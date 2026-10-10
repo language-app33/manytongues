@@ -3440,7 +3440,9 @@ function reportLearning(account: User | null) {
  * A question that can no longer be asked becomes another way of asking about
  * the same card, preferring one that is not already queued for it. A card
  * that has nothing else to offer — a recording and a spelling, no English —
- * drops out of the rest of the session; there is genuinely nothing to ask.
+ * has nothing to ask of it, so one of the session's backups stands in and
+ * the count at the top does not move. Only once those have run out does the
+ * session get shorter.
  *
  * "Can no longer be asked" is `openTypes` and not a rule of its own, which is
  * what lets one walk serve every reason a question can go away while a
@@ -3451,7 +3453,18 @@ function reportLearning(account: User | null) {
  * only skip. Asking the same door every builder asks means a reason handled
  * anywhere is handled here.
  */
-export function requeueUnaskable(exercises: Question[], from: number, items: Item[], settings: Settings): Question[] {
+export function requeueUnaskable(
+  exercises: Question[],
+  from: number,
+  items: Item[],
+  settings: Settings,
+  /* The session's backups. A question whose card has nothing else to offer
+     is replaced by the first of these that can still be asked, rather than
+     dropped, so the session keeps its length; only when they have run out
+     does it get shorter. Which were used is told by identity: a backup
+     taken is in the list returned, the same object. */
+  backups: Question[] = []
+): Question[] {
   const keyOf = (ex: Question) => `${ex.id}\u0000${ex.subId || ""}`;
   const used: Map<string, Set<string>> = new Map();
   const note = (ex: Question, type: string) => {
@@ -3466,11 +3479,28 @@ export function requeueUnaskable(exercises: Question[], from: number, items: Ite
 
   const tail: Question[] = [];
   let swapped = false;
+  const spare = backups.slice();
+  /* In place of a question there is nothing left to ask of: the first
+     backup that can still be asked, or nothing once they have run out. */
+  const standIn = () => {
+    while (spare.length) {
+      const b = spare.shift() as Question;
+      const r = resolveUnit(items, b);
+      if (r && askableTypes(r.unit, settings).includes(b.type)) {
+        tail.push(b);
+        swapped = true;
+        return;
+      }
+    }
+  };
   for (const ex of exercises.slice(from)) {
     const resolved = resolveUnit(items, ex);
     /* A card that has gone from under the queue — withdrawn mid-session —
        takes its questions with it. */
-    if (!resolved) continue;
+    if (!resolved) {
+      standIn();
+      continue;
+    }
     /* Asked of the gate rather than of the clock or the connection, so this
        answers the same way whenever it is called — including from a test.
 
@@ -3496,7 +3526,10 @@ export function requeueUnaskable(exercises: Question[], from: number, items: Ite
     const options = open.filter(
       (t) => !isListening(t) && !isGrid(t) && !(ex.within === "numbers" && borrowsPhrase(t))
     );
-    if (!options.length) continue;
+    if (!options.length) {
+      standIn();
+      continue;
+    }
     const seen = used.get(keyOf(ex)) || new Set();
     const pick = options.find((t) => !seen.has(t)) || options[0];
     note(ex, pick);
@@ -4043,6 +4076,38 @@ interface Session {
   /* New cards are waiting while the learner catches up on overdue reviews
      — see isBehind in session-mix.ts — and the screen says so. */
   catchingUp?: boolean;
+  /* Questions held back to stand in for one that can no longer be asked —
+     no sound, no connection — where its card has no other way to be asked,
+     so the session keeps its length. Never listening, so the reasons that
+     take a question away do not take its stand-in too. See backupsFor. */
+  backups?: Question[];
+  /* Answers got wrong so far. Each one put its question back at the end of
+     the queue, so the count at the top takes them off both sides: a miss
+     is a question not yet answered, not a question more. */
+  missed?: number;
+}
+
+/* A running session with its queue re-planned by requeueUnaskable, and the
+   backups that went into it taken off the ones still held. */
+function withQueue<S extends Session>(s: S, next: Question[]): S {
+  const backups = (s.backups || []).filter((b) => !next.includes(b));
+  return { ...s, exercises: next, backups };
+}
+
+/**
+ * What the count at the top of a session says, standing on question `qi`.
+ *
+ * A miss puts its question back at the end of the queue, which made the
+ * total go up by one on every wrong answer. It is the same question, not a
+ * new one, so the misses come off both sides: the total stays what the
+ * session started with, and the number in front of it moves only on a
+ * question got right. `done` is how many are answered, for the bar.
+ */
+export function sessionCount(s: Pick<Session, "exercises" | "missed">, qi: number) {
+  const missed = s.missed || 0;
+  const total = Math.max(0, s.exercises.length - missed);
+  const done = Math.min(total, Math.max(0, qi - missed));
+  return { at: Math.min(total, done + 1), total, done };
 }
 
 /*
@@ -4561,8 +4626,10 @@ export function buildSession({
     if (at >= 0) cut = Math.max(cut, at + 1);
   }
 
+  const exercises = withReadThroughs(questions.slice(0, cut), items, settings);
   return {
-    exercises: withReadThroughs(questions.slice(0, cut), items, settings),
+    exercises,
+    backups: backupsFor(rows, exercises, settings, typesOf, onlyNumbers),
     reason: null,
     items: dealtIds.size,
     units: plans.length,
@@ -4712,6 +4779,54 @@ function withReadThroughs(list: any[], items: Item[], settings: Settings) {
       if (sceneUnmet(card, settings)) out.push({ id: card.id, subId: null, type: "dlgread" });
     }
     out.push(ex);
+  }
+  return out;
+}
+
+/*
+ * A session's backups: questions held back to stand in for one that has to
+ * go mid-session — no sound, no connection — on a card with no other way to
+ * be asked, so the count at the top keeps its length. See requeueUnaskable.
+ *
+ * One question each from the pool's cards that the session did not take, in
+ * the order the pool was ranked, up to one per question dealt. Only cards
+ * already met: the mix decided which new cards came in, and a backup is not
+ * a side door past it. Never a listening question, which is what the commonest
+ * reasons for a question going would take away again; never a grid, which is
+ * dealt with partners; and never a scene or a number range, which need a
+ * read-through or a number drawn and are asked as part of a session, not
+ * dropped into one.
+ */
+function backupsFor(
+  rows: { card: { it: Item; units: Unit[] }; standing: string }[],
+  dealt: Question[],
+  settings: Settings,
+  typesOf: (unit: Form) => string[],
+  onlyNumbers: boolean
+): Question[] {
+  const taken = new Set(dealt.map((q) => q.id));
+  const out: Question[] = [];
+  for (const { card, standing } of rows) {
+    if (out.length >= dealt.length) break;
+    const { it } = card;
+    if (standing === "new" || taken.has(it.id) || isDialog(it) || it.range) continue;
+    for (const { unit, isSub } of card.units) {
+      if (unit.countedAt) continue;
+      const own = typesOf(unit);
+      const type = pickableTypes(unit, settings).find(
+        (t) => own.includes(t) && !isListening(t) && !isGrid(t) && (!onlyNumbers || !borrowsPhrase(t))
+      );
+      if (!type) continue;
+      const ctx = onlyNumbers ? null : pickContext(unit, type);
+      out.push({
+        id: it.id,
+        subId: isSub ? unit.id : null,
+        type,
+        ...(ctx ? { ctx: ctx.id } : null),
+        ...(onlyNumbers ? { within: "numbers" as const } : null),
+      });
+      break;
+    }
   }
   return out;
 }
@@ -11081,10 +11196,11 @@ export default function ArabicTrainer() {
    */
   useEffect(() => {
     if (!session || !session.exercises) return;
-    const next = requeueUnaskable(session.exercises, qi, items, settings);
-    /* Nothing went: the common case, and it must not churn the session
-       object or the question on screen. */
-    if (next.length === session.exercises.length) return;
+    const next = requeueUnaskable(session.exercises, qi, items, settings, session.backups);
+    /* Nothing changed: the common case, and it must not churn the session
+       object or the question on screen. Asked question by question, since a
+       swap or a backup standing in keeps the length the same. */
+    if (next.length === session.exercises.length && next.every((q, i) => q === session.exercises[i])) return;
     if (next.length <= qi) {
       /* Everything left needed something this device cannot do. Ending here
          is honest, the way the quiet button ends it. */
@@ -11093,7 +11209,7 @@ export default function ArabicTrainer() {
       flash("Nothing left in this session that works offline");
       return;
     }
-    setSession((s: Session | null) => (s ? { ...s, exercises: next } : s));
+    setSession((s: Session | null) => (s ? withQueue(s, next) : s));
     /* The question at this index may be a different one now. */
     resetExercise();
   /* The two facts that change the answer, and nothing else: re-running this
@@ -11112,7 +11228,7 @@ export default function ArabicTrainer() {
     setListenOff(until);
     saveListenOff(until);
 
-    const next = session ? requeueUnaskable(session.exercises, qi, items, settings) : [];
+    const next = session ? requeueUnaskable(session.exercises, qi, items, settings, session.backups) : [];
     if (next.length <= qi) {
       /* Every card left needs sound. Ending here is honest — running the
          queue out would show "Session complete" over a session that was
@@ -11122,7 +11238,7 @@ export default function ArabicTrainer() {
       flash("Nothing left in this session that works without sound");
       return;
     }
-    setSession((s: Session | null) => (s ? { ...s, exercises: next } : s));
+    setSession((s: Session | null) => (s ? withQueue(s, next) : s));
     /* The question at this index is a different one now, so nothing typed
        against the old one should survive. */
     resetExercise();
@@ -11499,12 +11615,14 @@ export default function ArabicTrainer() {
       setSession((s2: any) => ({
         ...s2,
         exercises: requeueMissed(s2.exercises, qi + 1, exercise),
+        missed: (s2.missed || 0) + 1,
       }));
     }
     setQi((i) => i + 1);
     resetExercise();
-    // The last card of a session earns a different feel from the rest.
-    if (session && qi + 1 >= session.exercises.length) sfx("complete");
+    // The last card of a session earns a different feel from the rest — and
+    // a miss on it is not the last, since it comes straight back.
+    if (session && correct && qi + 1 >= session.exercises.length) sfx("complete");
     else sfx("tick");
   }
 
@@ -12180,14 +12298,21 @@ export default function ArabicTrainer() {
                           pausedAt={session.pausedAt || 0}
                         />
                       ) : (
-                        <>
-                          <span className="at-count" data-el="session-count">
-                            {`${qi + 1} / ${session.exercises.length}`}
-                          </span>
-                          <div className="at-progress" data-el="session-progress">
-                            <i style={{ width: `${(qi / session.exercises.length) * 100}%` }} />
-                          </div>
-                        </>
+                        (() => {
+                          /* A miss is a question not yet answered, not a
+                             question more — see sessionCount. */
+                          const count = sessionCount(session, qi);
+                          return (
+                            <>
+                              <span className="at-count" data-el="session-count">
+                                {`${count.at} / ${count.total}`}
+                              </span>
+                              <div className="at-progress" data-el="session-progress">
+                                <i style={{ width: `${count.total ? (count.done / count.total) * 100 : 0}%` }} />
+                              </div>
+                            </>
+                          );
+                        })()
                       )}
                       {/* Only a clock can be paused: a counted session
                           already waits for as long as you take. */}

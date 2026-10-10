@@ -5958,3 +5958,30 @@ being asked a number built on a word they did not know.
 number line from day one) and opening on recognised words alone (still
 all-or-nothing) were offered; the owner chose this one.
 
+
+## The count at the top of a session holds its length (0.417)
+
+**What was wrong.** A wrong answer puts its question back at the end of the
+queue (requeueMissed), and the count read `qi + 1 / exercises.length`, so
+every miss added one to the total. And when sound or the connection went,
+requeueUnaskable dropped any question whose card had no other way to be
+asked, so the total shrank too.
+
+**What changed.** The session carries `missed`, bumped beside each requeue,
+and the count (sessionCount) takes it off both sides: the total is the
+length the session started with, and the number moves only on a question
+got right. buildSession now also deals `backups`: one question each from
+the pool's met cards it did not take, never listening, a grid, a scene or
+a number range, up to one per question. requeueUnaskable puts the first
+backup that can still be asked in place of a question it would have
+dropped; the session keeps the ones not yet used. Same-card swaps still
+come first. Only once the backups run out does the session get shorter.
+
+**Also.** The offline re-check compared lengths alone to decide nothing
+had changed, which skipped same-length swaps; it now compares question by
+question. A miss on the last question no longer plays the end-of-session
+sound, since the question comes straight back.
+
+**Choices the owner made.** A connection dropping is handled the same as
+"can't listen right now"; the button's own note stays; with no backups
+left, the session gets shorter rather than ending.

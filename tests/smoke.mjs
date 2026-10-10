@@ -1119,15 +1119,25 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
      second exercise on the bottom level — so this is a step or two, not
      a session. */
   let typedField = null;
+  /* And each of those steps is a miss, which puts its question back on the
+     end of the queue: the count at the top is not to move for it. */
+  const countNow = () => ((document.querySelector('[data-el="session-count"]') || {}).textContent || "").trim();
+  let countHeld = null;
   for (let i = 0; i < 12 && !typedField; i++) {
     typedField = document.querySelector('[data-el="answer-input"]');
     if (typedField) break;
+    const before = countNow();
     /* A grid has no "I don't know": it is paired and checked instead. */
-    if (document.querySelector('[data-el="answer-match"]')) await playGrid();
+    const grid = !!document.querySelector('[data-el="answer-match"]');
+    if (grid) await playGrid();
     else click(buttonNamed(/^I don't know$/));
     await sleep(150);
     click(buttonNamed(/Continue|Next/));
     await sleep(250);
+    if (!grid && countHeld === null && /^\d+ \/ \d+$/.test(before) && document.querySelector(".at-instruction")) {
+      countHeld = `${before} → ${countNow()}`;
+      check("a wrong answer leaves the count at the top as it was", countNow() === before, countHeld);
+    }
   }
   check("a question that is typed into was reached", !!typedField,
     (document.body.textContent || "").slice(0, 90));
@@ -3203,6 +3213,16 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   setAudibleClips(null);
   check("and a card that can only be listened to drops out once it cannot be heard",
     dropped.length === 0, JSON.stringify(dropped));
+
+  /* Unless the session holds a backup, which stands in so its length holds. */
+  setOfflineNow(true);
+  setAudibleClips(new Set());
+  const backup = { id: card1.id, subId: null, type: "ar2en" };
+  const covered = requeueUnaskable(soundQueue, 0, withSound, set, [backup]);
+  setOfflineNow(false);
+  setAudibleClips(null);
+  check("a backup stands in for a card that can only be listened to",
+    covered.length === 1 && covered[0] === backup, JSON.stringify(covered));
 
   /* Nothing to do when there is nothing to listen to. */
   const untouched = requeueUnaskable(queue.filter((e) => e.type === "ar2en"), 0, stored2.items, set);

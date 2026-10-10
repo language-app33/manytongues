@@ -8,6 +8,29 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.417 — 10 October 2026
+
+**The number of questions at the top of a session stays the same.**
+
+- Getting a question wrong used to add one to the total at the top of the
+  session ("4 / 11" after a miss on the third of ten). The missed question
+  still comes back at the end, but it no longer counts as a question more:
+  it counts as not yet answered. The total stays at ten, and the first
+  number and the bar under it move only when a question is got right.
+- A question missed twice still counts once, whenever it is finally got
+  right.
+- Pressing "can't listen right now", or losing the connection, used to
+  drop questions that could only be heard and make the session shorter.
+  Each session now has a few backup questions to hand, from words already
+  met, and these stand in quietly. The note saying listening is off for
+  15 minutes still shows.
+- Only if the backups run out, which should be rare (a small deck that is
+  almost all listening), does the session get shorter, as before.
+- To check by hand: in a ten-question session, answer one wrong and see
+  the count stay on the same number and the total stay at 10; then press
+  "can't listen right now" during a session with listening questions and
+  see the total stay the same.
+
 ## 0.416 — 10 October 2026
 
 **Higher numbers open once most of the numbers below are known, not all of them.**
