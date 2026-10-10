@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.417 — 10 October 2026
+
+**The language picker shows just the number of cards under each language.**
+
+- Each language in the picker now says only how many cards it has. The
+  extra notes — how many are ready, or "the only one on" when it is the
+  last language switched on — are gone.
+- The last language switched on still can't be switched off; tapping it
+  simply leaves it on.
+- To check by hand: open the language picker with two or more languages and
+  switch all but one off; every language shows only its card count.
+
 ## 0.416 — 10 October 2026
 
 **Higher numbers open once most of the numbers below are known, not all of them.**
