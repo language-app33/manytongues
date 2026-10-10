@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.417 — 10 October 2026
+## 0.418 — 10 October 2026
 
 **Questions say less twice, and the card editor flags forms nobody can tell apart.**
 
@@ -45,6 +45,22 @@ From eleven reports sent in from the answer screen.
   you?" card in the editor and look for the note under the forms. Then
   answer a "Tired" question in the script and confirm "feminine" appears
   once, under the question.
+
+## 0.417 — 10 October 2026
+
+**Reports from students are read in the admin space only.**
+
+- An admin who also teaches no longer sees "reports from students" at the
+  top of their cards, and the flag button beside the card search is gone.
+  The teaching space now says nothing about reports, for anyone.
+- Reports are still all there, unchanged, under Flags in the admin space,
+  where they can be opened, copied and deleted as before.
+- Trade-off: the reports screen in the teaching space was the one place a
+  reported sentence could be struck in a single tap. That shortcut went
+  with it; a sentence is now struck from the card's own review instead.
+- To check by hand: sign in as an admin who teaches, with a report waiting.
+  The teaching space shows no notice and no flag button; the admin space's
+  Flags tab lists the report.
 
 ## 0.416 — 10 October 2026
 
