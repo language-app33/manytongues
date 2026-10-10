@@ -76,7 +76,7 @@ test("asked what صَبِر means, the other card is the one ruled out", () => {
   installIndexes([cactus, patience, book], settings);
   const sibs = siblingsAsked(cactus, lead(cactus), EX.ar2en, settings);
   assert.deepEqual(sibs.map((/** @type {any} */ s) => s.card.id), ["patience"]);
-  assert.equal(clueFor(cactus, sibs, "en"), "not patience");
+  assert.equal(clueFor(cactus, sibs, "en"), "More than one meaning — not patience");
   assert.equal(clueFor({ ...cactus, clue: "the plant" }, sibs, "en"), "the plant");
   /* Written from its meaning, nothing is unclear: "cactus" is one card. */
   assert.deepEqual(siblingsAsked(cactus, lead(cactus), EX.en2ar, settings), []);
@@ -88,5 +88,5 @@ test("asked to write 'right', the other word for it is the one ruled out", () =>
   installIndexes([sahh, yamin, book], settings);
   const sibs = siblingsAsked(yamin, lead(yamin), EX.en2ar, settings);
   assert.deepEqual(sibs.map((/** @type {any} */ s) => s.card.id), ["sahh"]);
-  assert.equal(clueFor(yamin, sibs, "ar"), "not صح");
+  assert.equal(clueFor(yamin, sibs, "ar"), "More than one word for this — not صح");
 });

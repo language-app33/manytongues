@@ -18,6 +18,7 @@ import {
   labelFor,
   answerLabel,
   askLabel,
+  untoldMeanings,
   lentLabel,
   formLabel,
   normDimValue,
@@ -239,7 +240,7 @@ test("a word lent to a sentence is named only where its English is shared", () =
   const cell = (/** @type {string} */ col, /** @type {string} */ word) =>
     ({ id: `u-${col}`, ar: word, en: "You understand", lat: "", row: "present", col });
   const verb = { id: "u", ar: "", en: "", category: "verb", subs: [cell("you-m", "بتِفهَم"), cell("you-f", "بتِفهَمي")] };
-  assert.equal(lentLabel(verb.subs[1], verb, ar), "you (feminine)");
+  assert.equal(lentLabel(verb.subs[1], verb, ar), "feminine", "the you is in the English already");
 });
 
 test("dimValues carries every declared field, including a Vietnamese classifier", () => {
@@ -1196,8 +1197,15 @@ test("a verb's cells that read alike in English say who, and when, in whole word
   const card = { id: "u", ar: "", en: "", name: "to understand", category: "verb",
     subs: [cell("present", "you-m", "بتِفهَم"), cell("present", "you-f", "بتِفهَمي"),
       cell("present", "he", "بيِفهَم", "He understands")] };
-  assert.equal(askLabel(card.subs[1], card, ar), "you (feminine)");
-  assert.equal(askLabel(card.subs[0], card, ar), "you (masculine)");
+  /* The *you* is the English's first word, so only what it leaves open is
+     said: "you (feminine)" under "You understand" was reported as saying
+     it twice. */
+  assert.equal(askLabel(card.subs[1], card, ar), "feminine");
+  assert.equal(askLabel(card.subs[0], card, ar), "masculine");
+  /* An English without the pronoun keeps the person whole. */
+  const bare = { ...card, subs: [cell("present", "you-m", "بتِفهَم", "understand"),
+    cell("present", "you-f", "بتِفهَمي", "understand")] };
+  assert.equal(askLabel(bare.subs[1], bare, ar), "you (feminine)");
   /* A cell whose English is its own still names nothing. */
   assert.equal(askLabel(card.subs[2], card, ar), "");
   const said = { ...card, subs: [cell("present", "you-m", "بتِفهَم", "you (m) understand"),
@@ -1315,9 +1323,29 @@ test("a person noted for gender and number is spelt out in full", () => {
     ({ id: `e-${col}`, ar: word, en: "You eat", lat: "", row: "present", col });
   const card = { id: "e", ar: "", en: "", name: "to eat", category: "verb",
     subs: [cell("you-pl", "אוכלים"), cell("you-pl-f", "אוכלות")] };
-  assert.equal(askLabel(card.subs[1], card, he), "you (feminine plural)");
-  assert.equal(askLabel(card.subs[0], card, he), "you (masculine plural)");
+  assert.equal(askLabel(card.subs[1], card, he), "feminine plural", "the you is in the English already");
+  assert.equal(askLabel(card.subs[0], card, he), "masculine plural");
   /* And an English answer is right without the note, or with it. */
   assert.ok(checkEn("you eat", "you (f pl) eat").ok);
   assert.ok(checkEn("you (f pl) eat", "you eat").ok);
+});
+
+test("the editor names the meanings two forms share with nothing to tell them apart", () => {
+  /* Reported by a learner: مِش منيح and مِش منيحة, both "Not good", and
+     the question never said which gender it wanted. */
+  const ar = LANGUAGES["ar-PS"];
+  const notGood = { id: "k", forms: [{ id: "k", ar: "مِش منيح", en: "Not good" }, { id: "k-f2", ar: "مِش منيحة", en: "Not good" }] };
+  assert.deepEqual(untoldMeanings(notGood, ar), ["Not good"]);
+  /* Marked, each is asked for by name: nothing to say. */
+  const told = { id: "k", forms: [{ ...notGood.forms[0], gender: "masculine" }, { ...notGood.forms[1], gender: "feminine" }] };
+  assert.deepEqual(untoldMeanings(told, ar), []);
+  /* Three forms of "And you?", listed once. */
+  const you = { id: "y", forms: ["وانتَ؟", "وانتِ؟", "وانتو؟"].map((w, i) => ({ id: `y${i}`, ar: w, en: "And you?" })) };
+  assert.deepEqual(untoldMeanings(you, ar), ["And you?"]);
+  /* One meaning among several is enough to share; a meaning of its own is not. */
+  const brothers = { id: "b", forms: [{ id: "b", ar: "أَخ", en: "Brother" }, { id: "b2", ar: "إخوة", en: "Brothers / Siblings" }] };
+  assert.deepEqual(untoldMeanings(brothers, ar), []);
+  /* Spelt alike, whichever is written is right. */
+  const alike = { id: "a", forms: [{ id: "a", ar: "ساكن", en: "live" }, { id: "a2", ar: "ساكن", en: "live" }] };
+  assert.deepEqual(untoldMeanings(alike, ar), []);
 });

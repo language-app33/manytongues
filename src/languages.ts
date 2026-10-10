@@ -1481,9 +1481,26 @@ function cellWhereUnsaid(unit: Record<string, any>, card: unknown, lang: Lang): 
   }
   if (picked.includes("col")) {
     const person = personsOf(spec).find((p) => p.id === colOf(unit));
-    if (person) bits.push(spelledPerson(person.label || person.id));
+    if (person) bits.push(unsaidOfPerson(spelledPerson(person.label || person.id), en));
   }
   return bits.join(" · ");
+}
+
+/*
+ * The part of a person's name the English has not already said.
+ *
+ * "You work", asked of the feminine, was tagged "you (feminine)": the
+ * *you* is the first word of the question, and a learner reported it as
+ * saying it twice. So where the English already holds the person's
+ * pronoun, only what is in its brackets is left — "feminine", "plural".
+ * A person with nothing in brackets, or whose pronoun the English does
+ * not use, keeps its whole name.
+ */
+export function unsaidOfPerson(label: string, en: string): string {
+  const m = /^\s*([^()]+?)\s*\(([^)]+)\)\s*$/.exec(label);
+  if (!m) return label;
+  const words = normEn(en).split(/\s+/);
+  return words.includes(normEn(m[1])) ? m[2].trim() : label;
 }
 
 /**
@@ -1508,6 +1525,41 @@ export function askLabel(
      masculine, which only the card can say — see formLabel. */
   if (!card || labelFor(unit, lang)) return "";
   return formLabel(unit, card, lang);
+}
+
+/**
+ * The meanings two forms of a card share with nothing to tell them apart.
+ *
+ * مِش منيح and مِش منيحة, both "Not good", with neither marked masculine
+ * or feminine: a question asking for "Not good" in the script has no way
+ * to say which it wants, so it takes either — and a learner reported that
+ * the question never said which gender it meant. وانتَ، وانتِ، وانتو, all
+ * "And you?", the same. The app cannot know which is which; only the
+ * teacher can, so the editor says so while the card is open, in the words
+ * of the meaning they share.
+ *
+ * A meaning is listed where two forms that are spelt differently share it
+ * and one of them has nothing askLabel can name it by. Forms spelt alike
+ * are left alone: whichever is written is right. So are a verb's cells,
+ * which are named by their place in the table.
+ */
+export function untoldMeanings(card: unknown, lang: Lang = activeLang()): string[] {
+  const forms = ([leadOf(card)].concat(subFormsOf(card)) as Record<string, any>[])
+    .filter((f) => f && !isCell(f) && String(f.ar || "").trim() && String(f.en || "").trim());
+  const meanings = (f: Record<string, any>) =>
+    String(f.en || "").split(/[/;]/).map((m) => m.trim()).filter((m) => normEn(m));
+  const out: string[] = [];
+  forms.forEach((f, i) => {
+    for (const m of meanings(f)) {
+      const key = normEn(m);
+      if (out.some((o) => normEn(o) === key)) continue;
+      const sharing = forms.filter((g, j) => j !== i && meanings(g).some((x) => normEn(x) === key)
+        && String(g.ar).trim() !== String(f.ar).trim());
+      if (!sharing.length) continue;
+      if ([f].concat(sharing).some((g) => !askLabel(g, card, lang))) out.push(m);
+    }
+  });
+  return out;
 }
 
 /**

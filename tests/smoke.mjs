@@ -3738,6 +3738,7 @@ const rightTile = (tiles, shown) => {
   let grid = false;
   let sawWhereItTurnedUp = 0;
   let sawOnAPlainQuestion = false;
+  let sawUnderAGap = false;
   /* The two that put four whole cards up and ask which one: the meanings
      of the word on screen, and the word a meaning belongs to. What is
      checked of each is that its tiles are drawn from the right side of the
@@ -3863,6 +3864,7 @@ const rightTile = (tiles, shown) => {
         sawWhereItTurnedUp += 1;
         if (!contextQuestion) sawOnAPlainQuestion = true;
       }
+      if (where && gapped) sawUnderAGap = true;
     }
     click(buttonNamed(/^Continue$/));
     await sleep(200);
@@ -3963,6 +3965,10 @@ const rightTile = (tiles, shown) => {
     sawOnAPlainQuestion
       ? "which is the thing that changed: the link pays out everywhere now"
       : "it only paid out on the questions built from it");
+  /* But not under the gap itself, whose phrase is still at the top of the
+     screen: a learner reported it as the prompt shown again. */
+  check("and not after a gap question, whose phrase is still on the screen",
+    !sawUnderAGap, sawUnderAGap ? "the phrase was shown twice" : "shown once, at the top");
 }
 
 /* ---- a frame remembers which of its names it has been met with ----
@@ -7645,11 +7651,12 @@ const openPronounTables = async () => {
     click(document.querySelector('[data-el="check-button"]'));
     await sleep(250);
   }
-  /* And the answer says it again, which is where it is said on every
-     question about a card with more than one form — see formTagsAt. */
-  const answerTag = ((document.querySelector('[data-el="answer-form-tag"]') || {}).textContent || "")
-    .replace(/\s+/g, " ").trim();
-  check("and the answer names the form too", /^masculine\b/.test(answerTag), answerTag || "(nothing said)");
+  /* And the answer does not say it again: the tag under the prompt is
+     still on the screen, and saying it twice was reported as crowding it
+     — see formTagsAt. */
+  check("and the answer leaves the form to the tag still under the prompt",
+    !document.querySelector('[data-el="answer-form-tag"]') && /^masculine\b/.test(tag()),
+    tag() || "(nothing said)");
   click(buttonNamed(/^Continue$/));
   await sleep(700);
 

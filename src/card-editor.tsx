@@ -38,6 +38,7 @@ import {
   BARE_ROW,
   endRowsOf,
   saysAboutPersons,
+  untoldMeanings,
 } from "./languages.ts";
 import { CONVERSATION, MAX_SPEAKERS, TEXT, isDialog, isText, namedPart, pickedFrom, pickedLine, proseOf, sceneKindOf, sideOf } from "./dialogs.ts";
 import type { SceneKind } from "./dialogs.ts";
@@ -7283,10 +7284,25 @@ function PronounTable({ word, lang, index: i, form: f }: {
   );
 }
 
-function AddFormButton({ word }: { word: WordDraft }) {
+function AddFormButton({ word, lang }: { word: WordDraft; lang: Lang }) {
   const { addForm } = word;
+  /* Forms sharing a meaning with nothing to say which is which — see
+     untoldMeanings. Said here, under the forms, because the fix is on
+     them: a gender or a number on each. */
+  const untold = useMemo(
+    () => untoldMeanings({ forms: word.forms }, lang),
+    [word.forms, lang],
+  );
   return (
     <>
+    {untold.length > 0 && (
+      <Help data-el="editor-untold-forms">
+        {untold.length === 1 ? `“${untold[0]}” is` : `${untold.map((m) => `“${m}”`).join(", ")} are`} the
+        meaning of more than one form here, and nothing says which form is which. A question
+        asking for it can't say which one it wants, so it accepts any of them. Mark each form
+        masculine, feminine or plural to have it asked for by name.
+      </Help>
+    )}
     {/* Not on a card whose forms are laid out in a table.
 
         A verb's forms are the table — and where the language cites
@@ -8825,7 +8841,7 @@ function WordEditor({ word, lang, allCards, selfId }: {
             role=""
           />
         ))}
-        <AddFormButton word={word} />
+        <AddFormButton word={word} lang={lang} />
       </FormsSection>
       <NothingAsked word={word} />
       <BlanksBlock word={word} lang={lang} />
@@ -8997,7 +9013,7 @@ function AttachedEditor({ word, lang, allCards, selfId }: {
             <PronounTable word={word} lang={lang} index={i} form={f} />
           </FormBlock>
         ))}
-        <AddFormButton word={word} />
+        <AddFormButton word={word} lang={lang} />
       </FormsSection>
       <NothingAsked word={word} />
       <BlanksBlock word={word} lang={lang} />
@@ -9676,7 +9692,7 @@ function MeaningsBlock({ lang, selfId, lead, allCards, clue, onClue, canAdd, onA
         <Help>
           Without a clue, a question that could mean either card names the other one instead
           {shared.word.length
-            ? ` — “not ${splitAlternatives(String(leadOf(shared.word[0]).en || "")).filter(Boolean)[0] || "…"}”`
+            ? ` — “More than one meaning — not ${splitAlternatives(String(leadOf(shared.word[0]).en || "")).filter(Boolean)[0] || "…"}”`
             : ""}
           .
         </Help>

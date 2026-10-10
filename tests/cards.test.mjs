@@ -943,14 +943,15 @@ test("and nothing is said where the question already settles it", () => {
 
 /*
  * Where the form is said: under the prompt only where the learner could
- * not otherwise know which is wanted, and beside the answer always.
+ * not otherwise know which is wanted, and beside the answer otherwise —
+ * never both, which a learner reported as crowding the screen.
  *
  * عندَك shown with "you · masculine" under it, and كلبة with "feminine",
  * were the grammar handed over with the word that already showed it — a
  * learner reported both, and asked for it with the answer instead. And
  * "Your name: plural" under اسمكم شمس was the English answer itself.
  */
-test("a form is named under the prompt only where it has to be, and always beside the answer", () => {
+test("a form is named under the prompt only where it has to be, and beside the answer otherwise", () => {
   const base = { label: "you · masculine", kin: 6, lent: false };
   /* Shown the word, or its transliteration: the answer says it, the
      question does not. */
@@ -962,10 +963,12 @@ test("a form is named under the prompt only where it has to be, and always besid
     );
   }
   /* Writing "You have" in the script, which three cells read alike: the
-     question must say which, or it has no one right answer. */
+     question must say which, or it has no one right answer. And having
+     said it there, the answer does not say it again — the prompt is still
+     on the screen, and a learner reported the second one as crowding it. */
   assert.deepEqual(
     formTagsAt({ ...base, ambiguous: true, promptField: "en" }),
-    { question: true, answer: true, lentQuestion: false, lentAnswer: false },
+    { question: true, answer: false, lentQuestion: false, lentAnswer: false },
   );
   /* A card with one form has nothing to tell apart, and a form with no
      grammar written on it has nothing to say. */
@@ -975,6 +978,7 @@ test("a form is named under the prompt only where it has to be, and always besid
      answered; never under اسمكم شمس, where it is the answer. */
   const lent = { label: "", kin: 0, ambiguous: false, lent: true };
   assert.equal(formTagsAt({ ...lent, promptField: "en" }).lentQuestion, true);
+  assert.equal(formTagsAt({ ...lent, promptField: "en" }).lentAnswer, false, "said once, under the prompt");
   assert.equal(formTagsAt({ ...lent, promptField: "ar" }).lentQuestion, false);
   assert.equal(formTagsAt({ ...lent, promptField: "ar" }).lentAnswer, true);
   /* Nothing on a grid or a scene, where every word is asked. */

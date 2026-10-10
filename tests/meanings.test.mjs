@@ -84,10 +84,10 @@ test("vowel marks tell words apart; spacing and end punctuation do not", () => {
 test("the clue is the teacher's when written, otherwise the other answers ruled out", () => {
   const index = siblingIndexOf([cactus, patience], langOf);
   const sibs = siblingsOf(index, cactus, unit(cactus), "word", "ar-PS");
-  assert.equal(clueFor(cactus, sibs, "en"), "not patience");
+  assert.equal(clueFor(cactus, sibs, "en"), "More than one meaning — not patience");
   assert.equal(clueFor({ ...cactus, clue: "the plant" }, sibs, "en"), "the plant");
   const meaningSibs = siblingsOf(siblingIndexOf([sahh, yamin], langOf), yamin, unit(yamin), "meaning", "ar-PS");
-  assert.equal(clueFor(yamin, meaningSibs, "ar"), "not صح");
+  assert.equal(clueFor(yamin, meaningSibs, "ar"), "More than one word for this — not صح");
 });
 
 test("a sibling answered the same way is no ambiguity", () => {
