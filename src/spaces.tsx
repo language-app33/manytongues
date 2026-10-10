@@ -75,7 +75,7 @@ import { needsReview, reviewStates, toReview } from "./review.ts";
 import { inPlayWith, langsToMakeIn, teachingChoices } from "./lang-choice.ts";
 import type { LangChoice } from "./lang-choice.ts";
 import type { ReviewState } from "./review.ts";
-import { ReportsScreen, ReviewLine, ReviewScreen } from "./review-sheet.tsx";
+import { ReviewLine, ReviewScreen } from "./review-sheet.tsx";
 import { composerFor, timeComposerFor } from "./numbers/index.ts";
 import { emptyNumberSystem, emptyTimeSystem, readNumberSystem, readTimeSystem } from "./numbers/schema.ts";
 import { fillerCards } from "./numbers/generate.ts";
@@ -4560,29 +4560,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      is not the same as no form at all. */
   const [newDeckName, setNewDeckName] = useState<string | null>(null);
   const [pickedCourses, setPickedCourses] = useState<string[]>([]);
-  /* The card whose sentences are being reviewed, and whether the reports
-     from students are open — both take over the screen, like the editor. */
+  /* The card whose sentences are being reviewed — it takes over the
+     screen, like the editor. Reports from students are not here at all:
+     they are read in the admin space alone, even by an admin who also
+     teaches, so this space neither shows nor announces them. */
   const [reviewing, setReviewing] = useState<Card | null>(null);
-  const [reportsOpen, setReportsOpen] = useState(false);
-  /* What students have reported, with the cards themselves — a card may
-     not be in the list above. An administrator's alone: a teacher is not
-     shown reports, and is not asked for them (see my-reports). */
-  const seesReports = !!account.admin;
-  const [reports, setReports] = useState<{ flags: Flag[]; cards: Card[] }>({ flags: [], cards: [] });
-  const loadReports = useCallback(async () => {
-    if (!seesReports) return;
-    try {
-      const r = await API.myReports();
-      setReports({ flags: r.flags || [], cards: r.cards || [] });
-    } catch (e) {
-      /* Reports are a side panel: a failure to read them leaves the rest
-         of the space exactly as it was, and the next look tries again. */
-    }
-  }, [seesReports]);
-  useEffect(() => {
-    void loadReports();
-  }, [loadReports]);
-
   /* As in AdminSpace: whether it worked, for the poll's own backoff. A
      partial answer counts as a failure for that purpose — something is
      wrong out there — while still putting on screen whatever did arrive. */
@@ -5563,13 +5545,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      Its sentences are worked out against every card this teacher holds,
      since what fills a blank is the whole collection. */
   if (reviewing) {
-    const fresh = cards.find((c) => c.id === reviewing.id) ||
-      reports.cards.find((c) => c.id === reviewing.id) || reviewing;
+    const fresh = cards.find((c) => c.id === reviewing.id) || reviewing;
     const pool = lendable.some((c) => c.id === fresh.id) ? lendable : lendable.concat([fresh]);
     const lang = langOfCard(fresh) || languages[soleLang];
     const took = (card: Card) => {
       setViewing((v) => (v && v.id === card.id ? { ...v, ...card } : v));
-      setReports((r) => ({ ...r, cards: r.cards.map((c) => (c.id === card.id ? { ...c, ...card } : c)) }));
     };
     return (
       <ReviewScreen
@@ -5605,47 +5585,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               setReviewing(frame);
             }
             snack(`Narrowed — ${plural(Math.max(0, changed.length - 1), "word")} tagged`, "good");
-          } finally {
-            setBusy(false);
-          }
-        }}
-      />
-    );
-  }
-
-  if (reportsOpen && seesReports) {
-    return (
-      <ReportsScreen
-        flags={reports.flags}
-        cards={reports.cards}
-        languages={languages}
-        busy={busy}
-        onClose={() => setReportsOpen(false)}
-        onReview={(card) => setReviewing(card)}
-        onStrike={async (flag, card) => {
-          if (!flag.sentence) return;
-          setBusy(true);
-          try {
-            const r = await API.reviewCard(card.id, { no: [flag.sentence] });
-            absorbSaved(r);
-            setReports((was) => ({
-              ...was,
-              cards: was.cards.map((c) => (c.id === r.card.id ? { ...c, ...r.card } : c)),
-            }));
-            snack("Sentence struck — no student sees it again", "good");
-          } catch (e) {
-            setError(API.explain(e));
-          } finally {
-            setBusy(false);
-          }
-        }}
-        onDismiss={async (flag) => {
-          setBusy(true);
-          try {
-            await API.dismissReports([flag.id]);
-            setReports((was) => ({ ...was, flags: was.flags.filter((f) => f.id !== flag.id) }));
-          } catch (e) {
-            setError(API.explain(e));
           } finally {
             setBusy(false);
           }
@@ -7032,15 +6971,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   }
                 />
               )}
-              {seesReports && reports.flags.length > 0 && (
-                <div className="at-reviewbanner">
-                  <span>{`${plural(reports.flags.length, "report")} from students.`}</span>
-                  <Button size="sm" onClick={() => { setReportsOpen(true); void loadReports(); }}>
-                    Read {reports.flags.length === 1 ? "it" : "them"}
-                  </Button>
-                </div>
-              )}
-
               <Help>
                 A card is one thing to learn — a word, a phrase, a sentence. Add it to a deck so students get it.
               </Help>
@@ -7061,16 +6991,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                    word is on the screen it opens. */
                 tools={
                   <>
-                    {seesReports && (
-                      <IconButton
-                        icon="flag"
-                        label="Reports from students"
-                        onClick={() => {
-                          setReportsOpen(true);
-                          void loadReports();
-                        }}
-                      />
-                    )}
                   {numberLangsOn.length || pronounLangsOn.length ? (
                     <>
                       {numberLangsOn.length ? (
