@@ -8,6 +8,44 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.417 — 10 October 2026
+
+**Questions say less twice, and the card editor flags forms nobody can tell apart.**
+
+From eleven reports sent in from the answer screen.
+
+- **Said once, not twice.** Where the question already says which form it
+  wants — "feminine" under "Tired" — the answer no longer repeats it
+  underneath. The tag under the question is still on screen. Where the
+  question doesn't say, the answer still does, as before.
+- **No repeated "you".** Under "you work", the tag now says only
+  "feminine" or "plural" rather than "you (feminine)", since the question
+  already says "you". A person the English doesn't mention is still named
+  in full.
+- **The gap question doesn't show its phrase again.** After "Which word is
+  missing?", "Learn more" no longer repeats the phrase under "Where it
+  turned up". The phrase and its meaning are still at the top of the
+  screen. Every other question still shows the phrase.
+- **Words with more than one meaning say so.** Where another of the
+  learner's cards shares the word, the hint under the question used to
+  read "not girl". It now reads "More than one meaning — not girl" (or
+  "More than one word for this — not …" the other way round). A clue the
+  teacher writes on the card still replaces it. A clue such as "the family
+  member" gives exactly the wording one learner asked for.
+- **Numbers asked in Arabic figures show the everyday digits too.** After
+  a question asked from ١٦, "Learn more" also shows "In Arabic numerals:
+  16".
+- **The card editor warns about forms it can't tell apart.** When two
+  forms of a card share a meaning ("Not good", "And you?") and nothing
+  marks them masculine, feminine or plural, a note under the forms says
+  so. Until they're marked, a question can't say which form it wants and
+  accepts any of them. Marking them makes the question ask for one by
+  name.
+- To check by hand: open the "Not good" (مِش منيح) card and the "And
+  you?" card in the editor and look for the note under the forms. Then
+  answer a "Tired" question in the script and confirm "feminine" appears
+  once, under the question.
+
 ## 0.416 — 10 October 2026
 
 **Higher numbers open once most of the numbers below are known, not all of them.**
