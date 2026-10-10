@@ -12965,8 +12965,16 @@ export default function ArabicTrainer() {
                             means. A gap question showed that meaning with
                             the gap; every other question held it back
                             until now, where it would have given the game
-                            away before. */}
-                        {(context || alsoContext) && (
+                            away before.
+
+                            Not under the gap question itself: its phrase
+                            and that meaning are still at the top of the
+                            screen, and the word that fills the gap is the
+                            answer right above this. A learner reported it
+                            as the prompt shown again. Heard rather than
+                            read, the phrase was never written out, so
+                            there it stays. */}
+                        {((context && spec.promptField !== "context") || alsoContext) && (
                           <div className="at-answeralso" data-el="also-context">
                             <p className="at-alsolabel" data-el="also-context-label">
                               Where it turned up
@@ -13003,6 +13011,22 @@ export default function ArabicTrainer() {
                               In {qLang.numeralsLabel || `${qLang.scriptLabel} figures`}
                             </p>
                             <Field value={item.numeral} field="numeral" name="also-figures-text" />
+                          </div>
+                        )}
+                        {/* And the other way round: asked from the
+                            language's own figures, the same number in the
+                            ones English uses — ١٦ is 16. The question
+                            showed only ١٦, and a learner reported wanting
+                            the 16 beside it once answered. Called what the
+                            exercises call them, "Arabic numerals". */}
+                        {spec.promptField === "numeral" &&
+                          item.numeral &&
+                          /[0-9]/.test(String(item.en || "")) && (
+                          <div className="at-answeralso" data-el="also-figures">
+                            <p className="at-alsolabel" data-el="also-figures-label">
+                              In Arabic numerals
+                            </p>
+                            <Field value={item.en} field="en" name="also-figures-text" />
                           </div>
                         )}
                         {/* The field the question never showed.
@@ -16234,9 +16258,15 @@ function readAlike(
  *
  * So the prompt names the form only where the learner could not otherwise
  * know which is wanted — writing "You have" in the script, where three
- * cells read the same in English. The answer names it on every question
- * about a card with more than one form, whatever the verdict, because
- * that is where a learner reported looking for it.
+ * cells read the same in English. The answer names it on every other
+ * question about a card with more than one form, whatever the verdict,
+ * because that is where a learner reported looking for it.
+ *
+ * Never both. The prompt stays on the screen once the question is
+ * answered, so a tag under it is still there to be read, and the same
+ * word again beside the answer was reported — three times in an evening —
+ * as saying twice what the question had already said, on a screen with
+ * little room to spare. The blanks of a sentence the same way.
  *
  * A sentence's blanks follow the same line. "Your name: plural" under
  * "Your name is Shams" is what makes the English answerable in the
@@ -16260,11 +16290,13 @@ export function formTagsAt({ label, ambiguous, kin, lent, promptField }: {
   promptField: string;
 }): { question: boolean; answer: boolean; lentQuestion: boolean; lentAnswer: boolean } {
   const none = promptField === "pairs" || promptField === "scene";
+  const question = !none && !!label && ambiguous;
+  const lentQuestion = !none && lent && !PROMPT_SHOWS_FORM.includes(promptField);
   return {
-    question: !none && !!label && ambiguous,
-    answer: !none && !!label && kin > 0,
-    lentQuestion: !none && lent && !PROMPT_SHOWS_FORM.includes(promptField),
-    lentAnswer: !none && lent,
+    question,
+    answer: !none && !!label && kin > 0 && !question,
+    lentQuestion,
+    lentAnswer: !none && lent && !lentQuestion,
   };
 }
 

@@ -5959,7 +5959,7 @@ number line from day one) and opening on recognised words alone (still
 all-or-nothing) were offered; the owner chose this one.
 
 
-## The count at the top of a session holds its length (0.418)
+## The count at the top of a session holds its length (0.419)
 
 **What was wrong.** A wrong answer puts its question back at the end of the
 queue (requeueMissed), and the count read `qi + 1 / exercises.length`, so
