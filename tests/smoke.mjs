@@ -1233,6 +1233,7 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
     }
 
     /* Now answer it, so the second half of the card can be looked at. */
+    const countBefore = countNow();
     click(buttonNamed(/^I don't know$/));
     await sleep(250);
     const answered = named();
@@ -1555,7 +1556,15 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
 
     click(buttonNamed(/Continue|Next/));
     await sleep(300);
+    /* That "I don't know" was a miss, and its question went back on the end
+       of the queue: the count at the top stays where it was. Checked here
+       when the walk above reached a typed question at once. */
+    if (countHeld === null && /^\d+ \/ \d+$/.test(countBefore) && document.querySelector(".at-instruction")) {
+      countHeld = `${countBefore} → ${countNow()}`;
+      check("a wrong answer leaves the count at the top as it was", countNow() === countBefore, countHeld);
+    }
   }
+  check("the count after a wrong answer was looked at", countHeld !== null, "no counted question was missed");
 
   /* The band of empty page above a question. 66px of the root's padding is
      room for the fixed chrome, and none of that chrome renders during an

@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.417 — 10 October 2026
+## 0.418 — 10 October 2026
 
 **The number of questions at the top of a session stays the same.**
 
@@ -30,6 +30,22 @@ and moves once per batch of work you would notice, not once per commit.
   the count stay on the same number and the total stay at 10; then press
   "can't listen right now" during a session with listening questions and
   see the total stay the same.
+
+## 0.417 — 10 October 2026
+
+**Reports from students are read in the admin space only.**
+
+- An admin who also teaches no longer sees "reports from students" at the
+  top of their cards, and the flag button beside the card search is gone.
+  The teaching space now says nothing about reports, for anyone.
+- Reports are still all there, unchanged, under Flags in the admin space,
+  where they can be opened, copied and deleted as before.
+- Trade-off: the reports screen in the teaching space was the one place a
+  reported sentence could be struck in a single tap. That shortcut went
+  with it; a sentence is now struck from the card's own review instead.
+- To check by hand: sign in as an admin who teaches, with a report waiting.
+  The teaching space shows no notice and no flag button; the admin space's
+  Flags tab lists the report.
 
 ## 0.416 — 10 October 2026
 
