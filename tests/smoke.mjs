@@ -2529,8 +2529,8 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
   check("the last language on cannot be switched off",
     !!arRow && arRow.getAttribute("aria-checked") === "true" && cardCount() === both - 1,
     `${arRow ? arRow.getAttribute("aria-checked") : "no row"}, ${cardCount()} cards`);
-  check("and the row says why rather than just refusing",
-    /the only one on/i.test((arRow || {}).textContent || ""),
+  check("and the row still says only how many cards it has",
+    /^\s*✓?\s*Palestinian Arabic\s*\d+ cards?\s*$/.test((arRow || {}).textContent || ""),
     ((arRow || {}).textContent || "").replace(/\s+/g, " "));
 
   /* And back on again, which is the state everything else expects. */
