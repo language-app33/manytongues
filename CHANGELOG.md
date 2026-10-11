@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.423 — 11 October 2026
+
+**Wrong answers come from the decks being practised.**
+
+- When a question asks you to choose the right meaning, word or picture,
+  the three wrong answers now come from the decks this session is
+  practising. Before, they could come from any deck you hold. In a Foods
+  session, "apple" could stand beside words from other topics, and you
+  could choose it just because it was the only food, without knowing the
+  Arabic. A learner reported exactly that.
+- The matching grids take their spare meanings the same way.
+- Where the decks being practised hold too few words of the right kind,
+  words from other decks still make up the four, as before.
+- A session over everything you hold works as it did.
+- The trade-off: in a small deck the same few wrong answers come round
+  more often.
+- To check by hand: practise one deck from the home screen, or a
+  catching-up session, and see that the wrong answers are from that deck.
+
 ## 0.422 — 11 October 2026
 
 **The buttons for another meaning say which word, and which language.**

@@ -4085,6 +4085,12 @@ interface Session {
      the queue, so the count at the top takes them off both sides: a miss
      is a question not yet answered, not a question more. */
   missed?: number;
+  /* The cards the session was dealt from — the deck chosen on the home
+     screen, a prep's decks, the cards picked by hand — where that is less
+     than everything held. A question's wrong answers come from these first:
+     a food among words from other decks is the one to choose by its topic.
+     Absent, every card held is as good as any other. */
+  from?: string[];
 }
 
 /* A running session with its queue re-planned by requeueUnaskable, and the
@@ -4627,6 +4633,7 @@ export function buildSession({
   }
 
   const exercises = withReadThroughs(questions.slice(0, cut), items, settings);
+  const from = items.filter(inDeck).map((it) => it.id);
   return {
     exercises,
     backups: backupsFor(rows, exercises, settings, typesOf, onlyNumbers),
@@ -4635,6 +4642,7 @@ export function buildSession({
     units: plans.length,
     due,
     ...(mix && mix.behind ? { catchingUp: true } : null),
+    ...(from.length < items.length ? { from } : null),
   };
 }
 
@@ -4988,7 +4996,11 @@ function gridOthers(type: string, u: Form): string[] {
   return (specOf(type)?.answerField || "en") === "en" ? meaningsOf(u) : [gridOther(type, u)];
 }
 
-export function gridFor(item: Form, exercise: Question, asking: Item[], settings: Settings, qLang: Lang) {
+/* `near` is the session's own forms, as for pickChoices: a spare meaning
+   from the decks being practised is one the learner has to read to rule
+   out, and one from another topic is not. They come first, the most alike
+   first among them, and the rest after. */
+export function gridFor(item: Form, exercise: Question, asking: Item[], settings: Settings, qLang: Lang, near?: (u: Form) => boolean) {
   /* The grid of recordings: a play button for each word, and the words
      themselves down the other side where the meanings would be. Its
      spare tiles are words, so they need no recording; every word asked
@@ -5035,7 +5047,7 @@ export function gridFor(item: Form, exercise: Question, asking: Item[], settings
     .map((u) => oneOf(u, exercise.type));
   const reps = (statesOf(item)[exercise.type] || {}).reps || 0;
   const likeness = (u: Form) => Math.max(...answers.map((a) => wordLikeness(a.ar, u.ar, qLang)));
-  const ranked = [...pool].sort((x, y) => likeness(y) - likeness(x));
+  const ranked = [...pool].sort((x, y) => (near ? Number(near(y)) - Number(near(x)) : 0) || likeness(y) - likeness(x));
   /* A question dealt no mates — a teacher trying the exercise on one
      card — is given its company from the pool, the most alike first, so
      the grid they see is the grid a learner gets. Nothing is marked on a
@@ -5098,6 +5110,7 @@ export function pickChoices({
   pool,
   seed,
   systems,
+  near,
 }: {
   item: Form;
   parentItem: Item | null | undefined;
@@ -5105,6 +5118,9 @@ export function pickChoices({
   pool: Form[];
   seed: string;
   systems: SystemSet[];
+  /** The forms of the cards the session was dealt from — see `from` on the
+      session. Wrong answers come from these first. */
+  near?: (w: Form) => boolean;
 }): Form[] {
   const field = picks === "meaning" ? "en" : "ar";
   const textOf = (w: Form) => String(w[field] || "");
@@ -5121,6 +5137,8 @@ export function pickChoices({
     wanted: PICK_OPTIONS,
     seed,
     textOf,
+    /* A made-up number is about the number asked, wherever its card is. */
+    near: near ? (w) => made.includes(w) || near(w) : undefined,
   });
 }
 
@@ -10696,6 +10714,22 @@ export default function ArabicTrainer() {
    * in the same language — a wrong answer has to be a word they could
    * believe, which means one they have actually met.
    */
+  /* The forms of the cards this session was dealt from, which a question's
+     wrong answers are drawn from first — see `from` on the session. Null
+     where the session draws on everything held. */
+  const sessionFrom: string[] | undefined = session ? session.from : undefined;
+  const nearForms = useMemo(() => {
+    if (!sessionFrom) return null;
+    const from = new Set(sessionFrom);
+    const ids = new Set<string>();
+    for (const card of asking) {
+      if (!from.has(card.id)) continue;
+      for (const { unit } of unitsOf(card)) ids.add(unit.id);
+    }
+    return ids;
+  }, [sessionFrom, asking]);
+  const near = nearForms ? (u: Form) => nearForms.has(u.id) : undefined;
+
   /*
    * The words a matching grid puts up, and the meanings beside them.
    *
@@ -10714,9 +10748,9 @@ export default function ArabicTrainer() {
     if (!item || !spec || !exercise || spec.picks !== "pair") {
       return { words: [] as Form[], meanings: [] as string[], said: [] as Form[] };
     }
-    return gridFor(item, exercise, asking, settings, qLang);
+    return gridFor(item, exercise, asking, settings, qLang, near);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item && item.id, exercise && exercise.type, exercise && exercise.mates, asking, qLang.id]);
+  }, [item && item.id, exercise && exercise.type, exercise && exercise.mates, asking, qLang.id, nearForms]);
 
   /*
    * What each tile of the grid says about itself, beside its word.
@@ -10847,6 +10881,7 @@ export default function ArabicTrainer() {
         wanted: PICK_OPTIONS,
         seed: `${item.id} picture ${reps}`,
         textOf: (w) => (Array.isArray(w.images) && w.images[0]) || "",
+        near,
       });
     }
     /* The meanings of the learner's other words, one meaning apiece: a
@@ -10864,6 +10899,7 @@ export default function ArabicTrainer() {
           .map((u) => oneOf(u, exercise ? exercise.type : "")),
         seed: `${item.id} meaning ${reps}`,
         systems,
+        near,
       });
     }
     return pickChoices({
@@ -10883,9 +10919,10 @@ export default function ArabicTrainer() {
         exercise && !exercise.ctx ? (statesOf(item)[exercise.type] || {}).reps || 0 : ""
       }`,
       systems,
+      near,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dialog && dialog.id, at, item && item.id, exercise && exercise.type, exercise && exercise.ctx, asking.length, siblingCards.join(" "), systems]);
+  }, [dialog && dialog.id, at, item && item.id, exercise && exercise.type, exercise && exercise.ctx, asking.length, siblingCards.join(" "), systems, nearForms]);
 
   /*
    * Whether the prompt has to say which form it wants.
