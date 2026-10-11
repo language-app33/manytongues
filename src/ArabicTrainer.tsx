@@ -12758,10 +12758,6 @@ export default function ArabicTrainer() {
                           field={spec.answerField === "en" ? "en" : spec.answerField === "numeral" ? "numeral" : "ar"}
                           heard={spec.tiles === "audio"}
                         />
-                        {/* A grid half done is not an answer, and a Check
-                            that sits dead without saying why is the button
-                            people tap twice and then give up on. */}
-                        {!checked && !typed && <Help>Pair them all, then check.</Help>}
                       </>
                     ) : spec.picks === "image" ? (
                       <PictureChoices

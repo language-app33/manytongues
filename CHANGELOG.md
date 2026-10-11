@@ -8,6 +8,13 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.427 — 11 October 2026
+
+**Matching exercises lose a repeated hint.**
+
+- The "Pair them all, then check." line under a matching grid is gone: the
+  instruction at the top of the exercise already says the same thing.
+
 ## 0.426 — 11 October 2026
 
 **A text can be a single sentence.**
