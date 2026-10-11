@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.419 — 10 October 2026
+## 0.420 — 11 October 2026
 
 **The number of questions at the top of a session stays the same.**
 
@@ -30,6 +30,18 @@ and moves once per batch of work you would notice, not once per commit.
   the count stay on the same number and the total stay at 10; then press
   "can't listen right now" during a session with listening questions and
   see the total stay the same.
+
+## 0.419 — 10 October 2026
+
+**The language picker shows just the number of cards under each language.**
+
+- Each language in the picker now says only how many cards it has. The
+  extra notes — how many are ready, or "the only one on" when it is the
+  last language switched on — are gone.
+- The last language switched on still can't be switched off; tapping it
+  simply leaves it on.
+- To check by hand: open the language picker with two or more languages and
+  switch all but one off; every language shows only its card count.
 
 ## 0.418 — 10 October 2026
 

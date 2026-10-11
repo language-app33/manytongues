@@ -18011,26 +18011,21 @@ function LanguageSwitch({ choices, off, onChange, note }: {
           <div className="at-cklist">
             {choices.map((c) => {
               const chosen = !off.includes(c.id);
-              const stuck = chosen && only;
               return (
                 <button
                   key={c.id}
                   className={`at-ck${chosen ? " on" : ""}`}
                   role="checkbox"
                   aria-checked={chosen}
-                  /* Not disabled: a button that cannot be pressed says
-                     nothing about why. It is pressable, it holds, and the
-                     line under it says so. */
+                  /* Not disabled: the last one on is pressable and simply
+                     holds. The line under each language is only its card
+                     count, whatever its state. */
                   onClick={() => toggle(c.id)}
                 >
                   <span className="at-ckbox">{chosen ? "✓" : ""}</span>
                   <span className="at-cktext">
                     <b>{c.name}</b>
-                    <i>
-                      {stuck
-                        ? "the only one on"
-                        : `${plural(c.total, "card")}${c.ready ? `, ${c.ready} ready` : ""}`}
-                    </i>
+                    <i>{plural(c.total, "card")}</i>
                   </span>
                 </button>
               );
