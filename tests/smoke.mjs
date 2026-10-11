@@ -6,7 +6,7 @@ import { JSDOM } from "jsdom";
 import { build } from "esbuild";
 import path from "node:path";
 import { must } from "./helpers.mjs";
-import { asMeaning } from "../src/variables.ts";
+import { asMeaning, fillNames } from "../src/variables.ts";
 
 /*
  * One generator, seeded, for the whole walk.
@@ -4736,6 +4736,46 @@ const openPronounTables = async () => {
   await sleep(250);
   click(cardsFrame.querySelector(".at-selectbtn"));
   await sleep(200);
+
+  /* ---- a group tag on several cards at once ----
+
+     A tag could only be put on a card from inside that card's editor, so
+     tagging a set of words meant opening each in turn. The selection
+     carries a tag now, made on the spot if it does not exist yet. */
+  takeSaves = true;
+  const savedBefore = savedCards.length;
+  click(cardsFrame.querySelector(".at-selectbtn"));
+  await sleep(200);
+  click(cardsFrame.querySelector(".at-ckbox.pick"));
+  await sleep(200);
+  check("the selection offers to add tags", clickNamed(/^Add tags$/),
+    [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-160));
+  await sleep(300);
+  const tagBox = /** @type {HTMLInputElement | null} */ (document.querySelector('input[aria-label="Name a new tag"]'));
+  check("and a tag can be made there", !!tagBox, "no box for a new tag");
+  if (tagBox) {
+    const setTag = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the input's value descriptor").set;
+    must(setTag, "the input's value setter").call(tagBox, "Smoke Colours");
+    tagBox.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(80);
+    clickNamed(/^Create$/);
+    await sleep(150);
+    const tagRow = [...document.querySelectorAll(".at-tickrow")].find((r) => /smokecolours/.test(r.textContent || ""));
+    check("made as a tag is named, and ticked", !!tagRow && !!tagRow.querySelector("input:checked"),
+      tagRow ? (tagRow.textContent || "") : "not listed");
+    const addBtns = [...document.querySelectorAll("button")].filter((b) => /^Add$/.test((b.textContent || "").trim()));
+    click(addBtns[addBtns.length - 1]);
+    await sleep(400);
+    const sent = savedCards.slice(savedBefore);
+    check("the selected card is saved carrying it",
+      sent.length === 1 && fillNames(sent[0]).includes("smokecolours"),
+      JSON.stringify(sent.map((c) => c.fills)));
+  }
+  takeSaves = false;
+  if (cardsFrame.querySelector(".at-ckbox.pick")) {
+    click(cardsFrame.querySelector(".at-selectbtn"));
+    await sleep(200);
+  }
 
   /* ---- and the report sees it ----
      A conversation keeps its words in its turns, so a report reading the

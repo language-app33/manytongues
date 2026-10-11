@@ -8,6 +8,30 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.421 — 11 October 2026
+
+**Tags can be put on, or taken off, many cards at once.**
+
+- Selecting cards — on the Cards tab or inside a deck — now offers "Add
+  tags" and "Remove tags" beside the deck actions. Before, a tag could
+  only be put on a card from inside that card, one card at a time.
+- "Add tags" lists the tags already in use, each saying how many of the
+  selected cards have it already. A new tag can be made right there and
+  is ticked straight away.
+- "Remove tags" lists only the tags the selected cards carry. Sentences
+  that have a blank for a tag keep the blank, as when a tag is taken off
+  from inside a card.
+- The same rules as inside a card: a sentence takes no tags, a card holds
+  at most twelve, and a new tag cannot have a card's ID or a kind of
+  word's name. Cards left out for either of the first two are counted in
+  the message that says what was done.
+- This works inside a locked deck too: the lock is on which cards are in
+  the deck, not on what the cards say.
+- To check by hand: select a few words, choose "Add tags", make a tag
+  and press Add; open one of the words and see the tag under Custom tags.
+  Then select them again, choose "Remove tags", tick it and press Take
+  off.
+
 ## 0.420 — 11 October 2026
 
 **The number of questions at the top of a session stays the same.**
