@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.426 — 11 October 2026
+
+**A text can be a single sentence.**
+
+- A text no longer has to have two sentences before it can be saved. A
+  name and one sentence are enough, and the second empty sentence box a
+  new text starts with can now be removed.
+- Everything a text is practised with works on one sentence: reading it
+  through, choosing and typing the missing word, and its meaning both
+  ways where it has English.
+- Conversations are unchanged: they still need two lines, because a
+  conversation of one line has no reply to practise.
+- To check by hand: make a new text, give it a name and write only the
+  first sentence. It should save, and practising it should ask for its
+  missing word.
+
 ## 0.425 — 11 October 2026
 
 **Practise what a text's sentences mean, where they have a translation.**

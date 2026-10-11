@@ -3884,9 +3884,12 @@ export const canSaveVerb = (
   );
 
 /* A conversation needs a name and two turns. One line with the reply
-   missing is a phrase card in the wrong editor. */
-export const canSaveScene = (title: string, written: unknown[]): boolean =>
-  !!title.trim() && written.length >= 2;
+   missing is a phrase card in the wrong editor. A text needs only one
+   sentence: nobody replies to prose, and everything a text is asked — the
+   whole of it read through, a word taken out, a sentence's meaning — is
+   asked of one sentence as well as of several. */
+export const canSaveScene = (title: string, written: unknown[], text = false): boolean =>
+  !!title.trim() && written.length >= (text ? 1 : 2);
 
 /* The turns that will be saved: the ones somebody has written. */
 export const writtenLines = <T extends { ar?: string }>(lines: T[]): T[] =>
@@ -5574,8 +5577,8 @@ export function useSceneDraft({ card, allCards = [] }: { card: Card | null; allC
     return side === null ? "" : ` side${side}`;
   };
 
-  const canSave = !!sceneKind && canSaveScene(title, written);
   const text = sceneKind === TEXT;
+  const canSave = !!sceneKind && canSaveScene(title, written, text);
 
   /* Whoever did not speak last — which is what a conversation does on its
      own. Nobody, in a text. */
@@ -6395,7 +6398,7 @@ function SceneBlock({ talk }: { talk: SceneDraft }) {
         <span className="at-formrole">{text ? "What it is and what it is about." : "What it is and who is in it."}</span>
       </div>
       <p className={`at-formneed${canSave ? "" : " unmet"}`}>
-        {sceneKind ? "A name, and two lines or more." : "A subtype, a name, and two lines or more."}
+        {text ? "A name, and one sentence or more." : sceneKind ? "A name, and two lines or more." : "A subtype, a name, and two lines or more."}
       </p>
 
       <Field label="What it is called">
@@ -6568,7 +6571,7 @@ function TurnBlock({ talk, lang, allCards, selfId, index: i, line: l }: {
           {text || you === null ? "" : (l.who || 0) === you ? "The student's turn." : "Said to them."}
         </span>
         <span className="at-formacts">
-          {lines.length > 2 && (
+          {lines.length > (text ? 1 : 2) && (
             <Button
               variant="ghost"
               size="sm"
