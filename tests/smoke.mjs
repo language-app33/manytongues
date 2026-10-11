@@ -7379,7 +7379,7 @@ const openPronounTables = async () => {
 
    The fixture's word carries two meanings on one card ("book /
    notebook"), so the Cards tab offers it for splitting. Its editor has a
-   Meanings section, and "Another meaning of this word" saves it and opens
+   Meanings section, and "Add another meaning of كتاب" saves it and opens
    a copy with the word kept and the meaning emptied, which names the
    original as sharing its word. */
 {
@@ -7410,8 +7410,12 @@ const openPronounTables = async () => {
   check("the editor has a Meanings section with a clue",
     /Meanings/.test(text()) && !!document.querySelector('input[aria-label="Clue"]'),
     /Meanings/.test(text()) ? "there" : "(no section)");
+  const buttonText = [...document.querySelectorAll("button")].map((b) => (b.textContent || "").trim());
+  check("the buttons name the word and the meaning, and the meaning's language",
+    buttonText.includes("Add another meaning of كتاب") && buttonText.includes("Add another Arabic word for “book”"),
+    buttonText.filter((t) => /^Add another/.test(t)).join(" | ") || "(no buttons)");
   const before = savedCards.length;
-  const another = /** @type {any} */ ([...document.querySelectorAll("button")].find((b) => /Another meaning of this word/.test(b.textContent || "")) || null);
+  const another = /** @type {any} */ ([...document.querySelectorAll("button")].find((b) => /^Add another meaning of كتاب$/.test((b.textContent || "").trim())) || null);
   click(another);
   await sleep(600);
   const sent = savedCards[before] || {};
@@ -7425,6 +7429,9 @@ const openPronounTables = async () => {
     `${heading} · ${values.filter(Boolean).join(" | ")}`);
   check("which names the original as sharing its word",
     /Same word:\s*book/.test(text()), (text().match(/Same word:[^.]{0,30}/) || ["(no line)"])[0]);
+  check("and, with no meaning written yet, its button says this meaning",
+    [...document.querySelectorAll("button")].some((b) => (b.textContent || "").trim() === "Add another Arabic word for this meaning"),
+    "(looked for the button)");
   click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
   await sleep(300);
   takeSaves = false;

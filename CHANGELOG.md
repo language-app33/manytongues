@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.422 — 11 October 2026
+
+**The buttons for another meaning say which word, and which language.**
+
+- In a card's Meanings section, the two buttons now name the word on the
+  card rather than "this word": "Add another meaning of صَبِر" and "Add
+  another Arabic word for “cactus”". Before, it was not clear which
+  language "this word" meant.
+- The language is named in its short form — Arabic, Vietnamese, Hebrew —
+  the same short name the app already uses for the field headings.
+- A card with several meanings written on it ("book / notebook") is named
+  by the first. A long phrase is cut short with "…", so the button stays
+  on one line.
+- Before anything is written, the buttons say "this word" and "this
+  meaning", as before.
+- To check by hand: open a Hebrew or Vietnamese word, and see the second
+  button name that language.
+
 ## 0.421 — 11 October 2026
 
 **Tags can be put on, or taken off, many cards at once.**

@@ -283,6 +283,23 @@ export function siblingAnswerNote(side: Side, given: Sibling, answerField: strin
  */
 export const LEARNING_LANGUAGE = "English";
 
+/* How long a word may run on the Meanings block's buttons before it is
+   cut, so a phrase does not push the button over several lines. */
+const ON_A_BUTTON = 24;
+
+/*
+ * The word a button names: "Add another meaning of صَبِر", "Add another
+ * Arabic word for “cactus”". The first of several written ("book /
+ * notebook" is "book"), as the Meanings block's own list names a card,
+ * and cut short with an ellipsis past a couple of dozen letters. Empty
+ * when nothing is written yet, and the button says what it did before.
+ */
+export function buttonWord(text: unknown): string {
+  const first = splitAlternatives(String(text || "")).map((s) => s.trim()).filter(Boolean)[0] || "";
+  const letters = [...first];
+  return letters.length > ON_A_BUTTON ? `${letters.slice(0, ON_A_BUTTON - 1).join("").trimEnd()}…` : first;
+}
+
 /* A card that is not one of the teacher's own words: a number made out of
    the number system, which nobody writes and nobody splits. */
 const madeByApp = (card: Card): boolean => String(card.id || "").startsWith("sys:") || card.derived === true;

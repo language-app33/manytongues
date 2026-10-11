@@ -53,7 +53,7 @@ import { subtypeTakesCapitals, tickCapitals } from "./capitals.ts";
 import { readSpan, spanTag } from "./numbers/spans.ts";
 import type { Span } from "./numbers/spans.ts";
 import { NUMBER_RANGES } from "./numbers/types.ts";
-import { LEARNING_LANGUAGE, cardsSharingChange, sharedWith, wordChanges } from "./meanings.ts";
+import { LEARNING_LANGUAGE, buttonWord, cardsSharingChange, sharedWith, wordChanges } from "./meanings.ts";
 import type { WordChange } from "./meanings.ts";
 import { MAX_IMAGES, shrinkImage } from "./images.ts";
 import type { Answer } from "./answers.ts";
@@ -9615,10 +9615,10 @@ function CapitalsBlock({ on, onChange }: { on: boolean; onChange: (on: boolean) 
  * rather than stored — see meanings.ts. So the line follows the typing:
  * write صَبِر into a new card and the cactus card appears under it.
  *
- * The two buttons are mirror images. "Another meaning of this word" saves
+ * The two buttons are mirror images. "Add another meaning of صَبِر" saves
  * this card and opens a new one with the word, its forms and recordings
- * already in it and every meaning empty; "Another word for this meaning"
- * saves this card and opens a new one with the meaning in it and the word
+ * already in it and every meaning empty; "Add another Arabic word for
+ * “cactus”" saves this card and opens a new one with the meaning in it and the word
  * empty. Both start in no deck: a meaning is put where it belongs, on
  * purpose.
  */
@@ -9655,6 +9655,10 @@ function MeaningsBlock({ lang, selfId, lead, allCards, clue, onClue, canAdd, onA
       );
     });
   const sharing = shared.word.length + shared.meaning.length > 0;
+  /* The buttons name the word and the meaning they start from, since
+     "this word" did not say which language's — see buttonWord. */
+  const ownWord = buttonWord(lead.ar);
+  const meaning = buttonWord(lead.en);
   return (
     <div className="at-formblock at-mt5">
       <div className="at-formhead">
@@ -9699,10 +9703,19 @@ function MeaningsBlock({ lang, selfId, lead, allCards, clue, onClue, canAdd, onA
       )}
       <div className="at-row at-mt3">
         <Button variant="ghost" size="sm" icon="add" disabled={!canAdd} onClick={() => onAnother("meaning")}>
-          Another meaning of this word
+          {ownWord ? (
+            <>
+              Add another meaning of{" "}
+              <bdi lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack }}>{ownWord}</bdi>
+            </>
+          ) : (
+            "Add another meaning of this word"
+          )}
         </Button>
         <Button variant="ghost" size="sm" icon="add" disabled={!canAdd} onClick={() => onAnother("word")}>
-          Another word for this meaning
+          {meaning
+            ? `Add another ${lang.scriptLabel} word for “${meaning}”`
+            : `Add another ${lang.scriptLabel} word for this meaning`}
         </Button>
       </div>
       <Help>Either one saves this card first, then opens the new one.</Help>

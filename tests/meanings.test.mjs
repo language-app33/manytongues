@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 
 import {
   answersAlike,
+  buttonWord,
   clueFor,
   leavesWordToSibling,
   onlyAboutWord,
@@ -232,4 +233,13 @@ test("a learner's device starts a split card where the original stood", async ()
   assert.equal(arrived.forms[0].s.ar2en.interval, 9);
   const stays = items.find((/** @type {any} */ i) => i.id === original.id);
   assert.equal(stays.forms[0].s.ar2en.interval, 9, "and the original keeps its own");
+});
+
+test("a button names the first word written, cut short when it is long", () => {
+  assert.equal(buttonWord("صَبِر"), "صَبِر");
+  assert.equal(buttonWord("book / notebook"), "book");
+  assert.equal(buttonWord(""), "");
+  assert.equal(buttonWord(undefined), "");
+  const long = buttonWord("to take something out of the cupboard carefully");
+  assert.ok(long.endsWith("…") && [...long].length <= 24, long);
 });

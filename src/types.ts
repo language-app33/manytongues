@@ -483,6 +483,13 @@ export interface Lang {
    * to an element's dir attribute.
    */
   direction: "rtl" | "ltr";
+  /**
+   * The language's short name, in English: "Arabic", "Vietnamese",
+   * "Hebrew". `name` is the dialect ("Palestinian Arabic"), which is right
+   * on the language picker and too long anywhere a sentence or a heading
+   * names the language in passing — a field's heading, an import column,
+   * "Add another Arabic word for “cactus”". Use this there.
+   */
   scriptLabel: string;
   /**
    * The same word, written in the language.
