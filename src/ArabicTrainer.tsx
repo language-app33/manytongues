@@ -279,6 +279,9 @@ import {
   SELF_SOME,
   WHOLE_SCENE,
   buildDialogIndex,
+  gapAt,
+  gapOptions,
+  gappedLine,
   isDialog,
   isText,
   isTwoSided,
@@ -3018,6 +3021,38 @@ function castRange(
 }
 
 /*
+ * A scene, cast as the word taken out of it.
+ *
+ * The scene's own word keeps its id and so its schedule — the answer is
+ * about the scene — and is given the hidden word as the thing marked
+ * against, with nothing beside it: no meaning or second writing, and none
+ * of the scene's own accepted answers. `gap` rides along for the screen.
+ *
+ * Which word is hidden walks the scene's count of having been asked this,
+ * and is fixed for the question the first time it is cast: an answer moves
+ * the count, and the word must not change under the answer screen. A
+ * question asked again later in the sitting is a new question and takes
+ * the next word.
+ */
+const GAP_TYPES = new Set(["gap2pick", "gap2ar"]);
+const GAP_TURNS = new WeakMap<Question, number>();
+
+function castGap(resolved: { unit: Form; parent: Item; isSub: boolean } | null, ex: Question) {
+  if (!resolved || !GAP_TYPES.has(ex.type) || !isDialog(resolved.parent)) return resolved;
+  let turn = GAP_TURNS.get(ex);
+  if (turn === undefined) {
+    const st = statesOf(resolved.unit)[ex.type];
+    turn = st ? (st.right || 0) + (st.wrong || 0) + (st.near || 0) + (st.skips || 0) : 0;
+    GAP_TURNS.set(ex, turn);
+  }
+  const gap = gapAt(resolved.parent, turn);
+  if (!gap) return resolved;
+  const { answers: _answers, ...rest } = resolved.unit as Form & { answers?: unknown };
+  const unit = { ...rest, ar: gap.word, en: "", lat: "", recs: [], gap } as Form;
+  return { ...resolved, unit };
+}
+
+/*
  * A face that counts things, cast as the small sentence it was dealt as:
  * *three books* for the word three takes before a noun.
  *
@@ -5361,14 +5396,17 @@ export function tokenCards(
  * question as the screen would have shown it.
  */
 export function resolveQuestion(asking: Item[], exercise: Question, trial: boolean, systems: SystemSet[]) {
-  return castRange(
-    castMeaning(
-      castTaught(castAnswer(castFill(resolveUnit(asking, exercise), exercise.type, trial), exercise.type), exercise.type),
-      exercise.type,
+  return castGap(
+    castRange(
+      castMeaning(
+        castTaught(castAnswer(castFill(resolveUnit(asking, exercise), exercise.type, trial), exercise.type), exercise.type),
+        exercise.type,
+        exercise,
+      ),
       exercise,
+      systems,
     ),
     exercise,
-    systems,
   );
 }
 
@@ -10848,6 +10886,18 @@ export default function ArabicTrainer() {
         ? replyOptions({ card: dialog, at, pool: replyPool(asking, settings, qLang.id) })
         : [];
     }
+    /* A word taken out of a scene: the scene's own words first, then those
+       of the other scenes in the same language. */
+    if (spec.promptField === "gap") {
+      return dialog && item && item.gap
+        ? gapOptions({
+            card: dialog,
+            gap: item.gap,
+            answerId: item.id,
+            pool: asking.filter((c) => isDialog(c) && langIdOf(c, settings) === qLang.id),
+          })
+        : [];
+    }
     if (!item) return [];
     /*
      * A range brings its own wrong answers, already said.
@@ -10959,7 +11009,7 @@ export default function ArabicTrainer() {
      leaves it open — see lentTags. Said under the prompt and again beside
      the answer, which is where a learner reported looking for it. */
   const lentLines = useMemo(
-    () => (item && spec && spec.promptField !== "pairs" && spec.promptField !== "scene" ? lentTags(item, qLang) : []),
+    () => (item && spec && spec.promptField !== "pairs" && spec.promptField !== "scene" && spec.promptField !== "gap" ? lentTags(item, qLang) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [item, spec, qLang.id],
   );
@@ -12502,6 +12552,15 @@ export default function ArabicTrainer() {
                         after={context ? [] : chainOf(item)}
                         autoPlay
                         lead={leadSpeed(item, exercise.type)}
+                      />
+                    ) : spec.promptField === "gap" ? (
+                      /* One sentence of the scene, the word taken out of
+                         it; put back once the question is answered. */
+                      <Field
+                        value={dialog && item.gap ? gappedLine(dialog, item.gap, checked ? null : undefined) : ""}
+                        field="ar"
+                        kind="phrase"
+                        name="question-prompt-text"
                       />
                     ) : spec.promptField === "context" ? (
                       <Field
@@ -16326,7 +16385,7 @@ export function formTagsAt({ label, ambiguous, kin, lent, promptField }: {
   lent: boolean;
   promptField: string;
 }): { question: boolean; answer: boolean; lentQuestion: boolean; lentAnswer: boolean } {
-  const none = promptField === "pairs" || promptField === "scene";
+  const none = promptField === "pairs" || promptField === "scene" || promptField === "gap";
   const question = !none && !!label && ambiguous;
   const lentQuestion = !none && lent && !PROMPT_SHOWS_FORM.includes(promptField);
   return {

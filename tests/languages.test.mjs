@@ -660,6 +660,9 @@ test("the gentle types are read off the definitions, not kept beside them", () =
      them puts the answer on the screen — nothing here is written out. */
   assert.deepEqual(EASY_TYPES, [
     "ar2pick", "ar2en", "rec2en", "rec2img", "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick", "dlgwhole",
+    /* A word taken out of a scene and chosen back is the phrase gap-fill
+       asked of a scene's own text. */
+    "gap2pick",
     /* Reading a number or a time and saying what it is, and picking one
        out of four, are recognition in exactly the sense the six above
        are: the answer is on the screen and nothing is written out. */

@@ -126,6 +126,9 @@ export const TYPES = [
   "en2ar", "own2ar", "img2ar", "ctx2ar", "rec2ctx",
   /* and a conversation, on its own levels: 1, 3, 3 */
   "dlgwhole", "dlgpick", "dlgorder",
+  /* and a word taken out of a scene: chosen, then typed. Levels 2 and 4,
+     as the same pair is for a word in a phrase. */
+  "gap2pick", "gap2ar",
   /* and a range of numbers or of times, which is a skill and climbs the
      same four levels: read one, pick one, count with one, write one. A
      range is never dealt an exercise above because it has no word of its
@@ -983,6 +986,53 @@ export const EX: Record<string, ExerciseSpec> = {
     answerField: "",
     answerMode: "order",
   },
+  /*
+   * A word taken out of a scene, and chosen back.
+   *
+   * The scene's own text is the whole of what it needs: no meaning, no
+   * recording, so a text written in the language alone has a question to
+   * be asked beyond reading it through. One sentence is shown, not the
+   * scene — the gap is the question and the rest would be reading — and
+   * the word is a different one each time it comes round: see gapAt.
+   *
+   * Level 2, as "In a phrase → choose" is: picking a word out of four is
+   * telling it apart, and comes before writing it. The three wrong ones
+   * are other words of the same scene where it has them.
+   */
+  gap2pick: {
+    level: 2,
+    instruction: "Which word is missing?",
+    label: "Missing word → choose",
+    short: "Gap→C",
+    needs: ["dialog", "gap"],
+    dialog: "card",
+    question: "Which word is missing?",
+    placeholder: "",
+    promptField: "gap",
+    answerField: "ar",
+    answerMode: "choice",
+    picks: "word",
+    gentle: true,
+  },
+  /*
+   * And typed. Level 4, as "fill the gap" is for a word in a phrase: the
+   * sentence is the only cue, and nothing on the screen spells the word.
+   * Marked by the language's own rule like every other answer in the
+   * script, one letter out asked again, and the letters marked.
+   */
+  gap2ar: {
+    level: 4,
+    instruction: "Fill the gap",
+    label: "Missing word → {script}",
+    short: "Gap→{S}",
+    needs: ["dialog", "gap"],
+    dialog: "card",
+    question: "Which word is missing?",
+    placeholder: "",
+    promptField: "gap",
+    answerField: "ar",
+    answerMode: "ar",
+  },
   /* Retired. Every turn of a scene typed out at once was the longest
      answer in the app and the least forgiving: one missed mark in the
      third line made the whole conversation wrong. */
@@ -1792,6 +1842,7 @@ export function needLabel(need: string, lang: Partial<Lang>) {
     choices: "a third line to choose between",
     order: "three lines or more",
     part: "a part to play",
+    gap: "a word of three letters or more",
   };
   return names[need] || need;
 }

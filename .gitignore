@@ -29,3 +29,4 @@ tests/.backup-build/
 tests/.counted-faces-build/
 tests/.missing-lines-build/
 tests/.look-alike-build/
+tests/.scene-gaps-build/

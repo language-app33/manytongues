@@ -9553,6 +9553,119 @@ const openPronounTables = async () => {
     errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
+/* ---- the missing word in a text ----
+
+   A text in the language alone — no meaning, no pronunciation — already
+   read through, so the next thing it asks is a word taken out of one of
+   its sentences: chosen out of four, and once that is solid, typed. Each
+   walk starts the app cold on its own document, as the picture walks do. */
+{
+  const before = errors.length;
+  const KEY = "arabic-trainer:arabic-trainer-v3";
+  const sentences = ["ذهبت إلى المدرسة اليوم", "كان الطقس جميلا جدا", "رجعت إلى البيت مساء"];
+  const solid = { phase: "review", reps: 4, interval: 9, ease: 2.5, due: Date.now() + 5 * 86400000,
+    right: 4, wrong: 0, hist: [1, 1, 1, 1], updated: Date.now() };
+  /** @param {Record<string, any>} s */
+  const textCard = (s) => ({
+    id: "gaptext", kind: "dialog", sceneKind: "text", tags: ["Texts"], created: 1, updated: Date.now(),
+    forms: [{ id: "gaptext", ar: "", en: "", lat: "", s }],
+    speakers: [], you: null,
+    lines: sentences.map((ar, i) => ({ id: `gl${i}`, who: 0, ar, en: "", lat: "", recs: [], s: {} })),
+  });
+  /* The word a prompt is missing: the one that, put in the blank, makes
+     one of the sentences. */
+  /** @param {string} prompt @param {string[]} words */
+  const fits = (prompt, words) => words.find((w) => sentences.includes(prompt.replace("____", w))) || "";
+  /** @param {any[]} items @param {(host: HTMLElement, typeIn: (v: string) => void) => Promise<Record<string, any>>} answer */
+  const walk = async (items, answer) => {
+    remoteDocs.clear();
+    localStorage.setItem(KEY, JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items,
+    }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    for (let t = 0; t < 100 && !startBtn(); t++) await sleep(100);
+    click(startBtn());
+    for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
+    const typeIn = (/** @type {string} */ value) => {
+      const el = /** @type {any} */ (host.querySelector('[data-el="answer-input"]'));
+      if (!el) return;
+      must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "value").set.call(el, value);
+      el.dispatchEvent(new w.Event("input", { bubbles: true }));
+    };
+    const seen = await answer(host, typeIn);
+    r.unmount();
+    host.remove();
+    let was = localStorage.getItem(KEY);
+    for (let t = 0, still = 0; t < 40 && still < 4; t++) {
+      await sleep(100);
+      const now = localStorage.getItem(KEY);
+      still = now === was ? still + 1 : 0;
+      was = now;
+    }
+    return seen;
+  };
+  const text = (/** @type {Element | null} */ el) => ((el && el.textContent) || "").trim();
+  const prompt = (/** @type {HTMLElement} */ host) => text(host.querySelector('[data-el="question-prompt-text"]'));
+  const verdictOf = (/** @type {HTMLElement} */ host) => text(host.querySelector('[data-el="verdict"]'));
+
+  materialQuiet = true;
+  const chosen = await walk([textCard({ dlgwhole: { ...solid } })], async (host) => {
+    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), verdict: "", after: "" };
+    const choices = host.querySelector('[data-el="answer-choices"]');
+    if (!choices) return out;
+    const buttons = [...choices.querySelectorAll("button")];
+    out.tiles = buttons.map((b) => text(b));
+    const want = fits(out.prompt, out.tiles);
+    click(buttons.find((b) => text(b) === want) || null);
+    await sleep(60);
+    click(host.querySelector('[data-el="check-button"]'));
+    await sleep(250);
+    out.verdict = verdictOf(host);
+    out.after = prompt(host);
+    return out;
+  });
+  check("a text already read asks for a word taken out of one of its sentences",
+    /Which word is missing/.test(chosen.instruction) && /____/.test(chosen.prompt), JSON.stringify(chosen));
+  check("showing that one sentence and not the whole text",
+    sentences.some((t) => chosen.prompt.split("____").every((part) => t.includes(part.trim()))) &&
+      !sentences.every((t) => chosen.prompt.includes(t.split(" ")[0])),
+    chosen.prompt);
+  check("out of four words, all from the text itself",
+    chosen.tiles.length === 4 && chosen.tiles.every((t) => sentences.some((s) => s.split(" ").includes(t))),
+    chosen.tiles.join(" | "));
+  check("and none of them a word of one or two letters",
+    chosen.tiles.every((t) => t.length >= 3), chosen.tiles.join(" | "));
+  check("choosing the word that fits is marked right, and the sentence is shown whole",
+    /Correct|Good job|Nicely done|Great/.test(chosen.verdict) && sentences.includes(chosen.after),
+    `${chosen.verdict} / ${chosen.after}`);
+
+  const typed = await walk([textCard({ dlgwhole: { ...solid }, gap2pick: { ...solid } })], async (host, typeIn) => {
+    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), choices: false, input: false, verdict: "", missVerdict: "", missShows: "" };
+    out.choices = !!host.querySelector('[data-el="answer-choices"]');
+    out.input = !!host.querySelector('[data-el="answer-input"]');
+    if (!out.input) return out;
+    const words = sentences.flatMap((s) => s.split(" "));
+    typeIn(fits(out.prompt, words));
+    await sleep(60);
+    click(host.querySelector('[data-el="check-button"]'));
+    await sleep(250);
+    out.verdict = verdictOf(host);
+    return out;
+  });
+  materialQuiet = false;
+  check("once choosing it is solid, the missing word is typed instead",
+    /Fill the gap/.test(typed.instruction) && typed.input && !typed.choices && /____/.test(typed.prompt),
+    JSON.stringify(typed));
+  check("and typing the word that fits is marked right",
+    /Correct|Good job|Nicely done|Great/.test(typed.verdict), typed.verdict);
+  check("and nothing threw while the missing words were practised",
+    errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
 /* ---- the review screens ----
 
    Driven directly, as the number system's screen is: a card's sentences

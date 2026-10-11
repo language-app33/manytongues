@@ -8,6 +8,38 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.424 — 11 October 2026
+
+**Practise texts and conversations by filling in a missing word.**
+
+- Two new exercises for every scene, text or conversation. One sentence
+  of it is shown with a word missing. First you **choose the missing
+  word** out of four. Once you have that right twice in a row (and, in a
+  conversation, choosing the reply and putting it in order too), you
+  **type it** instead.
+- They need only the text in the language you are learning: no meaning,
+  pronunciation or recording. A text of a single sentence is enough.
+- The app chooses which word is missing and works through the words in
+  order, a different one each time the scene comes round. Words of one
+  or two letters are never hidden.
+- The wrong choices come from the same text where it has enough words,
+  and from your other scenes in the same language when it has too few.
+- Typing is marked like every other typed answer in that language: one
+  letter out asks you again, and wrong letters are highlighted. Whether
+  missing accents, tone marks or vowel marks count follows the
+  language's existing rule.
+- A scene now counts as learnt once you have typed its missing words
+  correctly on two separate reviews.
+- The trade-off: conversations you have already practised will first ask
+  you to choose a missing word a couple of times before choosing the
+  reply and putting the scene in order come back, and a scene shown as
+  learnt stops being learnt until you have typed its missing words on
+  two reviews.
+- To check by hand: open a text with a few sentences, practise it, and
+  see one sentence with a gap and four words to choose from; after two
+  right answers, see the same kind of question asking you to type the
+  word.
+
 ## 0.423 — 11 October 2026
 
 **Wrong answers come from the decks being practised.**
