@@ -368,6 +368,33 @@ test("a card with nothing else to offer drops out of the rest of the session", (
   assert.deepEqual(after, [], "there is genuinely nothing to ask");
 });
 
+test("a backup stands in for a card with nothing else to offer, so the length holds", () => {
+  /* The count at the top of a session is not to move when sound or the
+     connection goes: the session was dealt backups for exactly this. */
+  const reads = { ...heardAndRead(), id: "c3", forms: [{ ...form(""), id: "f3" }] };
+  const items = [heardOnly(), reads];
+  installIndexes(items, settings);
+  state({ offline: true, here: [] });
+  const backup = { id: "c3", subId: null, type: "ar2en" };
+  const after = requeueUnaskable(queueOf([{ id: "c2", type: "rec2en" }]), 0, items, settings, [backup]);
+  assert.equal(after.length, 1, "replaced rather than dropped");
+  assert.equal(after[0], backup, "by the backup itself, so the caller can tell it is used");
+});
+
+test("a backup that cannot be asked either is passed over, and once they run out the session is shorter", () => {
+  const items = [heardOnly(), { ...heardOnly(), id: "c4", forms: [{ ...heardOnly().forms[0], id: "f4" }] }];
+  installIndexes(items, settings);
+  state({ offline: true, here: [] });
+  const after = requeueUnaskable(
+    queueOf([{ id: "c2", type: "rec2en" }]),
+    0,
+    items,
+    settings,
+    [{ id: "c4", subId: null, type: "rec2en" }],
+  );
+  assert.deepEqual(after, [], "no backup that works, so the question goes");
+});
+
 test("the listing landing late is the same fact arriving a moment later", () => {
   /* Until the device has said which recordings it holds, everything reads
      as reachable — deliberately, so a card that is ready is never silenced

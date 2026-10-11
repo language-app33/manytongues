@@ -6,7 +6,7 @@ import { JSDOM } from "jsdom";
 import { build } from "esbuild";
 import path from "node:path";
 import { must } from "./helpers.mjs";
-import { asMeaning } from "../src/variables.ts";
+import { asMeaning, fillNames } from "../src/variables.ts";
 
 /*
  * One generator, seeded, for the whole walk.
@@ -1119,15 +1119,25 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
      second exercise on the bottom level — so this is a step or two, not
      a session. */
   let typedField = null;
+  /* And each of those steps is a miss, which puts its question back on the
+     end of the queue: the count at the top is not to move for it. */
+  const countNow = () => ((document.querySelector('[data-el="session-count"]') || {}).textContent || "").trim();
+  let countHeld = null;
   for (let i = 0; i < 12 && !typedField; i++) {
     typedField = document.querySelector('[data-el="answer-input"]');
     if (typedField) break;
+    const before = countNow();
     /* A grid has no "I don't know": it is paired and checked instead. */
-    if (document.querySelector('[data-el="answer-match"]')) await playGrid();
+    const grid = !!document.querySelector('[data-el="answer-match"]');
+    if (grid) await playGrid();
     else click(buttonNamed(/^I don't know$/));
     await sleep(150);
     click(buttonNamed(/Continue|Next/));
     await sleep(250);
+    if (!grid && countHeld === null && /^\d+ \/ \d+$/.test(before) && document.querySelector(".at-instruction")) {
+      countHeld = `${before} → ${countNow()}`;
+      check("a wrong answer leaves the count at the top as it was", countNow() === before, countHeld);
+    }
   }
   check("a question that is typed into was reached", !!typedField,
     (document.body.textContent || "").slice(0, 90));
@@ -1223,6 +1233,7 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
     }
 
     /* Now answer it, so the second half of the card can be looked at. */
+    const countBefore = countNow();
     click(buttonNamed(/^I don't know$/));
     await sleep(250);
     const answered = named();
@@ -1545,7 +1556,15 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
 
     click(buttonNamed(/Continue|Next/));
     await sleep(300);
+    /* That "I don't know" was a miss, and its question went back on the end
+       of the queue: the count at the top stays where it was. Checked here
+       when the walk above reached a typed question at once. */
+    if (countHeld === null && /^\d+ \/ \d+$/.test(countBefore) && document.querySelector(".at-instruction")) {
+      countHeld = `${countBefore} → ${countNow()}`;
+      check("a wrong answer leaves the count at the top as it was", countNow() === countBefore, countHeld);
+    }
   }
+  check("the count after a wrong answer was looked at", countHeld !== null, "no counted question was missed");
 
   /* The band of empty page above a question. 66px of the root's padding is
      room for the fixed chrome, and none of that chrome renders during an
@@ -2529,8 +2548,8 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
   check("the last language on cannot be switched off",
     !!arRow && arRow.getAttribute("aria-checked") === "true" && cardCount() === both - 1,
     `${arRow ? arRow.getAttribute("aria-checked") : "no row"}, ${cardCount()} cards`);
-  check("and the row says why rather than just refusing",
-    /the only one on/i.test((arRow || {}).textContent || ""),
+  check("and the row still says only how many cards it has",
+    /^\s*✓?\s*Palestinian Arabic\s*\d+ cards?\s*$/.test((arRow || {}).textContent || ""),
     ((arRow || {}).textContent || "").replace(/\s+/g, " "));
 
   /* And back on again, which is the state everything else expects. */
@@ -3204,6 +3223,16 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   check("and a card that can only be listened to drops out once it cannot be heard",
     dropped.length === 0, JSON.stringify(dropped));
 
+  /* Unless the session holds a backup, which stands in so its length holds. */
+  setOfflineNow(true);
+  setAudibleClips(new Set());
+  const backup = { id: card1.id, subId: null, type: "ar2en" };
+  const covered = requeueUnaskable(soundQueue, 0, withSound, set, [backup]);
+  setOfflineNow(false);
+  setAudibleClips(null);
+  check("a backup stands in for a card that can only be listened to",
+    covered.length === 1 && covered[0] === backup, JSON.stringify(covered));
+
   /* Nothing to do when there is nothing to listen to. */
   const untouched = requeueUnaskable(queue.filter((e) => e.type === "ar2en"), 0, stored2.items, set);
   check("a queue with no listening exercises is returned unchanged",
@@ -3738,6 +3767,7 @@ const rightTile = (tiles, shown) => {
   let grid = false;
   let sawWhereItTurnedUp = 0;
   let sawOnAPlainQuestion = false;
+  let sawUnderAGap = false;
   /* The two that put four whole cards up and ask which one: the meanings
      of the word on screen, and the word a meaning belongs to. What is
      checked of each is that its tiles are drawn from the right side of the
@@ -3863,6 +3893,7 @@ const rightTile = (tiles, shown) => {
         sawWhereItTurnedUp += 1;
         if (!contextQuestion) sawOnAPlainQuestion = true;
       }
+      if (where && gapped) sawUnderAGap = true;
     }
     click(buttonNamed(/^Continue$/));
     await sleep(200);
@@ -3963,6 +3994,10 @@ const rightTile = (tiles, shown) => {
     sawOnAPlainQuestion
       ? "which is the thing that changed: the link pays out everywhere now"
       : "it only paid out on the questions built from it");
+  /* But not under the gap itself, whose phrase is still at the top of the
+     screen: a learner reported it as the prompt shown again. */
+  check("and not after a gap question, whose phrase is still on the screen",
+    !sawUnderAGap, sawUnderAGap ? "the phrase was shown twice" : "shown once, at the top");
 }
 
 /* ---- a frame remembers which of its names it has been met with ----
@@ -4701,6 +4736,46 @@ const openPronounTables = async () => {
   await sleep(250);
   click(cardsFrame.querySelector(".at-selectbtn"));
   await sleep(200);
+
+  /* ---- a group tag on several cards at once ----
+
+     A tag could only be put on a card from inside that card's editor, so
+     tagging a set of words meant opening each in turn. The selection
+     carries a tag now, made on the spot if it does not exist yet. */
+  takeSaves = true;
+  const savedBefore = savedCards.length;
+  click(cardsFrame.querySelector(".at-selectbtn"));
+  await sleep(200);
+  click(cardsFrame.querySelector(".at-ckbox.pick"));
+  await sleep(200);
+  check("the selection offers to add tags", clickNamed(/^Add tags$/),
+    [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-160));
+  await sleep(300);
+  const tagBox = /** @type {HTMLInputElement | null} */ (document.querySelector('input[aria-label="Name a new tag"]'));
+  check("and a tag can be made there", !!tagBox, "no box for a new tag");
+  if (tagBox) {
+    const setTag = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the input's value descriptor").set;
+    must(setTag, "the input's value setter").call(tagBox, "Smoke Colours");
+    tagBox.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(80);
+    clickNamed(/^Create$/);
+    await sleep(150);
+    const tagRow = [...document.querySelectorAll(".at-tickrow")].find((r) => /smokecolours/.test(r.textContent || ""));
+    check("made as a tag is named, and ticked", !!tagRow && !!tagRow.querySelector("input:checked"),
+      tagRow ? (tagRow.textContent || "") : "not listed");
+    const addBtns = [...document.querySelectorAll("button")].filter((b) => /^Add$/.test((b.textContent || "").trim()));
+    click(addBtns[addBtns.length - 1]);
+    await sleep(400);
+    const sent = savedCards.slice(savedBefore);
+    check("the selected card is saved carrying it",
+      sent.length === 1 && fillNames(sent[0]).includes("smokecolours"),
+      JSON.stringify(sent.map((c) => c.fills)));
+  }
+  takeSaves = false;
+  if (cardsFrame.querySelector(".at-ckbox.pick")) {
+    click(cardsFrame.querySelector(".at-selectbtn"));
+    await sleep(200);
+  }
 
   /* ---- and the report sees it ----
      A conversation keeps its words in its turns, so a report reading the
@@ -7304,7 +7379,7 @@ const openPronounTables = async () => {
 
    The fixture's word carries two meanings on one card ("book /
    notebook"), so the Cards tab offers it for splitting. Its editor has a
-   Meanings section, and "Another meaning of this word" saves it and opens
+   Meanings section, and "Add another meaning of كتاب" saves it and opens
    a copy with the word kept and the meaning emptied, which names the
    original as sharing its word. */
 {
@@ -7335,8 +7410,12 @@ const openPronounTables = async () => {
   check("the editor has a Meanings section with a clue",
     /Meanings/.test(text()) && !!document.querySelector('input[aria-label="Clue"]'),
     /Meanings/.test(text()) ? "there" : "(no section)");
+  const buttonText = [...document.querySelectorAll("button")].map((b) => (b.textContent || "").trim());
+  check("the buttons name the word and the meaning, and the meaning's language",
+    buttonText.includes("Add another meaning of كتاب") && buttonText.includes("Add another Arabic word for “book”"),
+    buttonText.filter((t) => /^Add another/.test(t)).join(" | ") || "(no buttons)");
   const before = savedCards.length;
-  const another = /** @type {any} */ ([...document.querySelectorAll("button")].find((b) => /Another meaning of this word/.test(b.textContent || "")) || null);
+  const another = /** @type {any} */ ([...document.querySelectorAll("button")].find((b) => /^Add another meaning of كتاب$/.test((b.textContent || "").trim())) || null);
   click(another);
   await sleep(600);
   const sent = savedCards[before] || {};
@@ -7350,6 +7429,9 @@ const openPronounTables = async () => {
     `${heading} · ${values.filter(Boolean).join(" | ")}`);
   check("which names the original as sharing its word",
     /Same word:\s*book/.test(text()), (text().match(/Same word:[^.]{0,30}/) || ["(no line)"])[0]);
+  check("and, with no meaning written yet, its button says this meaning",
+    [...document.querySelectorAll("button")].some((b) => (b.textContent || "").trim() === "Add another Arabic word for this meaning"),
+    "(looked for the button)");
   click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
   await sleep(300);
   takeSaves = false;
@@ -7645,11 +7727,12 @@ const openPronounTables = async () => {
     click(document.querySelector('[data-el="check-button"]'));
     await sleep(250);
   }
-  /* And the answer says it again, which is where it is said on every
-     question about a card with more than one form — see formTagsAt. */
-  const answerTag = ((document.querySelector('[data-el="answer-form-tag"]') || {}).textContent || "")
-    .replace(/\s+/g, " ").trim();
-  check("and the answer names the form too", /^masculine\b/.test(answerTag), answerTag || "(nothing said)");
+  /* And the answer does not say it again: the tag under the prompt is
+     still on the screen, and saying it twice was reported as crowding it
+     — see formTagsAt. */
+  check("and the answer leaves the form to the tag still under the prompt",
+    !document.querySelector('[data-el="answer-form-tag"]') && /^masculine\b/.test(tag()),
+    tag() || "(nothing said)");
   click(buttonNamed(/^Continue$/));
   await sleep(700);
 

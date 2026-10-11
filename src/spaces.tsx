@@ -58,7 +58,7 @@ import {
   answerShape,
   scriptVars } from "./languages.ts";
 import { isDialog, linesOf, sceneKindOf } from "./dialogs.ts";
-import { asMeaning, cardRef, droppedIn, fillNames, hasSlots, renamedIn, slotsOf } from "./variables.ts";
+import { asMeaning, cardRef, droppedIn, fillNames, hasSlots, isSentence, MAX_FILLS, refClash, renamedIn, slotName, slotsOf, taggedIn } from "./variables.ts";
 import { fillersFor, groupPronouns, isPronounCard, isPronounGroup, pickedCardIds } from "./card-facts.ts";
 import type { PronounGroup } from "./card-facts.ts";
 import { linkReport, pairsIn } from "./context-links.ts";
@@ -75,7 +75,7 @@ import { needsReview, reviewStates, toReview } from "./review.ts";
 import { inPlayWith, langsToMakeIn, teachingChoices } from "./lang-choice.ts";
 import type { LangChoice } from "./lang-choice.ts";
 import type { ReviewState } from "./review.ts";
-import { ReportsScreen, ReviewLine, ReviewScreen } from "./review-sheet.tsx";
+import { ReviewLine, ReviewScreen } from "./review-sheet.tsx";
 import { composerFor, timeComposerFor } from "./numbers/index.ts";
 import { emptyNumberSystem, emptyTimeSystem, readNumberSystem, readTimeSystem } from "./numbers/schema.ts";
 import { fillerCards } from "./numbers/generate.ts";
@@ -4530,6 +4530,12 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   );
   const [selCards, setSelCards] = useState(() => new Set<string>());
   const [cardAction, setCardAction] = useState<"add" | "remove" | null>(null); // "add" | "remove"
+  /* The same two-way question for group tags: which to put on the
+     selected cards or take off them, and the name of one being made on the
+     spot. See tagActionScreen. */
+  const [tagAction, setTagAction] = useState<"add" | "remove" | null>(null);
+  const [pickedTags, setPickedTags] = useState<string[]>([]);
+  const [newTagName, setNewTagName] = useState("");
   const [newCardLang, setNewCardLang] = useState<LangId | null>(null);
   const [managingDecks, setManagingDecks] = useState<string | null>(null); // a course id
   /* The language whose numbers are being filled in, where one is.
@@ -4560,29 +4566,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      is not the same as no form at all. */
   const [newDeckName, setNewDeckName] = useState<string | null>(null);
   const [pickedCourses, setPickedCourses] = useState<string[]>([]);
-  /* The card whose sentences are being reviewed, and whether the reports
-     from students are open — both take over the screen, like the editor. */
+  /* The card whose sentences are being reviewed — it takes over the
+     screen, like the editor. Reports from students are not here at all:
+     they are read in the admin space alone, even by an admin who also
+     teaches, so this space neither shows nor announces them. */
   const [reviewing, setReviewing] = useState<Card | null>(null);
-  const [reportsOpen, setReportsOpen] = useState(false);
-  /* What students have reported, with the cards themselves — a card may
-     not be in the list above. An administrator's alone: a teacher is not
-     shown reports, and is not asked for them (see my-reports). */
-  const seesReports = !!account.admin;
-  const [reports, setReports] = useState<{ flags: Flag[]; cards: Card[] }>({ flags: [], cards: [] });
-  const loadReports = useCallback(async () => {
-    if (!seesReports) return;
-    try {
-      const r = await API.myReports();
-      setReports({ flags: r.flags || [], cards: r.cards || [] });
-    } catch (e) {
-      /* Reports are a side panel: a failure to read them leaves the rest
-         of the space exactly as it was, and the next look tries again. */
-    }
-  }, [seesReports]);
-  useEffect(() => {
-    void loadReports();
-  }, [loadReports]);
-
   /* As in AdminSpace: whether it worked, for the poll's own backoff. A
      partial answer counts as a failure for that purpose — something is
      wrong out there — while still putting on screen whatever did arrive. */
@@ -5563,13 +5551,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      Its sentences are worked out against every card this teacher holds,
      since what fills a blank is the whole collection. */
   if (reviewing) {
-    const fresh = cards.find((c) => c.id === reviewing.id) ||
-      reports.cards.find((c) => c.id === reviewing.id) || reviewing;
+    const fresh = cards.find((c) => c.id === reviewing.id) || reviewing;
     const pool = lendable.some((c) => c.id === fresh.id) ? lendable : lendable.concat([fresh]);
     const lang = langOfCard(fresh) || languages[soleLang];
     const took = (card: Card) => {
       setViewing((v) => (v && v.id === card.id ? { ...v, ...card } : v));
-      setReports((r) => ({ ...r, cards: r.cards.map((c) => (c.id === card.id ? { ...c, ...card } : c)) }));
     };
     return (
       <ReviewScreen
@@ -5605,47 +5591,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               setReviewing(frame);
             }
             snack(`Narrowed — ${plural(Math.max(0, changed.length - 1), "word")} tagged`, "good");
-          } finally {
-            setBusy(false);
-          }
-        }}
-      />
-    );
-  }
-
-  if (reportsOpen && seesReports) {
-    return (
-      <ReportsScreen
-        flags={reports.flags}
-        cards={reports.cards}
-        languages={languages}
-        busy={busy}
-        onClose={() => setReportsOpen(false)}
-        onReview={(card) => setReviewing(card)}
-        onStrike={async (flag, card) => {
-          if (!flag.sentence) return;
-          setBusy(true);
-          try {
-            const r = await API.reviewCard(card.id, { no: [flag.sentence] });
-            absorbSaved(r);
-            setReports((was) => ({
-              ...was,
-              cards: was.cards.map((c) => (c.id === r.card.id ? { ...c, ...r.card } : c)),
-            }));
-            snack("Sentence struck — no student sees it again", "good");
-          } catch (e) {
-            setError(API.explain(e));
-          } finally {
-            setBusy(false);
-          }
-        }}
-        onDismiss={async (flag) => {
-          setBusy(true);
-          try {
-            await API.dismissReports([flag.id]);
-            setReports((was) => ({ ...was, flags: was.flags.filter((f) => f.id !== flag.id) }));
-          } catch (e) {
-            setError(API.explain(e));
           } finally {
             setBusy(false);
           }
@@ -6261,6 +6206,156 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     </Screen>
   );
 
+  /* ---- putting a group tag on the selected cards, or taking one off ----
+     What the tag sheet in the editor does to one card, done to every card
+     selected, from both places cards are selected. The tags offered are
+     the ones already written in the selected cards' languages — a tag is a
+     name cards agree on, so a new one made here is held to the same rules
+     as one made in the editor: never a card's ID, nor a kind of word.
+     Each card goes through taggedIn or droppedIn, so a sentence takes no
+     tag and no card goes past its limit, as on the card's own screen. ---- */
+  const tagActionScreen = () => {
+    const adding = tagAction === "add";
+    const picked = pickedIds(selCards)
+      .map((id) => cards.find((c) => c.id === id))
+      .filter(Boolean) as Card[];
+    const inLangs = (c: Card) => {
+      const l = langOfCard(c);
+      return !!l && pickedLangs.has(l.id);
+    };
+    const pool = cards.filter(inLangs);
+    const kinds = [...pickedLangs].flatMap((id) =>
+      languages[id] ? categoriesOf(languages[id]).map((k) => String(k.id).toLowerCase()) : [],
+    );
+    const tally = (list: Card[]) => {
+      const out = new Map<string, number>();
+      for (const c of list) for (const name of fillNames(c)) out.set(name, (out.get(name) || 0) + 1);
+      return out;
+    };
+    const onPicked = tally(picked);
+    const inAll = tally(pool.filter((c) => !isSentence(c)));
+    /* Adding: every tag there is, and any made here a moment ago. Taking
+       off: only the ones some selected card carries. */
+    const names = adding
+      ? [...new Set([...inAll.keys(), ...pickedTags])]
+      : [...onPicked.keys()];
+    names.sort((a, b) => a.localeCompare(b));
+    const typed = slotName(newTagName);
+    const held = typed ? refClash(typed, pool as unknown as Record<string, unknown>[], "", kinds) : null;
+    const typedTrouble = !held
+      ? ""
+      : held.kind === "card"
+        ? "A card's ID is that name already, so it cannot be a tag as well."
+        : held.kind === "category"
+          ? "That name is spoken for by a kind of word, which every card of that kind fills already."
+          : "";
+    const makeTag = () => {
+      if (!typed || typedTrouble) return;
+      setPickedTags((x) => (x.includes(typed) ? x : x.concat([typed])));
+      setNewTagName("");
+    };
+    const close = () => {
+      setTagAction(null);
+      setPickedTags([]);
+      setNewTagName("");
+    };
+    return (
+      <Screen
+        title={adding ? "Add tags to the selected cards" : "Take tags off the selected cards"}
+        onBack={close}
+      >
+        <Help>
+          {adding
+            ? "Tick the tags every selected card should have. Wherever another card has a blank for one of these tags, these cards can fill it."
+            : "Tick the tags to take off every selected card that has them. Sentences that have a blank for a tag keep the blank."}
+        </Help>
+        {adding && (
+          <div className="at-formblock at-mb3">
+            <Field label="New tag" hint={typedTrouble}>
+              <div className="at-blanknew">
+                <input
+                  className="at-input"
+                  placeholder="Name a new tag"
+                  aria-label="Name a new tag"
+                  value={newTagName}
+                  onChange={(e) => setNewTagName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24))}
+                  onKeyDown={(e) => e.key === "Enter" && makeTag()}
+                />
+                <Button variant="ghost" size="sm" icon="add" disabled={!typed || !!typedTrouble} onClick={makeTag}>
+                  Create
+                </Button>
+              </div>
+            </Field>
+          </div>
+        )}
+        <CheckList
+          options={names.map((name) => ({
+            id: name,
+            title: name,
+            note: [
+              `on ${onPicked.get(name) || 0} of the ${plural(picked.length, "selected card")}`,
+              adding ? (inAll.get(name) ? `${plural(inAll.get(name) || 0, "card")} in all` : "new") : "",
+            ]
+              .filter(Boolean)
+              .join(" · "),
+          }))}
+          chosen={pickedTags}
+          onToggle={(id, on) => setPickedTags((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))}
+          empty={adding ? "No tags yet. Create one above." : "None of the selected cards has a tag."}
+        />
+        <div className="at-row at-mt5">
+          <Button variant="ghost" onClick={close} icon="close">
+            Cancel
+          </Button>
+          <Button variant="primary"
+            disabled={!pickedTags.length || busy}
+            onClick={() =>
+              run(
+                async () => {
+                  /* Counted rather than assumed, as decks are: a card that
+                     already had the tag is not a card changed, and the
+                     ones that could not take it are said, not dropped. */
+                  let changed = 0;
+                  let sentences = 0;
+                  let full = 0;
+                  for (const card of picked) {
+                    let next: Card = card;
+                    for (const name of pickedTags) {
+                      next = (adding ? taggedIn(next, name) : droppedIn(next, name)) || next;
+                    }
+                    if (adding) {
+                      if (isSentence(card)) sentences += 1;
+                      else if (pickedTags.some((name) => !fillNames(next).includes(name))) full += 1;
+                    }
+                    if (next === card) continue;
+                    absorbSaved(await API.saveCard(next, card.decks || []));
+                    changed += 1;
+                  }
+                  close();
+                  setSelCards(new Set());
+                  return { changed, sentences, full };
+                },
+                ({ changed, sentences, full }) =>
+                  [
+                    changed
+                      ? `${pickedTags.length === 1 ? "Tag" : "Tags"} ${adding ? "added to" : "taken off"} ${plural(changed, "card")}`
+                      : "Nothing to change — they were already like that",
+                    sentences ? `${plural(sentences, "sentence")} left out: a sentence takes no tags` : "",
+                    full ? `${plural(full, "card")} already had ${MAX_FILLS} tags, the most a card may have` : "",
+                  ]
+                    .filter(Boolean)
+                    .join(". "),
+              )
+            }
+            icon="check"
+          >
+            {adding ? "Add" : "Take off"}
+          </Button>
+        </div>
+      </Screen>
+    );
+  };
+
   /* ---- what a deck can hold besides cards: parts of the numbers, and
          pronouns ----
      Numbers are one document per language and pronouns one screen, so
@@ -6370,7 +6465,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     const mine = deckView ? deckView.mine : [];
     const listed = deckView ? deckView.listed : [];
     return (
-      <Screen title={d.title} onBack={() => { setOpenDeck(null); setCardAction(null); setDeckExtras(null); }}>
+      <Screen title={d.title} onBack={() => { setOpenDeck(null); setCardAction(null); setTagAction(null); setDeckExtras(null); }}>
             <Notice kind="error">{error}</Notice>
             <Help>
               {(langOfDeck(d) || {}).name} · {deckSize(d, held.length)}
@@ -6485,6 +6580,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                    second, and had to go to the Cards tab and find them
                    again to put them there. */
                 { label: "Add to another deck", onClick: () => setCardAction("add") },
+                /* Tags are about the card, not the deck, so a locked deck
+                   offers them too: a lock keeps which cards are in it. */
+                { label: "Add tags", onClick: () => setTagAction("add") },
+                { label: "Remove tags", onClick: () => setTagAction("remove") },
                 ...(d.locked ? [] : [{
                   label: "Remove from this deck",
                   onClick: (picked: string[]) => {
@@ -6554,6 +6653,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         )}
 
         {cardAction === "add" && cardActionScreen(d.id)}
+        {tagAction && tagActionScreen()}
 
         {confirm && confirm.kind === "cards" && (
           <ConfirmModal
@@ -6950,6 +7050,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               )}
 
               {cardAction && cardActionScreen()}
+              {tagAction && tagActionScreen()}
 
               {viewing && (
                 <Screen
@@ -7032,15 +7133,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   }
                 />
               )}
-              {seesReports && reports.flags.length > 0 && (
-                <div className="at-reviewbanner">
-                  <span>{`${plural(reports.flags.length, "report")} from students.`}</span>
-                  <Button size="sm" onClick={() => { setReportsOpen(true); void loadReports(); }}>
-                    Read {reports.flags.length === 1 ? "it" : "them"}
-                  </Button>
-                </div>
-              )}
-
               <Help>
                 A card is one thing to learn — a word, a phrase, a sentence. Add it to a deck so students get it.
               </Help>
@@ -7061,16 +7153,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                    word is on the screen it opens. */
                 tools={
                   <>
-                    {seesReports && (
-                      <IconButton
-                        icon="flag"
-                        label="Reports from students"
-                        onClick={() => {
-                          setReportsOpen(true);
-                          void loadReports();
-                        }}
-                      />
-                    )}
                   {numberLangsOn.length || pronounLangsOn.length ? (
                     <>
                       {numberLangsOn.length ? (
@@ -7144,6 +7226,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 bulkActions={[
                   { label: "Add to a deck", onClick: () => setCardAction("add") },
                   { label: "Remove from a deck", onClick: () => setCardAction("remove") },
+                  { label: "Add tags", onClick: () => setTagAction("add") },
+                  { label: "Remove tags", onClick: () => setTagAction("remove") },
                   {
                     label: "Delete",
                     danger: true,

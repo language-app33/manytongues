@@ -42,6 +42,7 @@ import {
   refClash,
   renameSlot,
   droppedIn,
+  taggedIn,
   renamedIn,
   slotName,
   readingOf,
@@ -880,6 +881,27 @@ test("taking a group off a card takes the tag and nothing else", () => {
   assert.equal(droppedIn(tagged, "greetings"), null);
   assert.equal(droppedIn(tagged, ""), null);
   assert.equal(droppedIn(/** @type {any} */ (null), "colours"), null);
+});
+
+/* And putting one on, which is what tagging several cards at once does to
+   each of them: the editor's rules, so a bulk tag cannot do what a card's
+   own screen would refuse. */
+test("putting a group on a card keeps the editor's rules", () => {
+  const word = { id: "c9", forms: [{ ar: "aṣfar", en: "yellow", lat: "asfar" }], fills: ["warm"] };
+  assert.deepEqual(/** @type {any} */ (taggedIn(word, " Colours ")).fills, ["warm", "colours"]);
+  /* A card that carries none, including one written when `fills` was a
+     single string. */
+  assert.deepEqual(/** @type {any} */ (taggedIn({ ...word, fills: undefined }, "colours")).fills, ["colours"]);
+  assert.deepEqual(/** @type {any} */ (taggedIn({ ...word, fills: "warm" }, "colours")).fills, ["warm", "colours"]);
+  /* Already there: nothing to save. */
+  assert.equal(taggedIn(word, "warm"), null);
+  assert.equal(taggedIn(word, ""), null);
+  /* A sentence fills nothing, so it takes no tag. */
+  const asks = { id: "f1", forms: [{ ar: "il-bayt {{colours}}", en: "the house is {{colours}}", lat: "" }] };
+  assert.equal(taggedIn(asks, "colours"), null);
+  /* And no card goes past the cap. */
+  const full = { ...word, fills: Array.from({ length: MAX_FILLS }, (_, i) => `t${i}`) };
+  assert.equal(taggedIn(full, "colours"), null);
 });
 
 /* ------------------------------------------------------------------

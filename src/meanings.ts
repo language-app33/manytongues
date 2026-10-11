@@ -206,8 +206,16 @@ export function answersAlike(a: Form, b: Form, answerField: string): boolean {
  * What goes under the prompt, where a sibling makes it unclear.
  *
  * The teacher's clue where they wrote one — *the plant* — and otherwise
- * the other cards' answers, ruled out: "not patience", "not صح or يمين".
- * Empty where nothing needs saying.
+ * the other cards' answers, ruled out, after a word on why they are being
+ * ruled out: "More than one meaning — not patience", "More than one word
+ * for this — not صح or يمين". A bare "not patience" worked, a learner
+ * said, but read as a riddle until they had met it twice; saying first
+ * that the word has other meanings is what they asked for. Empty where
+ * nothing needs saying.
+ *
+ * Answered in English, the prompt is the word and the siblings are its
+ * other meanings; answered in the language, the prompt is the meaning
+ * and the siblings are its other words.
  */
 export function clueFor(card: Item | null | undefined, siblings: Sibling[], answerField: string): string {
   if (!siblings.length) return "";
@@ -215,7 +223,9 @@ export function clueFor(card: Item | null | undefined, siblings: Sibling[], answ
   if (written) return written;
   const others = siblings.map((s) => firstIn(s.unit, answerField)).filter(Boolean);
   const unique = others.filter((x, i) => others.indexOf(x) === i);
-  return unique.length ? `not ${unique.join(" or ")}` : "";
+  if (!unique.length) return "";
+  const why = answerField === "en" ? "More than one meaning" : "More than one word for this";
+  return `${why} — not ${unique.join(" or ")}`;
 }
 
 /*
@@ -272,6 +282,23 @@ export function siblingAnswerNote(side: Side, given: Sibling, answerField: strin
  * language later is a change here rather than a hunt.
  */
 export const LEARNING_LANGUAGE = "English";
+
+/* How long a word may run on the Meanings block's buttons before it is
+   cut, so a phrase does not push the button over several lines. */
+const ON_A_BUTTON = 24;
+
+/*
+ * The word a button names: "Add another meaning of صَبِر", "Add another
+ * Arabic word for “cactus”". The first of several written ("book /
+ * notebook" is "book"), as the Meanings block's own list names a card,
+ * and cut short with an ellipsis past a couple of dozen letters. Empty
+ * when nothing is written yet, and the button says what it did before.
+ */
+export function buttonWord(text: unknown): string {
+  const first = splitAlternatives(String(text || "")).map((s) => s.trim()).filter(Boolean)[0] || "";
+  const letters = [...first];
+  return letters.length > ON_A_BUTTON ? `${letters.slice(0, ON_A_BUTTON - 1).join("").trimEnd()}…` : first;
+}
 
 /* A card that is not one of the teacher's own words: a number made out of
    the number system, which nobody writes and nobody splits. */

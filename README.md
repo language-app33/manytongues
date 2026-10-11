@@ -1119,7 +1119,15 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   same card: `requeueMissed` beside `varyTypes`. Where nothing is left but
   the card's own questions it is asked next, which is what keeps a session
   of one question from ending the moment it is missed, and is Ultimate's
-  promise to repeat what you miss until you have it right.
+  promise to repeat what you miss until you have it right. The count at the
+  top does not grow for it: a miss is a question not yet answered, not a
+  question more (`sessionCount`).
+- **A session keeps its length when sound or the connection goes.** A
+  question that can no longer be asked is asked another way about the same
+  card, or, where the card has no other way, replaced by one of the
+  backups the session was dealt — met cards it did not take, never a
+  listening question (`backupsFor`, `requeueUnaskable`). Only once those
+  run out does the session get shorter.
 
 - **A matching grid is five questions.** Every word in it is asked, marked
   and scheduled in its own right. Which words stand together is decided

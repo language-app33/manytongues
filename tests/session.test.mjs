@@ -41,7 +41,7 @@ await build({
 });
 const { lentTags, varyTypes, requeueMissed, isUrgent, buildSession, buildManualSession, installIndexes,
   fillersIn, buildWeakSession, weakness, isWeak, movesAmong, mergeMoves,
-  saidMoves, sumMoves, laddered, castQuestion, mixCardsOf } = await import(path.join(out, "trainer.js"));
+  saidMoves, sumMoves, laddered, castQuestion, mixCardsOf, sessionCount } = await import(path.join(out, "trainer.js"));
 const langs = await import(path.join(here, "..", "src", "languages.ts"));
 const { TYPES } = langs;
 const { MAX_IN_LEARNING, inLearningOf } = await import(path.join(here, "..", "src", "session-mix.ts"));
@@ -365,6 +365,49 @@ test("a session of due cards is spread over several rather than spent on one", (
   for (const [id, n] of perCard) {
     assert.ok(n <= got.exercises.length / 3, `${id} has ${n} of ${got.exercises.length}`);
   }
+});
+
+test("a session is dealt backups from the met cards it did not take, none of them listening", () => {
+  /* Held back to stand in for a question that has to go mid-session — no
+     sound, no connection — so the count at the top keeps its length. */
+  const got = deal(dueDeck(40));
+  const taken = new Set(got.exercises.map((/** @type {any} */ e) => e.id));
+  assert.ok(got.backups.length > 0, "there are backups");
+  assert.ok(got.backups.length <= got.exercises.length, "no more than one per question");
+  for (const b of got.backups) {
+    assert.ok(!taken.has(b.id), `${b.id} is already in the session`);
+    assert.ok(!/^rec2/.test(b.type), `${b.type} is a listening question`);
+  }
+});
+
+test("nor are new cards slipped in as backups", () => {
+  /* The mix decides which new cards come in; a backup is not a side door. */
+  const got = deal(deckOf(60));
+  assert.deepEqual(got.backups, []);
+});
+
+/* ------------------------------------------------------------------
+   The count at the top of a session
+   ------------------------------------------------------------------ */
+
+test("a wrong answer does not change the count at the top", () => {
+  const list = [q("a", "ar2en"), q("b", "ar2en"), q("c", "ar2en")];
+  assert.deepEqual(sessionCount({ exercises: list }, 0), { at: 1, total: 3, done: 0 });
+  /* "a" right, then "b" wrong: it goes back on the end, and does not count. */
+  const after = requeueMissed(list, 2, list[1]);
+  const s = { exercises: after, missed: 1 };
+  assert.deepEqual(sessionCount(s, 2), { at: 2, total: 3, done: 1 }, "still on the second of three");
+  /* "c" right: the retry of "b" is the third. */
+  assert.deepEqual(sessionCount(s, 3), { at: 3, total: 3, done: 2 });
+  /* And got right: all three done. */
+  assert.deepEqual(sessionCount(s, 4), { at: 3, total: 3, done: 3 });
+});
+
+test("a question missed twice still counts once", () => {
+  let list = [q("a", "ar2en")];
+  list = requeueMissed(list, 1, list[0]);
+  list = requeueMissed(list, 2, list[1]);
+  assert.deepEqual(sessionCount({ exercises: list, missed: 2 }, 2), { at: 1, total: 1, done: 0 });
 });
 
 test("nothing new is dealt while a pile of new cards is already in hand", () => {

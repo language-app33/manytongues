@@ -8,6 +8,7 @@ import assert from "node:assert/strict";
 
 import {
   answersAlike,
+  buttonWord,
   clueFor,
   leavesWordToSibling,
   onlyAboutWord,
@@ -84,10 +85,10 @@ test("vowel marks tell words apart; spacing and end punctuation do not", () => {
 test("the clue is the teacher's when written, otherwise the other answers ruled out", () => {
   const index = siblingIndexOf([cactus, patience], langOf);
   const sibs = siblingsOf(index, cactus, unit(cactus), "word", "ar-PS");
-  assert.equal(clueFor(cactus, sibs, "en"), "not patience");
+  assert.equal(clueFor(cactus, sibs, "en"), "More than one meaning — not patience");
   assert.equal(clueFor({ ...cactus, clue: "the plant" }, sibs, "en"), "the plant");
   const meaningSibs = siblingsOf(siblingIndexOf([sahh, yamin], langOf), yamin, unit(yamin), "meaning", "ar-PS");
-  assert.equal(clueFor(yamin, meaningSibs, "ar"), "not صح");
+  assert.equal(clueFor(yamin, meaningSibs, "ar"), "More than one word for this — not صح");
 });
 
 test("a sibling answered the same way is no ambiguity", () => {
@@ -232,4 +233,13 @@ test("a learner's device starts a split card where the original stood", async ()
   assert.equal(arrived.forms[0].s.ar2en.interval, 9);
   const stays = items.find((/** @type {any} */ i) => i.id === original.id);
   assert.equal(stays.forms[0].s.ar2en.interval, 9, "and the original keeps its own");
+});
+
+test("a button names the first word written, cut short when it is long", () => {
+  assert.equal(buttonWord("صَبِر"), "صَبِر");
+  assert.equal(buttonWord("book / notebook"), "book");
+  assert.equal(buttonWord(""), "");
+  assert.equal(buttonWord(undefined), "");
+  const long = buttonWord("to take something out of the cupboard carefully");
+  assert.ok(long.endsWith("…") && [...long].length <= 24, long);
 });

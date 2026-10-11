@@ -91,7 +91,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["also-hint", "The field the question never showed — the hint's, where the exercise offers one, and otherwise whichever of the three the prompt and the answer did not use.", ""],
     ["also-hint-label", "Its label, which names the field.", "How it's pronounced"],
     ["also-hint-text", "The field itself — the meaning, or how it is pronounced.", "kitaab"],
-    ["also-figures", "A number in the digits the language writes it in, on a number question, where they are not the ones on the screen.", ""],
+    ["also-figures", "A number in the digits the language writes it in, on a number question, where they are not the ones on the screen — or, asked from those, in the digits English uses.", ""],
     ["also-figures-label", "The small line naming that block.", "In Eastern Arabic numerals"],
     ["also-figures-text", "The number in those digits.", "٤٧"],
     ["also-audio", "How it sounds, with a play button.", ""],

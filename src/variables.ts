@@ -579,6 +579,26 @@ export function droppedIn<T extends WithSlots>(card: T, name: string): T | null 
   return { ...card, fills: tags.filter((tag) => tag !== want) } as unknown as T;
 }
 
+/*
+ * One card, with a group tag put on it.
+ *
+ * droppedIn the other way, for tagging many cards at once from the card
+ * list: the editor's own rules, held here so a bulk tag cannot do what a
+ * card's own screen would refuse. A sentence fills nothing — see fillsOf —
+ * so it takes no tag; a name already there is not added twice; and no card
+ * goes past MAX_FILLS.
+ *
+ * Null where nothing moved, so the caller saves only the cards that
+ * changed and can say why the rest did not.
+ */
+export function taggedIn<T extends WithSlots>(card: T, name: string): T | null {
+  const want = slotName(name);
+  if (!want || !card || isSentence(card)) return null;
+  const tags = fillNames(card);
+  if (tags.includes(want) || tags.length >= MAX_FILLS) return null;
+  return { ...card, fills: tags.concat([want]) } as unknown as T;
+}
+
 /** One string, with one slot renamed — `{{name}}` to `{{name-is}}`. */
 export function renameSlot(value: string | null | undefined, from: string, to: string): string {
   const was = slotName(from);

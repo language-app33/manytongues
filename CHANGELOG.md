@@ -8,6 +8,137 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.422 — 11 October 2026
+
+**The buttons for another meaning say which word, and which language.**
+
+- In a card's Meanings section, the two buttons now name the word on the
+  card rather than "this word": "Add another meaning of صَبِر" and "Add
+  another Arabic word for “cactus”". Before, it was not clear which
+  language "this word" meant.
+- The language is named in its short form — Arabic, Vietnamese, Hebrew —
+  the same short name the app already uses for the field headings.
+- A card with several meanings written on it ("book / notebook") is named
+  by the first. A long phrase is cut short with "…", so the button stays
+  on one line.
+- Before anything is written, the buttons say "this word" and "this
+  meaning", as before.
+- To check by hand: open a Hebrew or Vietnamese word, and see the second
+  button name that language.
+
+## 0.421 — 11 October 2026
+
+**Tags can be put on, or taken off, many cards at once.**
+
+- Selecting cards — on the Cards tab or inside a deck — now offers "Add
+  tags" and "Remove tags" beside the deck actions. Before, a tag could
+  only be put on a card from inside that card, one card at a time.
+- "Add tags" lists the tags already in use, each saying how many of the
+  selected cards have it already. A new tag can be made right there and
+  is ticked straight away.
+- "Remove tags" lists only the tags the selected cards carry. Sentences
+  that have a blank for a tag keep the blank, as when a tag is taken off
+  from inside a card.
+- The same rules as inside a card: a sentence takes no tags, a card holds
+  at most twelve, and a new tag cannot have a card's ID or a kind of
+  word's name. Cards left out for either of the first two are counted in
+  the message that says what was done.
+- This works inside a locked deck too: the lock is on which cards are in
+  the deck, not on what the cards say.
+- To check by hand: select a few words, choose "Add tags", make a tag
+  and press Add; open one of the words and see the tag under Custom tags.
+  Then select them again, choose "Remove tags", tick it and press Take
+  off.
+
+## 0.420 — 11 October 2026
+
+**The number of questions at the top of a session stays the same.**
+
+- Getting a question wrong used to add one to the total at the top of the
+  session ("4 / 11" after a miss on the third of ten). The missed question
+  still comes back at the end, but it no longer counts as a question more:
+  it counts as not yet answered. The total stays at ten, and the first
+  number and the bar under it move only when a question is got right.
+- A question missed twice still counts once, whenever it is finally got
+  right.
+- Pressing "can't listen right now", or losing the connection, used to
+  drop questions that could only be heard and make the session shorter.
+  Each session now has a few backup questions to hand, from words already
+  met, and these stand in quietly. The note saying listening is off for
+  15 minutes still shows.
+- Only if the backups run out, which should be rare (a small deck that is
+  almost all listening), does the session get shorter, as before.
+- To check by hand: in a ten-question session, answer one wrong and see
+  the count stay on the same number and the total stay at 10; then press
+  "can't listen right now" during a session with listening questions and
+  see the total stay the same.
+
+## 0.419 — 10 October 2026
+
+**The language picker shows just the number of cards under each language.**
+
+- Each language in the picker now says only how many cards it has. The
+  extra notes — how many are ready, or "the only one on" when it is the
+  last language switched on — are gone.
+- The last language switched on still can't be switched off; tapping it
+  simply leaves it on.
+- To check by hand: open the language picker with two or more languages and
+  switch all but one off; every language shows only its card count.
+
+## 0.418 — 10 October 2026
+
+**Questions say less twice, and the card editor flags forms nobody can tell apart.**
+
+From eleven reports sent in from the answer screen.
+
+- **Said once, not twice.** Where the question already says which form it
+  wants — "feminine" under "Tired" — the answer no longer repeats it
+  underneath. The tag under the question is still on screen. Where the
+  question doesn't say, the answer still does, as before.
+- **No repeated "you".** Under "you work", the tag now says only
+  "feminine" or "plural" rather than "you (feminine)", since the question
+  already says "you". A person the English doesn't mention is still named
+  in full.
+- **The gap question doesn't show its phrase again.** After "Which word is
+  missing?", "Learn more" no longer repeats the phrase under "Where it
+  turned up". The phrase and its meaning are still at the top of the
+  screen. Every other question still shows the phrase.
+- **Words with more than one meaning say so.** Where another of the
+  learner's cards shares the word, the hint under the question used to
+  read "not girl". It now reads "More than one meaning — not girl" (or
+  "More than one word for this — not …" the other way round). A clue the
+  teacher writes on the card still replaces it. A clue such as "the family
+  member" gives exactly the wording one learner asked for.
+- **Numbers asked in Arabic figures show the everyday digits too.** After
+  a question asked from ١٦, "Learn more" also shows "In Arabic numerals:
+  16".
+- **The card editor warns about forms it can't tell apart.** When two
+  forms of a card share a meaning ("Not good", "And you?") and nothing
+  marks them masculine, feminine or plural, a note under the forms says
+  so. Until they're marked, a question can't say which form it wants and
+  accepts any of them. Marking them makes the question ask for one by
+  name.
+- To check by hand: open the "Not good" (مِش منيح) card and the "And
+  you?" card in the editor and look for the note under the forms. Then
+  answer a "Tired" question in the script and confirm "feminine" appears
+  once, under the question.
+
+## 0.417 — 10 October 2026
+
+**Reports from students are read in the admin space only.**
+
+- An admin who also teaches no longer sees "reports from students" at the
+  top of their cards, and the flag button beside the card search is gone.
+  The teaching space now says nothing about reports, for anyone.
+- Reports are still all there, unchanged, under Flags in the admin space,
+  where they can be opened, copied and deleted as before.
+- Trade-off: the reports screen in the teaching space was the one place a
+  reported sentence could be struck in a single tap. That shortcut went
+  with it; a sentence is now struck from the card's own review instead.
+- To check by hand: sign in as an admin who teaches, with a report waiting.
+  The teaching space shows no notice and no flag button; the admin space's
+  Flags tab lists the report.
+
 ## 0.416 — 10 October 2026
 
 **Higher numbers open once most of the numbers below are known, not all of them.**
