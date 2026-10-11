@@ -82,13 +82,15 @@ test("the wrong answers come from the same text first, and never read as the ans
   assert.equal(options.length, 4);
   assert.equal(options.filter((o) => o.ar === "Tôi").length, 1, "the answer once");
   const words = options.map((o) => o.ar).filter((w) => w !== "Tôi");
-  for (const w of words) assert.ok(["học", "Mai", "nhà", "Nhà", "đẹp", "lắm"].includes(w), `${w} is from this text`);
+  for (const w of words) assert.ok(["Mai", "nhà", "Nhà", "đẹp", "lắm"].includes(w), `${w} is from this text`);
+  assert.ok(!words.includes("học"), "and not from the sentence on screen, where the answer is the odd one out");
   assert.equal(new Set(options.map((o) => o.ar)).size, 4, "no word twice");
 
   /* Too few words in a text of its own: the others fill the rest. */
-  const short = text(["Tôi học."]);
+  const short = text(["Tôi học.", "Mai ở nhà."]);
   const filled = gapOptions({ card: short, gap: must(gapAt(short, 0), "Tôi"), answerId: "T", pool: [short, other] });
-  assert.ok(filled.some((o) => o.ar === "học"), "the text's own word first");
+  assert.ok(filled.some((o) => o.ar === "Mai") && filled.some((o) => o.ar === "nhà"), "the text's own words first");
+  assert.ok(!filled.some((o) => o.ar === "học"), "but not the one still in the sentence");
   assert.equal(filled.length, 4, "then the other text's");
 
   /* Worked out, not drawn: the same question offers the same four. */

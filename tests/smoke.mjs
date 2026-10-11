@@ -9106,7 +9106,9 @@ const openPronounTables = async () => {
     items: [{
       id: "scene1", kind: "dialog", tags: ["Lesson 1"], created: 1, updated: 1, lang: "ar-PS",
       name: "At the door", speakers: ["Layla", "Karim"], you: null,
-      forms: [{ id: "scene1", ar: "", en: "At the door", lat: "", s: { dlgwhole: { ...climbedState } } }],
+      /* And a missing word chosen back, the scene's other rung below the
+         ordering. */
+      forms: [{ id: "scene1", ar: "", en: "At the door", lat: "", s: { dlgwhole: { ...climbedState }, gap2pick: { ...climbedState } } }],
       lines: [
         turn("scene1-l0", "مرحبا", "hello", "marhaba", 0),
         turn("scene1-l1", "أهلا وسهلا", "welcome", "ahlan wa sahlan", 1),
@@ -9593,7 +9595,8 @@ const openPronounTables = async () => {
     const typeIn = (/** @type {string} */ value) => {
       const el = /** @type {any} */ (host.querySelector('[data-el="answer-input"]'));
       if (!el) return;
-      must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "value").set.call(el, value);
+      const setter = must(must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "value").set, "setter");
+      setter.call(el, value);
       el.dispatchEvent(new w.Event("input", { bubbles: true }));
     };
     const seen = await answer(host, typeIn);
@@ -9613,7 +9616,32 @@ const openPronounTables = async () => {
   const verdictOf = (/** @type {HTMLElement} */ host) => text(host.querySelector('[data-el="verdict"]'));
 
   materialQuiet = true;
+  /* The session may open on something else about the text — reading it
+     through again — so it is walked on with "I don't know" until the
+     question wanted comes up. */
+  const reach = async (/** @type {HTMLElement} */ host, /** @type {RegExp} */ wanted) => {
+    const button = (/** @type {RegExp} */ re) =>
+      [...host.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
+    for (let n = 0; n < 12; n++) {
+      if (wanted.test(text(host.querySelector(".at-instruction")))) return true;
+      const dunno = button(/^I don.t know$/);
+      const self = host.querySelector('[data-el="answer-self"] button');
+      if (dunno) click(dunno);
+      else if (self) {
+        click(self);
+        await sleep(60);
+        click(host.querySelector('[data-el="check-button"]'));
+      } else return false;
+      await sleep(200);
+      const onward = button(/^(Continue|Next)$/);
+      if (!onward) return false;
+      click(onward);
+      await sleep(300);
+    }
+    return false;
+  };
   const chosen = await walk([textCard({ dlgwhole: { ...solid } })], async (host) => {
+    await reach(host, /Which word is missing/);
     const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), verdict: "", after: "" };
     const choices = host.querySelector('[data-el="answer-choices"]');
     if (!choices) return out;
@@ -9631,20 +9659,24 @@ const openPronounTables = async () => {
   check("a text already read asks for a word taken out of one of its sentences",
     /Which word is missing/.test(chosen.instruction) && /____/.test(chosen.prompt), JSON.stringify(chosen));
   check("showing that one sentence and not the whole text",
-    sentences.some((t) => chosen.prompt.split("____").every((part) => t.includes(part.trim()))) &&
+    sentences.some((t) => chosen.prompt.split("____").every((/** @type {string} */ part) => t.includes(part.trim()))) &&
       !sentences.every((t) => chosen.prompt.includes(t.split(" ")[0])),
     chosen.prompt);
   check("out of four words, all from the text itself",
-    chosen.tiles.length === 4 && chosen.tiles.every((t) => sentences.some((s) => s.split(" ").includes(t))),
+    chosen.tiles.length === 4 && chosen.tiles.every((/** @type {string} */ t) => sentences.some((s) => s.split(" ").includes(t))),
     chosen.tiles.join(" | "));
+  check("and only the answer missing from the sentence on screen, so it cannot be found by elimination",
+    chosen.tiles.filter((/** @type {string} */ t) => !chosen.prompt.split(" ").includes(t)).length === chosen.tiles.length,
+    `${chosen.prompt} / ${chosen.tiles.join(" | ")}`);
   check("and none of them a word of one or two letters",
-    chosen.tiles.every((t) => t.length >= 3), chosen.tiles.join(" | "));
+    chosen.tiles.every((/** @type {string} */ t) => t.length >= 3), chosen.tiles.join(" | "));
   check("choosing the word that fits is marked right, and the sentence is shown whole",
     /Correct|Good job|Nicely done|Great/.test(chosen.verdict) && sentences.includes(chosen.after),
     `${chosen.verdict} / ${chosen.after}`);
 
   const typed = await walk([textCard({ dlgwhole: { ...solid }, gap2pick: { ...solid } })], async (host, typeIn) => {
-    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), choices: false, input: false, verdict: "", missVerdict: "", missShows: "" };
+    await reach(host, /Fill the gap/);
+    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), choices: false, input: false, verdict: "" };
     out.choices = !!host.querySelector('[data-el="answer-choices"]');
     out.input = !!host.querySelector('[data-el="answer-input"]');
     if (!out.input) return out;

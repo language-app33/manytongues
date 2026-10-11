@@ -584,7 +584,9 @@ export function gappedLine(card: Scene, gap: Gap, blank: string | null = GAP_BLA
  * The right one and three others, drawn from the same scene first — a word
  * from two lines up is a mistake a learner could really make — and from
  * the other scenes in `pool` when this one has too few. A word that reads
- * the same as the answer is never offered as wrong.
+ * the same as the answer is never offered as wrong, and nor is any word
+ * still standing in the sentence on screen: the one tile not already in
+ * front of the learner would be the answer found without reading.
  */
 export function gapOptions({
   card,
@@ -601,7 +603,15 @@ export function gapOptions({
   wanted?: number;
   seed?: string;
 }): { id: string; ar: string }[] {
-  const own = (c: Scene) => gapsOf(c).map((g) => ({ id: `${(c && c.id) || ""} ${g.line} ${g.at}`, ar: g.word }));
+  const shown = new Set(
+    gapTokens(String((linesOf(card)[gap.line] || {}).ar || ""))
+      .filter((_, i) => i !== gap.at)
+      .map((t) => t.word),
+  );
+  const own = (c: Scene) =>
+    gapsOf(c)
+      .filter((g) => !shown.has(g.word))
+      .map((g) => ({ id: `${(c && c.id) || ""} ${g.line} ${g.at}`, ar: g.word }));
   const here = own(card);
   const near = new Set(here.map((w) => w.id));
   const others = pool.filter((c) => c && card && c.id !== card.id).flatMap(own);
