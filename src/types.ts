@@ -138,7 +138,7 @@ export interface ExerciseSpec {
    * Absent means a choice between classes of sound, which is graded
    * differently.
    */
-  picks?: "reply" | "word" | "meaning" | "pair" | "image";
+  picks?: "reply" | "word" | "meaning" | "pair" | "image" | "sentence";
   /**
    * What a grid's words are shown as, where not as themselves: "audio" puts
    * a play button on each tile where the word would be. The other column is

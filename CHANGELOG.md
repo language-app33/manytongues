@@ -8,6 +8,37 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.425 — 11 October 2026
+
+**Practise what a text's sentences mean, where they have a translation.**
+
+- Two new exercises for every text and conversation whose sentences have
+  their English written in. Both take one sentence at a time, a
+  different one each time the scene comes round:
+  - **Sentence → choose its meaning:** a sentence is shown and you pick
+    its English out of four. This is the first step, next to reading the
+    scene through.
+  - **Meaning → choose the sentence:** the English is shown and you pick
+    the right sentence out of four. This is the step above, next to
+    choosing the missing word.
+- The wrong choices are the scene's other sentences, and come from your
+  other scenes only when it has too few. Two that differ only in a
+  capital or a full stop are never both offered.
+- **Typing the missing word now shows the sentence's English underneath**
+  as a clue, where the sentence has it. Scenes without a translation
+  work exactly as before.
+- Sentences without English are simply left out of the two new
+  exercises, and a scene with no English at all is not asked them.
+- The trade-off: in scenes that already have translations, these new
+  steps come first. Choosing the missing word, the reply and the order
+  will wait until you have chosen a sentence's meaning right twice in a
+  row, and typing the missing word waits on choosing the sentence too.
+  Each can happen in one sitting.
+- To check by hand: practise a text that has English for its
+  sentences. You should be asked what a sentence means, then later which
+  sentence an English line means, and on the typing question see the
+  English under the sentence.
+
 ## 0.424 — 11 October 2026
 
 **Practise texts and conversations by filling in a missing word.**

@@ -165,3 +165,72 @@ test("the word moves on with the asking, but not under an answer", () => {
   const next = { id: "T", subId: null, type: "gap2pick" };
   assert.equal(must(resolveQuestion([answered], next, false, []), "next question").unit.ar, "học");
 });
+
+/* ---- a sentence and its meaning ---- */
+
+/** @param {[string, string][]} pairs @param {Record<string, any>} [over] @returns {any} */
+const meant = (pairs, over = {}) => text(pairs.map(([ar]) => ar), {
+  lines: pairs.map(([ar, en], i) => ({ id: `m${i}`, who: 0, ar, en, lat: "", recs: [], s: {} })),
+  ...over,
+});
+
+test("only sentences with a meaning are asked about their meaning, each in turn", async () => {
+  const { meantLines, meantAt } = await import("../src/dialogs.ts");
+  const card = meant([["Tôi đi học.", "I go to school."], ["Mai ở nhà.", ""], ["Trời mưa.", "It is raining."]]);
+  assert.deepEqual(meantLines(card), [0, 2]);
+  assert.deepEqual([0, 1, 2].map((n) => meantAt(card, n)), [0, 2, 0]);
+  assert.equal(meantAt(text(["Tôi đi học."]), 0), null, "a text with no meanings is not asked these");
+  assert.equal(dialogNeedMet("meant", null, card), true);
+  assert.equal(dialogNeedMet("meant", null, text(["Tôi đi học."])), false);
+  /* A line still waiting for a blank is not a sentence yet. */
+  assert.deepEqual(meantLines(meant([["Tôi là {{name}}.", "I am {{name}}."]])), []);
+});
+
+test("the four on offer are the scene's other sentences first, and never the answer twice", async () => {
+  const { sentenceOptions } = await import("../src/dialogs.ts");
+  const card = meant([
+    ["Tôi đi học.", "I go to school."],
+    ["Mai ở nhà.", "Mai is at home."],
+    ["Trời mưa.", "It is raining."],
+    ["Chào bạn.", "Hello."],
+    ["Chào bạn!", "hello"],
+  ]);
+  const other = meant([["Hôm nay trời đẹp.", "The weather is nice today."]], { id: "U" });
+  const meanings = sentenceOptions({ card, at: 3, field: "en", answerId: "T", pool: [card, other] });
+  assert.equal(meanings.length, 4);
+  assert.equal(meanings.filter((o) => o.en === "Hello.").length, 1, "the answer once");
+  assert.ok(!meanings.some((o) => o.en === "hello"), "and not again in other words of the same reading");
+  assert.ok(meanings.every((o) => o.en !== "The weather is nice today."), "the scene's own came first");
+  const sentences = sentenceOptions({ card, at: 0, field: "ar", answerId: "T", pool: [card, other] });
+  assert.equal(sentences.length, 4);
+  assert.ok(sentences.some((o) => o.ar === "Tôi đi học."));
+  /* Too few in the scene: another scene's make up the four. */
+  const short = meant([["Tôi đi học.", "I go to school."]]);
+  const filled = sentenceOptions({ card: short, at: 0, field: "en", answerId: "T", pool: [short, other, { ...card, id: "V" }] });
+  assert.equal(filled.length, 4);
+});
+
+test("a sentence with its meaning is asked both ways, the meaning first", () => {
+  const card = meant([["Tôi đi học.", "I go to school."]]);
+  const list = offersFor({ units: [{ unit: card, isSub: false, scene: null }], lang: vi });
+  const find = (/** @type {string} */ type) => list.find((o) => o.type === type);
+  assert.equal(must(find("sen2en"), "meaning").ready, true);
+  assert.equal(must(find("en2sen"), "sentence").ready, true);
+  assert.ok(levelOf("sen2en") < levelOf("en2sen"));
+  const bare = offersFor({ units: [{ unit: text(["Tôi đi học."]), isSub: false, scene: null }], lang: vi });
+  assert.equal(must(bare.find((o) => o.type === "sen2en"), "listed").ready, false, "no meaning, nothing to choose");
+});
+
+test("the scene is cast as one sentence and its meaning, and marked on the one chosen", () => {
+  const card = meant([["Tôi đi học.", "I go to school."], ["Trời mưa.", "It is raining."]]);
+  installIndexes([card], settings);
+  const r = must(resolveQuestion([card], { id: "T", subId: null, type: "sen2en" }, false, []), "the question");
+  assert.equal(r.unit.id, "T");
+  assert.equal(r.unit.ar, "Tôi đi học.");
+  assert.equal(r.unit.en, "I go to school.");
+  assert.equal(checkAnswer("I go to school.", r.unit, "sen2en", settings).ok, true);
+  assert.equal(checkAnswer("It is raining.", r.unit, "sen2en", settings).ok, false);
+  const back = must(resolveQuestion([card], { id: "T", subId: null, type: "en2sen" }, false, []), "the other way");
+  assert.equal(checkAnswer("Tôi đi học.", back.unit, "en2sen", settings).ok, true);
+  assert.equal(checkAnswer("Trời mưa.", back.unit, "en2sen", settings).ok, false);
+});

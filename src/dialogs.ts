@@ -625,6 +625,84 @@ export function gapOptions({
   });
 }
 
+/* ------------------------------------------------------------------
+   A sentence and its meaning
+
+   Where a scene's sentences carry their English, two more questions are
+   asked of it: one sentence shown and its meaning chosen out of four, and
+   the meaning shown and the sentence chosen. Chosen rather than typed,
+   which is what "A line → English" got wrong — there are many ways to say
+   what a sentence means and only the teacher's would have been marked
+   right. Asked of the scene as a whole and walked one sentence at a time,
+   as the missing word is.
+   ------------------------------------------------------------------ */
+
+/* A line written out in full with its meaning beside it — not one still
+   waiting for a blank to be filled, whose words are not yet a sentence. */
+const said = (l: Scene): boolean =>
+  !!l && !!String(l.ar || "").trim() && !!String(l.en || "").trim() && !/[{}]/.test(`${l.ar} ${l.en}`);
+
+/* The lines of a scene that have a meaning, by where they stand. */
+export function meantLines(card: Scene): number[] {
+  const out: number[] = [];
+  linesOf(card).forEach((l, i) => {
+    if (said(l)) out.push(i);
+  });
+  return out;
+}
+
+/* The line for the scene's n-th asking: each in turn, then round again. */
+export function meantAt(card: Scene, n: number): number | null {
+  const lines = meantLines(card);
+  if (!lines.length) return null;
+  return lines[Math.abs(Math.round(Number(n) || 0)) % lines.length];
+}
+
+/*
+ * The four on offer for a sentence: its own meaning or words and three
+ * others, from this scene first and then from the scenes in `pool`. Two
+ * that read the same — "Hello" and "hello." — are one, so being marked
+ * wrong for the right words cannot happen.
+ */
+export function sentenceOptions({
+  card,
+  at,
+  field,
+  answerId,
+  pool = [],
+  wanted = PICK_OPTIONS,
+  seed = "",
+}: {
+  card: Scene;
+  at: number;
+  field: "ar" | "en";
+  answerId: string;
+  pool?: Scene[];
+  wanted?: number;
+  seed?: string;
+}): { id: string; ar: string; en: string }[] {
+  const lines = linesOf(card);
+  const answer = lines[at];
+  if (!said(answer)) return [];
+  const own = (c: Scene) =>
+    linesOf(c)
+      .filter(said)
+      .map((l) => ({ id: `${(c && c.id) || ""} ${l.id}`, ar: String(l.ar), en: String(l.en) }));
+  const here = own(card).filter((o) => o.id !== `${(card && card.id) || ""} ${answer.id}`);
+  const near = new Set(here.map((o) => o.id));
+  const others = pool.filter((c) => c && card && c.id !== card.id).flatMap(own);
+  const key = (o: { ar: string; en: string }) =>
+    String(o[field]).toLowerCase().replace(/[\p{P}\s]+/gu, " ").trim();
+  return optionsFor({
+    answer: { id: answerId, ar: String(answer.ar), en: String(answer.en) },
+    pool: here.concat(others),
+    wanted,
+    seed: `${(card && card.id) || ""} ${answer.id} ${field} ${seed}`,
+    textOf: key,
+    near: (o) => near.has(o.id),
+  });
+}
+
 /*
  * Playing a part: every turn the learner's speaker takes, in one go.
  *
@@ -651,6 +729,9 @@ export function dialogNeedMet(need: string, scene: Placed | null, unit: Record<s
   if (need === "dialog") return isDialog(card);
   /* A word to take out, which a text has as much as a conversation. */
   if (need === "gap") return isDialog(card) && gapsOf(card).length > 0;
+  /* A sentence with its meaning, which a text has as much as a
+     conversation. */
+  if (need === "meant") return isDialog(card) && meantLines(card).length > 0;
   /* A text is asked as a whole and nothing else: a line of prose has no
      reply to choose, nobody to play, and a paragraph's order is too often
      arguable to mark. */
@@ -668,7 +749,7 @@ export function dialogNeedMet(need: string, scene: Placed | null, unit: Record<s
   return false;
 }
 
-export const DIALOG_NEEDS: string[] = ["dialog", "line", "reply", "choices", "order", "part", "gap"];
+export const DIALOG_NEEDS: string[] = ["dialog", "line", "reply", "choices", "order", "part", "gap", "meant"];
 
 /*
  * What a unit is, as far as the exercise table is concerned.

@@ -3421,7 +3421,16 @@ check("no console errors during the session", errors.length === 0, errors.slice(
       await sleep(250);
       continue;
     }
-    if (order) {
+    if (/What does it mean/.test(asked) && choices) {
+      /* A sentence of the scene, its meaning chosen: level one, beside
+         reading it. The tile that is the meaning of the sentence shown. */
+      met.add("meaning-pick");
+      const shownAr = ((document.querySelector('[data-el="question-prompt-text"]') || {}).textContent || "").trim();
+      const wanted = (said.find((l) => l.ar === shownAr) || {}).en;
+      click([...choices.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === wanted) ||
+        choices.querySelector("button"));
+      await sleep(40);
+    } else if (order) {
       met.add("order");
       /* Tapped into place, in the order the scene was written: the taps
          are the answer, so this is somebody getting it right. */
@@ -9106,9 +9115,9 @@ const openPronounTables = async () => {
     items: [{
       id: "scene1", kind: "dialog", tags: ["Lesson 1"], created: 1, updated: 1, lang: "ar-PS",
       name: "At the door", speakers: ["Layla", "Karim"], you: null,
-      /* And a missing word chosen back, the scene's other rung below the
-         ordering. */
-      forms: [{ id: "scene1", ar: "", en: "At the door", lat: "", s: { dlgwhole: { ...climbedState }, gap2pick: { ...climbedState } } }],
+      /* And a missing word chosen back, and a sentence's meaning chosen
+         either way: the scene's other rungs below the ordering. */
+      forms: [{ id: "scene1", ar: "", en: "At the door", lat: "", s: { dlgwhole: { ...climbedState }, gap2pick: { ...climbedState }, sen2en: { ...climbedState }, en2sen: { ...climbedState } } }],
       lines: [
         turn("scene1-l0", "مرحبا", "hello", "marhaba", 0),
         turn("scene1-l1", "أهلا وسهلا", "welcome", "ahlan wa sahlan", 1),
@@ -9688,7 +9697,71 @@ const openPronounTables = async () => {
     out.verdict = verdictOf(host);
     return out;
   });
+  /* The same text with each sentence's meaning written beside it. */
+  const meanings = ["I went to school today", "The weather was very nice", "I came home in the evening"];
+  /** @param {Record<string, any>} st */
+  const meantCard = (st) => {
+    const card = textCard(st);
+    card.lines = card.lines.map((/** @type {any} */ l, /** @type {number} */ i) => ({ ...l, en: meanings[i] }));
+    return card;
+  };
+  const meaningOf = (/** @type {string} */ ar) => meanings[sentences.indexOf(ar)] || "";
+  const toMeaning = await walk([meantCard({ dlgwhole: { ...solid } })], async (host) => {
+    await reach(host, /What does it mean/);
+    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), verdict: "" };
+    const choices = host.querySelector('[data-el="answer-choices"]');
+    if (!choices) return out;
+    const buttons = [...choices.querySelectorAll("button")];
+    out.tiles = buttons.map((b) => text(b));
+    click(buttons.find((b) => text(b) === meaningOf(out.prompt)) || null);
+    await sleep(60);
+    click(host.querySelector('[data-el="check-button"]'));
+    await sleep(250);
+    out.verdict = verdictOf(host);
+    return out;
+  });
+  const toSentence = await walk([meantCard({ dlgwhole: { ...solid }, sen2en: { ...solid } })], async (host) => {
+    await reach(host, /Which sentence means this/);
+    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), verdict: "" };
+    const choices = host.querySelector('[data-el="answer-choices"]');
+    if (!choices) return out;
+    const buttons = [...choices.querySelectorAll("button")];
+    out.tiles = buttons.map((b) => text(b));
+    click(buttons.find((b) => text(b) === sentences[meanings.indexOf(out.prompt)]) || null);
+    await sleep(60);
+    click(host.querySelector('[data-el="check-button"]'));
+    await sleep(250);
+    out.verdict = verdictOf(host);
+    return out;
+  });
+  const clued = await walk(
+    [meantCard({ dlgwhole: { ...solid }, sen2en: { ...solid }, gap2pick: { ...solid }, en2sen: { ...solid } })],
+    async (host) => {
+      await reach(host, /Fill the gap/);
+      return {
+        instruction: text(host.querySelector(".at-instruction")),
+        prompt: prompt(host),
+        clue: text(host.querySelector('[data-el="question-prompt-meaning"]')),
+      };
+    },
+  );
   materialQuiet = false;
+  check("a text with its meanings asks a sentence's meaning, chosen out of four",
+    /What does it mean/.test(toMeaning.instruction) && sentences.includes(toMeaning.prompt) &&
+      toMeaning.tiles.length === 3 && toMeaning.tiles.every((/** @type {string} */ t) => meanings.includes(t)),
+    JSON.stringify(toMeaning));
+  check("and choosing the right meaning is marked right",
+    /Correct|Good job|Nicely done|Great/.test(toMeaning.verdict), toMeaning.verdict);
+  check("then the other way: the meaning shown, the sentence chosen",
+    /Which sentence means this/.test(toSentence.instruction) && meanings.includes(toSentence.prompt) &&
+      toSentence.tiles.every((/** @type {string} */ t) => sentences.includes(t)),
+    JSON.stringify(toSentence));
+  check("and choosing the right sentence is marked right",
+    /Correct|Good job|Nicely done|Great/.test(toSentence.verdict), toSentence.verdict);
+  check("typing a missing word shows the sentence's meaning as the clue",
+    /Fill the gap/.test(clued.instruction) && /____/.test(clued.prompt) &&
+      clued.clue !== "" && meanings.some((m) => clued.clue.includes(m)),
+    JSON.stringify(clued));
   check("once choosing it is solid, the missing word is typed instead",
     /Fill the gap/.test(typed.instruction) && typed.input && !typed.choices && /____/.test(typed.prompt),
     JSON.stringify(typed));

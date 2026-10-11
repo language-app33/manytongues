@@ -17,8 +17,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
 
   | level | what it asks | exercises |
   |---|---|---|
-  | 1 | what the word means | choose the meaning · {script} → English · listen → English · read a scene |
-  | 2 | which word it is | match the pairs · match the recordings · match recordings to numbers (both kinds of figures) · English → choose · choose the missing word · choose a scene's missing word |
+  | 1 | what the word means | choose the meaning · {script} → English · listen → English · read a scene · choose a scene sentence's meaning |
+  | 2 | which word it is | match the pairs · match the recordings · match recordings to numbers (both kinds of figures) · English → choose · choose the missing word · choose a scene's missing word · choose a scene's sentence from its meaning |
   | 3 | write it from a cue | {translit} → script · listen → script · listen → tone · choose the reply · put a scene in order |
   | 4 | write it from its meaning | English → script · fill the gap · phrase heard → script · type a scene's missing word |
 
@@ -840,7 +840,12 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   word is every one of three letters or more in turn (`gapsOf`, `gapAt`
   in `src/dialogs.ts`), walked by the scene's count of having been asked
   and fixed for the question when it is cast (`castGap` in the trainer),
-  and the wrong ones are the scene's own words first. One kind with a subtype, the way
+  and the wrong ones are the scene's own words first, never one still
+  standing in the sentence on screen. Where its sentences carry their
+  English, a scene is also asked **a sentence's meaning, and the sentence
+  from its meaning**, both chosen out of four (`sen2en`, `en2sen`;
+  `meantAt` and `sentenceOptions`), walked the same way; and the typed
+  missing word shows that sentence's meaning under it as the clue. One kind with a subtype, the way
   a word is one kind whether it is a noun or a verb: `sceneKind: "text"`,
   absent on a conversation, read through `sceneKindOf` in `src/dialogs.ts`,
   and changeable, because a line's progress means the same in either.

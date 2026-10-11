@@ -129,6 +129,9 @@ export const TYPES = [
   /* and a word taken out of a scene: chosen, then typed. Levels 2 and 4,
      as the same pair is for a word in a phrase. */
   "gap2pick", "gap2ar",
+  /* and a sentence of a scene with its meaning: the meaning chosen, then
+     the sentence chosen from its meaning. Levels 1 and 2. */
+  "sen2en", "en2sen",
   /* and a range of numbers or of times, which is a skill and climbs the
      same four levels: read one, pick one, count with one, write one. A
      range is never dealt an exercise above because it has no word of its
@@ -1033,6 +1036,51 @@ export const EX: Record<string, ExerciseSpec> = {
     answerField: "ar",
     answerMode: "ar",
   },
+  /*
+   * One sentence of a scene, and its meaning chosen out of four.
+   *
+   * What "A line → English" asked, chosen instead of typed: a sentence can
+   * be put into English a dozen ways and only the teacher's was marked
+   * right. The three wrong meanings are the scene's other sentences' where
+   * it has them. Level 1, beside reading the scene: it asks what the words
+   * mean and puts the answer on the screen.
+   */
+  sen2en: {
+    level: 1,
+    instruction: "What does it mean?",
+    label: "Sentence → choose its meaning",
+    short: "S→M",
+    needs: ["dialog", "meant"],
+    dialog: "card",
+    question: "What does it mean?",
+    placeholder: "",
+    promptField: "sentence",
+    answerField: "en",
+    answerMode: "choice",
+    picks: "meaning",
+    gentle: true,
+  },
+  /*
+   * And the other way: the meaning given, the sentence chosen. Level 2,
+   * as "English → choose" is for a word — telling the right one apart
+   * from others that look like it, which in a scene of similar lines is
+   * the harder half.
+   */
+  en2sen: {
+    level: 2,
+    instruction: "Which sentence means this?",
+    label: "Meaning → choose the sentence",
+    short: "M→S",
+    needs: ["dialog", "meant"],
+    dialog: "card",
+    question: "Which sentence means this?",
+    placeholder: "",
+    promptField: "sentenceMeaning",
+    answerField: "ar",
+    answerMode: "choice",
+    picks: "sentence",
+    gentle: true,
+  },
   /* Retired. Every turn of a scene typed out at once was the longest
      answer in the app and the least forgiving: one missed mark in the
      third line made the whole conversation wrong. */
@@ -1843,6 +1891,7 @@ export function needLabel(need: string, lang: Partial<Lang>) {
     order: "three lines or more",
     part: "a part to play",
     gap: "a word of three letters or more",
+    meant: "a sentence with its meaning",
   };
   return names[need] || need;
 }

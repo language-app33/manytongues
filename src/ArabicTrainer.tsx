@@ -283,6 +283,8 @@ import {
   gapOptions,
   gappedLine,
   isDialog,
+  meantAt,
+  sentenceOptions,
   isText,
   isTwoSided,
   linesOf,
@@ -3035,19 +3037,29 @@ function castRange(
  * the next word.
  */
 const GAP_TYPES = new Set(["gap2pick", "gap2ar"]);
+/* And the same walk for the two that ask about one whole sentence and its
+   meaning: the scene's own word given that sentence to be marked against. */
+const SENTENCE_TYPES = new Set(["sen2en", "en2sen"]);
 const GAP_TURNS = new WeakMap<Question, number>();
 
 function castGap(resolved: { unit: Form; parent: Item; isSub: boolean } | null, ex: Question) {
-  if (!resolved || !GAP_TYPES.has(ex.type) || !isDialog(resolved.parent)) return resolved;
+  if (!resolved || !(GAP_TYPES.has(ex.type) || SENTENCE_TYPES.has(ex.type)) || !isDialog(resolved.parent)) return resolved;
   let turn = GAP_TURNS.get(ex);
   if (turn === undefined) {
     const st = statesOf(resolved.unit)[ex.type];
     turn = st ? (st.right || 0) + (st.wrong || 0) + (st.near || 0) + (st.skips || 0) : 0;
     GAP_TURNS.set(ex, turn);
   }
+  const { answers: _answers, ...rest } = resolved.unit as Form & { answers?: unknown };
+  if (SENTENCE_TYPES.has(ex.type)) {
+    const at = meantAt(resolved.parent, turn);
+    const line = at === null ? null : linesOf(resolved.parent)[at];
+    if (!line) return resolved;
+    const unit = { ...rest, ar: line.ar, en: line.en, lat: line.lat || "", recs: [], sentenceAt: at } as Form;
+    return { ...resolved, unit };
+  }
   const gap = gapAt(resolved.parent, turn);
   if (!gap) return resolved;
-  const { answers: _answers, ...rest } = resolved.unit as Form & { answers?: unknown };
   const unit = { ...rest, ar: gap.word, en: "", lat: "", recs: [], gap } as Form;
   return { ...resolved, unit };
 }
@@ -10886,6 +10898,19 @@ export default function ArabicTrainer() {
         ? replyOptions({ card: dialog, at, pool: replyPool(asking, settings, qLang.id) })
         : [];
     }
+    /* A sentence of a scene and its meaning: the scene's other sentences
+       first, then those of the other scenes in the same language. */
+    if (spec.promptField === "sentence" || spec.promptField === "sentenceMeaning") {
+      return dialog && item && typeof item.sentenceAt === "number"
+        ? sentenceOptions({
+            card: dialog,
+            at: item.sentenceAt,
+            field: spec.answerField === "en" ? "en" : "ar",
+            answerId: item.id,
+            pool: asking.filter((c) => isDialog(c) && langIdOf(c, settings) === qLang.id),
+          })
+        : [];
+    }
     /* A word taken out of a scene: the scene's own words first, then those
        of the other scenes in the same language. */
     if (spec.promptField === "gap") {
@@ -11009,7 +11034,7 @@ export default function ArabicTrainer() {
      leaves it open — see lentTags. Said under the prompt and again beside
      the answer, which is where a learner reported looking for it. */
   const lentLines = useMemo(
-    () => (item && spec && spec.promptField !== "pairs" && spec.promptField !== "scene" && spec.promptField !== "gap" ? lentTags(item, qLang) : []),
+    () => (item && spec && !["pairs", "scene", "gap", "sentence", "sentenceMeaning"].includes(spec.promptField) ? lentTags(item, qLang) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [item, spec, qLang.id],
   );
@@ -12555,13 +12580,27 @@ export default function ArabicTrainer() {
                       />
                     ) : spec.promptField === "gap" ? (
                       /* One sentence of the scene, the word taken out of
-                         it; put back once the question is answered. */
-                      <Field
-                        value={dialog && item.gap ? gappedLine(dialog, item.gap, checked ? null : undefined) : ""}
-                        field="ar"
-                        kind="phrase"
-                        name="question-prompt-text"
-                      />
+                         it; put back once the question is answered. When
+                         the word is to be typed and the sentence has its
+                         meaning, the meaning is under it as the clue —
+                         the sentence alone often fits more than one word. */
+                      <>
+                        <Field
+                          value={dialog && item.gap ? gappedLine(dialog, item.gap, checked ? null : undefined) : ""}
+                          field="ar"
+                          kind="phrase"
+                          name="question-prompt-text"
+                        />
+                        {spec.answerMode === "ar" && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
+                          <p className="at-ctxmeaning" data-el="question-prompt-meaning">
+                            {asMeaning(String(linesOf(dialog)[item.gap.line].en))}
+                          </p>
+                        ) : null}
+                      </>
+                    ) : spec.promptField === "sentence" ? (
+                      <Field value={item.ar} field="ar" kind="phrase" name="question-prompt-text" />
+                    ) : spec.promptField === "sentenceMeaning" ? (
+                      <Field value={item.en} field="en" kind="phrase" name="question-prompt-text" />
                     ) : spec.promptField === "context" ? (
                       <Field
                         /* The phrase can go between building the queue and
@@ -16385,7 +16424,7 @@ export function formTagsAt({ label, ambiguous, kin, lent, promptField }: {
   lent: boolean;
   promptField: string;
 }): { question: boolean; answer: boolean; lentQuestion: boolean; lentAnswer: boolean } {
-  const none = promptField === "pairs" || promptField === "scene" || promptField === "gap";
+  const none = ["pairs", "scene", "gap", "sentence", "sentenceMeaning"].includes(promptField);
   const question = !none && !!label && ambiguous;
   const lentQuestion = !none && lent && !PROMPT_SHOWS_FORM.includes(promptField);
   return {

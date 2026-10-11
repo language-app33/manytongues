@@ -663,6 +663,8 @@ test("the gentle types are read off the definitions, not kept beside them", () =
     /* A word taken out of a scene and chosen back is the phrase gap-fill
        asked of a scene's own text. */
     "gap2pick",
+    /* And a sentence of a scene with its meaning, chosen either way. */
+    "sen2en", "en2sen",
     /* Reading a number or a time and saying what it is, and picking one
        out of four, are recognition in exactly the sense the six above
        are: the answer is on the screen and nothing is written out. */
