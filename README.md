@@ -17,10 +17,10 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
 
   | level | what it asks | exercises |
   |---|---|---|
-  | 1 | what the word means | choose the meaning · {script} → English · listen → English · read a scene |
-  | 2 | which word it is | match the pairs · match the recordings · match recordings to numbers (both kinds of figures) · English → choose · choose the missing word |
+  | 1 | what the word means | choose the meaning · {script} → English · listen → English · read a scene · choose a scene sentence's meaning |
+  | 2 | which word it is | match the pairs · match the recordings · match recordings to numbers (both kinds of figures) · English → choose · choose the missing word · choose a scene's missing word · choose a scene's sentence from its meaning |
   | 3 | write it from a cue | {translit} → script · listen → script · listen → tone · choose the reply · put a scene in order |
-  | 4 | write it from its meaning | English → script · fill the gap · phrase heard → script |
+  | 4 | write it from its meaning | English → script · fill the gap · phrase heard → script · type a scene's missing word |
 
   **A level opens on two right answers in a row**, and closes on two
   wrong. One rule for all four, read off the record of outings rather than
@@ -833,7 +833,19 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
 - **A scene is lines in order, and its blanks are one cast.** A scene is a
   **conversation** — speakers, a part for the learner, the reply to choose
   and the order to restore — or a **text**, prose nobody speaks, read as
-  one paragraph and asked only as a whole. One kind with a subtype, the way
+  one paragraph and asked only as a whole. Either is also asked for **a
+  word taken out of one of its sentences**, chosen out of four and then
+  typed (`gap2pick`, `gap2ar`): the scene's own text is all they need, so
+  a text with no meaning or recording has more to it than reading. The
+  word is every one of three letters or more in turn (`gapsOf`, `gapAt`
+  in `src/dialogs.ts`), walked by the scene's count of having been asked
+  and fixed for the question when it is cast (`castGap` in the trainer),
+  and the wrong ones are the scene's own words first, never one still
+  standing in the sentence on screen. Where its sentences carry their
+  English, a scene is also asked **a sentence's meaning, and the sentence
+  from its meaning**, both chosen out of four (`sen2en`, `en2sen`;
+  `meantAt` and `sentenceOptions`), walked the same way; and the typed
+  missing word shows that sentence's meaning under it as the clue. One kind with a subtype, the way
   a word is one kind whether it is a noun or a verb: `sceneKind: "text"`,
   absent on a conversation, read through `sceneKindOf` in `src/dialogs.ts`,
   and changeable, because a line's progress means the same in either.

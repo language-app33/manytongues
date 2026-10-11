@@ -38,6 +38,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["question-fill-tag", "What a word dropped into a sentence is, where its English could be more than one form of it. Only then; nothing on most sentences.", "Your name: plural"],
     ["question-prompt", "The block being asked about. A word, a phrase with a gap in it, a play button, or a conversation, depending on the exercise.", ""],
     ["question-prompt-text", "The words inside it, when it is words. One size in every exercise.", "كِتاب"],
+    ["question-prompt-meaning", "Under a scene's sentence with a word missing, when the word is to be typed: what the sentence means, as the clue. Only where the sentence has its English.", "I went to school today"],
     ["scene", "The conversation, on a dialog question: as much of it as the question shows.", ""],
     ["scene-line", "One turn in it — who spoke, and what they said.", ""],
     ["scene-speaker", "Whose turn it is. One colour per speaker, for the whole scene.", "Layla"],

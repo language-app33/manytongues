@@ -279,7 +279,12 @@ import {
   SELF_SOME,
   WHOLE_SCENE,
   buildDialogIndex,
+  gapAt,
+  gapOptions,
+  gappedLine,
   isDialog,
+  meantAt,
+  sentenceOptions,
   isText,
   isTwoSided,
   linesOf,
@@ -3018,6 +3023,48 @@ function castRange(
 }
 
 /*
+ * A scene, cast as the word taken out of it.
+ *
+ * The scene's own word keeps its id and so its schedule — the answer is
+ * about the scene — and is given the hidden word as the thing marked
+ * against, with nothing beside it: no meaning or second writing, and none
+ * of the scene's own accepted answers. `gap` rides along for the screen.
+ *
+ * Which word is hidden walks the scene's count of having been asked this,
+ * and is fixed for the question the first time it is cast: an answer moves
+ * the count, and the word must not change under the answer screen. A
+ * question asked again later in the sitting is a new question and takes
+ * the next word.
+ */
+const GAP_TYPES = new Set(["gap2pick", "gap2ar"]);
+/* And the same walk for the two that ask about one whole sentence and its
+   meaning: the scene's own word given that sentence to be marked against. */
+const SENTENCE_TYPES = new Set(["sen2en", "en2sen"]);
+const GAP_TURNS = new WeakMap<Question, number>();
+
+function castGap(resolved: { unit: Form; parent: Item; isSub: boolean } | null, ex: Question) {
+  if (!resolved || !(GAP_TYPES.has(ex.type) || SENTENCE_TYPES.has(ex.type)) || !isDialog(resolved.parent)) return resolved;
+  let turn = GAP_TURNS.get(ex);
+  if (turn === undefined) {
+    const st = statesOf(resolved.unit)[ex.type];
+    turn = st ? (st.right || 0) + (st.wrong || 0) + (st.near || 0) + (st.skips || 0) : 0;
+    GAP_TURNS.set(ex, turn);
+  }
+  const { answers: _answers, ...rest } = resolved.unit as Form & { answers?: unknown };
+  if (SENTENCE_TYPES.has(ex.type)) {
+    const at = meantAt(resolved.parent, turn);
+    const line = at === null ? null : linesOf(resolved.parent)[at];
+    if (!line) return resolved;
+    const unit = { ...rest, ar: line.ar, en: line.en, lat: line.lat || "", recs: [], sentenceAt: at } as Form;
+    return { ...resolved, unit };
+  }
+  const gap = gapAt(resolved.parent, turn);
+  if (!gap) return resolved;
+  const unit = { ...rest, ar: gap.word, en: "", lat: "", recs: [], gap } as Form;
+  return { ...resolved, unit };
+}
+
+/*
  * A face that counts things, cast as the small sentence it was dealt as:
  * *three books* for the word three takes before a noun.
  *
@@ -4085,6 +4132,12 @@ interface Session {
      the queue, so the count at the top takes them off both sides: a miss
      is a question not yet answered, not a question more. */
   missed?: number;
+  /* The cards the session was dealt from — the deck chosen on the home
+     screen, a prep's decks, the cards picked by hand — where that is less
+     than everything held. A question's wrong answers come from these first:
+     a food among words from other decks is the one to choose by its topic.
+     Absent, every card held is as good as any other. */
+  from?: string[];
 }
 
 /* A running session with its queue re-planned by requeueUnaskable, and the
@@ -4627,6 +4680,7 @@ export function buildSession({
   }
 
   const exercises = withReadThroughs(questions.slice(0, cut), items, settings);
+  const from = items.filter(inDeck).map((it) => it.id);
   return {
     exercises,
     backups: backupsFor(rows, exercises, settings, typesOf, onlyNumbers),
@@ -4635,6 +4689,7 @@ export function buildSession({
     units: plans.length,
     due,
     ...(mix && mix.behind ? { catchingUp: true } : null),
+    ...(from.length < items.length ? { from } : null),
   };
 }
 
@@ -4988,7 +5043,11 @@ function gridOthers(type: string, u: Form): string[] {
   return (specOf(type)?.answerField || "en") === "en" ? meaningsOf(u) : [gridOther(type, u)];
 }
 
-export function gridFor(item: Form, exercise: Question, asking: Item[], settings: Settings, qLang: Lang) {
+/* `near` is the session's own forms, as for pickChoices: a spare meaning
+   from the decks being practised is one the learner has to read to rule
+   out, and one from another topic is not. They come first, the most alike
+   first among them, and the rest after. */
+export function gridFor(item: Form, exercise: Question, asking: Item[], settings: Settings, qLang: Lang, near?: (u: Form) => boolean) {
   /* The grid of recordings: a play button for each word, and the words
      themselves down the other side where the meanings would be. Its
      spare tiles are words, so they need no recording; every word asked
@@ -5035,7 +5094,7 @@ export function gridFor(item: Form, exercise: Question, asking: Item[], settings
     .map((u) => oneOf(u, exercise.type));
   const reps = (statesOf(item)[exercise.type] || {}).reps || 0;
   const likeness = (u: Form) => Math.max(...answers.map((a) => wordLikeness(a.ar, u.ar, qLang)));
-  const ranked = [...pool].sort((x, y) => likeness(y) - likeness(x));
+  const ranked = [...pool].sort((x, y) => (near ? Number(near(y)) - Number(near(x)) : 0) || likeness(y) - likeness(x));
   /* A question dealt no mates — a teacher trying the exercise on one
      card — is given its company from the pool, the most alike first, so
      the grid they see is the grid a learner gets. Nothing is marked on a
@@ -5098,6 +5157,7 @@ export function pickChoices({
   pool,
   seed,
   systems,
+  near,
 }: {
   item: Form;
   parentItem: Item | null | undefined;
@@ -5105,6 +5165,9 @@ export function pickChoices({
   pool: Form[];
   seed: string;
   systems: SystemSet[];
+  /** The forms of the cards the session was dealt from — see `from` on the
+      session. Wrong answers come from these first. */
+  near?: (w: Form) => boolean;
 }): Form[] {
   const field = picks === "meaning" ? "en" : "ar";
   const textOf = (w: Form) => String(w[field] || "");
@@ -5121,6 +5184,8 @@ export function pickChoices({
     wanted: PICK_OPTIONS,
     seed,
     textOf,
+    /* A made-up number is about the number asked, wherever its card is. */
+    near: near ? (w) => made.includes(w) || near(w) : undefined,
   });
 }
 
@@ -5343,14 +5408,17 @@ export function tokenCards(
  * question as the screen would have shown it.
  */
 export function resolveQuestion(asking: Item[], exercise: Question, trial: boolean, systems: SystemSet[]) {
-  return castRange(
-    castMeaning(
-      castTaught(castAnswer(castFill(resolveUnit(asking, exercise), exercise.type, trial), exercise.type), exercise.type),
-      exercise.type,
+  return castGap(
+    castRange(
+      castMeaning(
+        castTaught(castAnswer(castFill(resolveUnit(asking, exercise), exercise.type, trial), exercise.type), exercise.type),
+        exercise.type,
+        exercise,
+      ),
       exercise,
+      systems,
     ),
     exercise,
-    systems,
   );
 }
 
@@ -10696,6 +10764,22 @@ export default function ArabicTrainer() {
    * in the same language — a wrong answer has to be a word they could
    * believe, which means one they have actually met.
    */
+  /* The forms of the cards this session was dealt from, which a question's
+     wrong answers are drawn from first — see `from` on the session. Null
+     where the session draws on everything held. */
+  const sessionFrom: string[] | undefined = session ? session.from : undefined;
+  const nearForms = useMemo(() => {
+    if (!sessionFrom) return null;
+    const from = new Set(sessionFrom);
+    const ids = new Set<string>();
+    for (const card of asking) {
+      if (!from.has(card.id)) continue;
+      for (const { unit } of unitsOf(card)) ids.add(unit.id);
+    }
+    return ids;
+  }, [sessionFrom, asking]);
+  const near = nearForms ? (u: Form) => nearForms.has(u.id) : undefined;
+
   /*
    * The words a matching grid puts up, and the meanings beside them.
    *
@@ -10714,9 +10798,9 @@ export default function ArabicTrainer() {
     if (!item || !spec || !exercise || spec.picks !== "pair") {
       return { words: [] as Form[], meanings: [] as string[], said: [] as Form[] };
     }
-    return gridFor(item, exercise, asking, settings, qLang);
+    return gridFor(item, exercise, asking, settings, qLang, near);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [item && item.id, exercise && exercise.type, exercise && exercise.mates, asking, qLang.id]);
+  }, [item && item.id, exercise && exercise.type, exercise && exercise.mates, asking, qLang.id, nearForms]);
 
   /*
    * What each tile of the grid says about itself, beside its word.
@@ -10814,6 +10898,31 @@ export default function ArabicTrainer() {
         ? replyOptions({ card: dialog, at, pool: replyPool(asking, settings, qLang.id) })
         : [];
     }
+    /* A sentence of a scene and its meaning: the scene's other sentences
+       first, then those of the other scenes in the same language. */
+    if (spec.promptField === "sentence" || spec.promptField === "sentenceMeaning") {
+      return dialog && item && typeof item.sentenceAt === "number"
+        ? sentenceOptions({
+            card: dialog,
+            at: item.sentenceAt,
+            field: spec.answerField === "en" ? "en" : "ar",
+            answerId: item.id,
+            pool: asking.filter((c) => isDialog(c) && langIdOf(c, settings) === qLang.id),
+          })
+        : [];
+    }
+    /* A word taken out of a scene: the scene's own words first, then those
+       of the other scenes in the same language. */
+    if (spec.promptField === "gap") {
+      return dialog && item && item.gap
+        ? gapOptions({
+            card: dialog,
+            gap: item.gap,
+            answerId: item.id,
+            pool: asking.filter((c) => isDialog(c) && langIdOf(c, settings) === qLang.id),
+          })
+        : [];
+    }
     if (!item) return [];
     /*
      * A range brings its own wrong answers, already said.
@@ -10847,6 +10956,7 @@ export default function ArabicTrainer() {
         wanted: PICK_OPTIONS,
         seed: `${item.id} picture ${reps}`,
         textOf: (w) => (Array.isArray(w.images) && w.images[0]) || "",
+        near,
       });
     }
     /* The meanings of the learner's other words, one meaning apiece: a
@@ -10864,6 +10974,7 @@ export default function ArabicTrainer() {
           .map((u) => oneOf(u, exercise ? exercise.type : "")),
         seed: `${item.id} meaning ${reps}`,
         systems,
+        near,
       });
     }
     return pickChoices({
@@ -10883,9 +10994,10 @@ export default function ArabicTrainer() {
         exercise && !exercise.ctx ? (statesOf(item)[exercise.type] || {}).reps || 0 : ""
       }`,
       systems,
+      near,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dialog && dialog.id, at, item && item.id, exercise && exercise.type, exercise && exercise.ctx, asking.length, siblingCards.join(" "), systems]);
+  }, [dialog && dialog.id, at, item && item.id, exercise && exercise.type, exercise && exercise.ctx, asking.length, siblingCards.join(" "), systems, nearForms]);
 
   /*
    * Whether the prompt has to say which form it wants.
@@ -10922,7 +11034,7 @@ export default function ArabicTrainer() {
      leaves it open — see lentTags. Said under the prompt and again beside
      the answer, which is where a learner reported looking for it. */
   const lentLines = useMemo(
-    () => (item && spec && spec.promptField !== "pairs" && spec.promptField !== "scene" ? lentTags(item, qLang) : []),
+    () => (item && spec && !["pairs", "scene", "gap", "sentence", "sentenceMeaning"].includes(spec.promptField) ? lentTags(item, qLang) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [item, spec, qLang.id],
   );
@@ -12466,6 +12578,29 @@ export default function ArabicTrainer() {
                         autoPlay
                         lead={leadSpeed(item, exercise.type)}
                       />
+                    ) : spec.promptField === "gap" ? (
+                      /* One sentence of the scene, the word taken out of
+                         it; put back once the question is answered. When
+                         the word is to be typed and the sentence has its
+                         meaning, the meaning is under it as the clue —
+                         the sentence alone often fits more than one word. */
+                      <>
+                        <Field
+                          value={dialog && item.gap ? gappedLine(dialog, item.gap, checked ? null : undefined) : ""}
+                          field="ar"
+                          kind="phrase"
+                          name="question-prompt-text"
+                        />
+                        {spec.answerMode === "ar" && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
+                          <p className="at-ctxmeaning" data-el="question-prompt-meaning">
+                            {asMeaning(String(linesOf(dialog)[item.gap.line].en))}
+                          </p>
+                        ) : null}
+                      </>
+                    ) : spec.promptField === "sentence" ? (
+                      <Field value={item.ar} field="ar" kind="phrase" name="question-prompt-text" />
+                    ) : spec.promptField === "sentenceMeaning" ? (
+                      <Field value={item.en} field="en" kind="phrase" name="question-prompt-text" />
                     ) : spec.promptField === "context" ? (
                       <Field
                         /* The phrase can go between building the queue and
@@ -16289,7 +16424,7 @@ export function formTagsAt({ label, ambiguous, kin, lent, promptField }: {
   lent: boolean;
   promptField: string;
 }): { question: boolean; answer: boolean; lentQuestion: boolean; lentAnswer: boolean } {
-  const none = promptField === "pairs" || promptField === "scene";
+  const none = ["pairs", "scene", "gap", "sentence", "sentenceMeaning"].includes(promptField);
   const question = !none && !!label && ambiguous;
   const lentQuestion = !none && lent && !PROMPT_SHOWS_FORM.includes(promptField);
   return {

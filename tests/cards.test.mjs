@@ -1942,7 +1942,7 @@ test("a save carries the table on screen, minus cells whose form is gone or blan
   assert.deepEqual(tableCellsOf(cells, null, forms), [], "no table on screen, nothing carried");
 });
 
-test("what can be saved: a word needs its script and its English, a scene a name and two turns", () => {
+test("what can be saved: a word needs its script and its English, a scene a name and two turns, a text one sentence", () => {
   assert.equal(canSaveWord({ ar: "كتاب", en: "book" }, null), true);
   assert.equal(canSaveWord({ ar: "كتاب", en: "  " }, null), false);
   assert.equal(canSaveWord({ ar: "", en: "book" }, null), false);
@@ -1950,6 +1950,8 @@ test("what can be saved: a word needs its script and its English, a scene a name
   assert.equal(canSaveScene("At the door", [{}, {}]), true);
   assert.equal(canSaveScene("  ", [{}, {}]), false);
   assert.equal(canSaveScene("At the door", [{}]), false);
+  assert.equal(canSaveScene("Our street", [{}], true), true, "a text of one sentence");
+  assert.equal(canSaveScene("Our street", [], true), false);
   assert.deepEqual(writtenLines([{ ar: "سلام" }, { ar: " " }, { ar: "" }]).map((/** @type {any} */ l) => l.ar), ["سلام"]);
 });
 

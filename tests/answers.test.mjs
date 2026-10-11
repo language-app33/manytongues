@@ -493,6 +493,9 @@ test("every question shows one accepted answer, and the typed ones still take an
   const keepsAll = TYPES.filter((t) => !showsOneAnswer(t));
   assert.deepEqual(keepsAll, [
     "rec2ar", "en2ar", "own2ar", "img2ar", "ctx2ar", "rec2ctx",
+    /* A word typed back into a scene. Its question has one answer — the
+       word as the scene spells it — so keeping all of them is keeping one. */
+    "gap2ar",
     /* And the six that ask for a number or a time to be written out. A
        skill has exactly one way of saying what it drew, so narrowing it
        would be narrowing a list of one — the rule holds trivially here

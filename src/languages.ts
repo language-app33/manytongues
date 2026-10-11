@@ -126,6 +126,12 @@ export const TYPES = [
   "en2ar", "own2ar", "img2ar", "ctx2ar", "rec2ctx",
   /* and a conversation, on its own levels: 1, 3, 3 */
   "dlgwhole", "dlgpick", "dlgorder",
+  /* and a word taken out of a scene: chosen, then typed. Levels 2 and 4,
+     as the same pair is for a word in a phrase. */
+  "gap2pick", "gap2ar",
+  /* and a sentence of a scene with its meaning: the meaning chosen, then
+     the sentence chosen from its meaning. Levels 1 and 2. */
+  "sen2en", "en2sen",
   /* and a range of numbers or of times, which is a skill and climbs the
      same four levels: read one, pick one, count with one, write one. A
      range is never dealt an exercise above because it has no word of its
@@ -983,6 +989,98 @@ export const EX: Record<string, ExerciseSpec> = {
     answerField: "",
     answerMode: "order",
   },
+  /*
+   * A word taken out of a scene, and chosen back.
+   *
+   * The scene's own text is the whole of what it needs: no meaning, no
+   * recording, so a text written in the language alone has a question to
+   * be asked beyond reading it through. One sentence is shown, not the
+   * scene — the gap is the question and the rest would be reading — and
+   * the word is a different one each time it comes round: see gapAt.
+   *
+   * Level 2, as "In a phrase → choose" is: picking a word out of four is
+   * telling it apart, and comes before writing it. The three wrong ones
+   * are other words of the same scene where it has them.
+   */
+  gap2pick: {
+    level: 2,
+    instruction: "Which word is missing?",
+    label: "Missing word → choose",
+    short: "Gap→C",
+    needs: ["dialog", "gap"],
+    dialog: "card",
+    question: "Which word is missing?",
+    placeholder: "",
+    promptField: "gap",
+    answerField: "ar",
+    answerMode: "choice",
+    picks: "word",
+    gentle: true,
+  },
+  /*
+   * And typed. Level 4, as "fill the gap" is for a word in a phrase: the
+   * sentence is the only cue, and nothing on the screen spells the word.
+   * Marked by the language's own rule like every other answer in the
+   * script, one letter out asked again, and the letters marked.
+   */
+  gap2ar: {
+    level: 4,
+    instruction: "Fill the gap",
+    label: "Missing word → {script}",
+    short: "Gap→{S}",
+    needs: ["dialog", "gap"],
+    dialog: "card",
+    question: "Which word is missing?",
+    placeholder: "",
+    promptField: "gap",
+    answerField: "ar",
+    answerMode: "ar",
+  },
+  /*
+   * One sentence of a scene, and its meaning chosen out of four.
+   *
+   * What "A line → English" asked, chosen instead of typed: a sentence can
+   * be put into English a dozen ways and only the teacher's was marked
+   * right. The three wrong meanings are the scene's other sentences' where
+   * it has them. Level 1, beside reading the scene: it asks what the words
+   * mean and puts the answer on the screen.
+   */
+  sen2en: {
+    level: 1,
+    instruction: "What does it mean?",
+    label: "Sentence → choose its meaning",
+    short: "S→M",
+    needs: ["dialog", "meant"],
+    dialog: "card",
+    question: "What does it mean?",
+    placeholder: "",
+    promptField: "sentence",
+    answerField: "en",
+    answerMode: "choice",
+    picks: "meaning",
+    gentle: true,
+  },
+  /*
+   * And the other way: the meaning given, the sentence chosen. Level 2,
+   * as "English → choose" is for a word — telling the right one apart
+   * from others that look like it, which in a scene of similar lines is
+   * the harder half.
+   */
+  en2sen: {
+    level: 2,
+    instruction: "Which sentence means this?",
+    label: "Meaning → choose the sentence",
+    short: "M→S",
+    needs: ["dialog", "meant"],
+    dialog: "card",
+    question: "Which sentence means this?",
+    placeholder: "",
+    promptField: "sentenceMeaning",
+    answerField: "ar",
+    answerMode: "choice",
+    picks: "sentence",
+    gentle: true,
+  },
   /* Retired. Every turn of a scene typed out at once was the longest
      answer in the app and the least forgiving: one missed mark in the
      third line made the whole conversation wrong. */
@@ -1792,6 +1890,8 @@ export function needLabel(need: string, lang: Partial<Lang>) {
     choices: "a third line to choose between",
     order: "three lines or more",
     part: "a part to play",
+    gap: "a word of three letters or more",
+    meant: "a sentence with its meaning",
   };
   return names[need] || need;
 }

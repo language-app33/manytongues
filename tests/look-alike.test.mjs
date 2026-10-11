@@ -180,3 +180,32 @@ test("a number written in thousands is offered numbers written the same way", ()
   assert.ok(shown.includes("10,000") || shown.some((t) => !/,/.test(t) && Number(t) < 1000), shown.join(" / "));
   assert.ok(!shown.includes("10000"), "never a big number without its commas beside one with them");
 });
+
+/* ---- the session's own decks ---- */
+
+test("a session on one deck takes its wrong answers from that deck", () => {
+  /* The report: a Foods session offered "apple" beside words from other
+     decks, and the one food was the answer. The session says which cards
+     it was dealt from, and a choice question draws on those first. */
+  const foods = WORDS.slice(0, 6).map((w) => w.id);
+  const inFoods = (/** @type {any} */ it) => foods.includes(it.id);
+  const built = buildSession({ items: ITEMS, settings, inDeck: inFoods, systems: SETS });
+  assert.deepEqual([...built.from].sort(), [...foods].sort(), "the session names the cards it was dealt from");
+  const near = (/** @type {any} */ u) => foods.includes(u.id);
+  const asked = built.exercises.filter((/** @type {any} */ q) => CHOICE.includes(q.type));
+  assert.ok(asked.length > 0, "no choice question was dealt to look at");
+  for (const q of asked) {
+    const r = resolveQuestion(ITEMS, q, false, SETS);
+    if (!r) continue;
+    const picks = EX[q.type].picks;
+    const got = pickChoices({ item: r.unit, parentItem: r.parent, picks, pool: others(r.unit), seed: `${q.id} ${q.type}`, systems: SETS, near });
+    assert.equal(got.length, PICK_OPTIONS);
+    const strays = got.filter((/** @type {any} */ w) => !near(w));
+    assert.deepEqual(strays.map((/** @type {any} */ w) => w.ar), [], `${q.type} on ${r.unit.ar} offered words from other decks`);
+  }
+});
+
+test("a session on everything held names no deck to prefer", () => {
+  const built = buildSession({ items: ITEMS, settings, inDeck: () => true, systems: SETS });
+  assert.equal(built.from, undefined);
+});

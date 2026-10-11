@@ -389,3 +389,38 @@ test("a grid's spare meanings are of its own shape", () => {
   const { said } = matchSet({ answers, pool, seed: "s", textOf, meaningOf, shapeOf });
   assert.deepEqual(ids(said.filter((w) => !answers.includes(w))).sort(), ["w4", "w5"]);
 });
+
+test("wrong answers come from what the session is about first", () => {
+  /* A learner reported a Foods session offering "apple" among words from
+     other decks: the only food was the answer, Arabic or no Arabic. With
+     enough of the session's own words, no other deck's word is offered. */
+  const answer = { id: "a", text: "apple" };
+  const foods = ["bread", "rice", "milk", "tea", "cheese"].map((t) => ({ id: `f-${t}`, text: t }));
+  const others = ["car", "teacher", "hello", "house", "blue", "run"].map((t) => ({ id: `o-${t}`, text: t }));
+  const near = (/** @type {{id: string}} */ x) => x.id.startsWith("f-");
+  for (const seed of ["s1", "s2", "s3", "s4", "s5", "s6"]) {
+    const got = optionsFor({ answer, pool: others.concat(foods), wanted: PICK_OPTIONS, seed, textOf: (x) => x.text, near });
+    assert.equal(got.length, PICK_OPTIONS);
+    assert.ok(got.every((x) => x.id === "a" || near(x)), `another deck's word was offered: ${got.map((x) => x.text).join(" / ")}`);
+  }
+});
+
+test("a session holding too few of its own is made up from the rest", () => {
+  /* One other food in the deck: it is offered, and the count is still
+     made, from the other decks. */
+  const answer = { id: "a", text: "apple" };
+  const pool = [{ id: "o-car", text: "car" }, { id: "f-bread", text: "bread" }, { id: "o-hello", text: "hello" }, { id: "o-blue", text: "blue" }];
+  const got = optionsFor({ answer, pool, wanted: PICK_OPTIONS, seed: "s", textOf: (x) => x.text, near: (x) => x.id.startsWith("f-") });
+  assert.equal(got.length, PICK_OPTIONS);
+  assert.ok(got.some((x) => x.id === "f-bread"), "the session's own word is among them");
+});
+
+test("without a session to prefer, the draw is what it always was", () => {
+  const answer = { id: "a", text: "نعم" };
+  const pool = words(10).map((w, i) => ({ id: `p${i}`, text: `w${i}` }));
+  for (const seed of ["s1", "s2", "s3"]) {
+    const plainDraw = optionsFor({ answer, pool, wanted: PICK_OPTIONS, seed, textOf: (x) => x.text });
+    const allNear = optionsFor({ answer, pool, wanted: PICK_OPTIONS, seed, textOf: (x) => x.text, near: () => true });
+    assert.deepEqual(ids(allNear), ids(plainDraw));
+  }
+});

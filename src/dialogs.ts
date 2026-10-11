@@ -484,6 +484,225 @@ export const orderOf = (lines: Line[]): string => lines.map((l) => l.id).join(OR
 export const orderIsRight = (typed: string, card: Scene): boolean =>
   !!typed && typed === orderOf(linesOf(card));
 
+/* ------------------------------------------------------------------
+   The missing word
+
+   A scene's own text with one word taken out of one sentence: chosen out
+   of a few, a level up from reading it, and typed, a level up again. Both
+   are asked of the scene as a whole, so they need nothing a teacher has
+   not already written — no meaning, no recording — and a text in the
+   language alone has something to be practised with beyond reading it.
+
+   Which word is taken out is the app's choice and is never random: every
+   word worth hiding is listed in reading order, and the scene's count of
+   having been asked this walks the list, so over a few sittings each word
+   gets its turn.
+   ------------------------------------------------------------------ */
+
+/*
+ * The fewest letters a word may have and still be hidden.
+ *
+ * Words of one or two letters are mostly the small change of a sentence —
+ * و, في, đi, là — that are told apart by a mark or a letter and guessed
+ * from the shape of the gap. Hiding them asks about the gap rather than
+ * the word. Letters are counted as Unicode letters, so Arabic's harakat and
+ * a decomposed Vietnamese tone mark are not letters of their own.
+ */
+export const GAP_MIN_LETTERS = 3;
+
+/* One word of a sentence, with whatever punctuation clings to it kept
+   outside the gap: "Mai, đi học!" hides "Mai" and leaves the comma. */
+export interface GapToken {
+  lead: string;
+  word: string;
+  trail: string;
+}
+
+/* A sentence as its words. Split on spaces, which is where every script
+   the app writes puts the end of a word. */
+export function gapTokens(text: string): GapToken[] {
+  return String(text || "")
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((t) => {
+      const lead = (t.match(/^[^\p{L}\p{M}\p{N}]+/u) || [""])[0];
+      const rest = t.slice(lead.length);
+      const trail = (rest.match(/[^\p{L}\p{M}\p{N}]+$/u) || [""])[0];
+      return { lead, word: rest.slice(0, rest.length - trail.length), trail };
+    });
+}
+
+/* Whether a word may be the one taken out. Not a blank still waiting to
+   be filled — "{{name}}" is not a word yet — and not a short one. */
+export function hideable(word: string): boolean {
+  if (!word || /[{}]/.test(word)) return false;
+  return (word.match(/\p{L}/gu) || []).length >= GAP_MIN_LETTERS;
+}
+
+/* One gap: which line, which word of it, and the word itself. */
+export interface Gap {
+  line: number;
+  at: number;
+  word: string;
+}
+
+/* Every word in the scene worth hiding, in reading order. */
+export function gapsOf(card: Scene): Gap[] {
+  const out: Gap[] = [];
+  linesOf(card).forEach((l, line) => {
+    gapTokens(String((l && l.ar) || "")).forEach((t, at) => {
+      if (hideable(t.word)) out.push({ line, at, word: t.word });
+    });
+  });
+  return out;
+}
+
+/* The gap for the scene's n-th asking: each word in turn, then round again. */
+export function gapAt(card: Scene, n: number): Gap | null {
+  const gaps = gapsOf(card);
+  if (!gaps.length) return null;
+  const k = Math.abs(Math.round(Number(n) || 0)) % gaps.length;
+  return gaps[k];
+}
+
+/* What stands where the word was taken out. */
+export const GAP_BLANK = "____";
+
+/* The sentence a gap stands in, with the word taken out — or put back, for
+   the answer screen. */
+export function gappedLine(card: Scene, gap: Gap, blank: string | null = GAP_BLANK): string {
+  const line = linesOf(card)[gap.line];
+  return gapTokens(String((line && line.ar) || ""))
+    .map((t, i) => (i === gap.at && blank !== null ? `${t.lead}${blank}${t.trail}` : `${t.lead}${t.word}${t.trail}`))
+    .join(" ");
+}
+
+
+/*
+ * The words on offer for a gap.
+ *
+ * The right one and three others, drawn from the same scene first — a word
+ * from two lines up is a mistake a learner could really make — and from
+ * the other scenes in `pool` when this one has too few. A word that reads
+ * the same as the answer is never offered as wrong, and nor is any word
+ * still standing in the sentence on screen: the one tile not already in
+ * front of the learner would be the answer found without reading.
+ */
+export function gapOptions({
+  card,
+  gap,
+  answerId,
+  pool = [],
+  wanted = PICK_OPTIONS,
+  seed = "",
+}: {
+  card: Scene;
+  gap: Gap;
+  answerId: string;
+  pool?: Scene[];
+  wanted?: number;
+  seed?: string;
+}): { id: string; ar: string }[] {
+  const shown = new Set(
+    gapTokens(String((linesOf(card)[gap.line] || {}).ar || ""))
+      .filter((_, i) => i !== gap.at)
+      .map((t) => t.word),
+  );
+  const own = (c: Scene) =>
+    gapsOf(c)
+      .filter((g) => !shown.has(g.word))
+      .map((g) => ({ id: `${(c && c.id) || ""} ${g.line} ${g.at}`, ar: g.word }));
+  const here = own(card);
+  const near = new Set(here.map((w) => w.id));
+  const others = pool.filter((c) => c && card && c.id !== card.id).flatMap(own);
+  return optionsFor({
+    answer: { id: answerId, ar: gap.word },
+    pool: here.concat(others),
+    wanted,
+    seed: `${(card && card.id) || ""} ${gap.line} ${gap.at} ${seed}`,
+    textOf: (w) => w.ar,
+    near: (w) => near.has(w.id),
+  });
+}
+
+/* ------------------------------------------------------------------
+   A sentence and its meaning
+
+   Where a scene's sentences carry their English, two more questions are
+   asked of it: one sentence shown and its meaning chosen out of four, and
+   the meaning shown and the sentence chosen. Chosen rather than typed,
+   which is what "A line → English" got wrong — there are many ways to say
+   what a sentence means and only the teacher's would have been marked
+   right. Asked of the scene as a whole and walked one sentence at a time,
+   as the missing word is.
+   ------------------------------------------------------------------ */
+
+/* A line written out in full with its meaning beside it — not one still
+   waiting for a blank to be filled, whose words are not yet a sentence. */
+const said = (l: Scene): boolean =>
+  !!l && !!String(l.ar || "").trim() && !!String(l.en || "").trim() && !/[{}]/.test(`${l.ar} ${l.en}`);
+
+/* The lines of a scene that have a meaning, by where they stand. */
+export function meantLines(card: Scene): number[] {
+  const out: number[] = [];
+  linesOf(card).forEach((l, i) => {
+    if (said(l)) out.push(i);
+  });
+  return out;
+}
+
+/* The line for the scene's n-th asking: each in turn, then round again. */
+export function meantAt(card: Scene, n: number): number | null {
+  const lines = meantLines(card);
+  if (!lines.length) return null;
+  return lines[Math.abs(Math.round(Number(n) || 0)) % lines.length];
+}
+
+/*
+ * The four on offer for a sentence: its own meaning or words and three
+ * others, from this scene first and then from the scenes in `pool`. Two
+ * that read the same — "Hello" and "hello." — are one, so being marked
+ * wrong for the right words cannot happen.
+ */
+export function sentenceOptions({
+  card,
+  at,
+  field,
+  answerId,
+  pool = [],
+  wanted = PICK_OPTIONS,
+  seed = "",
+}: {
+  card: Scene;
+  at: number;
+  field: "ar" | "en";
+  answerId: string;
+  pool?: Scene[];
+  wanted?: number;
+  seed?: string;
+}): { id: string; ar: string; en: string }[] {
+  const lines = linesOf(card);
+  const answer = lines[at];
+  if (!said(answer)) return [];
+  const own = (c: Scene) =>
+    linesOf(c)
+      .filter(said)
+      .map((l) => ({ id: `${(c && c.id) || ""} ${l.id}`, ar: String(l.ar), en: String(l.en) }));
+  const here = own(card).filter((o) => o.id !== `${(card && card.id) || ""} ${answer.id}`);
+  const near = new Set(here.map((o) => o.id));
+  const others = pool.filter((c) => c && card && c.id !== card.id).flatMap(own);
+  const key = (o: { ar: string; en: string }) =>
+    String(o[field]).toLowerCase().replace(/[\p{P}\s]+/gu, " ").trim();
+  return optionsFor({
+    answer: { id: answerId, ar: String(answer.ar), en: String(answer.en) },
+    pool: here.concat(others),
+    wanted,
+    seed: `${(card && card.id) || ""} ${answer.id} ${field} ${seed}`,
+    textOf: key,
+    near: (o) => near.has(o.id),
+  });
+}
+
 /*
  * Playing a part: every turn the learner's speaker takes, in one go.
  *
@@ -508,6 +727,11 @@ export function dialogNeedMet(need: string, scene: Placed | null, unit: Record<s
      and the teaching space both do — the unit itself. */
   const card = scene ? scene.card : unit;
   if (need === "dialog") return isDialog(card);
+  /* A word to take out, which a text has as much as a conversation. */
+  if (need === "gap") return isDialog(card) && gapsOf(card).length > 0;
+  /* A sentence with its meaning, which a text has as much as a
+     conversation. */
+  if (need === "meant") return isDialog(card) && meantLines(card).length > 0;
   /* A text is asked as a whole and nothing else: a line of prose has no
      reply to choose, nobody to play, and a paragraph's order is too often
      arguable to mark. */
@@ -525,7 +749,7 @@ export function dialogNeedMet(need: string, scene: Placed | null, unit: Record<s
   return false;
 }
 
-export const DIALOG_NEEDS: string[] = ["dialog", "line", "reply", "choices", "order", "part"];
+export const DIALOG_NEEDS: string[] = ["dialog", "line", "reply", "choices", "order", "part", "gap", "meant"];
 
 /*
  * What a unit is, as far as the exercise table is concerned.

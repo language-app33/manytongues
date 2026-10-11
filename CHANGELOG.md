@@ -8,6 +8,104 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.426 — 11 October 2026
+
+**A text can be a single sentence.**
+
+- A text no longer has to have two sentences before it can be saved. A
+  name and one sentence are enough, and the second empty sentence box a
+  new text starts with can now be removed.
+- Everything a text is practised with works on one sentence: reading it
+  through, choosing and typing the missing word, and its meaning both
+  ways where it has English.
+- Conversations are unchanged: they still need two lines, because a
+  conversation of one line has no reply to practise.
+- To check by hand: make a new text, give it a name and write only the
+  first sentence. It should save, and practising it should ask for its
+  missing word.
+
+## 0.425 — 11 October 2026
+
+**Practise what a text's sentences mean, where they have a translation.**
+
+- Two new exercises for every text and conversation whose sentences have
+  their English written in. Both take one sentence at a time, a
+  different one each time the scene comes round:
+  - **Sentence → choose its meaning:** a sentence is shown and you pick
+    its English out of four. This is the first step, next to reading the
+    scene through.
+  - **Meaning → choose the sentence:** the English is shown and you pick
+    the right sentence out of four. This is the step above, next to
+    choosing the missing word.
+- The wrong choices are the scene's other sentences, and come from your
+  other scenes only when it has too few. Two that differ only in a
+  capital or a full stop are never both offered.
+- **Typing the missing word now shows the sentence's English underneath**
+  as a clue, where the sentence has it. Scenes without a translation
+  work exactly as before.
+- Sentences without English are simply left out of the two new
+  exercises, and a scene with no English at all is not asked them.
+- The trade-off: in scenes that already have translations, these new
+  steps come first. Choosing the missing word, the reply and the order
+  will wait until you have chosen a sentence's meaning right twice in a
+  row, and typing the missing word waits on choosing the sentence too.
+  Each can happen in one sitting.
+- To check by hand: practise a text that has English for its
+  sentences. You should be asked what a sentence means, then later which
+  sentence an English line means, and on the typing question see the
+  English under the sentence.
+
+## 0.424 — 11 October 2026
+
+**Practise texts and conversations by filling in a missing word.**
+
+- Two new exercises for every scene, text or conversation. One sentence
+  of it is shown with a word missing. First you **choose the missing
+  word** out of four. Once you have that right twice in a row (and, in a
+  conversation, choosing the reply and putting it in order too), you
+  **type it** instead.
+- They need only the text in the language you are learning: no meaning,
+  pronunciation or recording. A text of a single sentence is enough.
+- The app chooses which word is missing and works through the words in
+  order, a different one each time the scene comes round. Words of one
+  or two letters are never hidden.
+- The wrong choices come from the same text where it has enough words,
+  and from your other scenes in the same language when it has too few.
+- Typing is marked like every other typed answer in that language: one
+  letter out asks you again, and wrong letters are highlighted. Whether
+  missing accents, tone marks or vowel marks count follows the
+  language's existing rule.
+- A scene now counts as learnt once you have typed its missing words
+  correctly on two separate reviews.
+- The trade-off: conversations you have already practised will first ask
+  you to choose a missing word a couple of times before choosing the
+  reply and putting the scene in order come back, and a scene shown as
+  learnt stops being learnt until you have typed its missing words on
+  two reviews.
+- To check by hand: open a text with a few sentences, practise it, and
+  see one sentence with a gap and four words to choose from; after two
+  right answers, see the same kind of question asking you to type the
+  word.
+
+## 0.423 — 11 October 2026
+
+**Wrong answers come from the decks being practised.**
+
+- When a question asks you to choose the right meaning, word or picture,
+  the three wrong answers now come from the decks this session is
+  practising. Before, they could come from any deck you hold. In a Foods
+  session, "apple" could stand beside words from other topics, and you
+  could choose it just because it was the only food, without knowing the
+  Arabic. A learner reported exactly that.
+- The matching grids take their spare meanings the same way.
+- Where the decks being practised hold too few words of the right kind,
+  words from other decks still make up the four, as before.
+- A session over everything you hold works as it did.
+- The trade-off: in a small deck the same few wrong answers come round
+  more often.
+- To check by hand: practise one deck from the home screen, or a
+  catching-up session, and see that the wrong answers are from that deck.
+
 ## 0.422 — 11 October 2026
 
 **The buttons for another meaning say which word, and which language.**

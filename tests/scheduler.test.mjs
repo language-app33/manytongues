@@ -754,12 +754,17 @@ test("the settings say which level each exercise stands on, and every one has a 
      what it means: the grid, and the two that offer the word among four. */
   assert.deepEqual(TYPES.filter((t) => levelOf(t) === 2), [
     "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick",
+    /* A word taken out of a scene, chosen out of four; and a scene's
+       sentence chosen from its meaning. */
+    "gap2pick", "en2sen",
     /* Picking a number out of four, and showing a time on a dial. Both
        put the answer on the screen and ask which one it is. */
     "fig2pick", "time2dial",
   ]);
   assert.deepEqual(TYPES.filter((t) => levelOf(t) === 1), [
     "ar2pick", "ar2en", "rec2en", "rec2img", "dlgwhole",
+    /* A scene's sentence, its meaning chosen. */
+    "sen2en",
     "num2fig", "rec2fig", "time2fig",
     "dig2fig",
   ]);

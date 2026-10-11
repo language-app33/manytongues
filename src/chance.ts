@@ -56,29 +56,45 @@ export const PICK_OPTIONS = 4;
  * unforgivable question — and the answer itself is put back in at a place
  * the seed decides, so it is not always third.
  */
+/*
+ * **`near` is what the session is about**, and the wrong answers are drawn
+ * from it first: a session on the Foods deck offering "apple" beside a car,
+ * a teacher and hello is answered by knowing which of them is a food. Only
+ * when it holds too few is the rest of the pool drawn on to make up the
+ * count. A caller with no session to speak of leaves it out, and the whole
+ * pool is near.
+ */
 export function optionsFor<T extends { id: string }>({
   answer,
   pool,
   wanted,
   seed,
   textOf,
+  near,
 }: {
   answer: T;
   pool: T[];
   wanted: number;
   seed: string;
   textOf: (x: T) => string;
+  near?: (x: T) => boolean;
 }): T[] {
   const taken = new Set([plain(textOf(answer))]);
-  const others: T[] = [];
-  for (const cand of pool) {
+  const close: T[] = [];
+  const far: T[] = [];
+  /* The near ones are read first, so where two cards read alike it is the
+     one from the session that stands. */
+  const ordered = near ? pool.filter((x) => x && near(x)).concat(pool.filter((x) => x && !near(x))) : pool;
+  for (const cand of ordered) {
     if (!cand || cand.id === answer.id) continue;
     const text = plain(textOf(cand));
     if (!text || taken.has(text)) continue;
     taken.add(text);
-    others.push(cand);
+    (!near || near(cand) ? close : far).push(cand);
   }
-  const wrong = shuffledBy(others, seed, (x) => x.id).slice(0, Math.max(0, wanted - 1));
+  const want = Math.max(0, wanted - 1);
+  const first = shuffledBy(close, seed, (x) => x.id).slice(0, want);
+  const wrong = first.concat(shuffledBy(far, seed, (x) => x.id).slice(0, want - first.length));
   return shuffledBy(wrong.concat([answer]), `${seed} place`, (x) => x.id);
 }
 

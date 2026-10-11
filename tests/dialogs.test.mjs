@@ -376,7 +376,7 @@ test("what a scene is asked, and what it is no longer asked", () => {
      What is left is what a conversation is actually for: reading a page
      of two people talking, choosing what comes next, and knowing the
      order it happened in. */
-  assert.deepEqual(TYPES.filter((t) => EX[t].dialog), ["dlgwhole", "dlgpick", "dlgorder"]);
+  assert.deepEqual(TYPES.filter((t) => EX[t].dialog), ["dlgwhole", "dlgpick", "dlgorder", "gap2pick", "gap2ar", "sen2en", "en2sen"]);
   for (const gone of ["dlg2en", "dlgreply", "dlgplay"]) {
     assert.equal(TYPES.includes(gone), false, `${gone} is still offered`);
     /* The definition stays, as a retired one does: a stored session or an
