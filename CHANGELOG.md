@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.428 — 11 October 2026
+
+**A phrase's English waits until it is asked for.**
+
+- In "choose the missing word in a phrase" and "fill the gap in a phrase",
+  the English of the whole phrase is no longer on the screen from the
+  start. It is behind the hint button, because it often all but names the
+  missing word: "I want to understand the news in Arabic" over a gap for
+  الأخبار.
+- In "choose the missing word", opening the hint costs nothing: a right
+  answer is still marked right.
+- In "fill the gap", the hint now shows the pronunciation and the phrase's
+  English together, and opening it costs the mark as the pronunciation
+  always has.
+- Unchanged: the version where the phrase is heard rather than read still
+  shows the word's meaning, since there is no gap to point at; and a phrase
+  written without English still shows the word's meaning as before.
+- Trade-off: a beginner who cannot yet read the Arabic around the gap has
+  only the choices to go on until they ask for the hint.
+- To check by hand: on a word with a phrase, try both phrase questions and
+  confirm the English line appears only after pressing the hint button.
+
 ## 0.427 — 11 October 2026
 
 **Matching exercises lose a repeated hint.**

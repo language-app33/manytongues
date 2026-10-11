@@ -466,6 +466,13 @@ export const EX: Record<string, ExerciseSpec> = {
     answerMode: "choice",
     picks: "word",
     gentle: true,
+    /* What the phrase means, behind the nudge — see hintPhrase. It is the
+       whole of this question's hint, and does not cost the answer its good
+       mark: this is the gentle half, and choosing from four with the
+       meaning up is still reading the Arabic round the gap. */
+    hintPhrase: true,
+    hintLabel: "Show what the phrase means",
+    hintHideLabel: "Hide what the phrase means",
   },
   /* The other way round, and a level up: the meaning is given and the word
      itself has to be picked out of four. Recognising a spelling is not
@@ -536,11 +543,14 @@ export const EX: Record<string, ExerciseSpec> = {
     promptField: "context",
     answerField: "ar",
     hintField: "lat",
-    hintLabel: "Show {translit}",
-    hintHideLabel: "Hide {translit}",
+    hintLabel: "Show {translit} and what the phrase means",
+    hintHideLabel: "Hide {translit} and what the phrase means",
     /* As in English → {script}: the hint is the word itself, said another
        way. */
     hintTells: true,
+    /* And what the phrase means comes up with it, rather than sitting on
+       the screen from the start — see hintPhrase. */
+    hintPhrase: true,
     answerMode: "ar",
   },
   /* And the same again by ear. Harder than hearing the word alone, which is
