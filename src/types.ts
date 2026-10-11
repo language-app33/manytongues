@@ -93,6 +93,16 @@ export interface ExerciseSpec {
    * the word off the screen.
    */
   hintTells?: boolean;
+  /**
+   * Whether what the phrase means is part of the hint rather than on the
+   * screen from the start. On the two questions that put a word's phrase up
+   * with a gap, the phrase's English says most of what the missing word is
+   * — "I want to understand the news in Arabic" over a gap for الأخبار — so
+   * a learner reported it should wait to be asked for. Shown with the hint
+   * where the question has one of its own, and as the hint where it has
+   * none.
+   */
+  hintPhrase?: boolean;
   /** Recognition rather than production. */
   gentle?: boolean;
   /**

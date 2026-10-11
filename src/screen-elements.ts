@@ -59,7 +59,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["match-sound", "In the grid of recordings, the play button standing where a word would. A target of its own, drawn long: tapping it only plays the word, and tapping the rest of the tile pairs it like any other tile.", ""],
     ["match-form-tag", "On a tile, which form of its card it is. Only where two forms of one card are in the grid, and on both the word and the meaning.", "plural"],
     ["answer-self", "The two answers to \"could you follow all of it\". Nobody else was in the room, so the reader marks it.", ""],
-    ["question-context-meaning", "On a gap-fill, which word is wanted — the word's own meaning, never the phrase's.", "book"],
+    ["question-context-meaning", "On a gap-fill, what the phrase means — behind the nudge until asked for. Heard rather than read, the word's own meaning.", "book"],
     ["hint-button", "The question-mark button in the bar at the foot. Reveals the nudge, and puts it away again.", "Show meaning"],
     ["hint-value", "The nudge, once revealed.", ""],
     ["hint-value-text", "The nudge itself — whichever field the exercise reveals.", "kitaab"],

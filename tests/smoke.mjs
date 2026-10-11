@@ -7795,11 +7795,13 @@ const openPronounTables = async () => {
   await sleep(300);
 }
 
-/* ---- a gap in a phrase comes with what the phrase means ----
+/* ---- a gap in a phrase comes with what the phrase means, when asked ----
 
    The missing word's own meaning is what the word's own questions already
    ask, and a learner said so: the gap question should give the whole
-   phrase in English and leave the missing word to be worked out. */
+   phrase in English and leave the missing word to be worked out. And then
+   another said the phrase's English all but names the word, so it waits
+   behind the nudge until it is asked for. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
   const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
@@ -7815,8 +7817,14 @@ const openPronounTables = async () => {
     [...document.querySelectorAll(".at-try")].map((b) => b.getAttribute("aria-label")).join(" | "));
   click(tryIt);
   await sleep(600);
+  const early = ((document.querySelector('[data-el="question-context-meaning"]') || {}).textContent || "").trim();
+  check("the phrase's English is not on the screen until asked for", !early, early);
+  const nudge = document.querySelector('[data-el="hint-button"]');
+  check("the nudge is there to ask with", !!nudge, "(no hint button)");
+  click(nudge);
+  await sleep(200);
   const means = ((document.querySelector('[data-el="question-context-meaning"]') || {}).textContent || "").trim();
-  check("and the question gives the phrase's English, not the word's", means === "The book is big",
+  check("and asked for, it gives the phrase's English, not the word's", means === "The book is big",
     means || "(nothing said)");
   click(buttonNamed(/^I don't know$/));
   await sleep(200);

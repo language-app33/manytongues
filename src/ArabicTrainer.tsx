@@ -10694,10 +10694,6 @@ export default function ArabicTrainer() {
    * from its meaning alone. Asking for it is one press, and asking is what
    * makes it a nudge rather than the answer.
    */
-  const hintAt = spec && spec.hintField && item ? String(item[spec.hintField] || "") : "";
-  const hintShown = !!hintAt && !!hintOpen;
-  /* On the screen now, or on it at some point. */
-  const hintTaken = hintShown || hintUsed;
   /* Whether the answer as marked stands as a right one, before the hint is
      taken into account. */
   const answerStands = !!(overridden || (checked && checked.ok && !skipped));
@@ -10706,7 +10702,9 @@ export default function ArabicTrainer() {
      answer went in, not what is on it now — the nudge can still be opened
      afterwards to look at the pronunciation, and looking at it once the
      question is answered is not leaning on it. */
-  const toldAnswer = !!(spec && spec.hintTells && hintAtAnswer && answerStands);
+  const toldAnswer = !!(
+    spec && spec.hintTells && spec.hintField && item && item[spec.hintField] && hintAtAnswer && answerStands
+  );
   /* The phrase this question shows the word in, if it is that sort of
      question. Chosen when the queue was built and named on the exercise, so
      it stays put; looked up again here because only the id travels. */
@@ -10715,6 +10713,15 @@ export default function ArabicTrainer() {
     wantsContext && exercise && exercise.ctx && item
       ? contextsFor(item.id).find((c) => c.id === exercise.ctx) || null
       : null;
+  /* What the phrase means, where the question keeps it behind the nudge —
+     see hintPhrase. Empty where the phrase was written without English:
+     the line under the phrase then says the word's own meaning, as it
+     always has, and there is nothing to hide. */
+  const phraseHint = spec && spec.hintPhrase && context && context.en ? context.en : "";
+  const hintAt = (spec && spec.hintField && item ? String(item[spec.hintField] || "") : "") || phraseHint;
+  const hintShown = !!hintAt && !!hintOpen;
+  /* On the screen now, or on it at some point. */
+  const hintTaken = hintShown || hintUsed;
   /*
    * Somewhere this word turned up, for the answer screen — whatever the
    * question was.
@@ -12680,7 +12687,11 @@ export default function ArabicTrainer() {
                         point at, so there it is still the word's meaning
                         that says which word to write. And a phrase written
                         without its English falls back to the word's. */}
-                    {context && (
+                    {/* Unless the question keeps the phrase's meaning
+                        behind the nudge, when it is there only once asked
+                        for: "I want to understand the news in Arabic" over
+                        a gap all but names the word. */}
+                    {context && (!phraseHint || hintShown) && (
                       <p className="at-ctxmeaning" data-el="question-context-meaning">
                         {asMeaning((spec.promptField === "context" && context.en) || item.en)}
                       </p>
@@ -12758,10 +12769,6 @@ export default function ArabicTrainer() {
                           field={spec.answerField === "en" ? "en" : spec.answerField === "numeral" ? "numeral" : "ar"}
                           heard={spec.tiles === "audio"}
                         />
-                        {/* A grid half done is not an answer, and a Check
-                            that sits dead without saying why is the button
-                            people tap twice and then give up on. */}
-                        {!checked && !typed && <Help>Pair them all, then check.</Help>}
                       </>
                     ) : spec.picks === "image" ? (
                       <PictureChoices
@@ -13260,7 +13267,7 @@ export default function ArabicTrainer() {
                             which field it reveals, which the revealed field
                             says for itself a moment later. The name is
                             still there for anyone using a screen reader. */}
-                        {item[spec.hintField] && (
+                        {hintAt && (
                           /* Stays after revealing, so the nudge can be put
                              away again — reading the answer with the hint
                              still on the screen is not the same test. */
