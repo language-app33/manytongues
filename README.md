@@ -837,8 +837,9 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   word taken out of one of its sentences**, chosen out of four and then
   typed (`gap2pick`, `gap2ar`): the scene's own text is all they need, so
   a text with no meaning or recording has more to it than reading. The
-  word is every one of three letters or more in turn (`gapsOf`, `gapAt`
-  in `src/dialogs.ts`), walked by the scene's count of having been asked
+  word is every one of three letters or more in turn, and every shorter
+  one that a card of the learner's teaches on its own (`gapsOf`, `gapAt`,
+  `taughtShortGaps` in `src/dialogs.ts`), walked by the scene's count of having been asked
   and fixed for the question when it is cast (`castGap` in the trainer),
   and the wrong ones are the scene's own words first, never one still
   standing in the sentence on screen. Where its sentences carry their

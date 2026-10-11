@@ -25,9 +25,11 @@ import {
   gappedLine,
   gapsOf,
   hideable,
+  setTaughtShort,
+  taughtShortGaps,
 } from "../src/dialogs.ts";
 import { offersFor } from "../src/offers.ts";
-import { EX, LANGUAGES, checkAnswer, levelOf } from "../src/languages.ts";
+import { EX, LANGUAGES, arTokenIsWord, checkAnswer, levelOf } from "../src/languages.ts";
 
 const vi = LANGUAGES["vi-Hue"];
 
@@ -65,6 +67,25 @@ test("each word worth hiding gets its turn, in reading order, then round again",
   assert.deepEqual(gapsOf(card).map((g) => g.word), ["Tôi", "học", "Mai", "nhà"]);
   assert.deepEqual([0, 1, 2, 3, 4].map((n) => must(gapAt(card, n), "a gap").word), ["Tôi", "học", "Mai", "nhà", "Tôi"]);
   assert.equal(gapAt(text(["ở đi"]), 0), null, "nothing long enough, nothing hidden");
+});
+
+/* A short word is small change unless the course teaches it: one with a
+   card of its own is asked in a scene like any other. */
+test("a short word with a card of its own takes its turn too", () => {
+  const card = text(["أنا بس بدي في البيت", "بك"], { lang: "ar-PS" });
+  /* Marks aside it is the card's word; a prefix peeled is not: بك is not
+     the card for بِ, and في with no card stays out. */
+  const found = taughtShortGaps([card], ["بَس", "بِ", "كتاب"], arTokenIsWord);
+  assert.deepEqual([...must(found.get("T"), "the scene's short words")], ["0 1"]);
+  assert.deepEqual(gapsOf(card).map((g) => g.word), ["أنا", "بدي", "البيت"], "not until the cards are known");
+  setTaughtShort(found);
+  try {
+    assert.deepEqual(gapsOf(card).map((g) => g.word), ["أنا", "بس", "بدي", "البيت"]);
+    assert.equal(must(gapAt(card, 1), "the short word").word, "بس");
+  } finally {
+    setTaughtShort(null);
+  }
+  assert.deepEqual(taughtShortGaps([card], ["كتاب"], arTokenIsWord).size, 0, "no short cards, nothing added");
 });
 
 test("only the sentence with the gap is shown, and the word goes back once answered", () => {
@@ -165,6 +186,27 @@ test("the word moves on with the asking, but not under an answer", () => {
   const next = { id: "T", subId: null, type: "gap2pick" };
   assert.equal(must(resolveQuestion([answered], next, false, []), "next question").unit.ar, "học");
 });
+
+test("a short word the learner holds a card for is asked in the scene", () => {
+  const card = text(["Tôi đi học."]);
+  const word = {
+    id: "W", lang: "vi-Hue", kind: "word", tags: [], created: 1,
+    forms: [{ id: "W", ar: "đi", en: "to go", lat: "", lang: "vi-Hue", s: {} }],
+  };
+  installIndexes([card], settings);
+  assert.equal(gapsFor(card, 1), "học", "without the card, the short word is passed over");
+  installIndexes([card, word], settings);
+  assert.equal(gapsFor(card, 1), "đi", "with it, the short word takes its turn");
+  assert.equal(gapsFor(card, 2), "học");
+  installIndexes([card], settings);
+});
+
+/* The gap the trainer casts for a scene's n-th asking. */
+function gapsFor(/** @type {any} */ card, /** @type {number} */ n) {
+  const asked = { ...card, forms: [{ ...card.forms[0], s: { gap2pick: { right: n, wrong: 0, near: 0, skips: 0 } } }] };
+  const items = [asked];
+  return must(resolveQuestion(items, { id: card.id, subId: null, type: "gap2pick" }, false, []), "the question").unit.ar;
+}
 
 /* ---- a sentence and its meaning ---- */
 

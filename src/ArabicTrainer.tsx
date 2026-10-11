@@ -170,6 +170,7 @@ import {
   NUMBER_EQUIVALENT,
   NUMBER_FALLBACK,
   normEn,
+  supportsContext,
 } from "./languages.ts";
 import {
   agreedCell,
@@ -281,6 +282,8 @@ import {
   buildDialogIndex,
   gapAt,
   gapOptions,
+  setTaughtShort,
+  taughtShortGaps,
   gappedLine,
   isDialog,
   meantAt,
@@ -1705,6 +1708,14 @@ function setDialogIndex(map: Map<string, { card: Item, at: number }>) {
   forgetTypes();
 }
 
+/* Which short words of a scene may be its gap. Kept in dialogs.ts, where
+   the gaps are worked out; set from here so what a card supports is
+   forgotten with it. */
+function setTaughtShortIndex(map: Map<string, Set<string>>) {
+  setTaughtShort(map);
+  forgetTypes();
+}
+
 /* The scene a line stands in, or null for anything that is not a line. */
 function sceneOf(unitId: string): { card: Item, at: number } | null {
   return DIALOG_INDEX.get(unitId) || null;
@@ -2194,6 +2205,31 @@ export function contextIndexOf(items: Item[], settings: Settings): Map<string, a
 }
 
 /**
+ * The short words of each scene that have a card of their own — see
+ * taughtShortGaps. A language at a time, as the contexts are, because
+ * whether a word in a sentence is a card's word is the language's rule.
+ */
+export function taughtShortOf(items: Item[], settings: Settings): Map<string, Set<string>> {
+  const byLang: Map<LangId, Item[]> = new Map();
+  for (const it of items) {
+    const id = langIdOf(it, settings);
+    byLang.set(id, (byLang.get(id) || []).concat([it]));
+  }
+  const merged: Map<string, Set<string>> = new Map();
+  for (const [id, list] of byLang) {
+    const lang = LANGUAGES[id] || langOf(settings);
+    if (!supportsContext(lang)) continue;
+    const scenes = list.filter((it) => isDialog(it));
+    if (!scenes.length) continue;
+    const words = list
+      .filter((it) => !isDialog(it))
+      .flatMap((it) => unitsOf(it).map(({ unit }) => String(unit.ar || "")));
+    for (const [sceneId, found] of taughtShortGaps(scenes, words, lang.context.matches)) merged.set(sceneId, found);
+  }
+  return merged;
+}
+
+/**
  * What can fill each variable, by language.
  *
  * Ordered by when the cards were made rather than by where they happen to
@@ -2317,6 +2353,7 @@ export function installIndexes(items: Item[], settings: Settings, systems: Syste
   setActiveLang(settings.language || DEFAULT_LANGUAGE);
   setContextIndex(contextIndexOf(items, settings));
   setDialogIndex(buildDialogIndex(items));
+  setTaughtShortIndex(taughtShortOf(items, settings));
   /* And the numbers the parts lend to sentences, as the app adds them. */
   const lent = items.concat(systems.flatMap((set) => fillerCards(composerFor(set.numbers.languageId), set.numbers)));
   setValueIndex(valueIndexOf(lent, settings));
@@ -9853,6 +9890,14 @@ export default function ArabicTrainer() {
      unit has no way to be handed a map as well. */
   const dialogIndex = useMemo(() => buildDialogIndex(asking), [asking]);
   setDialogIndex(dialogIndex);
+  /* And which short words of a scene have a card of their own, so a scene
+     can ask them — rebuilt with the cards, for the same reason. */
+  const taughtShort = useMemo(
+    () => taughtShortOf(asking, settings),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [asking, settings.language]
+  );
+  setTaughtShortIndex(taughtShort);
 
   /* And what can fill each variable, by language. Ordered by when the cards
      were made rather than by where they happen to sit in the document: the

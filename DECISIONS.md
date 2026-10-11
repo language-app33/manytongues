@@ -5985,3 +5985,28 @@ sound, since the question comes straight back.
 **Choices the owner made.** A connection dropping is handled the same as
 "can't listen right now"; the button's own note stays; with no backups
 left, the session gets shorter rather than ending.
+
+
+## A scene's missing word can be a short word with its own card (0.429)
+
+**What was wrong.** A scene's missing word was any word of three letters
+or more (hideable), and nothing shorter, whatever the course taught. A
+word card's own phrase question (ctx2pick, ctx2ar) blanks the card's word
+at any length. So بس, taught on its own card, was asked in its phrases but
+never in a scene, and a learner asked whether the two rules agreed.
+
+**What changed.** gapsOf also takes a short word when a card the learner
+holds, in the scene's language, is that word: the language's context
+matcher asked both ways round, so harakat are set aside but a peeled
+prefix is not (بك is not the card for بِ). Worked out per language by
+taughtShortOf in the trainer, alongside the context index, and held in
+dialogs.ts (setTaughtShort), since dialogNeedMet is asked of a card alone.
+Long words are asked exactly as before, card or no card.
+
+**Also.** Adding words to a scene's list moves which word each later
+asking lands on; the walk still reaches every word in turn.
+
+**Choices the owner made.** Of: leave both rules as they are; blank only
+carded words in scenes; keep the long words and add short carded ones;
+put the length limit on word cards' phrases too, the owner chose the
+third.

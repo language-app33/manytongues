@@ -539,6 +539,63 @@ export function hideable(word: string): boolean {
   return (word.match(/\p{L}/gu) || []).length >= GAP_MIN_LETTERS;
 }
 
+/*
+ * The short words of each scene that a card teaches on its own.
+ *
+ * The length rule above is for the words a scene happens to contain: a
+ * two-letter word nobody teaches is small change. A two-letter word with a
+ * card of its own — بس, في — is a word the course set out to teach, and
+ * its own card already asks it in a phrase, so a scene leaving it alone
+ * was the one place it was never asked. Scene id to "line at" for each
+ * such word.
+ *
+ * Held at module level, in step with the cards, for the reason the
+ * trainer's indexes are: dialogNeedMet is asked of a card alone and has no
+ * way to be handed the rest. Built by taughtShortGaps; empty until it is.
+ */
+let TAUGHT_SHORT: Map<string, Set<string>> = new Map();
+
+export function setTaughtShort(map: Map<string, Set<string>> | null): void {
+  TAUGHT_SHORT = map || new Map();
+}
+
+const letterCount = (word: string): number => (word.match(/\p{L}/gu) || []).length;
+
+/*
+ * Which short words of these scenes have a card of their own among
+ * `words` — every word the learner holds, in the scenes' one language.
+ *
+ * A match is the language's own rule asked both ways round, so the word
+ * is the card's word with its marks aside and nothing more: Arabic's rule
+ * peels a prefix, and بك is not the card for بِ.
+ */
+export function taughtShortGaps(
+  scenes: Scene[],
+  words: string[],
+  matches: (token: string, word: string) => boolean,
+): Map<string, Set<string>> {
+  const out: Map<string, Set<string>> = new Map();
+  const short = words
+    .flatMap((w) => String(w || "").split(/[/;]/))
+    .map((w) => w.trim())
+    .filter((w) => w && !/\s/.test(w) && letterCount(w) > 0 && letterCount(w) < GAP_MIN_LETTERS);
+  if (!short.length) return out;
+  for (const card of scenes) {
+    if (!isDialog(card)) continue;
+    linesOf(card).forEach((l, line) => {
+      gapTokens(String((l && l.ar) || "")).forEach((t, at) => {
+        if (!t.word || /[{}]/.test(t.word) || hideable(t.word)) return;
+        if (!short.some((w) => matches(t.word, w) && matches(w, t.word))) return;
+        const id = String(card && card.id);
+        const set = out.get(id) || new Set<string>();
+        set.add(`${line} ${at}`);
+        out.set(id, set);
+      });
+    });
+  }
+  return out;
+}
+
 /* One gap: which line, which word of it, and the word itself. */
 export interface Gap {
   line: number;
@@ -546,12 +603,14 @@ export interface Gap {
   word: string;
 }
 
-/* Every word in the scene worth hiding, in reading order. */
+/* Every word in the scene worth hiding, in reading order: the long ones,
+   and the short ones with a card of their own. */
 export function gapsOf(card: Scene): Gap[] {
   const out: Gap[] = [];
+  const taught = (card && TAUGHT_SHORT.get(card.id)) || null;
   linesOf(card).forEach((l, line) => {
     gapTokens(String((l && l.ar) || "")).forEach((t, at) => {
-      if (hideable(t.word)) out.push({ line, at, word: t.word });
+      if (hideable(t.word) || (taught && taught.has(`${line} ${at}`))) out.push({ line, at, word: t.word });
     });
   });
   return out;

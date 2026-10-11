@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.429 — 11 October 2026
+
+**A scene can ask a short word that has its own card.**
+
+- Choosing or typing a scene's missing word used to leave out every word
+  shorter than three letters. Now a short word is left out only if no card
+  teaches it: a word like بس, with a card of its own, takes its turn as a
+  missing word in the scenes it appears in, as it already does in its own
+  phrases.
+- Longer words are asked exactly as before, whether or not they have a
+  card.
+- Trade-off: scenes now ask a few more short words, but only ones the
+  teacher chose to teach. Because a scene has a few more words to walk
+  through, the word a scene asks next may be a different one from what it
+  would have been.
+- To check by hand: in a text or conversation containing بس, with a بس
+  card in the course, practise its missing word a few times and confirm
+  بس comes up as the gap.
+
 ## 0.428 — 11 October 2026
 
 **A phrase's English waits until it is asked for.**
