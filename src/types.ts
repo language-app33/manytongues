@@ -998,38 +998,12 @@ export type Card = {
   /** A text, where the scene is one; absent (or, on its way to the server,
       "conversation") on a conversation. See sceneKindOf in dialogs.ts. */
   sceneKind?: "text" | "conversation";
-  /**
-   * Whether students get it: a draft, ready for review, or published.
-   * Absent on the server is published — every card saved before there
-   * were statuses — and a teacher's copy always says. See "A card's
-   * status" in server/api/courses.js.
-   */
-  status?: CardStatus;
-  /**
-   * The status of a published card's unpublished changes, on a teacher's
-   * copy, where it has any. The copy itself is the changes: students have
-   * the card as it was until they are published.
-   */
-  changes?: "draft" | "review";
-  /** When those changes were last saved. */
-  changed?: Millis;
-  /**
-   * On the server only: the changes themselves, which a teacher's copy has
-   * already laid over the card and a student's never carries.
-   */
-  pending?: { status?: "draft" | "review"; card: Record<string, unknown>; updated?: Millis; by?: string };
-  /** On the server: which revision last changed each part of the card, so
-      a save started before somebody else's can be told so. */
-  edits?: Record<string, number>;
   rev?: number;
   created?: Millis;
   updated?: Millis;
   inDecks?: string[];
   decks?: string[];
 } & Record<string, unknown>;
-
-/** Whether a card reaches students. See Card.status. */
-export type CardStatus = "draft" | "review" | "published";
 
 /** Where a deck sits in a course, and since when. */
 export interface DeckLink {

@@ -106,14 +106,7 @@ async function call(
   if (data === null || typeof data !== "object") {
     throw new Error(res.ok ? "bad-response" : `http-${res.status}`);
   }
-  if (!res.ok) {
-    /* With the answer kept on it, for the refusals that carry something
-       to act on — a card somebody else changed, sent back as it stands. */
-    const err = new Error(data.error || `http-${res.status}`) as Error & { data?: unknown; status?: number };
-    err.data = data;
-    err.status = res.status;
-    throw err;
-  }
+  if (!res.ok) throw new Error(data.error || `http-${res.status}`);
   return data;
 }
 
@@ -197,30 +190,7 @@ export const setDeckParts = (deckId: string, parts: string[]) =>
 export const myCards = () => call("my-cards");
 /* The server calls this field "decks"; sending anything else means the
    card saves but never lands in a deck. */
-/**
- * How a save is made, beside the card — see save-card. `touched` names the
- * fields that changed, and only those are written; `baseRev` is the
- * revision they were changed on, so a save that would put back somebody
- * else's change is refused (unless `force`); `into: "changes"` sends the
- * card screen's saves to a published card's unpublished changes; `walk`
- * is a rename or a tag taken off the collection, applied by the server to
- * both of a card's versions; `status: "draft"` makes a new card a draft.
- */
-export type SaveExtra = {
-  touched?: string[];
-  baseRev?: number;
-  force?: boolean;
-  into?: "changes";
-  walk?: { renames?: { from: string; to: string }[]; drops?: string[] };
-  status?: "draft";
-};
-export const saveCard = (card: Partial<Card>, decks: string[], extra: SaveExtra = {}) =>
-  call("save-card", { body: { card, decks, ...extra } });
-/* A card's status, or its unpublished changes' — see card-status. */
-export const cardStatus = (
-  cardId: string,
-  to: "draft" | "review" | "published" | "discard" | "unpublish",
-): Promise<{ ok: true; card: Card }> => call("card-status", { body: { cardId, to } });
+export const saveCard = (card: Partial<Card>, decks: string[]) => call("save-card", { body: { card, decks } });
 /* A teacher's say on the sentences a card makes: fingerprints approved,
    struck, or forgotten — see review.ts and review-card on the server. */
 export const reviewCard = (
