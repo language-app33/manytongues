@@ -8305,7 +8305,9 @@ function BlanksBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
               hint={
                 picked.length
                   ? `Only the ${rowsLine(lang, picked)}. Words with no tenses stand in it as they always did.`
-                  : "Any tense. Tick one or more to ask this sentence in those alone."
+                  : rows.some((t) => t.onlyWhenTicked)
+                    ? `Any tense but the ${rowsLine(lang, rows.filter((t) => t.onlyWhenTicked).map((t) => t.id))}, which is used only where it is ticked. Tick one or more to ask this sentence in those alone.`
+                    : "Any tense. Tick one or more to ask this sentence in those alone."
               }
             >
               <CheckList

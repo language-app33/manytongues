@@ -3013,20 +3013,22 @@ export const blankAdmits = (
     }
   }
   const rows = rowsFor(slot) || [];
+  const ends = endRowsOf(lang);
   if (rows.length) {
     /* Whether it has a pronoun on the end, where the sentence said: the
        attached pronouns' own row for "my name, your name", and BARE_ROW for
        "name" and the word's other forms. A form carrying a pronoun is
        admitted by the first and by nothing else — it is in no tense. */
-    const ends = endRowsOf(lang);
     const endsSaid = rows.filter((r) => ends.has(r) || r === BARE_ROW);
     if (endsSaid.length) {
       if (ends.has(rowOf(form))) return endsSaid.some((r) => ends.has(r));
       if (!endsSaid.includes(BARE_ROW)) return false;
     }
-    const tenses = rows.filter((r) => !ends.has(r) && r !== BARE_ROW);
-    if (tenses.length && !standsInRows(tensedOf(lang, card && card.category), form, tenses)) return false;
   }
+  /* Asked of every blank, narrowed or not: one that has ticked no tense
+     still leaves out a row that waits to be ticked. */
+  const tenses = rows.filter((r) => !ends.has(r) && r !== BARE_ROW);
+  if (!standsInRows(tensedOf(lang, card && card.category), form, tenses)) return false;
   if (agreesFor(slot)) {
     const tensed = tensedOf(lang, card && card.category);
     if (tensed && rowIdsOf(tensed).has(rowOf(form))) return isRowLead(card, tensed, form, isLent);
@@ -3454,6 +3456,12 @@ export const LANGUAGES: Record<LangId, Lang> = {
           { id: "present", label: "present" },
           { id: "past", label: "past" },
           { id: "command", label: "command" },
+          /* The present without its b- — بدها تاكل, لازم أروح, رح نشوف.
+             Last, so a learner part of the way down a verb is not stopped
+             at it; and only where a sentence ticks it, since it follows a
+             word that calls for it and is not a sentence's verb on its
+             own. Never "bare": that name is BARE_ROW's. */
+          { id: "subjunctive", label: "subjunctive", onlyWhenTicked: true },
         ],
         /* There is no infinitive. A dictionary lists أكل — he ate — and
            that is a cell of this table, so the card's own word and that

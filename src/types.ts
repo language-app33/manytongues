@@ -206,6 +206,18 @@ export interface VerbPerson {
 export interface VerbTense {
   id: string;
   label: string;
+  /**
+   * Whether a sentence's blank takes this row only where it was ticked.
+   *
+   * A blank nobody has narrowed takes every row, which is right for the
+   * tenses a sentence about nothing in particular can be in and wrong for
+   * a form that only follows another word: Palestinian Arabic's
+   * subjunctive — تاكل after بدها, لازم, ممكن — is not a way to say "she
+   * eats an apple" on its own. So a row saying this is left out of an
+   * unnarrowed blank and admitted by a tick alone. See standsInRows in
+   * src/verbs.ts. Absent is every row as it always was.
+   */
+  onlyWhenTicked?: boolean;
 }
 
 /**

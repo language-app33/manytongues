@@ -8,6 +8,29 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.432 — 12 October 2026
+
+**Palestinian Arabic verbs have a subjunctive: the present without its b-.**
+
+- A verb card now has a fourth set of boxes, after the command: the
+  subjunctive, one per person — تاكل، آكل، ناكل — the form used after
+  بدي، لازم، ممكن، رح. Like the other tenses it is optional, so a verb
+  saves without it, and you type each form and its English yourself.
+- A sentence card lists the subjunctive among the tenses a verb blank can
+  ask for. Unlike the other tenses it is used **only where it is ticked**:
+  a blank with nothing ticked goes on taking the present, the past and
+  the command, so every sentence already written is filled exactly as
+  before. "بدها {{verb}}" with the subjunctive ticked is met as بدها تاكل.
+- Students meet it last, once the command is known, so nobody part of the
+  way through a verb is held back by it.
+- Trade-off: a verb a student has already learnt goes back to learning
+  once you add its subjunctive, until they have practised the new forms.
+- Hebrew and Vietnamese verbs are unchanged.
+
+To check by hand: on a verb card, the English you give the subjunctive
+boxes, so that "English → Arabic" can tell them from the present — for
+example "(she wants to) eat".
+
 ## 0.431 — 12 October 2026
 
 **The score at the end of a session counts questions, the way the count at
