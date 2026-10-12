@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.430 — 12 October 2026
+
+**"Words this teaches" finds every form of a word.**
+
+- When writing a phrase, a sentence or a line of a conversation, the list
+  of words it teaches used to offer a card only if the word on the front
+  of that card was in the text. Now every form written on the card is
+  looked for: a verb's conjugations, a noun's plural, an adjective's
+  feminine. A sentence with "she wrote" now offers the card for "he
+  wrote".
+- Where a card is offered because of one of its other forms, the list
+  says which, for example "he wrote · found as كتبت (she wrote)".
+- Nothing is ticked for you: the teacher still chooses, as before. Once
+  ticked, the word is practised in the sentence in the form it appears
+  in there.
+- Trade-off: with more forms to look for, the list will now and then offer
+  a card whose form only looks like a word in the sentence. Leave it
+  unticked.
+- To check by hand: write a sentence using a conjugated form of a verb
+  that has its own card (not the form on the front), and confirm the verb
+  is offered with "found as" and the form you wrote.
+
 ## 0.429 — 11 October 2026
 
 **A scene can ask a short word that has its own card.**

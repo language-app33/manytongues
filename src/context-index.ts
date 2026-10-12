@@ -17,8 +17,8 @@
  * the cards it came from, because it is rebuilt from them.
  */
 
-import type { Item, Lang } from "./types.ts";
-import { findWordSpan, supportsContext } from "./languages.ts";
+import type { Form, Item, Lang } from "./types.ts";
+import { findWordSpan, guessKind, supportsContext } from "./languages.ts";
 import { unitsOf } from "./scheduler.ts";
 import { leadOf } from "./cards.ts";
 import { dialogPhrases } from "./dialogs.ts";
@@ -109,4 +109,35 @@ export function buildContextIndex(items: Item[], lang: Lang): Map<string, Contex
     }
   }
   return index;
+}
+
+/*
+ * The word cards a phrase or sentence could be ticked as teaching, for the
+ * editor's "Words this teaches": every single-word card any of whose forms
+ * turns up in `text`, with the form that did.
+ *
+ * Every form, not only the word on the front — a verb's conjugations, a
+ * noun's plural — because a sentence saying "she wrote" teaches the card
+ * for "he wrote" as surely as one saying "he wrote". The forms are tried
+ * in the order buildContextIndex tries them, front word first, so the form
+ * named here is the one the practice side will blank.
+ */
+export function wordsOffered(
+  text: string,
+  cards: Item[],
+  lang: Lang,
+  selfId: string = "",
+  most: number = 24,
+): { card: Item; form: Form }[] {
+  if (!supportsContext(lang) || !String(text || "").trim() || guessKind(text, lang) === "word") return [];
+  const out: { card: Item; form: Form }[] = [];
+  for (const card of cards || []) {
+    if (out.length >= most) break;
+    if (!card || !card.id || card.id === selfId) continue;
+    const lead = leadOf(card).ar;
+    if (!lead || guessKind(lead, lang) !== "word") continue;
+    const hit = unitsOf(card).find(({ unit }) => unit.ar && findWordSpan(text, unit.ar, lang));
+    if (hit) out.push({ card, form: hit.unit });
+  }
+  return out;
 }

@@ -6010,3 +6010,23 @@ asking lands on; the walk still reaches every word in turn.
 carded words in scenes; keep the long words and add short carded ones;
 put the length limit on word cards' phrases too, the owner chose the
 third.
+
+
+## "Words this teaches" looks for every form of a card (0.430)
+
+**What was wrong.** The editor's list of words a phrase or sentence
+teaches (WordsUsed) offered a card only when the word on its front was
+found in the text (findWordSlot on leadOf). A sentence saying "she wrote"
+never offered the card for "he wrote", nor one using a plural the card
+for the singular. Once ticked, buildContextIndex already looked through
+every form of the card, so only the offer was missing.
+
+**What changed.** The offer is worked out by wordsOffered in
+context-index.ts, beside the index it feeds: every form of each
+single-word card is tried, front word first and in the index's own order,
+so the form named is the form that will be blanked. Where it is not the
+front word, the row says "found as" that form with its English.
+
+**Choices the owner made.** Showing the form found, rather than the card's
+front word alone, so a card offered for a conjugation does not read as a
+wrong match.

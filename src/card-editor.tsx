@@ -12,7 +12,8 @@
  */
 import React, { createContext, useContext, useState, useEffect, useId, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
-import type { Card, Deck, GrammarDim, Lang, VerbSpec, VerbTense } from "./types.ts";
+import type { Card, Deck, Form, GrammarDim, Item, Lang, VerbSpec, VerbTense } from "./types.ts";
+import { wordsOffered } from "./context-index.ts";
 import { cellsIn, citationOf, citedWord, framesOf, isCell, isFrame, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf } from "./cards.ts";
 import type { Node } from "./shared.tsx";
@@ -27,7 +28,6 @@ import {
   dimValues,
   specOf,
   tablesOf,
-  findWordSlot,
   answerFields,
   guessKind,
   kindOf,
@@ -1676,8 +1676,15 @@ function ClipDrop({ label, disabled, onFiles }: {
  * Which words a phrase teaches.
  *
  * Shown only on a card that is a phrase or a sentence, because a single
- * word does not contain anything. The app proposes — every word card whose
- * text it can find inside this one — and the teacher accepts. It is
+ * word does not contain anything. The app proposes — every word card any
+ * of whose forms it can find inside this one, a verb's conjugations and a
+ * noun's plural as much as the word on the front — and the teacher accepts.
+ * Only the front word was looked for once, so a sentence saying "she
+ * wrote" never offered the card for "he wrote"; and the practice side
+ * already looked through every form of a ticked card, so it was only the
+ * offer that was missing. Where the form found is not the front word, the
+ * row says which it was: a card offered for a word that is not in the
+ * sentence would otherwise read as a mistake. It is
  * deliberately not automatic: finding a word inside another is done by
  * peeling prefixes, and in Arabic that occasionally lands on a different
  * real word. A wrong pairing would reach a learner as a question with no
@@ -1695,14 +1702,11 @@ function WordsUsed({ lang, text, cards, selfId, chosen, onChange }: {
   onChange: (ids: string[]) => void;
 }) {
   const kind = guessKind(text, lang);
-  const suggestions = useMemo(() => {
-    if (!supportsContext(lang) || kind === "word" || !text.trim()) return [];
-    return (cards || [])
-      .filter((c) => c.id && c.id !== selfId && leadOf(c).ar)
-      .filter((c) => guessKind(leadOf(c).ar, lang) === "word")
-      .filter((c) => findWordSlot(text, leadOf(c).ar, lang) >= 0)
-      .slice(0, 24);
-  }, [cards, lang, text, selfId, kind]);
+  const found = useMemo(
+    () => wordsOffered(text, (cards || []) as Item[], lang, selfId) as { card: Card; form: Form }[],
+    [cards, lang, text, selfId],
+  );
+  const suggestions = found.map((m) => m.card);
 
   /* Anything ticked that the matcher no longer proposes — the phrase was
      edited, or it was ticked when the wording was different. It has to stay
@@ -1723,10 +1727,17 @@ function WordsUsed({ lang, text, cards, selfId, chosen, onChange }: {
     );
   }
 
+  /* Which form was found, where it is not the word on the front. */
+  const foundAs = (c: Card): string => {
+    const m = found.find((x) => x.card.id === c.id);
+    const form = m && m.form;
+    if (!form || form.ar === leadOf(c).ar) return "";
+    return form.en ? `found as ${form.ar} (${form.en})` : `found as ${form.ar}`;
+  };
   const options = suggestions.concat(keptCards).map((c) => ({
     id: String(c.id),
     title: leadOf(c).ar,
-    note: leadOf(c).en || "",
+    note: [leadOf(c).en || "", foundAs(c)].filter(Boolean).join(" · "),
   }));
 
   return (
