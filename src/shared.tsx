@@ -309,9 +309,7 @@ function ClipRow({ hash, label, index, onRemove, load }: {
 
   return (
     <div className="at-clip">
-      {/* Pressable rather than a button, so a recording can be played in
-          a locked section of the card screen. */}
-      <Pressable
+      <button
         className={`at-clipplay${state === "playing" ? " on" : ""}`}
         onClick={toggle}
         disabled={state === "loading"}
@@ -319,7 +317,7 @@ function ClipRow({ hash, label, index, onRemove, load }: {
         title={state === "playing" ? "Pause" : "Play"}
       >
         {state === "loading" ? "…" : state === "playing" ? "❚❚" : "▶"}
-      </Pressable>
+      </button>
       <span className="at-clipname">
         {label || `Voice ${index + 1}`}
         {error ? ` — ${error}` : ""}
@@ -419,56 +417,6 @@ export function deckSize(d: { cardCount?: number; parts?: string[]; partsWaiting
    Four looks and two sizes. The class strings used to be assembled at
    the call site, which is how "sm ghost" and "ghost sm" both came to
    exist, along with a stray "at-btn" with no variant at all. */
-/*
- * Whether the part of a screen this sits in is locked: a section of the
- * card screen that is not being edited. See EditSection in card-editor.tsx,
- * which is what says so.
- *
- * A locked section is a disabled fieldset, so every box, tick and button in
- * it stops answering without being told — including the ones added after
- * this was written, which is the point. The few controls that only help
- * somebody *read* — a fold, a recording played, a blank's words shown — are
- * drawn as Pressable instead, which a fieldset cannot reach. This context is
- * for the rest: a control that is not a form element at all (a box typed
- * into through the app's own keypad) and has to be told.
- */
-export const Locked = React.createContext(false);
-
-/**
- * Something pressed to read rather than to change: a fold, a play button, a
- * chip that shows what fills a blank. A button in every way a person or a
- * screen reader can tell — focusable, named, answering Enter and Space —
- * except the one that matters on the card screen: a locked section's
- * fieldset does not disable it.
- */
-export function Pressable({ onClick, disabled, children, className = "", ...rest }: {
-  onClick?: (e: React.SyntheticEvent) => void;
-  disabled?: boolean;
-  children?: Node;
-  className?: string;
-} & Record<string, any>) {
-  return (
-    <span
-      role="button"
-      tabIndex={disabled ? -1 : 0}
-      aria-disabled={disabled || undefined}
-      data-reads=""
-      className={`at-pressable${className ? " " + className : ""}`}
-      onClick={(e) => {
-        if (!disabled && onClick) onClick(e);
-      }}
-      onKeyDown={(e) => {
-        if (e.key !== "Enter" && e.key !== " ") return;
-        e.preventDefault();
-        if (!disabled && onClick) onClick(e);
-      }}
-      {...rest}
-    >
-      {children}
-    </span>
-  );
-}
-
 export function Button({
   variant = "default",
   size,
@@ -476,7 +424,6 @@ export function Button({
   icon,
   iconSize,
   off,
-  reads,
   className = "",
   children,
   ...rest
@@ -487,9 +434,6 @@ export function Button({
   icon?: string;
   iconSize?: number;
   off?: boolean;
-  /** Pressed to read or to go somewhere, never to change what is on the
-      screen — so it keeps working in a locked section. See Pressable. */
-  reads?: boolean;
   className?: string;
   children?: Node;
 } & Record<string, any>) {
@@ -512,17 +456,10 @@ export function Button({
        beside it and the wrong one where a learner is left tapping a dead
        button and guessing. Both are here; which to reach for is a question
        about whether anything else says why. */
-    reads ? (
-      <Pressable className={cls} {...rest}>
-        {icon ? <Icon name={icon} size={iconSize || (size === "sm" ? 16 : 18)} /> : null}
-        {children}
-      </Pressable>
-    ) : (
-      <button type="button" className={cls} aria-disabled={off || undefined} {...rest}>
-        {icon ? <Icon name={icon} size={iconSize || (size === "sm" ? 16 : 18)} /> : null}
-        {children}
-      </button>
-    )
+    <button type="button" className={cls} aria-disabled={off || undefined} {...rest}>
+      {icon ? <Icon name={icon} size={iconSize || (size === "sm" ? 16 : 18)} /> : null}
+      {children}
+    </button>
   );
 }
 
