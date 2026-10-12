@@ -1210,6 +1210,12 @@ export interface Question {
    * session is known to be numbers and nothing else.
    */
   within?: "numbers";
+  /**
+   * Set on the copy a miss puts back at the end of the session. The same
+   * question asked again, so the screen at the end counts it once: it was
+   * missed, whatever happens when it comes back.
+   */
+  retry?: boolean;
 }
 
 /**

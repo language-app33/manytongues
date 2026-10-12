@@ -4185,6 +4185,32 @@ function withQueue<S extends Session>(s: S, next: Question[]): S {
 }
 
 /**
+ * What a session scored, for the screen at the end of it.
+ *
+ * `ok` and `no` count answers, the way they always have; the praise after
+ * a right answer turns on `ok`. `asked` and `first` count questions: a
+ * question put back by a miss is the same question when it comes round
+ * again, so its second asking adds to neither. A question missed twice is
+ * one question missed, as at the top of the session — see sessionCount.
+ */
+export interface Score {
+  ok: number;
+  no: number;
+  asked: number;
+  first: number;
+}
+export const NO_SCORE: Score = { ok: 0, no: 0, asked: 0, first: 0 };
+export function scoreAnswer(t: Score, ex: Pick<Question, "retry"> | null | undefined, correct: boolean): Score {
+  const again = !!(ex && ex.retry);
+  return {
+    ok: t.ok + (correct ? 1 : 0),
+    no: t.no + (correct ? 0 : 1),
+    asked: t.asked + (again ? 0 : 1),
+    first: t.first + (!again && correct ? 1 : 0),
+  };
+}
+
+/**
  * What the count at the top of a session says, standing on question `qi`.
  *
  * A miss puts its question back at the end of the queue, which made the
@@ -9174,7 +9200,7 @@ export default function ArabicTrainer() {
   /* Closed for every new question. Opening it for one card is not a
      standing request to see it for the next twenty. */
   const [leaving, setLeaving] = useState(false);
-  const [tally, setTally] = useState({ ok: 0, no: 0 });
+  const [tally, setTally] = useState<Score>(NO_SCORE);
   /*
    * What this sitting moved, for the screen at the end of it.
    *
@@ -10192,7 +10218,7 @@ export default function ArabicTrainer() {
     warmSession(built);
     setSession({ ...built, practice: true, startedAt: now(), endsAt: 0 });
     setQi(0);
-    setTally({ ok: 0, no: 0 });
+    setTally(NO_SCORE);
     setMoved([]);
     resetExercise();
     /* Out of the teaching space and onto the screen questions are asked
@@ -10301,7 +10327,7 @@ export default function ArabicTrainer() {
       endsAt: minutes ? now() + minutes * 60000 : 0,
     });
     setQi(0);
-    setTally({ ok: 0, no: 0 });
+    setTally(NO_SCORE);
     setMoved([]);
     resetExercise();
     setTab("home"); // a session started from anywhere is run on the home screen
@@ -10574,7 +10600,7 @@ export default function ArabicTrainer() {
     warmSession(built);
     setSession({ ...built, practice: false, startedAt: now(), endsAt: 0 });
     setQi(0);
-    setTally({ ok: 0, no: 0 });
+    setTally(NO_SCORE);
     setMoved([]);
     resetExercise();
     setTab("home");
@@ -10622,7 +10648,7 @@ export default function ArabicTrainer() {
     warmSession(built);
     setSession({ ...built, practice });
     setQi(0);
-    setTally({ ok: 0, no: 0 });
+    setTally(NO_SCORE);
     setMoved([]);
     resetExercise();
   }
@@ -11770,10 +11796,7 @@ export default function ArabicTrainer() {
     /* Onto the session's own list, outside the write: `persist` runs its
        function there and then, so this is the same answer's news. */
     if (moving.length) setMoved((was) => mergeMoves(was, moving));
-    setTally((t) => ({
-      ok: t.ok + (correct ? 1 : 0),
-      no: t.no + (correct ? 0 : 1),
-    }));
+    setTally((t) => scoreAnswer(t, exercise, correct));
 
     if (!correct) {
       setSession((s2: any) => ({
@@ -13366,7 +13389,12 @@ export default function ArabicTrainer() {
             {session && !exercise && (
               <div className="at-card">
                 <p className="at-eyebrow">{practice ? "Practice done" : "Session complete"}</p>
-                <Stat value={`${tally.ok} / ${tally.ok + tally.no}`} big />
+                {/* Questions, not answers: a miss comes back at the end
+                    and is got right then, which used to count as a
+                    question more ("20 / 21" for twenty questions). The
+                    count at the top already says twenty; this says how
+                    many of them were right first time. */}
+                <Stat value={`${tally.first} / ${tally.asked}`} big />
                 <Help>
                   {practice
                     ? "Your schedule is untouched, apart from anything marked Again."
@@ -13385,9 +13413,9 @@ export default function ArabicTrainer() {
                     ? "None of these were due, so your schedule has barely moved. The practice still counts."
                     : session.items && session.due && session.due < session.items
                     ? `${session.items - session.due} of these weren't due yet and have barely moved.`
-                    : tally.no === 0
+                    : tally.first === tally.asked
                     ? "Clean run. Every gap just got longer."
-                    : `${tally.no} lapsed and will come back shortly.`}
+                    : `${tally.asked - tally.first} lapsed and will come back shortly.`}
                 </Help>
                 <WhatMoved moved={moved} items={items} settings={settings} />
                 <div className="at-row">

@@ -41,7 +41,7 @@ await build({
 });
 const { lentTags, varyTypes, requeueMissed, isUrgent, buildSession, buildManualSession, installIndexes,
   fillersIn, buildWeakSession, weakness, isWeak, movesAmong, mergeMoves,
-  saidMoves, sumMoves, laddered, castQuestion, mixCardsOf, sessionCount } = await import(path.join(out, "trainer.js"));
+  saidMoves, sumMoves, laddered, castQuestion, mixCardsOf, sessionCount, scoreAnswer, NO_SCORE } = await import(path.join(out, "trainer.js"));
 const langs = await import(path.join(here, "..", "src", "languages.ts"));
 const { TYPES } = langs;
 const { MAX_IN_LEARNING, inLearningOf } = await import(path.join(here, "..", "src", "session-mix.ts"));
@@ -408,6 +408,22 @@ test("a question missed twice still counts once", () => {
   list = requeueMissed(list, 1, list[0]);
   list = requeueMissed(list, 2, list[1]);
   assert.deepEqual(sessionCount({ exercises: list, missed: 2 }, 2), { at: 1, total: 1, done: 0 });
+});
+
+test("the end of a session counts questions, not answers", () => {
+  /* Three questions, the second missed once and got right when it came
+     back: three questions, two right first time — not "3 / 4". */
+  let list = [q("a", "ar2en"), q("b", "ar2en"), q("c", "ar2en")];
+  let t = scoreAnswer(NO_SCORE, list[0], true);
+  t = scoreAnswer(t, list[1], false);
+  list = requeueMissed(list, 2, list[1]);
+  t = scoreAnswer(t, list[2], true);
+  assert.equal(/** @type {any} */ (list[3]).retry, true, "the copy put back is marked as asked before");
+  t = scoreAnswer(t, list[3], false);
+  list = requeueMissed(list, 4, list[3]);
+  t = scoreAnswer(t, list[4], true);
+  assert.deepEqual(t, { ok: 3, no: 2, asked: 3, first: 2 }, "missed twice is still one question missed");
+  assert.equal(t.asked, sessionCount({ exercises: list, missed: 2 }, 5).total, "the same total as the top");
 });
 
 test("nothing new is dealt while a pile of new cards is already in hand", () => {
