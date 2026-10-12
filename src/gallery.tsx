@@ -262,6 +262,12 @@ const PLACES: Record<string, [string, string]> = {
   /* Components built out of other components. Where you see them depends
      on where that one is used, which its own entry answers. */
   Button: [PARTS, "A button"],
+  Pressable: [PARTS, "A button that works in a locked section"],
+  EditSection: [PARTS, "A section of the card screen"],
+  CardHead: [PARTS, "The card screen's header"],
+  CardBody: [PARTS, "The card screen's sections"],
+  NamesPart: [PARTS, "A card's ID and tags"],
+  StatusMenu: [PARTS, "A card's status"],
   IconButton: [PARTS, "An icon button"],
   PlayButton: [PARTS, "A play button"],
   ClipRow: [PARTS, "A recording in a list"],

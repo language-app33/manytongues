@@ -3,7 +3,7 @@ import * as API from "./courses-api.ts";
 import type { Card, Course, Deck, Flag, Form, Lang, LangId, User } from "./types.ts";
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
 import { CardEditor, NewCardKind } from "./card-editor.tsx";
-import type { CardShape } from "./card-editor.tsx";
+import type { CardShape, SaveHow, WrittenCard } from "./card-editor.tsx";
 import { formsOf, leadOf } from "./cards.ts";
 
 /*
@@ -4236,6 +4236,24 @@ export function sortCards(cards: Card[], key: string, newestFirst: boolean = tru
  * all filters" puts it back to.
  */
 /* The table view of a teacher's card lists, column by column. */
+/* Where a card stands with students, said in a list only where it is not
+   simply published: a draft, or a published card with changes waiting. */
+const statusWords = (c: Card): string =>
+  c.status && c.status !== "published"
+    ? c.status === "review" ? "Ready for review" : "Draft"
+    : c.changes === "review"
+      ? "Changes ready for review"
+      : c.changes
+        ? "Changes in draft"
+        : "";
+
+/* What a card carries about itself rather than about the word: never what
+   a save changed. See touchedBy. */
+const SAVE_BOOKKEEPING = new Set([
+  "id", "owner", "lang", "rev", "created", "updated", "decks", "inDecks",
+  "status", "changes", "changed", "edits", "review",
+]);
+
 const TEACHER_COLUMNS = [
   { key: "word", label: "Word" },
   { key: "lat", label: "Transliteration" },
@@ -4243,6 +4261,7 @@ const TEACHER_COLUMNS = [
   { key: "kind", label: "Kind" },
   { key: "subtype", label: "Subtype" },
   { key: "decks", label: "Decks" },
+  { key: "status", label: "Status" },
   { key: "audio", label: "Recording" },
   { key: "review", label: "Review" },
   { key: "created", label: "Created" },
@@ -4471,6 +4490,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const [courseView, setCourseView] = useState<any | null>(null);
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
   const [cards, setCards] = useState<Card[]>(last ? last.cards : []);
+  /* The same, for a save to compare against — see touchedBy. */
+  const cardsNow = useRef(cards);
+  cardsNow.current = cards;
   /* Whether the list of cards holding more than one meaning is open — see
      MeaningSplits. */
   const [splitting, setSplitting] = useState(false);
@@ -4490,7 +4512,16 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
        names. The editor is drawn afresh for it, rather than keeping the
        card it was just showing. */
     opened?: number;
-  } | null>(null);
+  } | null>(() => {
+    /* On the way back from a trial, the card the trial was asked about,
+       found in the copy this space had in hand when it left — nothing to
+       fetch, it is the same list the button was pressed from, kept across
+       the round trip. */
+    const c = back && back.cardId && last
+      ? (last.cards || []).find((x: Card) => x.id === back.cardId) || null
+      : null;
+    return c ? { card: c, decks: c.decks || [] } : null;
+  });
   /*
    * A card being started: everything settled about it so far, and nothing
    * typed yet.
@@ -4519,15 +4550,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const offline = useOffline();
   const [naming, setNaming] = useState<any | null>(null); // "new" | deck
   const [confirm, setConfirm] = useState<Pending | null>(null); // whatever is awaiting a yes
-  /* A card being read rather than edited. On the way back from a trial it
-     is the card the trial was asked about, found in the copy this space had
-     in hand when it left — nothing to fetch, it is the same list the button
-     was pressed from, kept across the round trip. */
-  const [viewing, setViewing] = useState<Card | null>(
-    back && back.cardId && last
-      ? (last.cards || []).find((c: Card) => c.id === back.cardId) || null
-      : null,
-  );
+  /* A save that met somebody else's change to the same part of the card,
+     waiting on the teacher's answer — see saveSection. */
+  const [clash, setClash] = useState<{ resolve: (keep: boolean) => void } | null>(null);
   const [selCards, setSelCards] = useState(() => new Set<string>());
   const [cardAction, setCardAction] = useState<"add" | "remove" | null>(null); // "add" | "remove"
   /* The same two-way question for group tags: which to put on the
@@ -4885,8 +4910,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     <CardTile
       card={c}
       lang={langOfCard(c)}
-      meta={shortDate(cardAdded(c))}
-      onClick={() => setViewing(c)}
+      meta={
+        <>
+          {statusWords(c) ? <span className="at-statusbadge">{statusWords(c)}</span> : null}
+          {shortDate(cardAdded(c))}
+        </>
+      }
+      onClick={() => setEditing({ card: c, decks: c.decks || [] })}
       actions={cardActions(c)}
     />
   );
@@ -4927,12 +4957,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           kind: cardKindLabel(c),
           subtype: cardSubtypeLabel(c, langOfCard(c)),
           decks: titles.join(", "),
+          status: statusWords(c) || "Published",
           audio: cardHasAudio(c) ? "Yes" : "",
           review: waitingIds.has(c.id) ? "Waiting" : needsReview(c) ? "Reviewed" : "",
           created: shortDate(c.created),
           modified: shortDate(c.updated),
         },
-        open: () => setViewing(c),
+        open: () => setEditing({ card: c, decks: c.decks || [] }),
         actions: cardActions(c),
       };
     },
@@ -5283,7 +5314,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       /* A locked deck the server kept as it was outranks "done": the
          teacher asked for a change that did not all happen. */
       if (lockedHits.current.size) snack(lockedNote(lockedHits.current), "warn");
-      else if (done) snack(typeof done === "function" ? done(out) : done, "good");
+      else if (done) {
+        /* Nothing to say is said by saying nothing. */
+        const said = typeof done === "function" ? done(out) : done;
+        if (said) snack(said, "good");
+      }
       /* What it made, for a caller that has to know whether it did. */
       return out;
     } catch (e) {
@@ -5404,15 +5439,37 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   };
 
-  const sendOrKeep = useCallback(async (card: Partial<Card>, decks: string[]) => {
+  /*
+   * A save names what it changed, so the server writes only that and
+   * leaves the rest of the card as it stands — see `touched` in save-card.
+   * Worked out here, against the card as this screen holds it, for every
+   * save that does not say for itself (the card screen does): tagging a
+   * selection, narrowing a blank, the Pronouns screen. Without it a whole
+   * card goes up, and on a published card with changes waiting, the whole
+   * card is the changes — saving a tag would publish them.
+   */
+  const touchedBy = (card: Partial<Card>, decks: string[]): string[] | undefined => {
+    const was = card.id ? cardsNow.current.find((c) => c.id === card.id) : null;
+    if (!was) return undefined;
+    const keys = new Set([...Object.keys(card), ...Object.keys(was)]);
+    const out = [...keys].filter((k) => !SAVE_BOOKKEEPING.has(k) &&
+      JSON.stringify((card as Record<string, unknown>)[k] ?? null) !== JSON.stringify((was as Record<string, unknown>)[k] ?? null));
+    if ([...(was.decks || [])].sort().join() !== [...decks].sort().join()) out.push("decks");
+    return out;
+  };
+  const sendOrKeep = useCallback(async (card: Partial<Card>, decks: string[], given: API.SaveExtra = {}) => {
+    const extra: API.SaveExtra = given.touched || given.walk || !card.id
+      ? given
+      : { ...given, touched: touchedBy(card, decks) };
     try {
-      return await API.saveCard(card, decks);
+      return await API.saveCard(card, decks, extra);
     } catch (e) {
       if (String((e && (e as Error).message) || e) !== "offline") throw e;
-      keepPending(CARD_OUTBOX, { card, decks });
+      keepPending(CARD_OUTBOX, { card, decks, extra });
       setKept(waitingToSend(CARD_OUTBOX));
       return { kept: true };
     }
+  /* touchedBy reads the cards through a ref, so this is made once. */
   }, []);
 
   /* And send them when there is something to send them down. One at a
@@ -5421,9 +5478,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const sendKeptCards = useCallback(async () => {
     if (isOffline()) return;
     const { sent } = await drainOutbox(CARD_OUTBOX, async (body) => {
-      const held = body as { card: Partial<Card>; decks: string[] };
+      const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra };
       try {
-        absorbSaved(await API.saveCard(held.card, held.decks));
+        /* Kept for later, a save keeps what it said about itself — but not
+           the revision it started from: by the time it goes, the card has
+           moved on, and a save waiting on a train is the teacher's latest
+           word on what it touched. */
+        const extra = held.extra ? { ...held.extra, force: true } : {};
+        absorbSaved(await API.saveCard(held.card, held.decks, extra));
         return "sent";
       } catch (e) {
         return String((e && (e as Error).message) || e) === "offline" ? "keep" : "drop";
@@ -5554,9 +5616,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     const fresh = cards.find((c) => c.id === reviewing.id) || reviewing;
     const pool = lendable.some((c) => c.id === fresh.id) ? lendable : lendable.concat([fresh]);
     const lang = langOfCard(fresh) || languages[soleLang];
-    const took = (card: Card) => {
-      setViewing((v) => (v && v.id === card.id ? { ...v, ...card } : v));
-    };
+    /* The card screen under the review reads the card from the list, which
+       absorbSaved has already brought up to date. */
+    const took = (_card: Card) => {};
     return (
       <ReviewScreen
         key={`${fresh.id}:${fresh.rev || 0}`}
@@ -5654,8 +5716,24 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   }
 
-  /* ---- the card editor takes over the screen ---- */
-  if (editing) {
+  /* ---- a card takes over the screen ----
+
+     One screen for a card, read or changed — see "The card screen" in
+     card-editor.tsx. Opening a card from a list, a deck, a report or a
+     trial lands here, locked; a section opens on its own Edit button and
+     is saved on its own. */
+  /* Drawn over whichever list it was opened from rather than in place of
+     it, the way the read-out it replaced was: Back lands on the list where
+     it was left, scrolled where it was scrolled. The screen is portalled
+     to the app's root, so where in the tree it sits decides nothing else. */
+  const cardScreen = (() => {
+    if (!editing) return null;
+    /* The card as it stands now, rather than as it was when it was opened:
+       a save, a status changed, a co-teacher's save fetched in the
+       background — all of them are the card on this screen. */
+    const live = editing.card && editing.card.id
+      ? cards.find((c) => c.id === editing.card!.id) || editing.card
+      : editing.card;
     const forDeck = editing.decks[0]
       ? decks.find((d) => d.id === editing.decks[0])
       : decks[0] || { courses: [] };
@@ -5663,271 +5741,319 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
        is going into. With one language taught there is never a choice. */
     const editLang =
       (editing.lang && languages[editing.lang]) ||
-      (editing.card ? langOfCard(editing.card) : langOfDeck(forDeck || ({ courses: [] } as any)));
+      (live ? langOfCard(live) : langOfDeck(forDeck || ({ courses: [] } as any)));
+    const theLang = editLang || LANGUAGES[DEFAULT_LANGUAGE];
+    const inDecks = live && live.id ? live.decks || [] : editing.decks;
+    /*
+     * The card as it is saved, out of what the screen wrote.
+     *
+     * One card, one shape of save. A conversation is a kind of card, so it
+     * goes up the way every card does — the same request, the same decks,
+     * the same revision — and what differs is only what a scene has
+     * instead of a word: its name is the card's English, its setting is
+     * the note, and the turns travel in `lines`. Which is why a scene
+     * reaches a student through the same material payload as everything
+     * else.
+     */
+    const payloadOf = (w: WrittenCard): Partial<Card> => {
+      const { forms, note, name, category, sentence, uses, fills, ref, drill, scene: written, clue, capitals } = w;
+      const [main, ...subs] = forms;
+      return {
+        id: live && live.id ? live.id : "",
+        lang: theLang.id,
+        ...(written
+          ? {
+              /* A scene's name is the card's own word and its setting the
+                 note: a conversation has nothing else to put in either, and
+                 its turns are the lesson. */
+              forms: [{ ar: "", en: written.title, lat: "" }],
+              note: written.setting,
+              uses: [],
+              speakers: written.speakers,
+              you: written.you,
+              lines: written.lines,
+              /* A text or a conversation, said either way: the server reads
+                 saying nothing as "unchanged", which is what a build from
+                 before texts means by it. */
+              sceneKind: written.sceneKind,
+            }
+          : {
+              /* The card's own word first, then every other form of it —
+                 one list, which is how a card is stored and how the editor
+                 has always held it. A form with nothing written in it is
+                 not a form. */
+              forms: [
+                {
+                  ...main,
+                  ar: main.ar.trim(),
+                  en: main.en.trim(),
+                  lat: main.lat.trim(),
+                  ...dimValues(main),
+                  /* And whether the card's own word is asked about, as
+                     against the forms under it: a verb whose table is the
+                     lesson and whose dictionary form is there to be read. */
+                  ask: main.ask !== false,
+                },
+                ...subs.filter((f: any) => f.ar.trim() || f.en.trim()),
+              ],
+              note: note.trim(),
+              /* What to call it in a list, where its own words do not name
+                 it — a verb saved as the form a dictionary lists. Empty on
+                 every other card. */
+              name,
+              /* And what the teacher says the word is — a noun, a verb, a
+                 name. Which table the editor offers follows from it;
+                 nothing about how the card is drilled reads it. */
+              category,
+              /* And whether it is a sentence — a frame other cards are
+                 dropped into — which is the teacher's answer and not
+                 something to be worked out from the braces afterwards. */
+              sentence,
+              uses,
+              /* Which blanks it fills, and the ID another card's blank may
+                 ask for it by — the header's two. */
+              fills,
+              ref,
+              drill,
+              /* Which verb column it is, where it is a pronoun the Pronouns
+                 screen wrote: kept through an edit here, since this screen
+                 does not ask it and a save without it would take it away. */
+              ...(live && live.person ? { person: live.person } : {}),
+              /* And what it reads as with "to be", for the same reason:
+                 written on the Pronouns screen only. */
+              ...(live && live.enIs ? { enIs: live.enIs } : {}),
+              ...(live && live.enAsk ? { enAsk: live.enAsk } : {}),
+              /* Which meaning this card is, for a question another card
+                 shares its prompt with. Said every time, so a clue taken
+                 off comes off. */
+              clue,
+              /* And whether its English keeps its capitals, where the
+                 editor asked: yes or no, so a no stays a no — see
+                 capitals.ts. */
+              ...(typeof capitals === "boolean" ? { capitals } : {}),
+            }),
+      } as Partial<Card>;
+    };
+    /* Which fields of the saved card a section changed: the two writings
+       of it compared, the one from when the section opened and the one
+       now, made by the same function so that nothing differs but what the
+       teacher did. */
+    const touchedOf = (w: WrittenCard, was: WrittenCard): string[] => {
+      const a = payloadOf(w) as Record<string, unknown>;
+      const b = payloadOf(was) as Record<string, unknown>;
+      const keys = [...new Set([...Object.keys(a), ...Object.keys(b)])].filter((k) => k !== "id" && k !== "lang");
+      const out = keys.filter((k) => JSON.stringify(a[k] ?? null) !== JSON.stringify(b[k] ?? null));
+      if ([...w.decks].sort().join() !== [...was.decks].sort().join()) out.push("decks");
+      return out;
+    };
+    const published = !!live && !!live.id && (!live.status || live.status === "published");
+    const saveSection = async (w: WrittenCard, how: SaveHow): Promise<boolean | "reload"> => {
+      const { spread, stripped, carry, next } = w;
+      const making = !(live && live.id);
+      const touched = !making && how.was ? touchedOf(w, how.was) : null;
+      const header = !!touched && touched.length > 0 && touched.every((k) => ["fills", "ref", "decks"].includes(k));
+      const nothing = !!touched && !touched.length && !(spread || []).length && !(stripped || []).length && !carry;
+      let outcome: boolean | "reload" = false;
+      await run(
+        async () => {
+          /* Straight on to the next card, where the teacher asked for
+             another meaning of this word or another word for this meaning:
+             a copy of what was just saved, with what it means emptied, or a
+             new card with only the meaning in it. In no deck either way —
+             see MeaningsBlock. */
+          const onward = (saved: Card | null) => {
+            if (!saved) return;
+            if (next === "meaning") {
+              setEditing({ card: anotherMeaningOf(saved), decks: [], lang: saved.lang || theLang.id, opened: Date.now() });
+            } else if (next === "word") {
+              setEditing({
+                card: null,
+                decks: [],
+                lang: saved.lang || theLang.id,
+                making: "word",
+                draft: anotherWordDraft(saved, ((saved.forms || [])[0] || null) as any),
+                opened: Date.now(),
+              });
+            }
+          };
+          if (nothing) {
+            outcome = true;
+            onward(live);
+            return { said: next ? "" : "Nothing changed" };
+          }
+          const send = (force: boolean) =>
+            sendOrKeep(
+              payloadOf(w),
+              w.decks,
+              making
+                ? { status: "draft" }
+                : { touched: touched || undefined, baseRev: how.baseRev, into: "changes", ...(force ? { force: true } : {}) },
+            );
+          let r: any;
+          try {
+            r = await send(false);
+          } catch (e) {
+            const data = (e as { data?: any }).data;
+            if (String((e as Error).message) !== "changed-elsewhere" || !data) throw e;
+            /* Somebody else saved this part of the card after the section
+               opened. The card as they left it is what the screen shows
+               behind the question; the answer is the teacher's. */
+            absorbSaved({ card: data.card });
+            const keep = await new Promise<boolean>((resolve) => setClash({ resolve }));
+            setClash(null);
+            if (!keep) {
+              outcome = "reload";
+              return { said: "Their changes are kept — yours were not saved" };
+            }
+            r = await send(true);
+          }
+          absorbSaved(r);
+          const saved: Card | null = (r && r.card) || null;
+          if (making) {
+            /* Made: the screen is the card's screen from here on. Kept for
+               later instead, it has no card to be the screen of yet. */
+            if (saved) setEditing((e) => (e ? { ...e, card: saved, decks: saved.decks || [], draft: undefined, making: undefined } : e));
+            else setEditing(null);
+          }
+          /*
+           * And the renames the teacher said should follow the name, and
+           * the tags they took off the collection.
+           *
+           * The screen holds one card, so it carries the answer out rather
+           * than reaching for the rest: these are the names that moved,
+           * and every other card that writes one is told — the server
+           * rewrites both its versions, what students have and any changes
+           * waiting, since a blank has to find the name in both. Through
+           * `sendOrKeep` like any card, so a rename made on a train is kept
+           * and sent like anything else.
+           */
+          const renames = ((spread || []) as { from: string; to: string }[]).filter((x) => x.from !== x.to);
+          const drops = stripped || [];
+          const selfId = saved ? saved.id : live && live.id;
+          const pool = new Map(cards.map((c) => [c.id, c] as [string, Card]));
+          const walked = new Set<string>();
+          for (const [id, other] of pool) {
+            if (id === selfId) continue;
+            let next1: Card | null = other;
+            for (const { from, to } of renames) next1 = renamedIn(next1, from, to) || next1;
+            for (const name of drops) next1 = droppedIn(next1, name) || next1;
+            if (next1 === other) continue;
+            pool.set(id, next1);
+            walked.add(id);
+          }
+          for (const id of walked) {
+            const one = pool.get(id)!;
+            absorbSaved(await sendOrKeep({ id, lang: one.lang || "" }, one.decks || [], { walk: { renames, drops } }));
+          }
+          /*
+           * And the word itself, onto the other cards that share it, where
+           * the teacher said so — see CarryAsk. A change to those cards'
+           * words like any other, so on a published one it waits with its
+           * changes, as this card's does.
+           */
+          let carried = 0;
+          for (const id of (carry && carry.ids) || []) {
+            const other = pool.get(id);
+            if (!other) continue;
+            const next1 = carryWordChanges(other, carry!.changes);
+            if (!next1) continue;
+            const keys = Object.keys(next1).filter((k) => JSON.stringify((next1 as any)[k]) !== JSON.stringify((other as any)[k]));
+            absorbSaved(await sendOrKeep({ ...next1, id, lang: next1.lang || "" }, next1.decks || [], { touched: keys, into: "changes" }));
+            carried += 1;
+          }
+          outcome = true;
+          onward(saved);
+          /* Whether the card just saved turns up in phrases already
+             written. Counted against the list with the new card in it — it
+             is the thing being looked for, and the list in hand was taken
+             before it existed. */
+          const waiting =
+            w.scene || !saved || !making
+              ? 0
+              : pairsIn(
+                  cards.filter((c) => c.id !== saved.id).concat([saved]),
+                  theLang
+                ).filter((pair) => !pair.confirmed && pair.word.id === saved.id).length;
+          const name = (w.scene ? w.scene.title : w.forms[0].en.trim() || w.forms[0].ar.trim()) || "Card";
+          const trimmed: string[] = (r && r.trimmed) || [];
+          return {
+            said: r && r.kept
+              ? `${making ? name : "Changes"} saved on this device — ${making ? "it goes" : "they go"} up when you're back online`
+              : trimmed.length
+                ? `Saved — but ${trimmed.join(" and ")} did not fit and ${trimmed.length === 1 ? "was" : "were"} left out`
+                : walked.size
+                  ? `Saved · the new name went into ${plural(walked.size, "other card")}`
+                  : waiting
+                    ? `${name} saved as a draft · it turns up in ${plural(waiting, "phrase")} you have written — confirm them under In context`
+                    : making
+                      ? `${name} saved as a draft`
+                      : published && !header
+                        ? `Changes saved — students get them when you publish${carried ? ` (and on ${plural(carried, "other card")})` : ""}`
+                        : "Saved",
+          };
+        },
+        (done: { said: string } | undefined) => (done && done.said) || "",
+      );
+      return outcome;
+    };
     return (
+      <>
       <CardEditor
         key={`${editing.opened || ""}`}
-        card={editing.card}
-        lang={editLang || LANGUAGES[DEFAULT_LANGUAGE]}
-        decks={decksIn(new Set([(editLang || LANGUAGES[DEFAULT_LANGUAGE]).id]), editing.decks)}
-        inDecks={editing.decks}
+        card={live}
+        lang={theLang}
+        decks={decksIn(new Set([theLang.id]), inDecks)}
+        inDecks={inDecks}
         busy={busy}
         onClose={() => setEditing(null)}
         allCards={lendable}
         making={editing.making}
         draft={editing.draft || null}
         onOpenCard={(other) =>
-          setEditing({ card: other, decks: other.decks || [], lang: other.lang || (editLang || {}).id || "", opened: Date.now() })
+          setEditing({ card: other, decks: other.decks || [], lang: other.lang || theLang.id, opened: Date.now() })
         }
-        onSave={({ forms, note, name, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next }) =>
-          run(
-            async () => {
-              const [main, ...subs] = forms;
-              /*
-               * One card, one save.
-               *
-               * A conversation is a kind of card, so it goes up the way
-               * every card does — the same request, the same decks, the
-               * same revision — and this used to be two objects built in
-               * two branches, which is what a separate sort of thing looks
-               * like in code. What differs is only what a scene has
-               * instead of a word: its name is the card's English, its
-               * setting is the note, and the turns travel in `lines`.
-               *
-               * Which is why a scene reaches a student through the same
-               * material payload as everything else.
-               */
-              const r = await sendOrKeep(
-                {
-                  id: editing.card ? editing.card.id : "",
-                  lang: (editLang || {}).id || "",
-                  ...(written
-                    ? {
-                        /* A scene's name is the card's own word and its
-                           setting the note: a conversation has nothing else
-                           to put in either, and its turns are the lesson. */
-                        forms: [{ ar: "", en: written.title, lat: "" }],
-                        note: written.setting,
-                        uses: [],
-                        speakers: written.speakers,
-                        you: written.you,
-                        lines: written.lines,
-                        /* A text or a conversation, said either way: the
-                           server reads saying nothing as "unchanged", which
-                           is what a build from before texts means by it. */
-                        sceneKind: written.sceneKind,
-                      }
-                    : {
-                        /* The card's own word first, then every other form
-                           of it — one list, which is how a card is stored
-                           and how the editor has always held it. A form
-                           with nothing written in it is not a form. */
-                        forms: [
-                          {
-                            ...main,
-                            ar: main.ar.trim(),
-                            en: main.en.trim(),
-                            lat: main.lat.trim(),
-                            ...dimValues(main),
-                            /* And whether the card's own word is asked
-                               about, as against the forms under it: a verb
-                               whose table is the lesson and whose
-                               dictionary form is there to be read. */
-                            ask: main.ask !== false,
-                          },
-                          ...subs.filter((f: any) => f.ar.trim() || f.en.trim()),
-                        ],
-                        note: note.trim(),
-                        /* What to call it in a list, where its own words do
-                           not name it — a verb saved as the form a
-                           dictionary lists. Empty on every other card. */
-                        name,
-                        /* And what the teacher says the word is — a noun, a
-                           verb, a name. Which table the editor offers
-                           follows from it; nothing about how the card is
-                           drilled reads it. */
-                        category,
-                        /* And whether it is a sentence — a frame other
-                           cards are dropped into — which is the teacher's
-                           answer and not something to be worked out from
-                           the braces afterwards. A conversation is asked
-                           nothing here: its turns are the cards. */
-                        sentence,
-                        uses,
-                        /* Which blanks it fills — one name or several —
-                           and whether it is a question of its own. A
-                           conversation is neither: its turns are the cards,
-                           and the editor does not offer either field on
-                           one. */
-                        fills,
-                        /* The ID the teacher gave it, which another
-                           card's blank may ask for by name. */
-                        ref,
-                        drill,
-                        /* Which verb column it is, where it is a pronoun the
-                           Pronouns screen wrote: kept through an edit here,
-                           since this screen does not ask it and a save
-                           without it would take it away. */
-                        ...(editing.card && editing.card.person ? { person: editing.card.person } : {}),
-                        /* And what it reads as with "to be", for the same
-                           reason: written on the Pronouns screen only. */
-                        ...(editing.card && editing.card.enIs ? { enIs: editing.card.enIs } : {}),
-                        ...(editing.card && editing.card.enAsk ? { enAsk: editing.card.enAsk } : {}),
-                        /* Which meaning this card is, for a question
-                           another card shares its prompt with. Said every
-                           time, so a clue taken off comes off. */
-                        clue,
-                        /* And whether its English keeps its capitals,
-                           where the editor asked: yes or no, so a no
-                           stays a no — see capitals.ts. */
-                        ...(typeof capitals === "boolean" ? { capitals } : {}),
-                      }),
-                },
-                inDecks
-              );
-              absorbSaved(r);
-              /*
-               * And the renames the teacher said should follow the name.
-               *
-               * The editor holds one card, so it carries the answer out
-               * rather than reaching for the rest: what it hands back is
-               * the names that moved, and this is where every other card
-               * that writes one is rewritten. No bulk write — the same
-               * `sendOrKeep` every card goes through, in a loop, so a
-               * rename made on a train is kept and sent like anything
-               * else.
-               *
-               * Worked out over a pool rather than the list in hand, so
-               * two renames in one sitting reach the same card twice and
-               * it is saved once, with both.
-               */
-              const saved0 = r && r.card;
-              const pool = new Map(cards.map((c) => [c.id, c] as [string, Card]));
-              const moved = new Set<string>();
-              for (const { from, to } of spread || []) {
-                for (const [id, other] of pool) {
-                  if (saved0 && id === saved0.id) continue;
-                  const next = renamedIn(other, from, to);
-                  if (!next) continue;
-                  pool.set(id, next);
-                  moved.add(id);
-                }
-              }
-              /*
-               * And the groups the teacher took off the collection.
-               *
-               * After the renames and over the same pool, so a tag renamed
-               * and then taken off in one sitting comes off where it
-               * landed, and a card caught by both is written once with
-               * both. Only the tags come off: a sentence that asks for the
-               * name goes on asking for it, which is the honest half of
-               * what the teacher was told before they pressed.
-               */
-              for (const name of stripped || []) {
-                for (const [id, other] of pool) {
-                  if (saved0 && id === saved0.id) continue;
-                  const next = droppedIn(other, name);
-                  if (!next) continue;
-                  pool.set(id, next);
-                  moved.add(id);
-                }
-              }
-              /*
-               * And the word itself, onto the other cards that share it,
-               * where the teacher said so — see CarryAsk. Through the same
-               * pool, so a card a rename also reached is saved once with
-               * both.
-               */
-              for (const id of (carry && carry.ids) || []) {
-                const other = pool.get(id);
-                if (!other) continue;
-                const next1 = carryWordChanges(other, carry!.changes);
-                if (!next1) continue;
-                pool.set(id, next1);
-                moved.add(id);
-              }
-              for (const id of moved) {
-                const one = pool.get(id);
-                if (!one) continue;
-                absorbSaved(
-                  await sendOrKeep({ ...one, id, lang: one.lang || "" }, one.decks || []),
-                );
-              }
-              /*
-               * And straight on to the next card, where the teacher asked
-               * for another meaning of this word or another word for this
-               * meaning: a copy of what was just saved, with what it means
-               * emptied, or a new card with only the meaning in it. In no
-               * deck either way — see MeaningsBlock.
-               */
-              const savedNow = r && r.card;
-              if (next === "meaning" && savedNow) {
-                setEditing({ card: anotherMeaningOf(savedNow), decks: [], lang: savedNow.lang || (editLang || {}).id || "", opened: Date.now() });
-              } else if (next === "word" && savedNow) {
-                setEditing({
-                  card: null,
-                  decks: [],
-                  lang: savedNow.lang || (editLang || {}).id || "",
-                  making: "word",
-                  draft: anotherWordDraft(savedNow, (savedNow.forms || [])[0] || null),
-                  opened: Date.now(),
-                });
-              } else {
-                setEditing(null);
-              }
-              /* Whether the card just saved turns up in phrases already
-                 written. Counted against the list with the new card in
-                 it — it is the thing being looked for, and the list in
-                 hand was taken before it existed. */
-              const saved = r && r.card;
-              const waiting =
-                written || !saved
-                  ? 0
-                  : pairsIn(
-                      cards.filter((c) => c.id !== saved.id).concat([saved]),
-                      editLang || LANGUAGES[DEFAULT_LANGUAGE]
-                    ).filter((pair) => !pair.confirmed && pair.word.id === saved.id).length;
-              return {
-                name: (written ? written.title : main.en.trim() || main.ar.trim()) || "Card",
-                /* Kept for later rather than saved, which is a different
-                   promise and has to read as one. */
-                kept: !!(r && r.kept),
-                waiting,
-                /* And how many other cards a rename followed the name
-                   into, which is the one thing about this save that
-                   happened somewhere the teacher was not looking. */
-                moved: moved.size,
-                /* And whatever the server had to cut to store it — a
-                   thirteenth turn, a fifth speaker. Every one of those
-                   caps used to apply in silence, so the only way to find
-                   out was to notice what was gone. */
-                trimmed: (r && r.trimmed) || [],
-              };
-            },
-            /* Named, because the editor closes on save: without the word
-               back there is nothing left on screen to confirm which card
-               it was. English first — it is the one field a teacher can
-               always read at a glance.
-               And where the card that was just saved turns up in phrases
-               already written, say so — that is the moment the link is
-               worth making, and the alternative is a deck whose coverage
-               quietly falls as it grows. */
-            (done: { name: string, kept: boolean, waiting: number, trimmed: string[], moved: number }) =>
-              done.kept
-                ? `${done.name} saved on this device — it goes up when you're back online`
-                : done.moved
-                ? `${done.name} saved · the new name went into ${plural(done.moved, "other card")}`
-                : done.trimmed.length
-                ? `${done.name} saved — but ${done.trimmed.join(" and ")} did not fit and ${done.trimmed.length === 1 ? "was" : "were"} left out`
-                : done.waiting
-                ? `${done.name} saved · it turns up in ${plural(done.waiting, "phrase")} you have written — confirm them under In context`
-                : `${done.name} saved`
-          )
+        onSave={saveSection}
+        onStatus={(to) => {
+          if (!live || !live.id) return;
+          const was = live;
+          void run(
+            async () => absorbSaved(await API.cardStatus(was.id, to)),
+            to === "published"
+              ? was.status && was.status !== "published"
+                ? "Published — students get it now"
+                : "Changes published — students get them now"
+              : to === "discard"
+                ? "Changes discarded"
+                : to === "unpublish"
+                  ? "Unpublished — students no longer see it"
+                  : to === "review"
+                    ? "Marked ready for review"
+                    : "Marked as a draft",
+          );
+        }}
+        about={
+          live && live.id ? (
+            <ReviewLine state={reviewMap.get(live.id)} onOpen={() => setReviewing(live)} />
+          ) : null
+        }
+        below={
+          live && live.id ? (
+            <TryExercises
+              /* The card, and the screen it was opened from — a deck's card
+                 list, say, so answering comes back to the card inside the
+                 deck rather than to the space's front door. */
+              back={{ cardId: live.id, tab, deckId: openDeck }}
+              card={live}
+              cards={lendable}
+              lang={theLang}
+              onTry={onTry}
+            />
+          ) : null
         }
         onDelete={
-          editing.card
+          live && live.id
             ? (() => {
-                const doomed = editing.card;
+                const doomed = live;
                 return () => setConfirm({ kind: "card", card: doomed, action: () => {} });
               })()
             : undefined
@@ -5963,8 +6089,26 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           ) : null
         }
       />
+      {clash && (
+        <ConfirmModal
+          danger={false}
+          title="Someone else changed this part"
+          body={
+            <p>
+              After you started editing, someone else saved a change to the same part of this card.
+              Keep your version and replace theirs, or keep theirs and drop yours.
+            </p>
+          }
+          confirmLabel="Keep mine"
+          altLabel="Keep theirs"
+          onAlt={() => clash.resolve(false)}
+          onCancel={() => clash.resolve(false)}
+          onConfirm={() => clash.resolve(true)}
+        />
+      )}
+      </>
     );
-  }
+  })();
 
   /* ---- filling in the numbers a deck builds from ----
          Sits before the deck screen so that closing it lands back on the
@@ -6613,45 +6757,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               renderItem={cardTile}
             />
 
-        {viewing && (
-          <Screen
-            title={asMeaning(leadOf(viewing).en) || leadOf(viewing).ar}
-            onBack={() => setViewing(null)}
-            action={
-              <Button variant="primary" size="sm"
-                onClick={() => {
-                  setEditing({ card: viewing, decks: viewing.decks || [] });
-                  setViewing(null);
-                }}
-              >
-                <Icon name="edit" />
-                Edit
-              </Button>
-            }
-          >
-            <ReviewLine state={reviewMap.get(viewing.id)} onOpen={() => setReviewing(viewing)} />
-            <CardReadout
-              card={viewing}
-              lang={langOfCard(viewing)}
-              decks={decks}
-              /* And the rest of the collection, because what is behind a
-                 blank and how many cards wear a tag are facts about the
-                 collection rather than about this card. */
-              cards={lendable}
-            />
-            <TryExercises
-              /* The card, and the screen it was read from — a deck's card
-                 list here, so answering comes back to the card inside the
-                 deck rather than to the space's front door. */
-              back={{ cardId: viewing.id, tab, deckId: openDeck }}
-              card={viewing}
-              cards={lendable}
-              lang={langOfCard(viewing)}
-              onTry={onTry}
-            />
-          </Screen>
-        )}
-
         {cardAction === "add" && cardActionScreen(d.id)}
         {tagAction && tagActionScreen()}
 
@@ -6683,6 +6788,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
             }
           />
         )}
+      {cardScreen}
       </Screen>
     );
   }
@@ -7052,39 +7158,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               {cardAction && cardActionScreen()}
               {tagAction && tagActionScreen()}
 
-              {viewing && (
-                <Screen
-                  title={asMeaning(leadOf(viewing).en) || leadOf(viewing).ar}
-                  onBack={() => setViewing(null)}
-                  action={
-                    <Button variant="primary" size="sm"
-                      onClick={() => {
-                        setEditing({ card: viewing, decks: viewing.decks || [] });
-                        setViewing(null);
-                      }}
-          icon="edit"
-        >
-          Edit
-        </Button>
-                  }
-                >
-                  <ReviewLine state={reviewMap.get(viewing.id)} onOpen={() => setReviewing(viewing)} />
-                  <CardReadout
-                    card={viewing}
-                    lang={langOfCard(viewing)}
-                    decks={decks}
-                    cards={lendable}
-                  />
-                  <TryExercises
-                    back={{ cardId: viewing.id, tab, deckId: null }}
-                    card={viewing}
-                    cards={lendable}
-                    lang={langOfCard(viewing)}
-                    onTry={onTry}
-                  />
-                </Screen>
-              )}
-
               {/* What is waiting on the teacher: sentences nobody has read
                   yet, and what students have reported. Said above the list
                   rather than left to a filter, because both are work that
@@ -7280,7 +7353,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               onAddWord={(text, lang) =>
                 setEditing({ card: null, decks: [], lang: lang.id, draft: { ar: text } })
               }
-              onOpenCard={(id) => setViewing(cards.find((c) => c.id === id) || null)}
+              onOpenCard={(id) => {
+                const c = cards.find((x) => x.id === id);
+                if (c) setEditing({ card: c, decks: c.decks || [] });
+              }}
             />
           )}
 
@@ -7502,6 +7578,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               />
             </>
           )}
+      {cardScreen}
     </SpaceFrame>
   );
 }

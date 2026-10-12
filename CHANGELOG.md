@@ -8,6 +8,44 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.431 — 12 October 2026
+
+**One screen for a card, edited a section at a time — and a card is a
+draft until you publish it.**
+
+- Opening a card in Teaching now shows the card editor itself, with every
+  section locked. Reading a card and editing it look the same because they
+  are the same screen, and anything added to the editor shows up when you
+  read a card too. Folds, recordings and links to other cards still work
+  while a section is locked.
+- Each section has its own Edit button. Saving or cancelling happens in a
+  bar at the bottom of the screen, and only that section is saved. What
+  you save shows straight away everywhere the card is used, the exercises
+  under "Try the exercises" included. One section is open at a time.
+- Where Save used to be there is a status: Draft, Ready for review or
+  Published. Only a published card reaches students. A new card starts as
+  a draft.
+- Changing a published card does not change what students have. Your
+  changes wait, as a draft or ready for review, until you choose Publish
+  changes, or Discard changes to drop them. Unpublish takes a card away
+  from students and keeps it as a draft; their progress on it comes back if
+  you publish it again.
+- At the top of each card, "This card" holds what is not part of a draft:
+  the type of card, its decks, its ID and its tags. Changes there apply
+  straight away, to what students have too, because other cards depend on
+  them. It also says which sentence cards the card fills a blank in.
+- If someone else saved the same part of a card while you were editing it,
+  you are asked whether to keep your version or theirs, rather than one
+  silently replacing the other.
+- Card lists show a badge on drafts and on cards with changes waiting, and
+  the table view has a Status column.
+- Every existing card is Published, so students lose nothing. Cards made by
+  the Pronouns screen or by splitting a card's meanings are published
+  straight away, as before.
+
+To check by hand: on a phone, the Save and Cancel bar while typing with
+the on-screen Arabic keyboard open.
+
 ## 0.430 — 12 October 2026
 
 **"Words this teaches" finds every form of a word.**
