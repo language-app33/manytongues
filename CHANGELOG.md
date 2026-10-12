@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.431 — 12 October 2026
+
+**The score at the end of a session counts questions, the way the count at
+the top does.**
+
+- Since 0.420 a missed question coming back at the end no longer counts as
+  a question more at the top of the session. The screen at the end still
+  counted it: twenty questions with one miss ended on "20 / 21".
+- Now that screen shows how many of the session's questions were right
+  first time, out of the same total as the top: "19 / 20" for that
+  session. A question missed twice is still one question missed.
+- The line under it counts the same way: "1 lapsed and will come back
+  shortly" counts questions, not wrong answers.
+- To check by hand: in a ten-question session, answer one wrong, finish,
+  and see "9 / 10" with "1 lapsed".
+
 ## 0.430 — 12 October 2026
 
 **"Words this teaches" finds every form of a word.**
