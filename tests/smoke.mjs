@@ -5990,7 +5990,7 @@ const openPronounTables = async () => {
       typeInto(en(), "yesterday {{friend}} {{verb}}");
       await sleep(320);
       check("a blank that verbs fill is asked which tenses it wants them in",
-        JSON.stringify(tenseNames()) === JSON.stringify(["present", "past", "command"]),
+        JSON.stringify(tenseNames()) === JSON.stringify(["present", "past", "command", "subjunctive"]),
         tenseNames().join(", ") || "(nothing asked)");
       /* And which blank the verb agrees with: the first other, until the
          teacher links it to another or to nothing. */
