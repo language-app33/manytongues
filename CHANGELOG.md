@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.433 — 12 October 2026
+
+**Another meaning of an adjective can be a noun.**
+
+- "Add another meaning" on an adjective used to open the new card stuck as
+  an adjective, because it arrived with the adjective's forms already in
+  it. Until the new card is first saved, its subtype can now be anything:
+  صغير, "small", can have a second card for "a child" that is a noun.
+- Trade-off: changing the subtype puts the adjective's feminine and plural
+  aside, and the line under the subtype says how many will be dropped. The
+  noun's own forms are typed and recorded again.
+- A card that has been saved is held to its table exactly as before.
+
+To check by hand: on a saved adjective, "Add another meaning", choose Noun,
+and save; the original adjective is unchanged.
+
 ## 0.432 — 12 October 2026
 
 **Palestinian Arabic verbs have a subjunctive: the present without its b-.**
