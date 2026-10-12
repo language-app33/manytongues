@@ -662,7 +662,7 @@ test("two forms of one word each have their own table", () => {
  */
 test("a verb's table is unaffected by whose table a cell is in", () => {
   assert.deepEqual(openRows(toEat, arabic, () => false), ["present"]);
-  assert.deepEqual(openRows(toEat, arabic, () => true), ["present", "past", "command"]);
+  assert.deepEqual(openRows(toEat, arabic, () => true), ["present", "past", "command", "subjunctive"]);
   const she = must(cellAt(toEat, "past", "she"), "she ate");
   assert.equal(cellIsOpen(toEat, arabic, she, () => false), false);
   assert.equal(cellIsOpen(toEat, arabic, she, () => true), true);

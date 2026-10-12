@@ -1074,8 +1074,9 @@ test("the Arabic subjunctive stands in a blank only where the sentence ticks it"
   assert.equal(blankAdmits(ar, () => ["subjunctive"])(verb, subj, "verb"), true);
   assert.equal(blankAdmits(ar, () => ["subjunctive"])(verb, present, "verb"), false);
   assert.equal(blankAdmits(ar, () => ["present", "subjunctive"])(verb, subj, "verb"), true);
-  /* Beside a subject it stands as its row's lead, like any tense. */
-  const card = { category: "verb", ar: "أكل", subs: [subj, { ar: "تاكل", row: "subjunctive", col: "he" }] };
+  /* Beside a subject it stands as its row's lead, like any tense — and
+     not at all where the blank has not ticked it. */
+  const card = { category: "verb", ar: "أكل", subs: [subj] };
   assert.equal(blankAdmits(ar, () => ["subjunctive"], () => true)(card, card.subs[0], "verb"), true);
   assert.equal(blankAdmits(ar, () => [], () => true)(card, card.subs[0], "verb"), false);
   /* Huế and Hebrew are as they were. */
