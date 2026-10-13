@@ -6757,7 +6757,7 @@ const openPronounTables = async () => {
     check("the subjunctive's forms have no English box of their own",
       !!cellNamed("Arabic for subjunctive · she") && !cellNamed("English for subjunctive · she"),
       cellNamed("English for subjunctive · she") ? "still asked" : "no subjunctive cell");
-    const examplesSection = () => document.querySelector('[data-el="editor-verb-examples"]');
+    const examplesSection = () => /** @type {any} */ (document.querySelector('[data-el="editor-verb-examples"]'));
     check("and its examples are written under them", !!examplesSection(),
       "no examples section");
     typeInto(nameBox(), "to eat");
