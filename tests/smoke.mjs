@@ -4914,12 +4914,17 @@ const openPronounTables = async () => {
     const sentenceBox = () => {
       const block = [...document.querySelectorAll(".at-formblock")].find((b) =>
         ((b.querySelector(".at-formnum") || {}).textContent || "").trim() === "Sentence 1");
-      return block ? /** @type {any} */ (block.querySelector("[contenteditable]")) : null;
+      return block ? /** @type {any} */ (block.querySelector("[contenteditable], input")) : null;
     };
+    /* A scene's script box is an input; a sentence card's draws its blanks
+       and is editable text. Either is written the way a keystroke would. */
     const write = async (/** @type {string} */ value) => {
       const el = sentenceBox();
       if (!el) return;
-      el.textContent = value;
+      if (el.tagName === "INPUT") {
+        must(must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set,
+          "the value setter").call(el, value);
+      } else el.textContent = value;
       el.dispatchEvent(new w.Event("input", { bubbles: true }));
       await sleep(300);
     };
