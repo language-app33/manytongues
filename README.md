@@ -832,8 +832,9 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   verb's own place in its own sentence to its table's gate.
 - **A scene is lines in order, and its blanks are one cast.** A scene is a
   **conversation** — speakers, a part for the learner, the reply to choose
-  and the order to restore — or a **text**, prose nobody speaks, read as
-  one paragraph and asked only as a whole. Either is also asked for **a
+  and the order to restore — or a **text**, prose nobody speaks, learnt a
+  sentence at a time and read through as one paragraph at the end. Either
+  is also asked for **a
   word taken out of one of its sentences**, chosen out of four and then
   typed (`gap2pick`, `gap2ar`): the scene's own text is all they need, so
   a text with no meaning or recording has more to it than reading. The
@@ -846,7 +847,16 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   English, a scene is also asked **a sentence's meaning, and the sentence
   from its meaning**, both chosen out of four (`sen2en`, `en2sen`;
   `meantAt` and `sentenceOptions`), walked the same way; and the typed
-  missing word shows that sentence's meaning under it as the clue. One kind with a subtype, the way
+  missing word shows that sentence's meaning under it as the clue.
+
+  **A text asks these of each sentence, not of itself** (`bySentence` on
+  the four, `dialogRoleOf` in `src/offers.ts`): every sentence keeps its
+  own progress, so a sentence missed is the one that comes back, and each
+  is shown alone with its meaning before its first question
+  (`withReadThroughs`). The whole text is read through once every
+  sentence is cleared (`sentencesCleared` in `quietUnits`), and the
+  progress a text made before 0.433 is handed down to its sentences once
+  (`carryToSentences`). One kind with a subtype, the way
   a word is one kind whether it is a noun or a verb: `sceneKind: "text"`,
   absent on a conversation, read through `sceneKindOf` in `src/dialogs.ts`,
   and changeable, because a line's progress means the same in either.

@@ -6030,3 +6030,40 @@ front word, the row says "found as" that form with its English.
 **Choices the owner made.** Showing the form found, rather than the card's
 front word alone, so a card offered for a conjugation does not read as a
 wrong match.
+
+
+## A text is asked a sentence at a time, and read whole last (0.433)
+
+**What was wrong.** A text's sentence questions (gap2pick, gap2ar, sen2en,
+en2sen) were asked of the text's own word and walked its sentences by the
+count of askings (castGap). So a sentence missed was never the one asked
+again, the next one along was; and a level opened on two right answers
+that could be two different sentences, leaving the rest of a long text
+never asked before the text moved up. The read-through opened every text
+with the whole paragraph, which the owner found long and full of unknown
+words.
+
+**What changed.** The four questions carry `bySentence`. On a text,
+`dialogRoleOf` in offers.ts makes them line questions, so canAsk and
+offersFor ask them of each line, and dialogNeedMet reads the gap and the
+meaning off that line alone. castGap draws from the line's own words, and
+the line's own id carries the schedule. Conversations are untouched: they
+still walk their lines at the scene level.
+
+The whole-text read-through (dlgwhole) stays on the text's own word, but
+quietUnits holds it until every line is cleared at everything it is asked
+(sentencesCleared). The introduction moved with the questions:
+withReadThroughs puts a dlgread before each sentence's first question
+while that sentence is unmet, showing the one sentence with its meaning
+and pronunciation, and none before the whole.
+
+**Progress is handed down, once.** carryToSentences, in liftItem, copies
+the text's own state on each of the four questions onto every line that
+has none, then marks the text's state `carried`. The mark is what stops a
+sentence added later inheriting a standing it never earned. The text's
+states are kept for the day it is turned back into a conversation.
+
+**Choices the owner made.** Of: one exercise shown a sentence at a time;
+each sentence its own exercise with the whole text read at the end; the
+same without the whole-text reading, the owner chose the second. Texts
+only, for now.

@@ -1008,6 +1008,12 @@ export const EX: Record<string, ExerciseSpec> = {
    * scene — the gap is the question and the rest would be reading — and
    * the word is a different one each time it comes round: see gapAt.
    *
+   * In a text, it and the three sentence questions below are asked of
+   * each sentence rather than of the text (`bySentence`), so every
+   * sentence keeps its own progress: one missed comes back, and one known
+   * moves on. A conversation still walks its lines in turn, since what it
+   * is learnt by is choosing the reply.
+   *
    * Level 2, as "In a phrase → choose" is: picking a word out of four is
    * telling it apart, and comes before writing it. The three wrong ones
    * are other words of the same scene where it has them.
@@ -1026,6 +1032,7 @@ export const EX: Record<string, ExerciseSpec> = {
     answerMode: "choice",
     picks: "word",
     gentle: true,
+    bySentence: true,
   },
   /*
    * And typed. Level 4, as "fill the gap" is for a word in a phrase: the
@@ -1045,6 +1052,7 @@ export const EX: Record<string, ExerciseSpec> = {
     promptField: "gap",
     answerField: "ar",
     answerMode: "ar",
+    bySentence: true,
   },
   /*
    * One sentence of a scene, and its meaning chosen out of four.
@@ -1069,6 +1077,7 @@ export const EX: Record<string, ExerciseSpec> = {
     answerMode: "choice",
     picks: "meaning",
     gentle: true,
+    bySentence: true,
   },
   /*
    * And the other way: the meaning given, the sentence chosen. Level 2,
@@ -1090,6 +1099,7 @@ export const EX: Record<string, ExerciseSpec> = {
     answerMode: "choice",
     picks: "sentence",
     gentle: true,
+    bySentence: true,
   },
   /* Retired. Every turn of a scene typed out at once was the longest
      answer in the app and the least forgiving: one missed mark in the

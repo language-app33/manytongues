@@ -616,9 +616,11 @@ export function gapsOf(card: Scene): Gap[] {
   return out;
 }
 
-/* The gap for the scene's n-th asking: each word in turn, then round again. */
-export function gapAt(card: Scene, n: number): Gap | null {
-  const gaps = gapsOf(card);
+/* The gap for the scene's n-th asking: each word in turn, then round again.
+   Of one sentence only, where `line` names it — a text's sentence, asked
+   in its own right. */
+export function gapAt(card: Scene, n: number, line: number | null = null): Gap | null {
+  const gaps = gapsOf(card).filter((g) => line === null || g.line === line);
   if (!gaps.length) return null;
   const k = Math.abs(Math.round(Number(n) || 0)) % gaps.length;
   return gaps[k];
@@ -785,12 +787,15 @@ export function dialogNeedMet(need: string, scene: Placed | null, unit: Record<s
      placed in, or — for a caller holding a whole card, which the editor
      and the teaching space both do — the unit itself. */
   const card = scene ? scene.card : unit;
+  /* One sentence of it, where these are asked of a sentence — a text's —
+     rather than of the whole. */
+  const one = scene && scene.at !== WHOLE_SCENE ? scene.at : null;
   if (need === "dialog") return isDialog(card);
   /* A word to take out, which a text has as much as a conversation. */
-  if (need === "gap") return isDialog(card) && gapsOf(card).length > 0;
+  if (need === "gap") return isDialog(card) && gapsOf(card).some((g) => one === null || g.line === one);
   /* A sentence with its meaning, which a text has as much as a
      conversation. */
-  if (need === "meant") return isDialog(card) && meantLines(card).length > 0;
+  if (need === "meant") return isDialog(card) && meantLines(card).some((at) => one === null || at === one);
   /* A text is asked as a whole and nothing else: a line of prose has no
      reply to choose, nobody to play, and a paragraph's order is too often
      arguable to mark. */

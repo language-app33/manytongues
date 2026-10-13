@@ -2865,7 +2865,7 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
           <p className="at-hint">
             {card.note ||
               (isText(card)
-                ? "A text. It is read as a whole."
+                ? "A text. Each sentence is practised in its own right, and the whole text is read through once they all are."
                 : "A conversation. Each line is practised in its own right.")}
           </p>
           {/* Its name, which is where a conversation keeps the words a word
@@ -2893,10 +2893,12 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
                   {line.en ? <p className="at-scenemeaning"><Written text={asMeaning(line.en)} /></p> : null}
                   {line.lat ? <p className="at-scenemeaning"><Written text={line.lat} /></p> : null}
                   {clipsOf(line).length ? <ClipList clips={clipsOf(line)} /> : null}
-                  {/* A line of a text is never asked on its own, so there is
-                      nothing for this to say about one. */}
-                  {teacher && !isText(card) ? <ReadAsked form={line as Record<string, any>} /> : null}
-                  <ReadTaught of={line as Record<string, any>} cards={cards} label="Words this turn teaches" />
+                  {teacher ? <ReadAsked form={line as Record<string, any>} /> : null}
+                  <ReadTaught
+                    of={line as Record<string, any>}
+                    cards={cards}
+                    label={isText(card) ? "Words this sentence teaches" : "Words this turn teaches"}
+                  />
                   <ReadGrammar of={line as Record<string, any>} lang={L} />
                 </div>
               </div>

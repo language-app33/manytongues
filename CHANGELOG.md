@@ -8,6 +8,33 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.433 — 12 October 2026
+
+**A text is learnt one sentence at a time.**
+
+- Each sentence of a text is now its own exercise with its own progress:
+  what it means, which sentence an English line means, and its missing
+  word, chosen and then typed. A sentence answered wrong is the one that
+  comes back. Before, the next question about a text was always about the
+  next sentence along, whether the last answer was right or wrong.
+- The first time a sentence comes up it is shown on its own, with its
+  meaning and pronunciation, under "Read the sentence".
+- Reading the whole text through ("Could you follow all of it?") now comes
+  last, once every sentence is cleared, when it should read easily. It no
+  longer opens a text.
+- Nobody goes backwards: the progress a text had made is copied onto each
+  of its sentences. A sentence added to the text afterwards starts from
+  the beginning.
+- Conversations are unchanged.
+- Trade-off: a long text takes longer to learn, because each sentence has
+  to be learnt. Sentences of a text a student had already cleared count
+  as cleared even if that student never practised them, and come up at
+  their next review.
+- To check by hand: practise a new text that has English for its
+  sentences. Each sentence should be introduced on its own before its
+  first question, a sentence you get wrong should come back, and "Read
+  the whole text" should not appear until every sentence is cleared.
+
 ## 0.432 — 12 October 2026
 
 **Palestinian Arabic verbs have a subjunctive: the present without its b-.**

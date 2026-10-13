@@ -137,6 +137,13 @@ export interface ExerciseSpec {
    */
   dialog?: "card" | "line";
   /**
+   * Asked of each sentence of a text, rather than of the text: a question
+   * about one sentence, which a conversation walks through a sentence at
+   * a time and a text asks of each sentence in its own right. See
+   * `dialogRoleOf` in offers.ts.
+   */
+  bySentence?: boolean;
+  /**
    * Met rather than answered: never scheduled, never marked, and not in
    * TYPES.
    */
@@ -1135,6 +1142,12 @@ export interface ExerciseState {
    * always going to be.
    */
   passes?: number;
+  /**
+   * On a text's own question about its sentences: that its progress has
+   * been handed down to each sentence, which is asked in its own right
+   * since 0.433. See carryToSentences in the trainer.
+   */
+  carried?: boolean;
   updated: Millis;
 }
 

@@ -9633,14 +9633,29 @@ const openPronounTables = async () => {
   const verdictOf = (/** @type {HTMLElement} */ host) => text(host.querySelector('[data-el="verdict"]'));
 
   materialQuiet = true;
-  /* The session may open on something else about the text — reading it
-     through again — so it is walked on with "I don't know" until the
-     question wanted comes up. */
+  /* What the sentences were introduced as, before their first question. */
+  /** @type {{ instruction: string, scene: string, meaning: string }[]} */
+  const introduced = [];
+  /* The session may open on something else about the text — a sentence
+     met before its first question, or another question about it — so it
+     is walked on with "I've read it" and "I don't know" until the question
+     wanted comes up. */
   const reach = async (/** @type {HTMLElement} */ host, /** @type {RegExp} */ wanted) => {
     const button = (/** @type {RegExp} */ re) =>
       [...host.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
-    for (let n = 0; n < 12; n++) {
+    for (let n = 0; n < 16; n++) {
       if (wanted.test(text(host.querySelector(".at-instruction")))) return true;
+      const read = button(/^I.ve read it$/);
+      if (read) {
+        introduced.push({
+          instruction: text(host.querySelector(".at-instruction")),
+          scene: text(host.querySelector('[data-el="scene-text"]')),
+          meaning: text(host.querySelector('[data-el="scene-text-meaning"]')),
+        });
+        click(read);
+        await sleep(300);
+        continue;
+      }
       const dunno = button(/^I don.t know$/);
       const self = host.querySelector('[data-el="answer-self"] button');
       if (dunno) click(dunno);
@@ -9754,6 +9769,11 @@ const openPronounTables = async () => {
     },
   );
   materialQuiet = false;
+  check("each sentence of a new text is met on its own before it is asked, with its meaning",
+    introduced.length > 0 && introduced.every((m) =>
+      /Read the sentence/.test(m.instruction) && sentences.includes(m.scene.replace(/\.$/, ""))) &&
+      introduced.some((m) => meanings.includes(m.meaning.replace(/\.$/, ""))),
+    JSON.stringify(introduced));
   check("a text with its meanings asks a sentence's meaning, chosen out of four",
     /What does it mean/.test(toMeaning.instruction) && sentences.includes(toMeaning.prompt) &&
       toMeaning.tiles.length === 3 && toMeaning.tiles.every((/** @type {string} */ t) => meanings.includes(t)),

@@ -157,6 +157,21 @@ export function unmetNeeds(
   });
 }
 
+/*
+ * Which of the three things an exercise is asked of, for this unit: a
+ * scene, a line in one, or a word.
+ *
+ * The exercise's own answer, except for the questions about one sentence:
+ * a conversation is asked those as a whole, a sentence at a time in turn,
+ * and a text asks them of each sentence in its own right, so that every
+ * sentence keeps its own progress. See `bySentence`.
+ */
+export function dialogRoleOf(spec: ExerciseSpec, unit: Form, scene: Placed | null): "card" | "line" | "word" {
+  const role = spec.dialog || "word";
+  if (role === "card" && spec.bySentence && isText(scene ? scene.card : unit)) return "line";
+  return role;
+}
+
 /* Whether this unit can be asked this exercise at all: nothing missing,
    the right shape of card, and a language that drills it. */
 export function canAsk(
@@ -175,7 +190,7 @@ export function canAsk(
 ): boolean {
   const spec = EX[type];
   if (!spec || spec.retired) return false;
-  if ((spec.dialog || "word") !== roleOf(on.unit, on.scene)) return false;
+  if (dialogRoleOf(spec, on.unit, on.scene) !== roleOf(on.unit, on.scene)) return false;
   if (!drilledBy(spec, lang, on.unit)) return false;
   if (askedInstead(spec, on.unit)) return false;
   if (on.unit.countedAt && !COUNTED_FACE_TYPES.includes(type)) return false;
@@ -292,8 +307,7 @@ export function offersFor({
   const offers: Offer[] = [];
   for (const type of TYPES) {
     const spec = EX[type];
-    const role = spec.dialog || "word";
-    const fits = known.filter((u) => roleOf(u.unit, u.scene) === role);
+    const fits = known.filter((u) => roleOf(u.unit, u.scene) === dialogRoleOf(spec, u.unit, u.scene));
     if (!fits.length) continue;
     /* A text is asked as a whole and nothing else, whatever it holds — so
        the questions it never asks are not offered as waiting for something
