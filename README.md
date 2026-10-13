@@ -855,7 +855,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   is shown alone with its meaning before its first question
   (`withReadThroughs`). The whole text is read through once every
   sentence is cleared (`sentencesCleared` in `quietUnits`), and the
-  progress a text made before 0.433 is handed down to its sentences once
+  progress a text made before 0.434 is handed down to its sentences once
   (`carryToSentences`). A sentence not yet met waits until most of its
   words are known — eight in ten of the word cards found in it, each with
   the bottom of its own ladder cleared (`sentenceWaits`, matched by

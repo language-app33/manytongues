@@ -1,7 +1,7 @@
 /*
  * A text is learnt a sentence at a time.
  *
- * Since 0.433 each sentence of a text is asked its own questions — what it
+ * Since 0.434 each sentence of a text is asked its own questions — what it
  * means, which word is missing — and keeps its own progress, so a sentence
  * missed is the one that comes back. Each is shown with its meaning before
  * its first question, the whole text is read through once every sentence
@@ -124,7 +124,7 @@ test("a text's progress is handed down to its sentences, once", () => {
   assert.equal(carryToSentences(talkOf(before)), talkOf(before), "a conversation is left alone");
 });
 
-/* ---- a sentence waits on its words (0.434) ---- */
+/* ---- a sentence waits on its words (0.435) ---- */
 
 /** A word card, its every question cleared when `known`. @param {string} id @param {string} ar @param {string} en @param {boolean} known */
 const word = (id, ar, en, known) => ({
@@ -188,7 +188,7 @@ test("eight words in ten known is enough", () => {
   assert.ok(quietUnits(fewer, settings).has("t0"), "three of five: it waits");
 });
 
-/* ---- what the editor says about a sentence (0.435) ---- */
+/* ---- what the editor says about a sentence (0.436) ---- */
 
 test("a sentence is long by its own language's count", () => {
   const ar = LANGUAGES["ar-PS"];

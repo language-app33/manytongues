@@ -1151,7 +1151,7 @@ export interface ExerciseState {
   /**
    * On a text's own question about its sentences: that its progress has
    * been handed down to each sentence, which is asked in its own right
-   * since 0.433. See carryToSentences in the trainer.
+   * since 0.434. See carryToSentences in the trainer.
    */
   carried?: boolean;
   updated: Millis;

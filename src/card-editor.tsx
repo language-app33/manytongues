@@ -3628,11 +3628,18 @@ export function initialCategory(
  * typed into a card that has never been saved is not yet anybody's work,
  * and locking a teacher into a shape because they filled one box to see
  * what it did would be the opposite of the point.
+ *
+ * And a card with no id has not been saved, whatever it arrives holding:
+ * another meaning of a word comes in with the original's whole table (see
+ * anotherMeaningOf), and the second meaning of an adjective may well be a
+ * noun — صغير is "small" and "a child". Choosing one there puts the table
+ * aside, and the line under the radio counts what that drops.
  */
 export function storedFormsOf(
   card: Card | null,
   lang: Lang | null | undefined,
 ): CardForms {
+  if (!card || !card.id) return "";
   for (const [name, spec] of Object.entries(tablesOf(lang))) {
     if (subFormsOf(card).some((f) => rowIdsOf(spec).has(String(f.row || "")))) return name;
   }
@@ -6692,8 +6699,8 @@ function TurnBlock({ talk, lang, allCards, selfId, index: i, line: l }: {
  * What a student will meet in a sentence of a text, said while it is
  * written: whether it is long, and which of its words no card teaches.
  *
- * Since 0.433 a text is asked a sentence at a time, so a long sentence is
- * a long question; and since 0.434 a sentence waits until most of its
+ * Since 0.434 a text is asked a sentence at a time, so a long sentence is
+ * a long question; and since 0.435 a sentence waits until most of its
  * words are known, which only the words with a card can ever be. A word
  * with none is met unlearnt and is not counted, so a sentence made mostly
  * of them comes up early and is hard. Both are said rather than refused: a

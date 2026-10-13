@@ -8,13 +8,13 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.435 — 13 October 2026
+## 0.436 — 13 October 2026
 
 **Writing a text warns about long sentences and words with no card.**
 
 - Under each sentence of a text, the editor now lists the words that no
   card teaches. Students meet those words without having learnt them, and
-  since 0.434 they don't count when the app decides whether a student is
+  since 0.435 they don't count when the app decides whether a student is
   ready for the sentence.
 - It also warns when a sentence is over 12 words, or over 20 in
   Vietnamese, which writes each syllable as a separate word. Each sentence
@@ -27,7 +27,7 @@ and moves once per batch of work you would notice, not once per commit.
   have a card for and one you don't. Only the second should be listed.
   Then write a sentence of more than 12 words and see the length warning.
 
-## 0.434 — 13 October 2026
+## 0.435 — 13 October 2026
 
 **A sentence of a text waits until most of its words are known.**
 
@@ -48,7 +48,7 @@ and moves once per batch of work you would notice, not once per commit.
   The second should be asked straight away; the first only once the
   student has learnt most of its words.
 
-## 0.433 — 12 October 2026
+## 0.434 — 12 October 2026
 
 **A text is learnt one sentence at a time.**
 
@@ -74,6 +74,22 @@ and moves once per batch of work you would notice, not once per commit.
   sentences. Each sentence should be introduced on its own before its
   first question, a sentence you get wrong should come back, and "Read
   the whole text" should not appear until every sentence is cleared.
+
+## 0.433 — 12 October 2026
+
+**Another meaning of an adjective can be a noun.**
+
+- "Add another meaning" on an adjective used to open the new card stuck as
+  an adjective, because it arrived with the adjective's forms already in
+  it. Until the new card is first saved, its subtype can now be anything:
+  صغير, "small", can have a second card for "a child" that is a noun.
+- Trade-off: changing the subtype puts the adjective's feminine and plural
+  aside, and the line under the subtype says how many will be dropped. The
+  noun's own forms are typed and recorded again.
+- A card that has been saved is held to its table exactly as before.
+
+To check by hand: on a saved adjective, "Add another meaning", choose Noun,
+and save; the original adjective is unchanged.
 
 ## 0.432 — 12 October 2026
 

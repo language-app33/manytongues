@@ -2026,7 +2026,7 @@ function withFacesWaiting(quiet: Set<string>, items: Item[], settings: Settings,
  *
  * Only a sentence not yet met. One already asked keeps going whatever
  * happens to its words, and so does every sentence of a text the learner
- * had started before sentences were asked on their own (0.433), whose
+ * had started before sentences were asked on their own (0.434), whose
  * progress has been handed down to them or sits on the text's own word.
  */
 type WordsHeld = { cards: Item[]; byId: Map<string, Item>; sig: string };
@@ -6434,7 +6434,7 @@ const formPart = (f: Record<string, any>): Record<string, any> =>
 /*
  * A text's progress, handed down to its sentences.
  *
- * Until 0.433 a text was asked about its sentences as a whole, a sentence
+ * Until 0.434 a text was asked about its sentences as a whole, a sentence
  * at a time in turn, and its progress was the text's. Now each sentence is
  * asked in its own right and keeps its own, so the text's progress on
  * those questions is copied onto every sentence that has none yet: nobody

@@ -6032,7 +6032,7 @@ front word alone, so a card offered for a conjugation does not read as a
 wrong match.
 
 
-## A text is asked a sentence at a time, and read whole last (0.433)
+## A text is asked a sentence at a time, and read whole last (0.434)
 
 **What was wrong.** A text's sentence questions (gap2pick, gap2ar, sen2en,
 en2sen) were asked of the text's own word and walked its sentences by the
@@ -6069,7 +6069,7 @@ same without the whole-text reading, the owner chose the second. Texts
 only, for now.
 
 
-## A sentence of a text waits on most of its words (0.434)
+## A sentence of a text waits on most of its words (0.435)
 
 **What was wrong.** A text came up whether or not the learner knew its
 words, so its sentences were long reads full of words never met.
@@ -6089,9 +6089,9 @@ words, as ids looked up afresh, since an answer makes new card objects.
 
 **Who it does not hold.** Only a sentence not yet met, and only in a text
 whose own word is unmet: a sentence asked keeps going whatever happens to
-its words, and a text begun before 0.433 has either handed its progress
+its words, and a text begun before 0.434 has either handed its progress
 down (carryToSentences) or carries it on its own word. A word with no card
-is not counted, since nothing could make it known; 0.435 tells the teacher
+is not counted, since nothing could make it known; 0.436 tells the teacher
 which words those are.
 
 **Choices the owner made.** Recognised rather than cleared (writing
@@ -6099,12 +6099,12 @@ included), because reading a sentence asks for its words to be understood,
 not written.
 
 
-## The text editor says which words have no card, and when a sentence is long (0.435)
+## The text editor says which words have no card, and when a sentence is long (0.436)
 
 **What was wrong.** Nothing told a teacher that a sentence of a text was
-long, or full of words no card teaches. Since 0.433 every sentence is a
+long, or full of words no card teaches. Since 0.434 every sentence is a
 question of its own, so a long sentence is a long question; and since
-0.434 a sentence waits on its words, which only words with a card can
+0.435 a sentence waits on its words, which only words with a card can
 ever satisfy.
 
 **What changed.** SentenceCheck, under each sentence of a text in the
