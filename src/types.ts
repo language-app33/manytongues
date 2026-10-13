@@ -137,6 +137,13 @@ export interface ExerciseSpec {
    */
   dialog?: "card" | "line";
   /**
+   * Asked of each sentence of a text, rather than of the text: a question
+   * about one sentence, which a conversation walks through a sentence at
+   * a time and a text asks of each sentence in its own right. See
+   * `dialogRoleOf` in offers.ts.
+   */
+  bySentence?: boolean;
+  /**
    * Met rather than answered: never scheduled, never marked, and not in
    * TYPES.
    */
@@ -206,6 +213,18 @@ export interface VerbPerson {
 export interface VerbTense {
   id: string;
   label: string;
+  /**
+   * Whether a sentence's blank takes this row only where it was ticked.
+   *
+   * A blank nobody has narrowed takes every row, which is right for the
+   * tenses a sentence about nothing in particular can be in and wrong for
+   * a form that only follows another word: Palestinian Arabic's
+   * subjunctive — تاكل after بدها, لازم, ممكن — is not a way to say "she
+   * eats an apple" on its own. So a row saying this is left out of an
+   * unnarrowed blank and admitted by a tick alone. See standsInRows in
+   * src/verbs.ts. Absent is every row as it always was.
+   */
+  onlyWhenTicked?: boolean;
 }
 
 /**
@@ -539,6 +558,12 @@ export interface Lang {
   similarityMode: string;
   context: LangContext;
   translitDrilled: boolean;
+  /**
+   * How many words a sentence of a text may have before the editor calls
+   * it long. Absent means twelve; a language that writes each syllable
+   * apart counts more words for the same sentence. See sentence-words.ts.
+   */
+  longSentence?: number;
   formsLabel: string;
   fontStack: string;
   keys: LangKeys;
@@ -1123,6 +1148,12 @@ export interface ExerciseState {
    * always going to be.
    */
   passes?: number;
+  /**
+   * On a text's own question about its sentences: that its progress has
+   * been handed down to each sentence, which is asked in its own right
+   * since 0.434. See carryToSentences in the trainer.
+   */
+  carried?: boolean;
   updated: Millis;
 }
 
@@ -1184,6 +1215,12 @@ export interface Question {
    * session is known to be numbers and nothing else.
    */
   within?: "numbers";
+  /**
+   * Set on the copy a miss puts back at the end of the session. The same
+   * question asked again, so the screen at the end counts it once: it was
+   * missed, whatever happens when it comes back.
+   */
+  retry?: boolean;
 }
 
 /**

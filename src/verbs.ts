@@ -774,9 +774,16 @@ export function standsInRows(
   form: unknown,
   rows: string[],
 ): boolean {
-  if (!rows.length || !spec) return true;
+  if (!spec) return true;
+  /* Nothing ticked is every row but the ones that wait to be ticked —
+     see onlyWhenTicked on a row. */
+  if (!rows.length) return !onlyWhenTicked(spec, rowOf(form));
   return rows.includes(rowOf(form));
 }
+
+/** Whether a row of this table stands in a blank only where it is ticked. */
+export const onlyWhenTicked = (spec: VerbSpec | null | undefined, row: string): boolean =>
+  tensesOf(spec).some((t) => t.id === str(row) && !!t.onlyWhenTicked);
 
 /* ---- the gate: one tense of a verb is ever new at a time ---- */
 

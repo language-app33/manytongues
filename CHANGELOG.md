@@ -8,6 +8,128 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.436 — 13 October 2026
+
+**Writing a text warns about long sentences and words with no card.**
+
+- Under each sentence of a text, the editor now lists the words that no
+  card teaches. Students meet those words without having learnt them, and
+  since 0.435 they don't count when the app decides whether a student is
+  ready for the sentence.
+- It also warns when a sentence is over 12 words, or over 20 in
+  Vietnamese, which writes each syllable as a separate word. Each sentence
+  is asked as one question, so a long one is easier to learn split in two.
+- These are only warnings: the text still saves.
+- Trade-off: none for students. The list of words with no card uses the
+  same matching as "Words this teaches", so now and then it may miss a
+  word or count one wrongly.
+- To check by hand: in a new text, write a sentence with one word you
+  have a card for and one you don't. Only the second should be listed.
+  Then write a sentence of more than 12 words and see the length warning.
+
+## 0.435 — 13 October 2026
+
+**A sentence of a text waits until most of its words are known.**
+
+- A student now meets a sentence of a text only once they can say what
+  most of its words mean: 8 in 10 of the words in it that have a card, or
+  every one of them in a sentence with three or fewer. A word counts once
+  the first step of its own card is cleared.
+- Words with no card are not counted, since nothing could ever make them
+  known. A sentence made only of such words comes up straight away.
+- Easier sentences of a text therefore tend to come first, and the rest
+  follow as their words are learnt.
+- Nobody is held back mid-way: a sentence already asked keeps coming, and
+  so does every sentence of a text a student had already started.
+- Trade-off: texts arrive later than before, by as long as it takes to
+  learn their words.
+- To check by hand: make a text with a sentence built from word cards a
+  student has not started, and a second sentence of words with no cards.
+  The second should be asked straight away; the first only once the
+  student has learnt most of its words.
+
+## 0.434 — 12 October 2026
+
+**A text is learnt one sentence at a time.**
+
+- Each sentence of a text is now its own exercise with its own progress:
+  what it means, which sentence an English line means, and its missing
+  word, chosen and then typed. A sentence answered wrong is the one that
+  comes back. Before, the next question about a text was always about the
+  next sentence along, whether the last answer was right or wrong.
+- The first time a sentence comes up it is shown on its own, with its
+  meaning and pronunciation, under "Read the sentence".
+- Reading the whole text through ("Could you follow all of it?") now comes
+  last, once every sentence is cleared, when it should read easily. It no
+  longer opens a text.
+- Nobody goes backwards: the progress a text had made is copied onto each
+  of its sentences. A sentence added to the text afterwards starts from
+  the beginning.
+- Conversations are unchanged.
+- Trade-off: a long text takes longer to learn, because each sentence has
+  to be learnt. Sentences of a text a student had already cleared count
+  as cleared even if that student never practised them, and come up at
+  their next review.
+- To check by hand: practise a new text that has English for its
+  sentences. Each sentence should be introduced on its own before its
+  first question, a sentence you get wrong should come back, and "Read
+  the whole text" should not appear until every sentence is cleared.
+
+## 0.433 — 12 October 2026
+
+**Another meaning of an adjective can be a noun.**
+
+- "Add another meaning" on an adjective used to open the new card stuck as
+  an adjective, because it arrived with the adjective's forms already in
+  it. Until the new card is first saved, its subtype can now be anything:
+  صغير, "small", can have a second card for "a child" that is a noun.
+- Trade-off: changing the subtype puts the adjective's feminine and plural
+  aside, and the line under the subtype says how many will be dropped. The
+  noun's own forms are typed and recorded again.
+- A card that has been saved is held to its table exactly as before.
+
+To check by hand: on a saved adjective, "Add another meaning", choose Noun,
+and save; the original adjective is unchanged.
+
+## 0.432 — 12 October 2026
+
+**Palestinian Arabic verbs have a subjunctive: the present without its b-.**
+
+- A verb card now has a fourth set of boxes, after the command: the
+  subjunctive, one per person — تاكل، آكل، ناكل — the form used after
+  بدي، لازم، ممكن، رح. Like the other tenses it is optional, so a verb
+  saves without it, and you type each form and its English yourself.
+- A sentence card lists the subjunctive among the tenses a verb blank can
+  ask for. Unlike the other tenses it is used **only where it is ticked**:
+  a blank with nothing ticked goes on taking the present, the past and
+  the command, so every sentence already written is filled exactly as
+  before. "بدها {{verb}}" with the subjunctive ticked is met as بدها تاكل.
+- Students meet it last, once the command is known, so nobody part of the
+  way through a verb is held back by it.
+- Trade-off: a verb a student has already learnt goes back to learning
+  once you add its subjunctive, until they have practised the new forms.
+- Hebrew and Vietnamese verbs are unchanged.
+
+To check by hand: on a verb card, the English you give the subjunctive
+boxes, so that "English → Arabic" can tell them from the present — for
+example "(she wants to) eat".
+
+## 0.431 — 12 October 2026
+
+**The score at the end of a session counts questions, the way the count at
+the top does.**
+
+- Since 0.420 a missed question coming back at the end no longer counts as
+  a question more at the top of the session. The screen at the end still
+  counted it: twenty questions with one miss ended on "20 / 21".
+- Now that screen shows how many of the session's questions were right
+  first time, out of the same total as the top: "19 / 20" for that
+  session. A question missed twice is still one question missed.
+- The line under it counts the same way: "1 lapsed and will come back
+  shortly" counts questions, not wrong answers.
+- To check by hand: in a ten-question session, answer one wrong, finish,
+  and see "9 / 10" with "1 lapsed".
+
 ## 0.430 — 12 October 2026
 
 **"Words this teaches" finds every form of a word.**

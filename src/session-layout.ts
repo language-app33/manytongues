@@ -210,7 +210,7 @@ export function varyTypes(
  * there is something to stand between.
  */
 export function requeueMissed(list: Question[], from: number, ex: Question): Question[] {
-  const put = (at: number) => list.slice(0, at).concat([{ ...ex }], list.slice(at));
+  const put = (at: number) => list.slice(0, at).concat([{ ...ex, retry: true }], list.slice(at));
   /* The back of the queue, then forward off any neighbour it may not stand
      beside — about the same card, or the same exercise — on both sides.
      Never as far as `from`: the question there is the miss itself, still on

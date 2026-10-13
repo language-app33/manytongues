@@ -268,6 +268,7 @@ import {
 } from "./meanings.ts";
 import type { Sibling, SiblingIndex } from "./meanings.ts";
 import { buildContextIndex } from "./context-index.ts";
+import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
 import { drainOutbox, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
@@ -751,6 +752,7 @@ import {
   docSize,
   drainRemote,
   compactItem,
+  isFreshState,
   mergeData,
   syncAfterChange,
   SESSION_END_SYNC_MS,
@@ -2009,6 +2011,80 @@ function withFacesWaiting(quiet: Set<string>, items: Item[], settings: Settings,
   return out;
 }
 
+/*
+ * A sentence of a text waits until most of its words are known.
+ *
+ * A text written in words nobody has learnt is long to read and hard to
+ * follow, so a sentence is not met until the learner can say what most of
+ * the words in it mean: eight in ten of the word cards it was found to
+ * contain, rounded up, so a sentence with three or fewer of them wants
+ * every one — the share a stretch of the number line asks of its words
+ * (STRETCH_SHARE). A word counts once the bottom level of its own ladder
+ * is cleared: reading a sentence asks for its words to be understood, not
+ * written. A word with no card is not counted, since nothing could ever
+ * make it known; the editor tells the teacher which words those are.
+ *
+ * Only a sentence not yet met. One already asked keeps going whatever
+ * happens to its words, and so does every sentence of a text the learner
+ * had started before sentences were asked on their own (0.434), whose
+ * progress has been handed down to them or sits on the text's own word.
+ */
+type WordsHeld = { cards: Item[]; byId: Map<string, Item>; sig: string };
+
+function wordsHeldIn(items: Item[], settings: Settings, lang: Lang): WordsHeld {
+  const cards = items.filter((it) => !isDialog(it) && it.drill !== false && langIdOf(it, settings) === lang.id);
+  const sig = cards.map((c) => `${c.id}\u0001${unitsOf(c).map(({ unit }) => unit.ar || "").join("\u0002")}`).join("\u0003");
+  return { cards, byId: byIdOf(cards), sig };
+}
+
+/* Which cards each sentence holds, kept while the learner's words read the
+   same: matching every word against every sentence is not work to repeat
+   on every answer, and an answer changes a schedule, not a word. Kept as
+   ids and looked up afresh, because an answer does make a new card. */
+const SENTENCE_WORDS: Map<string, { sig: string; hits: { card: string; form: string }[] }> = new Map();
+
+function heldIn(text: string, held: WordsHeld, lang: Lang): { card: Item; form: Form }[] {
+  const key = `${lang.id}\u0000${text}`;
+  let kept = SENTENCE_WORDS.get(key);
+  if (!kept || kept.sig !== held.sig) {
+    const hits = sentenceWords(text, held.cards, lang).hits.map((h) => ({ card: h.card.id, form: h.form.id }));
+    kept = { sig: held.sig, hits };
+    SENTENCE_WORDS.set(key, kept);
+  }
+  const out: { card: Item; form: Form }[] = [];
+  for (const h of kept.hits) {
+    const card = held.byId.get(h.card);
+    const form = card && unitsOf(card).find(({ unit }) => unit.id === h.form);
+    if (card && form) out.push({ card, form: form.unit });
+  }
+  return out;
+}
+
+const unmet = (unit: Form): boolean => Object.values(statesOf(unit)).every((st) => !st || st.phase === "new");
+
+function sentenceWaits(card: Item, line: Form, held: WordsHeld, lang: Lang): boolean {
+  if (!unmet(line) || !unmet(leadOf(card))) return false;
+  const hits = heldIn(String(line.ar || ""), held, lang);
+  if (!hits.length) return false;
+  const known = hits.filter(({ card: word, form }) => {
+    const unit = isAsked(form) ? form : leadOf(word);
+    const types = availableTypes(unit, lang);
+    return !types.length || reachedLevel(types, (t) => statesOf(unit)[t], 2);
+  }).length;
+  return known < Math.ceil(hits.length * STRETCH_SHARE - 1e-9);
+}
+
+/* Whether every sentence of a text is cleared, at everything it is asked.
+   Through availableTypes and not laddered, for the reason stretchOpen
+   gives: laddered reads the quiet set this is in the middle of working out. */
+function sentencesCleared(card: Item, lang: Lang): boolean {
+  return linesOf(card).every((line) => {
+    if (!isAsked(line)) return true;
+    const types = availableTypes(line, lang);
+    return !types.length || cleared(types, (t) => statesOf(line)[t]);
+  });
+}
+
 /* What a table's cells wait on, where it says nothing: the word, which is
    the rule every one-row table has followed since there was one. */
 const waitsOnWord = (spec: VerbSpec): boolean => (spec.gate || "word") === "word";
@@ -2027,12 +2103,31 @@ export function quietUnits(items: Item[], settings: Settings): Set<string> {
   /* Whether each stretch is open, worked out once however many of its
      words ask. */
   const opened: Map<string, boolean> = new Map();
+  /* The learner's word cards in each language, for the sentences of a
+     text to be read against — worked out once however many sentences ask. */
+  const words: Map<string, WordsHeld> = new Map();
+  const wordsIn = (lang: Lang): WordsHeld => {
+    if (!words.has(lang.id)) words.set(lang.id, wordsHeldIn(items, settings, lang));
+    return words.get(lang.id) as WordsHeld;
+  };
   const isOpen = (stretch: Item, lang: Lang) => {
     if (!opened.has(stretch.id)) opened.set(stretch.id, stretchOpen(stretch, items, lang));
     return opened.get(stretch.id) as boolean;
   };
   for (const card of items) {
     const lang = langOf(settingsFor(settings, card));
+    /*
+     * A text is read through as a whole once each of its sentences is
+     * cleared, and not before: the sentences are learnt one at a time and
+     * the whole is the last step, met when it can be read. Read afresh, so
+     * a sentence slipping back off cleared holds it again until recovered.
+     * A sentence with nothing to ask holds nothing back.
+     */
+    if (isText(card)) {
+      for (const line of linesOf(card)) if (sentenceWaits(card, line, wordsIn(lang), lang)) out.add(line.id);
+      if (!sentencesCleared(card, lang)) out.add(leadOf(card).id);
+      continue;
+    }
     /*
      * A number's word waits with its stretch — see homeStretch. The word
      * for ninety is not met before 20 to 99 opens, nor *a million* on the
@@ -3088,14 +3183,18 @@ function castGap(resolved: { unit: Form; parent: Item; isSub: boolean } | null, 
     GAP_TURNS.set(ex, turn);
   }
   const { answers: _answers, ...rest } = resolved.unit as Form & { answers?: unknown };
+  /* A sentence of a text, asked in its own right: the gap is one of its
+     own words and the sentence is itself. Its own id, so its own progress. */
+  const placed = sceneOf(resolved.unit.id);
+  const own = placed && placed.at !== WHOLE_SCENE ? placed.at : null;
   if (SENTENCE_TYPES.has(ex.type)) {
-    const at = meantAt(resolved.parent, turn);
+    const at = own !== null ? own : meantAt(resolved.parent, turn);
     const line = at === null ? null : linesOf(resolved.parent)[at];
     if (!line) return resolved;
     const unit = { ...rest, ar: line.ar, en: line.en, lat: line.lat || "", recs: [], sentenceAt: at } as Form;
     return { ...resolved, unit };
   }
-  const gap = gapAt(resolved.parent, turn);
+  const gap = gapAt(resolved.parent, turn, own);
   if (!gap) return resolved;
   const unit = { ...rest, ar: gap.word, en: "", lat: "", recs: [], gap } as Form;
   return { ...resolved, unit };
@@ -4185,6 +4284,32 @@ function withQueue<S extends Session>(s: S, next: Question[]): S {
 }
 
 /**
+ * What a session scored, for the screen at the end of it.
+ *
+ * `ok` and `no` count answers, the way they always have; the praise after
+ * a right answer turns on `ok`. `asked` and `first` count questions: a
+ * question put back by a miss is the same question when it comes round
+ * again, so its second asking adds to neither. A question missed twice is
+ * one question missed, as at the top of the session — see sessionCount.
+ */
+export interface Score {
+  ok: number;
+  no: number;
+  asked: number;
+  first: number;
+}
+export const NO_SCORE: Score = { ok: 0, no: 0, asked: 0, first: 0 };
+export function scoreAnswer(t: Score, ex: Pick<Question, "retry"> | null | undefined, correct: boolean): Score {
+  const again = !!(ex && ex.retry);
+  return {
+    ok: t.ok + (correct ? 1 : 0),
+    no: t.no + (correct ? 0 : 1),
+    asked: t.asked + (again ? 0 : 1),
+    first: t.first + (!again && correct ? 1 : 0),
+  };
+}
+
+/**
  * What the count at the top of a session says, standing on question `qi`.
  *
  * A miss puts its question back at the end of the queue, which made the
@@ -4866,6 +4991,20 @@ function withReadThroughs(list: any[], items: Item[], settings: Settings) {
   const out = [];
   for (const ex of list) {
     const card = items.find((i) => i.id === ex.id) || null;
+    /* A text is met a sentence at a time, as it is asked: each sentence
+       is shown with its meaning and pronunciation before its first
+       question, and the whole text is what is read at the end. */
+    if (card && isText(card)) {
+      const line = ex.subId ? linesOf(card).find((l) => l.id === ex.subId) : null;
+      if (line && !seen.has(line.id)) {
+        seen.add(line.id);
+        if (supportedTypes(line, settings).every((t) => stateOf(line, t).phase === "new")) {
+          out.push({ id: card.id, subId: line.id, type: "dlgread" });
+        }
+      }
+      out.push(ex);
+      continue;
+    }
     if (card && isDialog(card) && !seen.has(card.id)) {
       seen.add(card.id);
       if (sceneUnmet(card, settings)) out.push({ id: card.id, subId: null, type: "dlgread" });
@@ -6292,6 +6431,39 @@ const CARD_ONLY = new Set([
 const formPart = (f: Record<string, any>): Record<string, any> =>
   Object.fromEntries(Object.entries(f).filter(([k]) => !CARD_ONLY.has(k)));
 
+/*
+ * A text's progress, handed down to its sentences.
+ *
+ * Until 0.434 a text was asked about its sentences as a whole, a sentence
+ * at a time in turn, and its progress was the text's. Now each sentence is
+ * asked in its own right and keeps its own, so the text's progress on
+ * those questions is copied onto every sentence that has none yet: nobody
+ * goes backwards, and a sentence that was in fact never asked is asked
+ * again at its next review.
+ *
+ * Once. The text's own record is marked as handed down, so a sentence the
+ * teacher adds later starts from the beginning rather than inheriting a
+ * standing it never earned. The text's record itself is kept, untouched
+ * but for the mark, for the day a text is turned back into a conversation.
+ */
+const BY_SENTENCE = TYPES.filter((t) => EX[t].bySentence);
+
+export function carryToSentences<T extends Record<string, any>>(card: T): T {
+  if (!isText(card) || !Array.isArray(card.lines) || !Array.isArray(card.forms) || !card.forms[0]) return card;
+  const lead = card.forms[0];
+  const own: Record<string, ExerciseState> = lead.s || {};
+  const keys = Object.keys(own).filter((k) => BY_SENTENCE.includes(typeOf(k)) && !isFreshState(own[k]) && !own[k].carried);
+  if (!keys.length) return card;
+  const lines = card.lines.map((ln: Record<string, any>) => {
+    const s = { ...(ln.s || {}) };
+    for (const k of keys) if (isFreshState(s[k])) s[k] = { ...own[k] };
+    return { ...ln, s };
+  });
+  const marked = { ...own };
+  for (const k of keys) marked[k] = { ...own[k], carried: true };
+  return { ...card, forms: [{ ...lead, s: marked }, ...card.forms.slice(1)], lines };
+}
+
 function liftItem(stored: Record<string, any>, settings: Record<string, any> = {}) {
   /* A custom tag that is also a subtype, folded into the subtype — see
      subtype-tags.ts. In the card's own language, or the one this device
@@ -6300,7 +6472,7 @@ function liftItem(stored: Record<string, any>, settings: Record<string, any> = {
   /* And "keeps its capital letters" ticked on a card the old list of words
      kept a capital on, where nobody has answered — see capitals.ts. */
   const it = tickCapitals(lifted) || lifted;
-  return {
+  return carryToSentences({
     ...it,
     tags: Array.isArray(it.tags) ? it.tags : [],
     locked: !!it.locked,
@@ -6347,7 +6519,7 @@ function liftItem(stored: Record<string, any>, settings: Record<string, any> = {
         }
       : null),
     s: undefined,
-  };
+  });
 }
 
 /*
@@ -9174,7 +9346,7 @@ export default function ArabicTrainer() {
   /* Closed for every new question. Opening it for one card is not a
      standing request to see it for the next twenty. */
   const [leaving, setLeaving] = useState(false);
-  const [tally, setTally] = useState({ ok: 0, no: 0 });
+  const [tally, setTally] = useState<Score>(NO_SCORE);
   /*
    * What this sitting moved, for the screen at the end of it.
    *
@@ -10192,7 +10364,7 @@ export default function ArabicTrainer() {
     warmSession(built);
     setSession({ ...built, practice: true, startedAt: now(), endsAt: 0 });
     setQi(0);
-    setTally({ ok: 0, no: 0 });
+    setTally(NO_SCORE);
     setMoved([]);
     resetExercise();
     /* Out of the teaching space and onto the screen questions are asked
@@ -10301,7 +10473,7 @@ export default function ArabicTrainer() {
       endsAt: minutes ? now() + minutes * 60000 : 0,
     });
     setQi(0);
-    setTally({ ok: 0, no: 0 });
+    setTally(NO_SCORE);
     setMoved([]);
     resetExercise();
     setTab("home"); // a session started from anywhere is run on the home screen
@@ -10574,7 +10746,7 @@ export default function ArabicTrainer() {
     warmSession(built);
     setSession({ ...built, practice: false, startedAt: now(), endsAt: 0 });
     setQi(0);
-    setTally({ ok: 0, no: 0 });
+    setTally(NO_SCORE);
     setMoved([]);
     resetExercise();
     setTab("home");
@@ -10622,7 +10794,7 @@ export default function ArabicTrainer() {
     warmSession(built);
     setSession({ ...built, practice });
     setQi(0);
-    setTally({ ok: 0, no: 0 });
+    setTally(NO_SCORE);
     setMoved([]);
     resetExercise();
   }
@@ -10807,6 +10979,8 @@ export default function ArabicTrainer() {
      the conversation rather than about a turn in it: meeting it, and
      reading it through for yourself. */
   const whole = !!dialog && !!spec && (!!spec.intro || spec.answerMode === "self");
+  /* One sentence of a text, shown before its first question. */
+  const sentenceMet = !!dialog && isText(dialog) && !!spec && !!spec.intro && at !== null;
   /*
    * The few answers on offer, for whichever question offers a few.
    *
@@ -11770,10 +11944,7 @@ export default function ArabicTrainer() {
     /* Onto the session's own list, outside the write: `persist` runs its
        function there and then, so this is the same answer's news. */
     if (moving.length) setMoved((was) => mergeMoves(was, moving));
-    setTally((t) => ({
-      ok: t.ok + (correct ? 1 : 0),
-      no: t.no + (correct ? 0 : 1),
-    }));
+    setTally((t) => scoreAnswer(t, exercise, correct));
 
     if (!correct) {
       setSession((s2: any) => ({
@@ -12541,7 +12712,9 @@ export default function ArabicTrainer() {
                         questions say so in their own words. */}
                     {dialog && isText(dialog) && spec.promptField === "scene"
                       ? spec.intro
-                        ? "Read the text"
+                        ? at !== null
+                          ? "Read the sentence"
+                          : "Read the text"
                         : "Read the whole text"
                       : instructionFor(spec, item)}
                   </p>
@@ -12559,14 +12732,18 @@ export default function ArabicTrainer() {
                           <Scene
                             card={dialog}
                             lang={qLang}
-                            lines={whole ? linesOf(dialog) : soFar}
+                            /* A text's sentence, met before it is first
+                               asked, is that sentence alone. */
+                            lines={sentenceMet ? [linesOf(dialog)[at as number]] : whole ? linesOf(dialog) : soFar}
                             blankId={spec.answerMode === "choice" ? linesOf(dialog)[at || 0].id : null}
                             /* A read-through has the meanings beside the
                                words; reading one through for yourself has
                                whichever of them you asked for. Everywhere
-                               else one of them is the answer. */
+                               else one of them is the answer. A sentence
+                               met has how it sounds too: it is the first
+                               the learner has seen of it. */
                             meanings={!!spec.intro || (whole && showMeaning)}
-                            said={whole && showSaid}
+                            said={sentenceMet || (whole && showSaid)}
                           />
                           {/* Taken when they are needed rather than given.
                               The script alone is the exercise; each of
@@ -13366,7 +13543,12 @@ export default function ArabicTrainer() {
             {session && !exercise && (
               <div className="at-card">
                 <p className="at-eyebrow">{practice ? "Practice done" : "Session complete"}</p>
-                <Stat value={`${tally.ok} / ${tally.ok + tally.no}`} big />
+                {/* Questions, not answers: a miss comes back at the end
+                    and is got right then, which used to count as a
+                    question more ("20 / 21" for twenty questions). The
+                    count at the top already says twenty; this says how
+                    many of them were right first time. */}
+                <Stat value={`${tally.first} / ${tally.asked}`} big />
                 <Help>
                   {practice
                     ? "Your schedule is untouched, apart from anything marked Again."
@@ -13385,9 +13567,9 @@ export default function ArabicTrainer() {
                     ? "None of these were due, so your schedule has barely moved. The practice still counts."
                     : session.items && session.due && session.due < session.items
                     ? `${session.items - session.due} of these weren't due yet and have barely moved.`
-                    : tally.no === 0
+                    : tally.first === tally.asked
                     ? "Clean run. Every gap just got longer."
-                    : `${tally.no} lapsed and will come back shortly.`}
+                    : `${tally.asked - tally.first} lapsed and will come back shortly.`}
                 </Help>
                 <WhatMoved moved={moved} items={items} settings={settings} />
                 <div className="at-row">

@@ -6030,3 +6030,88 @@ front word, the row says "found as" that form with its English.
 **Choices the owner made.** Showing the form found, rather than the card's
 front word alone, so a card offered for a conjugation does not read as a
 wrong match.
+
+
+## A text is asked a sentence at a time, and read whole last (0.434)
+
+**What was wrong.** A text's sentence questions (gap2pick, gap2ar, sen2en,
+en2sen) were asked of the text's own word and walked its sentences by the
+count of askings (castGap). So a sentence missed was never the one asked
+again, the next one along was; and a level opened on two right answers
+that could be two different sentences, leaving the rest of a long text
+never asked before the text moved up. The read-through opened every text
+with the whole paragraph, which the owner found long and full of unknown
+words.
+
+**What changed.** The four questions carry `bySentence`. On a text,
+`dialogRoleOf` in offers.ts makes them line questions, so canAsk and
+offersFor ask them of each line, and dialogNeedMet reads the gap and the
+meaning off that line alone. castGap draws from the line's own words, and
+the line's own id carries the schedule. Conversations are untouched: they
+still walk their lines at the scene level.
+
+The whole-text read-through (dlgwhole) stays on the text's own word, but
+quietUnits holds it until every line is cleared at everything it is asked
+(sentencesCleared). The introduction moved with the questions:
+withReadThroughs puts a dlgread before each sentence's first question
+while that sentence is unmet, showing the one sentence with its meaning
+and pronunciation, and none before the whole.
+
+**Progress is handed down, once.** carryToSentences, in liftItem, copies
+the text's own state on each of the four questions onto every line that
+has none, then marks the text's state `carried`. The mark is what stops a
+sentence added later inheriting a standing it never earned. The text's
+states are kept for the day it is turned back into a conversation.
+
+**Choices the owner made.** Of: one exercise shown a sentence at a time;
+each sentence its own exercise with the whole text read at the end; the
+same without the whole-text reading, the owner chose the second. Texts
+only, for now.
+
+
+## A sentence of a text waits on most of its words (0.435)
+
+**What was wrong.** A text came up whether or not the learner knew its
+words, so its sentences were long reads full of words never met.
+
+**What changed.** quietUnits holds a sentence of a text (sentenceWaits)
+until the learner can say what most of its words mean. The words are the
+learner's own single-word cards in the text's language found in the
+sentence by sentenceWords (src/sentence-words.ts): every window against
+every form, with the language's context matcher, the same one wordsOffered
+uses for "Words this teaches", so the automatic matches count and not only
+the ticked ones. A word counts once reachedLevel(…, 2) holds on the form
+found — level one cleared, the bar "recognised" means everywhere else —
+and a word with nothing to ask counts as known. The share is the number
+line's STRETCH_SHARE, 80% rounded up, so three words or fewer want all.
+The matches are cached by sentence and by a signature of the learner's
+words, as ids looked up afresh, since an answer makes new card objects.
+
+**Who it does not hold.** Only a sentence not yet met, and only in a text
+whose own word is unmet: a sentence asked keeps going whatever happens to
+its words, and a text begun before 0.434 has either handed its progress
+down (carryToSentences) or carries it on its own word. A word with no card
+is not counted, since nothing could make it known; 0.436 tells the teacher
+which words those are.
+
+**Choices the owner made.** Recognised rather than cleared (writing
+included), because reading a sentence asks for its words to be understood,
+not written.
+
+
+## The text editor says which words have no card, and when a sentence is long (0.436)
+
+**What was wrong.** Nothing told a teacher that a sentence of a text was
+long, or full of words no card teaches. Since 0.434 every sentence is a
+question of its own, so a long sentence is a long question; and since
+0.435 a sentence waits on its words, which only words with a card can
+ever satisfy.
+
+**What changed.** SentenceCheck, under each sentence of a text in the
+editor, reads sentenceWords against the teacher's own cards in the text's
+language and lists the words left uncovered (`bare`), once each, and
+warns when wordCount passes longSentenceOf: the language's `longSentence`
+or twelve. Vietnamese gives twenty, since it writes syllables apart. A
+blank is counted as a word for length, never listed as a word with no
+card. Warnings, not refusals: a name or a word worth meeting in passing is
+the teacher's call.

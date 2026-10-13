@@ -10,6 +10,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { formsOf, subFormsOf } from "../src/cards.ts";
+import { anotherMeaningOf } from "../src/meanings.ts";
 import { must } from "./helpers.mjs";
 import { build } from "esbuild";
 import path from "node:path";
@@ -1912,12 +1913,24 @@ test("a card opens as what the teacher said, or as what it looks like", () => {
 
 test("a saved card is told what it lays out, and a new one is asked", () => {
   assert.equal(storedFormsOf(null, arLang), "");
-  assert.equal(storedFormsOf(/** @type {any} */ ({ subs: [cellOf("past", "he")] }), arLang), "verb");
-  assert.equal(storedFormsOf(/** @type {any} */ ({ subs: [cellOf("attached", "me")] }), arLang), "attached");
-  assert.equal(storedFormsOf(/** @type {any} */ ({ subs: [cellOf("agreement", "plural")] }), arLang), "agreement");
-  assert.equal(storedFormsOf(/** @type {any} */ ({ subs: [{ ar: "a", en: "b" }] }), arLang), "");
+  assert.equal(storedFormsOf(/** @type {any} */ ({ id: "c", subs: [cellOf("past", "he")] }), arLang), "verb");
+  assert.equal(storedFormsOf(/** @type {any} */ ({ id: "c", subs: [cellOf("attached", "me")] }), arLang), "attached");
+  assert.equal(storedFormsOf(/** @type {any} */ ({ id: "c", subs: [cellOf("agreement", "plural")] }), arLang), "agreement");
+  assert.equal(storedFormsOf(/** @type {any} */ ({ id: "c", subs: [{ ar: "a", en: "b" }] }), arLang), "");
   /* And a table this language does not lay out is no table here. */
-  assert.equal(storedFormsOf(/** @type {any} */ ({ subs: [cellOf("agreement", "plural")] }), LANGUAGES["vi-Hue"]), "");
+  assert.equal(storedFormsOf(/** @type {any} */ ({ id: "c", subs: [cellOf("agreement", "plural")] }), LANGUAGES["vi-Hue"]), "");
+});
+
+test("another meaning of a saved adjective may be any subtype until it is saved", () => {
+  const adjective = /** @type {any} */ ({ id: "k1", category: "adjective", forms: [{ ar: "صغير", en: "small" }, cellOf("agreement", "plural")] });
+  assert.equal(storedFormsOf(adjective, arLang), "agreement");
+  const copy = anotherMeaningOf(adjective);
+  assert.equal(storedFormsOf(copy, arLang), "");
+  const offered = categoryOffers(arLang, { worded: true, storedForms: storedFormsOf(copy, arLang) }).map((/** @type {any} */ c) => c.value);
+  assert.ok(offered.includes("noun"), offered.join(", "));
+  /* And the saved original is still held to its table. */
+  const held = categoryOffers(arLang, { worded: true, storedForms: storedFormsOf(adjective, arLang) }).map((/** @type {any} */ c) => c.value);
+  assert.ok(!held.includes("noun"), held.join(", "));
 });
 
 test("the table put aside is counted, filled boxes only, and never the one on screen", () => {

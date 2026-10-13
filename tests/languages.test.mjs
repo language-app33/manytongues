@@ -1051,6 +1051,39 @@ test("a narrowed blank takes the verbs of those tenses and everything else as be
   assert.equal(perSlot(verb, { ar: "بياكل", row: "present", col: "he" }, "verb"), false);
 });
 
+test("the Arabic subjunctive stands in a blank only where the sentence ticks it", () => {
+  const ar = LANGUAGES["ar-PS"];
+  const verb = { category: "verb" };
+  const subj = { ar: "تاكل", row: "subjunctive", col: "she" };
+  const present = { ar: "بتاكل", row: "present", col: "she" };
+  /* Last, so nobody part of the way down a verb is stopped at it. */
+  const rows = must(tensedOf(ar, "verb"), "Arabic verbs").tenses.map((t) => t.id);
+  assert.equal(rows[rows.length - 1], "subjunctive");
+  assert.notEqual("subjunctive", BARE_ROW, "the noun blank's row is a different thing");
+  /* A blank nobody has narrowed — every sentence written before this —
+     is filled the way it was: the subjunctive is not a sentence's verb on
+     its own. */
+  const open = blankAdmits(ar, () => []);
+  assert.equal(open(verb, present, "verb"), true);
+  assert.equal(open(verb, subj, "verb"), false);
+  /* Nor does ticking another tense, or the noun blank's question, bring
+     it in. */
+  assert.equal(blankAdmits(ar, () => ["present"])(verb, subj, "verb"), false);
+  assert.equal(blankAdmits(ar, () => [BARE_ROW])(verb, subj, "verb"), false);
+  /* Ticked, it is there, alone or beside another tense. */
+  assert.equal(blankAdmits(ar, () => ["subjunctive"])(verb, subj, "verb"), true);
+  assert.equal(blankAdmits(ar, () => ["subjunctive"])(verb, present, "verb"), false);
+  assert.equal(blankAdmits(ar, () => ["present", "subjunctive"])(verb, subj, "verb"), true);
+  /* Beside a subject it stands as its row's lead, like any tense — and
+     not at all where the blank has not ticked it. */
+  const card = { category: "verb", ar: "أكل", subs: [subj] };
+  assert.equal(blankAdmits(ar, () => ["subjunctive"], () => true)(card, card.subs[0], "verb"), true);
+  assert.equal(blankAdmits(ar, () => [], () => true)(card, card.subs[0], "verb"), false);
+  /* Huế and Hebrew are as they were. */
+  assert.ok(!must(tensedOf(LANGUAGES["vi-Hue"], "verb"), "Huế verbs").tenses.some((t) => t.onlyWhenTicked));
+  assert.ok(!must(tensedOf(LANGUAGES["he-IL"], "verb"), "Hebrew verbs").tenses.some((t) => t.id === "subjunctive"));
+});
+
 test("a noun blank can ask for the word itself, or only its forms with a pronoun on the end", () => {
   const ar = LANGUAGES["ar-PS"];
   const noun = { category: "noun" };

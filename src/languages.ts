@@ -1008,6 +1008,12 @@ export const EX: Record<string, ExerciseSpec> = {
    * scene — the gap is the question and the rest would be reading — and
    * the word is a different one each time it comes round: see gapAt.
    *
+   * In a text, it and the three sentence questions below are asked of
+   * each sentence rather than of the text (`bySentence`), so every
+   * sentence keeps its own progress: one missed comes back, and one known
+   * moves on. A conversation still walks its lines in turn, since what it
+   * is learnt by is choosing the reply.
+   *
    * Level 2, as "In a phrase → choose" is: picking a word out of four is
    * telling it apart, and comes before writing it. The three wrong ones
    * are other words of the same scene where it has them.
@@ -1026,6 +1032,7 @@ export const EX: Record<string, ExerciseSpec> = {
     answerMode: "choice",
     picks: "word",
     gentle: true,
+    bySentence: true,
   },
   /*
    * And typed. Level 4, as "fill the gap" is for a word in a phrase: the
@@ -1045,6 +1052,7 @@ export const EX: Record<string, ExerciseSpec> = {
     promptField: "gap",
     answerField: "ar",
     answerMode: "ar",
+    bySentence: true,
   },
   /*
    * One sentence of a scene, and its meaning chosen out of four.
@@ -1069,6 +1077,7 @@ export const EX: Record<string, ExerciseSpec> = {
     answerMode: "choice",
     picks: "meaning",
     gentle: true,
+    bySentence: true,
   },
   /*
    * And the other way: the meaning given, the sentence chosen. Level 2,
@@ -1090,6 +1099,7 @@ export const EX: Record<string, ExerciseSpec> = {
     answerMode: "choice",
     picks: "sentence",
     gentle: true,
+    bySentence: true,
   },
   /* Retired. Every turn of a scene typed out at once was the longest
      answer in the app and the least forgiving: one missed mark in the
@@ -3013,20 +3023,22 @@ export const blankAdmits = (
     }
   }
   const rows = rowsFor(slot) || [];
+  const ends = endRowsOf(lang);
   if (rows.length) {
     /* Whether it has a pronoun on the end, where the sentence said: the
        attached pronouns' own row for "my name, your name", and BARE_ROW for
        "name" and the word's other forms. A form carrying a pronoun is
        admitted by the first and by nothing else — it is in no tense. */
-    const ends = endRowsOf(lang);
     const endsSaid = rows.filter((r) => ends.has(r) || r === BARE_ROW);
     if (endsSaid.length) {
       if (ends.has(rowOf(form))) return endsSaid.some((r) => ends.has(r));
       if (!endsSaid.includes(BARE_ROW)) return false;
     }
-    const tenses = rows.filter((r) => !ends.has(r) && r !== BARE_ROW);
-    if (tenses.length && !standsInRows(tensedOf(lang, card && card.category), form, tenses)) return false;
   }
+  /* Asked of every blank, narrowed or not: one that has ticked no tense
+     still leaves out a row that waits to be ticked. */
+  const tenses = rows.filter((r) => !ends.has(r) && r !== BARE_ROW);
+  if (!standsInRows(tensedOf(lang, card && card.category), form, tenses)) return false;
   if (agreesFor(slot)) {
     const tensed = tensedOf(lang, card && card.category);
     if (tensed && rowIdsOf(tensed).has(rowOf(form))) return isRowLead(card, tensed, form, isLent);
@@ -3454,6 +3466,12 @@ export const LANGUAGES: Record<LangId, Lang> = {
           { id: "present", label: "present" },
           { id: "past", label: "past" },
           { id: "command", label: "command" },
+          /* The present without its b- — بدها تاكل, لازم أروح, رح نشوف.
+             Last, so a learner part of the way down a verb is not stopped
+             at it; and only where a sentence ticks it, since it follows a
+             word that calls for it and is not a sentence's verb on its
+             own. Never "bare": that name is BARE_ROW's. */
+          { id: "subjunctive", label: "subjunctive", onlyWhenTicked: true },
         ],
         /* There is no infinitive. A dictionary lists أكل — he ate — and
            that is a cell of this table, so the card's own word and that
@@ -3698,6 +3716,9 @@ export const LANGUAGES: Record<LangId, Lang> = {
        transliteration" exercise would ask for the word already on screen.
        The pronunciation note is a note; it is not drilled. */
     translitDrilled: false,
+    /* Each syllable is written apart, so a sentence counts about half as
+       many words again as the same sentence would in Arabic. */
+    longSentence: 20,
     formsLabel: "Other forms",
     fontStack: '"Be Vietnam Pro", "Noto Sans", system-ui, sans-serif',
     keys: { rows: VI_KEY_ROWS, extras: VI_EXTRAS, marks: VI_MARKS, marksLabel: "◌̀ ◌́ ◌̉" },

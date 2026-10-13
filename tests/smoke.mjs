@@ -4908,6 +4908,41 @@ const openPronounTables = async () => {
     /The text/.test(textText) && !/Who is in it/.test(textText) && /Sentence 1/.test(textText) &&
       ![...document.querySelectorAll('[role="group"][aria-label="Who says line 1"]')].length,
     textText.slice(0, 120) || "(no editor open)");
+  /* A sentence of a text says, while it is written, which of its words no
+     card teaches and whether it is long. */
+  {
+    const sentenceBox = () => {
+      const block = [...document.querySelectorAll(".at-formblock")].find((b) =>
+        ((b.querySelector(".at-formnum") || {}).textContent || "").trim() === "Sentence 1");
+      return block ? /** @type {any} */ (block.querySelector("[contenteditable], input")) : null;
+    };
+    /* A scene's script box is an input; a sentence card's draws its blanks
+       and is editable text. Either is written the way a keystroke would. */
+    const write = async (/** @type {string} */ value) => {
+      const el = sentenceBox();
+      if (!el) return;
+      if (el.tagName === "INPUT") {
+        must(must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set,
+          "the value setter").call(el, value);
+      } else el.textContent = value;
+      el.dispatchEvent(new w.Event("input", { bubbles: true }));
+      await sleep(300);
+    };
+    const said = (/** @type {string} */ name) =>
+      ((document.querySelector(`[data-el="${name}"]`) || {}).textContent || "").replace(/\s+/g, " ").trim();
+    await write("الكتاب على الطاولة");
+    const bare = said("sentence-bare");
+    check("a sentence of a text names the words no card teaches, and not the ones a card does",
+      /2 words have no card/.test(bare) && /على/.test(bare) && /الطاولة/.test(bare) && !/الكتاب/.test(bare) &&
+        !said("sentence-long"),
+      bare || "(nothing said)");
+    await write("الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب");
+    check("and says when it is long enough to be worth splitting",
+      /13 words long/.test(said("sentence-long")) && !said("sentence-bare"),
+      `${said("sentence-long") || "(nothing said)"} / ${said("sentence-bare")}`);
+    await write("");
+  }
+
   /* And a line can be picked from a sentence card rather than typed. */
   click(buttonNamed(/^Pick a sentence card$/));
   await sleep(400);
@@ -5990,7 +6025,7 @@ const openPronounTables = async () => {
       typeInto(en(), "yesterday {{friend}} {{verb}}");
       await sleep(320);
       check("a blank that verbs fill is asked which tenses it wants them in",
-        JSON.stringify(tenseNames()) === JSON.stringify(["present", "past", "command"]),
+        JSON.stringify(tenseNames()) === JSON.stringify(["present", "past", "command", "subjunctive"]),
         tenseNames().join(", ") || "(nothing asked)");
       /* And which blank the verb agrees with: the first other, until the
          teacher links it to another or to nothing. */
@@ -9633,14 +9668,29 @@ const openPronounTables = async () => {
   const verdictOf = (/** @type {HTMLElement} */ host) => text(host.querySelector('[data-el="verdict"]'));
 
   materialQuiet = true;
-  /* The session may open on something else about the text — reading it
-     through again — so it is walked on with "I don't know" until the
-     question wanted comes up. */
+  /* What the sentences were introduced as, before their first question. */
+  /** @type {{ instruction: string, scene: string, meaning: string }[]} */
+  const introduced = [];
+  /* The session may open on something else about the text — a sentence
+     met before its first question, or another question about it — so it
+     is walked on with "I've read it" and "I don't know" until the question
+     wanted comes up. */
   const reach = async (/** @type {HTMLElement} */ host, /** @type {RegExp} */ wanted) => {
     const button = (/** @type {RegExp} */ re) =>
       [...host.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
-    for (let n = 0; n < 12; n++) {
+    for (let n = 0; n < 16; n++) {
       if (wanted.test(text(host.querySelector(".at-instruction")))) return true;
+      const read = button(/^I.ve read it$/);
+      if (read) {
+        introduced.push({
+          instruction: text(host.querySelector(".at-instruction")),
+          scene: text(host.querySelector('[data-el="scene-text"]')),
+          meaning: text(host.querySelector('[data-el="scene-text-meaning"]')),
+        });
+        click(read);
+        await sleep(300);
+        continue;
+      }
       const dunno = button(/^I don.t know$/);
       const self = host.querySelector('[data-el="answer-self"] button');
       if (dunno) click(dunno);
@@ -9754,6 +9804,11 @@ const openPronounTables = async () => {
     },
   );
   materialQuiet = false;
+  check("each sentence of a new text is met on its own before it is asked, with its meaning",
+    introduced.length > 0 && introduced.every((m) =>
+      /Read the sentence/.test(m.instruction) && sentences.includes(m.scene.replace(/\.$/, ""))) &&
+      introduced.some((m) => meanings.includes(m.meaning.replace(/\.$/, ""))),
+    JSON.stringify(introduced));
   check("a text with its meanings asks a sentence's meaning, chosen out of four",
     /What does it mean/.test(toMeaning.instruction) && sentences.includes(toMeaning.prompt) &&
       toMeaning.tiles.length === 3 && toMeaning.tiles.every((/** @type {string} */ t) => meanings.includes(t)),
