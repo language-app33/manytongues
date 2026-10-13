@@ -35,7 +35,7 @@ await build({
 });
 const { buildSession, installIndexes, quietUnits, carryToSentences, laddered } = await import(path.join(out, "trainer.js"));
 const { TYPES, LANGUAGES } = await import(path.join(here, "..", "src", "languages.ts"));
-const { sentenceWords } = await import(path.join(here, "..", "src", "sentence-words.ts"));
+const { sentenceWords, wordCount, longSentenceOf, LONG_SENTENCE } = await import(path.join(here, "..", "src", "sentence-words.ts"));
 
 const settings = { language: "ar-PS" };
 const anyDeck = () => true;
@@ -186,6 +186,17 @@ test("eight words in ten known is enough", () => {
   const fewer = items.map((/** @type {any} */ c, /** @type {number} */ i) => (i === 2 ? word("w1", "قلم", "thing 1", false) : c));
   installIndexes(fewer, settings);
   assert.ok(quietUnits(fewer, settings).has("t0"), "three of five: it waits");
+});
+
+/* ---- what the editor says about a sentence (0.435) ---- */
+
+test("a sentence is long by its own language's count", () => {
+  const ar = LANGUAGES["ar-PS"];
+  const vi = LANGUAGES["vi-Hue"];
+  assert.equal(longSentenceOf(ar), LONG_SENTENCE);
+  assert.ok(longSentenceOf(vi) > LONG_SENTENCE, "a language that writes each syllable apart counts more words");
+  assert.equal(wordCount("أنا ساكن بالبيت — مع {{name}}.", ar), 5, "a dash is not a word, and a blank is one");
+  assert.equal(wordCount("", ar), 0);
 });
 
 /** The same card as a conversation. @param {any} card */

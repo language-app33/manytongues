@@ -558,6 +558,12 @@ export interface Lang {
   similarityMode: string;
   context: LangContext;
   translitDrilled: boolean;
+  /**
+   * How many words a sentence of a text may have before the editor calls
+   * it long. Absent means twelve; a language that writes each syllable
+   * apart counts more words for the same sentence. See sentence-words.ts.
+   */
+  longSentence?: number;
   formsLabel: string;
   fontStack: string;
   keys: LangKeys;

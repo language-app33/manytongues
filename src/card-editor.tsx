@@ -14,6 +14,7 @@ import React, { createContext, useContext, useState, useEffect, useId, useMemo, 
 import * as API from "./courses-api.ts";
 import type { Card, Deck, Form, GrammarDim, Item, Lang, VerbSpec, VerbTense } from "./types.ts";
 import { wordsOffered } from "./context-index.ts";
+import { longSentenceOf, sentenceWords, wordCount } from "./sentence-words.ts";
 import { cellsIn, citationOf, citedWord, framesOf, isCell, isFrame, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf } from "./cards.ts";
 import type { Node } from "./shared.tsx";
@@ -6679,8 +6680,58 @@ function TurnBlock({ talk, lang, allCards, selfId, index: i, line: l }: {
       </>
       )}
 
+      {text && <SentenceCheck lang={lang} text={l.ar} cards={allCards} selfId={selfId} />}
+
       <CastChoice talk={talk} index={i} line={l} />
     </div>
+    </>
+  );
+}
+
+/*
+ * What a student will meet in a sentence of a text, said while it is
+ * written: whether it is long, and which of its words no card teaches.
+ *
+ * Since 0.433 a text is asked a sentence at a time, so a long sentence is
+ * a long question; and since 0.434 a sentence waits until most of its
+ * words are known, which only the words with a card can ever be. A word
+ * with none is met unlearnt and is not counted, so a sentence made mostly
+ * of them comes up early and is hard. Both are said rather than refused: a
+ * name or a word worth meeting in passing is the teacher's call. Read off
+ * the teacher's own collection, in the text's language, with the matcher
+ * "Words this teaches" uses, so the two lists cannot disagree.
+ */
+function SentenceCheck({ lang, text, cards, selfId }: {
+  lang: Lang;
+  text: string;
+  cards: Card[];
+  selfId: string;
+}) {
+  const bare = useMemo(() => {
+    const mine = (cards || []).filter((c) => !c.lang || c.lang === lang.id) as Item[];
+    return sentenceWords(text, mine, lang, selfId).bare;
+  }, [text, cards, lang, selfId]);
+  const words = wordCount(text, lang);
+  const most = longSentenceOf(lang);
+  if (words <= most && !bare.length) return null;
+  const unique = [...new Set(bare)];
+  return (
+    <>
+      {words > most && (
+        <p className="at-formneed unmet" data-el="sentence-long">
+          This sentence is {words} words long. Students are asked each sentence as one question, so
+          a sentence over {most} words is easier to learn split in two.
+        </p>
+      )}
+      {unique.length > 0 && (
+        <p className="at-formneed unmet" data-el="sentence-bare">
+          {unique.length === 1 ? "One word has" : `${unique.length} words have`} no card:{" "}
+          <span lang={lang.id} dir={lang.direction}>{unique.join(" · ")}</span>. Students will meet{" "}
+          {unique.length === 1 ? "it" : "them"} without having learnt {unique.length === 1 ? "it" : "them"}, and{" "}
+          {unique.length === 1 ? "it does" : "they do"} not count when deciding whether a student is ready
+          for this sentence.
+        </p>
+      )}
     </>
   );
 }

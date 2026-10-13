@@ -4908,6 +4908,36 @@ const openPronounTables = async () => {
     /The text/.test(textText) && !/Who is in it/.test(textText) && /Sentence 1/.test(textText) &&
       ![...document.querySelectorAll('[role="group"][aria-label="Who says line 1"]')].length,
     textText.slice(0, 120) || "(no editor open)");
+  /* A sentence of a text says, while it is written, which of its words no
+     card teaches and whether it is long. */
+  {
+    const sentenceBox = () => {
+      const block = [...document.querySelectorAll(".at-formblock")].find((b) =>
+        ((b.querySelector(".at-formnum") || {}).textContent || "").trim() === "Sentence 1");
+      return block ? /** @type {any} */ (block.querySelector("[contenteditable]")) : null;
+    };
+    const write = async (/** @type {string} */ value) => {
+      const el = sentenceBox();
+      if (!el) return;
+      el.textContent = value;
+      el.dispatchEvent(new w.Event("input", { bubbles: true }));
+      await sleep(300);
+    };
+    const said = (/** @type {string} */ name) =>
+      ((document.querySelector(`[data-el="${name}"]`) || {}).textContent || "").replace(/\s+/g, " ").trim();
+    await write("الكتاب على الطاولة");
+    const bare = said("sentence-bare");
+    check("a sentence of a text names the words no card teaches, and not the ones a card does",
+      /2 words have no card/.test(bare) && /على/.test(bare) && /الطاولة/.test(bare) && !/الكتاب/.test(bare) &&
+        !said("sentence-long"),
+      bare || "(nothing said)");
+    await write("الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب الكتاب");
+    check("and says when it is long enough to be worth splitting",
+      /13 words long/.test(said("sentence-long")) && !said("sentence-bare"),
+      `${said("sentence-long") || "(nothing said)"} / ${said("sentence-bare")}`);
+    await write("");
+  }
+
   /* And a line can be picked from a sentence card rather than typed. */
   click(buttonNamed(/^Pick a sentence card$/));
   await sleep(400);

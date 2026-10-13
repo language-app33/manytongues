@@ -78,3 +78,18 @@ export function sentenceWords(text: string, cards: Item[], lang: Lang, selfId: s
     .filter((w) => w && /\p{L}/u.test(w));
   return { tokens, hits, bare };
 }
+
+/*
+ * How many words a sentence of a text may have before the editor calls it
+ * long. The language's own number where it gives one — Vietnamese writes
+ * each syllable apart, so its sentences count more words for the same
+ * length — and twelve otherwise.
+ */
+export const LONG_SENTENCE = 12;
+
+export const longSentenceOf = (lang: Lang): number => lang.longSentence || LONG_SENTENCE;
+
+/* How many words of the sentence count towards its length: the tokens with
+   a letter in them, so a dash standing alone is not a word. */
+export const wordCount = (text: string, lang: Lang): number =>
+  contextTokens(String(text || ""), lang).filter((t) => /\p{L}/u.test(t) || /[{}]/.test(t)).length;

@@ -6097,3 +6097,21 @@ which words those are.
 **Choices the owner made.** Recognised rather than cleared (writing
 included), because reading a sentence asks for its words to be understood,
 not written.
+
+
+## The text editor says which words have no card, and when a sentence is long (0.435)
+
+**What was wrong.** Nothing told a teacher that a sentence of a text was
+long, or full of words no card teaches. Since 0.433 every sentence is a
+question of its own, so a long sentence is a long question; and since
+0.434 a sentence waits on its words, which only words with a card can
+ever satisfy.
+
+**What changed.** SentenceCheck, under each sentence of a text in the
+editor, reads sentenceWords against the teacher's own cards in the text's
+language and lists the words left uncovered (`bare`), once each, and
+warns when wordCount passes longSentenceOf: the language's `longSentence`
+or twelve. Vietnamese gives twenty, since it writes syllables apart. A
+blank is counted as a word for length, never listed as a word with no
+card. Warnings, not refusals: a name or a word worth meeting in passing is
+the teacher's call.

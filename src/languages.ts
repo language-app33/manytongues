@@ -3716,6 +3716,9 @@ export const LANGUAGES: Record<LangId, Lang> = {
        transliteration" exercise would ask for the word already on screen.
        The pronunciation note is a note; it is not drilled. */
     translitDrilled: false,
+    /* Each syllable is written apart, so a sentence counts about half as
+       many words again as the same sentence would in Arabic. */
+    longSentence: 20,
     formsLabel: "Other forms",
     fontStack: '"Be Vietnam Pro", "Noto Sans", system-ui, sans-serif',
     keys: { rows: VI_KEY_ROWS, extras: VI_EXTRAS, marks: VI_MARKS, marksLabel: "◌̀ ◌́ ◌̉" },

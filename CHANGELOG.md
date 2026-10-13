@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.435 — 13 October 2026
+
+**Writing a text warns about long sentences and words with no card.**
+
+- Under each sentence of a text, the editor now lists the words that no
+  card teaches. Students meet those words without having learnt them, and
+  since 0.434 they don't count when the app decides whether a student is
+  ready for the sentence.
+- It also warns when a sentence is over 12 words, or over 20 in
+  Vietnamese, which writes each syllable as a separate word. Each sentence
+  is asked as one question, so a long one is easier to learn split in two.
+- These are only warnings: the text still saves.
+- Trade-off: none for students. The list of words with no card uses the
+  same matching as "Words this teaches", so now and then it may miss a
+  word or count one wrongly.
+- To check by hand: in a new text, write a sentence with one word you
+  have a card for and one you don't. Only the second should be listed.
+  Then write a sentence of more than 12 words and see the length warning.
+
 ## 0.434 — 13 October 2026
 
 **A sentence of a text waits until most of its words are known.**

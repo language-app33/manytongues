@@ -860,7 +860,9 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   words are known — eight in ten of the word cards found in it, each with
   the bottom of its own ladder cleared (`sentenceWaits`, matched by
   `sentenceWords` in `src/sentence-words.ts`); a word with no card is not
-  counted. One kind with a subtype, the way
+  counted, and the editor lists those words under each sentence, with a
+  warning when a sentence passes the language's `longSentence` (twelve
+  words unless it says otherwise). One kind with a subtype, the way
   a word is one kind whether it is a noun or a verb: `sceneKind: "text"`,
   absent on a conversation, read through `sceneKindOf` in `src/dialogs.ts`,
   and changeable, because a line's progress means the same in either.
