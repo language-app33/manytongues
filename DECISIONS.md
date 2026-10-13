@@ -6115,3 +6115,27 @@ or twelve. Vietnamese gives twenty, since it writes syllables apart. A
 blank is counted as a word for length, never listed as a word with no
 card. Warnings, not refusals: a name or a word worth meeting in passing is
 the teacher's call.
+
+
+## Texts begun before 0.434 wait on their words too (0.437)
+
+**What was wrong.** sentenceWaits passed over any sentence of a text whose
+own word had a record, and any sentence with one. Every text practised
+before 0.434 had both: the read-through was its first question, and
+carryToSentences handed the text's records down to each sentence. So the
+rule from 0.435 held back nothing a learner had already met, and the
+owner went on seeing long sentences of unknown words on 0.436.
+
+**What changed.** practisedAlone asks whether a sentence has a record of
+its own: one that is not new and is not still the copy handed down, read
+as a record matching the text's `carried` one in `updated` and `reps`.
+Answering the sentence writes a new record, so it then counts. The text's
+own read-through no longer exempts its sentences. And the text's own word
+is quiet while any sentence waits, since a held sentence is no easier
+inside the paragraph.
+
+**Choices the owner made.** Of: holding back sentences of texts already
+started; splitting a box of several sentences when practising; fewer
+choices for long sentences, the owner chose the first. The cost, that a
+text partly got through shows fewer sentences for a while, was put to
+them.

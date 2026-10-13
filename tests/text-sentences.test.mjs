@@ -164,15 +164,29 @@ test("a sentence is not met until most of its words are known", () => {
   assert.ok(quiet(deck([true, true, false])).has("t0"), "two of three is not enough: three or fewer wants every one");
   assert.ok(!quiet(deck([true, true, true])).has("t0"), "every word known: it is met");
 
-  /* Started already: a sentence asked, or a text the learner had begun
-     before its sentences were asked on their own, keeps going. */
+  /* A sentence asked in its own right keeps going. */
   const asked = deck([false, false, false]);
   asked[0].lines[0].s = { sen2en: { ...solidState(), hist: [0], right: 0, wrong: 1, phase: "learning" } };
   assert.ok(!quiet(asked).has("t0"), "a sentence already asked is not held back");
+
+  /* A text begun before sentences were asked on their own is held like
+     any other (0.437): its read-through, and the progress it handed down,
+     are the text's and not the sentence's. */
   const begun = deck([false, false, false], {
-    forms: [{ id: "T", ar: "", en: "At home", lat: "", lang: "ar-PS", s: { dlgwhole: solidState() } }],
+    forms: [{ id: "T", ar: "", en: "At home", lat: "", lang: "ar-PS", s: { dlgwhole: solidState(), sen2en: solidState() } }],
   });
-  assert.ok(!quiet(begun).has("t0"), "nor any sentence of a text begun before");
+  const handed = carryToSentences(begun[0]);
+  assert.equal(handed.lines[0].s.sen2en.phase, "review", "the sentence carries the text's progress");
+  const carried = [handed, ...begun.slice(1)];
+  const held = quiet(carried);
+  assert.ok(held.has("t0"), "a sentence whose words are unknown waits, whatever the text had made");
+  assert.ok(held.has("T"), "and the whole text waits with it");
+  assert.ok(!held.has("t1"), "a sentence of words with no card still does not");
+
+  /* Answered since, the sentence's record is its own and it keeps going. */
+  const since = { ...handed, lines: handed.lines.map((/** @type {any} */ l, /** @type {number} */ i) =>
+    (i === 0 ? { ...l, s: { ...l.s, sen2en: { ...l.s.sen2en, reps: 3, updated: 2 } } } : l)) };
+  assert.ok(!quiet([since, ...begun.slice(1)]).has("t0"), "practised on its own, it is not held back");
 });
 
 test("eight words in ten known is enough", () => {

@@ -2024,10 +2024,14 @@ function withFacesWaiting(quiet: Set<string>, items: Item[], settings: Settings,
  * written. A word with no card is not counted, since nothing could ever
  * make it known; the editor tells the teacher which words those are.
  *
- * Only a sentence not yet met. One already asked keeps going whatever
- * happens to its words, and so does every sentence of a text the learner
- * had started before sentences were asked on their own (0.434), whose
- * progress has been handed down to them or sits on the text's own word.
+ * Only a sentence not yet practised on its own. One already asked keeps
+ * going whatever happens to its words. Since 0.437 that is so in a text
+ * the learner had started before sentences were asked on their own
+ * (0.434) as well: progress handed down from the text (carryToSentences)
+ * is the text's, not the sentence's, so it does not count as practice,
+ * and nor does the text's own read-through. Until then a text begun even
+ * once was never held back at all, which left the long sentences the rule
+ * was written for exactly where they were.
  */
 type WordsHeld = { cards: Item[]; byId: Map<string, Item>; sig: string };
 
@@ -2060,10 +2064,24 @@ function heldIn(text: string, held: WordsHeld, lang: Lang): { card: Item; form: 
   return out;
 }
 
-const unmet = (unit: Form): boolean => Object.values(statesOf(unit)).every((st) => !st || st.phase === "new");
+/*
+ * Whether a sentence has been asked anything in its own right.
+ *
+ * A record handed down from the text is a copy of the text's own, made
+ * once and left alone until the sentence is answered, which writes a new
+ * one. So a record that still reads as the text's does not count.
+ */
+function practisedAlone(card: Item, line: Form): boolean {
+  const text = statesOf(leadOf(card));
+  return Object.entries(statesOf(line)).some(([key, st]) => {
+    if (!st || st.phase === "new") return false;
+    const from = text[key];
+    return !(from && from.carried && (st.updated || 0) === (from.updated || 0) && (st.reps || 0) === (from.reps || 0));
+  });
+}
 
 function sentenceWaits(card: Item, line: Form, held: WordsHeld, lang: Lang): boolean {
-  if (!unmet(line) || !unmet(leadOf(card))) return false;
+  if (practisedAlone(card, line)) return false;
   const hits = heldIn(String(line.ar || ""), held, lang);
   if (!hits.length) return false;
   const known = hits.filter(({ card: word, form }) => {
@@ -2124,8 +2142,15 @@ export function quietUnits(items: Item[], settings: Settings): Set<string> {
      * A sentence with nothing to ask holds nothing back.
      */
     if (isText(card)) {
-      for (const line of linesOf(card)) if (sentenceWaits(card, line, wordsIn(lang), lang)) out.add(line.id);
-      if (!sentencesCleared(card, lang)) out.add(leadOf(card).id);
+      let waiting = false;
+      for (const line of linesOf(card)) {
+        if (!sentenceWaits(card, line, wordsIn(lang), lang)) continue;
+        out.add(line.id);
+        waiting = true;
+      }
+      /* And the whole text waits while any sentence does: a sentence held
+         for its words is no easier to read inside the paragraph. */
+      if (waiting || !sentencesCleared(card, lang)) out.add(leadOf(card).id);
       continue;
     }
     /*
