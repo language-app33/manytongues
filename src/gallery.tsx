@@ -241,6 +241,8 @@ const PLACES: Record<string, [string, string]> = {
   FormFields: [TEACH, "Editing a card · one form, under its name"],
   FormsSection: [TEACH, "Editing a card · the section its forms live in"],
   CellFields: [TEACH, "Editing a card · one cell of a table, in the fewest boxes"],
+  ExampleFields: [TEACH, "Editing a verb · the examples its subjunctive is practised in"],
+  SubjunctiveEnglish: [TEACH, "Editing a sentence · the English for a verb blank that takes the subjunctive"],
   ReferenceField: [TEACH, "Editing a card · what is kept about a word and never asked"],
   PracticeSection: [TEACH, "Editing a card · how the card can be practiced"],
   WrittenOutScreen: [TEACH, "A language's number system · one number written out by hand"],
