@@ -50,7 +50,7 @@ const { shapeOf, shapeChoices, shapeLabel, categoryChoices, categoryOffers, tabl
   initialForms, initialCells, initialCategory, initialFrames, storedFormsOf, asideOf, tableCellsOf,
   canSaveWord, canSaveVerb, canSaveScene, writtenCard, writtenLines, ownerLabel, askParts, partAsked,
   partLends, setPartFlags, keptNotAsked,
-  nounLayoutOf, nounBoxes, placeNounForms, stampNounForms, leadFirst, formSays } =
+  nounLayoutOf, nounBoxes, placeNounForms, stampNounForms, leadFirst, formSays, blankLabel } =
   await import(path.join(out, "card-editor.js"));
 
 /* The two halves of card identity live in shared.tsx, so it is bundled the
@@ -2998,4 +2998,13 @@ test("filtering by kind of card, and by the subtypes of each kind", () => {
      narrows nothing at all. */
   assert.deepEqual(ids({ kinds: ["sentence"], subtypes: ["noun"] }), ["sentence"]);
   assert.deepEqual(ids({ subtypes: ["noun"] }), ["noun", "verb", "bare", "sentence", "chat", "prose"]);
+});
+
+test("a verb blank's subjunctive readings are named in words on the screen", () => {
+  /* Stored as verb-who, verb-plain and verb-to; shown as the owner chose. */
+  assert.equal(blankLabel("verb-who"), "person");
+  assert.equal(blankLabel("verb-plain"), "verb");
+  assert.equal(blankLabel("verb-to"), "to + verb");
+  assert.equal(blankLabel("verb2-who"), "verb2: person", "another verb blank keeps its name");
+  assert.equal(blankLabel("name"), "name", "every other blank is its own name");
 });
