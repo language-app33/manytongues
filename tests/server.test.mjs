@@ -437,6 +437,54 @@ test("a sentence's blanks come back saying which blank each agrees with", async 
   assert.equal("agrees" in lead(open.json.card), false, "no empty map on a sentence that links nothing");
 });
 
+test("a verb comes back with its subjunctive examples, and a sentence with whose wish it is", async () => {
+  const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rami" } });
+  const key = made.json.key;
+  const verb = await api("/api/courses?action=save-card", {
+    method: "POST", key,
+    body: {
+      card: carded(
+        { ar: "أكل", en: "he ate", lat: "akal" },
+        [{ id: "s1", ar: "تاكل", en: "", lat: "taakul", row: "subjunctive", col: "she" }],
+        {
+          category: "verb", name: "to eat",
+          examples: [
+            { ar: " لازم {{verb}} ", lat: "laazim {{verb}}", en: "{{verb-who}} must {{verb-plain}}" },
+            { ar: "", lat: "", en: "" },
+            { ar: "بدي {{verb}}", en: "I want {{verb-to}}", wish: "I-F!" },
+            { ar: "رح {{verb}}", en: "{{verb-who}} will {{verb-plain}}" },
+            { ar: "ممكن {{verb}}", en: "{{verb-who}} can {{verb-plain}}" },
+          ],
+        },
+      ),
+      decks: [],
+    },
+  });
+  assert.equal(verb.status, 200, verb.text);
+  assert.deepEqual(verb.json.card.examples, [
+    { ar: "لازم {{verb}}", lat: "laazim {{verb}}", en: "{{verb-who}} must {{verb-plain}}" },
+    { ar: "بدي {{verb}}", en: "I want {{verb-to}}", wish: "i-f" },
+    { ar: "رح {{verb}}", en: "{{verb-who}} will {{verb-plain}}" },
+  ], "trimmed, the blank one dropped, whose wish narrowed like an id, three at most");
+  /* Taken off when the teacher takes them all off. */
+  const bare = await api("/api/courses?action=save-card", {
+    method: "POST", key,
+    body: { card: { ...carded({ ar: "أكل", en: "he ate", lat: "akal" }, [], { category: "verb", name: "to eat" }), id: verb.json.card.id, examples: [] }, decks: [] },
+  });
+  assert.equal(bare.status, 200, bare.text);
+  assert.equal("examples" in bare.json.card, false);
+
+  const want = await api("/api/courses?action=save-card", {
+    method: "POST", key,
+    body: {
+      card: carded({ ar: "بدها {{verb}}", en: "she wants {{verb-to}}", lat: "", wish: { " Verb ": "She", "": "i" } }, [], { sentence: true }),
+      decks: [],
+    },
+  });
+  assert.equal(want.status, 200, want.text);
+  assert.deepEqual(lead(want.json.card).wish, { verb: "she" });
+});
+
 /*
  * And what kind of card it is, which is settled when the card is made.
  *

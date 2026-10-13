@@ -1455,6 +1455,13 @@ export default async (req) => {
            was written, which reads as the other card's answer ruled out.
            See clueFor in src/meanings.ts. */
         clue: String(card.clue || "").trim().slice(0, 80) || undefined,
+        /* The examples a verb's subjunctive is practised in — see
+           VerbExample. At most three, each the teacher's words capped like
+           every other line of text, and whose wish it is narrowed like an
+           id. Absent where there are none, and undefined rather than left
+           out, because this object is spread over the card as it stood
+           and a verb whose examples were all taken away must lose them. */
+        examples: storedExamples(card.examples),
         /* Whether its English keeps the capitals it was typed with — the
            teacher's tick. Kept as false as well as true, because an
            answer of no is what stops the one-time tick (see capitals.ts)
@@ -1581,6 +1588,11 @@ export default async (req) => {
                teacher linked any — see slotLinks in src/verbs.ts, which
                this is read through. Absent where nothing is linked. */
             ...slotAgrees(f),
+            /* And whose wish each verb blank's `{{verb-to}}` reads
+               against, where the teacher chose — see CardForm.wish. A
+               blank's name and a column, each narrowed to the shape a
+               name or an id can take. Absent where nobody chose. */
+            ...slotWish(f),
             /* Where this form sits in the card's verb table, when it is a
                cell of one. Stored as given, like the grammar values above
                and for the same reason: which rows and columns a language
@@ -1855,6 +1867,38 @@ export default async (req) => {
       /* Which blank a sentence's blanks agree with, through the answer the
          app reads it through, every name narrowed like the names between
          braces and the whole capped like the tenses above. */
+      /** @param {Record<string, any>} form */
+      function slotWish(form) {
+        const said = form && form.wish;
+        if (!said || typeof said !== "object" || Array.isArray(said)) return {};
+        /** @type {Record<string, string>} */
+        const out = {};
+        for (const [name, who] of Object.entries(said).slice(0, MAX_FILLS)) {
+          const slot = slotName(name);
+          const col = idish(who);
+          if (slot && col) out[slot] = col;
+        }
+        return Object.keys(out).length ? { wish: out } : {};
+      }
+
+      /** @param {unknown} list */
+      function storedExamples(list) {
+        if (!Array.isArray(list)) return undefined;
+        const out = [];
+        for (const one of list) {
+          if (!one || typeof one !== "object") continue;
+          const ex = /** @type {Record<string, unknown>} */ (one);
+          const ar = String(ex.ar || "").trim().slice(0, 400);
+          const lat = String(ex.lat || "").trim().slice(0, 400);
+          const en = String(ex.en || "").trim().slice(0, 400);
+          if (!ar && !lat && !en) continue;
+          const wish = idish(ex.wish);
+          out.push({ ar, ...(lat ? { lat } : {}), en, ...(wish ? { wish } : {}) });
+          if (out.length >= 3) break;
+        }
+        return out.length ? out : undefined;
+      }
+
       /** @param {Record<string, any>} form */
       function slotAgrees(form) {
         /** @type {Record<string, string>} */

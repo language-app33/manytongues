@@ -30,7 +30,8 @@ import { DIALOG_NEEDS, dialogNeedMet, isText, roleOf } from "./dialogs.ts";
 import { saidAnswers } from "./answers.ts";
 import { slotsOf } from "./variables.ts";
 import { ownSlot } from "./verbs.ts";
-import { EX, TYPES, answerFields, derivedValue, exOf, needLabel, quizAttrOf } from "./languages.ts";
+import { EX, TYPES, answerFields, derivedValue, exOf, needLabel, quizAttrOf, tablesOf } from "./languages.ts";
+import { inExamplesRow } from "./examples.ts";
 import { MIN_PAIR_MATES, MIN_PAIR_WORDS, PICK_OPTIONS } from "./chance.ts";
 
 /*
@@ -50,7 +51,7 @@ export function unmetNeeds(
   spec: ExerciseSpec,
   scene: Placed | null,
   /** The phrases that show this unit in use. */
-  contexts: { recs?: { id: string }[] }[],
+  contexts: { recs?: { id: string }[]; example?: number }[],
   /** What each of the unit's variables can be filled with, where it has any. */
   values: Record<string, unknown[]> = {},
   /**
@@ -144,6 +145,7 @@ export function unmetNeeds(
     if (f === "heardFigures") return heardFigures < MIN_PAIR_WORDS - 1;
     if (f === "figure") return !isFigureForm(unit);
     if (f === "contexts") return !contexts.length;
+    if (f === "examples") return !contexts.some((c) => typeof c.example === "number");
     if (f === "contextAudio") return !contexts.some((c) => (c.recs || []).length > 0);
     if (DIALOG_NEEDS.includes(f)) return !dialogNeedMet(f, scene, unit);
     /* A pronunciation question is about one accepted answer, so what it
@@ -178,7 +180,7 @@ export function canAsk(
   on: {
     unit: Form;
     scene: Placed | null;
-    contexts: { recs?: { id: string }[] }[];
+    contexts: { recs?: { id: string }[]; example?: number }[];
     values?: Record<string, unknown[]>;
     mates?: number;
     pictured?: number;
@@ -194,8 +196,23 @@ export function canAsk(
   if (!drilledBy(spec, lang, on.unit)) return false;
   if (askedInstead(spec, on.unit)) return false;
   if (on.unit.countedAt && !COUNTED_FACE_TYPES.includes(type)) return false;
+  if (inExamples(on.unit, lang) && !EXAMPLE_TYPES.includes(type)) return false;
+  if (!inExamples(on.unit, lang) && EX[type].needs.includes("examples")) return false;
   return unmetNeeds(on.unit, spec, on.scene, on.contexts, on.values || {}, on.mates || 0, on.pictured || 0, on.heard || 0, on.heardFigures || 0).length === 0;
 }
+
+/*
+ * What a form only ever met in a verb's examples is asked: what an example
+ * means, then the form picked out of its gap, then written there — and
+ * heard there, where somebody recorded one. Never anything about the form
+ * on its own, which says nothing anybody could be asked for. See
+ * VerbExample.
+ */
+export const EXAMPLE_TYPES = ["ex2en", "ctx2pick", "ctx2ar", "rec2ctx"];
+
+/* Whether a unit is a cell of a row its language practises in examples. */
+const inExamples = (unit: Form, lang: Lang): boolean =>
+  Object.values(tablesOf(lang)).some((spec) => inExamplesRow(spec, unit));
 
 /*
  * What a face of a number that counts things is asked: the phrase read
@@ -280,7 +297,7 @@ export function offersFor({
 }: {
   units: { unit: Form; isSub: boolean; scene?: Placed | null }[];
   lang: Lang;
-  contextsFor?: (unit: Form) => { recs?: { id: string }[] }[];
+  contextsFor?: (unit: Form) => { recs?: { id: string }[]; example?: number }[];
   /** What each of a unit's variables can be filled with. */
   valuesFor?: (unit: Form) => Record<string, unknown[]>;
   /** How many other cards could stand beside it in the matching grid. */

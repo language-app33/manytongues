@@ -8,6 +8,41 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.441 — 13 October 2026
+
+**The subjunctive is practised in examples, and its English is put together for you.**
+
+- The subjunctive boxes on a verb card no longer have an English box. English
+  has no form that matches تاكل on its own, so there was nothing right to type.
+- Instead, the subjunctive section has up to three examples. Each one is
+  written once, with {{verb}} where the verb goes: لازم {{verb}}. Its English
+  uses three words that change with the person:
+  - {{verb-who}} is the person: I, you (f), she…
+  - {{verb-plain}} is the verb: eat, taken from the verb's name.
+  - {{verb-to}} is "to eat" or "her to eat", for wanting. You choose whose
+    wish it is: بدي is "I".
+  So "{{verb-who}} must {{verb-plain}}" becomes لازم آكل "I must eat",
+  لازم تاكلي "you (f) must eat", and so on for every form written. Under each
+  example you can see what two of its persons will read as.
+- A verb with any subjunctive form written can't be saved until it has at
+  least one example, and an example whose English would come out the same
+  for every person is refused, with a line saying why.
+- Students practise each subjunctive form only inside the examples, never on
+  its own: first choosing what an example means (the wrong answers are the
+  same example in other persons), then picking the missing form, then
+  writing it. The example's English is shown from the start, since it is
+  what says which person is wanted.
+- Sentence cards use the same three words in their English for a verb blank
+  with the subjunctive ticked. Where the sentence has no subject blank, you
+  choose whose wish it is.
+- Trade-off: English typed into the subjunctive boxes since 0.432 is kept
+  but no longer used. Verbs saved with subjunctive forms and no examples
+  aren't practised on those forms until an example is added.
+
+To check by hand: on a verb card, write two subjunctive forms and an
+example, and check the two lines under it; then start a session and answer
+the "Choose the meaning" question for one of the forms.
+
 ## 0.440 — 13 October 2026
 
 **A verb with its past "he" left empty is found in sentences again.**

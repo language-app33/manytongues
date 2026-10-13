@@ -762,7 +762,10 @@ test("the settings say which level each exercise stands on, and every one has a 
     "fig2pick", "time2dial",
   ]);
   assert.deepEqual(TYPES.filter((t) => levelOf(t) === 1), [
-    "ar2pick", "ar2en", "rec2en", "rec2img", "dlgwhole",
+    "ar2pick", "ar2en", "rec2en", "rec2img",
+    /* What a verb's example means, with a subjunctive form in its gap. */
+    "ex2en",
+    "dlgwhole",
     /* A scene's sentence, its meaning chosen. */
     "sen2en",
     "num2fig", "rec2fig", "time2fig",

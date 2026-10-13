@@ -175,6 +175,7 @@ import {
 import {
   agreedCell,
   cellsIn,
+  colOf,
   hasCells,
   ownSlot,
   linkedToNothing,
@@ -317,7 +318,7 @@ import {
   splitAlternatives,
   withAnswer as oneAnswer,
 } from "./answers.ts";
-import { asMeaning, fieldsLost, fillForm, fillsOf, hasSlots, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
+import { asMeaning, cellEnglish, fieldsLost, fillForm, fillsOf, hasSlots, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
 import type { Value } from "./variables.ts";
 import { agreeTook, countTook, finishTook, leadsOf, lineGate, passes, reviewOf, sentenceKey, SCAN_LIMIT } from "./review.ts";
 import { castFill as castScene, filledScene, hasCast } from "./cast.ts";
@@ -2812,6 +2813,10 @@ function contextsFor(unitId: string): any[] {
 function pickContext(unit: Form, type: string) {
   const list = contextsFor(unit.id).filter((c) =>
     specOf(type) && specOf(type).needs.includes("contextAudio") ? (c.recs || []).length > 0 : true
+  ).filter((c) =>
+    /* What an example means is asked only of a verb's own examples: a
+       phrase somebody wrote with the word in it is asked about the word. */
+    specOf(type) && specOf(type).needs.includes("examples") ? typeof c.example === "number" : true
   );
   if (!list.length) return null;
   const seen = turnOf(unit.s && unit.s[type]);
@@ -3300,7 +3305,7 @@ function verbValue(
   const filler = subject ? took[subject] : null;
   const cell = agreedCell(card, spec, rowOf(resolved.unit), filler ? filler.grammar : null);
   if (!cell || !cell.ar) return null;
-  return { id: cell.id, ar: cell.ar, en: cell.en, lat: cell.lat };
+  return { id: cell.id, ar: cell.ar, en: cell.en, lat: cell.lat, ...cellEnglish(card, cell) };
 }
 
 /*
@@ -5645,8 +5650,25 @@ export function tokenCards(
  * Read by the question screen and by the deck forecast, which marks the
  * question as the screen would have shown it.
  */
+/*
+ * A form met in one of its verb's examples, cast as that example: لازم
+ * تاكلي and *you (f) must eat*, for the question that asks what an example
+ * means. The form keeps its own id, so its own schedule — the answer is
+ * about it — and the example is only what is shown and marked against.
+ * See VerbExample.
+ */
+function castExample(resolved: { unit: Form; parent: Item; isSub: boolean } | null, ex: Question) {
+  const spec = specOf(typeOf(ex.type));
+  if (!resolved || !spec || spec.promptField !== "example") return resolved;
+  const context = contextsFor(resolved.unit.id).find((c) => c.id === ex.ctx) || null;
+  if (!context) return resolved;
+  const { answers: _answers, ...rest } = resolved.unit as Form & { answers?: unknown };
+  const unit = { ...rest, ar: context.ar, en: context.en, lat: context.lat || "", recs: [], clips: [], slowClips: [] } as Form;
+  return { ...resolved, unit };
+}
+
 export function resolveQuestion(asking: Item[], exercise: Question, trial: boolean, systems: SystemSet[]) {
-  return castGap(
+  return castExample(castGap(
     castRange(
       castMeaning(
         castTaught(castAnswer(castFill(resolveUnit(asking, exercise), exercise.type, trial), exercise.type), exercise.type),
@@ -5657,7 +5679,7 @@ export function resolveQuestion(asking: Item[], exercise: Question, trial: boole
       systems,
     ),
     exercise,
-  );
+  ), exercise);
 }
 
 /**
@@ -6521,7 +6543,7 @@ function liftAnswers(form: Record<string, any>): Record<string, any> {
 const CARD_ONLY = new Set([
   "kind", "tags", "locked", "flags", "source", "fills", "ref", "name", "category",
   "drill", "uses", "note", "lines", "speakers", "you", "subs", "forms", "sceneKind",
-  "capitals",
+  "capitals", "examples",
 ]);
 
 /* One of a stored card's forms, with nothing of the card left on it. */
@@ -11031,7 +11053,9 @@ export default function ArabicTrainer() {
      see hintPhrase. Empty where the phrase was written without English:
      the line under the phrase then says the word's own meaning, as it
      always has, and there is nothing to hide. */
-  const phraseHint = spec && spec.hintPhrase && context && context.en ? context.en : "";
+  /* Never a verb's own example, whose English is the one thing that says
+     which person its gap is in: there it is on the screen from the start. */
+  const phraseHint = spec && spec.hintPhrase && context && context.en && typeof context.example !== "number" ? context.en : "";
   const hintAt = (spec && spec.hintField && item ? String(item[spec.hintField] || "") : "") || phraseHint;
   const hintShown = !!hintAt && !!hintOpen;
   /* On the screen now, or on it at some point. */
@@ -11051,7 +11075,7 @@ export default function ArabicTrainer() {
    * skipped where the question already has one on the screen.
    */
   const alsoContext = useMemo(() => {
-    if (!item || context) return null;
+    if (!item || context || (spec && spec.promptField === "example")) return null;
     const list = contextsFor(item.id);
     if (!list.length) return null;
     const seen = Object.values(statesOf(item)).reduce((n, st) => n + ((st && st.reps) || 0), 0);
@@ -11247,6 +11271,41 @@ export default function ArabicTrainer() {
         : [];
     }
     if (!item) return [];
+    /*
+     * A verb's own example, and a form of its subjunctive in the gap.
+     *
+     * The wrong answers are the same example in the verb's other persons,
+     * because who is the whole of what the form says: what an example
+     * means is told from *I must eat* and *we must eat*, and the form in
+     * its gap from the other forms of the same row. A person spelt the
+     * same — تاكل is *you (m)* and *she* — is left out, being as right as
+     * the answer. See VerbExample.
+     */
+    const asked = exercise && exercise.ctx ? contextsFor(item.id).find((c) => c.id === exercise.ctx) || null : null;
+    if (asked && typeof asked.example === "number" && parentItem && (spec.promptField === "example" || spec.picks === "word")) {
+      const spelt = (u: Form) => String(u.ar || "").trim();
+      const own = (unitsOf(parentItem).find(({ unit }) => unit.id === item.id) || { unit: item }).unit;
+      const others = unitsOf(parentItem)
+        .map(({ unit }) => unit)
+        .filter((u) => u.id !== item.id && rowOf(u) === rowOf(own) && !!colOf(u) && spelt(u) && spelt(u) !== spelt(own));
+      const seed = `${item.id} ${asked.id} ${(statesOf(item)[exercise.type] || {}).reps || 0}`;
+      if (spec.promptField === "example") {
+        const pool = others
+          .map((u) => contextsFor(u.id).find((c) => c.id === asked.id))
+          .filter(Boolean)
+          .map((c, i) => ({ id: `opt:${i}:${c.id}`, ar: c.ar, en: c.en, lat: "" }));
+        return optionsFor({ answer: item, pool, wanted: PICK_OPTIONS, seed, textOf: (w) => String(w.en || "") });
+      }
+      if (others.length) {
+        return optionsFor({
+          answer: item,
+          pool: others.map((u) => oneOf(u, exercise ? exercise.type : "")),
+          wanted: PICK_OPTIONS,
+          seed,
+          textOf: (w) => String(w.ar || ""),
+        });
+      }
+    }
     /*
      * A range brings its own wrong answers, already said.
      *
@@ -12937,7 +12996,7 @@ export default function ArabicTrainer() {
                           </p>
                         ) : null}
                       </>
-                    ) : spec.promptField === "sentence" ? (
+                    ) : spec.promptField === "sentence" || spec.promptField === "example" ? (
                       <Field value={item.ar} field="ar" kind="phrase" name="question-prompt-text" />
                     ) : spec.promptField === "sentenceMeaning" ? (
                       <Field value={item.en} field="en" kind="phrase" name="question-prompt-text" />
@@ -16769,7 +16828,9 @@ export function formTagsAt({ label, ambiguous, kin, lent, promptField }: {
   lent: boolean;
   promptField: string;
 }): { question: boolean; answer: boolean; lentQuestion: boolean; lentAnswer: boolean } {
-  const none = ["pairs", "scene", "gap", "sentence", "sentenceMeaning"].includes(promptField);
+  /* Nor a verb's example, whose words already say which form is in the
+     gap — and naming its person would be its English given away. */
+  const none = ["pairs", "scene", "gap", "sentence", "sentenceMeaning", "example"].includes(promptField);
   const question = !none && !!label && ambiguous;
   const lentQuestion = !none && lent && !PROMPT_SHOWS_FORM.includes(promptField);
   return {

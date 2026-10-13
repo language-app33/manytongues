@@ -210,6 +210,87 @@ function withBe(en: string | null | undefined, beOf: (first: string) => string):
   return { is: `${base} ${be}${note}`, ask: `${be} ${base}${note}` };
 }
 
+/*
+ * A verb's subjunctive, as English says it.
+ *
+ * English has none. بدها تاكل is *she wants her to eat* — or *she wants
+ * to eat*, if she is the one eating — and لازم تاكل is *she must eat*:
+ * the English a form reads as depends on the word in front of the gap,
+ * which only the sentence knows, and on whose wish it is. So the form is
+ * not given an English of its own. The sentence's English says how to
+ * read it, with one of three words beside the verb blank's own name:
+ *
+ *     {{verb-who}}     I · you (f) · she            who does it
+ *     {{verb-plain}}   eat                           the verb, bare
+ *     {{verb-to}}      to eat · her to eat          after want, let, ask
+ *
+ * *{{verb-who}} must {{verb-plain}}* is *I must eat*, *she must eat*;
+ * *I want {{verb-to}}* is *I want to eat* beside آكل and *I want her to
+ * eat* beside تاكل. Which person wants is the sentence's to say — see
+ * CardForm.wish — and where it says nothing, the verb's own person does:
+ * a verb following a subject blank is in that subject's person.
+ *
+ * The persons are the app's own columns, read by id the way
+ * SPEAKER_COLUMNS reads them, because this is about English and nothing
+ * else: who and whom for each. A test holds the ids to the packs.
+ */
+export const VERB_READINGS = ["who", "plain", "to"];
+
+const PERSON_ENGLISH: Record<string, { who: string; whom: string }> = {
+  "i": { who: "I", whom: "me" },
+  "i-f": { who: "I", whom: "me" },
+  "you-m": { who: "you (m)", whom: "you (m)" },
+  "you-f": { who: "you (f)", whom: "you (f)" },
+  "he": { who: "he", whom: "him" },
+  "she": { who: "she", whom: "her" },
+  "we": { who: "we", whom: "us" },
+  "we-f": { who: "we", whom: "us" },
+  "you-pl": { who: "you (pl)", whom: "you (pl)" },
+  "you-pl-f": { who: "you (f pl)", whom: "you (f pl)" },
+  "they": { who: "they", whom: "them" },
+  "they-f": { who: "they", whom: "them" },
+};
+
+/** Who does it and who it is done to, in English, for one column — or
+    null for a column English has no pronoun for here. */
+export const personEnglish = (col: string | null | undefined): { who: string; whom: string } | null =>
+  PERSON_ENGLISH[String(col || "").trim()] || null;
+
+/** A verb's name as English says it bare: "to eat" is *eat*. */
+export const verbPlain = (name: string | null | undefined): string =>
+  String(name || "").trim().replace(/^to\s+/i, "").trim();
+
+/**
+ * The blank a reading belongs to, where `name` is one: "verb-to" is a
+ * reading of "verb" — but only where "verb" is a blank of the same card,
+ * so a blank somebody named "x-to" on its own is still a blank of its own.
+ */
+export function verbBlankOf(name: string, slots: string[]): string {
+  const m = String(name || "").toLowerCase().match(/^(.+)-(who|plain|to)$/);
+  return m && (slots || []).includes(m[1]) ? m[1] : "";
+}
+
+/** A list of blank names with the readings of the others taken out. */
+export const foldReadings = (names: string[]): string[] =>
+  (names || []).filter((n) => !verbBlankOf(n, names));
+
+/**
+ * What one value reads as in one of the three words. `wish` is the column
+ * of whoever wants, for `to`; nothing is the value's own person. A value
+ * the words cannot be made for — no column English names, or no name on
+ * its verb — reads as its own English, which is what it always did.
+ */
+export function verbReading(value: Value, kind: string, wish = ""): string {
+  const person = personEnglish(value.col);
+  const plain = String(value.plain || "").trim();
+  if (!person || !plain) return value.en;
+  if (kind === "who") return person.who;
+  if (kind === "plain") return plain;
+  const col = String(value.col || "");
+  const same = !wish || wish === col || (SPEAKER_COLUMNS.has(wish) && SPEAKER_COLUMNS.has(col));
+  return same ? `to ${plain}` : `${person.whom} to ${plain}`;
+}
+
 /* The numbers a noun takes *are* in: more than one, however many. */
 const MANY = ["plural", "dual", "counted"];
 
@@ -882,6 +963,18 @@ export interface Value {
    * this one, and filled as itself anywhere else. See countTook.
    */
   swallows?: string;
+  /**
+   * Which column of a table it is, where it is a cell of one — "she" for
+   * تاكل. What its English is put together from in `{{verb-who}}` and
+   * `{{verb-to}}`: see verbReading. Absent on a value that is no cell.
+   */
+  col?: string;
+  /**
+   * The verb as English says it bare — *eat* — off the name the teacher
+   * gave the verb card ("to eat"). What `{{verb-plain}}` and `{{verb-to}}`
+   * read. Absent on a value whose card has no name.
+   */
+  plain?: string;
 }
 
 const text =(form: WithSlots | null | undefined, field: string): string => {
@@ -992,7 +1085,9 @@ export function slotsOf(form: WithSlots | null | undefined): string[] {
   for (const field of FILLED_FIELDS) {
     for (const name of slotsIn(text(word, field))) if (!out.includes(name)) out.push(name);
   }
-  return out;
+  /* `{{verb-who}}` beside `{{verb}}` is how the English reads that blank,
+     not a blank of its own — see VERB_READINGS. */
+  return foldReadings(out);
 }
 
 export const hasSlots = (form: WithSlots | null | undefined): boolean => slotsOf(form).length > 0;
@@ -1045,7 +1140,7 @@ export function slotTrouble(
   for (const field of FILLED_FIELDS) {
     const written = text(form, field).trim();
     if (!written) continue;
-    const here = slotsIn(written);
+    const here = slotsIn(written).map((n) => verbBlankOf(n, all) || n).filter((n, i, list) => list.indexOf(n) === i);
     const missing = all.filter((s) => !here.includes(s));
     const extra = here.filter((s) => !all.includes(s));
     if (missing.length || extra.length) return { field, missing, extra };
@@ -1226,7 +1321,10 @@ export function lentBy(
     const kept = keepsCapitals(card) || speaksAsCard(at === 0 ? card : null, form as WithSlots)
       ? { ...asName, keepsCase: true }
       : asName;
-    const withPerson = person ? { ...kept, grammar: { ...(kept.grammar || {}), person } } : kept;
+    const placed = cellEnglish(card, form as WithSlots);
+    const withPerson = person
+      ? { ...kept, ...placed, grammar: { ...(kept.grammar || {}), person } }
+      : { ...kept, ...placed };
     /* And the English it reads as in the blanks that add *to be*, where it
        is a pronoun — see readingsOf. */
     const readings = readingsOf(card, form as WithSlots, at === 0);
@@ -1508,12 +1606,18 @@ export function fillText(
   values: Record<string, Value>,
   field = "ar",
   cased = true,
+  /** Whose wish each verb blank reads `{{verb-to}}` against — see
+      CardForm.wish. */
+  wish: Record<string, string> = {},
 ): string {
   return withoutSwallowed(String(value || ""), values).replace(SLOT, (whole, name, at: number, all: string) => {
     const slot = String(name).toLowerCase();
-    const took = values && values[slot];
+    const base = values && !values[slot] ? verbBlankOf(slot, Object.keys(values)) : "";
+    const took = values && values[base || slot];
     if (!took) return whole;
-    const read = field === "en" && took.readings ? took.readings[slot] : "";
+    const read = base
+      ? field === "en" ? verbReading(took, slot.slice(base.length + 1), (wish || {})[base] || "") : ""
+      : field === "en" && took.readings ? took.readings[slot] : "";
     const word = read || (took as unknown as Record<string, string>)[field];
     if (word === undefined || word === "") return whole;
     if (!cased || field === "lat") return word;
@@ -1583,12 +1687,12 @@ function withoutSwallowed(written: string, values: Record<string, Value>): strin
  * A sentence no blank of which reads more than one way is filled exactly
  * as fillText always filled it.
  */
-function fillEnglish(written: string, values: Record<string, Value>, cased: boolean): string {
+function fillEnglish(written: string, values: Record<string, Value>, cased: boolean, wish: Record<string, string> = {}): string {
   const several = Object.keys(values).filter((slot) => {
     const read = values[slot] && values[slot].readings ? values[slot].readings![slot] : "";
     return splitAlternatives(read).filter(Boolean).length > 1;
   });
-  if (!several.length) return fillText(written, values, "en", cased);
+  if (!several.length) return fillText(written, values, "en", cased, wish);
   let each: Record<string, Value>[] = [values];
   for (const slot of several) {
     each = each.flatMap((vs) =>
@@ -1601,7 +1705,7 @@ function fillEnglish(written: string, values: Record<string, Value>, cased: bool
   const out: string[] = [];
   for (const frame of splitAlternatives(written).filter(Boolean)) {
     for (const vs of each) {
-      const said = fillText(frame, vs, "en", cased);
+      const said = fillText(frame, vs, "en", cased, wish);
       if (!out.includes(said)) out.push(said);
     }
   }
@@ -1746,6 +1850,33 @@ export function asMeaning(said: string | null | undefined): string {
  * was filled from one that never had a hole — the editor's preview reads
  * it, and so does anything that must not offer to record this.
  */
+/**
+ * What a cell of a table carries into a sentence for the three words to
+ * be made from — its column, and its verb as English says it bare — or
+ * nothing for a form that is no cell. See verbReading.
+ */
+export function cellEnglish(
+  card: WithSlots | null | undefined,
+  form: WithSlots | null | undefined,
+): { col?: string; plain?: string } {
+  const col = text(form, "col").trim();
+  if (!col || !text(form, "row").trim()) return {};
+  const plain = verbPlain(text(card, "name"));
+  return plain ? { col, plain } : { col };
+}
+
+/* Whose wish each of a form's verb blanks reads against — see
+   CardForm.wish. Names lowered, as every blank's is. */
+function wishOf(form: WithSlots | null | undefined): Record<string, string> {
+  const said = form ? form.wish : null;
+  const out: Record<string, string> = {};
+  if (!said || typeof said !== "object" || Array.isArray(said)) return out;
+  for (const [k, v] of Object.entries(said as Record<string, unknown>)) {
+    if (typeof v === "string" && v.trim()) out[k.toLowerCase()] = v.trim();
+  }
+  return out;
+}
+
 export function fillForm<T extends WithSlots>(
   form: T,
   values: Record<string, Value> | null,
@@ -1762,7 +1893,7 @@ export function fillForm<T extends WithSlots>(
       out[field] = "";
       continue;
     }
-    out[field] = field === "en" ? fillEnglish(written, values, cased) : fillText(written, values, field, cased);
+    out[field] = field === "en" ? fillEnglish(written, values, cased, wishOf(form)) : fillText(written, values, field, cased);
   }
   /* The answers array is written from `ar` and would otherwise still hold
      the frame — see answersOf, which prefers it where the two agree. Filled

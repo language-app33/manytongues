@@ -6747,6 +6747,71 @@ const openPronounTables = async () => {
     check("a verb is offered no form outside its table", !addForm(),
       addForm() ? `still offered: "${(addForm().textContent || "").trim()}"` : "no such button");
 
+    /* ---- the subjunctive, practised in examples ----
+
+       Its forms have no English of their own — تاكل is nothing anybody
+       says — so they have no English box, and the verb carries up to
+       three examples they are practised in instead. A subjunctive form
+       written with no example is a form nothing could ever ask, and the
+       card is not saved until one is written. */
+    check("the subjunctive's forms have no English box of their own",
+      !!cellNamed("Arabic for subjunctive · she") && !cellNamed("English for subjunctive · she"),
+      cellNamed("English for subjunctive · she") ? "still asked" : "no subjunctive cell");
+    const examplesSection = () => document.querySelector('[data-el="editor-verb-examples"]');
+    check("and its examples are written under them", !!examplesSection(),
+      "no examples section");
+    typeInto(nameBox(), "to eat");
+    typeInto(cellNamed("Arabic for subjunctive · she"), "تاكل");
+    typeInto(cellNamed("Arabic for subjunctive · I (m)"), "آكل");
+    await sleep(250);
+    check("a subjunctive form with no example to be asked in is refused",
+      !!saveBtn() && saveBtn().disabled && unmetLines().some((t) => /at least one example/.test(t)),
+      `${saveBtn() && saveBtn().disabled ? "refused" : "offered"} · ${unmetLines().join(" · ")}`);
+    typeInto(cellNamed("Arabic for example 1"), "لازم {{verb}}");
+    typeInto(cellNamed("English for example 1"), "I must eat");
+    await sleep(250);
+    check("an example whose English could not change with the person is refused, and says so",
+      !!saveBtn() && saveBtn().disabled && unmetLines().some((t) => /changes with the person/.test(t)),
+      `${saveBtn() && saveBtn().disabled ? "refused" : "offered"} · ${unmetLines().join(" · ")}`);
+    typeInto(cellNamed("English for example 1"), "{{verb-who}} must {{verb-plain}}");
+    await sleep(250);
+    check("one that changes with the person saves the verb on its subjunctive alone",
+      !!saveBtn() && !saveBtn().disabled,
+      `${saveBtn() && saveBtn().disabled ? "refused" : "offered"} · ${unmetLines().join(" · ")}`);
+    const previewText = () => ((document.querySelector('[data-el="editor-verb-example-preview"]') || {}).textContent || "").replace(/\s+/g, " ");
+    check("and under it is what two of its persons will read as",
+      /لازم آكل — I must eat/.test(previewText()) && /لازم تاكل — She must eat/.test(previewText()),
+      previewText() || "(no preview)");
+    /* "Whose wish" is asked only where the English says {{verb-to}}. */
+    check("nobody is asked whose wish it is where nobody wants",
+      !document.querySelector('select[aria-label="Whose wish is it, in example 1"]'), "asked anyway");
+    typeInto(cellNamed("English for example 1"), "I want {{verb-to}}");
+    await sleep(250);
+    check("and where somebody does, it is asked, and the English follows it",
+      !!document.querySelector('select[aria-label="Whose wish is it, in example 1"]') &&
+        /I want to eat/.test(previewText()) && /I want her to eat/.test(previewText()),
+      previewText() || "(no preview)");
+    const addExample = () => /** @type {any} */ ([...document.querySelectorAll("button")]
+      .find((b) => /^Add an example$/.test((b.textContent || "").trim())) || null);
+    click(addExample());
+    await sleep(150);
+    click(addExample());
+    await sleep(150);
+    check("three examples at most",
+      document.querySelectorAll('[data-el="editor-verb-example"]').length === 3 && !addExample(),
+      `${document.querySelectorAll('[data-el="editor-verb-example"]').length} examples, ${addExample() ? "still offered more" : "no more offered"}`);
+    /* Taken back off, so what follows is about the table it was. */
+    for (let n = 0; n < 4; n++) {
+      const remove = [...document.querySelectorAll('[data-el="editor-verb-example"] button')]
+        .find((b) => /^Remove$/.test((b.textContent || "").trim()));
+      if (!remove) break;
+      click(remove);
+      await sleep(120);
+    }
+    typeInto(cellNamed("Arabic for subjunctive · she"), "");
+    typeInto(cellNamed("Arabic for subjunctive · I (m)"), "");
+    await sleep(200);
+
     /* Back to a word, and the one the block was holding is still there —
        putting the table away must not read as having thrown the card away.
        Still offered here because this card has never been saved: a stored
@@ -9139,10 +9204,14 @@ const openPronounTables = async () => {
    shape of it.
 
    On its own document, with the scene already up its ladder, because that
-   is the only state in which the ordering is dealt at all. */
+   is the only state in which the ordering is dealt at all. And with the
+   course quiet, as the walks after it are: the server's own lesson words
+   otherwise arrive on start and, on a slow run, take the session over —
+   twenty questions of somebody else's, with the scene never reached. */
 {
   root.unmount();
   await sleep(200);
+  materialQuiet = true;
   const before = errors.length;
   /* Answered right twice and due: the level-one reading is climbed, so
      the rung above it has opened. */
@@ -9228,6 +9297,7 @@ const openPronounTables = async () => {
   root7.unmount();
   host7.remove();
   await sleep(200);
+  materialQuiet = false;
 }
 
 /* ---- the settings screens, and the menu that reaches them ----
@@ -9415,6 +9485,125 @@ const openPronounTables = async () => {
   root5.unmount();
   host5.remove();
   await sleep(200);
+}
+
+/* ---- a verb's subjunctive, practised in its own examples ----
+   A verb with four of its subjunctive forms written and one example, لازم
+   {{verb}}. New, each form is asked what the example means with it in the
+   gap, the wrong answers being the same example in the other persons.
+   Known that far, it is asked to pick the form out of the gap, with the
+   example's English up from the start, since that is what says which
+   person is wanted. Never the form on its own. */
+{
+  const before = errors.length;
+  const solid = { phase: "review", reps: 4, interval: 9, ease: 2.5, due: Date.now() + 5 * 86400000,
+    right: 4, wrong: 0, hist: [1, 1, 1, 1], updated: Date.now() };
+  /** @type {Record<string, string>} */
+  const meaning = { "آكل": "I must eat", "تاكلي": "You (f) must eat", "تاكل": "She must eat", "ناكل": "We must eat" };
+  /** @param {Record<string, any>} s */
+  const verbCard = (s) => ({
+    id: "eatx", kind: "word", tags: ["Lesson 1"], created: 1, updated: Date.now(), lang: "ar-PS",
+    category: "verb", name: "to eat",
+    forms: [
+      { id: "eatx", ar: "أكل", en: "to eat", lat: "akal", ask: false },
+      ...Object.keys(meaning).map((word, i) => ({
+        id: `eatx-s${i}`, ar: word, en: "", lat: "", row: "subjunctive", col: ["i", "you-f", "she", "we"][i], s: { ...s },
+      })),
+    ],
+    examples: [{ ar: "لازم {{verb}}", lat: "laazim {{verb}}", en: "{{verb-who}} must {{verb-plain}}" }],
+  });
+  /* Company for the choices a word is offered, as every walk has. */
+  const others = ["قهوة", "شاي", "خبز", "ماء"].map((ar, i) => ({
+    id: `exw${i}`, kind: "word", tags: ["Lesson 1"], created: 2, updated: Date.now(), lang: "ar-PS",
+    forms: [{ id: `exw${i}`, ar, en: ["coffee", "tea", "bread", "water"][i], lat: "", s: {} }],
+  }));
+  /** @param {any[]} items */
+  const walk = async (items) => {
+    remoteDocs.clear();
+    localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items,
+    }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    for (let t = 0; t < 100 && !startBtn(); t++) await sleep(100);
+    click(startBtn());
+    for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
+    const met = {
+      meanings: 0, meaningRight: 0, meaningOptions: /** @type {string[]} */ ([]),
+      picks: 0, pickRight: 0, pickOptions: /** @type {string[]} */ ([]), cueShown: false, bare: 0,
+    };
+    for (let n = 0; n < 30 && host.querySelector(".at-instruction"); n++) {
+      const prompt = ((host.querySelector('[data-el="question-prompt-text"]') || {}).textContent || "").trim();
+      const choices = host.querySelector('[data-el="answer-choices"]');
+      const tiles = choices ? [...choices.querySelectorAll("button")] : [];
+      const said = tiles.map((b) => (b.textContent || "").trim());
+      const word = Object.keys(meaning).find((w) => prompt === `لازم ${w}`);
+      if (Object.keys(meaning).includes(prompt)) met.bare += 1;
+      if (word && tiles.length) {
+        met.meanings += 1;
+        met.meaningOptions = said;
+        const right = tiles.find((b) => (b.textContent || "").trim().toLowerCase() === meaning[word].toLowerCase());
+        click(right || tiles[0]);
+      } else if (/^لازم /.test(prompt) && tiles.length) {
+        met.picks += 1;
+        met.pickOptions = said;
+        const cue = ((host.querySelector('[data-el="question-context-meaning"]') || {}).textContent || "").trim();
+        if (/must eat/i.test(cue)) met.cueShown = true;
+        const want = Object.keys(meaning).find((w) => meaning[w].toLowerCase() === cue.toLowerCase());
+        click(tiles.find((b) => (b.textContent || "").trim() === want) || tiles[0]);
+      } else {
+        const giveUp = [...host.querySelectorAll("button")].find((b) => /^I don.t know$/.test((b.textContent || "").trim()));
+        if (giveUp) click(giveUp);
+        else if (tiles.length) click(tiles[0]);
+      }
+      await sleep(120);
+      if (!host.querySelector('[data-el="verdict"]')) {
+        click(host.querySelector('[data-el="check-button"]'));
+        await sleep(200);
+      }
+      const verdict = ((host.querySelector('[data-el="verdict"]') || {}).textContent || "").trim();
+      const ok = !!host.querySelector(".at-verdict.ok, [data-el=\"verdict\"].ok") || /^(Correct|Right|Yes|Nice|Good|Great)/i.test(verdict);
+      if (word && tiles.length && ok) met.meaningRight += 1;
+      if (!word && /^لازم /.test(prompt) && tiles.length && ok) met.pickRight += 1;
+      click([...host.querySelectorAll("button")].find((b) => /^Continue$/.test((b.textContent || "").trim())));
+      await sleep(200);
+    }
+    r.unmount();
+    host.remove();
+    const KEY = "arabic-trainer:arabic-trainer-v3";
+    let was = localStorage.getItem(KEY);
+    for (let t = 0, still = 0; t < 40 && still < 4; t++) {
+      await sleep(100);
+      const now = localStorage.getItem(KEY);
+      still = now === was ? still + 1 : 0;
+      was = now;
+    }
+    return met;
+  };
+  materialQuiet = true;
+  const fresh = await walk([verbCard({}), ...others]);
+  check("a new subjunctive form is asked what an example means with it in the gap",
+    fresh.meanings > 0, JSON.stringify(fresh));
+  check("and the wrong answers are the same example in the verb's other persons",
+    fresh.meaningOptions.length >= 2 && fresh.meaningOptions.every((t) => /must eat/i.test(t)),
+    JSON.stringify(fresh.meaningOptions));
+  check("and the right one is marked right", fresh.meaningRight > 0, JSON.stringify(fresh));
+  check("and the form is never asked on its own", fresh.bare === 0, JSON.stringify(fresh));
+  const known = await walk([verbCard({ ex2en: { ...solid } }), ...others]);
+  materialQuiet = false;
+  check("known that far, it is asked to pick the form out of the example's gap",
+    known.picks > 0, JSON.stringify(known));
+  check("with the example's English on the screen from the start, as that is what says which person",
+    known.cueShown, JSON.stringify(known));
+  check("out of the verb's other subjunctive forms",
+    known.pickOptions.length >= 2 && known.pickOptions.every((t) => Object.keys(meaning).includes(t)),
+    JSON.stringify(known.pickOptions));
+  check("and the right one is marked right", known.pickRight > 0, JSON.stringify(known));
+  check("nothing threw while a subjunctive was practised", errors.length === before,
+    errors.slice(before, before + 3).join(" | "));
 }
 
 /* ---- practising from pictures ----

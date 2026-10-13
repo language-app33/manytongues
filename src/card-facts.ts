@@ -806,6 +806,16 @@ export const CARD_FACTS: FieldRule[] = [
     shown: asWritten,
   },
   {
+    key: "examples",
+    on: "card",
+    label: "Subjunctive examples",
+    what: "Up to three short examples a verb's subjunctive is practised in, each with a gap for the verb — “{{verb-who}} must {{verb-plain}}”. Every subjunctive form is met in each of them, in its own person; none is ever asked on its own.",
+    reader: "both",
+    shown: (value) => (Array.isArray(value) ? value : [])
+      .map((ex) => (ex && typeof ex === "object" ? `${str((ex as Record<string, unknown>).ar)} — ${str((ex as Record<string, unknown>).en)}` : ""))
+      .filter((line) => line.replace(/[\s—]/g, "")),
+  },
+  {
     key: "note",
     on: "card",
     label: "Note",
@@ -1015,6 +1025,21 @@ export const CARD_FACTS: FieldRule[] = [
     shown: (value) => Object.entries(slotLinks({ agrees: value })).map(
       ([slot, to]) => `${slot} · ${to === NO_PARTNER ? "nothing" : to}`,
     ),
+  },
+  {
+    key: "wish",
+    on: "form",
+    label: "Whose wish",
+    what: "For a verb blank whose English reads {{verb-to}}, the person who wants, so the subjunctive reads as “I want to eat” or “I want her to eat”.",
+    reader: "both",
+    shown: (value, ctx) => {
+      const said = value && typeof value === "object" ? (value as Record<string, unknown>) : {};
+      const persons = personsOf(verbOf(ctx.lang));
+      return Object.entries(said).map(([slot, who]) => {
+        const person = persons.find((p) => p.id === str(who));
+        return `${slot} · ${person ? person.label : str(who)}`;
+      });
+    },
   },
   {
     key: "col",

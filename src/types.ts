@@ -225,6 +225,19 @@ export interface VerbTense {
    * src/verbs.ts. Absent is every row as it always was.
    */
   onlyWhenTicked?: boolean;
+  /**
+   * Whether this row's forms are practised in the card's own examples
+   * rather than as words on their own — see VerbExample. A form that only
+   * ever follows another word has no meaning a question could ask for by
+   * itself: تاكل is *(that) she eat*, which nobody says. So such a cell is
+   * asked what an example means, then to pick it out of the gap in one,
+   * then to write it there, and never anything about the word alone.
+   * Absent is every row as it always was.
+   */
+  examples?: boolean;
+  /** And an example of one, shown to a teacher writing their own — the
+      language's, because the word in front of the gap is. */
+  sample?: { ar: string; lat?: string; en: string };
 }
 
 /**
@@ -850,6 +863,42 @@ export interface CardForm {
    * and partnerOf in src/verbs.ts.
    */
   agrees?: Record<string, string>;
+  /**
+   * Whose wish it is, for a verb blank whose English reads `{{verb-to}}`:
+   * the blank's name, and the column of the person who wants — "i" for
+   * بدي {{verb}}, "she" for بدها {{verb}}. That is what turns the same
+   * subjunctive into *I want to eat* beside آكل and *I want her to eat*
+   * beside تاكل. See verbReading in src/variables.ts.
+   *
+   * Only on a blank that follows no other: one that agrees with a subject
+   * is in that subject's person, so whoever wants is whoever does, and
+   * the editor writes nothing for it. **Absent reads as the verb's own
+   * person** — *to eat* — which is what every sentence written before
+   * this would have meant.
+   */
+  wish?: Record<string, string>;
+}
+
+/**
+ * One example a verb's subjunctive is practised in, on the verb's own
+ * card: "لازم {{verb}}" — *{{verb-who}} must {{verb-plain}}*.
+ *
+ * Written once, with `{{verb}}` where the verb goes, and met once for
+ * every person the table has a form for: لازم آكل *I must eat*, لازم
+ * تاكلي *you (f) must eat*. The English is never typed per person; it is
+ * put together from the words `{{verb-who}}`, `{{verb-plain}}` and
+ * `{{verb-to}}` — see verbReading in src/variables.ts — because English
+ * has no subjunctive of its own and the right words depend on the word
+ * before the gap. See src/examples.ts.
+ */
+export interface VerbExample {
+  ar: string;
+  lat?: string;
+  en: string;
+  /** Whose wish it is, where the English reads `{{verb-to}}` — a column
+      of the verb table. See CardForm.wish, which is the same answer for a
+      sentence card's blank. */
+  wish?: string;
 }
 
 /**
@@ -946,6 +995,14 @@ export type Card = {
    * teaches.
    */
   name?: string;
+  /**
+   * Up to three examples a verb's subjunctive is practised in — see
+   * VerbExample. Only on a verb, and required there once any subjunctive
+   * form is written: the subjunctive is never asked as a word on its own,
+   * because "تاكل" alone means nothing a learner could be asked for.
+   * Absent on every other card.
+   */
+  examples?: VerbExample[];
   /**
    * Which column of the verb table this card is, where it is a pronoun the
    * Pronouns screen wrote — "i", "you-m", "she". What lets a sentence's
