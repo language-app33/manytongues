@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.439 — 13 October 2026
+
+**A verb with its past "he" left empty is found in sentences again.**
+
+- A verb's own word is its past-tense "he" box. A verb saved without it,
+  with only its present or subjunctive written, was treated as having no
+  word at all: "Words this teaches" never offered it, and its words in a
+  text were listed as having no card. "To keep", with only بخلّي, بتخلّي
+  and تخلي written, was not offered for "لو ممكن تخلي بس 3 تطبيقات…".
+- Such a verb is now looked for by every form it has, is offered as usual,
+  and is listed by the first form written, under the name you gave it.
+- Trade-off: a sentence of a text waits until most of its words are known
+  (since 0.434). These verbs' words now count among them, so a sentence
+  using a verb a student has not learnt yet may wait a little longer.
+
+To check by hand: open a text whose sentence uses a verb with an empty
+past "he" box; the verb is offered under "Words this teaches".
+
 ## 0.438 — 13 October 2026
 
 **No more questions with nothing to choose from.**

@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import type { Card, Course, Deck, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
-import { formsOf, leadOf } from "./cards.ts";
+import { formsOf, leadOf, wordOf } from "./cards.ts";
 import { createPortal } from "react-dom";
 import * as API from "./courses-api.ts";
 import { answerFields, categoryLabel, dimValues, kindOf, LANGUAGES, DEFAULT_LANGUAGE, scriptVars } from "./languages.ts";
@@ -3061,7 +3061,7 @@ function ReadTaught({ of, cards, label, panel = false }: {
   const words = cards
     ? ids
         .map((id: string) => (cards || []).find((c: Record<string, any>) => String(c.id) === id))
-        .map((c) => (c ? String(leadOf(c).ar || leadOf(c).en || "") : ""))
+        .map((c) => (c ? String(wordOf(c).ar || leadOf(c).en || c.name || "") : ""))
         .filter(Boolean)
     : [];
   const said = words.length ? words.join(" · ") : `${ids.length}`;
