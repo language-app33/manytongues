@@ -825,7 +825,7 @@ test("two forms sharing one meaning between their English answer the same prompt
      feminine is "I am hot" — one of the masculine's meanings — so the two
      lines differ while the question is the same. */
   const shape = { id: "k59562641e79c-f0", ar: "شَوْبانة", en: "I am hot", lat: "shawbaane", row: "agreement", col: "feminine" };
-  const hot = { id: "k59562641e79c", ar: "شَوْبان", en: "I am hot / I feel hot", lat: "shawbaan", category: "adjective", subs: [shape] };
+  const hot = { id: "k59562641e79c", ar: "شَوْبان", en: "I am hot\u001F\nI feel hot", lat: "shawbaan", category: "adjective", subs: [shape] };
   const ar = LANGUAGES["ar-PS"];
   assert.equal(formIsAmbiguous({ unit: hot, kin: [shape], shown: [], promptField: "en" }), true);
   assert.equal(formIsAmbiguous({ unit: shape, kin: [hot], shown: [], promptField: "en" }), true);
@@ -837,13 +837,14 @@ test("two forms sharing one meaning between their English answer the same prompt
     twinsOf({ unit: hot, kin: [shape], promptField: "en", told: false }).map((/** @type {any} */ f) => f.id),
     ["k59562641e79c-f0"],
   );
-  /* A semicolon separates meanings as a slash does; a comma does not, as
-     it sits inside a phrase as often as between two. */
+  /* Meanings are told apart by their boxes alone: a semicolon, a slash or
+     a comma typed inside one is part of it (0.439). */
   const one = (/** @type {string} */ id, /** @type {string} */ en) => form({ id, en });
-  assert.equal(formIsAmbiguous({ unit: one("a", "big; large"), kin: [one("a-f0", "Large")], shown: [], promptField: "en" }), true);
+  assert.equal(formIsAmbiguous({ unit: one("a", "big\u001F\nlarge"), kin: [one("a-f0", "Large")], shown: [], promptField: "en" }), true);
+  assert.equal(formIsAmbiguous({ unit: one("a", "big; large"), kin: [one("a-f0", "Large")], shown: [], promptField: "en" }), false);
   assert.equal(formIsAmbiguous({ unit: one("a", "Not good, thanks"), kin: [one("a-f0", "Not good")], shown: [], promptField: "en" }), false);
   /* Meanings with nothing in common still need no tag. */
-  assert.equal(formIsAmbiguous({ unit: one("a", "I am hot / I feel hot"), kin: [one("a-f0", "I am cold")], shown: [], promptField: "en" }), false);
+  assert.equal(formIsAmbiguous({ unit: one("a", "I am hot\u001F\nI feel hot"), kin: [one("a-f0", "I am cold")], shown: [], promptField: "en" }), false);
 });
 
 test("two forms with the same prompt and the same answer need no tag", () => {
@@ -2363,7 +2364,7 @@ test("what each accepted answer is grammatically survives being opened", () => {
      open and every save. */
   const forms = initialForms(/** @type {any} */ ({
     id: "k", lang: "ar-PS", forms: [{
-      id: "k", ar: "مبسوط / مبسوطة", en: "happy", lat: "mabsuuT / mabsuuTa",
+      id: "k", ar: "مبسوط\u001F\nمبسوطة", en: "happy", lat: "mabsuuT\u001F\nmabsuuTa",
       answers: [
         { text: "مبسوط", lat: "mabsuuT", gender: "masculine" },
         { text: "مبسوطة", lat: "mabsuuTa", gender: "feminine" },
@@ -2857,7 +2858,7 @@ test("a form goes into the box its number and gender say, and the rest are kept 
 });
 
 test("a form whose answers disagree is in no box, unless it is the card's own word", () => {
-  const mixed = { id: "f1", ar: "كتاب / كتب", en: "book", lat: "", answers: [
+  const mixed = { id: "f1", ar: "كتاب\u001F\nكتب", en: "book", lat: "", answers: [
     { text: "كتاب", lat: "", number: "singular" }, { text: "كتب", lat: "", number: "plural" },
   ] };
   assert.equal(formSays(mixed), null);

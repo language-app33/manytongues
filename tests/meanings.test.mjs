@@ -37,7 +37,7 @@ const unit = (/** @type {any} */ c) => c.forms[0];
 
 const cactus = card("cactus", "صَبِر", "cactus", { created: 1 });
 const patience = card("patience", "صَبِر", "patience", { created: 2 });
-const sahh = card("sahh", "صح", "right / correct");
+const sahh = card("sahh", "صح", "right\u001F\ncorrect");
 const yamin = card("yamin", "يمين", "right");
 const kitab = card("kitab", "كتاب", "book");
 
@@ -195,7 +195,7 @@ test("a spelling fix is offered to the cards still saying the old thing, and car
 });
 
 test("a card with two meanings is offered for splitting, and split into one card each", () => {
-  const two = { ...teacherCard(), forms: [{ id: "", ar: "صَبِر", en: "cactus / patience", lat: "sabir", images: ["pic"] }] };
+  const two = { ...teacherCard(), forms: [{ id: "", ar: "صَبِر", en: "cactus\u001F\npatience", lat: "sabir", images: ["pic"] }] };
   assert.deepEqual(meaningsOnCard(two), ["cactus", "patience"]);
   assert.deepEqual(meaningsOnCard({ ...two, together: true }), [], "not once the teacher said to keep it");
   assert.deepEqual(meaningsOnCard({ ...two, sentence: true }), [], "nor a sentence");
@@ -237,7 +237,7 @@ test("a learner's device starts a split card where the original stood", async ()
 
 test("a button names the first word written, cut short when it is long", () => {
   assert.equal(buttonWord("صَبِر"), "صَبِر");
-  assert.equal(buttonWord("book / notebook"), "book");
+  assert.equal(buttonWord("book\u001F\nnotebook"), "book");
   assert.equal(buttonWord(""), "");
   assert.equal(buttonWord(undefined), "");
   const long = buttonWord("to take something out of the cupboard carefully");

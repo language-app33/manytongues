@@ -136,7 +136,7 @@ const account = { handle: "sara-4f2a", displayName: "Sara", key: "amber-cedar-ha
    when the question is what the word means, and one of them is the question
    when the word is what is being asked for. */
 const card = {
-  id: "k111111111111", owner: "t-1", ar: "كتاب", en: "book / notebook", lat: "kitaab", note: "", lang: "ar-PS",
+  id: "k111111111111", owner: "t-1", ar: "كتاب", en: "book\u001F\nnotebook", lat: "kitaab", note: "", lang: "ar-PS",
   number: "singular", gender: "masculine", classifier: "", clips: ["a".repeat(64)],
   subs: [{ ar: "كتب", en: "books", lat: "kutub", number: "plural", gender: "", classifier: "", clips: [] }],
   rev: 2, updated: 1,
@@ -1917,7 +1917,7 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
   /* Its first meaning: a tile shows one of each, not every one accepted. */
   check("a tile says the word, its meaning and when it was added",
     !!tile &&
-      ((tile.querySelector(".at-minien") || {}).textContent || "").trim() === asMeaning(card.en.split("/")[0].trim()) &&
+      ((tile.querySelector(".at-minien") || {}).textContent || "").trim() === asMeaning(card.en.split("\u001F")[0].trim()) &&
       /\d/.test(((tile.querySelector(".at-minimeta") || {}).textContent || "")),
     shown.replace(/\s+/g, " ").trim() ||
       tiles.map((t) => (t.textContent || "").replace(/\s+/g, " ").slice(0, 16)).join(" | ") || "(no tile)");
@@ -2976,21 +2976,22 @@ check("no console errors during the session", errors.length === 0, errors.slice(
     [0, 1, 2, 3, 4, 5].every((i) => praiseFor(i) !== praiseFor(i + 1)),
     [0, 1, 2, 3, 4, 5, 6].map(praiseFor).join(" "));
 
-  /* Several accepted answers are one stored string with " / " between
-     them — the convention every existing card uses — edited as one field
-     per answer. The split has to take the ; a teacher may have typed by
-     hand too, and an added field left empty must leave nothing behind. */
+  /* Several accepted answers are one stored string, an answer to a line
+     after a mark nobody can type — edited as one box per answer. Nothing
+     typed inside a box splits it (0.439): a stored "a / b" is one answer,
+     and so is "a; b". An added field left empty must leave nothing behind. */
   const { splitAlternatives, joinAlternatives } = await import(path.join(out, "shared.js"));
-  check("a stored \"a / b\" opens as two answers",
-    JSON.stringify(splitAlternatives("book / notebook")) === JSON.stringify(["book", "notebook"]),
+  check("a stored \"a / b\" opens as one answer, slash and all",
+    JSON.stringify(splitAlternatives("book / notebook")) === JSON.stringify(["book / notebook"]),
     JSON.stringify(splitAlternatives("book / notebook")));
-  check("and a ; typed by hand is honoured too",
-    JSON.stringify(splitAlternatives("book; notebook")) === JSON.stringify(["book", "notebook"]),
+  check("and so does a ; typed inside it",
+    JSON.stringify(splitAlternatives("book; notebook")) === JSON.stringify(["book; notebook"]),
     JSON.stringify(splitAlternatives("book; notebook")));
   check("an empty field opens as one empty answer, never none",
     JSON.stringify(splitAlternatives("")) === JSON.stringify([""]), JSON.stringify(splitAlternatives("")));
-  check("two answers store as the slash convention the checker reads",
-    joinAlternatives(["book", " notebook "]) === "book / notebook", joinAlternatives(["book", " notebook "]));
+  check("two boxes store as two answers and read back as two",
+    JSON.stringify(splitAlternatives(joinAlternatives(["book", " notebook "]))) === JSON.stringify(["book", "notebook"]),
+    JSON.stringify(joinAlternatives(["book", " notebook "])));
   check("an added answer left empty leaves nothing behind",
     joinAlternatives(["book", ""]) === "book", JSON.stringify(joinAlternatives(["book", ""])));
 

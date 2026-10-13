@@ -13,6 +13,7 @@ import {
   heTokenIsWord,
   inScript,
   checkEn,
+  checkTr,
   dimValues,
   grammarFields,
   labelFor,
@@ -146,15 +147,28 @@ test("Vietnamese: tone marks behave like harakat; đ is its own letter", () => {
 
 test("English: leading articles and alternatives are forgiven", () => {
   assert.equal(checkEn("the book", "book").ok, true);
-  assert.equal(checkEn("desk", "office / desk").ok, true);
+  assert.equal(checkEn("desk", "office\u001F\ndesk").ok, true);
   assert.equal(checkEn("bok", "book").reason, "typo");
   assert.equal(checkEn("bok", "book").ok, true);
+});
+
+test("nothing typed inside an answer splits it: a slash, a semicolon or a comma is part of it", () => {
+  /* Until 0.439 a slash or a semicolon split an answer in two, which cut
+     "If it were possible / you could only keep 3 apps" into halves that
+     meant nothing. Only the boxes separate answers now. */
+  assert.equal(checkEn("office", "office / desk").ok, false, "a slash is not a second answer");
+  assert.equal(checkEn("office / desk", "office / desk").ok, true, "the whole of it is the answer");
+  assert.equal(checkEn("office", "office; desk").ok, false, "nor a semicolon");
+  assert.equal(checkEn("office", "office\u001F\ndesk").ok, true, "two boxes are two answers");
+  assert.equal(checkTr("kitaab", "kitaab, safar").ok, false, "a comma is not a second transliteration");
+  assert.equal(checkAr("كتاب", "كتاب / سفر", {}).ok, false, "nor a slash between two spellings");
+  assert.equal(checkAr("سفر", "كتاب\u001F\nسفر", {}).ok, true);
 });
 
 test("English: one letter out is a slip and right; further out, or a short word, is not", () => {
   assert.deepEqual(checkEn("Tiref", "Tired"), { ok: true, reason: "typo" });
   assert.deepEqual(checkEn("tird", "tired"), { ok: true, reason: "typo" });
-  assert.deepEqual(checkEn("dsk", "office / desk"), { ok: true, reason: "typo" });
+  assert.deepEqual(checkEn("dsk", "office\u001F\ndesk"), { ok: true, reason: "typo" });
   /* A swap is two changes, and a short word is one letter from another. */
   assert.equal(checkEn("tried", "tired").ok, false);
   assert.equal(checkEn("cut", "cat").ok, false);
@@ -166,17 +180,17 @@ test("English: one letter out is a slip and right; further out, or a short word,
 test("English: an s on the end is grammar, not a typo", () => {
   /* Reported by a learner: "Photo" for صُوَر, the plural, was marked right
      as one letter out. And "live" for "she lives" was too. */
-  assert.deepEqual(checkEn("Photo", "Pictures / Photos / Images"), { ok: false, reason: "ending" });
-  assert.deepEqual(checkEn("photos", "Picture / Photo / Image"), { ok: false, reason: "ending" });
+  assert.deepEqual(checkEn("Photo", "Pictures\u001F\nPhotos\u001F\nImages"), { ok: false, reason: "ending" });
+  assert.deepEqual(checkEn("photos", "Picture\u001F\nPhoto\u001F\nImage"), { ok: false, reason: "ending" });
   assert.deepEqual(checkEn("live", "lives"), { ok: false, reason: "ending" });
   assert.deepEqual(checkEn("she live", "she lives"), { ok: false, reason: "ending" });
   assert.deepEqual(checkEn("boxes", "box"), { ok: false, reason: "ending" });
   assert.deepEqual(checkEn("city", "cities"), { ok: false, reason: "ending" });
   /* The right ending is still right, and a doubled s dropped is still a slip. */
-  assert.deepEqual(checkEn("Photos", "Pictures / Photos / Images"), { ok: true, reason: "exact" });
+  assert.deepEqual(checkEn("Photos", "Pictures\u001F\nPhotos\u001F\nImages"), { ok: true, reason: "exact" });
   assert.deepEqual(checkEn("glas", "glass"), { ok: true, reason: "typo" });
   /* Any other one-letter slip is still forgiven. */
-  assert.deepEqual(checkEn("Phots", "Pictures / Photos / Images"), { ok: true, reason: "typo" });
+  assert.deepEqual(checkEn("Phots", "Pictures\u001F\nPhotos\u001F\nImages"), { ok: true, reason: "typo" });
 });
 
 test("Punctuation is never what an answer is marked on, curly or straight", () => {
@@ -196,7 +210,7 @@ test("Punctuation is never what an answer is marked on, curly or straight", () =
 test("English: a comma inside a meaning is part of it, not a break between meanings", () => {
   /* Reported by a learner, three times: the whole sentence was marked
      wrong, with or without its comma, and half of it was marked right. */
-  const m = "He's cold, he wants a jacket / He's cold, he needs a jacket / He is cold, he wants a jacket / He is cold, he needs a jacket";
+  const m = "He's cold, he wants a jacket\u001F\nHe's cold, he needs a jacket\u001F\nHe is cold, he wants a jacket\u001F\nHe is cold, he needs a jacket";
   assert.deepEqual(checkEn("He is cold, he wants a jacket ", m), { ok: true, reason: "exact" });
   assert.deepEqual(checkEn("He is cold he wants a jacket ", m), { ok: true, reason: "exact" });
   assert.deepEqual(checkEn("He's cold, he needs a jacket", m), { ok: true, reason: "exact" });
@@ -1291,7 +1305,7 @@ test("the answer a learner wrote is named in whole words, against the others it 
   const happy = { id: "h", en: "happy", answers: [
     { text: "مبسوط", lat: "mabsuut", gender: "masculine", number: "singular" },
     { text: "مبسوطة", lat: "mabsuuta", gender: "feminine", number: "singular" },
-  ], ar: "مبسوط / مبسوطة", lat: "mabsuut / mabsuuta" };
+  ], ar: "مبسوط\u001F\nمبسوطة", lat: "mabsuut\u001F\nmabsuuta" };
   assert.equal(answerLabel(happy.answers[1], happy, ar), "feminine");
   assert.equal(answerLabel(happy.answers[0], happy, ar), "masculine");
   /* One answer: nothing it could be told from. */
@@ -1381,7 +1395,7 @@ test("the editor names the meanings two forms share with nothing to tell them ap
   const you = { id: "y", forms: ["وانتَ؟", "وانتِ؟", "وانتو؟"].map((w, i) => ({ id: `y${i}`, ar: w, en: "And you?" })) };
   assert.deepEqual(untoldMeanings(you, ar), ["And you?"]);
   /* One meaning among several is enough to share; a meaning of its own is not. */
-  const brothers = { id: "b", forms: [{ id: "b", ar: "أَخ", en: "Brother" }, { id: "b2", ar: "إخوة", en: "Brothers / Siblings" }] };
+  const brothers = { id: "b", forms: [{ id: "b", ar: "أَخ", en: "Brother" }, { id: "b2", ar: "إخوة", en: "Brothers\u001F\nSiblings" }] };
   assert.deepEqual(untoldMeanings(brothers, ar), []);
   /* Spelt alike, whichever is written is right. */
   const alike = { id: "a", forms: [{ id: "a", ar: "ساكن", en: "live" }, { id: "a2", ar: "ساكن", en: "live" }] };

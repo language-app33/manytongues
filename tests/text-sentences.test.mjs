@@ -236,7 +236,10 @@ test("a question with nothing to choose between gives way to a backup", () => {
   const queue = got.exercises;
   const at = queue.findIndex((/** @type {any} */ e) => e.type === "sen2en");
   assert.ok(at >= 0);
-  const backup = { ...queue[at], subId: "t2", type: "sen2en" };
+  /* One the session itself dealt, about another sentence, so it can be asked. */
+  const dealt = queue.find((/** @type {any} */ e) => e.type === "sen2en" && e.subId !== queue[at].subId);
+  assert.ok(dealt, "another sentence is asked about too");
+  const backup = { ...dealt };
   const next = withoutQuestionAt(queue, at, items, settings, [backup]);
   assert.equal(next.length, queue.length, "the session keeps its length");
   assert.equal(next[at], backup, "a backup stands in");
