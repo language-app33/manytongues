@@ -34,6 +34,8 @@ await build({
   },
 });
 const { buildSession, installIndexes, quietUnits, carryToSentences, laddered } = await import(path.join(out, "trainer.js"));
+const { TYPES, LANGUAGES } = await import(path.join(here, "..", "src", "languages.ts"));
+const { sentenceWords } = await import(path.join(here, "..", "src", "sentence-words.ts"));
 
 const settings = { language: "ar-PS" };
 const anyDeck = () => true;
@@ -120,6 +122,70 @@ test("a text's progress is handed down to its sentences, once", () => {
   const again = carryToSentences(later);
   assert.equal(again.lines[3].s.gap2pick, undefined, "nothing inherited by a new sentence");
   assert.equal(carryToSentences(talkOf(before)), talkOf(before), "a conversation is left alone");
+});
+
+/* ---- a sentence waits on its words (0.434) ---- */
+
+/** A word card, its every question cleared when `known`. @param {string} id @param {string} ar @param {string} en @param {boolean} known */
+const word = (id, ar, en, known) => ({
+  id, lang: "ar-PS", kind: "word", tags: [], created: 2,
+  forms: [{ id, ar, en, lat: en, lang: "ar-PS", s: known ? Object.fromEntries(TYPES.map((/** @type {string} */ t) => [t, solidState()])) : {} }],
+});
+
+test("which of a sentence's words have a card, and which have none", () => {
+  const ar = LANGUAGES["ar-PS"];
+  const cards = [word("w1", "ساكن", "living", false), word("w2", "بيت", "house", false)];
+  const got = sentenceWords("أنا ساكن بالبيت، والبيت كبير.", cards, ar);
+  assert.deepEqual(got.hits.map((/** @type {any} */ h) => h.card.id), ["w1", "w2"], "a prefix peeled is still the word");
+  assert.deepEqual(got.bare, ["أنا", "كبير"], "and every other word, said once each time it is said, without its punctuation");
+  assert.deepEqual(sentenceWords("{{name}} ساكن هون", cards, ar).bare, ["هون"], "a blank is not a word without a card");
+});
+
+test("a sentence is not met until most of its words are known", () => {
+  /* Two sentences: one whose three carded words are all unknown, and one
+     with no card behind any of its words. */
+  const lines = [["أنا ساكن بالبيت", "I live in the house"], ["مش عارف شو بدي", "I don't know what I want"]];
+  /** @param {boolean[]} known @param {Record<string, any>} [over] */
+  const deck = (known, over = {}) => [
+    text({
+      lines: lines.map(([ar, en], i) => ({ id: `t${i}`, who: 0, ar, en, lat: "", recs: [], uses: [], s: {} })),
+      ...over,
+    }),
+    word("w1", "أنا", "I", known[0]),
+    word("w2", "ساكن", "living", known[1]),
+    word("w3", "بيت", "house", known[2]),
+  ];
+  const quiet = (/** @type {any[]} */ items) => {
+    installIndexes(items, settings);
+    return quietUnits(items, settings);
+  };
+  assert.ok(quiet(deck([false, false, false])).has("t0"), "none of its words known: it waits");
+  assert.ok(!quiet(deck([false, false, false])).has("t1"), "a sentence of words nobody teaches does not wait for ever");
+  assert.ok(quiet(deck([true, true, false])).has("t0"), "two of three is not enough: three or fewer wants every one");
+  assert.ok(!quiet(deck([true, true, true])).has("t0"), "every word known: it is met");
+
+  /* Started already: a sentence asked, or a text the learner had begun
+     before its sentences were asked on their own, keeps going. */
+  const asked = deck([false, false, false]);
+  asked[0].lines[0].s = { sen2en: { ...solidState(), hist: [0], right: 0, wrong: 1, phase: "learning" } };
+  assert.ok(!quiet(asked).has("t0"), "a sentence already asked is not held back");
+  const begun = deck([false, false, false], {
+    forms: [{ id: "T", ar: "", en: "At home", lat: "", lang: "ar-PS", s: { dlgwhole: solidState() } }],
+  });
+  assert.ok(!quiet(begun).has("t0"), "nor any sentence of a text begun before");
+});
+
+test("eight words in ten known is enough", () => {
+  const ar = ["كتاب", "قلم", "باب", "شباك", "طاولة"];
+  const items = [
+    text({ lines: [{ id: "t0", who: 0, ar: ar.join(" "), en: "things", lat: "", recs: [], uses: [], s: {} }] }),
+    ...ar.map((w, i) => word(`w${i}`, w, `thing ${i}`, i > 0)),
+  ];
+  installIndexes(items, settings);
+  assert.ok(!quietUnits(items, settings).has("t0"), "four of five known: met");
+  const fewer = items.map((/** @type {any} */ c, /** @type {number} */ i) => (i === 2 ? word("w1", "قلم", "thing 1", false) : c));
+  installIndexes(fewer, settings);
+  assert.ok(quietUnits(fewer, settings).has("t0"), "three of five: it waits");
 });
 
 /** The same card as a conversation. @param {any} card */

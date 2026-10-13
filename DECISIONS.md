@@ -6067,3 +6067,33 @@ states are kept for the day it is turned back into a conversation.
 each sentence its own exercise with the whole text read at the end; the
 same without the whole-text reading, the owner chose the second. Texts
 only, for now.
+
+
+## A sentence of a text waits on most of its words (0.434)
+
+**What was wrong.** A text came up whether or not the learner knew its
+words, so its sentences were long reads full of words never met.
+
+**What changed.** quietUnits holds a sentence of a text (sentenceWaits)
+until the learner can say what most of its words mean. The words are the
+learner's own single-word cards in the text's language found in the
+sentence by sentenceWords (src/sentence-words.ts): every window against
+every form, with the language's context matcher, the same one wordsOffered
+uses for "Words this teaches", so the automatic matches count and not only
+the ticked ones. A word counts once reachedLevel(…, 2) holds on the form
+found — level one cleared, the bar "recognised" means everywhere else —
+and a word with nothing to ask counts as known. The share is the number
+line's STRETCH_SHARE, 80% rounded up, so three words or fewer want all.
+The matches are cached by sentence and by a signature of the learner's
+words, as ids looked up afresh, since an answer makes new card objects.
+
+**Who it does not hold.** Only a sentence not yet met, and only in a text
+whose own word is unmet: a sentence asked keeps going whatever happens to
+its words, and a text begun before 0.433 has either handed its progress
+down (carryToSentences) or carries it on its own word. A word with no card
+is not counted, since nothing could make it known; 0.435 tells the teacher
+which words those are.
+
+**Choices the owner made.** Recognised rather than cleared (writing
+included), because reading a sentence asks for its words to be understood,
+not written.

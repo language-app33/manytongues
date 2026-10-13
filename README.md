@@ -856,7 +856,11 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   (`withReadThroughs`). The whole text is read through once every
   sentence is cleared (`sentencesCleared` in `quietUnits`), and the
   progress a text made before 0.433 is handed down to its sentences once
-  (`carryToSentences`). One kind with a subtype, the way
+  (`carryToSentences`). A sentence not yet met waits until most of its
+  words are known — eight in ten of the word cards found in it, each with
+  the bottom of its own ladder cleared (`sentenceWaits`, matched by
+  `sentenceWords` in `src/sentence-words.ts`); a word with no card is not
+  counted. One kind with a subtype, the way
   a word is one kind whether it is a noun or a verb: `sceneKind: "text"`,
   absent on a conversation, read through `sceneKindOf` in `src/dialogs.ts`,
   and changeable, because a line's progress means the same in either.

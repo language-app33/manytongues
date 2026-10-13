@@ -268,6 +268,7 @@ import {
 } from "./meanings.ts";
 import type { Sibling, SiblingIndex } from "./meanings.ts";
 import { buildContextIndex } from "./context-index.ts";
+import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
 import { drainOutbox, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
@@ -2010,6 +2011,69 @@ function withFacesWaiting(quiet: Set<string>, items: Item[], settings: Settings,
   return out;
 }
 
+/*
+ * A sentence of a text waits until most of its words are known.
+ *
+ * A text written in words nobody has learnt is long to read and hard to
+ * follow, so a sentence is not met until the learner can say what most of
+ * the words in it mean: eight in ten of the word cards it was found to
+ * contain, rounded up, so a sentence with three or fewer of them wants
+ * every one — the share a stretch of the number line asks of its words
+ * (STRETCH_SHARE). A word counts once the bottom level of its own ladder
+ * is cleared: reading a sentence asks for its words to be understood, not
+ * written. A word with no card is not counted, since nothing could ever
+ * make it known; the editor tells the teacher which words those are.
+ *
+ * Only a sentence not yet met. One already asked keeps going whatever
+ * happens to its words, and so does every sentence of a text the learner
+ * had started before sentences were asked on their own (0.433), whose
+ * progress has been handed down to them or sits on the text's own word.
+ */
+type WordsHeld = { cards: Item[]; byId: Map<string, Item>; sig: string };
+
+function wordsHeldIn(items: Item[], settings: Settings, lang: Lang): WordsHeld {
+  const cards = items.filter((it) => !isDialog(it) && it.drill !== false && langIdOf(it, settings) === lang.id);
+  const sig = cards.map((c) => `${c.id}\u0001${unitsOf(c).map(({ unit }) => unit.ar || "").join("\u0002")}`).join("\u0003");
+  return { cards, byId: byIdOf(cards), sig };
+}
+
+/* Which cards each sentence holds, kept while the learner's words read the
+   same: matching every word against every sentence is not work to repeat
+   on every answer, and an answer changes a schedule, not a word. Kept as
+   ids and looked up afresh, because an answer does make a new card. */
+const SENTENCE_WORDS: Map<string, { sig: string; hits: { card: string; form: string }[] }> = new Map();
+
+function heldIn(text: string, held: WordsHeld, lang: Lang): { card: Item; form: Form }[] {
+  const key = `${lang.id}\u0000${text}`;
+  let kept = SENTENCE_WORDS.get(key);
+  if (!kept || kept.sig !== held.sig) {
+    const hits = sentenceWords(text, held.cards, lang).hits.map((h) => ({ card: h.card.id, form: h.form.id }));
+    kept = { sig: held.sig, hits };
+    SENTENCE_WORDS.set(key, kept);
+  }
+  const out: { card: Item; form: Form }[] = [];
+  for (const h of kept.hits) {
+    const card = held.byId.get(h.card);
+    const form = card && unitsOf(card).find(({ unit }) => unit.id === h.form);
+    if (card && form) out.push({ card, form: form.unit });
+  }
+  return out;
+}
+
+const unmet = (unit: Form): boolean => Object.values(statesOf(unit)).every((st) => !st || st.phase === "new");
+
+function sentenceWaits(card: Item, line: Form, held: WordsHeld, lang: Lang): boolean {
+  if (!unmet(line) || !unmet(leadOf(card))) return false;
+  const hits = heldIn(String(line.ar || ""), held, lang);
+  if (!hits.length) return false;
+  const known = hits.filter(({ card: word, form }) => {
+    const unit = isAsked(form) ? form : leadOf(word);
+    const types = availableTypes(unit, lang);
+    return !types.length || reachedLevel(types, (t) => statesOf(unit)[t], 2);
+  }).length;
+  return known < Math.ceil(hits.length * STRETCH_SHARE - 1e-9);
+}
+
 /* Whether every sentence of a text is cleared, at everything it is asked.
    Through availableTypes and not laddered, for the reason stretchOpen
    gives: laddered reads the quiet set this is in the middle of working out. */
@@ -2039,6 +2103,13 @@ export function quietUnits(items: Item[], settings: Settings): Set<string> {
   /* Whether each stretch is open, worked out once however many of its
      words ask. */
   const opened: Map<string, boolean> = new Map();
+  /* The learner's word cards in each language, for the sentences of a
+     text to be read against — worked out once however many sentences ask. */
+  const words: Map<string, WordsHeld> = new Map();
+  const wordsIn = (lang: Lang): WordsHeld => {
+    if (!words.has(lang.id)) words.set(lang.id, wordsHeldIn(items, settings, lang));
+    return words.get(lang.id) as WordsHeld;
+  };
   const isOpen = (stretch: Item, lang: Lang) => {
     if (!opened.has(stretch.id)) opened.set(stretch.id, stretchOpen(stretch, items, lang));
     return opened.get(stretch.id) as boolean;
@@ -2053,6 +2124,7 @@ export function quietUnits(items: Item[], settings: Settings): Set<string> {
      * A sentence with nothing to ask holds nothing back.
      */
     if (isText(card)) {
+      for (const line of linesOf(card)) if (sentenceWaits(card, line, wordsIn(lang), lang)) out.add(line.id);
       if (!sentencesCleared(card, lang)) out.add(leadOf(card).id);
       continue;
     }

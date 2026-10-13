@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.434 — 13 October 2026
+
+**A sentence of a text waits until most of its words are known.**
+
+- A student now meets a sentence of a text only once they can say what
+  most of its words mean: 8 in 10 of the words in it that have a card, or
+  every one of them in a sentence with three or fewer. A word counts once
+  the first step of its own card is cleared.
+- Words with no card are not counted, since nothing could ever make them
+  known. A sentence made only of such words comes up straight away.
+- Easier sentences of a text therefore tend to come first, and the rest
+  follow as their words are learnt.
+- Nobody is held back mid-way: a sentence already asked keeps coming, and
+  so does every sentence of a text a student had already started.
+- Trade-off: texts arrive later than before, by as long as it takes to
+  learn their words.
+- To check by hand: make a text with a sentence built from word cards a
+  student has not started, and a second sentence of words with no cards.
+  The second should be asked straight away; the first only once the
+  student has learnt most of its words.
+
 ## 0.433 — 12 October 2026
 
 **A text is learnt one sentence at a time.**
