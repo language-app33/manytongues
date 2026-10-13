@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.438 — 13 October 2026
+
+**No more questions with nothing to choose from.**
+
+- A student reported a "what does it mean?" question about a sentence of a
+  text that showed no answers at all, only "I don't know". The sentence had
+  a slash in it, the app read it as two separate answers, and the question
+  asked about the second one never got its list of answers to choose from.
+- Now every question about one sentence of a text or conversation is asked
+  of the whole sentence, as written, so a slash in it no longer splits it.
+- And a safety net for every question where the answer is chosen: if it
+  ever ends up with fewer than two answers on screen, it is quietly
+  swapped for another question, or left out. Nothing is marked, right or
+  wrong, for a question that was never really asked.
+- Trade-off: where a student had progress on the "second half" of such a
+  sentence, that is dropped; their progress on the sentence itself is kept.
+- To check by hand: a text with a sentence containing a slash, such as
+  the "Homework instructions" card in TINAU Beginner Plus, Class 1. Its
+  "What does it mean?" question should show the whole sentence and four
+  meanings to choose from.
+
 ## 0.437 — 13 October 2026
 
 **Texts started before 0.434 now wait for their words too.**

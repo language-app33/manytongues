@@ -3200,7 +3200,8 @@ const SENTENCE_TYPES = new Set(["sen2en", "en2sen"]);
 const GAP_TURNS = new WeakMap<Question, number>();
 
 function castGap(resolved: { unit: Form; parent: Item; isSub: boolean } | null, ex: Question) {
-  if (!resolved || !(GAP_TYPES.has(ex.type) || SENTENCE_TYPES.has(ex.type)) || !isDialog(resolved.parent)) return resolved;
+  const type = typeOf(ex.type);
+  if (!resolved || !(GAP_TYPES.has(type) || SENTENCE_TYPES.has(type)) || !isDialog(resolved.parent)) return resolved;
   let turn = GAP_TURNS.get(ex);
   if (turn === undefined) {
     const st = statesOf(resolved.unit)[ex.type];
@@ -3212,7 +3213,7 @@ function castGap(resolved: { unit: Form; parent: Item; isSub: boolean } | null, 
      own words and the sentence is itself. Its own id, so its own progress. */
   const placed = sceneOf(resolved.unit.id);
   const own = placed && placed.at !== WHOLE_SCENE ? placed.at : null;
-  if (SENTENCE_TYPES.has(ex.type)) {
+  if (SENTENCE_TYPES.has(type)) {
     const at = own !== null ? own : meantAt(resolved.parent, turn);
     const line = at === null ? null : linesOf(resolved.parent)[at];
     if (!line) return resolved;
@@ -3759,6 +3760,38 @@ export function requeueUnaskable(
   const keep = tail[0] === exercises[from] ? 1 : 0;
   const settled = exercises.slice(0, from).concat(tail.slice(0, keep));
   return settled.concat(varyTypes(tail.slice(keep), settled[settled.length - 1] || null));
+}
+
+/*
+ * The question at `at` taken out of the queue because it turned out, once on
+ * the screen, to have nothing to choose between.
+ *
+ * A question offering answers to choose from is only worth asking with at
+ * least two of them. Whether there are enough is meant to be settled when it
+ * is dealt, but the answers themselves are only drawn on the question
+ * screen, from the cards the session holds — and when that came back with
+ * none, the question went up anyway with "I don't know" the one way past
+ * it. A learner reported exactly that. So whatever the reason, the screen
+ * hands it back here: one of the session's backups that can still be asked
+ * stands in, as for any question that can no longer be asked (see
+ * requeueUnaskable), or the session is one question shorter. Nothing is
+ * marked: the learner was never asked anything.
+ */
+export function withoutQuestionAt(
+  exercises: Question[],
+  at: number,
+  items: Item[],
+  settings: Settings,
+  backups: Question[] = [],
+): Question[] {
+  const gone = exercises[at];
+  if (!gone) return exercises;
+  const standIn = backups.find((b) => {
+    if (b.id === gone.id && b.type === gone.type && (b.subId || "") === (gone.subId || "")) return false;
+    const r = resolveUnit(items, b);
+    return !!r && askableTypes(r.unit, settings).includes(b.type);
+  });
+  return exercises.slice(0, at).concat(standIn ? [standIn] : [], exercises.slice(at + 1));
 }
 
 /* Which exercise types this card's data can support.
@@ -11249,6 +11282,20 @@ export default function ArabicTrainer() {
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dialog && dialog.id, at, item && item.id, exercise && exercise.type, exercise && exercise.ctx, asking.length, siblingCards.join(" "), systems, nearForms]);
+
+  /* A question to choose the answer to, with fewer than two answers to
+     choose between, is not asked: it is taken out and a backup stands in.
+     See withoutQuestionAt. */
+  const nothingToChoose = !!spec && !!spec.picks && spec.picks !== "pair" && !!item && !checked && choices.length < 2;
+  useEffect(() => {
+    if (!nothingToChoose || !session || !session.exercises) return;
+    const next = withoutQuestionAt(session.exercises, qi, items, settings, session.backups);
+    /* The last question gone leaves the end of the session on screen,
+       which is where it was going. */
+    setSession((s: Session | null) => (s ? withQueue(s, next) : s));
+    resetExercise();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nothingToChoose, qi]);
 
   /*
    * Whether the prompt has to say which form it wants.

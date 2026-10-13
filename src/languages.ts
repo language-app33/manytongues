@@ -4952,6 +4952,12 @@ export const levelOf = (key: string): number => {
 export function showsOneAnswer(key: string): boolean {
   const spec = EX[typeOf(key)];
   if (!spec) return true;
+  /* A question about one sentence of a scene is asked of the sentence as
+     it stands, whole: it has one meaning and one way of being written, and
+     is put on the screen from the line itself (see castGap). Split into an
+     answer apiece, the second half was a question nothing recognised as
+     being about a sentence, and it went up with no answers to choose. */
+  if (spec.bySentence) return false;
   if (spec.needs.includes("lat")) return true;
   return !(spec.answerMode === "ar" && spec.answerField === "ar");
 }

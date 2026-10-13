@@ -33,7 +33,7 @@ await build({
     __BUILT_AT__: '"0"',
   },
 });
-const { buildSession, installIndexes, quietUnits, carryToSentences, laddered } = await import(path.join(out, "trainer.js"));
+const { buildSession, installIndexes, quietUnits, carryToSentences, laddered, resolveQuestion, withoutQuestionAt } = await import(path.join(out, "trainer.js"));
 const { TYPES, LANGUAGES } = await import(path.join(here, "..", "src", "languages.ts"));
 const { sentenceWords, wordCount, longSentenceOf, LONG_SENTENCE } = await import(path.join(here, "..", "src", "sentence-words.ts"));
 
@@ -200,6 +200,50 @@ test("eight words in ten known is enough", () => {
   const fewer = items.map((/** @type {any} */ c, /** @type {number} */ i) => (i === 2 ? word("w1", "قلم", "thing 1", false) : c));
   installIndexes(fewer, settings);
   assert.ok(quietUnits(fewer, settings).has("t0"), "three of five: it waits");
+});
+
+/* ---- a sentence that reads as two answers (0.438) ---- */
+
+test("every question about a sentence is asked of the whole sentence", () => {
+  /* Reported: a sentence with a slash in it was split into two accepted
+     answers, the second was asked as a question of its own that nothing
+     recognised as being about a sentence, and it went up with no answers
+     to choose — "I don't know" the only way past it. */
+  const items = [text({ lines: [{
+    id: "t0", who: 0, ar: "لو بينفع/ ممكن تخلي بس 3 تطبيقات", en: "If it were possible / you could only keep 3 apps",
+    lat: "", recs: [], uses: [], s: {},
+  }] })];
+  installIndexes(items, settings);
+  const got = buildSession({ items, settings, inDeck: anyDeck });
+  const about = got.exercises.filter((/** @type {any} */ e) => /^(sen2en|en2sen)/.test(e.type));
+  assert.ok(about.length > 0, "the sentence is asked about");
+  for (const e of about) {
+    assert.ok(!e.type.includes("@"), `${e.type} is one question, not one per answer`);
+    const r = resolveQuestion(items, e, false, []);
+    assert.equal(r.unit.sentenceAt, 0, "it knows which sentence it is about");
+    assert.equal(r.unit.en, "If it were possible / you could only keep 3 apps", "and asks it whole");
+  }
+  /* Progress kept under a per-answer key before this is still read as a
+     sentence question. */
+  const r = resolveQuestion(items, { ...about[0], type: `${about[0].type.split("@")[0]}@1` }, false, []);
+  assert.equal(r.unit.sentenceAt, 0);
+});
+
+test("a question with nothing to choose between gives way to a backup", () => {
+  const items = [text()];
+  installIndexes(items, settings);
+  const got = buildSession({ items, settings, inDeck: anyDeck });
+  const queue = got.exercises;
+  const at = queue.findIndex((/** @type {any} */ e) => e.type === "sen2en");
+  assert.ok(at >= 0);
+  const backup = { ...queue[at], subId: "t2", type: "sen2en" };
+  const next = withoutQuestionAt(queue, at, items, settings, [backup]);
+  assert.equal(next.length, queue.length, "the session keeps its length");
+  assert.equal(next[at], backup, "a backup stands in");
+  assert.deepEqual(next.slice(0, at), queue.slice(0, at), "nothing already answered moves");
+  const none = withoutQuestionAt(queue, at, items, settings, []);
+  assert.equal(none.length, queue.length - 1, "with no backup, the session is one shorter");
+  assert.equal(none[at], queue[at + 1]);
 });
 
 /* ---- what the editor says about a sentence (0.436) ---- */

@@ -477,7 +477,7 @@ test("every question shows one accepted answer, and the typed ones still take an
     const bySound = spec.needs.includes("lat");
     assert.equal(
       showsOneAnswer(type),
-      bySound || !typesTheScript,
+      !spec.bySentence && (bySound || !typesTheScript),
       `${type} is on the wrong side of the rule`,
     );
   }
@@ -493,9 +493,11 @@ test("every question shows one accepted answer, and the typed ones still take an
   const keepsAll = TYPES.filter((t) => !showsOneAnswer(t));
   assert.deepEqual(keepsAll, [
     "rec2ar", "en2ar", "own2ar", "img2ar", "ctx2ar", "rec2ctx",
-    /* A word typed back into a scene. Its question has one answer — the
-       word as the scene spells it — so keeping all of them is keeping one. */
-    "gap2ar",
+    /* The four asked of one sentence of a scene. Each has one answer —
+       the word as the scene spells it, or the sentence as it stands — put
+       up from the line itself, so keeping all of them is keeping one. Split
+       an answer apiece, the second was asked with nothing to choose (0.438). */
+    "gap2pick", "gap2ar", "sen2en", "en2sen",
     /* And the six that ask for a number or a time to be written out. A
        skill has exactly one way of saying what it drew, so narrowing it
        would be narrowing a list of one — the rule holds trivially here
