@@ -109,14 +109,14 @@ test("an example says what is wrong with it, in the teacher's words", () => {
   assert.equal(exampleTrouble({ ar: "", en: "" }), "", "a blank example is not there");
   assert.equal(exampleTrouble(eat.examples[0]), "");
   assert.equal(exampleTrouble(eat.examples[1]), "");
-  assert.match(exampleTrouble({ ar: "لازم", en: "{{verb-who}} must eat" }), /\{\{verb\}\} once in the Arabic/);
+  assert.match(exampleTrouble({ ar: "لازم", en: "{{verb-who}} must eat" }), /verb gap in the Arabic once/);
   assert.match(exampleTrouble({ ar: "{{verb}} {{verb}}", en: "{{verb-who}} must eat" }), /once/);
   assert.match(exampleTrouble({ ar: "لازم {{verb}}", lat: "laazim", en: "{{verb-who}} must eat" }), /transliteration/);
   assert.match(exampleTrouble({ ar: "لازم {{verb}}", en: "" }), /English/);
   /* English that comes out the same for every person teaches nothing. */
   assert.match(exampleTrouble({ ar: "لازم {{verb}}", en: "I must eat" }), /changes with the person/);
   assert.match(exampleTrouble({ ar: "لازم {{verb}}", en: "{{verb-plain}} now" }), /changes with the person/);
-  assert.match(exampleTrouble({ ar: "لازم {{verb}}", en: "{{verb}} must" }), /verb-who/);
+  assert.match(exampleTrouble({ ar: "لازم {{verb}}", en: "{{verb}} must" }), /person, verb or to \+ verb/);
   assert.match(exampleTrouble({ ar: "لازم {{name}} {{verb}}", en: "{{verb-who}} must" }), /only gap/);
 });
 

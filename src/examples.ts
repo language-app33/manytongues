@@ -78,7 +78,6 @@ export function verbExamplesOf(card: unknown): VerbExample[] {
   return out;
 }
 
-const VERB = `{{${VERB_SLOT}}}`;
 const READINGS = ["who", "plain", "to"].map((r) => `${VERB_SLOT}-${r}`);
 
 /* How many times the verb's gap is written in some text. */
@@ -94,17 +93,17 @@ export function exampleTrouble(ex: Partial<VerbExample> | null | undefined): str
   const lat = str(ex.lat);
   const en = str(ex.en);
   if (!ar) return "Write the example in Arabic.";
-  if (gapsIn(ar) !== 1) return `Write ${VERB} once in the Arabic, where the verb goes.`;
-  if (slotsIn(ar).some((s) => s !== VERB_SLOT)) return `${VERB} is the only gap an example can have.`;
-  if (lat && gapsIn(lat) !== 1) return `Write ${VERB} once in the transliteration too.`;
-  if (lat && slotsIn(lat).some((s) => s !== VERB_SLOT)) return `${VERB} is the only gap an example can have.`;
+  if (gapsIn(ar) !== 1) return "Put the verb gap in the Arabic once: tap “verb” under the box where the verb goes.";
+  if (slotsIn(ar).some((s) => s !== VERB_SLOT)) return "The verb is the only gap an example can have.";
+  if (lat && gapsIn(lat) !== 1) return "Put the verb gap in the transliteration once too.";
+  if (lat && slotsIn(lat).some((s) => s !== VERB_SLOT)) return "The verb is the only gap an example can have.";
   if (!en) return "Write what the example means in English.";
   const words = slotsIn(en);
   if (words.some((w) => !READINGS.includes(w))) {
-    return "In the English, use {{verb-who}}, {{verb-plain}} or {{verb-to}} for the verb.";
+    return "In the English, use the chips under the box for the verb: person, verb or to + verb.";
   }
   if (!words.includes(`${VERB_SLOT}-who`) && !words.includes(`${VERB_SLOT}-to`)) {
-    return "Use {{verb-who}} or {{verb-to}} in the English, so it changes with the person.";
+    return "Use the “person” or “to + verb” chip in the English, so it changes with the person.";
   }
   return "";
 }

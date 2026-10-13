@@ -1111,6 +1111,16 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    stacked, and parted from the ticks above it as they are from the
    fields. */
 .at-part > .at-part { margin-top:12px; background: var(--raised); }
+/* A verb's examples — see ExampleFields: each a panel inside the panel
+   that explains them, named across its top like any subsection and with
+   Remove on the same line, the way a form's name carries its own. */
+.at-part > .at-examplehead { display:flex; align-items:center; justify-content:space-between;
+  gap:10px; margin:0 0 10px; padding-bottom:8px; border-bottom:1px solid var(--line); }
+.at-examplehead > .at-groupline { margin:0; }
+/* The three chips, and the two persons an example is shown as: a short
+   list, set as the lines of help around it are. */
+.at-examplekeys { margin:0 0 12px; padding-inline-start:20px; }
+.at-examplekeys > li { margin:2px 0; }
 /* The practice ticks folded under each form are such a panel too, the
    same as the pronouns' beside them — so the strip's rule and padding
    above give way to the panel's own frame. */

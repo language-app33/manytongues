@@ -8,6 +8,31 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.442 — 13 October 2026
+
+**Subjunctive examples are written with chips, like sentence cards, and explained plainly.**
+
+- An example's Arabic, transliteration and English boxes now work like a
+  sentence card's: you type the words, then tap a chip under the box to drop
+  the verb's gap in. You can drag it to move it, or tap its cross to remove
+  it. Nobody types braces any more.
+- In the English, the chips are called **person**, **verb** and
+  **to + verb** (they were {{verb-who}}, {{verb-plain}} and {{verb-to}}).
+  A sentence card's English box offers the same three chips for a verb
+  blank that has the subjunctive ticked.
+- The explanation above the examples is rewritten, under a heading of its
+  own: "How these forms are practised".
+- The examples now sit inside the subjunctive's section: the explanation is
+  a panel of that section, and each example is a panel inside it, headed
+  the way other panels on the card are.
+- Messages about an example that isn't finished talk about the gap and the
+  chips rather than braces.
+- Examples already written are unchanged: their gaps show as pills.
+
+To check by hand: on a verb card, write an example by tapping "verb" under
+the Arabic box and "person" and "verb" under the English one, and check the
+two lines shown under it.
+
 ## 0.441 — 13 October 2026
 
 **The subjunctive is practised in examples, and its English is put together for you.**

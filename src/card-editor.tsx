@@ -634,15 +634,34 @@ function readOut(from: HTMLElement | DocumentFragment | null): string {
 }
 
 /** One blank, as it stands in the sentence: its name, and its cross. */
+/*
+ * What a blank is called on the screen.
+ *
+ * Its own name, except the three ways a verb blank's English reads it in
+ * the subjunctive — see VERB_READINGS — which are stored as `verb-who`,
+ * `verb-plain` and `verb-to` and said in words: *person*, *verb*, *to +
+ * verb*. The stored names read like code, and the owner chose the words.
+ * A verb blank named anything else keeps its name in front: *verb2:
+ * person*.
+ */
+export function blankLabel(name: string): string {
+  const m = String(name || "").match(/^(.+)-(who|plain|to)$/);
+  if (!m) return name;
+  const [, base, read] = m;
+  if (read === "plain") return base;
+  if (read === "to") return `to + ${base}`;
+  return base === "verb" ? "person" : `${base}: person`;
+}
+
 function pillNode(name: string): HTMLElement {
   const pill = document.createElement("span");
   pill.className = "at-blankpill";
   pill.setAttribute("data-slot", name);
   pill.setAttribute("contenteditable", "false");
-  pill.setAttribute("aria-label", `The ${name} blank. Drag to move it.`);
+  pill.setAttribute("aria-label", `The ${blankLabel(name)} blank. Drag to move it.`);
   const word = document.createElement("span");
   word.className = "at-blankpillname";
-  word.textContent = name;
+  word.textContent = blankLabel(name);
   pill.appendChild(word);
   const off = document.createElement("button");
   off.type = "button";
@@ -652,7 +671,7 @@ function pillNode(name: string): HTMLElement {
      take the thing beside the caret off is the key that has always done
      it, and onKeyDown below makes backspace mean exactly this. */
   off.setAttribute("tabindex", "-1");
-  off.setAttribute("aria-label", `Take the ${name} blank out`);
+  off.setAttribute("aria-label", `Take the ${blankLabel(name)} blank out`);
   const cross = iconNode("close", 14);
   if (cross) off.appendChild(cross);
   pill.appendChild(off);
@@ -2096,6 +2115,17 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
  */
 const NO_EXAMPLE: VerbExample = { ar: "", lat: "", en: "" };
 
+/* The one gap an example's Arabic and transliteration have, and the three
+   ways its English reads the verb in it — offered as chips under each
+   box, as a sentence card's blanks are. No new blank can be made: an
+   example has the verb and nothing else. */
+const EXAMPLE_GAP: BlankWiring = { names: ["verb"] };
+const EXAMPLE_ENGLISH: BlankWiring = { names: ["verb-who", "verb-plain", "verb-to"] };
+
+/* What the cross on a pill in an example's box does: takes that one out
+   of that one box. Handed the box's own words and how to change them. */
+const dropIn = (text: string, set: (next: string) => void) => (name: string) => set(withoutSlot(text, name));
+
 function ExampleFields({ lang, spec, sample, examples, onChange, verbName, cells, saysHow }: {
   lang: Lang;
   spec: VerbSpec;
@@ -2116,17 +2146,40 @@ function ExampleFields({ lang, spec, sample, examples, onChange, verbName, cells
   /* Two of the forms written, to show what an example comes out as: the
      first two the teacher has, in the order the table lists them. */
   const shownCells = exampleCells({ forms: [{}, ...cells] }, spec).slice(0, 2);
+  const eat = verbPlainShown(verbName);
+  /*
+   * A subsection of the subjunctive's own section, as a table's practice
+   * ticks are of theirs: a well headed in the section's small capitals,
+   * and each example a panel inside it. The heading says what the panel
+   * is for, because that is the question a teacher arriving here has.
+   */
   return (
-    <div className="at-mt4" data-el="editor-verb-examples">
-      <p className="at-groupline">Examples</p>
-      <Help>
-        These forms are practised only inside examples, once for every person: first what an
-        example means, then the missing form picked out, then written. Write {"{{verb}}"} where
-        the verb goes. In the English, {"{{verb-who}}"} is the person (I, she), {"{{verb-plain}}"} the
-        verb ({verbPlainShown(verbName)}), and {"{{verb-to}}"} is “to {verbPlainShown(verbName)}” or
-        “her to {verbPlainShown(verbName)}”, for wanting.
-        {sample ? <> For example: <span lang={lang.id} dir={lang.direction}>{sample.ar}</span> — {sample.en}.</> : null}
-      </Help>
+    <div className="at-part at-mt4" data-el="editor-verb-examples">
+      <p className="at-groupline">How these forms are practised</p>
+      <p className="at-hint">
+        Students never see these forms on their own. They practise them inside the examples
+        below, once for every form filled in above.
+      </p>
+      <p className="at-hint">
+        Write each example once, with a gap where the verb goes: type the words around it, then
+        tap <strong>verb</strong> to drop the gap in
+        {sample ? <>, for example <span lang={lang.id} dir={lang.direction}>{sample.ar.replace(/\{\{\s*verb\s*\}\}/i, "").trim()}</span> + verb</> : null}.
+      </p>
+      <p className="at-hint">In the English, tap the chips to say how the verb reads:</p>
+      <ul className="at-hint at-examplekeys">
+        <li><strong>person</strong>: I, you, she…</li>
+        <li><strong>verb</strong>: {eat} (taken from the verb's name)</li>
+        <li><strong>to + verb</strong>: “to {eat}”, or “her to {eat}” when someone else wants it</li>
+      </ul>
+      <p className="at-hint">
+        The app writes the example out for every person. Under each example you'll see two of
+        them, such as “{sample && shownCells.length
+          ? (() => {
+              const one = filledExample({ name: verbName }, shownCells[0] as Form, sample, spec);
+              return `${one.ar} — ${one.en}`;
+            })()
+          : `… — I must ${eat}`}”.
+      </p>
       {shown.map((ex, at) => {
         const trouble = exampleTrouble(ex);
         const which = `example ${at + 1}`;
@@ -2134,43 +2187,62 @@ function ExampleFields({ lang, spec, sample, examples, onChange, verbName, cells
           ? shownCells.map((cell) => filledExample({ name: verbName }, cell as Form, ex, spec))
           : [];
         return (
-          <div className="at-formblock at-mt3" key={at} data-el="editor-verb-example">
-            <div className="at-formhead">
-              <span className="at-formnum">{cap(which)}</span>
+          <div className="at-part" key={at} data-el="editor-verb-example">
+            <div className="at-examplehead">
+              <p className="at-groupline">{cap(which)}</p>
               {(shown.length > 1 || !blankExample(ex)) && (
                 <Button variant="ghost" size="sm" icon="delete" onClick={() => drop(at)}>
                   Remove
                 </Button>
               )}
             </div>
-            <div className="at-cellfields">
-              <ScriptInput
-                compact
-                lang={lang}
-                label={`${lang.scriptLabel} for ${which}`}
-                placeholder={sample ? sample.ar : "{{verb}}"}
-                value={ex.ar}
-                onChange={(v) => write(at, { ar: v })}
-              />
-              {saysHow && (
-                <input
-                  className="at-input"
-                  aria-label={`${lang.translitLabel} for ${which}`}
-                  value={ex.lat || ""}
-                  placeholder={sample && sample.lat ? sample.lat : lang.translitLabel.toLowerCase()}
-                  onChange={(e) => write(at, { lat: e.target.value })}
-                />
-              )}
-              <input
-                className="at-input"
-                aria-label={`English for ${which}`}
-                value={ex.en}
-                placeholder={sample ? sample.en : "English"}
-                onChange={(e) => write(at, { en: e.target.value })}
-              />
-            </div>
+            <Field label={lang.scriptLabel}>
+              <BlankField wiring={EXAMPLE_GAP} value={ex.ar} onChange={(v) => write(at, { ar: v })} label={lang.scriptLabel} lang={lang} script>
+                {(box) => (
+                  <ScriptInput
+                    lang={lang}
+                    box={box}
+                    label={`${lang.scriptLabel} for ${which}`}
+                    placeholder={sample ? sample.ar.replace(/\{\{\s*verb\s*\}\}/i, "").trim() : undefined}
+                    value={ex.ar}
+                    onChange={(v) => write(at, { ar: v })}
+                    onRemoveBlank={dropIn(ex.ar, (v) => write(at, { ar: v }))}
+                  />
+                )}
+              </BlankField>
+            </Field>
+            {saysHow && (
+              <Field label={lang.translitLabel}>
+                <BlankField wiring={EXAMPLE_GAP} value={ex.lat || ""} onChange={(v) => write(at, { lat: v })} label={lang.translitLabel} lang={lang}>
+                  {(box) => (
+                    <BlankText
+                      box={box}
+                      className="at-input"
+                      label={`${lang.translitLabel} for ${which}`}
+                      placeholder={sample && sample.lat ? sample.lat.replace(/\{\{\s*verb\s*\}\}/i, "").trim() : lang.translitLabel.toLowerCase()}
+                      value={ex.lat || ""}
+                      onChange={(v) => write(at, { lat: v })}
+                    />
+                  )}
+                </BlankField>
+              </Field>
+            )}
+            <Field label="English">
+              <BlankField wiring={EXAMPLE_ENGLISH} value={ex.en} onChange={(v) => write(at, { en: v })} label="English" lang={lang}>
+                {(box) => (
+                  <BlankText
+                    box={box}
+                    className="at-input"
+                    label={`English for ${which}`}
+                    placeholder="English"
+                    value={ex.en}
+                    onChange={(v) => write(at, { en: v })}
+                  />
+                )}
+              </BlankField>
+            </Field>
             {asksWish(ex) && (
-              <Field label="Whose wish is it?" hint="Who wants, in “{{verb-to}}”: I want to eat, I want her to eat." className="at-mt3">
+              <Field label="Whose wish is it?" hint="Who wants, in “to + verb”: I want to eat, I want her to eat.">
                 <select
                   className="at-input"
                   aria-label={`Whose wish is it, in ${which}`}
@@ -2185,7 +2257,7 @@ function ExampleFields({ lang, spec, sample, examples, onChange, verbName, cells
             )}
             {trouble && <p className="at-formneed unmet">{trouble}</p>}
             {preview.length > 0 && (
-              <ul className="at-mt3" data-el="editor-verb-example-preview">
+              <ul className="at-hint at-examplekeys" data-el="editor-verb-example-preview">
                 {preview.map((p, i) => (
                   <li key={i}>
                     <span lang={lang.id} dir={lang.direction}>{p.ar}</span> — {p.en}
@@ -2207,9 +2279,10 @@ function ExampleFields({ lang, spec, sample, examples, onChange, verbName, cells
 
 /*
  * What a sentence's English says for a verb blank that takes the
- * subjunctive: one of the three words, since the form has no English of
- * its own — see VerbExample — and, for `{{verb-to}}` in a sentence with
- * no subject for the verb to follow, whose wish it is.
+ * subjunctive: one of its three readings, offered as chips under the
+ * English box — see the sentence's wiring — since the form has no English
+ * of its own; and, for "to + verb" in a sentence with no subject for the
+ * verb to follow, whose wish it is.
  */
 function SubjunctiveEnglish({ slot, spec, english, alone, wish, onWish }: {
   slot: string;
@@ -2226,11 +2299,11 @@ function SubjunctiveEnglish({ slot, spec, english, alone, wish, onWish }: {
     <>
       <p className="at-hint" data-el="editor-subjunctive-english">
         {said
-          ? "The subjunctive's English is put together from the words beside the blank."
-          : `The subjunctive has no English of its own. In the English, write {{${slot}-who}} for the person, {{${slot}-plain}} for the verb, or {{${slot}-to}} for “to eat” or “her to eat” — for example “{{${slot}-who}} must {{${slot}-plain}}”.`}
+          ? "The subjunctive's English is put together for each person from the chips in the English."
+          : `The subjunctive has no English of its own. In the English, use the chips under the box for this blank: ${blankLabel(`${slot}-who`)}, ${blankLabel(`${slot}-plain`)} or ${blankLabel(`${slot}-to`)}.`}
       </p>
       {alone && words.includes(`${slot}-to`) && (
-        <Field label="Whose wish is it?" hint="Who wants, in the English: I want to eat, I want her to eat." className="at-mt3">
+        <Field label="Whose wish is it?" hint="Who wants, in “to + verb”: I want to eat, I want her to eat." className="at-mt3">
           <select
             className="at-input"
             aria-label={`Whose wish is it, for ${slot}`}
@@ -2393,8 +2466,14 @@ interface Reading {
 interface BlankWiring {
   /** Every blank this card knows, in the order the card writes them. */
   names: string[];
-  /** Opens the sheet, which hands back a name to put where it was asked for. */
-  onNew: (put: (name: string) => void) => void;
+  /** What the English field's bar offers instead, where that differs: a
+      verb blank taking the subjunctive is put into the English as one of
+      its three readings, never as itself — see VERB_READINGS. */
+  english?: string[];
+  /** Opens the sheet, which hands back a name to put where it was asked
+      for. Left out where no new blank can be made — a verb's examples,
+      which have the one gap. */
+  onNew?: (put: (name: string) => void) => void;
 }
 
 /*
@@ -2602,7 +2681,7 @@ function BlankBar({ wiring, value, onChange, label, lang, script = false, box }:
               />
               {rail.pieces[i] && (
                 <span className={`at-blankword${rail.pieces[i].slot ? " slot" : ""}`}>
-                  {rail.pieces[i].slot ? rail.pieces[i].slot : rail.pieces[i].text}
+                  {rail.pieces[i].slot ? blankLabel(rail.pieces[i].slot) : rail.pieces[i].text}
                 </span>
               )}
             </React.Fragment>
@@ -2619,7 +2698,7 @@ function BlankBar({ wiring, value, onChange, label, lang, script = false, box }:
             /* What the chip is for, said in full: a chip reading only
                "name" says nothing about what tapping it would do, and on
                a bar under a field the field it is under is the point. */
-            aria-label={`Put the ${name} blank into ${label}`}
+            aria-label={`Put the ${blankLabel(name)} blank into ${label}`}
             onPointerDown={startDrag(name)}
             onPointerMove={moveDrag}
             onPointerUp={endDrag(name)}
@@ -2632,18 +2711,20 @@ function BlankBar({ wiring, value, onChange, label, lang, script = false, box }:
               tap(name);
             }}
           >
-            {name}
+            {blankLabel(name)}
           </button>
         ))}
-        <button
-          type="button"
-          className="at-blankadd"
-          aria-label={`Put a blank into ${label}`}
-          onClick={() => wiring.onNew((name) => put(name, caret()))}
-        >
-          <Icon name="add" size={16} />
-          Blank
-        </button>
+        {wiring.onNew && (
+          <button
+            type="button"
+            className="at-blankadd"
+            aria-label={`Put a blank into ${label}`}
+            onClick={() => wiring.onNew && wiring.onNew((name) => put(name, caret()))}
+          >
+            <Icon name="add" size={16} />
+            Blank
+          </button>
+        )}
       </div>
     </div>
   );
@@ -7272,7 +7353,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
           onChange={(v) => onChange({ en: v })}
           render={(v, set, label) =>
             blanks ? (
-              <BlankField wiring={blanks} value={v} onChange={set} label="English" lang={lang}>
+              <BlankField wiring={blanks.english ? { ...blanks, names: blanks.english } : blanks} value={v} onChange={set} label="English" lang={lang}>
                 {(box) => (
                   <BlankText
                     box={box}
@@ -9577,6 +9658,12 @@ function SentenceEditor({ word, lang, allCards, selfId }: {
    */
   const wiring: BlankWiring = {
     names: word.holes,
+    /* A blank whose verbs take the subjunctive is put into the English as
+       person, verb or to + verb — the form has no English of its own. */
+    english: word.holes.flatMap((h) => {
+      const row = examplesRowOf(word.tensed.get(h) || null);
+      return row && (word.blankRows[h] || []).includes(row) ? [`${h}-who`, `${h}-plain`, `${h}-to`] : [h];
+    }),
     onNew: (put) => setPutting({ put }),
   };
   /* A number blank already in the sentence, tapped: its ranges, to change. */
