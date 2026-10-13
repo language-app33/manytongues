@@ -859,8 +859,9 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   (`carryToSentences`). A sentence not yet met waits until most of its
   words are known — eight in ten of the word cards found in it, each with
   the bottom of its own ladder cleared (`sentenceWaits`, matched by
-  `sentenceWords` in `src/sentence-words.ts`); a word with no card is not
-  counted, and the editor lists those words under each sentence, with a
+  `sentenceWords` in `src/sentence-words.ts`), in a text begun before as
+  much as a new one, since progress handed down is not practice
+  (`practisedAlone`); a word with no card is not counted, and the editor lists those words under each sentence, with a
   warning when a sentence passes the language's `longSentence` (twelve
   words unless it says otherwise). One kind with a subtype, the way
   a word is one kind whether it is a noun or a verb: `sceneKind: "text"`,

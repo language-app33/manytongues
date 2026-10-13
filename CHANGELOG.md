@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.437 — 13 October 2026
+
+**Texts started before 0.434 now wait for their words too.**
+
+- Since 0.435 a sentence of a text has waited until most of its words are
+  known, but any text a student had already opened, even just to read it
+  through once, was left out of that rule entirely. Those texts kept
+  showing long sentences full of unknown words.
+- Now the rule applies to them as well. A sentence the student hasn't yet
+  practised on its own waits until most of its words are known, even if
+  the text had progress from before.
+- While any sentence of a text is waiting, reading the whole text waits
+  too.
+- A sentence already practised on its own since 0.434 keeps coming, as
+  before.
+- Trade-off: some texts a student had partly got through will show fewer
+  sentences for a while, until the words are learnt.
+- To check by hand: open a text you had practised before 0.434 whose
+  words you don't yet know. Its sentences, and "Read the whole text",
+  should stop coming up until most of the words in each sentence are
+  learnt.
+
 ## 0.436 — 13 October 2026
 
 **Writing a text warns about long sentences and words with no card.**
