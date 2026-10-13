@@ -673,7 +673,11 @@ test("the gentle types are read off the definitions, not kept beside them", () =
      recognising what a word means, then which word it is. Every one of
      them puts the answer on the screen — nothing here is written out. */
   assert.deepEqual(EASY_TYPES, [
-    "ar2pick", "ar2en", "rec2en", "rec2img", "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick", "dlgwhole",
+    "ar2pick", "ar2en", "rec2en", "rec2img",
+    /* And what a verb's example means, with one of its subjunctive forms
+       in the gap: the first rung of a form never asked on its own. */
+    "ex2en",
+    "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick", "dlgwhole",
     /* A word taken out of a scene and chosen back is the phrase gap-fill
        asked of a scene's own text. */
     "gap2pick",

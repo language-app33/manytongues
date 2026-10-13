@@ -18,7 +18,8 @@
  */
 
 import type { Form, Item, Lang } from "./types.ts";
-import { findWordSpan, guessKind, supportsContext } from "./languages.ts";
+import { contextTokens, findWordSpan, guessKind, supportsContext, tensedOf } from "./languages.ts";
+import { exampleCells, filledExample, verbExamplesOf } from "./examples.ts";
 import { unitsOf } from "./scheduler.ts";
 import { leadOf, wordOf } from "./cards.ts";
 import { dialogPhrases } from "./dialogs.ts";
@@ -43,6 +44,12 @@ export interface Context {
   recs: { id: string }[];
   slot: number;
   span: number;
+  /** Where it is one of a verb's own examples rather than a phrase
+      somebody wrote: which one, and how it is said. See examples.ts. Its
+      English is on the screen from the start, being what says which
+      person the gap is in. */
+  example?: number;
+  lat?: string;
 }
 
 /* What this reads of a phrase, which is all of what it reads. A card has
@@ -108,7 +115,52 @@ export function buildContextIndex(items: Item[], lang: Lang): Map<string, Contex
       }
     }
   }
+  /* And a verb's own examples, once for every form of its subjunctive:
+     the one place those forms are met, since none of them is asked as a
+     word. See examples.ts. */
+  for (const card of items) {
+    const examples = verbExamplesOf(card);
+    if (!examples.length) continue;
+    const spec = tensedOf(lang, card.category);
+    for (const cell of exampleCells(card, spec)) {
+      examples.forEach((ex, at) => {
+        const filled = filledExample(card, cell, ex, spec);
+        if (!filled.ar || !filled.en) return;
+        const span = gapIn(ex.ar, filled.ar, String(cell.ar || ""), lang);
+        if (!span) return;
+        const list = index.get(cell.id) || [];
+        list.push({
+          id: `${card.id}~ex${at}`,
+          ar: filled.ar,
+          en: filled.en,
+          ...(filled.lat ? { lat: filled.lat } : {}),
+          recs: [],
+          slot: span.at,
+          span: span.len,
+          example: at,
+        });
+        index.set(cell.id, list);
+      });
+    }
+  }
   return index;
+}
+
+/*
+ * Where the verb sits in a filled example: where its gap was written, so
+ * a form spelt like a word earlier in the example is not taken for it —
+ * and, where the tokens do not line up, wherever the form is found.
+ */
+function gapIn(written: string, filled: string, word: string, lang: Lang): { at: number; len: number } | null {
+  const before = String(written || "").split(/\{\{\s*verb\s*\}\}/i)[0];
+  const at = before.trim() ? contextTokens(before, lang).length : 0;
+  const len = contextTokens(word, lang).length;
+  const tokens = contextTokens(filled, lang);
+  if (len && at + len <= tokens.length) {
+    const window = len === 1 ? tokens[at] : tokens.slice(at, at + len).join(" ");
+    if (lang.context && lang.context.matches(window, word)) return { at, len };
+  }
+  return findWordSpan(filled, word, lang);
 }
 
 /*

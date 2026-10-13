@@ -12,7 +12,8 @@
  */
 import React, { createContext, useContext, useState, useEffect, useId, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
-import type { Card, Deck, Form, GrammarDim, Item, Lang, VerbSpec, VerbTense } from "./types.ts";
+import type { Card, Deck, Form, GrammarDim, Item, Lang, VerbExample, VerbSpec, VerbTense } from "./types.ts";
+import { MAX_EXAMPLES, asksWish, blankExample, exampleCells, exampleTrouble, examplesRowOf, filledExample, verbExamplesOf, wishOf } from "./examples.ts";
 import { wordsOffered } from "./context-index.ts";
 import { longSentenceOf, sentenceWords, wordCount } from "./sentence-words.ts";
 import { cellsIn, citationOf, citedWord, framesOf, isCell, isFrame, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
@@ -1844,7 +1845,7 @@ function cellLabel(spec: VerbSpec | null, at: { row: string, col: string }) {
  * where there are only a few of them. Same boxes either way; what differs
  * is what stands over them.
  */
-function CellFields({ lang, cell, which, saysHow, onChange, onRecord }: {
+function CellFields({ lang, cell, which, saysHow, asksEnglish = true, onChange, onRecord }: {
   lang: Lang;
   cell: Record<string, any> | null;
   /** What to call this one where a label has to name it out loud — for a
@@ -1852,6 +1853,9 @@ function CellFields({ lang, cell, which, saysHow, onChange, onRecord }: {
   which: string;
   /** Whether this language has a pronunciation worth writing per cell. */
   saysHow: boolean;
+  /** Whether the cell has an English of its own. Not a form met only in
+      the verb's examples, whose English those make — see VerbExample. */
+  asksEnglish?: boolean;
   onChange: (patch: Record<string, any>) => void;
   onRecord: () => void;
 }) {
@@ -1876,13 +1880,15 @@ function CellFields({ lang, cell, which, saysHow, onChange, onRecord }: {
             onChange={(e) => onChange({ lat: e.target.value })}
           />
         )}
-        <input
-          className="at-input"
-          aria-label={`English for ${which}`}
-          value={(cell && cell.en) || ""}
-          placeholder="English"
-          onChange={(e) => onChange({ en: e.target.value })}
-        />
+        {asksEnglish && (
+          <input
+            className="at-input"
+            aria-label={`English for ${which}`}
+            value={(cell && cell.en) || ""}
+            placeholder="English"
+            onChange={(e) => onChange({ en: e.target.value })}
+          />
+        )}
       </div>
       <IconButton
         icon="mic"
@@ -1918,9 +1924,15 @@ export function writeCell(
   return had ? cells.map((c) => (c === had ? next : c)) : cells.concat([next]);
 }
 
-function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, mint, onChange, onRecord, pronouns }: {
+function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, mint, onChange, onRecord, pronouns, examples, onExamples, verbName = "" }: {
   lang: Lang;
   spec: VerbSpec;
+  /** The verb's examples, where its table has a row practised in them —
+      see VerbExample — and how to change them. */
+  examples?: VerbExample[];
+  onExamples?: (next: VerbExample[]) => void;
+  /** The verb's name, which the examples' English is made from. */
+  verbName?: string;
   /** The pronoun written for each column, where the language has them —
       shown beside the column's name. Only a verb's table: its columns are
       who does it, which is what a pronoun is. */
@@ -2005,6 +2017,7 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
                   cell={cell}
                   which={which}
                   saysHow={saysHow}
+                  asksEnglish={!tense.examples}
                   onChange={(patch) => write(tense.id, person.id, patch)}
                   onRecord={() => onRecord(tense.id, person.id)}
                 />
@@ -2052,11 +2065,191 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
             )}
           </div>
           {row(tense, at_)}
+          {tense.examples && onExamples && (
+            <ExampleFields
+              lang={lang}
+              spec={spec}
+              sample={tense.sample || null}
+              examples={examples || []}
+              onChange={onExamples}
+              verbName={verbName}
+              cells={cells.filter(mine)}
+              saysHow={saysHow}
+            />
+          )}
         </div>
       ))}
     </>
   );
 }
+
+/*
+ * The examples a verb's subjunctive is practised in, under its forms.
+ *
+ * Up to three, each written once with {{verb}} where the verb goes and
+ * met once for every form above it — see VerbExample. The English is not
+ * typed per person but put together from three words, because English
+ * has no subjunctive and what it needs depends on the word in front of
+ * the gap. So under each example is what two of its persons will read
+ * as, worked out the way a question works it out: the teacher sees what
+ * the student will, before saving.
+ */
+const NO_EXAMPLE: VerbExample = { ar: "", lat: "", en: "" };
+
+function ExampleFields({ lang, spec, sample, examples, onChange, verbName, cells, saysHow }: {
+  lang: Lang;
+  spec: VerbSpec;
+  /** The language's own example of one, for the placeholders. */
+  sample: { ar: string; lat?: string; en: string } | null;
+  examples: VerbExample[];
+  onChange: (next: VerbExample[]) => void;
+  verbName: string;
+  cells: Record<string, any>[];
+  saysHow: boolean;
+}) {
+  /* Always one to write in, so the section is never a button alone. */
+  const shown = examples.length ? examples : [NO_EXAMPLE];
+  const write = (at: number, patch: Partial<VerbExample>) =>
+    onChange(shown.map((ex, i) => (i === at ? { ...ex, ...patch } : ex)));
+  const drop = (at: number) => onChange(shown.filter((_, i) => i !== at));
+  const persons = personsOf(spec);
+  /* Two of the forms written, to show what an example comes out as: the
+     first two the teacher has, in the order the table lists them. */
+  const shownCells = exampleCells({ forms: [{}, ...cells] }, spec).slice(0, 2);
+  return (
+    <div className="at-mt4" data-el="editor-verb-examples">
+      <p className="at-groupline">Examples</p>
+      <Help>
+        These forms are practised only inside examples, once for every person: first what an
+        example means, then the missing form picked out, then written. Write {"{{verb}}"} where
+        the verb goes. In the English, {"{{verb-who}}"} is the person (I, she), {"{{verb-plain}}"} the
+        verb ({verbPlainShown(verbName)}), and {"{{verb-to}}"} is “to {verbPlainShown(verbName)}” or
+        “her to {verbPlainShown(verbName)}”, for wanting.
+        {sample ? <> For example: <span lang={lang.id} dir={lang.direction}>{sample.ar}</span> — {sample.en}.</> : null}
+      </Help>
+      {shown.map((ex, at) => {
+        const trouble = exampleTrouble(ex);
+        const which = `example ${at + 1}`;
+        const preview = !trouble && !blankExample(ex)
+          ? shownCells.map((cell) => filledExample({ name: verbName }, cell as Form, ex, spec))
+          : [];
+        return (
+          <div className="at-formblock at-mt3" key={at} data-el="editor-verb-example">
+            <div className="at-formhead">
+              <span className="at-formnum">{cap(which)}</span>
+              {(shown.length > 1 || !blankExample(ex)) && (
+                <Button variant="ghost" size="sm" icon="delete" onClick={() => drop(at)}>
+                  Remove
+                </Button>
+              )}
+            </div>
+            <div className="at-cellfields">
+              <ScriptInput
+                compact
+                lang={lang}
+                label={`${lang.scriptLabel} for ${which}`}
+                placeholder={sample ? sample.ar : "{{verb}}"}
+                value={ex.ar}
+                onChange={(v) => write(at, { ar: v })}
+              />
+              {saysHow && (
+                <input
+                  className="at-input"
+                  aria-label={`${lang.translitLabel} for ${which}`}
+                  value={ex.lat || ""}
+                  placeholder={sample && sample.lat ? sample.lat : lang.translitLabel.toLowerCase()}
+                  onChange={(e) => write(at, { lat: e.target.value })}
+                />
+              )}
+              <input
+                className="at-input"
+                aria-label={`English for ${which}`}
+                value={ex.en}
+                placeholder={sample ? sample.en : "English"}
+                onChange={(e) => write(at, { en: e.target.value })}
+              />
+            </div>
+            {asksWish(ex) && (
+              <Field label="Whose wish is it?" hint="Who wants, in “{{verb-to}}”: I want to eat, I want her to eat." className="at-mt3">
+                <select
+                  className="at-input"
+                  aria-label={`Whose wish is it, in ${which}`}
+                  value={wishOf(ex, spec)}
+                  onChange={(e) => write(at, { wish: e.target.value })}
+                >
+                  {persons.map((p) => (
+                    <option key={p.id} value={p.id}>{p.label || p.id}</option>
+                  ))}
+                </select>
+              </Field>
+            )}
+            {trouble && <p className="at-formneed unmet">{trouble}</p>}
+            {preview.length > 0 && (
+              <ul className="at-mt3" data-el="editor-verb-example-preview">
+                {preview.map((p, i) => (
+                  <li key={i}>
+                    <span lang={lang.id} dir={lang.direction}>{p.ar}</span> — {p.en}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        );
+      })}
+      {shown.length < MAX_EXAMPLES && (
+        <Button variant="ghost" size="sm" icon="add" className="at-mt3" onClick={() => onChange(shown.concat([{ ...NO_EXAMPLE }]))}>
+          Add an example
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/*
+ * What a sentence's English says for a verb blank that takes the
+ * subjunctive: one of the three words, since the form has no English of
+ * its own — see VerbExample — and, for `{{verb-to}}` in a sentence with
+ * no subject for the verb to follow, whose wish it is.
+ */
+function SubjunctiveEnglish({ slot, spec, english, alone, wish, onWish }: {
+  slot: string;
+  spec: VerbSpec;
+  english: string;
+  alone: boolean;
+  wish: string;
+  onWish: (who: string) => void;
+}) {
+  const words = slotsIn(english);
+  const said = ["who", "plain", "to"].some((r) => words.includes(`${slot}-${r}`));
+  const persons = personsOf(spec);
+  return (
+    <>
+      <p className="at-hint" data-el="editor-subjunctive-english">
+        {said
+          ? "The subjunctive's English is put together from the words beside the blank."
+          : `The subjunctive has no English of its own. In the English, write {{${slot}-who}} for the person, {{${slot}-plain}} for the verb, or {{${slot}-to}} for “to eat” or “her to eat” — for example “{{${slot}-who}} must {{${slot}-plain}}”.`}
+      </p>
+      {alone && words.includes(`${slot}-to`) && (
+        <Field label="Whose wish is it?" hint="Who wants, in the English: I want to eat, I want her to eat." className="at-mt3">
+          <select
+            className="at-input"
+            aria-label={`Whose wish is it, for ${slot}`}
+            value={wish || (persons[0] ? persons[0].id : "")}
+            onChange={(e) => onWish(e.target.value)}
+          >
+            {persons.map((p) => (
+              <option key={p.id} value={p.id}>{p.label || p.id}</option>
+            ))}
+          </select>
+        </Field>
+      )}
+    </>
+  );
+}
+
+/* The verb as the help line names it — *eat* — or a stand-in while the
+   verb has no name yet. */
+const verbPlainShown = (name: string): string => String(name || "").trim().replace(/^to\s+/i, "").trim() || "eat";
 
 /*
  * Naming a blank, which is the one thing here nobody can do by choosing.
@@ -2272,7 +2465,11 @@ function BlankBar({ wiring, value, onChange, label, lang, script = false, box }:
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<number | null>(null);
   const from = useRef<{ x: number; y: number; moved: boolean } | null>(null);
-  const here = slotsIn(value);
+  /* `{{verb-who}}` in the English is the verb blank read another way, so
+     a field holding it holds the blank: no chip offers it again. See
+     VERB_READINGS. */
+  const written = slotsIn(value);
+  const here = written.concat(written.map((n) => (n.match(/^(.+)-(?:who|plain|to)$/) || ["", ""])[1]).filter(Boolean));
   const rail = useMemo(() => dropRail(value), [value]);
 
   /*
@@ -3256,6 +3453,51 @@ export function withLinks(
 }
 
 /*
+ * Whose wish each of a sentence's verb blanks reads `{{verb-to}}` against,
+ * read off the card's own word as the links are — see CardForm.wish.
+ */
+export function initialWish(card: Card | null): Record<string, string> {
+  const said = card ? (leadOf(card) as Record<string, any>).wish : null;
+  const out: Record<string, string> = {};
+  if (!said || typeof said !== "object") return out;
+  for (const [k, v] of Object.entries(said)) if (typeof v === "string" && v) out[k] = v;
+  return out;
+}
+
+/*
+ * The same forms, each saying whose wish its verb blanks read against:
+ * one answer for the card, as withLinks writes the links. Only for a blank
+ * the card still leaves, whose English still asks — `{{blank-to}}` — and
+ * which follows no other blank: one that agrees with a subject is in that
+ * subject's person, so whoever wants is whoever does, and a choice left
+ * over from before the subject was added would say otherwise.
+ */
+export function withWish(
+  forms: Record<string, any>[],
+  wish: Record<string, string>,
+  holes: string[],
+  /* Whose wish it is where the teacher has not chosen — the first person
+     the verb table lists, which is what the picker shows. */
+  fallback = "",
+): Record<string, any>[] {
+  const lead = forms[0] || {};
+  const said: Record<string, string> = {};
+  for (const slot of holes) {
+    const who = (wish || {})[slot] || fallback;
+    if (!who || !slotsIn(String(lead.en || "")).includes(`${slot}-to`)) continue;
+    if (partnerOf(lead, holes, slot)) continue;
+    said[slot] = who;
+  }
+  const any = Object.keys(said).length > 0;
+  return forms.map((form) => {
+    const next = { ...form };
+    if (any) next.wish = said;
+    else delete next.wish;
+    return next;
+  });
+}
+
+/*
  * One value per card for the axes that are about the card.
  *
  * Whether a noun is a person or a thing is as true of its plural as of its
@@ -3897,12 +4139,15 @@ export const canSaveWord = (
  */
 export const canSaveVerb = (
   name: string,
-  cells: { ar?: string; en?: string }[],
+  cells: { ar?: string; en?: string; row?: string }[],
   trouble: unknown,
+  /* Whether a cell's meaning is said — by its English, or, for a form
+     asked only in the verb's examples, by those. */
+  meant: (c: { ar?: string; en?: string; row?: string }) => boolean = (c) => !!String(c.en || "").trim(),
 ): boolean =>
   !!(
     String(name || "").trim() &&
-    cells.some((c) => String(c.ar || "").trim() && String(c.en || "").trim()) &&
+    cells.some((c) => String(c.ar || "").trim() && meant(c)) &&
     !trouble
   );
 
@@ -4121,6 +4366,9 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
      do not name them — a verb whose word is a cell of its table, and a
      sentence, which is a frame — see the block that asks for it. */
   const [name, setName] = useState(((card && card.name) || "") as string);
+  /* The examples a verb's subjunctive is practised in — see VerbExample.
+     Held as typed, blank ones included, and tidied on the way out. */
+  const [examples, setExamples] = useState<VerbExample[]>(() => verbExamplesOf(card));
   /*
    * On the way in to a table that cites a cell — a verb's — the card's own
    * word moves into the cell about to hold it, rather than being left
@@ -4384,6 +4632,16 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
       else delete next[slot];
       return next;
     });
+  /* Whose wish each verb blank reads `{{verb-to}}` against — see
+     withWish. "" takes the choice off. */
+  const [blankWish, setBlankWish] = useState<Record<string, string>>(() => initialWish(card));
+  const setBlankWishFor = (slot: string, who: string) =>
+    setBlankWish((was) => {
+      const next = { ...was };
+      if (who) next[slot] = who;
+      else delete next[slot];
+      return next;
+    });
   /* Whether a blank's words carry a pronoun on the end, which the sentence
      narrows in the same list as its tenses — see BARE_ROW. Put in place of
      any answer the blank had to this question, beside whatever tenses it
@@ -4437,15 +4695,20 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
      it rather than against a block nobody is filling in. Each of them
      carrying what its blanks ask their verbs for, which is one answer for
      the card and is written where the reader of a blank looks. */
-  const ownForms = withLinks(
-    withRows(
-      /* A noun's boxes marked as the boxes they are — see stampNounForms. */
-      stampNounForms([lead].concat(forms.slice(1)), nounBoxList, nounLayout, nounGenderOf(forms)),
-      blankRows,
+  const ownForms = withWish(
+    withLinks(
+      withRows(
+        /* A noun's boxes marked as the boxes they are — see stampNounForms. */
+        stampNounForms([lead].concat(forms.slice(1)), nounBoxList, nounLayout, nounGenderOf(forms)),
+        blankRows,
+        holes,
+      ),
+      blankLinks,
       holes,
     ),
-    blankLinks,
+    blankWish,
     holes,
+    (personsOf(verbOf(lang))[0] || { id: "" }).id,
   );
   /* And the card's own word as it will be saved, which is what everything
      below reads: the holes it leaves, the words behind them, the sentences
@@ -4455,7 +4718,7 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
      fresh map every render would re-fill the preview on every keystroke,
      and what they actually depend on is which tenses are ticked. */
   const rowsKey = holes
-    .map((slot) => `${slot}:${(blankRows[slot] || []).join(",")}>${blankLinks[slot] || ""}`)
+    .map((slot) => `${slot}:${(blankRows[slot] || []).join(",")}>${blankLinks[slot] || ""}~${blankWish[slot] || ""}`)
     .join("\u0000");
   /*
    * Every blank this card stands in, as it stands right now.
@@ -4493,6 +4756,27 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
      tableCellsOf. */
   const tableCells = tableCellsOf(cells, shownSpec, forms);
   const trouble = scene ? null : ownForms.map((f) => slotTrouble(f)).find(Boolean) || null;
+  /*
+   * The verb's examples, and what they hold the save to.
+   *
+   * A subjunctive form is asked only inside an example — see VerbExample
+   * — so a verb with one written and no example would carry a form no
+   * question could ever be asked of. That is the save the owner asked to
+   * be stopped. And an example written wrongly is stopped too, said in
+   * the example itself: one with no gap, or with English that comes out
+   * the same for every person, would be asked as nonsense.
+   */
+  const exampleRow = standsIn ? examplesRowOf(shownSpec) : "";
+  const writtenExamples = exampleRow ? examples.filter((e) => !blankExample(e)) : [];
+  const subjunctiveWritten = !!exampleRow && tableCells.some(
+    (c) => c.row === exampleRow && !String(c.of || "") && String(c.ar || "").trim(),
+  );
+  const needsExamples = subjunctiveWritten && !writtenExamples.length;
+  const examplesWrong = writtenExamples.some((e) => !!exampleTrouble(e));
+  /* A form of that row counts as written with its meaning once there is an
+     example to mean it in: it has no English box of its own. */
+  const meant = (c: { row?: string; en?: string }) =>
+    !!String(c.en || "").trim() || (!!exampleRow && c.row === exampleRow && writtenExamples.length > 0);
 
   /*
    * The blanks on a card that is not a sentence, which is a card that
@@ -5282,10 +5566,10 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
      rather than both at the foot of the table. */
   const needsName = standsIn && !name.trim();
   const needsForm = standsIn && !tableCells.some(
-    (c) => String(c.ar || "").trim() && String(c.en || "").trim(),
+    (c) => String(c.ar || "").trim() && meant(c),
   );
-  const canSave = (standsIn ? canSaveVerb(name, tableCells, trouble) : canSaveWord(main, trouble))
-    && refOk && !strayHoles.length;
+  const canSave = (standsIn ? canSaveVerb(name, tableCells, trouble, meant) : canSaveWord(main, trouble))
+    && refOk && !strayHoles.length && !needsExamples && !examplesWrong;
 
   /* Another form, named so that its own cells can point at it. No number
      override beyond the name: blankForm takes the language's declared
@@ -5456,6 +5740,11 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
     note,
     name,
     setName,
+    examples,
+    setExamples,
+    exampleRow,
+    writtenExamples,
+    needsExamples,
     fills,
     setFills,
     canLend,
@@ -5520,6 +5809,9 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
     blankLinks,
     setBlankLink,
     agreeing,
+    /* And whose wish a verb blank's `{{verb-to}}` reads against. */
+    blankWish,
+    setBlankWishFor,
     /* And whether a blank's words carry a pronoun on the end, where some
        word in it has those forms — see endsBehind and setBlankEnds. */
     endsBehind,
@@ -6351,7 +6643,7 @@ function PracticeSection({ word }: { word: WordDraft }) {
 }
 
 function TableBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
-  const { shownSpec, parts, cells, setCells, mintCell, setRecordingCell, needsForm } = word;
+  const { shownSpec, parts, cells, setCells, mintCell, setRecordingCell, needsForm, exampleRow, examples, setExamples, name, needsExamples } = word;
   /* The table's own line of what is drilled — see askParts, which lists
      nothing for a table nobody has written yet. */
   const mine = parts.find((p) => p.id === "table:");
@@ -6374,7 +6666,18 @@ function TableBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
           onChange={setCells}
           onRecord={(row, col) => setRecordingCell({ of: "", ofLabel: "", row, col })}
           pronouns={shownSpec === verbOf(lang) ? word.pronounWords : undefined}
+          examples={examples}
+          onExamples={exampleRow ? setExamples : undefined}
+          verbName={name}
         />
+        {/* The one thing a subjunctive form cannot be saved without: an
+            example to be asked in. Only while it is true. */}
+        {needsExamples && (
+          <p className="at-formneed unmet" data-el="editor-needs-examples">
+            Write at least one example for the subjunctive. Its forms are practised only inside
+            examples, so without one they could never be asked.
+          </p>
+        )}
         {/* Only when it is in the way, and never about one box. It
             used to read "Fill in past · he, plus its English" — the
             cell a dictionary lists the verb under, demanded because
@@ -8124,7 +8427,7 @@ function BlanksBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
   const {
     holes, starved, starvedWhy, combos, fillers, pool, fills, fillsOffer, addFill,
     main, trouble, sentence, strayHoles, tensed, blankRows, setBlankRow,
-    endsBehind, setBlankEnds, blankLinks, setBlankLink, agreeing,
+    endsBehind, setBlankEnds, blankLinks, setBlankLink, agreeing, blankWish, setBlankWishFor,
   } = word;
   /* The tenses a blank asks for, as against whether its words carry a
      pronoun on the end — two answers kept in one list. See BARE_ROW. */
@@ -8384,6 +8687,20 @@ function BlanksBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
                   )
                 }
               />
+              {/* A form with no English of its own — the subjunctive, see
+                  VerbExample — ticked here: what the English should say
+                  for it, and, where that is {{verb-to}} with nobody in
+                  the sentence to want, whose wish it is. */}
+              {rows.some((t) => t.examples && picked.includes(t.id)) && (
+                <SubjunctiveEnglish
+                  slot={slot}
+                  spec={spec}
+                  english={String((main && main.en) || "")}
+                  alone={!partnerOf(main, holes, slot)}
+                  wish={blankWish[slot] || ""}
+                  onWish={(who) => setBlankWishFor(slot, who)}
+                />
+              )}
             </Field>
           );
         })}
@@ -8804,7 +9121,7 @@ export function writtenCard({ word, talk, shape, chosen }: {
   chosen: string[];
 }) {
   const scene = shape === "scene";
-  const { shownSpec, ownForms, tableCells, keptFrames = [], forms, note, standsIn, name, uses, fills, category, refName, spread, stripped } = word;
+  const { shownSpec, ownForms, tableCells, keptFrames = [], forms, note, standsIn, name, uses, fills, category, refName, spread, stripped, writtenExamples = [] } = word;
   /* And the verb's own sentences back on the end, exactly as they were
      found: this screen does not write them, so the whole of what it owes
      them is not to lose them — see initialFrames. */
@@ -8828,6 +9145,18 @@ export function writtenCard({ word, talk, shape, chosen }: {
     /* And what to call it, where its own words do not: the two cards that
        are saved as something other than what they are about. */
     name: standsIn || shape === "sentence" ? name.trim() : "",
+    /* And the examples its subjunctive is practised in, on a verb that
+       has the row — each as written, with whose wish it is settled where
+       its English asks. See VerbExample. */
+    examples: shape === "word" ? writtenExamples.map((ex: VerbExample) => {
+      const wish = wishOf(ex, shownSpec);
+      return {
+        ar: ex.ar.trim(),
+        ...(String(ex.lat || "").trim() ? { lat: String(ex.lat).trim() } : {}),
+        en: ex.en.trim(),
+        ...(wish ? { wish } : {}),
+      };
+    }) : [],
     decks: chosen,
     uses,
     fills,
@@ -9840,7 +10169,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   decks: Deck[];
   inDecks?: string[];
   allCards: Card[];
-  onSave: (written: { forms: any, note: string, name: string, category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, setting: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null }) => void;
+  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, setting: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null }) => void;
   /** Open another of the teacher's cards in place of this one — the
       cards the Meanings block names. */
   onOpenCard?: (card: Card) => void;

@@ -48,7 +48,7 @@ import { agreementOf, blankAdmits, grammarFields, kindOf, lendsForm, lendsInto, 
 import { countedWith, standsAlone } from "./numbers/generate.ts";
 import { isAsked } from "./scheduler.ts";
 import type { Value } from "./variables.ts";
-import { aboutPerson, besideAdjectives, fillForm, fillsOf, lentBy, readAs, readingOf, readingsOf, refOf, slotsOf, speaks, valuesForTurn } from "./variables.ts";
+import { aboutPerson, besideAdjectives, cellEnglish, fillForm, fillsOf, lentBy, readAs, readingOf, readingsOf, refOf, slotsOf, speaks, valuesForTurn } from "./variables.ts";
 import {
   agreedCell, agreedValue, agreeWith, asSubject, colOf, followable, linkedPartner, linkedToNothing, ownSlot, partnerOf, personsOf,
   rowIdsOf, rowOf, slotLinks, slotRows, subjectSlot,
@@ -312,7 +312,11 @@ export function agreeTook(
     if (!cell || !String(cell.ar || "").trim()) return false;
     /* A form under *I* keeps its capitals, as it does when it is drawn
        on its own — see SPEAKER_COLUMNS. */
-    out[slot] = { id: cell.id, ar: cell.ar, en: cell.en, lat: cell.lat, ...(speaks(cell) ? { keepsCase: true } : {}) };
+    out[slot] = {
+      id: cell.id, ar: cell.ar, en: cell.en, lat: cell.lat,
+      ...cellEnglish(owner.card, cell),
+      ...(speaks(cell) ? { keepsCase: true } : {}),
+    };
     personAt[slot] = colOf(cell);
     return true;
   };
@@ -359,7 +363,7 @@ export function ownVerb(
   const filler = subject ? took[subject] : null;
   const cell = agreedCell(card, verbOf(lang), rowOf(part), filler ? filler.grammar : null);
   if (!cell || !cell.ar) return null;
-  return { id: cell.id, ar: cell.ar, en: cell.en, lat: cell.lat };
+  return { id: cell.id, ar: cell.ar, en: cell.en, lat: cell.lat, ...cellEnglish(card, cell) };
 }
 
 /* Two blanks written one straight after the other, with nothing but

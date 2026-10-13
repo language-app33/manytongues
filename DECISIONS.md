@@ -6178,3 +6178,49 @@ answer on the second of them is no longer read.
 On screen, several answers shown together have a dot between them
 (`SHOWN_SEP`), never a slash, so a slash a teacher wrote inside an answer
 cannot be mistaken for the break between two.
+
+## The subjunctive is practised in the verb's own examples, never as a word
+
+**13 October 2026** · `src/examples.ts`, `src/variables.ts` (`verbReading`), `src/context-index.ts`, `src/offers.ts` (`EXAMPLE_TYPES`)
+
+Palestinian Arabic's subjunctive — تاكل, the present without its b- — has
+no English of its own. It only follows another word: لازم تاكل is *she must
+eat*, بدي تاكل *I want her to eat*. 0.432 gave each form an English box like
+every other cell, and there was nothing true to type in it: *(that) she
+eat* is nobody's English, *her to eat* is wrong after *must*, and *to eat
+(she)* puts brackets in the middle of every sentence it fills.
+
+So the forms have no English box, and two things replace it.
+
+**On a sentence card, the English says how to read the blank.** Three
+words beside the blank's own name: `{{verb-who}}` (I, she), `{{verb-plain}}`
+(eat, off the verb card's name) and `{{verb-to}}` (to eat, her to eat),
+whose wish being the sentence's to say on `wish` where nothing in it is a
+subject. They are readings of the one blank — `slotsOf` folds them onto it
+— and are put together at fill time from the cell's column and the verb's
+name, which a lent value now carries (`col`, `plain`). Modelled on the
+pronoun's `{{pronoun-is}}`, with one difference: that is a blank of its
+own in every field, and these appear in the English only, because the
+Arabic has one gap where English needs two words.
+
+**On the verb card, up to three examples with a gap.** `examples` on the
+card, `{{verb}}` where the verb goes and the same three words in the
+English. Each becomes a context — somewhere the form turned up — for every
+subjunctive cell, through the same index phrases use, so the existing
+gap-fill questions ask them with no new screen: picked out of the gap at
+level 2, written into it at level 4. Level 1 is new: `ex2en`, what the
+example means, the wrong answers being the same example in the other
+persons. A cell of a row marked `examples` is asked those and nothing else
+(`EXAMPLE_TYPES`); the example's English is on the screen from the start,
+because there it is the only thing saying which person the gap wants.
+
+**Why examples on the card rather than sentence cards.** A sentence card is
+something to learn, with its own schedule and review; an example is not —
+nothing schedules it, and what it costs a teacher is one line per verb.
+The owner chose examples on the card, required once any subjunctive form
+is written, so no form can exist that nothing asks.
+
+**What it costs.** English that knows English: the persons' *who* and
+*whom* are a table keyed by the app's column ids, as SPEAKER_COLUMNS
+already is, and a test holds it to the Arabic pack. And English typed into
+those boxes under 0.432 is kept on the cells but no longer read.

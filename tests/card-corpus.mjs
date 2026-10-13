@@ -134,7 +134,11 @@ const verb = {
     { id: "v2", ar: "أكل", en: "he ate", lat: "akal", row: "past", col: "he" },
     { id: "v3", ar: "أكلت", en: "she ate", lat: "akalat", row: "past", col: "she", clips: [CLIP] },
     { id: "v4", ar: "بياكل", en: "he eats", lat: "byaakul", row: "present", col: "he", ask: false },
+    /* A subjunctive form, which has no English of its own: it is met only
+       in the examples below. */
+    { id: "v5", ar: "ياكل", en: "", lat: "yaakul", row: "subjunctive", col: "he" },
   ],
+  examples: [{ ar: "لازم {{verb}}", lat: "laazim {{verb}}", en: "{{verb-who}} must {{verb-plain}}" }],
 };
 
 /* A sentence: a frame with two holes in it, which fills nothing itself. */

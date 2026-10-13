@@ -2965,6 +2965,8 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
         .filter((t) => t.of && !loose.some((f) => String(f.id || "") === t.of))
         .map((t) => <ReadTable key={`orphan-${t.of}`} group={t} lang={L} reader={reader} />)}
 
+      <ReadExamples card={card} lang={L} />
+
       <ReadBlanks card={card} lang={L} cards={cards} />
 
       <ReadTaught of={card} cards={cards} label="Words this teaches" panel />
@@ -3035,6 +3037,32 @@ function ReadKind({ card, lang }: { card: Record<string, any>; lang: Lang }) {
       {perCard.map((dim) => (
         <ReadRow key={dim.field} label={dim.label}>
           {dimText(dim, lead[dim.field])}
+        </ReadRow>
+      ))}
+    </section>
+  );
+}
+
+/**
+ * The examples a verb's subjunctive is practised in — see VerbExample —
+ * as they were written, gap and English words and all: that is the
+ * teacher's own wording, and what each person's question is made from.
+ */
+function ReadExamples({ card, lang }: { card: Record<string, any>; lang: Lang }) {
+  const examples: Record<string, any>[] = Array.isArray(card.examples) ? card.examples : [];
+  const written = examples.filter((ex) => ex && (String(ex.ar || "").trim() || String(ex.en || "").trim()));
+  if (!written.length) return null;
+  return (
+    <section className="at-panel" data-el="readout-examples">
+      <p className="at-eyebrow">Subjunctive examples</p>
+      <p className="at-hint">
+        The subjunctive is practised only inside these, once for every person written in the table.
+      </p>
+      {written.map((ex, i) => (
+        <ReadRow key={i} label={`Example ${i + 1}`}>
+          <span lang={lang.id} dir={lang.direction}>{String(ex.ar || "").trim()}</span>
+          {" — "}
+          {String(ex.en || "").trim()}
         </ReadRow>
       ))}
     </section>

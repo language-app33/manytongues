@@ -5679,7 +5679,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         onOpenCard={(other) =>
           setEditing({ card: other, decks: other.decks || [], lang: other.lang || (editLang || {}).id || "", opened: Date.now() })
         }
-        onSave={({ forms, note, name, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next }) =>
+        onSave={({ forms, note, name, examples, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next }) =>
           run(
             async () => {
               const [main, ...subs] = forms;
@@ -5742,6 +5742,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                            not name it — a verb saved as the form a
                            dictionary lists. Empty on every other card. */
                         name,
+                        /* And the examples a verb's subjunctive is
+                           practised in. Said every time, so a verb whose
+                           examples were all taken off loses them. */
+                        examples,
                         /* And what the teacher says the word is — a noun, a
                            verb, a name. Which table the editor offers
                            follows from it; nothing about how the card is

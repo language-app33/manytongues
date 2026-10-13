@@ -116,8 +116,9 @@ export const NUMBER_FALLBACK: Record<string, string> = {
 };
 
 export const TYPES = [
-  /* 1: what does it mean */
-  "ar2pick", "ar2en", "rec2en", "rec2img",
+  /* 1: what does it mean — and, for a form only ever met in a verb's
+     examples, what the example means */
+  "ar2pick", "ar2en", "rec2en", "rec2img", "ex2en",
   /* 2: which one is it */
   "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick",
   /* 3: write it from a cue */
@@ -473,6 +474,31 @@ export const EX: Record<string, ExerciseSpec> = {
     hintPhrase: true,
     hintLabel: "Show what the phrase means",
     hintHideLabel: "Hide what the phrase means",
+  },
+  /*
+   * A verb's example, with one of its subjunctive forms in the gap, and
+   * what it means chosen out of a few: لازم تاكلي is *you (f) must eat*,
+   * beside *I must eat* and *we must eat*.
+   *
+   * The first rung of a form that is never asked as a word — see
+   * VerbExample. The wrong answers are the same example in the verb's
+   * other persons, so what is being told apart is who, which is the whole
+   * of what the form says; a person whose form is spelt the same — تاكل
+   * is *you (m)* and *she* — is left out, being no wrong answer at all.
+   */
+  ex2en: {
+    level: 1,
+    instruction: "Choose the meaning",
+    label: "Example → choose",
+    short: "X→?",
+    needs: ["ar", "contexts", "examples"],
+    question: "What does this mean?",
+    placeholder: "",
+    promptField: "example",
+    answerField: "en",
+    answerMode: "choice",
+    picks: "meaning",
+    gentle: true,
   },
   /* The other way round, and a level up: the meaning is given and the word
      itself has to be picked out of four. Recognising a spelling is not
@@ -1911,6 +1937,7 @@ export function needLabel(need: string, lang: Partial<Lang>) {
     part: "a part to play",
     gap: "a word of three letters or more",
     meant: "a sentence with its meaning",
+    examples: "an example on the verb card",
   };
   return names[need] || need;
 }
@@ -3469,8 +3496,12 @@ export const LANGUAGES: Record<LangId, Lang> = {
              Last, so a learner part of the way down a verb is not stopped
              at it; and only where a sentence ticks it, since it follows a
              word that calls for it and is not a sentence's verb on its
-             own. Never "bare": that name is BARE_ROW's. */
-          { id: "subjunctive", label: "subjunctive", onlyWhenTicked: true },
+             own. Never "bare": that name is BARE_ROW's. And practised in
+             the card's own examples, never on its own — see VerbExample. */
+          {
+            id: "subjunctive", label: "subjunctive", onlyWhenTicked: true, examples: true,
+            sample: { ar: "لازم {{verb}}", lat: "laazim {{verb}}", en: "{{verb-who}} must {{verb-plain}}" },
+          },
         ],
         /* There is no infinitive. A dictionary lists أكل — he ate — and
            that is a cell of this table, so the card's own word and that

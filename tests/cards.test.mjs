@@ -1994,6 +1994,16 @@ test("what can be saved: a verb needs a name and one form of itself, whichever o
     "a field disagreeing about a blank stops this save as it stops any other");
 });
 
+test("a verb saves on a subjunctive form alone once it has an example to mean it in", () => {
+  /* The subjunctive has no English box: its forms mean what the verb's
+     examples make them mean, so one written with an example to be asked
+     in is a form worth saving. See VerbExample. */
+  const cells = [{ ar: "تاكل", en: "", row: "subjunctive" }];
+  assert.equal(canSaveVerb("to eat", cells, null), false, "no English, and nothing to stand for it");
+  assert.equal(canSaveVerb("to eat", cells, null, (/** @type {any} */ c) => c.row === "subjunctive"), true);
+  assert.equal(canSaveVerb("to eat", [{ ar: "بياكل", en: "he eats" }], null), true, "as before");
+});
+
 /*
  * What is asked about, and what is only written down.
  *
