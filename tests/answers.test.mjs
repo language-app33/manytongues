@@ -68,7 +68,7 @@ const said = (list) => list.map(bare);
    Latin alphabet here for the same reason every other test is: what is
    being checked is the pairing, not the script. */
 /** @returns {any} */
-const two = () => ({ id: "w1", ar: "kitaab-script / safar-script", lat: "kitaab / safar", en: "book", recs: [], s: {} });
+const two = () => ({ id: "w1", ar: "kitaab-script\u001F\nsafar-script", lat: "kitaab\u001F\nsafar", en: "book", recs: [], s: {} });
 
 test("each accepted answer carries its own transliteration", () => {
   assert.deepEqual(said(answersOf(two(), fields)), [
@@ -90,7 +90,7 @@ test("a transliteration written for the second answer stays with the second", ()
   /* The thing that can go wrong with pairing by position: dropping the
      blank would hand the second answer's pronunciation to the first, which
      is worse than having none. */
-  const form = { ar: "one / two", lat: " / two-said" };
+  const form = { ar: "one\u001F\ntwo", lat: "\u001F\ntwo-said" };
   assert.deepEqual(said(answersOf(form, fields)), [
     { text: "one", lat: "", at: 0 },
     { text: "two", lat: "two-said", at: 1 },
@@ -101,7 +101,7 @@ test("a transliteration written for the second answer stays with the second", ()
 test("an answer with no spelling is not an answer, and takes its cell with it", () => {
   /* A row somebody started and left. Kept, it would be an accepted answer
      of nothing — and every transliteration after it would slide. */
-  assert.deepEqual(said(answersOf({ ar: " / two", lat: "one-said / two-said" }, fields)), [
+  assert.deepEqual(said(answersOf({ ar: "\u001F\ntwo", lat: "one-said\u001F\ntwo-said" }, fields)), [
     { text: "two", lat: "two-said", at: 1 },
   ]);
 });
@@ -111,8 +111,8 @@ test("the editor writes both strings at once, so they cannot drift", () => {
     { text: "one", lat: "" },
     { text: "two", lat: "two-said" },
   ], fields);
-  assert.deepEqual(packed.ar, "one / two");
-  assert.deepEqual(packed.lat, " / two-said", "the blank holds the first answer's place");
+  assert.deepEqual(packed.ar, "one\u001F\ntwo");
+  assert.deepEqual(packed.lat, "\u001F\ntwo-said", "the blank holds the first answer's place");
   /* And what comes back out is what went in. */
   assert.deepEqual(answersOf(packed, fields).map((a) => [a.text, a.lat]), [["one", ""], ["two", "two-said"]]);
 
@@ -128,17 +128,21 @@ test("the editor writes both strings at once, so they cannot drift", () => {
 
 test("the rows an editor opens on are never none", () => {
   assert.deepEqual(said(answerRows({}, fields)), [{ text: "", lat: "" }]);
-  assert.deepEqual(said(answerRows({ ar: "one / two", lat: "one-said" }, fields)), [
+  assert.deepEqual(said(answerRows({ ar: "one\u001F\ntwo", lat: "one-said" }, fields)), [
     { text: "one", lat: "one-said" },
     { text: "two", lat: "" },
   ]);
 });
 
 test("splitting keeps blanks and joining drops only the trailing ones", () => {
-  assert.deepEqual(splitAlternatives("a / b"), ["a", "b"]);
-  assert.deepEqual(splitAlternatives("a ; b"), ["a", "b"], "the other separator people typed by hand");
+  assert.deepEqual(splitAlternatives("a\u001F\nb"), ["a", "b"]);
+  /* Nothing written inside an answer splits it (0.439): one answer to a box. */
+  assert.deepEqual(splitAlternatives("a ; b"), ["a ; b"], "a semicolon is part of the answer");
+  assert.deepEqual(splitAlternatives("a / b"), ["a / b"], "and so is a slash");
+  assert.deepEqual(splitAlternatives("a, b"), ["a, b"], "and a comma");
+  assert.equal(joinAlternatives(["one\ntwo", "three"]), "one two\u001F\nthree", "a box holds one line");
   assert.deepEqual(splitAlternatives(""), [""]);
-  assert.equal(joinAlternatives(["a", "", "b"]), "a /  / b", "a blank in the middle is holding a place");
+  assert.equal(joinAlternatives(["a", "", "b"]), "a\u001F\n\u001F\nb", "a blank in the middle is holding a place");
   assert.equal(joinAlternatives(["a", "", ""]), "a", "blanks at the end are rows nobody filled in");
   assert.equal(joinAlternatives(["", ""]), "");
 });
@@ -177,7 +181,7 @@ test("a card recorded before they belonged to an answer gives its clips to each"
   /* The migration, stated as what it must not change. One answer and one
      set of recordings already pair correctly; two answers and one set
      meant the card's, and still do until somebody says otherwise. */
-  const old = { ar: "one / two", lat: "one-said / two-said", clips: [RECS.a], slowClips: [] };
+  const old = { ar: "one\u001F\ntwo", lat: "one-said\u001F\ntwo-said", clips: [RECS.a], slowClips: [] };
   assert.deepEqual(answersOf(old, fields).map((a) => a.clips), [[RECS.a], [RECS.a]]);
   assert.deepEqual(answersOf({ ar: "bayt", clips: [RECS.a] }, fields)[0].clips, [RECS.a]);
 });
@@ -217,8 +221,8 @@ test("a card whose answers name no recordings keeps the ones it had", () => {
      not claimed by either answer, and narrowing to one answer leaves them
      exactly where they were. */
   const card = {
-    ar: "one / two",
-    lat: "one-said / two-said",
+    ar: "one\u001F\ntwo",
+    lat: "one-said\u001F\ntwo-said",
     answers: [{ text: "one", lat: "one-said" }, { text: "two", lat: "two-said" }],
     recs: [{ id: RECS.a, speed: "regular" }],
   };
@@ -257,7 +261,7 @@ test("a card with two of them is drilled on both, one at a time", () => {
 
   /* An answer with no transliteration is not in the rotation: there is no
      question to ask about how it sounds. */
-  const half = { ar: "one / two", lat: " / two-said" };
+  const half = { ar: "one\u001F\ntwo", lat: "\u001F\ntwo-said" };
   assert.equal(turn(half, 0).text, "two");
   assert.equal(turn(half, 1).text, "two");
   assert.equal(answerForTurn({ ar: "one", lat: "" }, 0, fields), null, "and a card with none asks nothing");
@@ -267,7 +271,7 @@ test("what a pronunciation exercise waits for is an answer that has one", () => 
   /* Not merely a transliteration somewhere on the card. A form accepting
      two spellings with a transliteration for only the second can be asked
      — about the second. */
-  const half = { ...two(), lat: " / safar" };
+  const half = { ...two(), lat: "\u001F\nsafar" };
   assert.deepEqual(unmetNeeds(half, EX.tr2ar, null, []), []);
   assert.equal(canAsk({ unit: half, scene: null, contexts: [] }, "tr2ar", ar), true);
 
@@ -291,8 +295,8 @@ test("what a pronunciation exercise waits for is an answer that has one", () => 
 /** @returns {any} */
 const beforeTheChange = () => ({
   id: "w2",
-  ar: "mabsuut / mabsuuta",
-  lat: "mabsuut-said / mabsuuta-said",
+  ar: "mabsuut\u001F\nmabsuuta",
+  lat: "mabsuut-said\u001F\nmabsuuta-said",
   en: "happy",
   number: "singular",
   gender: "masculine",
@@ -328,8 +332,8 @@ test("a migrated card can then be corrected one answer at a time", () => {
   ]);
   /* The delimited strings the server and every export read are written from
      the same list, so they cannot drift from it. */
-  assert.equal(packed.ar, "mabsuut / mabsuuta");
-  assert.equal(packed.lat, "mabsuut-said / mabsuuta-said");
+  assert.equal(packed.ar, "mabsuut\u001F\nmabsuuta");
+  assert.equal(packed.lat, "mabsuut-said\u001F\nmabsuuta-said");
   /* And reading it back gives what went in. */
   assert.deepEqual(answersOf(packed, fields).map((a) => a.gender), ["masculine", "feminine"]);
 });
@@ -400,10 +404,11 @@ test("the delimited strings win where the array disagrees with them", () => {
 /* ---- the other side of the card: what it means ---- */
 
 test("a card that means two things means both of them", () => {
-  /* The same convention as the answers, on the English side: one stored
-     string with " / " between them, and a ; where somebody typed one. */
-  assert.deepEqual(meaningsOf({ en: "office / desk" }), ["office", "desk"]);
-  assert.deepEqual(meaningsOf({ en: "office; desk" }), ["office", "desk"]);
+  /* The same convention as the answers, on the English side: one to a
+     box, and nothing typed in a box splits it. */
+  assert.deepEqual(meaningsOf({ en: "office\u001F\ndesk" }), ["office", "desk"]);
+  assert.deepEqual(meaningsOf({ en: "office; desk" }), ["office; desk"]);
+  assert.deepEqual(meaningsOf({ en: "If it were possible / you could" }), ["If it were possible / you could"]);
   assert.deepEqual(meaningsOf({ en: " office " }), ["office"]);
   assert.deepEqual(meaningsOf({ en: "" }), []);
   assert.deepEqual(meaningsOf(null), []);
@@ -429,7 +434,7 @@ test("asked to write a card from its meaning, one meaning is the question", () =
      "office" and "desk" are each right. Asked for the word, showing both
      asks neither: it reads as one English phrase with a slash in it, and
      it hands over more of the card than the question meant to. */
-  const form = { ar: "maktab-script", lat: "maktab", en: "office / desk" };
+  const form = { ar: "maktab-script", lat: "maktab", en: "office\u001F\ndesk" };
   assert.equal(checkAnswer("desk", form, "ar2en", { language: "ar-PS" }).ok, true);
   assert.equal(checkAnswer("office", form, "ar2en", { language: "ar-PS" }).ok, true);
   assert.equal(meaningForTurn(form), "office", "and one of them is shown");
@@ -445,7 +450,7 @@ test("asked to write a card from its meaning, one meaning is the question", () =
   /* What is accepted does not move with it. The answer is the word, and a
      card accepting two spellings still accepts either — narrowing the
      question narrows the question. */
-  const asked = { ...form, ar: "maktab-script / maktib-script", en: meaningForTurn(form, 1) };
+  const asked = { ...form, ar: "maktab-script\u001F\nmaktib-script", en: meaningForTurn(form, 1) };
   assert.equal(checkAnswer("maktab-script", asked, "en2ar", { language: "ar-PS" }).ok, true);
   assert.equal(checkAnswer("maktib-script", asked, "en2ar", { language: "ar-PS" }).ok, true);
 });
@@ -514,8 +519,8 @@ test("every question shows one accepted answer, and the typed ones still take an
 
 test("which answer is shown is rotated, not drawn", () => {
   const form = {
-    ar: "kitaab / safar",
-    lat: "kitaab / safar",
+    ar: "kitaab\u001F\nsafar",
+    lat: "kitaab\u001F\nsafar",
     en: "book",
   };
   /* Every one of them is met before any is met twice, and the same count
@@ -528,7 +533,7 @@ test("which answer is shown is rotated, not drawn", () => {
 
   /* Unlike answerForTurn, it does not need a pronunciation written: a
      question that merely shows the word can show any of them. */
-  const quiet = { ar: "kitaab / safar", lat: "", en: "book" };
+  const quiet = { ar: "kitaab\u001F\nsafar", lat: "", en: "book" };
   assert.equal(must(answerAt(quiet, 1), "the second, unsaid").text, "safar");
   assert.equal(answerForTurn(quiet, 1), null);
 
@@ -592,7 +597,7 @@ test("a card with one answer is scheduled exactly as it always was", () => {
 });
 
 test("a card with two answers carries a schedule for each, where it shows one", () => {
-  const two = { ar: "kitaab / safar", lat: "kitaab / safar", en: "book" };
+  const two = { ar: "kitaab\u001F\nsafar", lat: "kitaab\u001F\nsafar", en: "book" };
 
   /* Reading the word, telling it apart, hearing it: two questions, two
      schedules. */
@@ -643,11 +648,11 @@ test("a picture chosen is right when it is one of the card's pictures", () => {
 
 test("a card in a list shows one answer of each, the transliteration beside its own word", () => {
   assert.deepEqual(
-    firstOfEach({ ar: "كتاب / سفر", lat: "kitaab / safar", en: "office; desk" }),
+    firstOfEach({ ar: "كتاب\u001F\nسفر", lat: "kitaab\u001F\nsafar", en: "office\u001F\ndesk" }),
     { ar: "كتاب", lat: "kitaab", en: "office" },
   );
   /* A blank first answer is a place held, not the one to show. */
-  assert.deepEqual(firstOfEach({ ar: " / سفر", lat: " / safar", en: "" }), { ar: "سفر", lat: "safar", en: "" });
+  assert.deepEqual(firstOfEach({ ar: "\u001F\nسفر", lat: "\u001F\nsafar", en: "" }), { ar: "سفر", lat: "safar", en: "" });
   assert.deepEqual(firstOfEach({ ar: "بيت", en: "house" }), { ar: "بيت", lat: "", en: "house" });
   assert.deepEqual(firstOfEach(null), { ar: "", lat: "", en: "" });
 });

@@ -31,7 +31,7 @@ import type {
    holds the shape of a scene, which marking a part and an ordering both
    have to read. */
 import { DIALOG_KIND, SELF_ALL, isDialog, linesOf, orderIsRight, partAnswers, yourLines } from "./dialogs.ts";
-import { ALT_SEP, answersOf, meaningsOf } from "./answers.ts";
+import { ALT_SEP, answersOf, meaningsOf, splitAlternatives } from "./answers.ts";
 import { leadOf, subFormsOf } from "./cards.ts";
 /* And what a row is, for the one rule below that reads one: verbs.ts
    knows what a table is made of and no language at all, which is the
@@ -1665,7 +1665,7 @@ export function untoldMeanings(card: unknown, lang: Lang = activeLang()): string
   const forms = ([leadOf(card)].concat(subFormsOf(card)) as Record<string, any>[])
     .filter((f) => f && !isCell(f) && String(f.ar || "").trim() && String(f.en || "").trim());
   const meanings = (f: Record<string, any>) =>
-    String(f.en || "").split(/[/;]/).map((m) => m.trim()).filter((m) => normEn(m));
+    splitAlternatives(String(f.en || "")).filter((m) => normEn(m));
   const out: string[] = [];
   forms.forEach((f, i) => {
     for (const m of meanings(f)) {
@@ -1704,8 +1704,7 @@ export function lentLabel(
 ): string {
   if (!form || !card) return "";
   const said = (f: Record<string, any>) =>
-    String(f.en || "")
-      .split(/[/;,]/)
+    splitAlternatives(String(f.en || ""))
       .map(normEn)
       .filter(Boolean);
   const mine = said(form);
@@ -2075,7 +2074,7 @@ export function viTokenIsWord(token: string, word: string) {
 
 export function checkViet(given: string, expected: string, settings: Settings) {
   const mode = settings.tones || "either";
-  const forms = splitForms(expected, /[/;]/);
+  const forms = splitForms(expected);
   let worst = { ok: false, reason: "wrong" };
 
   for (const form of forms) {
@@ -3293,7 +3292,7 @@ export function compareHe(given: string, expected: string, settings: Settings) {
    order is reused rather than restated. */
 export function checkHe(given: string, expected: string, settings: Settings) {
   let worst = { ok: false, reason: "wrong" };
-  for (const form of splitForms(expected, /[/;]/)) {
+  for (const form of splitForms(expected)) {
     const r = compareHe(given, form, settings);
     if (r.ok) return r;
     if (AR_RANK[r.reason] > AR_RANK[worst.reason]) worst = r;
@@ -4072,10 +4071,10 @@ export const tight = (x: string): string => x.replace(/\s+/g, "");
  * so a card storing "office / desk" accepts "desk" and also accepts
  * "office / desk" typed out in full.
  */
-export function splitForms(expected: string, sep: RegExp) {
-  const whole = String(expected).trim();
-  const parts = whole.split(sep).map((s) => s.trim()).filter(Boolean);
-  return parts.length > 1 ? parts.concat([whole]) : parts;
+/* The answers an expected value accepts: one to each box the teacher
+   filled — see ALT_SEP. Nothing written inside an answer splits it. */
+export function splitForms(expected: string) {
+  return splitAlternatives(String(expected ?? "")).filter(Boolean);
 }
 
 /*
@@ -4104,11 +4103,11 @@ const PERSON_NOTE = new RegExp(`\\s*\\(${NOTE_WORD}(?:[\\s,]+${NOTE_WORD})*\\)`,
 export function checkEn(given: string, expected: string) {
   const g = normEn(given);
   if (!g) return { ok: false, reason: "wrong" };
-  /* Alternatives are split on a slash or semicolon, not a comma: a comma
-     sits inside a phrase as often as between meanings. Splitting on it
+  /* One meaning to a box, and nothing inside a meaning splits it: a comma
+     sits inside a phrase as often as between meanings, and splitting on it
      marked "He is cold, he wants a jacket" wrong, written out in full,
-     and "He is cold" right. */
-  const split = splitForms(expected, /[/;]/);
+     and "He is cold" right. A slash, since 0.439, the same. */
+  const split = splitForms(expected);
   const bare = split.map((e) => e.replace(PERSON_NOTE, "")).filter((e, i) => e !== split[i]);
   const forms = split.concat(bare).map(normEn);
   if (forms.includes(g)) return { ok: true, reason: "exact" };
@@ -4185,7 +4184,7 @@ function sameWords(given: string, expected: string): boolean {
 export function checkTr(given: string, expected: string) {
   const g = normTr(given);
   if (!g) return { ok: false, reason: "wrong" };
-  const forms = splitForms(expected, /[/;,]/).map(normTr);
+  const forms = splitForms(expected).map(normTr);
   if (forms.includes(g)) return { ok: true, reason: "exact" };
   // Where the spaces and hyphens fall is a matter of scheme, not knowledge.
   if (forms.some((e) => tight(e) === tight(g))) return { ok: true, reason: "exact" };
@@ -4307,7 +4306,7 @@ export const AR_RANK: Record<string, number> = { wrong: 0, near: 1, missing: 2, 
 
 export function checkAr(given: string, expected: string, settings: Settings) {
   let worst = { ok: false, reason: "wrong" };
-  for (const form of splitForms(expected, /[/;]/)) {
+  for (const form of splitForms(expected)) {
     const r = compareAr(given, form, settings);
     if (r.ok) return r;
     if (AR_RANK[r.reason] > AR_RANK[worst.reason]) worst = r;
@@ -4552,7 +4551,7 @@ export function checkArPS(given: string, expected: string, settings: Settings, c
   const first = checkAr(given, expected, settings);
   if (first.ok) return right(first);
   let worst = first;
-  for (const form of splitForms(expected, /[/;]/)) {
+  for (const form of splitForms(expected)) {
     for (const alt of arInAtSpellings(form, ctx)) {
       const r = compareAr(given, alt, settings);
       if (r.ok) return right(r);
@@ -4570,7 +4569,7 @@ export function checkTrPS(given: string, expected: string, ctx: InAt = {}) {
   const first = checkTr(given, expected);
   if (first.ok) return right(first);
   let worst = first;
-  for (const form of splitForms(expected, /[/;,]/)) {
+  for (const form of splitForms(expected)) {
     for (const alt of trInAtSpellings(form, ctx)) {
       const r = checkTr(given, alt);
       if (r.ok) return right(r);
@@ -4600,15 +4599,14 @@ const NUMERAL = /^\d+$|^\d{1,3}(?:[,. '\u00A0\u2009\u202F\u066C]\d{3})+$/;
 /**
  * The numbers a meaning accepts, where every answer it accepts is a number
  * written in figures — the word for 40, for 1,000, a number a teacher
- * wrote out by hand — and null where any of them is a word. "five / 5" is
- * a word: it can be answered with letters.
+ * wrote out by hand — and null where any of them is a word. A card
+ * accepting "five" and "5" is a word: it can be answered with letters.
  *
- * Split on a slash or a semicolon and never a comma, which in a number is
- * grouping rather than a second answer.
+ * One answer to a box, as everywhere — see ALT_SEP. A comma inside one is
+ * grouping, as in 1,000, not a second answer.
  */
 export function numeralMeanings(expected: unknown): string[] | null {
-  const parts = String(expected == null ? "" : expected)
-    .split(/[/;]/)
+  const parts = splitAlternatives(String(expected == null ? "" : expected))
     .map((s) =>
       s
         .trim()
@@ -4648,7 +4646,7 @@ export function instructionFor(spec: Record<string, any>, item: Record<string, a
 function inAtOf(item: Record<string, any> | null | undefined, spec: Record<string, any> | null | undefined): InAt {
   const needs: string[] = (spec && spec.needs) || [];
   return {
-    meaning: meaningsOf(item as WithAnswers).join(" / "),
+    meaning: meaningsOf(item as WithAnswers).join(ALT_SEP),
     heard: needs.includes("recs") || needs.includes("contextAudio"),
   };
 }
@@ -4854,7 +4852,7 @@ export function checkAnswer(typed: string, item: Record<string, any>, key: strin
   /* A question showing the taught form keeps the card's own wording as an
      answer — see taughtForm in the trainer. */
   const from = (item && item.taughtFrom) || null;
-  const also = (field: "ar" | "lat") => (from && from[field] ? `${expected} / ${from[field]}` : expected);
+  const also = (field: "ar" | "lat") => (from && from[field] ? `${expected}${ALT_SEP}${from[field]}` : expected);
   if (mode === "ar") return langOf(settings).check(typed, also("ar"), settings, inAtOf(item, spec));
   if (mode === "tr") {
     const own = langOf(settings).checkTranslit;

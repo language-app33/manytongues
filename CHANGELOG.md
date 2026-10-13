@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.439 — 13 October 2026
+## 0.440 — 13 October 2026
 
 **A verb with its past "he" left empty is found in sentences again.**
 
@@ -25,6 +25,33 @@ and moves once per batch of work you would notice, not once per commit.
 
 To check by hand: open a text whose sentence uses a verb with an empty
 past "he" box; the verb is offered under "Words this teaches".
+
+## 0.439 — 13 October 2026
+
+**A slash is just a slash: each accepted answer has its own box.**
+
+- Until now, a slash (and a semicolon) typed in a card split it into two
+  accepted answers. That is how the "Homework instructions" sentence was
+  cut in half. Now nothing typed inside a box ever splits it: not a slash,
+  a semicolon or a comma. Two accepted answers means two boxes, added with
+  the + button, and nothing else.
+- When a card shows several answers together, they now have a dot between
+  them ("Office · Desk") instead of a slash, so a slash that is part of an
+  answer can't be mistaken for the break between two.
+- Pasting a table into the app (only possible when making your own cards,
+  which is switched off for now): a second answer goes in a column of its
+  own, "English 2", "Arabic 2", "Transliteration 2", and so on.
+- Trade-off, as chosen: every slash already on a card is now part of that
+  answer. This includes cards whose second answer was added with the +
+  button, because those were saved with a slash too. Until a teacher
+  splits such a card back into separate boxes, students must type the
+  whole thing, such as "office / desk", to be marked right, and progress
+  on the second answer is set aside.
+- To check by hand: open a card that accepts two answers, such as two
+  spellings or two meanings. It should show one box holding both with the
+  slash; split it into two boxes and save, and each should be accepted on
+  its own. A meaning such as "If it were possible / you could" should stay
+  one meaning.
 
 ## 0.438 — 13 October 2026
 

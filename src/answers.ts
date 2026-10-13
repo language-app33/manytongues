@@ -28,7 +28,7 @@
  * read from wherever they happen to be stored.
  *
  * `text` and `lat` were two delimited strings read together by position —
- * "كتاب / سفر" against "kitaab / safar" — and still are on the way to the
+ * كتاب and سفر one to a line against kitaab and safar — and still are on the way to the
  * server and in an export, because that is the shape the wire and the
  * spreadsheet know. Here they are one list of objects, which is the only
  * shape in which "this answer is feminine" can be said at all.
@@ -99,10 +99,35 @@ export interface PlacedAnswer extends Answer {
    first of those is an Item. */
 export type WithAnswers = Record<string, unknown>;
 
-/* Split on / or ; because both were accepted when the convention was typed
-   by hand; joined with / only. */
-export const ALT_SEP = " / ";
-const ALT_SPLIT = /[/;]/;
+/*
+ * How a field holding several answers keeps them apart: one to a line.
+ *
+ * Every accepted answer is written in a box of its own, and nothing typed
+ * inside a box is ever read as a separator — not a slash, not a semicolon,
+ * not a comma. Until 0.439 the answers were joined with " / " and split on
+ * "/" or ";", which was a convention from before the boxes, when a teacher
+ * typed the slash by hand; and it split a sentence such as "If it were
+ * possible / you could only keep three apps" into two answers that neither
+ * meant anything. What stands between them is a mark nobody can type —
+ * the unit separator, a control character — and a line break after it, so
+ * a value shown as it is reads as one answer to a line. The mark is what
+ * is split on, and it is not white space: trimming a field, which the app
+ * does on every save, cannot take the place-holder of a blank first
+ * answer with it and hand its neighbour's transliteration to the wrong
+ * word.
+ *
+ * Still a string, because that is what the server, sync and every card
+ * list carry. A slash written before 0.439 is read as part of the answer
+ * it is in: the owner chose that over guessing which slashes were meant
+ * as two answers, and the teacher splits such a card into boxes by hand.
+ */
+const ALT_MARK = "\u001F";
+export const ALT_SEP = `${ALT_MARK}\n`;
+
+/* What a box may hold: one line, and never the separator. Anything pasted
+   with a break in it is one answer, its lines run together. */
+export const oneLine = (value: string | null | undefined): string =>
+  String(value || "").split(ALT_MARK).join("").replace(/\s*[\r\n]+\s*/g, " ");
 
 /*
  * The answers a field holds, in order, blanks and all.
@@ -112,7 +137,16 @@ const ALT_SPLIT = /[/;]/;
  * and dropping the hole would hand "safar" to the wrong word.
  */
 export function splitAlternatives(value: string | null | undefined): string[] {
-  return String(value || "").split(ALT_SPLIT).map((x) => x.trim());
+  return String(value || "").split(ALT_MARK).map((x) => x.trim());
+}
+
+/* Several answers put on the screen together, which is the only place they
+   are ever side by side: a dot between them, and never the slash, which
+   since 0.439 is only ever a slash a teacher wrote inside an answer. */
+export const SHOWN_SEP = " · ";
+export function shownAlternatives(value: string | null | undefined): string {
+  const list = splitAlternatives(value).filter(Boolean);
+  return list.length > 1 ? list.join(SHOWN_SEP) : String(value || "").trim();
 }
 
 /*
@@ -138,7 +172,7 @@ export function firstOfEach(form: WithAnswers | null | undefined): { ar: string;
 /* Back to one string. Trailing blanks go — they are rows nobody filled in —
    and any blank before a filled one stays, because it is holding a place. */
 export function joinAlternatives(list: (string | null | undefined)[]): string {
-  const out = (list || []).map((x) => String(x || "").trim());
+  const out = (list || []).map((x) => oneLine(x).trim());
   while (out.length && !out[out.length - 1]) out.pop();
   return out.join(ALT_SEP);
 }
@@ -164,7 +198,7 @@ export function joinAlternatives(list: (string | null | undefined)[]): string {
  */
 export function readAnswer(raw: unknown, fields: AnswerField[] = []): Answer {
   const said = (raw && typeof raw === "object" ? raw : {}) as Record<string, unknown>;
-  const out: Answer = { text: str(said.text), lat: str(said.lat) };
+  const out: Answer = { text: oneLine(str(said.text)).trim(), lat: oneLine(str(said.lat)).trim() };
   /* Always both lists, even where they are empty, and unlike the grammar
      fields below. An answer read here is handed to `withAnswer`, which
      narrows a card to it — and an absent list there would leave the
@@ -407,16 +441,15 @@ export function answerAt(
 /*
  * What a card means, as the meanings it gives.
  *
- * The other side of the card keeps the same convention: "office / desk" is
- * two ways of saying what one word means, and both are accepted when the
+ * The other side of the card keeps the same convention: "office" and "desk",
+ * one to a line, are two ways of saying what one word means, and both are accepted when the
  * question is what it means. They are plain strings rather than Answers —
  * nothing is declared about an English gloss, and nothing is asked about how
  * it is pronounced.
  *
- * Split only where the app itself joins. The checker is looser and also
- * splits on a comma, because a card written by hand may separate them that
- * way; reading a comma as a separator here would cut "close the door,
- * please" in half and show a learner one clause of a phrase.
+ * Split only where the app itself joins, one meaning to a line — see
+ * ALT_SEP. Nothing written inside a meaning is a separator: "close the
+ * door, please" and "If it were possible / you could" are each one.
  */
 export function meaningsOf(form: WithAnswers | null | undefined): string[] {
   return splitAlternatives(field(form, "en")).filter(Boolean);

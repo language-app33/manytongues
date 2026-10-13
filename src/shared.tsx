@@ -660,7 +660,7 @@ export function StickyFoot({ above, children, className }: {
    its transliteration is decided — and which a test can import. Re-exported
    here because this is where the screens look for it. */
 export { splitAlternatives, joinAlternatives } from "./answers.ts";
-import { answersOf, firstOfEach, meaningsOf, storedAnswer } from "./answers.ts";
+import { answersOf, firstOfEach, meaningsOf, shownAlternatives, storedAnswer } from "./answers.ts";
 
 /*
  * What one listed sentence means, a line for each meaning.
@@ -980,7 +980,7 @@ export function LanguageTag({ languages, id }: {
  * composes. Anything outside this file that needs it wants CardTile.
  */
 function Written({ text }: { text?: string | null }) {
-  const runs = splitSlots(text);
+  const runs = splitSlots(shownAlternatives(text));
   if (runs.length === 1 && !runs[0].slot) return <>{runs[0].text}</>;
   return (
     <>

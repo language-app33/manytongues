@@ -303,6 +303,7 @@ import {
   speakersOf,
 } from "./dialogs.ts";
 import {
+  ALT_SEP,
   answerAt,
   answerForTurn,
   answerGiven,
@@ -310,7 +311,10 @@ import {
   firstOfEach,
   meaningForTurn,
   meaningsOf,
+  joinAlternatives,
   packAnswers,
+  shownAlternatives,
+  splitAlternatives,
   withAnswer as oneAnswer,
 } from "./answers.ts";
 import { asMeaning, fieldsLost, fillForm, fillsOf, hasSlots, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
@@ -1550,7 +1554,7 @@ export function lentTags(unit: Form | null | undefined, lang: Lang): string[] {
     if (!found) continue;
     const label = told[slot] || lentLabel(found.form, found.card, LANGUAGES[String(found.card.lang || "")] || lang);
     if (!label) continue;
-    const en = String(found.form.en || "").split("/")[0].trim();
+    const en = splitAlternatives(String(found.form.en || ""))[0] || "";
     const line = say("blankForm", { word: en, form: label });
     if (!out.includes(line)) out.push(line);
   }
@@ -3376,7 +3380,7 @@ function taughtForm(unit: Form, type: string): Form {
   const needs: string[] = (spec && spec.needs) || [];
   if (needs.includes("recs") || needs.includes("contextAudio")) return unit;
   if (Array.isArray(unit.recs) && unit.recs.length) return unit;
-  const en = meaningsOf(unit).join(" / ");
+  const en = meaningsOf(unit).join(ALT_SEP);
   const taught = lang.taught({ ar: unit.ar, lat: unit.lat, en });
   if (!taught) return unit;
   const answers = Array.isArray(unit.answers)
@@ -6253,10 +6257,44 @@ function isSeparatorLine(line?: string) {
   return cells.length > 0 && cells.every((c) => MD_SEPARATOR.test(c));
 }
 
+/* The three fields a card can accept more than one of. */
+const MANY_FIELDS = new Set(["ar", "lat", "en"]);
+
+/*
+ * The field a column heading names: "English", or "English 2" for a second
+ * accepted answer, "Arabic 3" for a third. One answer to a cell, as one to
+ * a box in the editor — nothing written inside a cell splits it (0.439) —
+ * so the extra answers each have a column of their own. A second answer is
+ * read as `en#1`, its place in the list, and folded in by foldAnswers.
+ */
+function fieldOf(heading: string): string | undefined {
+  const t = heading.toLowerCase().trim();
+  const m = /^(.*?)\s*(\d+)$/.exec(t);
+  const at = m ? Number(m[2]) : 1;
+  const key = FIELD_ALIASES[(m ? m[1] : t).replace(/[^a-z]/g, "")];
+  if (!key || at < 1) return undefined;
+  if (at === 1) return key;
+  return MANY_FIELDS.has(key) ? `${key}#${at - 1}` : undefined;
+}
+
+/* The answers read from numbered columns, into the field they belong to:
+   one answer to a line (see ALT_SEP), in the order the columns number
+   them. A transliteration stays beside the word in the same place. */
+function foldAnswers(row: Record<string, string>) {
+  for (const f of MANY_FIELDS) {
+    const list = [row[f] || ""];
+    for (const [k, v] of Object.entries(row)) {
+      const m = /^(\w+)#(\d+)$/.exec(k);
+      if (m && m[1] === f) list[Number(m[2])] = v || "";
+    }
+    row[f] = joinAlternatives(Array.from(list, (x) => x || ""));
+  }
+}
+
 function readHeader(cells: string[]): string[] | null {
   if (cells.length < 2) return null;
-  const map = cells.map((c) => FIELD_ALIASES[c.toLowerCase().replace(/[^a-z]/g, "")]);
-  return map.every(Boolean) ? map : null;
+  const map = cells.map(fieldOf);
+  return map.every(Boolean) ? (map as string[]) : null;
 }
 
 /**
@@ -6277,7 +6315,7 @@ type ParsedRow = Record<string, any> & {
  * and the count of lines that held nothing, and the callers all read the
  * rows first.
  */
-function parseLines(text: string, knownTags: string[] = []): ParsedRow[] & { skipped?: number } {
+export function parseLines(text: string, knownTags: string[] = []): ParsedRow[] & { skipped?: number } {
   const out: ParsedRow[] & { skipped?: number } = [];
   const known = new Set(knownTags.map((t) => t.toLowerCase()));
   const lines = String(text).split(/\r?\n/);
@@ -6316,8 +6354,8 @@ function parseLines(text: string, knownTags: string[] = []): ParsedRow[] & { ski
     const loose: { value: string, i: number }[] = [];
 
     cells.forEach((cell: string, i: number) => {
-      const m = cell.match(/^([A-Za-z]+)\s*[:=]\s*([\s\S]*)$/);
-      const key = m && FIELD_ALIASES[m[1].toLowerCase()];
+      const m = cell.match(/^([A-Za-z]+(?:\s*\d+)?)\s*[:=]\s*([\s\S]*)$/);
+      const key = m && fieldOf(m[1]);
       if (key) row[key] = m[2].trim();
       else loose.push({ value: cell, i });
     });
@@ -6354,6 +6392,7 @@ function parseLines(text: string, knownTags: string[] = []): ParsedRow[] & { ski
       }
     }
 
+    foldAnswers(row);
     if (!row.ar && !row.lat && !row.en) {
       skipped += 1;
       continue;
@@ -7833,7 +7872,7 @@ function Arabic({ text, kind, lang, name }: { text?: string; kind?: string; lang
       dir={L.direction}
       style={{ fontFamily: L.fontStack, direction: L.direction, ...scriptVars(L) }}
     >
-      {text}
+      {shownAlternatives(text)}
     </p>
   );
 }
@@ -11385,7 +11424,7 @@ export default function ArabicTrainer() {
     /* Told what the card means and whether it was heard, as the marking
        was, so an answer accepted there is found here too. */
     const needs: string[] = spec.needs || [];
-    const ctx = { meaning: meaningsOf(item).join(" / "), heard: needs.includes("recs") || needs.includes("contextAudio") };
+    const ctx = { meaning: meaningsOf(item).join(ALT_SEP), heard: needs.includes("recs") || needs.includes("contextAudio") };
     return answerGiven(typed, item, (given, want) => qLang.check(given, want, qSettings, ctx).ok, answerFields());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item && item.id, checked, typed, skipped, spec && spec.answerField]);
@@ -15473,7 +15512,7 @@ function ItemSheet({ mode, initial, allTags, settings, onSave, onClose, scene = 
             </div>
 
             <Help>
-              Slash-separated alternatives all count — <em>book / notebook</em>.
+              One answer to a box: whatever is typed here, a slash included, is one answer.
             </Help>
 
             <RecordingsField
@@ -16665,7 +16704,7 @@ export function formIsAmbiguous({ unit, kin, shown, promptField, answerField }: 
  * written "I am hot" are both *I am hot*, and asked that, a learner has no
  * way to know which was wanted. Exact lines let that pass with no tag, and
  * a learner reported it — the second report of a missing tag. The
- * meanings are split as lentLabel splits them, on a slash or a semicolon;
+ * meanings are split as lentLabel splits them, one to a box;
  * not on a comma, which sits inside a phrase as often as between two.
  */
 function readAlike(
@@ -16679,7 +16718,7 @@ function readAlike(
     return !!said(a) && said(a) === said(b);
   }
   const meanings = (x: Record<string, any> | null | undefined) =>
-    raw(x).split(/[/;]/).map(normEn).filter(Boolean);
+    splitAlternatives(raw(x)).map(normEn).filter(Boolean);
   const mine = meanings(a);
   return meanings(b).some((m) => mine.includes(m));
 }

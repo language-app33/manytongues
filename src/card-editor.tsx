@@ -128,10 +128,11 @@ const blankLine = (taken: { id?: string }[] = []) => ({
 });
 
 /* One answer, or several: a field per accepted answer, a + after the last
-   to add another and a − on every extra. What is stored is still one
-   string with " / " between the answers, so the checker and every card
-   already saved are untouched; the slash a teacher used to type by hand is
-   now a button. The list is local state seeded from the stored string —
+   to add another and a − on every extra. The box is the only thing that
+   separates two answers: whatever is typed in one — a slash, a comma, a
+   semicolon — is part of that answer (0.439). Stored as one string, an
+   answer to a line (see ALT_SEP), which a one-line box cannot hold. The
+   list is local state seeded from the stored string —
    deriving it on every render would drop an added field the moment it was
    added, because an empty answer joins to nothing. */
 function Alternatives({ value, onChange, render, of = "", addLabel = "Add another accepted answer" }: {

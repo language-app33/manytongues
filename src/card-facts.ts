@@ -137,7 +137,7 @@ const asWritten = (value: unknown): string[] =>
 const asMeaningWritten = (value: unknown): string[] => asWritten(asMeaning(str(value)));
 
 /** The same, for the two fields that hold every accepted answer at once,
-    slash-separated: each spelling is drawn on its own line. */
+    one to a line: each spelling is drawn on its own line. */
 const asAnswers = (value: unknown): string[] =>
   splitAlternatives(str(value)).filter(Boolean).flatMap(asWritten);
 
@@ -900,7 +900,7 @@ export const CARD_FACTS: FieldRule[] = [
     what: "The word in the language's own script — the answer, and what a blank in it asks for.",
     reader: "both",
     /* Every accepted spelling, because that is what the field holds: two
-       of them are stored slash-separated and drawn one per line, each with
+       of them are stored one to a line and drawn one per line, each with
        its own pronunciation and its own grammar beside it. */
     shown: asAnswers,
   },
