@@ -9204,10 +9204,14 @@ const openPronounTables = async () => {
    shape of it.
 
    On its own document, with the scene already up its ladder, because that
-   is the only state in which the ordering is dealt at all. */
+   is the only state in which the ordering is dealt at all. And with the
+   course quiet, as the walks after it are: the server's own lesson words
+   otherwise arrive on start and, on a slow run, take the session over —
+   twenty questions of somebody else's, with the scene never reached. */
 {
   root.unmount();
   await sleep(200);
+  materialQuiet = true;
   const before = errors.length;
   /* Answered right twice and due: the level-one reading is climbed, so
      the rung above it has opened. */
@@ -9293,6 +9297,7 @@ const openPronounTables = async () => {
   root7.unmount();
   host7.remove();
   await sleep(200);
+  materialQuiet = false;
 }
 
 /* ---- the settings screens, and the menu that reaches them ----
