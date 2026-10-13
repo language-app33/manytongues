@@ -20,7 +20,7 @@
 import type { Form, Item, Lang } from "./types.ts";
 import { findWordSpan, guessKind, supportsContext } from "./languages.ts";
 import { unitsOf } from "./scheduler.ts";
-import { leadOf } from "./cards.ts";
+import { leadOf, wordOf } from "./cards.ts";
 import { dialogPhrases } from "./dialogs.ts";
 
 /*
@@ -134,7 +134,7 @@ export function wordsOffered(
   for (const card of cards || []) {
     if (out.length >= most) break;
     if (!card || !card.id || card.id === selfId) continue;
-    const lead = leadOf(card).ar;
+    const lead = wordOf(card).ar;
     if (!lead || guessKind(lead, lang) !== "word") continue;
     const hit = unitsOf(card).find(({ unit }) => unit.ar && findWordSpan(text, unit.ar, lang));
     if (hit) out.push({ card, form: hit.unit });

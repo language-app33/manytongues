@@ -136,7 +136,7 @@ test("what can fill a hole is a card that says so, in the same language", () => 
 test("a value lends its first accepted answer, not the whole field", () => {
   /* A value card may accept two spellings, and "kitaab / safar" dropped
      whole into a sentence is not a sentence. */
-  const two = { id: "v9", fills: "name", ar: "raafi / rafa", en: "Raphael", lat: "raafi / rafa" };
+  const two = { id: "v9", fills: "name", ar: "raafi\u001F\nrafa", en: "Raphael", lat: "raafi\u001F\nrafa" };
   assert.deepEqual(valueOf(two), { id: "v9", ar: "raafi", en: "Raphael", lat: "raafi", proper: true });
 });
 
@@ -1252,7 +1252,7 @@ test("a blank's first letter fits where it stands", () => {
   assert.equal(fillText("Is that {{word}}?", { word: { ar: "", lat: "", en: "TV" } }, "en"), "Is that TV?");
   /* The start of each sentence, and of each way of saying it. */
   assert.equal(fillText("Yes. {{word}} is good", { word: cà }, "en"), "Yes. Coffee is good");
-  assert.equal(fillText("I like it / {{word}} is good", { word: sách }, "en"), "I like it / Book is good");
+  assert.equal(fillText("I like it\u001F\n{{word}} is good", { word: sách }, "en"), "I like it\u001F\nBook is good");
   /* No list of words: Monday is cased like any other word unless its card
      keeps its capitals (the teacher's tick) — then it is left exactly as
      typed, and only raised where it opens a sentence. */
@@ -1279,7 +1279,8 @@ test("a blank's first letter fits where it stands", () => {
 test("a meaning shown on its own starts with a capital", () => {
   assert.equal(asMeaning("book"), "Book");
   assert.equal(asMeaning("to eat"), "To eat");
-  assert.equal(asMeaning("office / desk"), "Office / Desk");
+  assert.equal(asMeaning("office\u001F\ndesk"), "Office · Desk");
+  assert.equal(asMeaning("office / desk"), "Office / desk", "a slash is part of the meaning");
   assert.equal(asMeaning("the book is big"), "The book is big");
   assert.equal(asMeaning("“hello”"), "“Hello”");
   assert.equal(asMeaning("iPhone"), "iPhone");

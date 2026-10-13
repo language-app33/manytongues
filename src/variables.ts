@@ -33,7 +33,7 @@
  * answers.ts are: it decides what a card says, so it is somewhere a test
  * can reach and somewhere nothing can reach back into.
  */
-import { ALT_SEP, splitAlternatives } from "./answers.ts";
+import { ALT_SEP, SHOWN_SEP, splitAlternatives } from "./answers.ts";
 import { formsOf, leadOf } from "./cards.ts";
 import { mixed, spansThrough } from "./numbers/spans.ts";
 
@@ -1644,11 +1644,14 @@ const speaksAsCard = (card: WithSlots | null | undefined, form: WithSlots | null
 
 /* Whether a blank written after `before` opens a sentence: nothing but
    space and opening marks since the start, or since a full stop, a
-   question or an exclamation — or since the slash between two ways of
-   saying it, each of which is a sentence of its own. */
+   question or an exclamation — or since the start of the answer it is in,
+   each answer being a sentence of its own (see ALT_SEP). A slash is only
+   a slash. */
 const startsSentence = (before: string): boolean => {
-  const rest = before.replace(/[\s"'“‘«¿¡([\-–—]+$/u, "");
-  return rest === "" || /[.!?/]$/.test(rest);
+  const cut = before.lastIndexOf(ALT_SEP);
+  const own = cut < 0 ? before : before.slice(cut + ALT_SEP.length);
+  const rest = own.replace(/[\s"'“‘«¿¡([\-–—]+$/u, "");
+  return rest === "" || /[.!?]$/.test(rest);
 };
 
 const hasCase = (ch: string): boolean => ch.toUpperCase() !== ch.toLowerCase();
@@ -1714,8 +1717,9 @@ export function fitEnglish(phrase: string, start: boolean, proper: boolean, keep
  * For the screen only. What is stored stays as the teacher wrote it, and
  * so does what an answer is marked against, so this cannot move a
  * sentence's review fingerprint or turn a right answer wrong. Each of the
- * ways a card is said gets its own capital — "Office / Desk" — because
- * each is read as a meaning of its own. A word whose second letter is a
+ * ways a card is said gets its own capital — "Office · Desk", one to a box
+ * and a dot between them on the screen — because each is read as a
+ * meaning of its own. A word whose second letter is a
  * capital too is left as it is (iPhone, eBay), as is a meaning opening
  * with a blank or a figure, which has no first letter to raise.
  */
@@ -1729,7 +1733,8 @@ export function asMeaning(said: string | null | undefined): string {
           : open + first.toUpperCase() + next,
       ),
     )
-    .join(ALT_SEP);
+    .filter((one) => one.trim())
+    .join(SHOWN_SEP);
 }
 
 /*

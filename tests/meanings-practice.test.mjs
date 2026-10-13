@@ -83,7 +83,7 @@ test("asked what صَبِر means, the other card is the one ruled out", () => {
 });
 
 test("asked to write 'right', the other word for it is the one ruled out", () => {
-  const sahh = card("sahh", "صح", "right / correct", 4);
+  const sahh = card("sahh", "صح", "right\u001F\ncorrect", 4);
   const yamin = card("yamin", "يمين", "right", 5);
   installIndexes([sahh, yamin, book], settings);
   const sibs = siblingsAsked(yamin, lead(yamin), EX.en2ar, settings);

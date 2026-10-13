@@ -6139,3 +6139,42 @@ started; splitting a box of several sentences when practising; fewer
 choices for long sentences, the owner chose the first. The cost, that a
 text partly got through shows fewer sentences for a while, was put to
 them.
+
+---
+
+## One answer to a box, and nothing typed inside one splits it
+
+**13 October 2026** · `src/answers.ts` (`ALT_SEP`, `splitAlternatives`)
+
+A card's accepted answers were kept in one string with " / " between them,
+and every reader split on "/" or ";" — the checker on "," too, for a
+transliteration. It dated from before the editor had a box per answer,
+when a teacher typed the slash by hand. It split a text's sentence, "If it
+were possible / you could only keep 3 apps…", into two halves that meant
+nothing, and a learner was asked a question with nothing to choose.
+
+The owner had the slash taken out altogether: answers are separated by
+their boxes and by nothing else. What stands between them in the stored
+string is now U+001F (the unit separator) followed by a line break. It
+cannot be typed into a one-line box, and `oneLine` strips it from anything
+pasted. It is a control character rather than plain white space because the
+app trims fields on every save, and a leading line break — the place-holder
+of a blank first answer, as in a transliteration written only for the
+second — would have been trimmed away, handing it to the wrong word. The
+line break after it is only so a raw value reads one answer to a line.
+
+Still one string rather than a list, because the server, sync and five
+hundred readers carry `ar`, `lat` and `en` as strings; changing the
+separator changed what they mean without changing their shape.
+
+**What it cost.** The owner chose not to guess which existing slashes were
+meant as two answers: every slash on every card written before 0.439 is
+now part of the answer it is in, including cards whose second answer was
+added with the editor's + button, which saved a slash too. A teacher puts
+such a card's answers back into separate boxes by hand; until then a
+student has to give the whole of "office / desk". Progress recorded per
+answer on the second of them is no longer read.
+
+On screen, several answers shown together have a dot between them
+(`SHOWN_SEP`), never a slash, so a slash a teacher wrote inside an answer
+cannot be mistaken for the break between two.

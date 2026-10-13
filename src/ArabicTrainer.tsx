@@ -303,6 +303,7 @@ import {
   speakersOf,
 } from "./dialogs.ts";
 import {
+  ALT_SEP,
   answerAt,
   answerForTurn,
   answerGiven,
@@ -310,7 +311,10 @@ import {
   firstOfEach,
   meaningForTurn,
   meaningsOf,
+  joinAlternatives,
   packAnswers,
+  shownAlternatives,
+  splitAlternatives,
   withAnswer as oneAnswer,
 } from "./answers.ts";
 import { asMeaning, fieldsLost, fillForm, fillsOf, hasSlots, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
@@ -1550,7 +1554,7 @@ export function lentTags(unit: Form | null | undefined, lang: Lang): string[] {
     if (!found) continue;
     const label = told[slot] || lentLabel(found.form, found.card, LANGUAGES[String(found.card.lang || "")] || lang);
     if (!label) continue;
-    const en = String(found.form.en || "").split("/")[0].trim();
+    const en = splitAlternatives(String(found.form.en || ""))[0] || "";
     const line = say("blankForm", { word: en, form: label });
     if (!out.includes(line)) out.push(line);
   }
@@ -3200,7 +3204,8 @@ const SENTENCE_TYPES = new Set(["sen2en", "en2sen"]);
 const GAP_TURNS = new WeakMap<Question, number>();
 
 function castGap(resolved: { unit: Form; parent: Item; isSub: boolean } | null, ex: Question) {
-  if (!resolved || !(GAP_TYPES.has(ex.type) || SENTENCE_TYPES.has(ex.type)) || !isDialog(resolved.parent)) return resolved;
+  const type = typeOf(ex.type);
+  if (!resolved || !(GAP_TYPES.has(type) || SENTENCE_TYPES.has(type)) || !isDialog(resolved.parent)) return resolved;
   let turn = GAP_TURNS.get(ex);
   if (turn === undefined) {
     const st = statesOf(resolved.unit)[ex.type];
@@ -3212,7 +3217,7 @@ function castGap(resolved: { unit: Form; parent: Item; isSub: boolean } | null, 
      own words and the sentence is itself. Its own id, so its own progress. */
   const placed = sceneOf(resolved.unit.id);
   const own = placed && placed.at !== WHOLE_SCENE ? placed.at : null;
-  if (SENTENCE_TYPES.has(ex.type)) {
+  if (SENTENCE_TYPES.has(type)) {
     const at = own !== null ? own : meantAt(resolved.parent, turn);
     const line = at === null ? null : linesOf(resolved.parent)[at];
     if (!line) return resolved;
@@ -3375,7 +3380,7 @@ function taughtForm(unit: Form, type: string): Form {
   const needs: string[] = (spec && spec.needs) || [];
   if (needs.includes("recs") || needs.includes("contextAudio")) return unit;
   if (Array.isArray(unit.recs) && unit.recs.length) return unit;
-  const en = meaningsOf(unit).join(" / ");
+  const en = meaningsOf(unit).join(ALT_SEP);
   const taught = lang.taught({ ar: unit.ar, lat: unit.lat, en });
   if (!taught) return unit;
   const answers = Array.isArray(unit.answers)
@@ -3759,6 +3764,38 @@ export function requeueUnaskable(
   const keep = tail[0] === exercises[from] ? 1 : 0;
   const settled = exercises.slice(0, from).concat(tail.slice(0, keep));
   return settled.concat(varyTypes(tail.slice(keep), settled[settled.length - 1] || null));
+}
+
+/*
+ * The question at `at` taken out of the queue because it turned out, once on
+ * the screen, to have nothing to choose between.
+ *
+ * A question offering answers to choose from is only worth asking with at
+ * least two of them. Whether there are enough is meant to be settled when it
+ * is dealt, but the answers themselves are only drawn on the question
+ * screen, from the cards the session holds — and when that came back with
+ * none, the question went up anyway with "I don't know" the one way past
+ * it. A learner reported exactly that. So whatever the reason, the screen
+ * hands it back here: one of the session's backups that can still be asked
+ * stands in, as for any question that can no longer be asked (see
+ * requeueUnaskable), or the session is one question shorter. Nothing is
+ * marked: the learner was never asked anything.
+ */
+export function withoutQuestionAt(
+  exercises: Question[],
+  at: number,
+  items: Item[],
+  settings: Settings,
+  backups: Question[] = [],
+): Question[] {
+  const gone = exercises[at];
+  if (!gone) return exercises;
+  const standIn = backups.find((b) => {
+    if (b.id === gone.id && b.type === gone.type && (b.subId || "") === (gone.subId || "")) return false;
+    const r = resolveUnit(items, b);
+    return !!r && askableTypes(r.unit, settings).includes(b.type);
+  });
+  return exercises.slice(0, at).concat(standIn ? [standIn] : [], exercises.slice(at + 1));
 }
 
 /* Which exercise types this card's data can support.
@@ -6220,10 +6257,44 @@ function isSeparatorLine(line?: string) {
   return cells.length > 0 && cells.every((c) => MD_SEPARATOR.test(c));
 }
 
+/* The three fields a card can accept more than one of. */
+const MANY_FIELDS = new Set(["ar", "lat", "en"]);
+
+/*
+ * The field a column heading names: "English", or "English 2" for a second
+ * accepted answer, "Arabic 3" for a third. One answer to a cell, as one to
+ * a box in the editor — nothing written inside a cell splits it (0.439) —
+ * so the extra answers each have a column of their own. A second answer is
+ * read as `en#1`, its place in the list, and folded in by foldAnswers.
+ */
+function fieldOf(heading: string): string | undefined {
+  const t = heading.toLowerCase().trim();
+  const m = /^(.*?)\s*(\d+)$/.exec(t);
+  const at = m ? Number(m[2]) : 1;
+  const key = FIELD_ALIASES[(m ? m[1] : t).replace(/[^a-z]/g, "")];
+  if (!key || at < 1) return undefined;
+  if (at === 1) return key;
+  return MANY_FIELDS.has(key) ? `${key}#${at - 1}` : undefined;
+}
+
+/* The answers read from numbered columns, into the field they belong to:
+   one answer to a line (see ALT_SEP), in the order the columns number
+   them. A transliteration stays beside the word in the same place. */
+function foldAnswers(row: Record<string, string>) {
+  for (const f of MANY_FIELDS) {
+    const list = [row[f] || ""];
+    for (const [k, v] of Object.entries(row)) {
+      const m = /^(\w+)#(\d+)$/.exec(k);
+      if (m && m[1] === f) list[Number(m[2])] = v || "";
+    }
+    row[f] = joinAlternatives(Array.from(list, (x) => x || ""));
+  }
+}
+
 function readHeader(cells: string[]): string[] | null {
   if (cells.length < 2) return null;
-  const map = cells.map((c) => FIELD_ALIASES[c.toLowerCase().replace(/[^a-z]/g, "")]);
-  return map.every(Boolean) ? map : null;
+  const map = cells.map(fieldOf);
+  return map.every(Boolean) ? (map as string[]) : null;
 }
 
 /**
@@ -6244,7 +6315,7 @@ type ParsedRow = Record<string, any> & {
  * and the count of lines that held nothing, and the callers all read the
  * rows first.
  */
-function parseLines(text: string, knownTags: string[] = []): ParsedRow[] & { skipped?: number } {
+export function parseLines(text: string, knownTags: string[] = []): ParsedRow[] & { skipped?: number } {
   const out: ParsedRow[] & { skipped?: number } = [];
   const known = new Set(knownTags.map((t) => t.toLowerCase()));
   const lines = String(text).split(/\r?\n/);
@@ -6283,8 +6354,8 @@ function parseLines(text: string, knownTags: string[] = []): ParsedRow[] & { ski
     const loose: { value: string, i: number }[] = [];
 
     cells.forEach((cell: string, i: number) => {
-      const m = cell.match(/^([A-Za-z]+)\s*[:=]\s*([\s\S]*)$/);
-      const key = m && FIELD_ALIASES[m[1].toLowerCase()];
+      const m = cell.match(/^([A-Za-z]+(?:\s*\d+)?)\s*[:=]\s*([\s\S]*)$/);
+      const key = m && fieldOf(m[1]);
       if (key) row[key] = m[2].trim();
       else loose.push({ value: cell, i });
     });
@@ -6321,6 +6392,7 @@ function parseLines(text: string, knownTags: string[] = []): ParsedRow[] & { ski
       }
     }
 
+    foldAnswers(row);
     if (!row.ar && !row.lat && !row.en) {
       skipped += 1;
       continue;
@@ -7800,7 +7872,7 @@ function Arabic({ text, kind, lang, name }: { text?: string; kind?: string; lang
       dir={L.direction}
       style={{ fontFamily: L.fontStack, direction: L.direction, ...scriptVars(L) }}
     >
-      {text}
+      {shownAlternatives(text)}
     </p>
   );
 }
@@ -11250,6 +11322,20 @@ export default function ArabicTrainer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dialog && dialog.id, at, item && item.id, exercise && exercise.type, exercise && exercise.ctx, asking.length, siblingCards.join(" "), systems, nearForms]);
 
+  /* A question to choose the answer to, with fewer than two answers to
+     choose between, is not asked: it is taken out and a backup stands in.
+     See withoutQuestionAt. */
+  const nothingToChoose = !!spec && !!spec.picks && spec.picks !== "pair" && !!item && !checked && choices.length < 2;
+  useEffect(() => {
+    if (!nothingToChoose || !session || !session.exercises) return;
+    const next = withoutQuestionAt(session.exercises, qi, items, settings, session.backups);
+    /* The last question gone leaves the end of the session on screen,
+       which is where it was going. */
+    setSession((s: Session | null) => (s ? withQueue(s, next) : s));
+    resetExercise();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [nothingToChoose, qi]);
+
   /*
    * Whether the prompt has to say which form it wants.
    *
@@ -11338,7 +11424,7 @@ export default function ArabicTrainer() {
     /* Told what the card means and whether it was heard, as the marking
        was, so an answer accepted there is found here too. */
     const needs: string[] = spec.needs || [];
-    const ctx = { meaning: meaningsOf(item).join(" / "), heard: needs.includes("recs") || needs.includes("contextAudio") };
+    const ctx = { meaning: meaningsOf(item).join(ALT_SEP), heard: needs.includes("recs") || needs.includes("contextAudio") };
     return answerGiven(typed, item, (given, want) => qLang.check(given, want, qSettings, ctx).ok, answerFields());
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [item && item.id, checked, typed, skipped, spec && spec.answerField]);
@@ -15426,7 +15512,7 @@ function ItemSheet({ mode, initial, allTags, settings, onSave, onClose, scene = 
             </div>
 
             <Help>
-              Slash-separated alternatives all count — <em>book / notebook</em>.
+              One answer to a box: whatever is typed here, a slash included, is one answer.
             </Help>
 
             <RecordingsField
@@ -16618,7 +16704,7 @@ export function formIsAmbiguous({ unit, kin, shown, promptField, answerField }: 
  * written "I am hot" are both *I am hot*, and asked that, a learner has no
  * way to know which was wanted. Exact lines let that pass with no tag, and
  * a learner reported it — the second report of a missing tag. The
- * meanings are split as lentLabel splits them, on a slash or a semicolon;
+ * meanings are split as lentLabel splits them, one to a box;
  * not on a comma, which sits inside a phrase as often as between two.
  */
 function readAlike(
@@ -16632,7 +16718,7 @@ function readAlike(
     return !!said(a) && said(a) === said(b);
   }
   const meanings = (x: Record<string, any> | null | undefined) =>
-    raw(x).split(/[/;]/).map(normEn).filter(Boolean);
+    splitAlternatives(raw(x)).map(normEn).filter(Boolean);
   const mine = meanings(a);
   return meanings(b).some((m) => mine.includes(m));
 }

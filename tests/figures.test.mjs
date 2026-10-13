@@ -19,7 +19,7 @@ const mark = (/** @type {string} */ typed, /** @type {string} */ en, key = "ar2e
 test("the number pad comes up where the answer is figures and nothing else", () => {
   assert.equal(answersInFigures(meaning(""), "num2fig"), true, "write the number in figures");
   assert.equal(answersInFigures(meaning(""), "rec2fig"), true, "listen, then write it in figures");
-  for (const en of ["5", "40", "1,000", "1,000,000", "10384", "5 / 6"]) {
+  for (const en of ["5", "40", "1,000", "1,000,000", "10384", "5\u001F\n6"]) {
     assert.equal(answersInFigures(meaning(en), "ar2en"), true, `the meaning ${en}`);
     assert.equal(answersInFigures(meaning(en), "rec2en"), true, `the meaning ${en}, heard`);
   }
@@ -27,7 +27,7 @@ test("the number pad comes up where the answer is figures and nothing else", () 
 
 test("and nowhere else", () => {
   /* Any word among the meanings means letters can answer it. */
-  for (const en of ["five", "five / 5", "3 books", "hundred", "1, 2", ""]) {
+  for (const en of ["five", "five\u001F\n5", "3 books", "hundred", "1, 2", ""]) {
     assert.equal(answersInFigures(meaning(en), "ar2en"), false, `the meaning ${JSON.stringify(en)}`);
   }
   /* A time has a colon, and a number pad has none. */
@@ -55,14 +55,14 @@ test("a number one figure out is another number, not a typo and not nearly", () 
   assert.deepEqual(mark("7", "8"), { ok: false, reason: "wrong" }, "not 'very close'");
   assert.deepEqual(mark("4", "40"), { ok: false, reason: "wrong" });
   assert.deepEqual(mark("8", "8"), { ok: true, reason: "exact" });
-  assert.equal(mark("6", "5 / 6").ok, true, "either of two numbers");
+  assert.equal(mark("6", "5\u001F\n6").ok, true, "either of two numbers");
   assert.equal(mark("eight", "8").ok, false, "a number asked for in figures");
 });
 
 test("a meaning in words is marked as English, as before", () => {
   assert.equal(mark("tiref", "tired").ok, true, "one letter out of a word is a slip");
-  assert.equal(mark("five", "five / 5").ok, true);
-  assert.equal(mark("5", "five / 5").ok, true);
+  assert.equal(mark("five", "five\u001F\n5").ok, true);
+  assert.equal(mark("5", "five\u001F\n5").ok, true);
 });
 
 test("every question asking for a number in figures says so in the same words", () => {
@@ -75,12 +75,12 @@ test("every question asking for a number in figures says so in the same words", 
   assert.equal(ask("dig2fig", { numeral: "٤", en: "4" }), written, "one of the ten figures");
   /* A number word's meaning is a number, so asking for it is the same
      question. */
-  for (const en of ["3", "40", "1,000", "5 / 6"]) {
+  for (const en of ["3", "40", "1,000", "5\u001F\n6"]) {
     assert.equal(ask("ar2en", meaning(en)), written, `the meaning ${en}`);
     assert.equal(ask("rec2en", meaning(en)), heard, `the meaning ${en}, heard`);
   }
   /* Any word among the meanings and it is asked for in English. */
-  for (const en of ["five", "five / 5", "book"]) {
+  for (const en of ["five", "five\u001F\n5", "book"]) {
     assert.equal(ask("ar2en", meaning(en)), "Write in English", `the meaning ${en}`);
     assert.equal(ask("rec2en", meaning(en)), "Listen, then write it in English", `the meaning ${en}, heard`);
   }

@@ -7,7 +7,7 @@
 
 import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
 import type { Card, Course, Deck, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
-import { formsOf, leadOf } from "./cards.ts";
+import { formsOf, leadOf, wordOf } from "./cards.ts";
 import { createPortal } from "react-dom";
 import * as API from "./courses-api.ts";
 import { answerFields, categoryLabel, dimValues, kindOf, LANGUAGES, DEFAULT_LANGUAGE, scriptVars } from "./languages.ts";
@@ -660,7 +660,7 @@ export function StickyFoot({ above, children, className }: {
    its transliteration is decided — and which a test can import. Re-exported
    here because this is where the screens look for it. */
 export { splitAlternatives, joinAlternatives } from "./answers.ts";
-import { answersOf, firstOfEach, meaningsOf, storedAnswer } from "./answers.ts";
+import { answersOf, firstOfEach, meaningsOf, shownAlternatives, storedAnswer } from "./answers.ts";
 
 /*
  * What one listed sentence means, a line for each meaning.
@@ -980,7 +980,7 @@ export function LanguageTag({ languages, id }: {
  * composes. Anything outside this file that needs it wants CardTile.
  */
 function Written({ text }: { text?: string | null }) {
-  const runs = splitSlots(text);
+  const runs = splitSlots(shownAlternatives(text));
   if (runs.length === 1 && !runs[0].slot) return <>{runs[0].text}</>;
   return (
     <>
@@ -3061,7 +3061,7 @@ function ReadTaught({ of, cards, label, panel = false }: {
   const words = cards
     ? ids
         .map((id: string) => (cards || []).find((c: Record<string, any>) => String(c.id) === id))
-        .map((c) => (c ? String(leadOf(c).ar || leadOf(c).en || "") : ""))
+        .map((c) => (c ? String(wordOf(c).ar || leadOf(c).en || c.name || "") : ""))
         .filter(Boolean)
     : [];
   const said = words.length ? words.join(" · ") : `${ids.length}`;

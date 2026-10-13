@@ -8,6 +8,72 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.440 — 13 October 2026
+
+**A verb with its past "he" left empty is found in sentences again.**
+
+- A verb's own word is its past-tense "he" box. A verb saved without it,
+  with only its present or subjunctive written, was treated as having no
+  word at all: "Words this teaches" never offered it, and its words in a
+  text were listed as having no card. "To keep", with only بخلّي, بتخلّي
+  and تخلي written, was not offered for "لو ممكن تخلي بس 3 تطبيقات…".
+- Such a verb is now looked for by every form it has, is offered as usual,
+  and is listed by the first form written, under the name you gave it.
+- Trade-off: a sentence of a text waits until most of its words are known
+  (since 0.434). These verbs' words now count among them, so a sentence
+  using a verb a student has not learnt yet may wait a little longer.
+
+To check by hand: open a text whose sentence uses a verb with an empty
+past "he" box; the verb is offered under "Words this teaches".
+
+## 0.439 — 13 October 2026
+
+**A slash is just a slash: each accepted answer has its own box.**
+
+- Until now, a slash (and a semicolon) typed in a card split it into two
+  accepted answers. That is how the "Homework instructions" sentence was
+  cut in half. Now nothing typed inside a box ever splits it: not a slash,
+  a semicolon or a comma. Two accepted answers means two boxes, added with
+  the + button, and nothing else.
+- When a card shows several answers together, they now have a dot between
+  them ("Office · Desk") instead of a slash, so a slash that is part of an
+  answer can't be mistaken for the break between two.
+- Pasting a table into the app (only possible when making your own cards,
+  which is switched off for now): a second answer goes in a column of its
+  own, "English 2", "Arabic 2", "Transliteration 2", and so on.
+- Trade-off, as chosen: every slash already on a card is now part of that
+  answer. This includes cards whose second answer was added with the +
+  button, because those were saved with a slash too. Until a teacher
+  splits such a card back into separate boxes, students must type the
+  whole thing, such as "office / desk", to be marked right, and progress
+  on the second answer is set aside.
+- To check by hand: open a card that accepts two answers, such as two
+  spellings or two meanings. It should show one box holding both with the
+  slash; split it into two boxes and save, and each should be accepted on
+  its own. A meaning such as "If it were possible / you could" should stay
+  one meaning.
+
+## 0.438 — 13 October 2026
+
+**No more questions with nothing to choose from.**
+
+- A student reported a "what does it mean?" question about a sentence of a
+  text that showed no answers at all, only "I don't know". The sentence had
+  a slash in it, the app read it as two separate answers, and the question
+  asked about the second one never got its list of answers to choose from.
+- Now every question about one sentence of a text or conversation is asked
+  of the whole sentence, as written, so a slash in it no longer splits it.
+- And a safety net for every question where the answer is chosen: if it
+  ever ends up with fewer than two answers on screen, it is quietly
+  swapped for another question, or left out. Nothing is marked, right or
+  wrong, for a question that was never really asked.
+- Trade-off: where a student had progress on the "second half" of such a
+  sentence, that is dropped; their progress on the sentence itself is kept.
+- To check by hand: a text with a sentence containing a slash, such as
+  the "Homework instructions" card in TINAU Beginner Plus, Class 1. Its
+  "What does it mean?" question should show the whole sentence and four
+  meanings to choose from.
+
 ## 0.437 — 13 October 2026
 
 **Texts started before 0.434 now wait for their words too.**

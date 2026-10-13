@@ -90,6 +90,23 @@ export function leadOf(card: unknown): Form {
 }
 
 /**
+ * The word a card goes by: its own word, or where that is blank, the first
+ * of its forms that has one.
+ *
+ * A verb's own word is a cell of its table — the past *he* — and that cell
+ * is as optional as any other, so a verb saved with only its present
+ * written has a blank lead and words everywhere else. Read by the lead
+ * alone, such a card was no word at all: never offered under "Words this
+ * teaches", never counted as a card a sentence's word has. Whatever form
+ * the teacher did write is the word it is known by there.
+ */
+export function wordOf(card: unknown): Form {
+  const lead = leadOf(card);
+  if (String(lead.ar || "").trim()) return lead;
+  return formsOf(card).find((f) => String((f && f.ar) || "").trim()) || lead;
+}
+
+/**
  * The same card, with a different word in front.
  *
  * A question is asked of a form, and the form is cast before it is shown —

@@ -22,7 +22,7 @@
 import type { Form, Item, Lang } from "./types.ts";
 import { contextTokens, guessKind, supportsContext } from "./languages.ts";
 import { unitsOf } from "./scheduler.ts";
-import { leadOf } from "./cards.ts";
+import { wordOf } from "./cards.ts";
 import { isDialog } from "./dialogs.ts";
 
 /* A card longer than this is not a word anybody is going to find inside a
@@ -57,7 +57,7 @@ export function sentenceWords(text: string, cards: Item[], lang: Lang, selfId: s
   const hits: WordHit[] = [];
   for (const card of cards || []) {
     if (!card || !card.id || card.id === selfId || isDialog(card)) continue;
-    const lead = leadOf(card).ar;
+    const lead = wordOf(card).ar;
     if (!lead || guessKind(lead, lang) !== "word") continue;
     let found: WordHit | null = null;
     for (const { unit } of unitsOf(card)) {

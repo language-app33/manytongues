@@ -37,6 +37,7 @@
 import type { Item, Line } from "./types.ts";
 import { PICK_OPTIONS, optionsFor, shuffledBy } from "./chance.ts";
 import { leadOf } from "./cards.ts";
+import { splitAlternatives } from "./answers.ts";
 
 /* A card, a line of one, or the half-written draft in an editor.
    Deliberately open: the same questions are asked of all three, and only
@@ -576,7 +577,7 @@ export function taughtShortGaps(
 ): Map<string, Set<string>> {
   const out: Map<string, Set<string>> = new Map();
   const short = words
-    .flatMap((w) => String(w || "").split(/[/;]/))
+    .flatMap((w) => splitAlternatives(String(w || "")))
     .map((w) => w.trim())
     .filter((w) => w && !/\s/.test(w) && letterCount(w) > 0 && letterCount(w) < GAP_MIN_LETTERS);
   if (!short.length) return out;

@@ -10,6 +10,7 @@ import assert from "node:assert/strict";
 import { must } from "./helpers.mjs";
 
 import { buildContextIndex, wordsOffered } from "../src/context-index.ts";
+import { sentenceWords } from "../src/sentence-words.ts";
 import { LANGUAGES } from "../src/languages.ts";
 
 const ar = LANGUAGES["ar-PS"];
@@ -56,4 +57,26 @@ test("nothing is offered for a single word, for itself, or for a word not there"
   assert.deepEqual(wordsOffered("كتبت", [wrote], ar), [], "a word does not contain words");
   assert.deepEqual(wordsOffered("هي كتبت رسالة", [{ ...wrote, id: "S" }], ar, "S"), [], "not itself");
   assert.deepEqual(wordsOffered("رحت على السوق", [wrote, house], ar), []);
+});
+
+/* A verb saved with its past "he" left blank — the card's own word — and
+   only its present and subjunctive written, as "to keep" was. */
+const keep = {
+  id: "K", lang: "ar-PS", tags: [], created: 1, category: "verb", name: "to keep",
+  forms: [
+    { id: "K", ar: "", en: "", lat: "", s: {} },
+    { id: "K-0", ar: "بَخَلّي", en: "I keep", row: "present", col: "i", lat: "", s: {} },
+    { id: "K-1", ar: "بِتخَلّي", en: "you keep", row: "present", col: "you-m", lat: "", s: {} },
+    { id: "K-2", ar: "تخلي", en: "to keep", row: "subjunctive", col: "you-m", lat: "", s: {} },
+  ],
+};
+
+test("a verb with its own word blank is offered for the forms it has", () => {
+  const found = wordsOffered("لو ممكن تخلي بس 3 تطبيقات", [keep, house], ar);
+  assert.deepEqual(found.map((m) => [m.card.id, m.form.ar]), [["K", "تخلي"]]);
+});
+
+test("a verb with its own word blank gives a sentence's word a card", () => {
+  const { bare } = sentenceWords("شو بتخلي", [keep], ar);
+  assert.deepEqual(bare, ["شو"]);
 });

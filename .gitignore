@@ -31,3 +31,4 @@ tests/.missing-lines-build/
 tests/.look-alike-build/
 tests/.scene-gaps-build/
 tests/.text-sentences-build/
+tests/.import-columns-build/

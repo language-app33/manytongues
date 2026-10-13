@@ -16,7 +16,7 @@ import type { Card, Deck, Form, GrammarDim, Item, Lang, VerbSpec, VerbTense } fr
 import { wordsOffered } from "./context-index.ts";
 import { longSentenceOf, sentenceWords, wordCount } from "./sentence-words.ts";
 import { cellsIn, citationOf, citedWord, framesOf, isCell, isFrame, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
-import { formsOf, leadOf, subFormsOf } from "./cards.ts";
+import { formsOf, leadOf, subFormsOf, wordOf } from "./cards.ts";
 import type { Node } from "./shared.tsx";
 import {
   categoriesOf,
@@ -128,10 +128,11 @@ const blankLine = (taken: { id?: string }[] = []) => ({
 });
 
 /* One answer, or several: a field per accepted answer, a + after the last
-   to add another and a − on every extra. What is stored is still one
-   string with " / " between the answers, so the checker and every card
-   already saved are untouched; the slash a teacher used to type by hand is
-   now a button. The list is local state seeded from the stored string —
+   to add another and a − on every extra. The box is the only thing that
+   separates two answers: whatever is typed in one — a slash, a comma, a
+   semicolon — is part of that answer (0.439). Stored as one string, an
+   answer to a line (see ALT_SEP), which a one-line box cannot hold. The
+   list is local state seeded from the stored string —
    deriving it on every render would drop an added field the moment it was
    added, because an empty answer joins to nothing. */
 function Alternatives({ value, onChange, render, of = "", addLabel = "Add another accepted answer" }: {
@@ -1732,13 +1733,16 @@ function WordsUsed({ lang, text, cards, selfId, chosen, onChange }: {
   const foundAs = (c: Card): string => {
     const m = found.find((x) => x.card.id === c.id);
     const form = m && m.form;
-    if (!form || form.ar === leadOf(c).ar) return "";
+    if (!form || form.ar === wordOf(c).ar) return "";
     return form.en ? `found as ${form.ar} (${form.en})` : `found as ${form.ar}`;
   };
+  /* A verb with its past *he* left blank is listed by the form it does
+     have, under the name it was given — "to keep" — since its own word has
+     no English either. */
   const options = suggestions.concat(keptCards).map((c) => ({
     id: String(c.id),
-    title: leadOf(c).ar,
-    note: [leadOf(c).en || "", foundAs(c)].filter(Boolean).join(" · "),
+    title: wordOf(c).ar,
+    note: [leadOf(c).en || String(c.name || "") || wordOf(c).en || "", foundAs(c)].filter(Boolean).join(" · "),
   }));
 
   return (
