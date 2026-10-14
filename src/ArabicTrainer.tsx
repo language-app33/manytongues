@@ -13767,7 +13767,7 @@ export default function ArabicTrainer() {
                       <TextChoices
                         options={choices}
                         kind={spec.picks === "word" ? "word" : "phrase"}
-                        field={spec.picks === "meaning" ? "en" : "ar"}
+                        field={spec.picks === "meaning" || spec.picks === "person" ? "en" : "ar"}
                         lang={qLang}
                         value={typed}
                         disabled={!!checked}
