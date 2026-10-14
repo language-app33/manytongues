@@ -6224,3 +6224,24 @@ is written, so no form can exist that nothing asks.
 *whom* are a table keyed by the app's column ids, as SPEAKER_COLUMNS
 already is, and a test holds it to the Arabic pack. And English typed into
 those boxes under 0.432 is kept on the cells but no longer read.
+
+
+## A practised sentence waits on its words too (0.443)
+
+**What was wrong.** sentenceWaits passed over any sentence with a record
+of its own (practisedAlone), so a sentence practised before cards were
+made for its words kept coming while its words were unknown.
+
+**What changed.** The exemption is gone: every sentence of a text is held
+by quietUnits while fewer than eight in ten of its carded words are
+recognised. Quiet keeps the sentence's record, so it resumes where it
+was. practisedAlone, and its reading of the `carried` mark, went with it;
+carryToSentences still sets the mark, to hand progress down once.
+
+**Choices the owner made.** Of: holding every practised sentence;
+holding only those not yet cleared; teaching the missing words sooner
+instead, the owner chose the first. Of: resuming where it was; starting
+the sentence again, the owner chose whichever was simpler, which is
+resuming (no new code). The costs, that new word cards can pause well-known
+sentences for every student and a word lapsing holds its sentences, were
+put to them.
