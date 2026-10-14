@@ -10035,7 +10035,7 @@ const openPronounTables = async () => {
       };
     },
   );
-  const chosenMeant = await walk([meantCard({ dlgwhole: { ...solid } })], async (host) => {
+  const chosenMeant = await walk([meantCard({ dlgwhole: { ...solid }, sen2en: { ...solid }, en2sen: { ...solid } })], async (host) => {
     await reach(host, /Which word is missing/);
     const out = { instruction: text(host.querySelector(".at-instruction")), before: "", after: "", meaning: "" };
     const choices = host.querySelector('[data-el="answer-choices"]');
