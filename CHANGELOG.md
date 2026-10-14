@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.444 — 14 October 2026
+## 0.445 — 14 October 2026
 
 **A saved session built from whole decks keeps up with those decks.**
 
@@ -28,6 +28,27 @@ and moves once per batch of work you would notice, not once per commit.
 - To check by hand: save a session with one whole deck, add a card to
   that deck, then start the saved session (or look at its card count
   under Saved sessions). The new card should be in it.
+
+## 0.444 — 14 October 2026
+
+**Example sentences with a blank in them are shown with the blank filled.**
+
+- A sentence card with a blank in it, such as "I'm learning
+  {{language}}", also counts as an example of the words it teaches. Where
+  it was shown as an example, under "Where it turned up" on the answer
+  screen or in "Which word is missing?", the blank came through as written,
+  braces and all.
+- Now the blank is filled the way the sentence card's own questions fill
+  it: "عم بتعلّم عربي — I'm learning Arabic", in the script, the English
+  and the transliteration alike. The word in the blank comes from the same
+  cards, takes turns in the same way, and is only one the student has
+  already learnt.
+- Where nothing can fill the blank yet, that sentence is not used as an
+  example. The word's other examples are shown instead, or none, and the
+  sentence comes back once a word for the blank is learnt.
+- To check by hand: answer a question about a word whose only example is a
+  sentence card with a blank. "Where it turned up" should show that
+  sentence with a real word in the blank, never braces.
 
 ## 0.443 — 14 October 2026
 
