@@ -155,13 +155,20 @@ export interface ExerciseSpec {
    * Absent means a choice between classes of sound, which is graded
    * differently.
    */
-  picks?: "reply" | "word" | "meaning" | "pair" | "image" | "sentence";
+  picks?: "reply" | "word" | "meaning" | "pair" | "image" | "sentence" | "person";
   /**
    * What a grid's words are shown as, where not as themselves: "audio" puts
    * a play button on each tile where the word would be. The other column is
    * then the `answerField`, which for a grid of words is the meaning.
    */
   tiles?: "audio";
+  /**
+   * A practice of a verb's tense, offered only where the language's verb
+   * table switches it on — see `practices` on VerbSpec. `row` is asked of
+   * the whole tense at once and marks every form in it; `cell` is asked of
+   * one form, with the rest of its tense as the company.
+   */
+  verbDrill?: "row" | "cell";
 }
 
 /* ---- a verb's table ----
@@ -309,6 +316,13 @@ export interface VerbSpec {
    * either, and nothing changes for them.
    */
   citation?: { row: string; col: string };
+  /**
+   * The verb practices this language offers on the table, by exercise
+   * type: the tense on its own, read through, sorted into its persons,
+   * and one person changed into another. Absent offers none, which is what
+   * a language whose verbs barely change is right to say — see Huế.
+   */
+  practices?: string[];
 }
 
 /**

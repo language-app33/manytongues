@@ -478,7 +478,9 @@ test("a verb with nothing in its own word is dealt through its table", () => {
   const got = deal([verb]);
   assert.equal(got.reason, null, "there was something to ask");
   const asked = got.exercises.map((/** @type {any} */ e) => e.subId || e.id);
-  assert.ok(asked.includes("v-present-he"),
+  /* Either cell: since 0.451 a tense is first met as a whole, through
+     whichever of its forms the session reached. */
+  assert.ok(asked.includes("v-present-he") || asked.includes("v-present-she"),
     `the table was not dealt: ${asked.join(", ") || "(nothing)"}`);
   /* And the empty word itself is asked nothing, having nothing to ask. */
   assert.equal(asked.includes("v1"), false,
@@ -1215,6 +1217,30 @@ test("twenty cards in learning stop new ones, and do not stop those being practi
     [...dealt].every((id) => String(id).startsWith("h")),
     `let a new word in past twenty in learning: ${[...dealt].join(" ")}`,
   );
+});
+
+test("Ultimate takes every new card, past the twenty in learning", () => {
+  const held = Array.from({ length: MAX_IN_LEARNING }, (_, i) => learningWord(`h${i + 1}`));
+  const got = deal(held.concat(deckOf(25)), { mode: "ultimate" });
+  assert.equal(got.reason, null, `refused: ${got.reason}`);
+  const dealt = new Set(got.exercises.map((/** @type {any} */ x) => x.id));
+  const fresh = [...dealt].filter((id) => String(id).startsWith("w"));
+  assert.equal(fresh.length, 25, `new words dealt: ${fresh.length}`);
+});
+
+test("Ultimate leaves out Cleared and Learnt cards that are not due", () => {
+  const waiting = Array.from({ length: 4 }, (_, i) => settled(`d${i + 1}`, -1));
+  const ahead = Array.from({ length: 4 }, (_, i) => settled(`a${i + 1}`, 7));
+  const got = deal(waiting.concat(ahead, deckOf(3)), { mode: "ultimate" });
+  assert.equal(got.reason, null, `refused: ${got.reason}`);
+  const dealt = new Set(got.exercises.map((/** @type {any} */ x) => x.id));
+  assert.ok([...dealt].every((id) => !String(id).startsWith("a")), `dealt ahead of time: ${[...dealt].join(" ")}`);
+  for (const id of ["d1", "d2", "d3", "d4", "w1", "w2", "w3"]) assert.ok(dealt.has(id), `${id} left out`);
+  /* A card asked for by name still comes, due or not. */
+  const asked = deal([...ahead.slice(0, 1).map((it) => ({ ...it, priority: true })), ...ahead.slice(1)], { mode: "ultimate" });
+  assert.deepEqual([...new Set(asked.exercises.map((/** @type {any} */ x) => x.id))], ["a1"]);
+  /* And nothing due at all says so, rather than dealing them anyway. */
+  assert.equal(deal(ahead, { mode: "ultimate" }).reason, "none-due");
 });
 
 /** A word still climbing, with a question waiting: right once, a retest

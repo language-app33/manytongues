@@ -482,7 +482,7 @@ test("every question shows one accepted answer, and the typed ones still take an
     const bySound = spec.needs.includes("lat");
     assert.equal(
       showsOneAnswer(type),
-      !spec.bySentence && (bySound || !typesTheScript),
+      !spec.bySentence && !spec.verbDrill && (bySound || !typesTheScript),
       `${type} is on the wrong side of the rule`,
     );
   }
@@ -497,7 +497,11 @@ test("every question shows one accepted answer, and the typed ones still take an
      writing the other one, on a guess, is worse than accepting both. */
   const keepsAll = TYPES.filter((t) => !showsOneAnswer(t));
   assert.deepEqual(keepsAll, [
-    "rec2ar", "en2ar", "own2ar", "img2ar", "ctx2ar", "rec2ctx",
+    /* A verb's tense, practised as a whole, and one form of it changed to
+       another person: put up as the teacher wrote each person, so there is
+       nothing to split by. */
+    "vpattern", "vread", "vwho", "vwhorec", "vrow",
+    "rec2ar", "vshift", "en2ar", "own2ar", "img2ar", "ctx2ar", "rec2ctx",
     /* The four asked of one sentence of a scene. Each has one answer —
        the word as the scene spells it, or the sentence as it stands — put
        up from the line itself, so keeping all of them is keeping one. Split

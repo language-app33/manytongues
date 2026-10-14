@@ -90,3 +90,12 @@ test("asked to write 'right', the other word for it is the one ruled out", () =>
   assert.deepEqual(sibs.map((/** @type {any} */ s) => s.card.id), ["sahh"]);
   assert.equal(clueFor(yamin, sibs, "ar"), "More than one word for this — not صح");
 });
+
+test("asked to write 'my birthday', a card spelt the same but for its marks is not ruled out", () => {
+  const mine = card("mine", "عيد ميلادي", "my birthday", 6);
+  const marked = card("marked", "عيدْ ميلادي", "my birthday", 7);
+  installIndexes([mine, marked, book], settings);
+  /* Either is marked right for the other, so there is nothing to choose. */
+  assert.deepEqual(siblingsAsked(mine, lead(mine), EX.en2ar, settings), []);
+  assert.deepEqual(siblingsAsked(marked, lead(marked), EX.en2ar, settings), []);
+});

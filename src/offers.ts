@@ -30,6 +30,7 @@ import { DIALOG_NEEDS, dialogNeedMet, isText, roleOf } from "./dialogs.ts";
 import { saidAnswers } from "./answers.ts";
 import { slotsOf } from "./variables.ts";
 import { ownSlot } from "./verbs.ts";
+import { drillTable } from "./verb-drills.ts";
 import { EX, TYPES, answerFields, derivedValue, exOf, needLabel, quizAttrOf, tablesOf } from "./languages.ts";
 import { inExamplesRow } from "./examples.ts";
 import { MIN_PAIR_MATES, MIN_PAIR_WORDS, PICK_OPTIONS } from "./chance.ts";
@@ -233,6 +234,14 @@ function askedInstead(spec: ExerciseSpec, unit: Form): boolean {
 
 /* The two reasons a language rather than a card refuses an exercise. */
 function drilledBy(spec: ExerciseSpec, lang: Lang, unit?: Form): boolean {
+  /* A verb practice is a language's to offer, on a cell of its verb table:
+     never on a word, and never in a language whose table names none. What
+     the rest of the tense has to hold is the trainer's to say — see
+     drillFits — since it is a fact about the card and not the form. */
+  if (spec.verbDrill) {
+    if (!verbTableOffers(lang, spec)) return false;
+    if (unit && !drillTable(lang, unit)) return false;
+  }
   const attr = quizAttrOf(lang);
   /* Only where the language has named something to listen for — and, when
      a particular card is in hand, where its spelling actually yields it. */
@@ -241,6 +250,12 @@ function drilledBy(spec: ExerciseSpec, lang: Lang, unit?: Form): boolean {
      for the word that is already on screen. */
   if (lang.translitDrilled === false && spec.needs.includes("lat")) return false;
   return true;
+}
+
+/* Whether any table of the language names this practice. */
+function verbTableOffers(lang: Lang, spec: ExerciseSpec): boolean {
+  const type = Object.keys(EX).find((t) => EX[t] === spec) || "";
+  return Object.values(tablesOf(lang)).some((t) => !!t && (t.practices || []).includes(type));
 }
 
 export interface Offer {
@@ -333,6 +348,9 @@ export function offersFor({
       continue;
     }
     if (!drilledBy(spec, lang)) continue;
+    /* A verb practice is about a tense, so a card with no cell of a verb
+       table is not waiting for one: it is another kind of card. */
+    if (spec.verbDrill && !fits.some((u) => drillTable(lang, u.unit))) continue;
     if (fits.every((u) => askedInstead(spec, u.unit))) continue;
     /* And the questions only a number system's own cards can carry: what
        they need is made by the app, so a card without it is not waiting for

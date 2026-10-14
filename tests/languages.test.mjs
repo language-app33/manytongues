@@ -28,6 +28,7 @@ import {
   contextCoverage,
   EASY_TYPES,
   findWordSlot,
+  gluedTo,
   GRAMMAR,
   guessKind,
   kindOf,
@@ -382,7 +383,7 @@ test("the listening exercises are exactly the ones prompted by audio, or made of
      and the "can't listen right now" button all picked it up unprompted,
      which is what deriving this from the prompt rather than a flag buys. */
   assert.deepEqual(byHelper, [
-    "rec2en", "rec2img", "recmatch", "recfig", "recown", "rec2ar", "rec2attr", "rec2ctx",
+    "rec2en", "rec2img", "vwhorec", "recmatch", "recfig", "recown", "rec2ar", "rec2attr", "rec2ctx",
     /* And the two that play a number or a time. They were picked up by
        the quiet window and the "can't listen right now" button without
        being told, which is what deriving this from the prompt buys. */
@@ -673,10 +674,15 @@ test("the gentle types are read off the definitions, not kept beside them", () =
      recognising what a word means, then which word it is. Every one of
      them puts the answer on the screen — nothing here is written out. */
   assert.deepEqual(EASY_TYPES, [
+    /* A verb's tense seen on its own and read through: the table is on
+       the screen, and the learner says what they made of it. */
+    "vpattern", "vread",
     "ar2pick", "ar2en", "rec2en", "rec2img",
     /* And what a verb's example means, with one of its subjunctive forms
        in the gap: the first rung of a form never asked on its own. */
     "ex2en",
+    /* And who a verb's form is about, chosen from the persons of its tense. */
+    "vwho", "vwhorec",
     "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick", "dlgwhole",
     /* A word taken out of a scene and chosen back is the phrase gap-fill
        asked of a scene's own text. */
@@ -1404,4 +1410,16 @@ test("the editor names the meanings two forms share with nothing to tell them ap
   /* Spelt alike, whichever is written is right. */
   const alike = { id: "a", forms: [{ id: "a", ar: "ساكن", en: "live" }, { id: "a2", ar: "ساكن", en: "live" }] };
   assert.deepEqual(untoldMeanings(alike, ar), []);
+});
+
+test("the gap in a phrase is the word: what is glued to it stays on the screen", () => {
+  const ar = LANGUAGES["ar-PS"];
+  assert.deepEqual(gluedTo("البوليس", "بوليس", ar), { before: "ال", after: "" });
+  assert.deepEqual(gluedTo("بوليسنا؟", "بوليس", ar), { before: "", after: "نا؟" });
+  assert.deepEqual(gluedTo("وبالكتاب", "كتاب", ar), { before: "وبال", after: "" });
+  // The word's own harakat go with it, not with what follows.
+  assert.deepEqual(gluedTo("البيتِك", "بيت", ar), { before: "ال", after: "ك" });
+  // A word that is the whole token leaves nothing behind.
+  assert.deepEqual(gluedTo("الأخبار", "الأخبار", ar), { before: "", after: "" });
+  assert.equal(gluedTo("مش", "بوليس", ar), null);
 });

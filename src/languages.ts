@@ -117,12 +117,14 @@ export const NUMBER_FALLBACK: Record<string, string> = {
 
 export const TYPES = [
   /* 1: what does it mean — and, for a form only ever met in a verb's
-     examples, what the example means */
-  "ar2pick", "ar2en", "rec2en", "rec2img", "ex2en",
+     examples, what the example means. A verb's tense is met first, as a
+     table, before anything is asked of it. */
+  "vpattern", "vread",
+  "ar2pick", "ar2en", "rec2en", "rec2img", "ex2en", "vwho", "vwhorec",
   /* 2: which one is it */
-  "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick",
+  "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick", "vrow",
   /* 3: write it from a cue */
-  "tr2ar", "rec2ar", "rec2attr",
+  "tr2ar", "rec2ar", "rec2attr", "vshift",
   /* 4: write it from its meaning */
   "en2ar", "own2ar", "img2ar", "ctx2ar", "rec2ctx",
   /* and a conversation, on its own levels: 1, 3, 3 */
@@ -568,15 +570,17 @@ export const EX: Record<string, ExerciseSpec> = {
     placeholder: "",
     promptField: "context",
     answerField: "ar",
-    hintField: "lat",
-    hintLabel: "Show {translit} and what the phrase means",
-    hintHideLabel: "Hide {translit} and what the phrase means",
-    /* As in English → {script}: the hint is the word itself, said another
-       way. */
-    hintTells: true,
-    /* And what the phrase means comes up with it, rather than sitting on
-       the screen from the start — see hintPhrase. */
+    /* The hint is what the phrase means, where it has a meaning written,
+       rather than its sitting on the screen from the start — see
+       hintPhrase. Only where it has none is the hint the pronunciation, and
+       then, as in English → {script}, it is the word itself said another
+       way and costs the mark. Never both at once: a learner reported being
+       shown two hints. */
     hintPhrase: true,
+    hintField: "lat",
+    hintLabel: "Show {translit}",
+    hintHideLabel: "Hide {translit}",
+    hintTells: true,
     answerMode: "ar",
   },
   /* And the same again by ear. Harder than hearing the word alone, which is
@@ -887,6 +891,120 @@ export const EX: Record<string, ExerciseSpec> = {
     answerField: "ar",
     answerMode: "choice",
     quizAttr: true,
+  },
+
+  /* ---- a verb's tense, as a whole ----------------------------------
+     Five practices of one tense of one verb, offered where the language's
+     verb table names them in `practices`. Each is scheduled on every form
+     of the tense like any other question, so a form has these to climb as
+     well as the ones above; the three marked `row` are asked of the whole
+     tense at once and mark every form in it from one answer.
+
+     `promptField: "tense"` is the tense itself on the screen, drawn as a
+     table of its persons. Nothing is coloured: the table is the pattern. */
+
+  /* The tense with no question asked, and the learner's own word on
+     whether they see how it goes. Met first: nothing else about a tense
+     is asked until this has been answered "I get it" once — see
+     patternFirst in the trainer. */
+  vpattern: {
+    level: 1,
+    instruction: "See how this verb changes",
+    label: "See the pattern",
+    short: "Pat",
+    needs: ["ar"],
+    question: "Do you see how it changes from person to person?",
+    placeholder: "",
+    promptField: "tense",
+    answerField: "",
+    answerMode: "self",
+    gentle: true,
+    verbDrill: "row",
+  },
+  /* The same table with each transliteration hidden: read the form, then
+     uncover how it is said and say whether you read it right. Marked form
+     by form, by the learner, so the forms misread come back on their
+     own. Only the forms that have a transliteration carry it. */
+  vread: {
+    level: 1,
+    instruction: "Read each form, then check how it is said",
+    label: "Read the forms",
+    short: "Read",
+    needs: ["ar", "lat"],
+    question: "Read each one, then tap to check",
+    placeholder: "",
+    promptField: "tense",
+    answerField: "",
+    answerMode: "vread",
+    gentle: true,
+    verbDrill: "row",
+  },
+  /* One form, and who it is about, chosen from the persons of the same
+     tense — the wrong ones those whose forms look most like it. A person
+     whose form is spelt the same is as right as the answer. */
+  vwho: {
+    level: 1,
+    instruction: "Who is it about?",
+    label: "{Script} → who",
+    short: "{S}→Who",
+    needs: ["ar"],
+    question: "Who is this form about?",
+    placeholder: "",
+    promptField: "ar",
+    answerField: "",
+    answerMode: "choice",
+    picks: "person",
+    gentle: true,
+    verbDrill: "cell",
+  },
+  vwhorec: {
+    level: 1,
+    instruction: "Listen, then choose who it is about",
+    label: "Listen → who",
+    short: "L→Who",
+    needs: ["recs", "ar"],
+    question: "Who is this form about?",
+    placeholder: "",
+    promptField: "audio",
+    answerField: "",
+    answerMode: "choice",
+    picks: "person",
+    gentle: true,
+    verbDrill: "cell",
+  },
+  /* The tense laid out by person with every form taken out, and the forms
+     underneath as tiles, one per person even where two are spelt the
+     same. Each person is marked on the tile put beside it, and a tile that
+     reads the same as the right one is the right one. */
+  vrow: {
+    level: 2,
+    instruction: "Put each form beside its person",
+    label: "Fill the row",
+    short: "Row",
+    needs: ["ar"],
+    question: "Which form goes with each person?",
+    placeholder: "",
+    promptField: "tense",
+    answerField: "ar",
+    answerMode: "vrow",
+    verbDrill: "row",
+  },
+  /* A form already met, with who it is about, and the same tense asked
+     for another person — written. Never between two persons spelt the
+     same, which would be copying. The cue is chosen on the screen, from
+     the forms of the tense the learner has got furthest with. */
+  vshift: {
+    level: 3,
+    instruction: "Write it for another person",
+    label: "Change the person",
+    short: "Shift",
+    needs: ["ar"],
+    question: "Write this form for another person",
+    placeholder: "",
+    promptField: "shift",
+    answerField: "ar",
+    answerMode: "ar",
+    verbDrill: "cell",
   },
 
   /* ---- a conversation, and a part in it -------------------------
@@ -1865,6 +1983,40 @@ export function findWordSpan(phrase: string, word: string, lang: Partial<Lang>):
   return null;
 }
 
+/*
+ * What a token holds besides the word: the ال, و or ب glued to its front
+ * and the pronoun glued to its end, as written, harakat and all. Null where
+ * the word is not in it, and for a word of more than one token, which
+ * nothing is glued into.
+ *
+ * For the gap in a phrase. Blanking البوليس whole over a choice of بوليس
+ * and three others left the article missing from the sentence and from
+ * every tile, and a learner reported the answer did not fit the sentence
+ * it went in. The gap is the word; what the matcher peeled off it stays
+ * where it was, ال____.
+ *
+ * Found by asking the language's own matcher of the shortest piece of the
+ * token that is the word, so it needs nothing from a pack beyond what it
+ * already declares. The marks written on the word's last letter go with
+ * the word.
+ */
+export function gluedTo(token: string, word: string, lang: Partial<Lang>): { before: string; after: string } | null {
+  if (!supportsContext(lang) || !token || !word || contextTokens(word, lang).length !== 1) return null;
+  const chars = Array.from(token);
+  let best: { a: number; b: number } | null = null;
+  for (let a = 0; a < chars.length; a++) {
+    if (/\p{M}/u.test(chars[a])) continue;
+    for (let b = a + 1; b <= chars.length; b++) {
+      if (best && b - a >= best.b - best.a) break;
+      if (lang.context.matches(chars.slice(a, b).join(""), word)) best = { a, b };
+    }
+  }
+  if (!best) return null;
+  let end = best.b;
+  while (end < chars.length && /\p{M}/u.test(chars[end])) end++;
+  return { before: chars.slice(0, best.a).join(""), after: chars.slice(end).join("") };
+}
+
 /* A card longer than this is not a word anybody is going to find inside a
    sentence, and pairing every card with every window of every other one is
    the sort of work that grows with the square of a deck. */
@@ -2416,6 +2568,15 @@ const SUBJECT_PERSONS: VerbPerson[] = [
  *
  * Hebrew needs more, and has its own list below.
  */
+/*
+ * The verb practices a language with a verb table of many persons offers:
+ * the tense on its own, read through, who a form is about (read and
+ * heard), sorted into its persons, and changed from one person to
+ * another. Arabic and Hebrew declare all of them; Huế's verb has one form
+ * for everybody and declares none.
+ */
+const VERB_PRACTICES = ["vpattern", "vread", "vwho", "vwhorec", "vrow", "vshift"];
+
 const AR_SUBJECT_PERSONS: VerbPerson[] = [
   { id: "i", label: "I (m)", is: MASC_ONE },
   { id: "i-f", label: "I (f)", is: FEM_ONE },
@@ -3508,6 +3669,9 @@ export const LANGUAGES: Record<LangId, Lang> = {
            cell are one word, not two things to learn. */
         citation: { row: "past", col: "he" },
         gate: "rows",
+        /* The practices of a tense as a whole. See the exercises marked
+           `verbDrill`. */
+        practices: VERB_PRACTICES,
       },
       /* And the pronouns that attach to the end of a word — كتابي is my
          book, عندي is I have. See ATTACHED_TABLE. */
@@ -3817,6 +3981,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
            this table. */
         citation: { row: "past", col: "he" },
         gate: "rows",
+        practices: VERB_PRACTICES,
       },
       /* The same endings, and the same reason: ספרי is my book. */
       attached: ATTACHED_TABLE,
@@ -4987,6 +5152,9 @@ export function showsOneAnswer(key: string): boolean {
      answer apiece, the second half was a question nothing recognised as
      being about a sentence, and it went up with no answers to choose. */
   if (spec.bySentence) return false;
+  /* A verb's tense is asked as the teacher wrote it, one form a person:
+     the table, the tiles and the persons have nothing to split by. */
+  if (spec.verbDrill) return false;
   if (spec.needs.includes("lat")) return true;
   return !(spec.answerMode === "ar" && spec.answerField === "ar");
 }

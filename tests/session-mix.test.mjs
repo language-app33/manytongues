@@ -162,6 +162,17 @@ test("no new cards while overdue reviews add up to more than three days' practic
   assert.equal(isBehind(rows("c", 29, "cleared"), { ...OPTS, dayCards: 1 }), false);
 });
 
+test("Ultimate lets every new card in: no limit of twenty, no pause for being behind", () => {
+  const full = [...rows("l", 20, "learning", { lastSeen: AT - HOUR }), ...rows("n", 30, "new")];
+  const every = mixSession(full, { ...OPTS, places: full.length, everyNew: true });
+  assert.equal(every.newcomers, 30);
+  assert.equal(howMany(every.cards.map((/** @type {any} */ c) => c.id), "n"), 30);
+  const behind = [...rows("c", 31, "cleared"), ...rows("n", 10, "new")];
+  const caughtUp = mixSession(behind, { ...OPTS, places: behind.length, everyNew: true });
+  assert.equal(caughtUp.behind, false, "no catching-up note when nothing waits");
+  assert.equal(caughtUp.newcomers, 10);
+});
+
 test("a card asked for by name comes first, on top of the shares", () => {
   const asked = row("asked", "learnt", { due: AT + 30 * DAY, askedFor: true });
   const pool = [...rows("l", 10, "learning"), ...rows("c", 10, "cleared"), ...rows("t", 10, "learnt"), asked];

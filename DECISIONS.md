@@ -5908,6 +5908,11 @@ The pace simulation runs the very rule the app does.
   a session — the reason "being due" stopped refusing sessions.
 - *Ultimate keeps no length*: the Build screen asks none, so it asks every
   question of every card the mix lets in, rather than 20.
+- *Ultimate lets every new card in and leaves out reviews not yet due*
+  (0.450, the owner's call): `everyNew` lifts both the 20-in-learning limit
+  and the catching-up pause, and buildSession drops Cleared and Learnt rows
+  that are not `dueAt`, unless asked for by name. Cards in learning stay,
+  due or not. Nothing left gives the reason `none-due`.
 - *The home screen's count reads a met card with a newly opened level as
   waiting*, not new: a learner with 88 number cards at the top of their
   ladder was shown nothing ready under the 20-in-learning limit.
@@ -6268,3 +6273,46 @@ the answer screen read the same one.
 
 **Choices the owner made.** Of: filling the blank; leaving frames out of
 the box; showing the blank as a gap, the owner chose filling.
+
+
+## A verb's tense is practised as a whole, by five ordinary exercises (0.451)
+
+**What was wrong.** A verb's table is its cells and each cell is drilled as
+a word of its own, which was right about scheduling and left the thing
+that makes verbs learnable unasked: nothing showed a tense laid out by
+person, and the forms that look alike — بتكتب is *you (m)* and *she* —
+were never put side by side. The owner found each form hard to learn on
+its own and asked for practices of the tense.
+
+**What changed.** Five exercises in the ordinary table, marked
+`verbDrill`, offered where a pack's verb table lists them in `practices`
+(Arabic and Hebrew; Huế lists none): `vpattern` and `vread` on level 1,
+asked of the whole tense; `vwho`/`vwhorec` on level 1, one form; `vrow` on
+level 2, the whole tense; `vshift` on level 3, one form. Each is keyed per
+cell like any exercise, so the scheduler, sync and the progress screens
+needed nothing new. What a tense needs to be asked about — two persons, a
+form not spelt like this one — is a fact about the card, so availableTypes
+reads it through `drillFits` with the card from a new index
+(`VERB_CARDS`), set with the others. A question about the whole tense is
+dealt once per tense (`withRows`) and marks each form from one answer
+(`tense` in `marksForAnswer`), the way a grid marks its words: the one it
+was dealt for moves as any question does, the rest where they were due.
+`patternFirst` narrows what is dealt, not the ladder: until "I get it" has
+been answered once, a cell is dealt `vpattern` alone.
+
+**Choices the owner made.** No colouring anywhere, for this first version
+— the pattern is the table; a root on the card was considered for it and
+dropped with it. Two forms spelt the same stay two rows and two tiles,
+never merged. "I get it" counts as a right answer and "I don't get it" as
+a miss, re-asked in the session. Reading the forms is marked form by form
+by the learner, after uncovering each pronunciation. The whole tense is
+shown at once, up to twelve rows in Hebrew. The practices go on the ladder
+for everybody (of: everybody; only verbs still climbing; beside the
+ladder), so a verb learnt before them goes back to learning until they are
+answered. All of it in one release.
+
+**What it costs.** Four or five more questions per form, softened by the
+three that mark a whole tense at once. The cited cell is asked none of
+them: it is met before its tense opens, and a question about its tense
+would show that tense early. The deck estimate counts the new questions
+per form, so it overstates the three tense-wide ones; it is an estimate.

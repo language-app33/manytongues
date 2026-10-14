@@ -8,6 +8,126 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.451 — 14 October 2026
+
+**Arabic and Hebrew verbs get five new practices that show a whole tense
+at once.**
+
+Until now, every form of a verb was learnt as if it were a separate word.
+These practices show a tense laid out by person, so learners can see how
+it changes and tell apart the forms that look almost the same. They come
+on top of the questions a verb already had.
+
+- **See the pattern.** When a tense opens, it's first shown on its own:
+  every person, its form, how it's said and what it means. "I get it"
+  counts as a right answer. "I don't get it" brings the table back later
+  in the same session. Nothing else about that tense is asked until the
+  learner has said "I get it" once.
+- **Read the forms.** The same table with each pronunciation blurred.
+  The learner reads a form, taps to uncover how it's said, then says
+  whether they read it right. Each form is marked on its own, so the ones
+  they misread come back. Only forms that have a pronunciation written are
+  asked.
+- **Who is it?** One form, read or heard if it has a recording: who is it
+  about? The wrong choices are the persons whose forms look most like it.
+  Where two persons are spelt the same (بتكتب is "you (m)" and "she"),
+  either answer is right.
+- **Fill the row.** The tense with every form taken out and the forms
+  below as tiles, one per person. Two forms spelt the same are two tiles,
+  and either goes in either place. Each person is marked on its own.
+- **Change the person.** A form the learner has met ("بيكتب, he writes")
+  and another person to write it for ("she"). It never asks between two
+  persons spelt the same.
+- Nothing is coloured. The table itself is the pattern.
+- Vietnamese verbs are unchanged.
+- The trade-off: every verb a student had already learnt in Arabic or
+  Hebrew goes back to learning until they've answered the new questions.
+  Each form also has more questions to climb, though the three that show
+  the whole tense mark every form at once.
+- To check by hand: open a verb with at least two persons written in a
+  tense and start a session. The first question about that tense should be
+  the table with "I get it". On a phone, check that a Hebrew tense of
+  twelve persons fits and scrolls well in "Fill the row".
+
+## 0.450 — 14 October 2026
+
+**Ultimate takes every new card, and no longer brings reviews forward.**
+
+- Ultimate now brings in every new card chosen. Before, it held new cards
+  back like any other session: no more than 20 cards being learnt at
+  once, and none at all while reviews were more than about three days
+  behind.
+- Ultimate now leaves out cleared and learnt cards that aren't due for
+  review yet. Before, it asked every chosen card, so a learnt card due
+  next week was practised today, ahead of its schedule. Those cards now
+  wait for their review date. A card marked to practise next still comes
+  in, due or not.
+- Cards still being learnt are asked as before, due or not.
+- If every chosen card is cleared or learnt and none is due, the Build
+  screen says so instead of starting.
+- The trade-off: Ultimate on a big unstarted deck now starts all of it at
+  once, which makes a long session and a lot of cards to keep up with
+  afterwards.
+- The Ultimate description on the Build screen says the above.
+- To check by hand: build an Ultimate session from a deck with some
+  learnt cards not due. They shouldn't come up, and every new card should.
+
+## 0.449 — 14 October 2026
+
+**Four fixes from learners' reports: the gap in a phrase, a needless warning, a word with two meanings, and one hint at a time.**
+
+- **The gap in a phrase leaves "ال" where it was.** In "which word is
+  missing?" on a phrase, the gap used to swallow everything stuck to the
+  word: البوليس became one gap, while the choices offered بوليس. The
+  answer then didn't fit the sentence. Now only the word is taken out, so
+  the sentence reads ال____ and بوليس fits it. The same goes for و, ب and
+  the rest at the front, and for an ending such as نا at the back.
+- **No "more than one word for this" where there isn't.** Asked to write
+  "My birthday", a learner was warned off another card whose Arabic is
+  the same words, differing only in vowel marks, which the marking
+  ignores anyway. The warning now appears only where the other card's
+  answer would really be marked wrong here.
+- **بعتّ means "I sent" and "you sent", and both are right.** Asked what
+  a word means, where the card has another form spelt exactly the same,
+  either meaning is now accepted. A learner answering "I sent" was marked
+  wrong for reading the word correctly. The question no longer names
+  which person the card filed it under, since that would only give the
+  English away; the answer screen still says it.
+- **"Fill the gap" in a phrase has one hint, not two.** The hint button
+  showed the pronunciation and the phrase's English together. Now it
+  shows what the phrase means, the same as the "choose" version, and
+  taking it no longer costs the mark, any more than the English does in
+  "English → Arabic". The pronunciation is still under "Learn more" once
+  answered. A phrase written without English keeps the pronunciation as
+  its hint, which still costs the mark.
+- Trade-offs: a word with a pronoun on the end now shows that ending
+  beside the gap, which is a small clue. And with "I sent" accepted for
+  بعتّ, the question no longer insists on the one the teacher filed.
+- Already fixed and left alone: the wrong choices in "choose the meaning"
+  have come from the decks being practised since 0.423.
+- To check by hand: (1) a "which word is missing?" question on a phrase
+  with البوليس should show ال____ and offer بوليس. (2) "My birthday"
+  in English → Arabic should show no warning. (3) Asked what بعتّ means
+  on the "to send" card, "I sent" and "You sent" should both be right.
+  (4) In "fill the gap" on a phrase, the hint should show only the
+  English.
+
+## 0.448 — 14 October 2026
+
+**On "which word is missing?" questions, the sentence's English comes with the answer.**
+
+- Once a "which word is missing?" question is answered, what the whole
+  sentence means is now shown below, with the verdict and the answer,
+  rather than up by the sentence where the hint shows it.
+- Before the answer nothing changes: the hint still gives the sentence's
+  English where it did, and on the typed question about a conversation
+  or text the English is still under the sentence as the clue. Once
+  answered, that line moves down to the answer as well.
+- Only where the teacher wrote the sentence's English.
+- To check by hand: answer a "which word is missing?" question, with the
+  hint open and without. The English should be under the verdict, and no
+  longer above.
+
 ## 0.447 — 14 October 2026
 
 **"Which word is missing?" questions show what the whole sentence means once answered.**

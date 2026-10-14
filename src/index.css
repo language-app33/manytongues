@@ -3433,6 +3433,40 @@ body.at-screening .at-chromebar { display:none; }
 .at-selfmark { display:flex; gap:8px; flex-wrap:wrap; }
 .at-selfmark > .at-btn { flex:1 1 auto; min-width:0; }
 
+/* A verb's tense, laid out by person: the person, the form, and under the
+   form how it is said and what it means. One row a person, two forms
+   spelt the same included, so the table keeps its shape. Nothing in it is
+   coloured — the pattern is for the learner to see. */
+.at-vtense { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; width:100%; }
+.at-vrow { display:grid; grid-template-columns: minmax(64px, auto) 1fr; column-gap:12px; row-gap:2px;
+  align-items:center; padding:8px 12px; border:1px solid var(--line); border-radius: var(--r-sm);
+  background: var(--surface); }
+.at-vperson { color: var(--muted); font-size: var(--fs-sm); }
+.at-vform { font-size: calc(var(--ask) * .7); line-height:1.3; text-align:end; }
+.at-vsaid { grid-column: 2; display:flex; flex-wrap:wrap; gap:4px 10px; justify-content:flex-end;
+  font-size: var(--fs-sm); color: var(--text-soft); }
+.at-ven { color: var(--muted); }
+.at-vhidden { border:1px dashed var(--line); border-radius: var(--r-sm); background: var(--well);
+  padding:2px 8px; cursor:pointer; color: var(--text-soft); }
+.at-vhidden > span { filter: blur(5px); user-select:none; }
+.at-vreadmark { grid-column: 1 / -1; display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
+.at-vnow { margin-top:10px; }
+
+/* Fill the row: an empty place a person, and the forms as tiles under it. */
+.at-vfill { display:flex; flex-direction:column; gap:14px; width:100%; }
+.at-vslot { min-height:44px; width:100%; border:2px dashed var(--line); border-radius: var(--r-sm);
+  background: var(--well); color: var(--text); font-size: calc(var(--ask) * .6); cursor:pointer; padding:4px 10px; }
+.at-vslot.on { border-style:solid; border-color: var(--jade-soft); }
+.at-vslot.right { border-style:solid; border-color: var(--jade-soft); }
+.at-vslot.wrong { border-style:solid; border-color: var(--rose-soft); }
+.at-vslot:disabled { cursor:default; }
+.at-vfix { grid-column: 2; }
+.at-vtiles { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+.at-vtile { border:2px solid var(--line); border-radius: var(--r-sm); background: var(--surface);
+  color: var(--text); padding:6px 12px; font-size: calc(var(--ask) * .6); cursor:pointer; min-height:44px; }
+.at-vtile:hover { border-color: var(--muted); }
+.at-answerperson { font-size: var(--fs-lg); margin:6px 0 0; }
+
 /* The replies on offer, one under the other. */
 .at-replies { display:flex; flex-direction:column; gap:8px; }
 .at-reply { text-align:start; width:100%; background: var(--surface);

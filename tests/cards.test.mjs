@@ -856,9 +856,11 @@ test("two forms with the same prompt and the same answer need no tag", () => {
   const iF = form({ id: "u-f3", ar: "بَفهَم", en: "I understand", lat: "bafham" });
   const you = form({ id: "u-f0", ar: "بتِفهَم", en: "You understand", lat: "btifham" });
   assert.equal(formIsAmbiguous({ unit: i, kin: [iF, you], shown: [], promptField: "ar", answerField: "en" }), false);
-  /* Spelt alike but meaning different things, it still has to say which. */
+  /* Spelt alike but meaning different things: either meaning is right
+     (see twinsOf), so there is still nothing for a tag to settle, and
+     "you" under بتِفهَم would be the English given away. */
   const she = form({ id: "u-f4", ar: "بتِفهَم", en: "She understands", lat: "btifham" });
-  assert.equal(formIsAmbiguous({ unit: you, kin: [she], shown: [], promptField: "ar", answerField: "en" }), true);
+  assert.equal(formIsAmbiguous({ unit: you, kin: [she], shown: [], promptField: "ar", answerField: "en" }), false);
   /* And the other way round: the same English, written differently. */
   assert.equal(
     formIsAmbiguous({ unit: form({ id: "t", ar: "مدرس", en: "teacher" }), kin: [form({ id: "t-f0", ar: "مدرسة", en: "teacher" })], shown: [], promptField: "en", answerField: "ar" }),
@@ -885,6 +887,17 @@ test("where the question cannot say which form, the forms it cannot tell apart a
   assert.deepEqual(twinsOf({ unit: fem, kin: [masc], promptField: "en", told: true }), []);
   /* Read from the script, the two are told apart by what is shown. */
   assert.deepEqual(twinsOf({ unit: fem, kin: [masc], promptField: "ar", told: false }), []);
+  /* Unless what is shown is the same: بعتّ is "I sent" and "you sent",
+     and a learner answering either has read it right, named form or not. */
+  const sentI = form({ id: "s-f1", ar: "بعتّ", en: "I sent" });
+  const sentYou = form({ id: "s-f2", ar: "بعتّ", en: "You sent" });
+  const sentYouF = form({ id: "s-f3", ar: "بعتّي", en: "You sent" });
+  for (const told of [false, true]) {
+    assert.deepEqual(
+      twinsOf({ unit: sentYou, kin: [sentI, sentYouF], promptField: "ar", told }).map((/** @type {any} */ f) => f.id),
+      ["s-f1"],
+    );
+  }
   /* And a gap in a phrase is not a prompt two forms can read alike. */
   assert.deepEqual(twinsOf({ unit: fem, kin: [masc], promptField: "context", told: false }), []);
 });
