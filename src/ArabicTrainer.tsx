@@ -137,6 +137,7 @@ import {
   EASY_TYPES,
   exOf,
   findWordSpan,
+  gluedTo,
   guessKind,
   inScript,
   kindOf,
@@ -2552,9 +2553,31 @@ export function siblingsAsked(card: Item | null | undefined, unit: Form | null |
   const side = promptSide(spec.promptField);
   if (!side) return [];
   const answerField = spec.answerField || "";
+  const lang = LANGUAGES[langIdOf(card, settings)];
   return siblingsOf(SIBLINGS, card, unit, side, langIdOf(card, settings)).filter(
-    (s) => !answersAlike(unit, s.unit, answerField),
+    (s) => !answersAlike(unit, s.unit, answerField) && !acceptedHere(s.unit, unit, answerField, lang, settings),
   );
+}
+
+/*
+ * Whether the sibling's answer, typed here, would be marked right anyway.
+ *
+ * answersAlike compares spellings as they are drawn, marks and all, which
+ * is right for telling two words apart on the screen and wrong for telling
+ * two answers apart: عيد ميلادي on one card and the same words with a
+ * sukun on another are the one answer to a learner who types neither mark,
+ * and the checker says so. A learner reported "More than one word for this
+ * — not …" over a question whose answer was accepted either way. Only for
+ * an answer in the script, the one place the checker forgives more than
+ * the drawing does.
+ */
+function acceptedHere(sibling: Form, unit: Form, answerField: string, lang: Lang | undefined, settings: Settings): boolean {
+  if (answerField !== "ar" || !lang || !unit.ar) return false;
+  const theirs = splitAlternatives(String(sibling.ar || "")).filter(Boolean);
+  return theirs.length > 0 && theirs.some((alt) => {
+    const r = lang.check(alt, String(unit.ar), settings, {});
+    return !!(r && r.ok);
+  });
 }
 
 let MATE_COUNTS: Map<string, number> = new Map();
@@ -3543,13 +3566,16 @@ function oneOf(unit: Form, type: string): Form {
   return meaning && meaning !== String(out.en || "").trim() ? { ...out, en: meaning } : out;
 }
 
-/* The phrase with the target word taken out, as the question shows it. */
+/* The phrase with the target word taken out, as the question shows it.
+   Only the word: what is glued to it stays — see gluedTo. */
 function blankedPhrase(context: any, lang: Lang, blank: string = "____") {
   const tokens = contextTokens(context.ar, lang);
   const span = Math.max(1, context.span || 1);
   if (context.slot < 0 || context.slot >= tokens.length) return context.ar;
+  const glued = span === 1 && context.word ? gluedTo(tokens[context.slot], context.word, lang) : null;
+  const gap = glued ? `${glued.before}${blank}${glued.after}` : blank;
   return tokens
-    .map((t, i) => (i === context.slot ? blank : i > context.slot && i < context.slot + span ? null : t))
+    .map((t, i) => (i === context.slot ? gap : i > context.slot && i < context.slot + span ? null : t))
     .filter((t) => t !== null)
     .join(" ");
 }
@@ -11084,14 +11110,6 @@ export default function ArabicTrainer() {
   /* Whether the answer as marked stands as a right one, before the hint is
      taken into account. */
   const answerStands = !!(overridden || (checked && checked.ok && !skipped));
-  /* And the case that costs an answer its good mark: right, but written
-     off a hint that spelt it out. Read off what was on the screen when the
-     answer went in, not what is on it now — the nudge can still be opened
-     afterwards to look at the pronunciation, and looking at it once the
-     question is answered is not leaning on it. */
-  const toldAnswer = !!(
-    spec && spec.hintTells && spec.hintField && item && item[spec.hintField] && hintAtAnswer && answerStands
-  );
   /* The phrase this question shows the word in, if it is that sort of
      question. Chosen when the queue was built and named on the exercise, so
      it stays put; looked up again here because only the id travels. */
@@ -11107,8 +11125,22 @@ export default function ArabicTrainer() {
   /* Never a verb's own example, whose English is the one thing that says
      which person its gap is in: there it is on the screen from the start. */
   const phraseHint = spec && spec.hintPhrase && context && context.en && typeof context.example !== "number" ? context.en : "";
-  const hintAt = (spec && spec.hintField && item ? String(item[spec.hintField] || "") : "") || phraseHint;
+  /* One hint, never two. Where the phrase's meaning is behind the nudge it
+     is the whole of it, and the pronunciation waits for the answer screen:
+     "fill the gap" put both up under one press, and a learner reported
+     being shown two hints. Without a meaning to give, the nudge is the
+     pronunciation, as it always was. */
+  const hintValue = !phraseHint && spec && spec.hintField && item ? String(item[spec.hintField] || "") : "";
+  const hintAt = phraseHint || hintValue;
   const hintShown = !!hintAt && !!hintOpen;
+  /* And the case that costs an answer its good mark: right, but written
+     off a hint that spelt it out. Read off what was on the screen when the
+     answer went in, not what is on it now — the nudge can still be opened
+     afterwards to look at the pronunciation, and looking at it once the
+     question is answered is not leaning on it. What the phrase means does
+     not spell the word, any more than the English over "English →
+     {script}" does, so taking it costs nothing. */
+  const toldAnswer = !!(spec && spec.hintTells && hintValue && hintAtAnswer && answerStands);
   /* On the screen now, or on it at some point. */
   const hintTaken = hintShown || hintUsed;
   /*
@@ -13159,7 +13191,7 @@ export default function ArabicTrainer() {
                     )}
                   </div>
 
-                  {hintShown && item[spec.hintField] && (
+                  {hintShown && hintValue && (
                     <div className="at-hintvalue" data-el="hint-value">
                       <Field
                         value={item[spec.hintField]}
@@ -13744,7 +13776,15 @@ export default function ArabicTrainer() {
                                answering yet — and a filled button next to a
                                ghost one read as the louder of the pair. */
                             ghost
-                            label={hintShown ? spec.hintHideLabel : spec.hintLabel}
+                            label={
+                              phraseHint
+                                ? hintShown
+                                  ? "Hide what the phrase means"
+                                  : "Show what the phrase means"
+                                : hintShown
+                                ? spec.hintHideLabel
+                                : spec.hintLabel
+                            }
                             className={`at-hintbtn${hintShown ? " on" : ""}`}
                             data-el="hint-button"
                             aria-pressed={hintShown}
@@ -16813,8 +16853,7 @@ export function formIsAmbiguous({ unit, kin, shown, promptField, answerField }: 
   if (!unit || !kin.length) return false;
   /* A prompt showing the word itself — in the script, its transliteration,
      or heard — already says which form it is, kin among the tiles or not;
-     naming the form there names the answer. Only two forms reading the
-     same in that field leave it open. See formTagsAt. */
+     naming the form there names the answer. See formTagsAt. */
   const ids = new Set((shown || []).map((s) => s && s.id).filter(Boolean));
   if (!PROMPT_SHOWS_FORM.includes(promptField) && kin.some((k) => k && ids.has(k.id))) return true;
   if (!PROMPT_FIELDS.includes(promptField)) return false;
@@ -16825,6 +16864,10 @@ export function formIsAmbiguous({ unit, kin, shown, promptField, answerField }: 
      learner reported exactly that. */
   const sameAnswer = (k: Record<string, any>) =>
     !!answerField && PROMPT_FIELDS.includes(answerField) && readAlike(unit, k, answerField);
+  /* Nor two forms spelt alike in the prompt that shows them: بعتّ is *I
+     sent* and *you sent*, and since both are right (see twinsOf) there is
+     nothing for a tag to settle. */
+  if (PROMPT_SHOWS_FORM.includes(promptField)) return false;
   return kin.some((k) => readAlike(unit, k, promptField) && !sameAnswer(k));
 }
 
@@ -16941,7 +16984,12 @@ export function twinsOf({ unit, kin, promptField, told }: {
   /** Whether the question names the form it wants. */
   told: boolean;
 }): Record<string, any>[] {
-  if (!unit || told || !PROMPT_FIELDS.includes(promptField)) return [];
+  /* Except where the prompt is the word itself. بعتّ is *I sent* and *you
+     sent* both, and a tag saying which of them the card filed it under does
+     not make the other a wrong reading of what is on the screen: a learner
+     answering "I sent" reported being marked wrong for the same word. */
+  if (!unit || !PROMPT_FIELDS.includes(promptField)) return [];
+  if (told && !PROMPT_SHOWS_FORM.includes(promptField)) return [];
   return kin.filter((k) => k && k.id !== unit.id && readAlike(unit, k, promptField));
 }
 

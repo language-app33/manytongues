@@ -568,15 +568,17 @@ export const EX: Record<string, ExerciseSpec> = {
     placeholder: "",
     promptField: "context",
     answerField: "ar",
-    hintField: "lat",
-    hintLabel: "Show {translit} and what the phrase means",
-    hintHideLabel: "Hide {translit} and what the phrase means",
-    /* As in English → {script}: the hint is the word itself, said another
-       way. */
-    hintTells: true,
-    /* And what the phrase means comes up with it, rather than sitting on
-       the screen from the start — see hintPhrase. */
+    /* The hint is what the phrase means, where it has a meaning written,
+       rather than its sitting on the screen from the start — see
+       hintPhrase. Only where it has none is the hint the pronunciation, and
+       then, as in English → {script}, it is the word itself said another
+       way and costs the mark. Never both at once: a learner reported being
+       shown two hints. */
     hintPhrase: true,
+    hintField: "lat",
+    hintLabel: "Show {translit}",
+    hintHideLabel: "Hide {translit}",
+    hintTells: true,
     answerMode: "ar",
   },
   /* And the same again by ear. Harder than hearing the word alone, which is
@@ -1863,6 +1865,40 @@ export function findWordSpan(phrase: string, word: string, lang: Partial<Lang>):
     if (lang.context.matches(window, word)) return { at: i, len };
   }
   return null;
+}
+
+/*
+ * What a token holds besides the word: the ال, و or ب glued to its front
+ * and the pronoun glued to its end, as written, harakat and all. Null where
+ * the word is not in it, and for a word of more than one token, which
+ * nothing is glued into.
+ *
+ * For the gap in a phrase. Blanking البوليس whole over a choice of بوليس
+ * and three others left the article missing from the sentence and from
+ * every tile, and a learner reported the answer did not fit the sentence
+ * it went in. The gap is the word; what the matcher peeled off it stays
+ * where it was, ال____.
+ *
+ * Found by asking the language's own matcher of the shortest piece of the
+ * token that is the word, so it needs nothing from a pack beyond what it
+ * already declares. The marks written on the word's last letter go with
+ * the word.
+ */
+export function gluedTo(token: string, word: string, lang: Partial<Lang>): { before: string; after: string } | null {
+  if (!supportsContext(lang) || !token || !word || contextTokens(word, lang).length !== 1) return null;
+  const chars = Array.from(token);
+  let best: { a: number; b: number } | null = null;
+  for (let a = 0; a < chars.length; a++) {
+    if (/\p{M}/u.test(chars[a])) continue;
+    for (let b = a + 1; b <= chars.length; b++) {
+      if (best && b - a >= best.b - best.a) break;
+      if (lang.context.matches(chars.slice(a, b).join(""), word)) best = { a, b };
+    }
+  }
+  if (!best) return null;
+  let end = best.b;
+  while (end < chars.length && /\p{M}/u.test(chars[end])) end++;
+  return { before: chars.slice(0, best.a).join(""), after: chars.slice(end).join("") };
 }
 
 /* A card longer than this is not a word anybody is going to find inside a

@@ -5909,7 +5909,7 @@ The pace simulation runs the very rule the app does.
 - *Ultimate keeps no length*: the Build screen asks none, so it asks every
   question of every card the mix lets in, rather than 20.
 - *Ultimate lets every new card in and leaves out reviews not yet due*
-  (0.449, the owner's call): `everyNew` lifts both the 20-in-learning limit
+  (0.450, the owner's call): `everyNew` lifts both the 20-in-learning limit
   and the catching-up pause, and buildSession drops Cleared and Learnt rows
   that are not `dueAt`, unless asked for by name. Cards in learning stay,
   due or not. Nothing left gives the reason `none-due`.

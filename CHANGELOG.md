@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.449 — 14 October 2026
+## 0.450 — 14 October 2026
 
 **Ultimate takes every new card, and no longer brings reviews forward.**
 
@@ -30,6 +30,46 @@ and moves once per batch of work you would notice, not once per commit.
 - The Ultimate description on the Build screen says the above.
 - To check by hand: build an Ultimate session from a deck with some
   learnt cards not due. They shouldn't come up, and every new card should.
+
+## 0.449 — 14 October 2026
+
+**Four fixes from learners' reports: the gap in a phrase, a needless warning, a word with two meanings, and one hint at a time.**
+
+- **The gap in a phrase leaves "ال" where it was.** In "which word is
+  missing?" on a phrase, the gap used to swallow everything stuck to the
+  word: البوليس became one gap, while the choices offered بوليس. The
+  answer then didn't fit the sentence. Now only the word is taken out, so
+  the sentence reads ال____ and بوليس fits it. The same goes for و, ب and
+  the rest at the front, and for an ending such as نا at the back.
+- **No "more than one word for this" where there isn't.** Asked to write
+  "My birthday", a learner was warned off another card whose Arabic is
+  the same words, differing only in vowel marks, which the marking
+  ignores anyway. The warning now appears only where the other card's
+  answer would really be marked wrong here.
+- **بعتّ means "I sent" and "you sent", and both are right.** Asked what
+  a word means, where the card has another form spelt exactly the same,
+  either meaning is now accepted. A learner answering "I sent" was marked
+  wrong for reading the word correctly. The question no longer names
+  which person the card filed it under, since that would only give the
+  English away; the answer screen still says it.
+- **"Fill the gap" in a phrase has one hint, not two.** The hint button
+  showed the pronunciation and the phrase's English together. Now it
+  shows what the phrase means, the same as the "choose" version, and
+  taking it no longer costs the mark, any more than the English does in
+  "English → Arabic". The pronunciation is still under "Learn more" once
+  answered. A phrase written without English keeps the pronunciation as
+  its hint, which still costs the mark.
+- Trade-offs: a word with a pronoun on the end now shows that ending
+  beside the gap, which is a small clue. And with "I sent" accepted for
+  بعتّ, the question no longer insists on the one the teacher filed.
+- Already fixed and left alone: the wrong choices in "choose the meaning"
+  have come from the decks being practised since 0.423.
+- To check by hand: (1) a "which word is missing?" question on a phrase
+  with البوليس should show ال____ and offer بوليس. (2) "My birthday"
+  in English → Arabic should show no warning. (3) Asked what بعتّ means
+  on the "to send" card, "I sent" and "You sent" should both be right.
+  (4) In "fill the gap" on a phrase, the hint should show only the
+  English.
 
 ## 0.448 — 14 October 2026
 

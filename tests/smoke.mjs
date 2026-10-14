@@ -3748,7 +3748,7 @@ const rightTile = (tiles, shown) => {
    Driven through Ultimate, which asks every type a card supports, so
    which questions come up is not a draw — everything else about a session
    now is. The climbed cards are what have those types open, and
-   Ultimate leaves a Cleared or Learnt card out until it is due (0.449), so
+   Ultimate leaves a Cleared or Learnt card out until it is due (0.450), so
    they are marked high priority for this walk — a card asked for by name
    comes whatever its schedule — and the marks taken off at the end. */
 /* The two climbed cards, and كتاب, which is Learnt and not due either. */

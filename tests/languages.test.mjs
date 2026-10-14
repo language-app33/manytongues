@@ -28,6 +28,7 @@ import {
   contextCoverage,
   EASY_TYPES,
   findWordSlot,
+  gluedTo,
   GRAMMAR,
   guessKind,
   kindOf,
@@ -1404,4 +1405,16 @@ test("the editor names the meanings two forms share with nothing to tell them ap
   /* Spelt alike, whichever is written is right. */
   const alike = { id: "a", forms: [{ id: "a", ar: "ساكن", en: "live" }, { id: "a2", ar: "ساكن", en: "live" }] };
   assert.deepEqual(untoldMeanings(alike, ar), []);
+});
+
+test("the gap in a phrase is the word: what is glued to it stays on the screen", () => {
+  const ar = LANGUAGES["ar-PS"];
+  assert.deepEqual(gluedTo("البوليس", "بوليس", ar), { before: "ال", after: "" });
+  assert.deepEqual(gluedTo("بوليسنا؟", "بوليس", ar), { before: "", after: "نا؟" });
+  assert.deepEqual(gluedTo("وبالكتاب", "كتاب", ar), { before: "وبال", after: "" });
+  // The word's own harakat go with it, not with what follows.
+  assert.deepEqual(gluedTo("البيتِك", "بيت", ar), { before: "ال", after: "ك" });
+  // A word that is the whole token leaves nothing behind.
+  assert.deepEqual(gluedTo("الأخبار", "الأخبار", ar), { before: "", after: "" });
+  assert.equal(gluedTo("مش", "بوليس", ar), null);
 });
