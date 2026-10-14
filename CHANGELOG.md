@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.448 — 14 October 2026
+## 0.449 — 14 October 2026
 
 **Ultimate takes every new card, and no longer brings reviews forward.**
 
@@ -30,6 +30,22 @@ and moves once per batch of work you would notice, not once per commit.
 - The Ultimate description on the Build screen says the above.
 - To check by hand: build an Ultimate session from a deck with some
   learnt cards not due. They shouldn't come up, and every new card should.
+
+## 0.448 — 14 October 2026
+
+**On "which word is missing?" questions, the sentence's English comes with the answer.**
+
+- Once a "which word is missing?" question is answered, what the whole
+  sentence means is now shown below, with the verdict and the answer,
+  rather than up by the sentence where the hint shows it.
+- Before the answer nothing changes: the hint still gives the sentence's
+  English where it did, and on the typed question about a conversation
+  or text the English is still under the sentence as the clue. Once
+  answered, that line moves down to the answer as well.
+- Only where the teacher wrote the sentence's English.
+- To check by hand: answer a "which word is missing?" question, with the
+  hint open and without. The English should be under the verdict, and no
+  longer above.
 
 ## 0.447 — 14 October 2026
 

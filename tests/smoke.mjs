@@ -3748,7 +3748,7 @@ const rightTile = (tiles, shown) => {
    Driven through Ultimate, which asks every type a card supports, so
    which questions come up is not a draw — everything else about a session
    now is. The climbed cards are what have those types open, and
-   Ultimate leaves a Cleared or Learnt card out until it is due (0.448), so
+   Ultimate leaves a Cleared or Learnt card out until it is due (0.449), so
    they are marked high priority for this walk — a card asked for by name
    comes whatever its schedule — and the marks taken off at the end. */
 /* The two climbed cards, and كتاب, which is Learnt and not due either. */
@@ -8014,10 +8014,11 @@ const openPronounTables = async () => {
     click(document.querySelector('[data-el="check-button"]'));
     await sleep(250);
   }
-  const after = ((document.querySelector('[data-el="question-context-meaning"]') || {}).textContent || "").trim();
+  const after = ((document.querySelector('[data-el="answer-meaning"]') || {}).textContent || "").trim();
+  const above = ((document.querySelector('[data-el="question-context-meaning"]') || {}).textContent || "").trim();
   const whole = ((document.querySelector('[data-el="question-prompt-text"]') || {}).textContent || "").trim();
-  check("once answered, the phrase is whole again and its English is under it",
-    after === "The book is big" && whole === "الكتاب كبير", JSON.stringify({ after, whole }));
+  check("once answered, the phrase is whole again and its English is with the answer, not up by the hint",
+    after === "The book is big" && !above && whole === "الكتاب كبير", JSON.stringify({ after, above, whole }));
   click(buttonNamed(/^Continue$/));
   await sleep(700);
   click(buttonNamed(/^Continue$/));
@@ -10080,7 +10081,7 @@ const openPronounTables = async () => {
   );
   const chosenMeant = await walk([meantCard({ dlgwhole: { ...solid }, sen2en: { ...solid }, en2sen: { ...solid } })], async (host) => {
     await reach(host, /Which word is missing/);
-    const out = { instruction: text(host.querySelector(".at-instruction")), before: "", after: "", meaning: "" };
+    const out = { instruction: text(host.querySelector(".at-instruction")), before: "", after: "", meaning: "", above: "" };
     const choices = host.querySelector('[data-el="answer-choices"]');
     if (!choices) return out;
     out.before = text(host.querySelector('[data-el="question-prompt-meaning"]'));
@@ -10089,7 +10090,8 @@ const openPronounTables = async () => {
     click(host.querySelector('[data-el="check-button"]'));
     await sleep(250);
     out.after = prompt(host);
-    out.meaning = text(host.querySelector('[data-el="question-prompt-meaning"]'));
+    out.meaning = text(host.querySelector('[data-el="answer-meaning"]'));
+    out.above = text(host.querySelector('[data-el="question-prompt-meaning"]'));
     return out;
   });
   materialQuiet = false;
@@ -10117,7 +10119,7 @@ const openPronounTables = async () => {
   check("choosing a missing word keeps the sentence's meaning back, then shows it with the answer",
     /Which word is missing/.test(chosenMeant.instruction) && chosenMeant.before === "" &&
       sentences.includes(chosenMeant.after) && chosenMeant.meaning.includes(meaningOf(chosenMeant.after)) &&
-      chosenMeant.meaning !== "",
+      chosenMeant.meaning !== "" && chosenMeant.above === "",
     JSON.stringify(chosenMeant));
   check("once choosing it is solid, the missing word is typed instead",
     /Fill the gap/.test(typed.instruction) && typed.input && !typed.choices && /____/.test(typed.prompt),
