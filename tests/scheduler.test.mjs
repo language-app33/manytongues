@@ -754,6 +754,8 @@ test("the settings say which level each exercise stands on, and every one has a 
      what it means: the grid, and the two that offer the word among four. */
   assert.deepEqual(TYPES.filter((t) => levelOf(t) === 2), [
     "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick",
+    /* A verb's tense put back together from its forms as tiles. */
+    "vrow",
     /* A word taken out of a scene, chosen out of four; and a scene's
        sentence chosen from its meaning. */
     "gap2pick", "en2sen",
@@ -762,9 +764,13 @@ test("the settings say which level each exercise stands on, and every one has a 
     "fig2pick", "time2dial",
   ]);
   assert.deepEqual(TYPES.filter((t) => levelOf(t) === 1), [
+    /* A verb's tense seen on its own, and read through. */
+    "vpattern", "vread",
     "ar2pick", "ar2en", "rec2en", "rec2img",
     /* What a verb's example means, with a subjunctive form in its gap. */
     "ex2en",
+    /* And who one of a verb's forms is about, read or heard. */
+    "vwho", "vwhorec",
     "dlgwhole",
     /* A scene's sentence, its meaning chosen. */
     "sen2en",
