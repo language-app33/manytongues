@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.443 — 14 October 2026
+
+**A sentence already practised also waits for its words.**
+
+- Since 0.435 a sentence of a text has waited until most of its words are
+  known, but only if the student hadn't practised it yet. A sentence
+  already practised kept coming even when its words were new, for example
+  when cards for them were made after the text.
+- Now every sentence follows the same rule. A practised sentence whose
+  words the student doesn't know well enough stops coming up, and picks
+  up where it left off once they are learnt. Its progress is kept.
+- While any sentence of a text is waiting, reading the whole text waits
+  too, as before.
+- Trade-off: making word cards for a text that students have already
+  practised can pause sentences they knew well, for every student, until
+  the words are learnt. A sentence that comes back may be late for its
+  review. And if a student starts getting a word wrong again, the
+  sentences with that word wait until it is recovered.
+- To check by hand: practise a sentence of a text, then make a card for
+  two or three of its words. The sentence should stop coming up until
+  most of those words are learnt, then come back with its progress.
+
 ## 0.442 — 13 October 2026
 
 **Subjunctive examples are written with chips, like sentence cards, and explained plainly.**
