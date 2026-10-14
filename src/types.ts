@@ -690,9 +690,10 @@ export type Settings = { language?: LangId } & Record<string, any>;
 /**
  * A session built by hand on the Build screen and kept.
  *
- * The cards are named by id rather than copied: a saved session is a way
- * back to the same material, not a snapshot of it, so a card edited since
- * is practised as it now reads and one withdrawn since simply drops out.
+ * The cards are named rather than copied: a saved session is a way back
+ * to the same material, not a snapshot of it, so a card edited since is
+ * practised as it now reads, one withdrawn since simply drops out, and a
+ * deck picked whole is the deck as it is now.
  * It rides in `settings`, which is what the whole document already syncs
  * as one last-writer-wins blob — right for something a person changes a
  * handful of times, and the reason it is not a top-level list with a merge
@@ -701,8 +702,17 @@ export type Settings = { language?: LangId } & Record<string, any>;
 export interface SavedSession {
   id: string;
   name: string;
-  /** The cards it was built from. Some may no longer exist. */
+  /** The cards picked one at a time. Some may no longer exist. */
   ids: string[];
+  /**
+   * Decks picked whole, by the name their cards carry as a tag. Read when
+   * the session is used, so a card added to the deck since is in it and
+   * one taken out is not. See cardsOfSaved in saved-sessions.ts. Absent on
+   * a session kept before decks were remembered: those name every card.
+   */
+  decks?: string[];
+  /** Everything the learner has, whatever it is by then. */
+  everything?: boolean;
   /** Which of MODES it was built in. */
   mode: string;
   /** Questions to ask; 999 where the length is a stretch of time instead. */

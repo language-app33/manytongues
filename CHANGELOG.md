@@ -8,6 +8,82 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.447 — 14 October 2026
+
+**"Which word is missing?" questions show what the whole sentence means once answered.**
+
+- After a "which word is missing?" question is answered, right or wrong,
+  the missing word goes back into the sentence and the English of the
+  whole sentence appears under it. This covers both kinds: a word missing
+  from a phrase on a card, and a word missing from a sentence of a
+  conversation or text, and both the choose and the type versions.
+- Before, the phrase's English stayed hidden unless the student had opened
+  the hint, and the "choose" question on a text never showed it at all.
+  So a student could pick the right word without ever finding out what
+  the sentence said.
+- Before the answer nothing changes: the meaning stays behind the hint
+  where it was, so it still doesn't give the word away.
+- Only where the teacher wrote the sentence's English. Without it, the
+  answer screen looks as it did.
+- To check by hand: answer a "which word is missing?" question without
+  opening the hint. The sentence should come back whole, with its English
+  underneath.
+
+## 0.446 — 14 October 2026
+
+**A saved session built from whole decks keeps up with those decks.**
+
+- A saved session used to remember the exact cards it was built from. If
+  a teacher then added cards to one of its decks, the session never
+  picked them up.
+- Now a deck ticked as a whole on the Build screen is kept as the deck.
+  Every time the session starts, it takes the deck as it is that day: new
+  cards are in, and cards taken out of the deck are gone. "Everything"
+  works the same way, taking in every card you have by then.
+- Cards picked one at a time are still kept as just those cards.
+- Sessions saved before this release still remember their cards. To make
+  one follow its decks, open it under Saved sessions, edit it, make sure
+  the deck's box is fully ticked, and save.
+- Trade-off: a deck is recognised by its name, so if a deck is renamed, a
+  saved session built from it loses it and needs editing again.
+- To check by hand: save a session with one whole deck, add a card to
+  that deck, then start the saved session (or look at its card count
+  under Saved sessions). The new card should be in it.
+
+## 0.445 — 14 October 2026
+
+**"Where it turned up" moves to the bottom of Learn more.**
+
+- After an answer, the phrase the word appeared in used to come first
+  under "Learn more". It now comes last, below how it's pronounced, how it
+  sounds, how it's written, the figures and the related words. It still
+  takes the full width of the box.
+- Nothing else in the box moves, and nothing is added or removed.
+- To check by hand: answer a question on a word that has a phrase recorded
+  for it. Under "Learn more", "Where it turned up" should be the last
+  block, just above the teacher's note and Continue.
+
+## 0.444 — 14 October 2026
+
+**Example sentences with a blank in them are shown with the blank filled.**
+
+- A sentence card with a blank in it, such as "I'm learning
+  {{language}}", also counts as an example of the words it teaches. Where
+  it was shown as an example, under "Where it turned up" on the answer
+  screen or in "Which word is missing?", the blank came through as written,
+  braces and all.
+- Now the blank is filled the way the sentence card's own questions fill
+  it: "عم بتعلّم عربي — I'm learning Arabic", in the script, the English
+  and the transliteration alike. The word in the blank comes from the same
+  cards, takes turns in the same way, and is only one the student has
+  already learnt.
+- Where nothing can fill the blank yet, that sentence is not used as an
+  example. The word's other examples are shown instead, or none, and the
+  sentence comes back once a word for the blank is learnt.
+- To check by hand: answer a question about a word whose only example is a
+  sentence card with a blank. "Where it turned up" should show that
+  sentence with a real word in the blank, never braces.
+
 ## 0.443 — 14 October 2026
 
 **A sentence already practised also waits for its words.**

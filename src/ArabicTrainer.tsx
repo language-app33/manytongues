@@ -744,6 +744,7 @@ export function mergeMoves(
    it was about. A module of its own so the one path that moves a learner's
    progress can be asked what it does without a browser — see grade.ts. */
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
+import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
 import type { Filler, Mark } from "./grade.ts";
 
 import { applyUpdate, beforeReload, onUpdateReady, updateReady } from "./updates.ts";
@@ -1343,6 +1344,7 @@ let SCENE_FILLS: WeakMap<Item, Map<string, Record<string, Record<string, Value>>
  * TYPE_CACHE keeps one: the question on screen moves that language in the
  * middle of a render, without any of the setters below being called.
  */
+let CONTEXT_FILLS: WeakMap<object, any> = new WeakMap();
 let ASKED_IN: WeakMap<Form, Map<string, { list: Value[]; lang: LangId; out: Value[] }>> = new WeakMap();
 
 /* Thrown away whole rather than picked over: the setters below run
@@ -1352,6 +1354,7 @@ function forgetTypes() {
   TYPE_CACHE = new WeakMap();
   SCENE_FILLS = new WeakMap();
   ASKED_IN = new WeakMap();
+  CONTEXT_FILLS = new WeakMap();
 }
 
 /* Exported, with the key it is filed under, so a test can say "these words
@@ -2778,7 +2781,56 @@ function replyPool(items: Item[], settings: Settings, langId: LangId) {
    held as a form of its card gets its own contexts rather than its
    parent's. */
 function contextsFor(unitId: string): any[] {
-  return CONTEXT_INDEX.get(unitId) || [];
+  const list = CONTEXT_INDEX.get(unitId) || [];
+  if (!list.some(holdsBlank)) return list;
+  return list.map(filledContext).filter(Boolean);
+}
+
+/*
+ * A phrase with a blank in it, filled — or left out.
+ *
+ * A teacher's frame — "I'm learning {{language}}" — is a context for the
+ * word in it like any other phrase, and was shown as written: the gap-fill
+ * and the answer screen's "Where it turned up" both put {{language}} in
+ * front of a learner. So it is filled the way the frame's own questions
+ * fill it, from the same values and under the same rules about which of
+ * them the learner has met, and turned by how often the frame has been
+ * answered, so it is met with each in turn. A phrase nothing can fill yet
+ * is not shown at all: the word's other phrases stand in for it, and it
+ * comes back the moment a value catches up.
+ *
+ * Kept per phrase until the cards next change (see forgetTypes), so the
+ * prompt and the answer screen are reading the same filling.
+ */
+const holdsBlank = (c: any): boolean => /\{\{/.test(`${c.ar || ""} ${c.en || ""} ${c.lat || ""}`);
+
+
+const CONTEXT_KEY = "ctxshown";
+
+function filledContext(c: any): any {
+  if (!holdsBlank(c)) return c;
+  if (CONTEXT_FILLS.has(c)) return CONTEXT_FILLS.get(c);
+  const said = fillContext(c);
+  const lang = LANGUAGES[String((c.frame && c.frame.lang) || "")] || activeLang();
+  const span = said && !holdsBlank(said) && c.word ? findWordSpan(said.ar, c.word, lang) : null;
+  const out = span ? { ...c, ar: said!.ar, en: said!.en || "", lat: said!.lat || "", slot: span.at, span: span.len } : null;
+  CONTEXT_FILLS.set(c, out);
+  return out;
+}
+
+function fillContext(c: any): { ar: string; en?: string; lat?: string } | null {
+  /* A turn of a conversation with a cast: filled as its scene is. */
+  const placed = sceneOf(c.id);
+  if (placed && hasCast(placed.card)) {
+    const took = sceneFill(placed.card, false);
+    if (!took) return null;
+    return (linesOf(filledScene(placed.card, took)).find((l) => l.id === c.id) as any) || null;
+  }
+  if (!c.frame) return null;
+  const lead = leadOf(c.frame) as Form;
+  const turn = Object.values(statesOf(lead)).reduce((n, st) => n + turnOf(st), 0);
+  const took = fillFor(lead, CONTEXT_KEY, c.frame, false, turn);
+  return took ? (fillForm(lead, took) as any) : null;
 }
 
 /*
@@ -2863,9 +2915,12 @@ function fillFor(
    * a preview of the question.
    */
   preview = false,
+  /* Where to start the walk, where the count is not this question's own —
+     a frame shown as the phrase a word turned up in. See filledContext. */
+  turn?: number,
 ): Record<string, Value> | null {
   const slots = slotsOf(unit);
-  const seen = turnOf(unit.s && unit.s[type]);
+  const seen = turn ?? turnOf(unit.s && unit.s[type]);
   /* The verb's own place is not filled from the cards: it is filled from
      the card's own table, by whatever fills the subject. So it is left out
      of the draw and put back below. Only on the card's own sentence — see
@@ -6106,7 +6161,8 @@ export function praiseFor(n: number) {
 
    The short blocks share a row two at a time — how it is pronounced beside
    how it sounds — so the box is half as tall and Continue half as far
-   down. Only the phrase it turned up in keeps the width to itself; the
+   down. Only the phrase it turned up in keeps the width to itself, and it
+   comes last, under the short blocks — until 0.445 it opened the box. The
    related words are a short block like the rest. The pronunciation and
    the recording are always the pair, when both are there; the others pair
    up in order, and one left over takes half a row like everything else,
@@ -6129,12 +6185,13 @@ function AlsoBox({ children }: { children?: Node }) {
       {cells}
     </div>
   );
-  const rows: any[] = shown.filter((el) => alsoName(el) === "also-context");
+  const rows: any[] = [];
   const short = shown.filter((el) => alsoName(el) !== "also-context");
   const pair = short.filter((el) => ALSO_PAIR.includes(alsoName(el)));
   const rest = pair.length === 2 ? short.filter((el) => !pair.includes(el)) : short;
   if (pair.length === 2) rows.push(row(pair));
   for (let i = 0; i < rest.length; i += 2) rows.push(row(rest.slice(i, i + 2)));
+  rows.push(...shown.filter((el) => alsoName(el) === "also-context"));
   return (
     <>
       <p className="at-alsomore" data-el="also-heading">
@@ -10503,6 +10560,8 @@ export default function ArabicTrainer() {
         id: x.id,
         name: String(x.name || "Saved session"),
         ids: x.ids.filter((i: unknown) => typeof i === "string"),
+        decks: Array.isArray(x.decks) ? x.decks.filter((d: unknown) => typeof d === "string") : [],
+        everything: x.everything === true,
         mode: x.mode,
         count: Number(x.count) || 0,
         minutes: Number(x.minutes) || 0,
@@ -10531,8 +10590,11 @@ export default function ArabicTrainer() {
     flash(`Saved changes to ${changed.name}`);
   }
 
+  /* The decks it names are read now, against the cards the Build screen
+     shows, so a card added to one since it was kept is in the session. */
   function startSaved(s: SavedSession) {
-    beginManual({ ids: s.ids, mode: s.mode, count: s.count, minutes: s.minutes });
+    const ids = new Set([...s.ids, ...cardsOfSaved(s, shown).map((it) => it.id)]);
+    beginManual({ ids, mode: s.mode, count: s.count, minutes: s.minutes });
   }
 
   /* A session assembled by hand on the Build screen. */
@@ -12970,7 +13032,11 @@ export default function ArabicTrainer() {
                           kind="phrase"
                           name="question-prompt-text"
                         />
-                        {spec.answerMode === "ar" && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
+                        {/* And once it is answered, whichever way, the
+                            sentence is whole again and its meaning is under
+                            it: the word chosen is only learnt in the
+                            sentence if what the sentence says is known. */}
+                        {(spec.answerMode === "ar" || checked) && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
                           <p className="at-ctxmeaning" data-el="question-prompt-meaning">
                             {asMeaning(String(linesOf(dialog)[item.gap.line].en))}
                           </p>
@@ -12986,7 +13052,7 @@ export default function ArabicTrainer() {
                            reaching this question — the teacher unticks it,
                            or the deck is withdrawn. Asking for the word on
                            its own is a lesser question, not a broken one. */
-                        value={context ? blankedPhrase(context, qLang) : item.en}
+                        value={context ? (checked ? context.ar : blankedPhrase(context, qLang)) : item.en}
                         field={context ? "ar" : "en"}
                         kind="phrase"
                         name="question-prompt-text"
@@ -13062,8 +13128,10 @@ export default function ArabicTrainer() {
                     {/* Unless the question keeps the phrase's meaning
                         behind the nudge, when it is there only once asked
                         for: "I want to understand the news in Arabic" over
-                        a gap all but names the word. */}
-                    {context && (!phraseHint || hintShown) && (
+                        a gap all but names the word. Once answered there
+                        is nothing left to give away: the phrase is whole
+                        again above, and what it means is shown with it. */}
+                    {context && (!phraseHint || hintShown || checked) && (
                       <p className="at-ctxmeaning" data-el="question-context-meaning">
                         {asMeaning((spec.promptField === "context" && context.en) || item.en)}
                       </p>
@@ -14198,12 +14266,11 @@ function SavedTiles({ sessions, items, settings, onStart }: {
   onStart: (session: SavedSession) => void;
 }) {
   const tiles = useMemo(() => {
-    const byId = new Map(items.map((it) => [it.id, it]));
     /* Newest first, as the list has them. */
     return [...sessions]
       .sort((a, b) => (b.created || 0) - (a.created || 0))
       .map((s) => {
-        const cards = s.ids.map((id) => byId.get(id)).filter((it): it is Item => !!it);
+        const cards = cardsOfSaved(s, items);
         return { s, alive: cards.length, pct: climbOf(cards, settings, items).pct };
       });
   }, [sessions, items, settings]);
@@ -15857,8 +15924,6 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const here = useMemo(() => new Set(items.map((i) => i.id)), [items]);
-
   /* Newest first: the one somebody just made is the one they are looking
      for. */
   const list = [...sessions].sort((a, b) => (b.created || 0) - (a.created || 0));
@@ -15876,7 +15941,8 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
           /* How much of it is still here. A card withdrawn since is simply
              gone from the session, and saying so before it is started is
              the difference between a short session and a broken one. */
-          const alive = s.ids.filter((id) => here.has(id)).length;
+          const alive = cardsOfSaved(s, items).length;
+          const gone = missingFromSaved(s, items).length;
           const mode = (MODES as Record<string, { label: string } | undefined>)[s.mode];
           const length = s.minutes
             ? `${s.minutes} min`
@@ -15889,9 +15955,9 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
                 <div className="en">{s.name}</div>
                 <div className="lat">
                   {[mode ? mode.label : s.mode, length,
-                    alive === s.ids.length
+                    !gone
                       ? plural(alive, "card")
-                      : `${alive} of ${s.ids.length} cards still here`,
+                      : `${alive} of ${alive + gone} cards still here`,
                   ].join(" · ")}
                 </div>
               </div>
@@ -15919,7 +15985,7 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
         })}
       </div>
 
-      {list.some((s) => s.ids.some((id) => !here.has(id))) && (
+      {list.some((s) => missingFromSaved(s, items).length) && (
         <Help className="at-mt3">
           A session keeps the cards it was built from by name, so one you
           have since deleted is no longer in it.
@@ -15941,7 +16007,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   settings: Settings;
   editing?: SavedSession;
   onStart: (plan: any) => void;
-  onSave: (session: { name: string; ids: string[]; mode: string; count: number; minutes: number }) => void;
+  onSave: (session: Omit<SavedSession, "id" | "created">) => void;
   onClose: () => void;
 }) {
   const eligible = useMemo(
@@ -15956,9 +16022,8 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
      is the last one to hand somebody by default. */
   const [mode, setMode] = useState(editing ? editing.mode : "");
   const [picked, setPicked] = useState(() => {
-    if (!editing) return new Set();
-    const here = new Set(eligible.map((i) => i.id));
-    return new Set(editing.ids.filter((id) => here.has(id)));
+    if (!editing) return new Set<string>();
+    return new Set(cardsOfSaved(editing, eligible).map((i) => i.id));
   });
   /* The kept cards this screen cannot show — another language's, under the
      switch, or one that has gone — carried through a save untouched, so
@@ -16099,9 +16164,12 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   const suggestion = mode
     ? `${(MODES as Record<string, { label: string }>)[mode].label} · ${plural(picked.size, "card")}`
     : "";
+  /* A deck whose box is ticked is kept as the deck, not as the cards it
+     holds today, so the session takes in what is added to it later. */
+  const described = describeSaved({ picked, groups: new Map(tagGroups), all: eligible });
   const spec = JSON.stringify({
     name: name.trim() || suggestion,
-    ids: [...picked].sort(),
+    ...described,
     mode,
     limitKind,
     count,
@@ -16121,7 +16189,8 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   function keep() {
     onSave({
       name: name.trim() || (editing && editing.name) || suggestion,
-      ids: [...picked, ...elsewhere] as string[],
+      ...described,
+      ids: [...described.ids, ...elsewhere],
       mode,
       count: limitKind === "count" ? count : 999,
       minutes: limitKind === "time" && needsLength ? minutes : 0,

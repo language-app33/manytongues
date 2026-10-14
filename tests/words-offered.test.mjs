@@ -80,3 +80,17 @@ test("a verb with its own word blank gives a sentence's word a card", () => {
   const { bare } = sentenceWords("شو بتخلي", [keep], ar);
   assert.deepEqual(bare, ["شو"]);
 });
+
+/* A frame — "I'm learning {{language}}" — is a context for the word in it,
+   and carries its card so the app can fill the blank before showing it;
+   a phrase with no blank carries nothing extra and is shown as written. */
+test("a phrase with a blank carries its card, to be filled before it is shown", () => {
+  const learn = card("L", "بتعلّم", "I learn");
+  const frame = { ...card("F", "عم بتعلّم {{language}}", "I'm learning {{language}}"), uses: ["L"] };
+  const plain = { ...card("Q", "بتعلّم عربي", "I learn Arabic"), uses: ["L"] };
+  const found = must(buildContextIndex([frame, plain, learn], ar).get("L"), "both phrases");
+  const framed = must(found.find((c) => c.id === "F"), "the frame");
+  assert.equal(must(framed.frame, "its card").id, "F");
+  assert.equal(framed.word, "بتعلّم");
+  assert.equal(must(found.find((c) => c.id === "Q"), "the plain phrase").frame, undefined);
+});
