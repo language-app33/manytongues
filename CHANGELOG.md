@@ -8,6 +8,29 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.448 — 14 October 2026
+
+**Ultimate takes every new card, and no longer brings reviews forward.**
+
+- Ultimate now brings in every new card chosen. Before, it held new cards
+  back like any other session: no more than 20 cards being learnt at
+  once, and none at all while reviews were more than about three days
+  behind.
+- Ultimate now leaves out cleared and learnt cards that aren't due for
+  review yet. Before, it asked every chosen card, so a learnt card due
+  next week was practised today, ahead of its schedule. Those cards now
+  wait for their review date. A card marked to practise next still comes
+  in, due or not.
+- Cards still being learnt are asked as before, due or not.
+- If every chosen card is cleared or learnt and none is due, the Build
+  screen says so instead of starting.
+- The trade-off: Ultimate on a big unstarted deck now starts all of it at
+  once, which makes a long session and a lot of cards to keep up with
+  afterwards.
+- The Ultimate description on the Build screen says the above.
+- To check by hand: build an Ultimate session from a deck with some
+  learnt cards not due. They shouldn't come up, and every new card should.
+
 ## 0.447 — 14 October 2026
 
 **"Which word is missing?" questions show what the whole sentence means once answered.**

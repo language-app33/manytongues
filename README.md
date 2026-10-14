@@ -187,7 +187,9 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   narrow the pool, Weak skills narrows it to what is going wrong and asks
   the questions that went wrong, Get started asks recognition alone, and
   Ultimate asks every question each card has — every card the mix lets in,
-  since it has no length of its own.
+  since it has no length of its own. It lets in every new card, without the
+  limit on cards in learning, and leaves out Cleared and Learnt cards that
+  are not yet due.
 
   They were six sliders under an Advanced disclosure, under a sentence
   saying the defaults were sensible — and two of the defaults were why the

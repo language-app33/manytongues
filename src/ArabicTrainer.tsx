@@ -241,7 +241,7 @@ import {
   shuffled,
 } from "./scheduler.ts";
 import type { Move, Standing, Unit } from "./scheduler.ts";
-import { mixSession, roomForNew as roomForNewIn } from "./session-mix.ts";
+import { dueAt, mixSession, roomForNew as roomForNewIn } from "./session-mix.ts";
 import type { MixCard } from "./session-mix.ts";
 import {
   SESSION_SIZE,
@@ -4284,7 +4284,7 @@ const MODES = {
   },
   ultimate: {
     label: "Ultimate",
-    blurb: "Every chosen item in every chosen exercise type, repeating anything you miss until you have it right.",
+    blurb: "Every chosen card that is new, still being learnt or due for review, in every exercise type it has — repeating anything you miss until you have it right. Cleared and learnt cards wait until they are due.",
   },
   started: {
     label: "Get started",
@@ -4788,8 +4788,14 @@ export function buildSession({
   /* Every card of the pool, where it stands. Chance first, between cards
      the due list calls equal, so which new cards come in and which of the
      overdue ones a session reaches differ from one sitting to the next. */
-  const rows = inOrder(mixCardsOf(pool, items, settings, typesOf), (c) => (c.askedFor ? -1 : dueRank(c.due)));
-  if (!rows.length) return { exercises: [], reason: "nothing-due" };
+  const every = inOrder(mixCardsOf(pool, items, settings, typesOf), (c) => (c.askedFor ? -1 : dueRank(c.due)));
+  /* Ultimate leaves out the Cleared and Learnt cards not yet due: it is
+     everything waiting, not reviews brought forward. A card asked for by
+     name still comes. */
+  const rows = mode === "ultimate"
+    ? every.filter((c) => c.askedFor || (c.standing !== "cleared" && c.standing !== "learnt") || dueAt(c, now()))
+    : every;
+  if (!rows.length) return { exercises: [], reason: every.length ? "none-due" : "nothing-due" };
 
   /* Which cards: the session mix (session-mix.ts). */
   const everything = !!(practice || includeAll);
@@ -4799,6 +4805,7 @@ export function buildSession({
         places: everyCard ? rows.length : budget / PER_UNIT,
         at: now(),
         dayCards: (perDay || 0) / PER_UNIT,
+        everyNew: mode === "ultimate",
       });
   const cards = mix ? mix.cards : rows;
   if (!cards.length) return { exercises: [], reason: "nothing-due" };
@@ -10617,6 +10624,8 @@ export default function ArabicTrainer() {
           ? "Nothing to fix — none of those have gone wrong recently"
           : built.reason === "no-unseen"
           ? "You've practised all of those in the last few days, or they're already cleared"
+          : built.reason === "none-due"
+          ? "None of those are due yet — Ultimate leaves cleared and learnt cards until they are"
           : built.reason === "nothing-due"
           ? "Nothing new to bring in yet — what you're learning comes back shortly"
           : built.reason === "no-variety"

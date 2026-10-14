@@ -77,6 +77,9 @@ export interface MixOptions {
   /** How many cards a typical day of this learner's practice reaches. Never
       read as less than one session's worth. */
   dayCards: number;
+  /** Let every new card in: no limit of 20 in learning, and no pause for
+      being behind. Ultimate's, which asks everything chosen. */
+  everyNew?: boolean;
 }
 
 export interface Mix<T> {
@@ -139,8 +142,8 @@ const SPARE: Group[] = ["cleared", "learnt", "learning"];
 export function mixSession<T>(pool: MixCard<T>[], o: MixOptions): Mix<T> {
   const { at } = o;
   const places = Math.max(1, Math.round(o.places));
-  const behind = isBehind(pool, { ...o, places });
-  let room = behind ? 0 : Math.max(0, MAX_IN_LEARNING - inLearningOf(pool));
+  const behind = !o.everyNew && isBehind(pool, { ...o, places });
+  let room = o.everyNew ? Number.POSITIVE_INFINITY : behind ? 0 : Math.max(0, MAX_IN_LEARNING - inLearningOf(pool));
 
   const asked = pool.filter((c) => c.askedFor);
   const open = pool.filter((c) => !c.askedFor);

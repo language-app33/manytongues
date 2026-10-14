@@ -5908,6 +5908,11 @@ The pace simulation runs the very rule the app does.
   a session — the reason "being due" stopped refusing sessions.
 - *Ultimate keeps no length*: the Build screen asks none, so it asks every
   question of every card the mix lets in, rather than 20.
+- *Ultimate lets every new card in and leaves out reviews not yet due*
+  (0.448, the owner's call): `everyNew` lifts both the 20-in-learning limit
+  and the catching-up pause, and buildSession drops Cleared and Learnt rows
+  that are not `dueAt`, unless asked for by name. Cards in learning stay,
+  due or not. Nothing left gives the reason `none-due`.
 - *The home screen's count reads a met card with a newly opened level as
   waiting*, not new: a learner with 88 number cards at the top of their
   ladder was shown nothing ready under the 20-in-learning limit.
