@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.452 — 14 October 2026
+
+**A verb's tense now comes right after the verb is met in a phrase, and
+without "Learn more".**
+
+- When a session has a phrase or sentence that uses a verb (a phrase
+  whose words include it, or a sentence where it fills a blank), the
+  "See how this verb changes" table now comes straight after that
+  question. The learner has just read the verb in use, and the table
+  shows how it changes. If the session has no such phrase or sentence,
+  the table comes where it did before.
+- "See how this verb changes" no longer has a "Learn more" box under it.
+  The table already shows everything about the tense.
+- Nothing else changes: what is asked, and how it is marked, are as
+  before.
+- To check by hand: a verb whose tense hasn't been seen yet, and a phrase
+  using that verb, both due. When the phrase comes up in a session, the
+  verb's table should follow it, with no "Learn more" once answered.
+
 ## 0.451 — 14 October 2026
 
 **Arabic and Hebrew verbs get five new practices that show a whole tense

@@ -344,7 +344,9 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   its own, from one answer (`tense` in `marksForAnswer`) — the seeing and
   the reading by the learner's own word, form by form for the reading.
   **The tense is seen before it is asked**: until "I get it" has been said
-  once, `vpattern` is all a cell is dealt (`patternFirst`). Two persons
+  once, `vpattern` is all a cell is dealt (`patternFirst`) — and where
+  the session has a phrase or sentence that uses the verb, the table comes
+  straight after it (`afterItsUse`), with no Learn more under it. Two persons
   spelt the same stay two rows and two tiles, either tile is right in
   either place, and either person is right in "who is it?"; "change the
   person" never asks between them. The cell a dictionary cites is asked

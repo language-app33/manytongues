@@ -36,7 +36,7 @@ await build({
     __BUILT_AT__: '"0"',
   },
 });
-const { buildSession, installIndexes, laddered, marksForAnswer, withRows } = await import(path.join(out, "trainer.js"));
+const { afterItsUse, buildSession, installIndexes, laddered, marksForAnswer, withRows } = await import(path.join(out, "trainer.js"));
 const { LANGUAGES, EX, TYPES, verbOf, keysFor } = await import("../src/languages.ts");
 const drills = await import("../src/verb-drills.ts");
 const { drillFits, whoChoices, whoIsRight, rowMarks, shiftCue, tenseOf, drillTable } = drills;
@@ -243,4 +243,35 @@ test("a tense answered as a whole marks each of its forms on its own", () => {
     marks.map((/** @type {any} */ m) => [m.subId, m.correct, m.advance]),
     [["p-he", true, true], ["p-she", false, true]],
   );
+});
+
+/** A phrase that uses the verb: its words include one of the verb's forms. */
+const phrase = () => /** @type {any} */ ({
+  id: "ph1", tags: [], created: 3, lang: "ar-PS", kind: "phrase", uses: ["v1"],
+  forms: [{ id: "ph1", ar: "هي بتكتب رسالة", en: "she is writing a letter", lat: "hiyye btiktub risaale", lang: "ar-PS", s: {} }],
+});
+
+test("the tense comes straight after a phrase in the session that uses the verb", () => {
+  const items = [verb(), phrase()].concat(words(3));
+  installIndexes(items, settings);
+  const list = [
+    { id: "v1", subId: "p-she", type: "vpattern" },
+    { id: "w1", subId: null, type: "ar2en" },
+    { id: "ph1", subId: null, type: "ar2en" },
+    { id: "w2", subId: null, type: "ar2en" },
+  ];
+  const got = afterItsUse(list, items, settings);
+  assert.deepEqual(got.map((/** @type {any} */ q) => `${q.id}:${q.type}`), ["w1:ar2en", "ph1:ar2en", "v1:vpattern", "w2:ar2en"]);
+});
+
+test("with nothing in the session using the verb, the tense stays where it was dealt", () => {
+  const items = [verb(), phrase()].concat(words(3));
+  installIndexes(items, settings);
+  const list = [
+    { id: "w1", subId: null, type: "ar2en" },
+    { id: "v1", subId: "p-she", type: "vpattern" },
+    { id: "v1", subId: "p-he", type: "vwho" },
+    { id: "w2", subId: null, type: "ar2en" },
+  ];
+  assert.deepEqual(afterItsUse(list, items, settings), list, "the verb's own questions are not a use of it");
 });
