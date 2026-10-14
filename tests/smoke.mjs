@@ -9711,6 +9711,8 @@ const openPronounTables = async () => {
     ["he", "he", "بيكتب", "biktub"], ["she", "she", "بتكتب", "btiktub"], ["they", "they", "بيكتبوا", "biktbu"],
   ];
   const formOf = Object.fromEntries(present.map(([, label, ar]) => [label, ar]));
+  /** @param {string} said */
+  const personOf = (said) => Object.keys(formOf).find((label) => label.toLowerCase() === said.toLowerCase()) || "";
   /* Every exercise up to a level, settled, so what is new is what the walk
      is about. The levels are the ladder's: see the exercise table. */
   const LEVELS = {
@@ -9816,11 +9818,12 @@ const openPronounTables = async () => {
         met.shift += 1;
         const label = ((person.querySelector("strong") || {}).textContent || "").trim();
         typeIn(host.querySelector('[data-el="answer-input"]'), formOf[label] || "؟");
-      } else if (options.length && options.some((b) => Object.keys(formOf).includes((b.textContent || "").trim()))) {
+      } else if (options.length && options.some((b) => !!personOf((b.textContent || "").trim()))) {
+        /* A person on a tile is said as the meanings are, capital first. */
         kind = "who";
         met.who += 1;
         met.whoOptions = options.map((b) => (b.textContent || "").trim());
-        const right = options.find((b) => formOf[(b.textContent || "").trim()] === prompt);
+        const right = options.find((b) => formOf[personOf((b.textContent || "").trim())] === prompt);
         click(right || options[0]);
       } else {
         const giveUp = btn(/^I don.t know$/);
@@ -9874,7 +9877,7 @@ const openPronounTables = async () => {
   const readMarks = (reading.verb && reading.verb.forms || []).filter((/** @type {any} */ f) => f.row === "present" && f.s && f.s.vread);
   check("each form read has a mark of its own", readMarks.length === 6, `${readMarks.length} marked`);
   check("and who a form is about is chosen among the persons of its tense", reading.met.who > 0 &&
-    reading.met.whoOptions.every((t) => Object.keys(formOf).includes(t)), JSON.stringify(reading.met));
+    reading.met.whoOptions.every((t) => !!personOf(t)), JSON.stringify(reading.met));
   check("and the right person is marked right", reading.met.whoRight > 0, JSON.stringify(reading.met.verdicts));
 
   const filling = await walk([verbCard(settled(2, ["vrow"])), ...others]);
