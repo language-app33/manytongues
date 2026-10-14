@@ -1291,9 +1291,14 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
     check("and everything in it is one of the blocks that were loose on the page",
       inBox.length > 0 && inBox.every((n) => FAMILY.includes(n || "")), inBox.join(" ") || "empty");
     /* It used to sit three blocks below its own siblings, under the notes. */
-    const heard = inBox.indexOf("also-audio");
+    const shortIn = inBox.filter((n) => n !== "also-context");
+    const heard = shortIn.indexOf("also-audio");
     check("how it sounds sits with its siblings, not below the notes",
-      heard === -1 || heard === inBox.length - 1 || inBox.indexOf("related-words") > heard,
+      heard === -1 || heard === shortIn.length - 1 || shortIn.indexOf("related-words") > heard,
+      inBox.join(" "));
+    /* The phrase it turned up in closes the box, under the short blocks. */
+    check("where it turned up is the last thing in the box",
+      !inBox.includes("also-context") || inBox[inBox.length - 1] === "also-context",
       inBox.join(" "));
     check("the box holds only what it was given, never an empty shell",
       !alsoBox || alsoBox.children.length > 0, String(alsoBox && alsoBox.children.length));
@@ -3777,6 +3782,7 @@ const rightTile = (tiles, shown) => {
   let grid = false;
   let sawWhereItTurnedUp = 0;
   let sawOnAPlainQuestion = false;
+  let whereNotLast = false;
   let sawUnderAGap = false;
   /* The two that put four whole cards up and ask which one: the meanings
      of the word on screen, and the word a meaning belongs to. What is
@@ -3902,6 +3908,7 @@ const rightTile = (tiles, shown) => {
       if (where && /الكتاب كبير/.test(where.textContent || "")) {
         sawWhereItTurnedUp += 1;
         if (!contextQuestion) sawOnAPlainQuestion = true;
+        if (more.lastElementChild !== where) whereNotLast = true;
       }
       if (where && gapped) sawUnderAGap = true;
     }
@@ -4004,6 +4011,11 @@ const rightTile = (tiles, shown) => {
     sawOnAPlainQuestion
       ? "which is the thing that changed: the link pays out everywhere now"
       : "it only paid out on the questions built from it");
+  /* At the foot of "Learn more", under the short blocks — until 0.444 it
+     opened the box. */
+  check("and it is the last thing under Learn more",
+    sawWhereItTurnedUp > 0 && !whereNotLast,
+    whereNotLast ? "something sat below it" : `last each of the ${sawWhereItTurnedUp} times`);
   /* But not under the gap itself, whose phrase is still at the top of the
      screen: a learner reported it as the prompt shown again. */
   check("and not after a gap question, whose phrase is still on the screen",
