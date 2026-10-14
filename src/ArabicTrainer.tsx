@@ -6160,7 +6160,8 @@ export function praiseFor(n: number) {
 
    The short blocks share a row two at a time — how it is pronounced beside
    how it sounds — so the box is half as tall and Continue half as far
-   down. Only the phrase it turned up in keeps the width to itself; the
+   down. Only the phrase it turned up in keeps the width to itself, and it
+   comes last, under the short blocks — until 0.445 it opened the box. The
    related words are a short block like the rest. The pronunciation and
    the recording are always the pair, when both are there; the others pair
    up in order, and one left over takes half a row like everything else,
@@ -6183,12 +6184,13 @@ function AlsoBox({ children }: { children?: Node }) {
       {cells}
     </div>
   );
-  const rows: any[] = shown.filter((el) => alsoName(el) === "also-context");
+  const rows: any[] = [];
   const short = shown.filter((el) => alsoName(el) !== "also-context");
   const pair = short.filter((el) => ALSO_PAIR.includes(alsoName(el)));
   const rest = pair.length === 2 ? short.filter((el) => !pair.includes(el)) : short;
   if (pair.length === 2) rows.push(row(pair));
   for (let i = 0; i < rest.length; i += 2) rows.push(row(rest.slice(i, i + 2)));
+  rows.push(...shown.filter((el) => alsoName(el) === "also-context"));
   return (
     <>
       <p className="at-alsomore" data-el="also-heading">

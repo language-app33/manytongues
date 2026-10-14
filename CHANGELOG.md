@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.445 — 14 October 2026
+## 0.446 — 14 October 2026
 
 **"Which word is missing?" questions show what the whole sentence means once answered.**
 
@@ -28,6 +28,19 @@ and moves once per batch of work you would notice, not once per commit.
 - To check by hand: answer a "which word is missing?" question without
   opening the hint. The sentence should come back whole, with its English
   underneath.
+
+## 0.445 — 14 October 2026
+
+**"Where it turned up" moves to the bottom of Learn more.**
+
+- After an answer, the phrase the word appeared in used to come first
+  under "Learn more". It now comes last, below how it's pronounced, how it
+  sounds, how it's written, the figures and the related words. It still
+  takes the full width of the box.
+- Nothing else in the box moves, and nothing is added or removed.
+- To check by hand: answer a question on a word that has a phrase recorded
+  for it. Under "Learn more", "Where it turned up" should be the last
+  block, just above the teacher's note and Continue.
 
 ## 0.444 — 14 October 2026
 
