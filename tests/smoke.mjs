@@ -537,7 +537,8 @@ anyWindow.fetch = anyGlobal.fetch = fakeFetch;
  * so a card with nothing due is not in one at all, and none of the walks
  * that give questions up can lapse one of these and close the level above
  * it. The walk that does ask them is Ultimate, which asks every exercise a
- * card has open whether it is due or not. */
+ * card has open — on these, marked high priority for it, since Ultimate
+ * otherwise waits for a Cleared or Learnt card to be due. */
 const CLIMBABLE = [
   "ar2pick", "ar2en", "rec2en", "match", "en2pick", "ctx2pick",
   "tr2ar", "rec2ar", "en2ar", "ctx2ar",
@@ -3746,7 +3747,23 @@ const rightTile = (tiles, shown) => {
 
    Driven through Ultimate, which asks every type a card supports, so
    which questions come up is not a draw — everything else about a session
-   now is. */
+   now is. The two climbed cards are what have those types open, and
+   Ultimate leaves a Cleared or Learnt card out until it is due (0.448), so
+   they are marked high priority for this walk — a card asked for by name
+   comes whatever its schedule — and the marks taken off at the end. */
+/** Mark or clear high priority on cards, through the learner's card list. */
+const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ on) => {
+  click(buttonNamed(/^Cards$/));
+  await sleep(400);
+  for (const id of ids) {
+    click(must(document.querySelector(`.at-cardgrid .at-minicard[data-card="${id}"]`), `the tile of ${id}`));
+    await sleep(350);
+    click(must(buttonNamed(on ? /^Mark as high priority$/ : /High priority — tap to clear/), `the priority button on ${id}`));
+    await sleep(300);
+    click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+    await sleep(350);
+  }
+};
 {
   if (document.querySelector('[data-el="leave-session"]')) {
     click(document.querySelector('[data-el="leave-session"]'));
@@ -3754,6 +3771,7 @@ const rightTile = (tiles, shown) => {
     click(buttonNamed(/^Leave$/));
     await sleep(300);
   }
+  await setPriority(["tied1", "tied2"], true);
   click(buttonNamed(/^Home$/));
   await sleep(300);
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
@@ -4020,6 +4038,17 @@ const rightTile = (tiles, shown) => {
      screen: a learner reported it as the prompt shown again. */
   check("and not after a gap question, whose phrase is still on the screen",
     !sawUnderAGap, sawUnderAGap ? "the phrase was shown twice" : "shown once, at the top");
+
+  if (document.querySelector('[data-el="leave-session"]')) {
+    click(document.querySelector('[data-el="leave-session"]'));
+    await sleep(150);
+    click(buttonNamed(/^Leave$/));
+    await sleep(300);
+  }
+  await setPriority(["tied1", "tied2"], false);
+  check("the climbed cards' marks come off again",
+    document.querySelectorAll(".at-cardgrid .at-minipri").length === 0,
+    `${document.querySelectorAll(".at-cardgrid .at-minipri").length} still marked`);
 }
 
 /* ---- a frame remembers which of its names it has been met with ----
