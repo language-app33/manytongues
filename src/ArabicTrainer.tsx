@@ -12970,7 +12970,11 @@ export default function ArabicTrainer() {
                           kind="phrase"
                           name="question-prompt-text"
                         />
-                        {spec.answerMode === "ar" && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
+                        {/* And once it is answered, whichever way, the
+                            sentence is whole again and its meaning is under
+                            it: the word chosen is only learnt in the
+                            sentence if what the sentence says is known. */}
+                        {(spec.answerMode === "ar" || checked) && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
                           <p className="at-ctxmeaning" data-el="question-prompt-meaning">
                             {asMeaning(String(linesOf(dialog)[item.gap.line].en))}
                           </p>
@@ -12986,7 +12990,7 @@ export default function ArabicTrainer() {
                            reaching this question — the teacher unticks it,
                            or the deck is withdrawn. Asking for the word on
                            its own is a lesser question, not a broken one. */
-                        value={context ? blankedPhrase(context, qLang) : item.en}
+                        value={context ? (checked ? context.ar : blankedPhrase(context, qLang)) : item.en}
                         field={context ? "ar" : "en"}
                         kind="phrase"
                         name="question-prompt-text"
@@ -13062,8 +13066,10 @@ export default function ArabicTrainer() {
                     {/* Unless the question keeps the phrase's meaning
                         behind the nudge, when it is there only once asked
                         for: "I want to understand the news in Arabic" over
-                        a gap all but names the word. */}
-                    {context && (!phraseHint || hintShown) && (
+                        a gap all but names the word. Once answered there
+                        is nothing left to give away: the phrase is whole
+                        again above, and what it means is shown with it. */}
+                    {context && (!phraseHint || hintShown || checked) && (
                       <p className="at-ctxmeaning" data-el="question-context-meaning">
                         {asMeaning((spec.promptField === "context" && context.en) || item.en)}
                       </p>

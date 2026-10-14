@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.444 — 14 October 2026
+
+**"Which word is missing?" questions show what the whole sentence means once answered.**
+
+- After a "which word is missing?" question is answered, right or wrong,
+  the missing word goes back into the sentence and the English of the
+  whole sentence appears under it. This covers both kinds: a word missing
+  from a phrase on a card, and a word missing from a sentence of a
+  conversation or text, and both the choose and the type versions.
+- Before, the phrase's English stayed hidden unless the student had opened
+  the hint, and the "choose" question on a text never showed it at all.
+  So a student could pick the right word without ever finding out what
+  the sentence said.
+- Before the answer nothing changes: the meaning stays behind the hint
+  where it was, so it still doesn't give the word away.
+- Only where the teacher wrote the sentence's English. Without it, the
+  answer screen looks as it did.
+- To check by hand: answer a "which word is missing?" question without
+  opening the hint. The sentence should come back whole, with its English
+  underneath.
+
 ## 0.443 — 14 October 2026
 
 **A sentence already practised also waits for its words.**

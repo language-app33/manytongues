@@ -7961,12 +7961,20 @@ const openPronounTables = async () => {
   const means = ((document.querySelector('[data-el="question-context-meaning"]') || {}).textContent || "").trim();
   check("and asked for, it gives the phrase's English, not the word's", means === "The book is big",
     means || "(nothing said)");
+  /* Closed again before answering: what the phrase means is then given
+     with the answer, and the phrase is whole again. */
+  click(document.querySelector('[data-el="hint-button"]'));
+  await sleep(200);
   click(buttonNamed(/^I don't know$/));
   await sleep(200);
   if (!document.querySelector('[data-el="verdict"]')) {
     click(document.querySelector('[data-el="check-button"]'));
     await sleep(250);
   }
+  const after = ((document.querySelector('[data-el="question-context-meaning"]') || {}).textContent || "").trim();
+  const whole = ((document.querySelector('[data-el="question-prompt-text"]') || {}).textContent || "").trim();
+  check("once answered, the phrase is whole again and its English is under it",
+    after === "The book is big" && whole === "الكتاب كبير", JSON.stringify({ after, whole }));
   click(buttonNamed(/^Continue$/));
   await sleep(700);
   click(buttonNamed(/^Continue$/));
@@ -10027,6 +10035,20 @@ const openPronounTables = async () => {
       };
     },
   );
+  const chosenMeant = await walk([meantCard({ dlgwhole: { ...solid } })], async (host) => {
+    await reach(host, /Which word is missing/);
+    const out = { instruction: text(host.querySelector(".at-instruction")), before: "", after: "", meaning: "" };
+    const choices = host.querySelector('[data-el="answer-choices"]');
+    if (!choices) return out;
+    out.before = text(host.querySelector('[data-el="question-prompt-meaning"]'));
+    click(choices.querySelector("button"));
+    await sleep(60);
+    click(host.querySelector('[data-el="check-button"]'));
+    await sleep(250);
+    out.after = prompt(host);
+    out.meaning = text(host.querySelector('[data-el="question-prompt-meaning"]'));
+    return out;
+  });
   materialQuiet = false;
   check("each sentence of a new text is met on its own before it is asked, with its meaning",
     introduced.length > 0 && introduced.every((m) =>
@@ -10049,6 +10071,11 @@ const openPronounTables = async () => {
     /Fill the gap/.test(clued.instruction) && /____/.test(clued.prompt) &&
       clued.clue !== "" && meanings.some((m) => clued.clue.includes(m)),
     JSON.stringify(clued));
+  check("choosing a missing word keeps the sentence's meaning back, then shows it with the answer",
+    /Which word is missing/.test(chosenMeant.instruction) && chosenMeant.before === "" &&
+      sentences.includes(chosenMeant.after) && chosenMeant.meaning.includes(meaningOf(chosenMeant.after)) &&
+      chosenMeant.meaning !== "",
+    JSON.stringify(chosenMeant));
   check("once choosing it is solid, the missing word is typed instead",
     /Fill the gap/.test(typed.instruction) && typed.input && !typed.choices && /____/.test(typed.prompt),
     JSON.stringify(typed));
