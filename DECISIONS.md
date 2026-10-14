@@ -6245,3 +6245,26 @@ the sentence again, the owner chose whichever was simpler, which is
 resuming (no new code). The costs, that new word cards can pause well-known
 sentences for every student and a word lapsing holds its sentences, were
 put to them.
+
+
+## A phrase with a blank is filled before it is shown as a context (0.444)
+
+**What was wrong.** buildContextIndex takes every card that names a word in
+`uses` as a context for it, frames included, and contextsFor handed those
+out as written. So "عم بتعلّم {{language}}" reached the answer screen's
+"Where it turned up" box (alsoContext) and the gap-fill prompt with the
+braces in it.
+
+**What changed.** The index now carries, on a context that came from a
+card with a blank, that card (`frame`) and the form it matched (`word`).
+contextsFor runs such a context through filledContext: a frame is filled
+by fillFor at the bottom level under its own key, starting at the frame's
+total right answers so it turns as the frame is practised; a scene's turn
+is filled with its scene (sceneFill). The word's span is found again in
+the filled text, since a value of two tokens moves it. A context that
+cannot be filled, or still holds a blank, is dropped, so the word's other
+contexts stand in. Fillings are kept until forgetTypes, so the prompt and
+the answer screen read the same one.
+
+**Choices the owner made.** Of: filling the blank; leaving frames out of
+the box; showing the blank as a gap, the owner chose filling.
