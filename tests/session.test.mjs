@@ -478,7 +478,9 @@ test("a verb with nothing in its own word is dealt through its table", () => {
   const got = deal([verb]);
   assert.equal(got.reason, null, "there was something to ask");
   const asked = got.exercises.map((/** @type {any} */ e) => e.subId || e.id);
-  assert.ok(asked.includes("v-present-he"),
+  /* Either cell: since 0.451 a tense is first met as a whole, through
+     whichever of its forms the session reached. */
+  assert.ok(asked.includes("v-present-he") || asked.includes("v-present-she"),
     `the table was not dealt: ${asked.join(", ") || "(nothing)"}`);
   /* And the empty word itself is asked nothing, having nothing to ask. */
   assert.equal(asked.includes("v1"), false,
