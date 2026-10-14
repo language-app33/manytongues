@@ -11590,9 +11590,22 @@ export default function ArabicTrainer() {
     /* Nor under a grid: every word paired wrong shows its meaning where
        it stands, and the first word's alone would say less. */
     !(spec && spec.picks === "pair");
+  /* What the whole sentence means, on a "which word is missing?" question
+     once answered: the word chosen is only learnt in the sentence if what
+     the sentence says is known. Said with the answer, under the verdict,
+     rather than up by the prompt where the nudge puts it — a learner looks
+     for what came back below. Only where the teacher wrote the English. */
+  const answeredMeaning = !checked || !spec
+    ? ""
+    : spec.promptField === "gap"
+    ? String((dialog && item && item.gap && (linesOf(dialog)[item.gap.line] || {}).en) || "")
+    : spec.promptField === "context"
+    ? String((context && context.en) || "")
+    : "";
   /* A right answer written off the hint has a line under it saying so, so
-     the praise is not the whole of what came back. */
-  const verdictAlone = answerRight && !answerRepeated && !toldAnswer;
+     the praise is not the whole of what came back. Nor is it where the
+     sentence's meaning follows it. */
+  const verdictAlone = answerRight && !answerRepeated && !toldAnswer && !answeredMeaning;
   /* Typed in figures and nothing else, on the phone's number pad. Its box
      is drawn for a few digits rather than a sentence. */
   const figures = !!exercise && answersInFigures(item, exercise.type);
@@ -13032,11 +13045,10 @@ export default function ArabicTrainer() {
                           kind="phrase"
                           name="question-prompt-text"
                         />
-                        {/* And once it is answered, whichever way, the
-                            sentence is whole again and its meaning is under
-                            it: the word chosen is only learnt in the
-                            sentence if what the sentence says is known. */}
-                        {(spec.answerMode === "ar" || checked) && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
+                        {/* Once answered the sentence is whole again, and
+                            what it means is said with the answer below —
+                            see answeredMeaning — not left up here. */}
+                        {spec.answerMode === "ar" && !checked && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
                           <p className="at-ctxmeaning" data-el="question-prompt-meaning">
                             {asMeaning(String(linesOf(dialog)[item.gap.line].en))}
                           </p>
@@ -13128,10 +13140,10 @@ export default function ArabicTrainer() {
                     {/* Unless the question keeps the phrase's meaning
                         behind the nudge, when it is there only once asked
                         for: "I want to understand the news in Arabic" over
-                        a gap all but names the word. Once answered there
-                        is nothing left to give away: the phrase is whole
-                        again above, and what it means is shown with it. */}
-                    {context && (!phraseHint || hintShown || checked) && (
+                        a gap all but names the word. Once answered, the
+                        phrase's English is said with the answer below
+                        instead — see answeredMeaning. */}
+                    {context && (!phraseHint || hintShown) && !(checked && answeredMeaning) && (
                       <p className="at-ctxmeaning" data-el="question-context-meaning">
                         {asMeaning((spec.promptField === "context" && context.en) || item.en)}
                       </p>
@@ -13530,6 +13542,11 @@ export default function ArabicTrainer() {
                           at. */}
                       {checked.reason === "bare" && (
                         <Help data-el="bare-note">{verdictWord(qLang, "bare")}</Help>
+                      )}
+                      {answeredMeaning && (
+                        <p className="at-ctxmeaning" data-el="answer-meaning">
+                          {asMeaning(answeredMeaning)}
+                        </p>
                       )}
 
                       {/* Everything after the answer is a second thing worth
