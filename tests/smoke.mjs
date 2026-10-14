@@ -4011,7 +4011,7 @@ const rightTile = (tiles, shown) => {
     sawOnAPlainQuestion
       ? "which is the thing that changed: the link pays out everywhere now"
       : "it only paid out on the questions built from it");
-  /* At the foot of "Learn more", under the short blocks — until 0.444 it
+  /* At the foot of "Learn more", under the short blocks — until 0.445 it
      opened the box. */
   check("and it is the last thing under Learn more",
     sawWhereItTurnedUp > 0 && !whereNotLast,

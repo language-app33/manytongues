@@ -1343,6 +1343,7 @@ let SCENE_FILLS: WeakMap<Item, Map<string, Record<string, Record<string, Value>>
  * TYPE_CACHE keeps one: the question on screen moves that language in the
  * middle of a render, without any of the setters below being called.
  */
+let CONTEXT_FILLS: WeakMap<object, any> = new WeakMap();
 let ASKED_IN: WeakMap<Form, Map<string, { list: Value[]; lang: LangId; out: Value[] }>> = new WeakMap();
 
 /* Thrown away whole rather than picked over: the setters below run
@@ -1352,6 +1353,7 @@ function forgetTypes() {
   TYPE_CACHE = new WeakMap();
   SCENE_FILLS = new WeakMap();
   ASKED_IN = new WeakMap();
+  CONTEXT_FILLS = new WeakMap();
 }
 
 /* Exported, with the key it is filed under, so a test can say "these words
@@ -2778,7 +2780,56 @@ function replyPool(items: Item[], settings: Settings, langId: LangId) {
    held as a form of its card gets its own contexts rather than its
    parent's. */
 function contextsFor(unitId: string): any[] {
-  return CONTEXT_INDEX.get(unitId) || [];
+  const list = CONTEXT_INDEX.get(unitId) || [];
+  if (!list.some(holdsBlank)) return list;
+  return list.map(filledContext).filter(Boolean);
+}
+
+/*
+ * A phrase with a blank in it, filled — or left out.
+ *
+ * A teacher's frame — "I'm learning {{language}}" — is a context for the
+ * word in it like any other phrase, and was shown as written: the gap-fill
+ * and the answer screen's "Where it turned up" both put {{language}} in
+ * front of a learner. So it is filled the way the frame's own questions
+ * fill it, from the same values and under the same rules about which of
+ * them the learner has met, and turned by how often the frame has been
+ * answered, so it is met with each in turn. A phrase nothing can fill yet
+ * is not shown at all: the word's other phrases stand in for it, and it
+ * comes back the moment a value catches up.
+ *
+ * Kept per phrase until the cards next change (see forgetTypes), so the
+ * prompt and the answer screen are reading the same filling.
+ */
+const holdsBlank = (c: any): boolean => /\{\{/.test(`${c.ar || ""} ${c.en || ""} ${c.lat || ""}`);
+
+
+const CONTEXT_KEY = "ctxshown";
+
+function filledContext(c: any): any {
+  if (!holdsBlank(c)) return c;
+  if (CONTEXT_FILLS.has(c)) return CONTEXT_FILLS.get(c);
+  const said = fillContext(c);
+  const lang = LANGUAGES[String((c.frame && c.frame.lang) || "")] || activeLang();
+  const span = said && !holdsBlank(said) && c.word ? findWordSpan(said.ar, c.word, lang) : null;
+  const out = span ? { ...c, ar: said!.ar, en: said!.en || "", lat: said!.lat || "", slot: span.at, span: span.len } : null;
+  CONTEXT_FILLS.set(c, out);
+  return out;
+}
+
+function fillContext(c: any): { ar: string; en?: string; lat?: string } | null {
+  /* A turn of a conversation with a cast: filled as its scene is. */
+  const placed = sceneOf(c.id);
+  if (placed && hasCast(placed.card)) {
+    const took = sceneFill(placed.card, false);
+    if (!took) return null;
+    return (linesOf(filledScene(placed.card, took)).find((l) => l.id === c.id) as any) || null;
+  }
+  if (!c.frame) return null;
+  const lead = leadOf(c.frame) as Form;
+  const turn = Object.values(statesOf(lead)).reduce((n, st) => n + turnOf(st), 0);
+  const took = fillFor(lead, CONTEXT_KEY, c.frame, false, turn);
+  return took ? (fillForm(lead, took) as any) : null;
 }
 
 /*
@@ -2863,9 +2914,12 @@ function fillFor(
    * a preview of the question.
    */
   preview = false,
+  /* Where to start the walk, where the count is not this question's own —
+     a frame shown as the phrase a word turned up in. See filledContext. */
+  turn?: number,
 ): Record<string, Value> | null {
   const slots = slotsOf(unit);
-  const seen = turnOf(unit.s && unit.s[type]);
+  const seen = turn ?? turnOf(unit.s && unit.s[type]);
   /* The verb's own place is not filled from the cards: it is filled from
      the card's own table, by whatever fills the subject. So it is left out
      of the draw and put back below. Only on the card's own sentence — see
@@ -6107,7 +6161,7 @@ export function praiseFor(n: number) {
    The short blocks share a row two at a time — how it is pronounced beside
    how it sounds — so the box is half as tall and Continue half as far
    down. Only the phrase it turned up in keeps the width to itself, and it
-   comes last, under the short blocks — until 0.444 it opened the box. The
+   comes last, under the short blocks — until 0.445 it opened the box. The
    related words are a short block like the rest. The pronunciation and
    the recording are always the pair, when both are there; the others pair
    up in order, and one left over takes half a row like everything else,

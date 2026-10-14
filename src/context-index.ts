@@ -50,6 +50,13 @@ export interface Context {
       person the gap is in. */
   example?: number;
   lat?: string;
+  /** The word as the phrase spells it, for finding it again once the
+      phrase's blanks are filled — a value longer than one token moves it. */
+  word?: string;
+  /** Where the phrase is a card with blanks in it — "I'm learning
+      {{language}}" — the card, so whoever shows the phrase can fill them
+      the way the card's own questions do. Never shown as written. */
+  frame?: Item;
 }
 
 /* What this reads of a phrase, which is all of what it reads. A card has
@@ -63,6 +70,7 @@ type Source = {
   uses?: string[];
   recs?: { id: string }[];
   lang?: string;
+  frame?: Item;
 };
 
 export function buildContextIndex(items: Item[], lang: Lang): Map<string, Context[]> {
@@ -81,7 +89,7 @@ export function buildContextIndex(items: Item[], lang: Lang): Map<string, Contex
      the card's own id and the words it teaches, which is what a phrase is
      to this index. */
   const sources: Source[] = [
-    ...items.map((it) => ({ ...leadOf(it), id: it.id, uses: it.uses || [], lang: it.lang })),
+    ...items.map((it) => ({ ...leadOf(it), id: it.id, uses: it.uses || [], lang: it.lang, frame: it })),
     ...dialogPhrases(items),
   ];
   for (const phrase of sources) {
@@ -106,6 +114,8 @@ export function buildContextIndex(items: Item[], lang: Lang): Map<string, Contex
              because blanking one syllable of a two-syllable word leaves
              the answer half written on the screen. */
           span: span.len,
+          word: unit.ar,
+          ...(phrase.frame && /\{\{/.test(`${phrase.ar} ${phrase.en || ""}`) ? { frame: phrase.frame } : {}),
         });
         index.set(unit.id, list);
         /* One form per phrase: if a phrase contained both the singular and
