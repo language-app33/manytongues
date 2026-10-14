@@ -3747,10 +3747,12 @@ const rightTile = (tiles, shown) => {
 
    Driven through Ultimate, which asks every type a card supports, so
    which questions come up is not a draw — everything else about a session
-   now is. The two climbed cards are what have those types open, and
+   now is. The climbed cards are what have those types open, and
    Ultimate leaves a Cleared or Learnt card out until it is due (0.448), so
    they are marked high priority for this walk — a card asked for by name
    comes whatever its schedule — and the marks taken off at the end. */
+/* The two climbed cards, and كتاب, which is Learnt and not due either. */
+const PICKED_OUT = ["tied1", "tied2", "srvk111111111111"];
 /** Mark or clear high priority on cards, through the learner's card list. */
 const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ on) => {
   click(buttonNamed(/^Cards$/));
@@ -3771,7 +3773,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     click(buttonNamed(/^Leave$/));
     await sleep(300);
   }
-  await setPriority(["tied1", "tied2"], true);
+  await setPriority(PICKED_OUT, true);
   click(buttonNamed(/^Home$/));
   await sleep(300);
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
@@ -4045,8 +4047,8 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     click(buttonNamed(/^Leave$/));
     await sleep(300);
   }
-  await setPriority(["tied1", "tied2"], false);
-  check("the climbed cards' marks come off again",
+  await setPriority(PICKED_OUT, false);
+  check("the marks put on for this walk come off again",
     document.querySelectorAll(".at-cardgrid .at-minipri").length === 0,
     `${document.querySelectorAll(".at-cardgrid .at-minipri").length} still marked`);
 }
