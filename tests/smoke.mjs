@@ -9692,6 +9692,204 @@ const openPronounTables = async () => {
     errors.slice(before, before + 3).join(" | "));
 }
 
+/* ---- a verb's tense, practised as a whole ----
+   A verb with its present written for six persons — two of them spelt the
+   same, بتكتب being "you (m)" and "she" — and its cited past. New, the
+   first thing asked of the present is the tense on its own, "I get it" or
+   "I don't get it", and nothing else about it until that has been said.
+   Then, a level at a time: the forms read with their pronunciation
+   hidden, who a form is about, the row put back together from tiles, and
+   a form written for another person. Each on its own document, as the
+   walks above. */
+{
+  const before = errors.length;
+  const solid = { phase: "review", step: 0, reps: 4, interval: 9, ease: 2.5, due: Date.now() + 5 * 86400000,
+    lapses: 0, right: 4, wrong: 0, skips: 0, near: 0, hints: 0, hist: [1, 1, 1, 1], updated: Date.now() - 86400000 };
+  /** @type {[string, string, string, string][]} */
+  const present = [
+    ["i", "I (m)", "بكتب", "baktub"], ["you-m", "you (m)", "بتكتب", "btiktub"], ["you-f", "you (f)", "بتكتبي", "btiktbi"],
+    ["he", "he", "بيكتب", "biktub"], ["she", "she", "بتكتب", "btiktub"], ["they", "they", "بيكتبوا", "biktbu"],
+  ];
+  const formOf = Object.fromEntries(present.map(([, label, ar]) => [label, ar]));
+  /* Every exercise up to a level, settled, so what is new is what the walk
+     is about. The levels are the ladder's: see the exercise table. */
+  const LEVELS = {
+    1: ["vpattern", "vread", "ar2pick", "ar2en", "rec2en", "rec2img", "ex2en", "vwho", "vwhorec"],
+    2: ["match", "recmatch", "en2pick", "img2pick", "ctx2pick", "vrow"],
+    3: ["tr2ar", "rec2ar", "rec2attr", "vshift"],
+  };
+  /** @param {number} upTo @param {string[]} fresh */
+  const settled = (upTo, fresh) => {
+    /** @type {Record<string, any>} */
+    const s = {};
+    for (const [lvl, keys] of Object.entries(LEVELS)) {
+      if (Number(lvl) > upTo) continue;
+      for (const k of keys) if (!fresh.includes(k)) s[k] = { ...solid };
+    }
+    return s;
+  };
+  /** @param {Record<string, any>} s */
+  const verbCard = (s) => ({
+    id: "writex", kind: "word", tags: ["Lesson 1"], created: 1, updated: Date.now(), lang: "ar-PS",
+    category: "verb", name: "to write",
+    forms: [
+      { id: "writex", ar: "كتب", en: "to write", lat: "katab", s: {} },
+      ...present.map(([col, label, ar, lat]) => ({
+        id: `writex-${col}`, ar, en: `${label.replace(" (m)", "")} write${col === "he" || col === "she" ? "s" : ""}`, lat,
+        row: "present", col, s: { ...s },
+      })),
+      { id: "writex-past-he", ar: "كتب", en: "he wrote", lat: "katab", row: "past", col: "he", s: {} },
+    ],
+  });
+  const others = ["قهوة", "شاي", "خبز", "ماء"].map((ar, i) => ({
+    id: `vdw${i}`, kind: "word", tags: ["Lesson 1"], created: 2, updated: Date.now(), lang: "ar-PS",
+    forms: [{ id: `vdw${i}`, ar, en: ["coffee", "tea", "bread", "water"][i], lat: "", s: {} }],
+  }));
+  const typeIn = (/** @type {any} */ el, /** @type {string} */ value) => {
+    if (!el) return;
+    const setter = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set;
+    must(setter, "the value setter").call(el, value);
+    el.dispatchEvent(new w.Event("input", { bubbles: true }));
+  };
+  /** @param {any[]} items */
+  const walk = async (items) => {
+    remoteDocs.clear();
+    localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items,
+    }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    for (let t = 0; t < 100 && !startBtn(); t++) await sleep(100);
+    click(startBtn());
+    for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
+    const met = {
+      order: /** @type {string[]} */ ([]), pattern: 0, patternRows: 0, read: 0, readRight: 0, hidden: 0,
+      who: 0, whoRight: 0, whoOptions: /** @type {string[]} */ ([]), row: 0, rowRight: 0, tiles: 0,
+      shift: 0, shiftRight: 0, verdicts: /** @type {string[]} */ ([]),
+    };
+    const btn = (/** @type {RegExp} */ re) => [...host.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
+    for (let n = 0; n < 30 && host.querySelector(".at-instruction"); n++) {
+      const table = host.querySelector('[data-el="verb-tense"]');
+      const tiles = host.querySelector('[data-el="verb-tiles"]');
+      const person = host.querySelector('[data-el="question-verb-person"]');
+      const prompt = ((host.querySelector('[data-el="question-prompt-text"]') || {}).textContent || "").trim();
+      const choices = host.querySelector('[data-el="answer-choices"]');
+      const options = choices ? [...choices.querySelectorAll("button")] : [];
+      let kind = "other";
+      if (table && tiles) {
+        kind = "row";
+        met.row += 1;
+        met.tiles = tiles.querySelectorAll("button").length;
+        /* Place by place, in the table's order: the next empty place is
+           chosen for you once a tile is put down. */
+        for (const li of [...table.querySelectorAll("li")]) {
+          const label = ((li.querySelector(".at-vperson") || {}).textContent || "").trim();
+          const want = formOf[label];
+          const tile = [...host.querySelectorAll('[data-el="verb-tiles"] button')].find((b) => (b.textContent || "").trim() === want);
+          click(tile);
+          await sleep(30);
+        }
+      } else if (table && host.querySelector('[data-el="verb-reveal"]')) {
+        kind = "read";
+        met.read += 1;
+        met.hidden = table.querySelectorAll('[data-el="verb-reveal"]').length;
+        for (let k = 0; k < 10; k++) {
+          const hidden = host.querySelector('[data-el="verb-reveal"]');
+          if (!hidden) break;
+          click(hidden);
+          await sleep(30);
+        }
+        for (const mark of [...host.querySelectorAll('[data-el="verb-read-mark"]')]) {
+          click([...mark.querySelectorAll("button")].find((b) => /Read it right/.test(b.textContent || "")));
+          await sleep(20);
+        }
+      } else if (table) {
+        kind = "pattern";
+        met.pattern += 1;
+        met.patternRows = table.querySelectorAll("li").length;
+        click(btn(/^I get it$/));
+      } else if (person) {
+        kind = "shift";
+        met.shift += 1;
+        const label = ((person.querySelector("strong") || {}).textContent || "").trim();
+        typeIn(host.querySelector('[data-el="answer-input"]'), formOf[label] || "؟");
+      } else if (options.length && options.some((b) => Object.keys(formOf).includes((b.textContent || "").trim()))) {
+        kind = "who";
+        met.who += 1;
+        met.whoOptions = options.map((b) => (b.textContent || "").trim());
+        const right = options.find((b) => formOf[(b.textContent || "").trim()] === prompt);
+        click(right || options[0]);
+      } else {
+        const giveUp = btn(/^I don.t know$/);
+        if (giveUp) click(giveUp);
+        else if (options.length) click(options[0]);
+      }
+      met.order.push(kind);
+      await sleep(120);
+      if (!host.querySelector('[data-el="verdict"]')) {
+        click(host.querySelector('[data-el="check-button"]'));
+        await sleep(200);
+      }
+      const verdict = host.querySelector('[data-el="verdict"]');
+      const ok = !!verdict && verdict.classList.contains("ok");
+      if (kind !== "other") met.verdicts.push(`${kind}:${ok ? "ok" : (verdict && verdict.textContent) || "none"}`);
+      if (kind === "read" && ok) met.readRight += 1;
+      if (kind === "who" && ok) met.whoRight += 1;
+      if (kind === "row" && ok) met.rowRight += 1;
+      if (kind === "shift" && ok) met.shiftRight += 1;
+      click(btn(/^Continue$/));
+      await sleep(200);
+    }
+    r.unmount();
+    host.remove();
+    const KEY = "arabic-trainer:arabic-trainer-v3";
+    let was = localStorage.getItem(KEY);
+    for (let t = 0, still = 0; t < 40 && still < 4; t++) {
+      await sleep(100);
+      const now = localStorage.getItem(KEY);
+      still = now === was ? still + 1 : 0;
+      was = now;
+    }
+    const saved = JSON.parse(localStorage.getItem(KEY) || "{}");
+    const verb = (saved.items || []).find((/** @type {any} */ c) => c.id === "writex");
+    return { met, verb };
+  };
+  materialQuiet = true;
+  const fresh = await walk([verbCard({}), ...others]);
+  const seen = fresh.met.order.filter((k) => k !== "other");
+  check("a new tense is first met as the tense on its own", fresh.met.pattern === 1 && seen[0] === "pattern",
+    JSON.stringify(fresh.met));
+  check("and nothing else about the tense is asked before it", seen.every((k) => k === "pattern"), JSON.stringify(seen));
+  check("laid out one row a person, the two spelt alike included", fresh.met.patternRows === 6, JSON.stringify(fresh.met));
+  const marked = (fresh.verb && fresh.verb.forms || []).filter((/** @type {any} */ f) => f.row === "present" && f.s && f.s.vpattern && f.s.vpattern.right > 0);
+  check("and \"I get it\" counts for every form of the tense", marked.length === 6, `${marked.length} marked`);
+
+  const reading = await walk([verbCard(settled(1, ["vread", "vwho"])), ...others]);
+  check("then the forms are read with their pronunciation hidden", reading.met.read > 0 && reading.met.hidden === 6,
+    JSON.stringify(reading.met));
+  check("and marked form by form as the learner says", reading.met.readRight > 0, JSON.stringify(reading.met.verdicts));
+  const readMarks = (reading.verb && reading.verb.forms || []).filter((/** @type {any} */ f) => f.row === "present" && f.s && f.s.vread);
+  check("each form read has a mark of its own", readMarks.length === 6, `${readMarks.length} marked`);
+  check("and who a form is about is chosen among the persons of its tense", reading.met.who > 0 &&
+    reading.met.whoOptions.every((t) => Object.keys(formOf).includes(t)), JSON.stringify(reading.met));
+  check("and the right person is marked right", reading.met.whoRight > 0, JSON.stringify(reading.met.verdicts));
+
+  const filling = await walk([verbCard(settled(2, ["vrow"])), ...others]);
+  check("then the row is put back together from tiles, one a person", filling.met.row > 0 && filling.met.tiles === 6,
+    JSON.stringify(filling.met));
+  check("and put back right it is marked right", filling.met.rowRight > 0, JSON.stringify(filling.met.verdicts));
+
+  const shifting = await walk([verbCard(settled(3, ["vshift"])), ...others]);
+  check("then a form is written for another person", shifting.met.shift > 0, JSON.stringify(shifting.met));
+  check("and written right it is marked right", shifting.met.shiftRight > 0, JSON.stringify(shifting.met.verdicts));
+  materialQuiet = false;
+  check("nothing threw while a verb's tense was practised", errors.length === before,
+    errors.slice(before, before + 3).join(" | "));
+}
+
 /* ---- practising from pictures ----
    Five words, each with a recording and a picture. New, they are asked
    the gentlest picture question — hear the word, choose its picture among

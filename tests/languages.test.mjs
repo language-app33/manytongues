@@ -383,7 +383,7 @@ test("the listening exercises are exactly the ones prompted by audio, or made of
      and the "can't listen right now" button all picked it up unprompted,
      which is what deriving this from the prompt rather than a flag buys. */
   assert.deepEqual(byHelper, [
-    "rec2en", "rec2img", "recmatch", "recfig", "recown", "rec2ar", "rec2attr", "rec2ctx",
+    "rec2en", "rec2img", "vwhorec", "recmatch", "recfig", "recown", "rec2ar", "rec2attr", "rec2ctx",
     /* And the two that play a number or a time. They were picked up by
        the quiet window and the "can't listen right now" button without
        being told, which is what deriving this from the prompt buys. */
@@ -674,10 +674,15 @@ test("the gentle types are read off the definitions, not kept beside them", () =
      recognising what a word means, then which word it is. Every one of
      them puts the answer on the screen — nothing here is written out. */
   assert.deepEqual(EASY_TYPES, [
+    /* A verb's tense seen on its own and read through: the table is on
+       the screen, and the learner says what they made of it. */
+    "vpattern", "vread",
     "ar2pick", "ar2en", "rec2en", "rec2img",
     /* And what a verb's example means, with one of its subjunctive forms
        in the gap: the first rung of a form never asked on its own. */
     "ex2en",
+    /* And who a verb's form is about, chosen from the persons of its tense. */
+    "vwho", "vwhorec",
     "match", "recmatch", "recfig", "recown", "en2pick", "img2pick", "ctx2pick", "dlgwhole",
     /* A word taken out of a scene and chosen back is the phrase gap-fill
        asked of a scene's own text. */

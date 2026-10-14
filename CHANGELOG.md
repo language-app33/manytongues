@@ -8,6 +8,47 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.451 — 14 October 2026
+
+**Arabic and Hebrew verbs get five new practices that show a whole tense
+at once.**
+
+Until now, every form of a verb was learnt as if it were a separate word.
+These practices show a tense laid out by person, so learners can see how
+it changes and tell apart the forms that look almost the same. They come
+on top of the questions a verb already had.
+
+- **See the pattern.** When a tense opens, it's first shown on its own:
+  every person, its form, how it's said and what it means. "I get it"
+  counts as a right answer. "I don't get it" brings the table back later
+  in the same session. Nothing else about that tense is asked until the
+  learner has said "I get it" once.
+- **Read the forms.** The same table with each pronunciation blurred.
+  The learner reads a form, taps to uncover how it's said, then says
+  whether they read it right. Each form is marked on its own, so the ones
+  they misread come back. Only forms that have a pronunciation written are
+  asked.
+- **Who is it?** One form, read or heard if it has a recording: who is it
+  about? The wrong choices are the persons whose forms look most like it.
+  Where two persons are spelt the same (بتكتب is "you (m)" and "she"),
+  either answer is right.
+- **Fill the row.** The tense with every form taken out and the forms
+  below as tiles, one per person. Two forms spelt the same are two tiles,
+  and either goes in either place. Each person is marked on its own.
+- **Change the person.** A form the learner has met ("بيكتب, he writes")
+  and another person to write it for ("she"). It never asks between two
+  persons spelt the same.
+- Nothing is coloured. The table itself is the pattern.
+- Vietnamese verbs are unchanged.
+- The trade-off: every verb a student had already learnt in Arabic or
+  Hebrew goes back to learning until they've answered the new questions.
+  Each form also has more questions to climb, though the three that show
+  the whole tense mark every form at once.
+- To check by hand: open a verb with at least two persons written in a
+  tense and start a session. The first question about that tense should be
+  the table with "I get it". On a phone, check that a Hebrew tense of
+  twelve persons fits and scrolls well in "Fill the row".
+
 ## 0.450 — 14 October 2026
 
 **Ultimate takes every new card, and no longer brings reviews forward.**

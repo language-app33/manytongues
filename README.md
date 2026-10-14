@@ -18,8 +18,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   | level | what it asks | exercises |
   |---|---|---|
   | 1 | what the word means | choose the meaning · {script} → English · listen → English · read a scene · choose a scene sentence's meaning · choose what a verb's example means |
-  | 2 | which word it is | match the pairs · match the recordings · match recordings to numbers (both kinds of figures) · English → choose · choose the missing word · choose a scene's missing word · choose a scene's sentence from its meaning |
-  | 3 | write it from a cue | {translit} → script · listen → script · listen → tone · choose the reply · put a scene in order |
+  | 2 | which word it is | fill a verb's row · match the pairs · match the recordings · match recordings to numbers (both kinds of figures) · English → choose · choose the missing word · choose a scene's missing word · choose a scene's sentence from its meaning |
+  | 3 | write it from a cue | change a verb's person · {translit} → script · listen → script · listen → tone · choose the reply · put a scene in order |
   | 4 | write it from its meaning | English → script · fill the gap · phrase heard → script · type a scene's missing word |
 
   **A level opens on two right answers in a row**, and closes on two
@@ -323,6 +323,35 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   {{object}}` — and the form that stands there is the one whatever filled
   the subject calls for, read off the number and gender its card already
   carries. See `src/verbs.ts`.
+- **A verb's tense is also practised as a whole.** Every question above
+  holds up one form, so a verb was thirty unrelated words: nothing showed
+  a tense laid out by person, or put the forms that look alike side by
+  side. Where a language's verb table lists them in `practices` — Arabic
+  and Hebrew, not Huế, whose verb has one form for everybody — each cell
+  of a tense with something to tell apart climbs five more questions, all
+  in the ordinary exercise table and marked `verbDrill`:
+
+  | | what it asks | level |
+  |---|---|---|
+  | `vpattern` | the tense on its own, "I get it" or "I don't get it" | 1 |
+  | `vread` | the tense with each pronunciation blurred: read, uncover, say whether you read it right | 1 |
+  | `vwho`, `vwhorec` | one form, read or heard: who is it about? | 1 |
+  | `vrow` | the tense with its forms taken out and put back from tiles | 2 |
+  | `vshift` | a form already met, written for another person | 3 |
+
+  The three asked of the whole tense (`verbDrill: "row"`) are dealt once
+  per tense in a session (`withRows`) and mark every form in it, each on
+  its own, from one answer (`tense` in `marksForAnswer`) — the seeing and
+  the reading by the learner's own word, form by form for the reading.
+  **The tense is seen before it is asked**: until "I get it" has been said
+  once, `vpattern` is all a cell is dealt (`patternFirst`). Two persons
+  spelt the same stay two rows and two tiles, either tile is right in
+  either place, and either person is right in "who is it?"; "change the
+  person" never asks between them. The cell a dictionary cites is asked
+  none of them — it is met before its tense opens. They are on the ladder
+  for everybody, so a verb learnt before them goes back to learning until
+  they are answered. Nothing is coloured: the table is the pattern. See
+  `src/verb-drills.ts`, and `drillFits` for when a cell can be asked one.
 - **A word carries the pronouns its language attaches to it.** Arabic and
   Hebrew write *my book* as one word, and the same endings carry a
   preposition — عند is *at*, عندي is *I have*. Those are forms of the word,
@@ -1317,6 +1346,8 @@ src/
   number-system-editor.tsx
                    the one screen a language's numbers and its clock are
                    written on, with the composer itself drawing the preview
+  verb-drills.ts   one tense of a verb practised as a whole: the table, the
+                   persons to choose, the tiles, the person to change to
   verbs.ts         a word's forms as a table over the card's own sub-forms —
                    a verb's persons and tenses, or the pronouns a language
                    attaches to the end of a word:

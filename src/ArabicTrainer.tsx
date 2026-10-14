@@ -122,6 +122,7 @@ import * as API from "./courses-api.ts";
 import {
   DEFAULT_LANGUAGE,
   EX,
+  editDistance,
   LANGUAGES,
   TYPES,
   activeLang,
@@ -176,6 +177,7 @@ import {
 import {
   agreedCell,
   cellsIn,
+  cellsOf,
   colOf,
   hasCells,
   ownSlot,
@@ -256,7 +258,7 @@ import {
   fillSession,
 } from "./session-layout.ts";
 export { varyTypes, requeueMissed, mayFollow } from "./session-layout.ts";
-import { PAIR_WORDS, PICK_OPTIONS, lookAlikes, matchGroups, matchSet, optionsFor } from "./chance.ts";
+import { PAIR_WORDS, PICK_OPTIONS, lookAlikes, matchGroups, matchSet, optionsFor, shuffledBy } from "./chance.ts";
 import {
   EMPTY_SIBLINGS,
   answersAlike,
@@ -327,6 +329,8 @@ import type { Review } from "./review.ts";
 import { liftSubtypeTagsIn } from "./subtype-tags.ts";
 import { tickCapitals } from "./capitals.ts";
 import { spellRuns, typoed } from "./spelling.ts";
+import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, whoChoices, whoIsRight } from "./verb-drills.ts";
+import type { Tense } from "./verb-drills.ts";
 import type { Run } from "./spelling.ts";
 
 /*
@@ -1768,6 +1772,36 @@ function setQuietUnits(quiet: Set<string>) {
 const isQuiet = (unit: Form): boolean => !!unit && QUIET_UNITS.has(unit.id);
 
 /* ------------------------------------------------------------------
+   Which card a verb's cell is on
+
+   The practices of a tense ask about the rest of the tense — the persons
+   beside a form, the tiles it is sorted among — and availableTypes is
+   handed one form. So which card each cell of a verb table is on is held
+   here, worked out with the other indexes, and setting it throws away
+   what forms can be asked, as every setter above does.
+   ------------------------------------------------------------------ */
+
+let VERB_CARDS: Map<string, Item> = new Map();
+
+/* Every cell of every card, by id. Cheap: a cell is a sub-form with a row
+   and a column, and most cards have none. */
+export function verbCardsOf(items: Item[]): Map<string, Item> {
+  const out: Map<string, Item> = new Map();
+  for (const card of items) {
+    for (const cell of cellsOf(card)) out.set(cell.id, card);
+  }
+  return out;
+}
+
+export function setVerbCards(map: Map<string, Item>) {
+  VERB_CARDS = map || new Map();
+  forgetTypes();
+}
+
+/* The card a cell is on, where it is one. */
+const verbCardOf = (unit: Form | null | undefined): Item | null => (unit && VERB_CARDS.get(unit.id)) || null;
+
+/* ------------------------------------------------------------------
    The ten figures, known
 
    Writing ٤٧ — from 47, or from the number in words — is asked only once
@@ -2468,6 +2502,7 @@ export function installIndexes(items: Item[], settings: Settings, systems: Syste
   setValueIndex(valueIndexOf(lent, settings));
   setReviewGate(reviewGateOf(items));
   setNumeralsKnown(numeralsKnownOf(items, settings));
+  setVerbCards(verbCardsOf(items));
   /*
    * The counts before the three walks that read them, and not after.
    *
@@ -3914,6 +3949,9 @@ function availableTypes(
       t,
       lang
     ) && (!EX[t].afterNumerals || numeralsKnownFor(it))
+      /* A verb practice asks about the tense the form is in, so whether
+         it can be asked is a fact about the card — see drillFits. */
+      && (!EX[t].verbDrill || drillFits(verbCardOf(it), it, t, lang))
       /* Reading or spelling a word another card of the learner's has
          too is asked on that card — see siblingStateOf. */
       && !(WORD_LEFT.has(it.id) && onlyAboutWord(EX[t]))
@@ -4060,7 +4098,27 @@ function reachedTypes(it: Form, settings: Settings): string[] {
    at all — left the card in the session and the silent question in it. */
 function openTypes(it: Form, settings: Settings): string[] {
   const cap = RANGE_CAPS.get(it && it.id);
-  return reachedTypes(it, settings).filter((k) => typeAllowedNow(k, it) && (cap == null || levelOf(k) <= cap));
+  return patternFirst(
+    it,
+    reachedTypes(it, settings).filter((k) => typeAllowedNow(k, it) && (cap == null || levelOf(k) <= cap)),
+  );
+}
+
+/*
+ * A tense is seen before it is asked.
+ *
+ * Where a form's tense can be shown on its own (`vpattern`), nothing else
+ * about the form is dealt until the learner has once said "I get it" to
+ * it: the table comes first, and the questions after it. Only what is
+ * dealt narrows — the ladder, the standing and the counts read the levels
+ * as they are, and "I get it" is a right answer on level one like any
+ * other, so it is passed the way the rest of that level is.
+ */
+export const PATTERN_KEY = "vpattern";
+function patternFirst(it: Form, keys: string[]): string[] {
+  if (!keys.includes(PATTERN_KEY)) return keys;
+  const st = statesOf(it)[PATTERN_KEY];
+  return st && (st.right || 0) > 0 ? keys : [PATTERN_KEY];
 }
 
 /*
@@ -4915,10 +4973,13 @@ export function buildSession({
   const byId = byIdOf(items);
   const finish = (dealt: Question[]) =>
     varyTypes(
-      withGrids(dealt, gridCompany(dealt, pool), settings, (unit, queued) =>
-        pickableTypes(unit, settings).find(
-          (t) => !isGrid(t) && !queued.has(t) && typesOf(unit).includes(t) && (!onlyNumbers || !borrowsPhrase(t))
-        ) || null
+      withRows(
+        withGrids(dealt, gridCompany(dealt, pool), settings, (unit, queued) =>
+          pickableTypes(unit, settings).find(
+            (t) => !isGrid(t) && !queued.has(t) && typesOf(unit).includes(t) && (!onlyNumbers || !borrowsPhrase(t))
+          ) || null
+        ),
+        items,
       ),
       null,
       (q) => orderKindOf(byId.get(q.id), settings)
@@ -5107,6 +5168,28 @@ function withGrids(
     result.push({ ...bare, type: pick, ...(ctx ? { ctx: ctx.id } : null) });
   }
   return result;
+}
+
+/*
+ * A verb's tense, asked once.
+ *
+ * A question about a whole tense is dealt for whichever of its forms the
+ * plan reached, and it marks all of them — so two forms of one tense
+ * dealt the same one would put the same table up twice. The first stays
+ * and the second goes; what it would have marked, the first marks.
+ */
+export function withRows(list: Question[], items: Item[]): Question[] {
+  const byId = byIdOf(items);
+  const seen: Set<string> = new Set();
+  return list.filter((ex) => {
+    if (!isRowDrill(ex.type)) return true;
+    const card = byId.get(ex.id);
+    const cell = card && ex.subId ? subFormsOf(card).find((f) => f.id === ex.subId) : null;
+    const key = `${typeOf(ex.type)} ${ex.id} ${rowOf(cell)}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 /*
@@ -5555,6 +5638,7 @@ export function marksForAnswer({
   rating,
   practice,
   grid,
+  tense,
 }: {
   exercise: Question;
   item: Form;
@@ -5566,6 +5650,12 @@ export function marksForAnswer({
   rating: string;
   practice: boolean;
   grid: { unit: Form; right: boolean }[] | null;
+  /**
+   * Each form of a verb's tense and whether it was right, where the
+   * question was about the whole tense — see isRowDrill. Every one is a
+   * form of `parentItem`.
+   */
+  tense?: { unit: Form; right: boolean }[] | null;
 }): Mark[] {
   /*
    * One question marks one form — except the grid, where every word up
@@ -5578,7 +5668,22 @@ export function marksForAnswer({
    * happens. The first word is marked as any question is.
    */
   const marks: Mark[] = [];
-  if (grid) {
+  if (tense && tense.length) {
+    /* A tense asked as a whole is a question about each of its forms, and
+       each is marked on its own, the way each word of a grid is: the one
+       the question was dealt for moves as any question does, and the rest
+       move where they were due. */
+    for (const m of tense) {
+      const lead = m.unit.id === item.id;
+      marks.push({
+        id: parentItem.id,
+        subId: m.unit.id === parentItem.id ? null : m.unit.id,
+        rating: m.right ? "good" : "again",
+        correct: m.right,
+        advance: !practice && (lead || stateReady(statesOf(m.unit)[exercise.type])),
+      });
+    }
+  } else if (grid) {
     const placeOf = (w: Form) => {
       if (w.id === item.id) return { id: parentItem.id, subId: exercise.subId || null };
       for (const mate of exercise.mates || []) {
@@ -6179,6 +6284,11 @@ export const HEARD_GRID_VERDICT = "Not all of them — the right words are shown
 export const HEARD_NUMBERS_VERDICT = "Not all of them — the right numbers are shown.";
 /* Giving up is not getting it wrong: nothing was offered to be incorrect.
    The answer is simply handed over. */
+/* A verb's tense, marked form by form: what came back says what happens
+   next rather than "incorrect", since nothing here was one answer. */
+export const ROW_VERDICT = "Not all of them — the right forms are shown.";
+export const READ_VERDICT = "The ones you misread will come back.";
+export const PATTERN_VERDICT = "No problem — it will come back later in this session.";
 export const SKIPPED_VERDICT = "The answer is:";
 export function praiseFor(n: number) {
   return PRAISE[((n % PRAISE.length) + PRAISE.length) % PRAISE.length];
@@ -8917,6 +9027,187 @@ function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase"
   );
 }
 
+/* Where a verb practice of a whole tense stands on the screen. */
+interface VerbAt {
+  /** The forms whose transliteration has been uncovered. */
+  revealed: string[];
+  /** Each form read, against whether the learner read it right. */
+  read: Record<string, boolean>;
+  /** Each person's place against the tile put there. */
+  placed: Record<string, number>;
+  /** The place the next tile goes to. */
+  at: string;
+}
+const NO_VERB_AT: VerbAt = { revealed: [], read: {}, placed: {}, at: "" };
+
+/*
+ * One tense of one verb, laid out by person.
+ *
+ * The screen the verb practices stand on: each person the teacher filled
+ * in, in the language's order, with the form, how it is said and what it
+ * means. Two forms spelt the same stay two rows, because the table is
+ * what a learner is meant to read the pattern off, and a row that went
+ * missing would be a person that went missing.
+ *
+ * `reading` turns it into "Read the forms": each transliteration is
+ * hidden until tapped, and once seen the learner says whether they had
+ * read it right — which is the mark, form by form. A form without a
+ * transliteration is shown as it is, with nothing to uncover.
+ */
+function VerbTable({ tense, lang, reading, checked }: {
+  tense: Tense;
+  lang: Lang;
+  reading?: {
+    /** The forms marked by this question: the rest are shown and not asked. */
+    asked: Set<string>;
+    revealed: Set<string>;
+    onReveal: (id: string) => void;
+    marks: Record<string, boolean>;
+    onMark: (id: string, right: boolean) => void;
+  } | null;
+  checked: boolean;
+}) {
+  const script = { fontFamily: lang.fontStack, direction: lang.direction } as React.CSSProperties;
+  const said = String(lang.translitLabel || "pronunciation").toLowerCase();
+  return (
+    <ol className="at-vtense" data-el="verb-tense" aria-label={tense.tense.label || "The tense"}>
+      {tense.places.map(({ person, form }) => {
+        const asked = !!reading && reading.asked.has(form.id) && !!String(form.lat || "").trim();
+        const shown = !reading || !asked || checked || reading.revealed.has(form.id);
+        const mark = reading ? reading.marks[form.id] : undefined;
+        return (
+          <li key={form.id} className="at-vrow">
+            <span className="at-vperson">{person.label}</span>
+            <span className="at-vform" lang={lang.id} dir={lang.direction} style={script}>
+              {String(form.ar || "")}
+            </span>
+            <span className="at-vsaid">
+              {form.lat ? (
+                shown ? (
+                  <span className="at-vlat">{String(form.lat)}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="at-vhidden"
+                    data-el="verb-reveal"
+                    aria-label={`Show the ${said}`}
+                    onClick={() => reading && reading.onReveal(form.id)}
+                  >
+                    <span aria-hidden="true">{String(form.lat)}</span>
+                  </button>
+                )
+              ) : null}
+              {form.en ? <span className="at-ven">{asMeaning(String(form.en))}</span> : null}
+            </span>
+            {asked && reading && (reading.revealed.has(form.id) || checked) && (
+              <span className="at-vreadmark" data-el="verb-read-mark">
+                <Button
+                  size="sm"
+                  variant={mark === true ? "primary" : undefined}
+                  disabled={checked}
+                  aria-pressed={mark === true}
+                  onClick={() => reading.onMark(form.id, true)}
+                >
+                  Read it right
+                </Button>
+                <Button
+                  size="sm"
+                  variant={mark === false ? "primary" : undefined}
+                  disabled={checked}
+                  aria-pressed={mark === false}
+                  onClick={() => reading.onMark(form.id, false)}
+                >
+                  Misread
+                </Button>
+              </span>
+            )}
+          </li>
+        );
+      })}
+    </ol>
+  );
+}
+
+/*
+ * "Fill the row": the tense with every form taken out, and the forms
+ * underneath as tiles — one a person, so two persons spelt the same are
+ * two tiles that read alike, and either goes in either place.
+ *
+ * Tap a person to choose the place, then a tile to put there; the next
+ * empty place is chosen for you. Tapping a filled place takes its tile
+ * back. Once checked, each place says whether it was right, and the right
+ * form stands beside any that was not.
+ */
+function VerbRowFill({ tense, lang, tiles, placed, at, onAt, onPlace, checked }: {
+  tense: Tense;
+  lang: Lang;
+  /** The forms as tiles, in the order they are shown. */
+  tiles: string[];
+  /** Each person's place against the index of the tile put there. */
+  placed: Record<string, number>;
+  /** The place a tile goes to next. */
+  at: string;
+  onAt: (personId: string) => void;
+  onPlace: (personId: string, tile: number | null) => void;
+  checked: boolean;
+}) {
+  const script = { fontFamily: lang.fontStack, direction: lang.direction } as React.CSSProperties;
+  const used = new Set(Object.values(placed));
+  return (
+    <div className="at-vfill">
+      <ol className="at-vtense" data-el="verb-tense" aria-label={tense.tense.label || "The tense"}>
+        {tense.places.map(({ person, form }) => {
+          const tile = placed[person.id];
+          const text = typeof tile === "number" ? tiles[tile] : "";
+          const right = checked && text.trim() === String(form.ar || "").trim();
+          return (
+            <li key={form.id} className="at-vrow">
+              <span className="at-vperson">{person.label}</span>
+              <button
+                type="button"
+                className={`at-vslot${at === person.id && !checked ? " on" : ""}${
+                  checked ? (right ? " right" : " wrong") : ""
+                }`}
+                disabled={checked}
+                aria-label={text ? `${person.label}: ${text}` : `${person.label}: empty`}
+                onClick={() => (typeof tile === "number" ? onPlace(person.id, null) : onAt(person.id))}
+              >
+                <span lang={lang.id} dir={lang.direction} style={script}>
+                  {text || "—"}
+                </span>
+              </button>
+              {checked && !right && (
+                <span className="at-vform at-vfix" lang={lang.id} dir={lang.direction} style={script}>
+                  {String(form.ar || "")}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ol>
+      {!checked && (
+        <div className="at-vtiles" data-el="verb-tiles">
+          {tiles.map((text, i) =>
+            used.has(i) ? null : (
+              <button
+                key={i}
+                type="button"
+                className="at-vtile"
+                lang={lang.id}
+                dir={lang.direction}
+                style={script}
+                onClick={() => onPlace(at, i)}
+              >
+                {text}
+              </button>
+            ),
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 /*
  * Four pictures, one of them the answer — "Listen → picture". Each tile is
  * a button holding a card's first picture, and what it answers with is
@@ -9483,6 +9774,10 @@ export default function ArabicTrainer() {
   /* The grid as it was paired: each word's id against the meaning put to
      it. Every word in a grid is marked on this, not only the first. */
   const [matched, setMatched] = useState<Record<string, string>>({});
+  /* Where a verb practice of a whole tense stands: which transliterations
+     have been uncovered and how each was marked, and which tile is in
+     which person's place. See VerbTable and VerbRowFill. */
+  const [verbAt, setVerbAt] = useState<VerbAt>(NO_VERB_AT);
   const [skipped, setSkipped] = useState(false);
   const [overridden, setOverridden] = useState(false);
   /*
@@ -10280,6 +10575,9 @@ export default function ArabicTrainer() {
      which is what decides whether a range is asked to write in them. */
   const numeralsKnown = useMemo(() => numeralsKnownOf(asking, settings), [asking, settings]);
   setNumeralsKnown(numeralsKnown);
+  /* And which card each verb cell is on, for the practices of a tense. */
+  const verbCards = useMemo(() => verbCardsOf(asking), [asking]);
+  setVerbCards(verbCards);
 
   /* And how many words each language has to pair against.
 
@@ -11040,6 +11338,7 @@ export default function ArabicTrainer() {
     setChecked(null);
     setPairs([]);
     setMatched({});
+    setVerbAt(NO_VERB_AT);
     setSkipped(false);
     setOverridden(false);
     setRetried(false);
@@ -11094,6 +11393,48 @@ export default function ArabicTrainer() {
   const qLang = langOf(qSettings);
   setActiveLang(qLang.id);
   const spec = exercise ? exOf(exercise.type, qLang) : null;
+
+  /*
+   * The tense a verb practice is about, laid out by person, and which of
+   * its forms this question marks — the ones that climb it, which leaves
+   * out the form a dictionary cites. Null for every other question.
+   */
+  const verbTense: Tense | null = useMemo(() => {
+    if (!spec || !spec.verbDrill || !item || !parentItem) return null;
+    const table = drillTable(qLang, item);
+    return table ? tenseOf(parentItem, table, rowOf(item)) : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [spec, item && item.id, parentItem, qLang.id]);
+  const verbAsked: Set<string> = useMemo(() => {
+    if (!verbTense || !exercise) return new Set();
+    const type = typeOf(exercise.type);
+    return new Set(
+      verbTense.places.filter((p) => availableTypes(p.form, qLang).includes(type)).map((p) => p.form.id),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verbTense, exercise && exercise.type, qLang.id]);
+  /* The tiles of "Fill the row": one a person, in an order of their own
+     that stays put while the question is up. */
+  const verbTiles: string[] = useMemo(() => {
+    if (!verbTense || !spec || spec.answerMode !== "vrow" || !item) return [];
+    const reps = (statesOf(item)[(exercise && exercise.type) || ""] || {}).reps || 0;
+    return shuffledBy(
+      verbTense.places.map((p, i) => ({ id: `${i}`, ar: String(p.form.ar || "").trim() })),
+      `${item.id} row ${reps}`,
+      (x) => x.id,
+    ).map((x) => x.ar);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verbTense, spec, item && item.id]);
+  /* And the form "Change the person" starts from: another person of the
+     same tense, the one the learner has answered right most often. */
+  const verbCue = useMemo(() => {
+    if (!verbTense || !spec || spec.promptField !== "shift" || !item) return null;
+    const reps = (statesOf(item)[(exercise && exercise.type) || ""] || {}).reps || 0;
+    const rank = (f: Form) => Object.values(statesOf(f)).reduce((n, st) => n + ((st && st.right) || 0), 0);
+    return shiftCue(verbTense, item, qLang, rank, reps);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verbTense, spec, item && item.id]);
+  const verbPlace = placeInTense(verbTense, item);
 
   /*
    * Whether the pronunciation or the meaning is beside the question.
@@ -11323,6 +11664,27 @@ export default function ArabicTrainer() {
 
   const choices = useMemo(() => {
     if (!spec || !spec.picks) return [];
+    /*
+     * Who a verb's form is about: the persons of its own tense, the right
+     * one and those whose forms look most like it. A person whose form is
+     * spelt the same is offered too and is as right — see whoIsRight.
+     */
+    if (spec.picks === "person") {
+      if (!verbTense || !item) return [];
+      const { right, wrong } = whoChoices(verbTense, item, qLang, editDistance, PICK_OPTIONS);
+      const lead = right.find((p) => p.id === colOf(item)) || right[0];
+      if (!lead) return [];
+      const others = right.filter((p) => p !== lead).concat(wrong).slice(0, PICK_OPTIONS - 1);
+      const asOption = (p: { id: string; label: string }) => ({ id: `who:${p.id}`, en: p.label || p.id });
+      const reps = (statesOf(item)[(exercise && exercise.type) || ""] || {}).reps || 0;
+      return optionsFor({
+        answer: asOption(lead),
+        pool: others.map(asOption),
+        wanted: PICK_OPTIONS,
+        seed: `${item.id} who ${reps}`,
+        textOf: (o) => o.en,
+      });
+    }
     if (spec.picks === "reply") {
       return dialog && at !== null
         ? replyOptions({ card: dialog, at, pool: replyPool(asking, settings, qLang.id) })
@@ -11628,6 +11990,9 @@ export default function ArabicTrainer() {
     !!checked &&
     (!answerRight || checked.reason === "bare" || checked.reason === "typo") &&
     !(spec && spec.answerMode === "part") &&
+    /* Nor under a verb's tense, which shows each person's form where it
+       stands. */
+    !(spec && spec.verbDrill === "row") &&
     /* Nor under a grid: every word paired wrong shows its meaning where
        it stands, and the first word's alone would say less. */
     !(spec && spec.picks === "pair");
@@ -11662,6 +12027,48 @@ export default function ArabicTrainer() {
      changes with it. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [qi]);
+
+  /*
+   * Each form of a verb's tense against what this answer said of it, for
+   * the practices asked of the whole tense. Only the forms the question
+   * marks — see verbAsked — and every one of them wrong where the learner
+   * gave up. Seeing the pattern is one answer for the whole tense.
+   */
+  const verbMarks = (correct: boolean): { unit: Form; right: boolean }[] => {
+    if (!verbTense || !spec || spec.verbDrill !== "row") return [];
+    const placed: Record<string, string> = {};
+    for (const [person, tile] of Object.entries(verbAt.placed)) placed[person] = verbTiles[tile] || "";
+    const byRow = spec.answerMode === "vrow" ? rowMarks(verbTense, placed) : [];
+    return verbTense.places
+      .filter((p) => verbAsked.has(p.form.id))
+      .map((p) => {
+        if (overridden) return { unit: p.form, right: true };
+        if (skipped) return { unit: p.form, right: false };
+        if (spec.answerMode === "vread") return { unit: p.form, right: verbAt.read[p.form.id] === true };
+        if (spec.answerMode === "vrow") {
+          const m = byRow.find((x) => x.form.id === p.form.id);
+          return { unit: p.form, right: !!m && m.right };
+        }
+        return { unit: p.form, right: correct };
+      });
+  };
+
+  /* What a verb practice comes to, where it is marked here rather than by
+     the language's checker: who a form is about, the forms read, the row
+     filled. Null for anything else, including seeing the pattern, which
+     the checker already marks as the learner's own word. */
+  function verbVerdict(): { ok: boolean; reason: string } | null {
+    if (!spec || !spec.verbDrill || !verbTense || !item) return null;
+    const verdict = (ok: boolean) => ({ ok, reason: ok ? "exact" : "wrong" });
+    if (spec.picks === "person") {
+      const person = verbTense.places.find((p) => (p.person.label || p.person.id) === typed);
+      return verdict(!!person && whoIsRight(verbTense, item, person.person.id, qLang));
+    }
+    if (spec.answerMode === "vread" || spec.answerMode === "vrow") {
+      return verdict(verbMarks(true).every((m) => m.right));
+    }
+    return null;
+  }
 
   /* Each word of the grid against what was put to it. The grid's own
      verdict is the whole of it: right when every pair is. */
@@ -11700,15 +12107,18 @@ export default function ArabicTrainer() {
 
   function submit() {
     if (!item || checked) return;
+    const verbOwn = verbVerdict();
     let result =
-      spec && spec.picks === "pair"
+      verbOwn
+        ? verbOwn
+        : spec && spec.picks === "pair"
         ? gridMarks().every((m) => m.right)
           ? { ok: true, reason: "exact" }
           : { ok: false, reason: "wrong" }
         : checkAnswer(typed, item, exercise.type, qSettings);
     /* Another form the question could not tell from this one, written
        instead: right, because nothing on the screen said which. */
-    if (!result.ok && !(spec && spec.picks === "pair")) {
+    if (!result.ok && !verbOwn && !(spec && spec.picks === "pair")) {
       for (const twin of twins) {
         const also = checkAnswer(typed, twin, exercise.type, qSettings);
         if (also.ok) {
@@ -12157,6 +12567,7 @@ export default function ArabicTrainer() {
       rating,
       practice: !!practice,
       grid: spec && spec.picks === "pair" ? gridMarks() : null,
+      tense: spec && spec.verbDrill === "row" ? verbMarks(!!correct) : null,
     });
     /* Filled in by the write below and read after it. `persist` calls its
        function there and then rather than queuing it, so by the time this
@@ -12985,7 +13396,83 @@ export default function ArabicTrainer() {
                       : instructionFor(spec, item)}
                   </p>
                   <div className="at-ask" data-el="question-prompt">
-                    {spec.promptField === "pairs" ? null : spec.promptField === "scene" ? (
+                    {spec.promptField === "pairs" ? null : spec.promptField === "tense" ? (
+                      /* A verb's tense, laid out by person: to look at,
+                         to read through, or to put back together. */
+                      verbTense ? (
+                        spec.answerMode === "vrow" ? (
+                          <VerbRowFill
+                            key={`${(item && item.id) || ""}-${qi}`}
+                            tense={verbTense}
+                            lang={qLang}
+                            tiles={verbTiles}
+                            placed={verbAt.placed}
+                            at={verbAt.at || (verbTense.places[0] ? verbTense.places[0].person.id : "")}
+                            checked={!!checked}
+                            onAt={(person) => setVerbAt((v) => ({ ...v, at: person }))}
+                            onPlace={(person, tile) => {
+                              if (!person) return;
+                              const placed = { ...verbAt.placed };
+                              if (tile === null) delete placed[person];
+                              else placed[person] = tile;
+                              /* The next place still empty, in the table's
+                                 order, after this one and then from the top. */
+                              const order = verbTense.places.map((p) => p.person.id);
+                              const from = order.indexOf(person);
+                              const next =
+                                tile === null
+                                  ? person
+                                  : order.slice(from + 1).concat(order.slice(0, from + 1)).find((id) => !(id in placed)) || "";
+                              setVerbAt((v) => ({ ...v, placed, at: next }));
+                              setTyped(order.every((id) => id in placed) ? "placed" : "");
+                            }}
+                          />
+                        ) : (
+                          <VerbTable
+                            tense={verbTense}
+                            lang={qLang}
+                            checked={!!checked}
+                            reading={
+                              spec.answerMode === "vread"
+                                ? {
+                                    asked: verbAsked,
+                                    revealed: new Set(verbAt.revealed),
+                                    onReveal: (id) =>
+                                      setVerbAt((v) => ({ ...v, revealed: v.revealed.concat([id]) })),
+                                    marks: verbAt.read,
+                                    onMark: (id, right) => {
+                                      const read = { ...verbAt.read, [id]: right };
+                                      setVerbAt((v) => ({ ...v, read }));
+                                      const all = verbTense.places
+                                        .filter((p) => verbAsked.has(p.form.id) && String(p.form.lat || "").trim())
+                                        .every((p) => p.form.id in read);
+                                      setTyped(all ? "read" : "");
+                                    },
+                                  }
+                                : null
+                            }
+                          />
+                        )
+                      ) : null
+                    ) : spec.promptField === "shift" ? (
+                      /* A form of the same tense the learner has met, with
+                         who it is about, and the person to write it for. */
+                      verbCue && verbPlace ? (
+                        <>
+                          <Field value={verbCue.form.ar} field="ar" kind={item.kind} name="question-prompt-text" />
+                          {verbCue.form.en ? (
+                            <p className="at-ctxmeaning" data-el="question-prompt-meaning">
+                              {asMeaning(String(verbCue.form.en))}
+                            </p>
+                          ) : null}
+                          <p className="at-asktag at-vnow" data-el="question-verb-person">
+                            Now for: <strong>{verbPlace.person.label || verbPlace.person.id}</strong>
+                          </p>
+                        </>
+                      ) : (
+                        <Field value={item.en} field="en" kind={item.kind} name="question-prompt-text" />
+                      )
+                    ) : spec.promptField === "scene" ? (
                       /* The conversation is the question. How much of it is
                          shown is the difference between them: everything up
                          to your turn when you are choosing one, all of it
@@ -13206,7 +13693,7 @@ export default function ArabicTrainer() {
                       second, so the at-mt4 gap was silently dropped and the
                       answer box sat hard against the hint button above it. */}
                   <div className="at-answerbox at-mt4" data-el="answer-box">
-                    {spec.answerMode === "read" ? null : spec.answerMode === "dial" ? (
+                    {spec.answerMode === "read" || spec.answerMode === "vread" || spec.answerMode === "vrow" ? null : spec.answerMode === "dial" ? (
                       /* The hands, dragged. What a learner does with a
                          clock is set it, so this is the answer in the form
                          the skill is actually used in — and it is a pair
@@ -13242,7 +13729,13 @@ export default function ArabicTrainer() {
                             disabled={!!checked}
                             onClick={() => setTyped(answer)}
                           >
-                            {answer === SELF_ALL ? "Yes, all of it" : "Not all of it"}
+                            {spec.verbDrill
+                              ? answer === SELF_ALL
+                                ? "I get it"
+                                : "I don't get it"
+                              : answer === SELF_ALL
+                              ? "Yes, all of it"
+                              : "Not all of it"}
                           </Button>
                         ))}
                       </div>
@@ -13442,6 +13935,12 @@ export default function ArabicTrainer() {
                           ? praiseFor(tally.ok)
                           : skipped
                           ? SKIPPED_VERDICT
+                          : spec.verbDrill === "row"
+                          ? spec.answerMode === "vrow"
+                            ? ROW_VERDICT
+                            : spec.answerMode === "vread"
+                            ? READ_VERDICT
+                            : PATTERN_VERDICT
                           : spec.picks === "pair"
                           ? spec.tiles === "audio"
                             ? spec.answerField === "ar"
@@ -13450,7 +13949,7 @@ export default function ArabicTrainer() {
                             : GRID_VERDICT
                           : WRONG_VERDICT}
                       </p>
-                      {!skipped && !checked.ok && checked.reason !== "wrong" && (
+                      {!skipped && !checked.ok && checked.reason !== "wrong" && !spec.verbDrill && (
                         <Help data-el="verdict-reason">{verdictText(checked, qLang)}</Help>
                       )}
                       {/* Right, and written the textbook's way: the
@@ -13494,7 +13993,18 @@ export default function ArabicTrainer() {
                           nudge under it would otherwise point at nothing. */}
                       {answerRepeated && (
                         <div className="at-answermain" data-el="answer-value">
-                          {spec.answerMode === "order" ? (
+                          {spec.picks === "person" ? (
+                            /* Who the form is about: every person whose
+                               form in this tense is spelt the same. */
+                            <p className="at-answerperson" data-el="answer-person">
+                              {verbTense && item
+                                ? verbTense.places
+                                    .filter((p) => whoIsRight(verbTense, item, p.person.id, qLang))
+                                    .map((p) => p.person.label || p.person.id)
+                                    .join(" · ")
+                                : ""}
+                            </p>
+                          ) : spec.answerMode === "order" ? (
                             /* The conversation as it was written, numbered,
                                because "wrong order" is only useful next to
                                the right one. */
@@ -13797,7 +14307,7 @@ export default function ArabicTrainer() {
                             }}
                           />
                         )}
-                        {!spec.intro && (
+                        {!spec.intro && !(spec.verbDrill && (spec.answerMode === "self" || spec.answerMode === "vread")) && (
                           <Button variant="ghost" data-el="dont-know-button" onClick={giveUp}>
                             I don't know
                           </Button>
