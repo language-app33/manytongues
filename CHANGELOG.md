@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.444 — 14 October 2026
+
+**A saved session built from whole decks keeps up with those decks.**
+
+- A saved session used to remember the exact cards it was built from. If
+  a teacher then added cards to one of its decks, the session never
+  picked them up.
+- Now a deck ticked as a whole on the Build screen is kept as the deck.
+  Every time the session starts, it takes the deck as it is that day: new
+  cards are in, and cards taken out of the deck are gone. "Everything"
+  works the same way, taking in every card you have by then.
+- Cards picked one at a time are still kept as just those cards.
+- Sessions saved before this release still remember their cards. To make
+  one follow its decks, open it under Saved sessions, edit it, make sure
+  the deck's box is fully ticked, and save.
+- Trade-off: a deck is recognised by its name, so if a deck is renamed, a
+  saved session built from it loses it and needs editing again.
+- To check by hand: save a session with one whole deck, add a card to
+  that deck, then start the saved session (or look at its card count
+  under Saved sessions). The new card should be in it.
+
 ## 0.443 — 14 October 2026
 
 **A sentence already practised also waits for its words.**

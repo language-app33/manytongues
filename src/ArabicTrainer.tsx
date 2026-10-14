@@ -744,6 +744,7 @@ export function mergeMoves(
    it was about. A module of its own so the one path that moves a learner's
    progress can be asked what it does without a browser — see grade.ts. */
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
+import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
 import type { Filler, Mark } from "./grade.ts";
 
 import { applyUpdate, beforeReload, onUpdateReady, updateReady } from "./updates.ts";
@@ -10503,6 +10504,8 @@ export default function ArabicTrainer() {
         id: x.id,
         name: String(x.name || "Saved session"),
         ids: x.ids.filter((i: unknown) => typeof i === "string"),
+        decks: Array.isArray(x.decks) ? x.decks.filter((d: unknown) => typeof d === "string") : [],
+        everything: x.everything === true,
         mode: x.mode,
         count: Number(x.count) || 0,
         minutes: Number(x.minutes) || 0,
@@ -10531,8 +10534,11 @@ export default function ArabicTrainer() {
     flash(`Saved changes to ${changed.name}`);
   }
 
+  /* The decks it names are read now, against the cards the Build screen
+     shows, so a card added to one since it was kept is in the session. */
   function startSaved(s: SavedSession) {
-    beginManual({ ids: s.ids, mode: s.mode, count: s.count, minutes: s.minutes });
+    const ids = new Set([...s.ids, ...cardsOfSaved(s, shown).map((it) => it.id)]);
+    beginManual({ ids, mode: s.mode, count: s.count, minutes: s.minutes });
   }
 
   /* A session assembled by hand on the Build screen. */
@@ -14198,12 +14204,11 @@ function SavedTiles({ sessions, items, settings, onStart }: {
   onStart: (session: SavedSession) => void;
 }) {
   const tiles = useMemo(() => {
-    const byId = new Map(items.map((it) => [it.id, it]));
     /* Newest first, as the list has them. */
     return [...sessions]
       .sort((a, b) => (b.created || 0) - (a.created || 0))
       .map((s) => {
-        const cards = s.ids.map((id) => byId.get(id)).filter((it): it is Item => !!it);
+        const cards = cardsOfSaved(s, items);
         return { s, alive: cards.length, pct: climbOf(cards, settings, items).pct };
       });
   }, [sessions, items, settings]);
@@ -15857,8 +15862,6 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const here = useMemo(() => new Set(items.map((i) => i.id)), [items]);
-
   /* Newest first: the one somebody just made is the one they are looking
      for. */
   const list = [...sessions].sort((a, b) => (b.created || 0) - (a.created || 0));
@@ -15876,7 +15879,8 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
           /* How much of it is still here. A card withdrawn since is simply
              gone from the session, and saying so before it is started is
              the difference between a short session and a broken one. */
-          const alive = s.ids.filter((id) => here.has(id)).length;
+          const alive = cardsOfSaved(s, items).length;
+          const gone = missingFromSaved(s, items).length;
           const mode = (MODES as Record<string, { label: string } | undefined>)[s.mode];
           const length = s.minutes
             ? `${s.minutes} min`
@@ -15889,9 +15893,9 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
                 <div className="en">{s.name}</div>
                 <div className="lat">
                   {[mode ? mode.label : s.mode, length,
-                    alive === s.ids.length
+                    !gone
                       ? plural(alive, "card")
-                      : `${alive} of ${s.ids.length} cards still here`,
+                      : `${alive} of ${alive + gone} cards still here`,
                   ].join(" · ")}
                 </div>
               </div>
@@ -15919,7 +15923,7 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
         })}
       </div>
 
-      {list.some((s) => s.ids.some((id) => !here.has(id))) && (
+      {list.some((s) => missingFromSaved(s, items).length) && (
         <Help className="at-mt3">
           A session keeps the cards it was built from by name, so one you
           have since deleted is no longer in it.
@@ -15941,7 +15945,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   settings: Settings;
   editing?: SavedSession;
   onStart: (plan: any) => void;
-  onSave: (session: { name: string; ids: string[]; mode: string; count: number; minutes: number }) => void;
+  onSave: (session: Omit<SavedSession, "id" | "created">) => void;
   onClose: () => void;
 }) {
   const eligible = useMemo(
@@ -15956,9 +15960,8 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
      is the last one to hand somebody by default. */
   const [mode, setMode] = useState(editing ? editing.mode : "");
   const [picked, setPicked] = useState(() => {
-    if (!editing) return new Set();
-    const here = new Set(eligible.map((i) => i.id));
-    return new Set(editing.ids.filter((id) => here.has(id)));
+    if (!editing) return new Set<string>();
+    return new Set(cardsOfSaved(editing, eligible).map((i) => i.id));
   });
   /* The kept cards this screen cannot show — another language's, under the
      switch, or one that has gone — carried through a save untouched, so
@@ -16099,9 +16102,12 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   const suggestion = mode
     ? `${(MODES as Record<string, { label: string }>)[mode].label} · ${plural(picked.size, "card")}`
     : "";
+  /* A deck whose box is ticked is kept as the deck, not as the cards it
+     holds today, so the session takes in what is added to it later. */
+  const described = describeSaved({ picked, groups: new Map(tagGroups), all: eligible });
   const spec = JSON.stringify({
     name: name.trim() || suggestion,
-    ids: [...picked].sort(),
+    ...described,
     mode,
     limitKind,
     count,
@@ -16121,7 +16127,8 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   function keep() {
     onSave({
       name: name.trim() || (editing && editing.name) || suggestion,
-      ids: [...picked, ...elsewhere] as string[],
+      ...described,
+      ids: [...described.ids, ...elsewhere],
       mode,
       count: limitKind === "count" ? count : 999,
       minutes: limitKind === "time" && needsLength ? minutes : 0,
