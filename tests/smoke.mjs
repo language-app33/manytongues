@@ -9770,7 +9770,7 @@ const openPronounTables = async () => {
     const met = {
       order: /** @type {string[]} */ ([]), pattern: 0, patternRows: 0, read: 0, readRight: 0, hidden: 0,
       who: 0, whoRight: 0, whoOptions: /** @type {string[]} */ ([]), row: 0, rowRight: 0, tiles: 0,
-      shift: 0, shiftRight: 0, verdicts: /** @type {string[]} */ ([]),
+      shift: 0, shiftRight: 0, verdicts: /** @type {string[]} */ ([]), patternMore: false,
     };
     const btn = (/** @type {RegExp} */ re) => [...host.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
     for (let n = 0; n < 30 && host.querySelector(".at-instruction"); n++) {
@@ -9838,6 +9838,7 @@ const openPronounTables = async () => {
       }
       const verdict = host.querySelector('[data-el="verdict"]');
       const ok = !!verdict && verdict.classList.contains("ok");
+      if (kind === "pattern" && host.querySelector('[data-el="also-heading"]')) met.patternMore = true;
       if (kind !== "other") met.verdicts.push(`${kind}:${ok ? "ok" : (verdict && verdict.textContent) || "none"}`);
       if (kind === "read" && ok) met.readRight += 1;
       if (kind === "who" && ok) met.whoRight += 1;
@@ -9866,6 +9867,7 @@ const openPronounTables = async () => {
   check("a new tense is first met as the tense on its own", fresh.met.pattern === 1 && seen[0] === "pattern",
     JSON.stringify(fresh.met));
   check("and nothing else about the tense is asked before it", seen.every((k) => k === "pattern"), JSON.stringify(seen));
+  check("and once answered it has no Learn more under it", !fresh.met.patternMore, JSON.stringify(fresh.met));
   check("laid out one row a person, the two spelt alike included", fresh.met.patternRows === 6, JSON.stringify(fresh.met));
   const marked = (fresh.verb && fresh.verb.forms || []).filter((/** @type {any} */ f) => f.row === "present" && f.s && f.s.vpattern && f.s.vpattern.right > 0);
   check("and \"I get it\" counts for every form of the tense", marked.length === 6, `${marked.length} marked`);

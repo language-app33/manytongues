@@ -5037,7 +5037,7 @@ export function buildSession({
     if (at >= 0) cut = Math.max(cut, at + 1);
   }
 
-  const exercises = withReadThroughs(questions.slice(0, cut), items, settings);
+  const exercises = withReadThroughs(afterItsUse(questions.slice(0, cut), items, settings, sets), items, settings);
   const from = items.filter(inDeck).map((it) => it.id);
   return {
     exercises,
@@ -5168,6 +5168,48 @@ function withGrids(
     result.push({ ...bare, type: pick, ...(ctx ? { ctx: ctx.id } : null) });
   }
   return result;
+}
+
+/*
+ * A verb's tense, seen right after the verb is met in use.
+ *
+ * Where the session has a phrase or a sentence that uses the verb — a
+ * phrase whose words include it, or a sentence whose blank it fills — the
+ * table of the tense comes straight after that question: the verb has
+ * just been read in a sentence, and the table says how it changes. Where
+ * the session has none, the table stays where it was dealt.
+ *
+ * The first such question in the session is the one, and a question about
+ * the verb's own card never counts: that is the verb, not a use of it.
+ */
+export function afterItsUse(list: Question[], items: Item[], settings: Settings, systems: SystemSet[] = []): Question[] {
+  const patterns = list.filter((q) => typeOf(q.type) === PATTERN_KEY);
+  if (!patterns.length) return list;
+  const byId = byIdOf(items);
+  const out = list.slice();
+  for (const pattern of patterns) {
+    const verb = byId.get(pattern.id);
+    if (!verb) continue;
+    /* The phrases the verb's forms turn up in. A verb's own examples are
+       its own card, not a use of it by another. */
+    const phrases: Set<string> = new Set();
+    for (const { unit } of unitsOf(verb)) {
+      for (const c of CONTEXT_INDEX.get(unit.id) || []) {
+        if (typeof c.example !== "number" && c.id) phrases.add(c.id);
+      }
+    }
+    const uses = (q: Question): boolean => {
+      if (q.id === verb.id || typeOf(q.type) === PATTERN_KEY) return false;
+      if (phrases.has(q.id) || (!!q.subId && phrases.has(q.subId))) return true;
+      const r = resolveQuestion(items, q, false, systems);
+      return !!r && !!r.unit && fillersIn(r.unit, q.type, settings).some((f) => f.id === verb.id);
+    };
+    const user = out.find(uses);
+    if (!user) continue;
+    out.splice(out.indexOf(pattern), 1);
+    out.splice(out.indexOf(user) + 1, 0, pattern);
+  }
+  return out;
 }
 
 /*
@@ -14109,7 +14151,10 @@ export default function ArabicTrainer() {
                           first word alone, without saying which. The
                           owner's call was to leave it out rather than
                           make it five times as long. */}
-                      {spec.picks !== "pair" && (
+                      {/* Nor under a verb's tense seen on its own: the
+                          table is already everything there is to say, and
+                          the box would be about one of its forms. */}
+                      {spec.picks !== "pair" && exercise.type !== "vpattern" && (
                       <AlsoBox>
                         {/* The phrase it appeared in, whole, and what it
                             means. A gap question showed that meaning with

@@ -6316,3 +6316,17 @@ three that mark a whole tense at once. The cited cell is asked none of
 them: it is met before its tense opens, and a question about its tense
 would show that tense early. The deck estimate counts the new questions
 per form, so it overstates the three tense-wide ones; it is an estimate.
+
+
+## The tense comes after the verb in use (0.452)
+
+**What changed.** `afterItsUse` moves each `vpattern` question to just
+after the first question in the session that uses the verb: a phrase the
+context index places one of its forms in, or a question whose blank a
+form of it fills (`fillersIn` over the resolved question). The verb's own
+card never counts, nor its own examples. With no such question it stays
+where it was dealt. Run on the cut session, before read-throughs.
+"Learn more" is not drawn under `vpattern`: the table is the whole of it.
+
+**Choices the owner made.** Of: after a phrase or sentence using the verb;
+after a question about the verb's own card, the owner chose the first.
