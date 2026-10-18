@@ -25,6 +25,14 @@ and moves once per batch of work you would notice, not once per commit.
   the pairs".
 - Trade-off: a word with no recorded phrase is no longer asked to be
   heard once it is past its lower levels. Writing it is the check.
+- Trade-off: "Get started" asks only easy recognition questions, so it
+  now has nothing to ask of these cards. On a deck that is mostly past
+  its lower levels it comes out short, or says there is nothing to
+  practise.
+- A card past its lower levels now takes one place in a session instead
+  of two, so someone practising many times a day meets it in more
+  sittings, one question each time. The total number of questions about
+  it stays about the same.
 - Nothing changes in what a card shows, the progress figures, or how
   Learnt is earned.
 - To check by hand: a Learnt word, due, in a session. Only its writing

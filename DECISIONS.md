@@ -6371,4 +6371,14 @@ the only check, and a card past its lower levels cannot drop below its top
 through its own reviews. Listening is not reviewed on such a word unless
 its top has a recorded phrase. In a deck that is mostly past its lower
 levels, matching grids have fewer spares and are swapped for another
-question more often. Tests: `tests/top-level.test.mjs`.
+question more often. Get started, which asks recognition alone, has
+nothing to ask such a form, so on a deck mostly past its lower levels it
+comes out short (agreed in `tests/session-fill.test.mjs`). One question
+per such form where it was two means it comes round in more sittings for
+about as many questions: at fifteen sittings a day, about 4 sittings and
+4 questions a day where it was about 2.8 and 4.2; the pace test now holds
+the questions. And "met" in `mixCardsOf` and the ready count is read over
+the whole ladder, or a form just on its top, its one askable question not
+yet answered, read as new and slipped past the twenty in learning. Its
+"mastered" is the questions a card is still asked at a four-day gap.
+Tests: `tests/top-level.test.mjs`.
