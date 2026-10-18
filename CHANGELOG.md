@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.453 — 18 October 2026
+
+**A card that has climbed every level is reviewed on its top level only.**
+
+- Once a card has passed every level below its top, whether it's Learnt,
+  Cleared, or back on its top level after a slip there, a session asks
+  it only its top questions (writing the word from its meaning, from its
+  picture, and so on). It no longer gets easy recognition questions.
+- Such a card comes up for review when one of its top questions is due,
+  not when an easy one is. Only the due ones are asked, two at most per
+  session; the rest wait for the next session.
+- Missing a top question twice running keeps the card on its top level
+  until it is answered right again; the easier questions don't come back.
+- These cards are no longer used as extra tiles in other words' "Match
+  the pairs".
+- Trade-off: a word with no recorded phrase is no longer asked to be
+  heard once it is past its lower levels. Writing it is the check.
+- Nothing changes in what a card shows, the progress figures, or how
+  Learnt is earned.
+- To check by hand: a Learnt word, due, in a session. Only its writing
+  questions should come up, never "choose the meaning".
+
 ## 0.452 — 14 October 2026
 
 **A verb's tense now comes right after the verb is met in a phrase, and

@@ -55,11 +55,27 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   a scene in order makes its passes there. Counting them at the top alone
   is what keeps the badge off the deal of the cards — a session hands a
   card two of its eight questions, so waiting on all of them would land
-  "learnt" whenever the last straggler happened to come up. What makes
-  that safe is that the rest of the ladder is still asked and still
-  counted: missing one of those twice running takes the card back off
-  cleared, and it stops being learnt until it is recovered. Its passes are waiting for it
-  when it is.
+  "learnt" whenever the last straggler happened to come up.
+
+  **And once a form is past everything under its top, the top is all it
+  is asked.** Learnt, Cleared, or back on its top level after a slip there:
+  writing the word from its meaning subsumes the questions below it, so a
+  session deals that form its top questions that are due and nothing else
+  — two at most, as for any form, the rest waiting for the next session —
+  and the form falls due when one of *those* does, not when a recognition
+  question it no longer needs comes round. It is not used as a spare tile
+  in another word's matching grid either, since every tile there is
+  marked. Where none of its top is due and it is dealt anyway — asked for
+  by name, a practice — it is asked its top. Until 0.453 the whole ladder
+  went on being asked, as the guard that a slip lower down would take a
+  card off learnt; with nothing lower asked, the top question is that
+  guard, and a slip there keeps the card on it until it is passed again.
+  A number part held under its top by a weaker member is not on its top
+  and is asked as before. `atItsTop` in the app, read inside its
+  `openTypes`, the door every dealt question and every count of what is
+  waiting goes through; the ladder and the standings do not read it.
+  Passes still wait for a card if a slip further down ever does take it
+  back.
 
   **One letter out is a typo, not a miss.** On an answer of four letters or
   more — measured in the language's own letters — a spelling a single

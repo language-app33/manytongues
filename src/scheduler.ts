@@ -747,11 +747,12 @@ export const topLevelOf = (types: string[]): number =>
  * card two of its eight questions, so "learnt" would land whenever the
  * last straggler happened to be dealt rather than when anything was
  * proved. Writing the word from its meaning is the question that subsumes
- * the others, and it is the one worth waiting on. The others have not
- * stopped being asked — they keep their own gaps and come round on their
- * own, and missing one of them twice running still shuts the levels above
- * and takes the card back off learnt, which is the guard that makes this
- * safe rather than merely shorter.
+ * the others, and it is the one worth waiting on. Since 0.453 it is also
+ * the only one asked: a form past everything under its top is dealt its
+ * top and nothing else (`atItsTop` in the app), so the top question is the
+ * guard as well as the badge — missed twice running, it puts the passes
+ * back to nought and the card back on its top level until it is passed
+ * again.
  */
 export const PASSES_TO_LEARN = 2;
 

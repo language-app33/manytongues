@@ -2914,7 +2914,9 @@ was proved. Writing a word from its meaning is the question that subsumes
 the others. What makes it safe rather than merely shorter is that the rest
 of the ladder is still asked and still counted — missing one of those
 twice running un-climbs the card and takes the badge back, and the passes
-are still on it for when it recovers.
+are still on it for when it recovers. (Since 0.453 the rest of the ladder
+is no longer asked of a card past it — see "A card past its lower levels is
+asked its top", at the end.)
 
 **What it cost.** Three things, and the third is the one to watch.
 
@@ -6330,3 +6332,43 @@ where it was dealt. Run on the cut session, before read-throughs.
 
 **Choices the owner made.** Of: after a phrase or sentence using the verb;
 after a question about the verb's own card, the owner chose the first.
+
+
+## A card past its lower levels is asked its top (0.453)
+
+**What was wrong.** A Learnt card fell due when any of its questions did,
+recognition included, and a session dealt it two of whatever was due — so
+a word the learner could write from its meaning came round to have its
+meaning picked out of four. The owner: a card that has climbed every level
+should be reviewed on its top level only, unless a slip drops it.
+
+**What changed.** `atItsTop` in the app: a form whose every key below its
+own top level is `solid`, and that no number part's cap holds under its
+top. Inside the app's `openTypes` such a form's keys narrow to its top
+level, and `openTypes` is the door everything that deals or counts goes
+through — `askableTypes` and so the session, the mix's due date and
+standing (`mixCardsOf`), the "ready to practise" count, a card asked for
+by name, and the spare tiles of a matching grid. `planOf` then keeps only
+the due ones among them, and all of them where none is due (a card asked
+for, a practice). The ladder, the standings and how Learnt is earned read
+`laddered` and the scheduler and are untouched, as are the lower keys'
+states.
+
+**Choices the owner made.** Of: Learnt only; every form past its lower
+levels (Learnt, Cleared, back on its top after a slip there) — the second,
+so a slip on the top keeps it on the top rather than bringing months of
+due recognition questions back at once. Of: leave such words out of other
+words' grids; keep them there unmarked; as before — the first. Of: accept
+that a word with no recorded phrase is never heard again once past its
+lower levels; keep a listening question — accept. Of: every due top
+question; two per form as now — two. Of: only the due ones; fill to two
+with ones not due — only the due. Of: a review date per question; one per
+climbed card; one per card everywhere — per question, as it was.
+
+**What it costs.** The lower questions are no longer re-checked once a
+form first reaches its top level, not only once it is Learnt: the top is
+the only check, and a card past its lower levels cannot drop below its top
+through its own reviews. Listening is not reviewed on such a word unless
+its top has a recorded phrase. In a deck that is mostly past its lower
+levels, matching grids have fewer spares and are swapped for another
+question more often. Tests: `tests/top-level.test.mjs`.
