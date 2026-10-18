@@ -4202,6 +4202,13 @@ export function mixCardsOf(
       for (const t of typesOf(unit)) {
         const st = stateOf(unit, t);
         dues.push(st.due || 0);
+      }
+      /* Met and last seen over the whole ladder, not only what can be
+         asked now: a form on its top is asked its top alone, and a top
+         not answered yet is a card in learning that has just climbed,
+         not a new one. */
+      for (const t of laddered(unit, settings)) {
+        const st = stateOf(unit, t);
         lastSeen = Math.max(lastSeen, st.updated || 0);
         if (st.phase !== "new") fresh = false;
       }
@@ -10785,7 +10792,7 @@ export default function ArabicTrainer() {
          mix reads it — not a new card. */
       const everMet = (it: Item) =>
         drillableUnits(it, settings).some(({ unit }) =>
-          openTypes(unit, settings).some((t) => stateOf(unit, t).phase !== "new")
+          laddered(unit, settings).some((t) => stateOf(unit, t).phase !== "new")
         );
       /* Everything genuinely waiting, which is the honest half of the number. */
       const met = pool.filter((it) => (everMet(it) ? waiting(it, true) : waiting(it, false))).length;

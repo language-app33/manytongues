@@ -140,3 +140,13 @@ test("a card asked for by name with nothing due is asked its top questions", () 
   const got = deal([card, fresh("n1"), fresh("n2"), fresh("n3")]);
   assert.deepEqual(askedOf(got, "w1"), topKeys(card));
 });
+
+test("a card that has just reached its top is in learning, not new", () => {
+  /* Its top never answered, and nothing else it can be asked: still a card
+     met, which counts against the twenty in learning. */
+  const card = climbed("w1", (_k, top) => (top ? null : kept(1)));
+  for (const f of card.forms) for (const k of Object.keys(f.s)) if (!f.s[k]) delete f.s[k];
+  installIndexes([card], settings);
+  const [mixed] = mixCardsOf([card], [card], settings);
+  assert.equal(mixed.standing, "learning");
+});
