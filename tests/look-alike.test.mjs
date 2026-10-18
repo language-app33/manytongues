@@ -45,7 +45,7 @@ const { buildSession, installIndexes, pickChoices, resolveQuestion, shapeOfUnit 
 const { generate } = await import(path.join(here, "..", "src", "numbers", "generate.ts"));
 const { arComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.ts"));
 const { arTimeComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.time.ts"));
-const { EX, TYPES } = await import(path.join(here, "..", "src", "languages.ts"));
+const { EX, TYPES, levelOf } = await import(path.join(here, "..", "src", "languages.ts"));
 const { freshState } = await import(path.join(here, "..", "src", "scheduler.ts"));
 const { PICK_OPTIONS } = await import(path.join(here, "..", "src", "chance.ts"));
 const { confusablesOf } = await import(path.join(here, "..", "src", "numbers", "range.ts"));
@@ -76,12 +76,14 @@ const SENTENCES = [
 const NUMBERS = generate({ composer: arComposer, sys: SYS, timeComposer: arTimeComposer, timeSys: TIME, now: 1 }).items;
 const MATERIAL = [...WORDS, ...PHRASES, ...SENTENCES, ...NUMBERS];
 
-/** Everything climbed and due, so every level is open and dealt. */
+/** Climbed through the choosing and due, so every level that chooses is
+    open and dealt. Not up every level: a card past everything under its
+    top is asked its top alone, and none of that chooses. */
 const solid = () => ({ ...freshState(), phase: "review", interval: 4, due: NOW - DAY, reps: 2, right: 2, hist: [1, 1], updated: NOW - 5 * DAY });
 const climbed = (/** @type {any[]} */ items) =>
   items.map((it) => ({
     ...it,
-    forms: (it.forms || []).map((/** @type {any} */ f) => ({ ...f, s: Object.fromEntries(TYPES.map((/** @type {string} */ t) => [t, solid()])) })),
+    forms: (it.forms || []).map((/** @type {any} */ f) => ({ ...f, s: Object.fromEntries(TYPES.filter((/** @type {string} */ t) => levelOf(t) <= 2).map((/** @type {string} */ t) => [t, solid()])) })),
   }));
 
 const ITEMS = climbed(MATERIAL);

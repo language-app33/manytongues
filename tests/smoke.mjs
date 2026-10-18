@@ -568,6 +568,20 @@ const kept = () =>
     Object.entries(climbed()).map(([t, s]) => [t, { ...s, passes: 2 }])
   );
 
+/* And a card up its first two levels and on its third, which is what the
+ * walks that want its choosing questions lean on. Since 0.453 a card past
+ * everything under its top is asked its top alone — no picking it out of
+ * four, no matching grid, no choosing it out of its phrase — so a card
+ * climbed to the top would never be asked them again. Up to here, with the
+ * writing open above it and nothing past it, every one of them is. */
+const CHOOSING = ["ar2pick", "ar2en", "rec2en", "match", "en2pick", "ctx2pick"];
+const choosing = () =>
+  Object.fromEntries(Object.entries(climbed()).map(([t, st]) =>
+    /* The writing above them answered right once, not twice — open and on
+       its way, and like the rest not due until tomorrow, so the card is
+       not waiting. The level over it stays shut. */
+    [t, CHOOSING.includes(t) ? st : { ...st, hist: [1] }]));
+
 /* ---- what the device held before this build: a signed-in account and a
    document from an older build carrying its own private sync key ---- */
 localStorage.setItem("arabic-account", JSON.stringify(account));
@@ -607,9 +621,9 @@ remoteDocs.set(realToken, {
          which is the ordinary state of a deck and what keeps every other
          walk on recognition. */
       { id: "tied1", ar: "شمس", en: "sun", lat: "shams", kind: "word", tags: ["Lesson 1"],
-        created: 1, updated: 5, s: climbed() },
+        created: 1, updated: 5, s: choosing() },
       { id: "tied2", ar: "قمر", en: "moon", lat: "qamar", kind: "word", tags: ["Lesson 1"],
-        created: 1, updated: 5, s: climbed() },
+        created: 1, updated: 5, s: choosing() },
       /* And two in the same state as each other and due at the same moment,
          so that "six sessions are not one session six times" has something
          to be random about that no other walk can spend. It used to lean on
@@ -648,9 +662,19 @@ remoteDocs.set(realToken, {
          has something behind it. It changes nothing about what is due or
          what can be asked of it, which is what makes it safe to be the
          card two other walks lean on. */
+      /* Up its first two levels rather than kept, since 0.453: the walk
+         that chooses it out of its phrase is the one these cards are for,
+         and a card past its lower levels is no longer asked that. The kept
+         card is `kept1`, below. */
       { id: "srvk111111111111", ar: "كتاب", en: "book", lat: "kitaab", kind: "word", tags: ["Lesson 1"],
-        created: 1, updated: 5, s: kept(),
-        subs: [{ id: "srvk111111111111-f0", ar: "كتب", en: "books", lat: "kutub", s: kept() }] },
+        created: 1, updated: 5, s: choosing(),
+        subs: [{ id: "srvk111111111111-f0", ar: "كتب", en: "books", lat: "kutub", s: choosing() }] },
+      /* The one card up every level and kept, so the Learnt tile on
+         Progress has something behind it. In no deck of its own, so the
+         decks the walks count are as they were; and not due, so no walk
+         meets it. */
+      { id: "kept1", ar: "ماء", en: "water", lat: "maa", kind: "word", tags: [],
+        created: 1, updated: 5, s: kept() },
       /* One card in a second language, which is what makes this device a
          two-language one: the switch at the top of Learning is there for
          somebody learning more than one and nobody else, so without this
@@ -784,7 +808,7 @@ check("stored document no longer carries an account", !("account" in stored));
    and the one on the wire — as the JSON they are. */
 /** @type {Record<string, any>} */
 const byId = Object.fromEntries(stored.items.map((/** @type {any} */ i) => [i.id, i]));
-check("both course cards and every old card landed in storage", stored.items.length === 12 && byId["srv" + card.id] && byId["srv" + phrase.id] && byId.oldclient1 && byId.v2card, `items=${stored.items.map((/** @type {any} */ i) => i.id).join(",")}`);
+check("both course cards and every old card landed in storage", stored.items.length === 13 && byId["srv" + card.id] && byId["srv" + phrase.id] && byId.oldclient1 && byId.v2card, `items=${stored.items.map((/** @type {any} */ i) => i.id).join(",")}`);
 /* And the values the deck's phrases need, which are in no deck at all: they
    arrive because a phrase leaves a hole of their name, carrying what makes
    them values rather than cards to learn. */
@@ -3751,7 +3775,7 @@ const rightTile = (tiles, shown) => {
    Ultimate leaves a Cleared or Learnt card out until it is due (0.450), so
    they are marked high priority for this walk — a card asked for by name
    comes whatever its schedule — and the marks taken off at the end. */
-/* The two climbed cards, and كتاب, which is Learnt and not due either. */
+/* The two climbed cards, and كتاب, up the same two levels and not due either. */
 const PICKED_OUT = ["tied1", "tied2", "srvk111111111111"];
 /** Mark or clear high priority on cards, through the learner's card list. */
 const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ on) => {

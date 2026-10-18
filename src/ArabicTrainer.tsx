@@ -4098,10 +4098,36 @@ function reachedTypes(it: Form, settings: Settings): string[] {
    at all — left the card in the session and the silent question in it. */
 function openTypes(it: Form, settings: Settings): string[] {
   const cap = RANGE_CAPS.get(it && it.id);
-  return patternFirst(
-    it,
-    reachedTypes(it, settings).filter((k) => typeAllowedNow(k, it) && (cap == null || levelOf(k) <= cap)),
-  );
+  const open = reachedTypes(it, settings).filter((k) => typeAllowedNow(k, it) && (cap == null || levelOf(k) <= cap));
+  return patternFirst(it, atItsTop(it, settings) ? open.filter((k) => levelOf(k) === topLevelOf(laddered(it, settings))) : open);
+}
+
+/*
+ * A form that has passed every level under its top is asked its top and
+ * nothing else.
+ *
+ * Learnt, Cleared, and a form back on its top level after a slip there:
+ * writing the word from its meaning is the question that subsumes the
+ * others, so asking a learnt word to pick its meaning out of four spends a
+ * place on what the learner has already shown. Said here, the door every
+ * dealt question, every count of what is waiting and every spare grid tile
+ * passes through, so they all narrow together — and only here: the ladder,
+ * the standings and how Learnt is earned read laddered and do not move.
+ * The questions below keep their states untouched for the day a slip
+ * further down would need them.
+ *
+ * A number part held under its top by a weaker member is not on its top
+ * and is asked as before (see RANGE_CAPS).
+ */
+function atItsTop(it: Form, settings: Settings): boolean {
+  if (RANGE_CAPS.get(it && it.id) != null) return false;
+  const ladder = laddered(it, settings);
+  const top = topLevelOf(ladder);
+  const below = ladder.filter((k) => levelOf(k) < top);
+  return below.length > 0 && below.every((k) => {
+    const s = statesOf(it)[k];
+    return !!s && solid(s);
+  });
 }
 
 /*
@@ -4176,6 +4202,13 @@ export function mixCardsOf(
       for (const t of typesOf(unit)) {
         const st = stateOf(unit, t);
         dues.push(st.due || 0);
+      }
+      /* Met and last seen over the whole ladder, not only what can be
+         asked now: a form on its top is asked its top alone, and a top
+         not answered yet is a card in learning that has just climbed,
+         not a new one. */
+      for (const t of laddered(unit, settings)) {
+        const st = stateOf(unit, t);
         lastSeen = Math.max(lastSeen, st.updated || 0);
         if (st.phase !== "new") fresh = false;
       }
@@ -4916,8 +4949,14 @@ export function buildSession({
       : parent.concat(subs).slice(0, MAX_UNITS_PER_FAMILY);
     return take.map(({ unit, isSub }) => {
       const own = typesOf(unit);
-      const ordered = (mode === "weak" ? own : pickableTypes(unit, settings).filter((t) => own.includes(t)))
+      const offered = (mode === "weak" ? own : pickableTypes(unit, settings).filter((t) => own.includes(t)))
         .filter((t) => !onlyNumbers || !borrowsPhrase(t));
+      /* A form on its top is asked the top questions that are due, and
+         not the ones that are not: answered early they count for nothing
+         and take a place. Where none is due — a card asked for by name, a
+         practice — it is asked them anyway, which is what it is there for. */
+      const due = atItsTop(unit, settings) ? offered.filter((t) => stateReady(stateOf(unit, t))) : offered;
+      const ordered = due.length ? due : offered;
       const picked = mode === "ultimate" ? ordered.slice() : ordered.slice(0, Math.min(PER_UNIT, ordered.length));
       /* Asked in the table's own order, which runs from recognition to
          production: which exercises a unit gets is a matter of chance,
@@ -10753,7 +10792,7 @@ export default function ArabicTrainer() {
          mix reads it — not a new card. */
       const everMet = (it: Item) =>
         drillableUnits(it, settings).some(({ unit }) =>
-          openTypes(unit, settings).some((t) => stateOf(unit, t).phase !== "new")
+          laddered(unit, settings).some((t) => stateOf(unit, t).phase !== "new")
         );
       /* Everything genuinely waiting, which is the honest half of the number. */
       const met = pool.filter((it) => (everMet(it) ? waiting(it, true) : waiting(it, false))).length;

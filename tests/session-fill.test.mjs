@@ -163,6 +163,19 @@ const questions = (s) => s.exercises.length;
  * @type {{ session: string, material: string, learner?: string, size: number, why: string }[]}
  */
 const AGREED = [
+  /* Get started asks recognition alone, and a word past everything under
+     its top is asked its top alone (0.453): so the words climbed here
+     have nothing to give it, and only those new or going wrong are asked.
+     Listed first, since the first entry that matches is the one read. */
+  ...["all due", "nothing due"].flatMap((learner) =>
+    ["40 words", "3 words"].map((material) => ({
+      session: "get started", material, learner, size: 0,
+      why: "every word is past its lower levels, and recognition is all this session asks",
+    }))),
+  ...["halfway", "struggling"].map((learner) => ({
+    session: "get started", material: "3 words", learner, size: 1 * 4,
+    why: "one word of the three still below its top (new, or going wrong), asked four times",
+  })),
   ...["everyday", "regular", "get started"].map((session) => ({
     session, material: "3 words", size: 3 * 4,
     why: "three words, each asked four times",
