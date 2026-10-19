@@ -670,7 +670,7 @@ remoteDocs.set(realToken, {
          that chooses it out of its phrase is the one these cards are for,
          and a card past its lower levels is no longer asked that. The kept
          card is `kept1`, below. */
-      /* The plural due a day after the word, since 0.454: a session takes
+      /* The plural due a day after the word, since 0.455: a session takes
          one form of a card, the soonest due, and the walks here are about
          the word its phrase teaches. */
       { id: "srvk111111111111", ar: "كتاب", en: "book", lat: "kitaab", kind: "word", tags: ["Lesson 1"],
@@ -9348,7 +9348,7 @@ const openPronounTables = async () => {
       /* And a missing word chosen back, and a sentence's meaning chosen
          either way: the scene's other rungs below the ordering. */
       /* Not due again until tomorrow, so the ordering, which is, is the
-         scene's first pick rather than a draw among five (0.454). */
+         scene's first pick rather than a draw among five (0.455). */
       forms: [{ id: "scene1", ar: "", en: "At the door", lat: "", s: Object.fromEntries(["dlgwhole", "gap2pick", "sen2en", "en2sen"]
         .map((k) => [k, { ...climbedState, due: Date.now() + 86400000 }])) }],
       lines: [
@@ -9904,7 +9904,10 @@ const openPronounTables = async () => {
   const seen = fresh.met.order.filter((k) => k !== "other");
   check("a new tense is first met as the tense on its own", fresh.met.pattern === 1 && seen[0] === "pattern",
     JSON.stringify(fresh.met));
-  check("and nothing else about the tense is asked before it", seen.every((k) => k === "pattern"), JSON.stringify(seen));
+  check("and nothing else about the tense is asked before it", seen.indexOf("pattern") === 0, JSON.stringify(seen));
+  /* Since 0.454 the table is practised in the same session: "Who is it?"
+     on the same tense, after it, and nothing more. */
+  check("then the same session asks who a form is about, once", seen.join(",") === "pattern,who", JSON.stringify(seen));
   check("and once answered it has no Learn more under it", !fresh.met.patternMore, JSON.stringify(fresh.met));
   check("laid out one row a person, the two spelt alike included", fresh.met.patternRows === 6, JSON.stringify(fresh.met));
   const marked = (fresh.verb && fresh.verb.forms || []).filter((/** @type {any} */ f) => f.row === "present" && f.s && f.s.vpattern && f.s.vpattern.right > 0);

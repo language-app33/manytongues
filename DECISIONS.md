@@ -6383,9 +6383,47 @@ yet answered, read as new and slipped past the twenty in learning. Its
 "mastered" is the questions a card is still asked at a four-day gap.
 Tests: `tests/top-level.test.mjs`.
 
+
+## One new tense a session, practised in it (0.454)
+
+**What was wrong.** Any number of `vpattern` tables could come in one
+session, each a whole tense to take in, and nothing else about a tense was
+asked until a later session — so a table only read was half forgotten by
+the time its questions came. The owner: never more than one new verb a
+session, and always practised in the same session beyond reading.
+
+**What changed.** `oneNewTable`, run on the cut session after
+`afterItsUse` and before read-throughs, keeps the first table that fits
+and drops the rest, topping the session back up from the questions dealt
+past the cut. It deals `vwho` (or `vwhorec`) of the same form,
+`FOLLOW_GAP` questions after the table, in place of the session's last
+question; `follows` on the question marks it. Too near the end, the table
+moves back just far enough; a session too short for the whole gap closes
+it up. A table with no "Who is it?" to ask is still shown, alone.
+The practice is dealt while `patternFirst` still has it locked, so
+`requeueUnaskable` treats a `follows` question that `openPastPattern`
+allows as waiting rather than unaskable, and after a miss
+`behindItsTable` moves it to just after the table's second showing.
+
+**Choices the owner made.** Of: a known verb's next tense counts as new;
+only a verb never seen — counts. Of: "Who is it?"; "Fill the row"; either —
+"Who is it?". Of: right after the table; a few questions later — later.
+"I don't get it": the practice waits for the table again — yes. No room
+for both: the verb waits — yes, but moving the table back makes room in
+any session of five or more, and below that the verb waiting would mean a
+small deck never opened its tenses (`tests/session.test.mjs`), so the gap
+closes up instead. The practice takes another question's place rather than
+lengthening the session.
+
+**What it costs.** New tenses arrive one a session, so a deck with many
+new verbs takes more sittings to open them. A table moved back for the gap
+may now come before the phrase that uses the verb. After "I don't get it"
+the practice comes straight after the second showing, with no gap, since
+the table goes to the end. Tests: `tests/verb-drills.test.mjs`.
+
 ---
 
-## One form of a card per session (0.454)
+## One form of a card per session (0.455)
 
 **19 October 2026** · `MAX_UNITS_PER_FAMILY` in `src/session-layout.ts`;
 `planOf` in `buildSession`, `src/ArabicTrainer.tsx`

@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.454 — 19 October 2026
+## 0.455 — 19 October 2026
 
 **A card's forms come up in different sessions, not together.**
 
@@ -28,6 +28,30 @@ and moves once per batch of work you would notice, not once per commit.
 - To check by hand: a new word with a feminine, practised a few sessions
   running. Its masculine should come first, and the feminine in a later
   session, never both in the same one.
+
+## 0.454 — 19 October 2026
+
+**At most one new verb table a session, and it's practised straight
+away.**
+
+- A session now shows "See how this verb changes" for one tense at most.
+  A known verb's next tense opening counts as new too. The other new
+  tenses wait for later sessions, and their places go to other questions.
+- A few questions after the table, the same session asks "Who is it?" on
+  that tense, so the learner recalls what they've just read. It takes the
+  place of the session's last question, so sessions stay the same length.
+- "I don't get it" shows the table again later, as before, and "Who is
+  it?" now waits until after that second showing.
+- If the table would land too near the end to leave a few questions
+  before "Who is it?", it is moved earlier. In a very short session the
+  question comes sooner instead, so a small deck still opens its verbs.
+- Trade-off: a deck with many new verbs takes more sessions to open them
+  all, one tense at a time.
+- Trade-off: a table moved earlier may come before the phrase that uses
+  the verb, where 0.452 put it after.
+- To check by hand: two verbs whose tenses haven't been seen yet, both
+  due. A session should show only one table, then "Who is it?" on it about
+  four questions later.
 
 ## 0.453 — 18 October 2026
 
