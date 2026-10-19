@@ -6446,3 +6446,58 @@ feminine come round more slowly; the places freed go to other cards.
 Conversations keep their two lines, which is a different rule
 (`MAX_DIALOG_LINES`).
 
+---
+
+## A verb has one *I* unless the teacher says it has two (0.456)
+
+**19 October 2026** · `joins` and `alone` on a column, `keepsApart`,
+`personsFor` and `foldJoined` in `src/verbs.ts`; `joinHeld` in
+`src/shared.tsx`; the tick in `VerbTable`, `src/card-editor.tsx`
+
+0.261 split Arabic's *I* into *I (m)* and *I (f)* for the participles
+(رايح / رايحة), and with it every verb, though a finite verb never marks
+the speaker's gender. So باكل was typed, recorded and learnt twice, and
+the table told a learner a woman says it differently. The owner picked
+one *I* by default, with a tick for the words that have two, worded
+without reference to who is speaking: "'I' has two forms". The labels
+*I (m)* and *I (f)* stay where there are two.
+
+**Read off the cells, not stored.** A card keeps *I (f)* apart exactly
+when some row has a word under it that is not the word under *I*,
+ignoring marks (`\p{M}`), so a haraka typed on one copy and not the other
+is still one word. That needs no new field on the server and no
+migration: every verb written before this is read correctly as it stands.
+The cost is that a tick with nothing different typed under it does not
+survive a save. That is the right answer, since it is one word typed
+twice, but it means "ticked, to be filled in later" cannot be saved.
+
+**The column stays; the copy goes.** *I (f)* is still a column, because
+the pronoun أنا the Pronouns screen writes under it is what makes an
+adjective agree with a woman speaker. A sentence with that pronoun takes
+the verb's *I* cell, handed back under the column asked for (`col:
+"i-f"`), so whatever agrees with the verb next still reads a woman. A
+word that has two and left one row's *I (f)* blank is not asked that row
+for her, as before, rather than given the man's word.
+
+**Folded at the two boundaries, not at every reader.** Dozens of places
+read cells. Rather than teach each one, the copy is taken out where a
+card enters the editor and leaves it (`initialCells`, `tableCellsOf`), and
+where a course card becomes a learner's item (`cardToItem`). Downstream,
+a verb with one *I* simply has one *I* cell. `tableOf` and `agreedCell`
+also apply the rule, for a card that reaches them unfolded, and so do
+the card's read-out (`ReadTable`) and the person a question names when
+two cells read alike (`cellWhereUnsaid`), so a verb with one *I* is never
+called *I (m)* to a learner. A recording
+on the copy moves to the *I* cell where that cell has none.
+
+**The learner keeps the better schedule.** The cell that stays carries
+`joinedFrom` (never stored). The fold then gives it the copy's schedule
+where the copy had more right answers, the same measure the trainer uses
+to pick the form a learner knows best.
+
+**The command row names its persons.** `persons` on a row lists the only
+columns it has, and the editor offers boxes for those, plus any box that
+already holds a word. Arabic's command lists *you (m)*, *you (f)* and
+*you (pl)*. Hebrew is unchanged on both counts. Tests:
+`tests/one-i.test.mjs`.
+

@@ -8,6 +8,36 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.456 — 19 October 2026
+
+**Palestinian Arabic verbs have one "I" unless the word really has two.**
+
+- A verb's table now has one box for "I", called plain "I". Words like
+  باكل and أكلت are the same whoever says them, and until now they had to
+  be typed and recorded twice, under *I (m)* and *I (f)*. Learners also
+  met them twice, as two separate things to learn, and the table suggested
+  a woman says "I eat" differently from a man.
+- For the few words where "I" does change, like رايح and رايحة, tick
+  **'I' has two forms** above the table. The two boxes come back, labelled
+  *I (m)* and *I (f)* as before. Unticking removes what was typed in the
+  second box.
+- **Verbs already written are sorted out by themselves.** Where both
+  boxes hold the same word, the verb now has one "I". A recording made
+  only under the second box is kept, and each learner keeps whichever of
+  the two they had got further with. Verbs where the two boxes differ are
+  left exactly as they were.
+- A sentence about a woman speaker (with أنا from the Pronouns screen)
+  uses the verb's one "I", and a describing word after it still takes
+  its feminine form.
+- The command row offers only the three boxes a command can have:
+  *you (m)*, *you (f)* and *you (pl)*. A word already typed in any other
+  box of that row stays visible.
+- Unchanged: Hebrew, whose present tense really does change with gender.
+- To check by hand: open a verb that had the same word under both "I"
+  boxes. It should show one "I", with the tick off. Tick it, type a
+  different word, save and reopen: both boxes should be there. On a
+  learner's device, the verb's tense table should list "I" once.
+
 ## 0.455 — 19 October 2026
 
 **A card's forms come up in different sessions, not together.**
