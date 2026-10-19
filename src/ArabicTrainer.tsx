@@ -4941,7 +4941,7 @@ export function buildSession({
        round in different sittings rather than always the two together. A
        card never met is met by its own form first. */
     const unmet = (u: Unit) => laddered(u.unit, settings).every((t) => stateOf(u.unit, t).phase === "new");
-    const forms = subs.length ? inOrder(parent.concat(subs), (u) => (!u.isSub && unmet(u) ? -1 : dueOf(u))) : parent;
+    const formOf = () => (subs.length ? inOrder(parent.concat(subs), (u) => (!u.isSub && unmet(u) ? -1 : dueOf(u))) : parent);
     /* A scene offers a line or two and not all of itself. Six lines would
        otherwise take a session over between them, and a conversation met
        two lines at a time across three evenings is learnt better than one
@@ -4949,7 +4949,7 @@ export function buildSession({
        them, which is what the card's own unit is. */
     const take = isDialog(it)
       ? parent.concat(subs.slice(0, MAX_DIALOG_LINES))
-      : forms.slice(0, MAX_UNITS_PER_FAMILY);
+      : formOf().slice(0, MAX_UNITS_PER_FAMILY);
     return take.map(({ unit, isSub }) => {
       const own = typesOf(unit);
       const offered = (mode === "weak" ? own : pickableTypes(unit, settings).filter((t) => own.includes(t)))

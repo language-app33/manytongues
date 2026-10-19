@@ -582,6 +582,10 @@ const choosing = () =>
        not waiting. The level over it stays shut. */
     [t, CHOOSING.includes(t) ? st : { ...st, hist: [1] }]));
 
+/** The same schedule, each question due a day later. @param {Record<string, any>} s */
+const dayLater = (s) =>
+  Object.fromEntries(Object.entries(s).map(([t, st]) => [t, { ...st, due: (st.due || 0) + 86400000 }]));
+
 /* ---- what the device held before this build: a signed-in account and a
    document from an older build carrying its own private sync key ---- */
 localStorage.setItem("arabic-account", JSON.stringify(account));
@@ -666,9 +670,12 @@ remoteDocs.set(realToken, {
          that chooses it out of its phrase is the one these cards are for,
          and a card past its lower levels is no longer asked that. The kept
          card is `kept1`, below. */
+      /* The plural due a day after the word, since 0.454: a session takes
+         one form of a card, the soonest due, and the walks here are about
+         the word its phrase teaches. */
       { id: "srvk111111111111", ar: "كتاب", en: "book", lat: "kitaab", kind: "word", tags: ["Lesson 1"],
         created: 1, updated: 5, s: choosing(),
-        subs: [{ id: "srvk111111111111-f0", ar: "كتب", en: "books", lat: "kutub", s: choosing() }] },
+        subs: [{ id: "srvk111111111111-f0", ar: "كتب", en: "books", lat: "kutub", s: dayLater(choosing()) }] },
       /* The one card up every level and kept, so the Learnt tile on
          Progress has something behind it. In no deck of its own, so the
          decks the walks count are as they were; and not due, so no walk
@@ -9340,7 +9347,10 @@ const openPronounTables = async () => {
       name: "At the door", speakers: ["Layla", "Karim"], you: null,
       /* And a missing word chosen back, and a sentence's meaning chosen
          either way: the scene's other rungs below the ordering. */
-      forms: [{ id: "scene1", ar: "", en: "At the door", lat: "", s: { dlgwhole: { ...climbedState }, gap2pick: { ...climbedState }, sen2en: { ...climbedState }, en2sen: { ...climbedState } } }],
+      /* Not due again until tomorrow, so the ordering, which is, is the
+         scene's first pick rather than a draw among five (0.454). */
+      forms: [{ id: "scene1", ar: "", en: "At the door", lat: "", s: Object.fromEntries(["dlgwhole", "gap2pick", "sen2en", "en2sen"]
+        .map((k) => [k, { ...climbedState, due: Date.now() + 86400000 }])) }],
       lines: [
         turn("scene1-l0", "مرحبا", "hello", "marhaba", 0),
         turn("scene1-l1", "أهلا وسهلا", "welcome", "ahlan wa sahlan", 1),
@@ -9754,6 +9764,10 @@ const openPronounTables = async () => {
     }
     return s;
   };
+  /* The cited past answered and not due: a session takes one form of a
+     card, the most overdue, and these walks are about the present. */
+  const { TYPES: everyKey } = await import(path.resolve("src/languages.ts"));
+  const pastDone = Object.fromEntries(everyKey.map((/** @type {string} */ k) => [k, { ...solid }]));
   /** @param {Record<string, any>} s */
   const verbCard = (s) => ({
     id: "writex", kind: "word", tags: ["Lesson 1"], created: 1, updated: Date.now(), lang: "ar-PS",
@@ -9764,7 +9778,7 @@ const openPronounTables = async () => {
         id: `writex-${col}`, ar, en: `${label.replace(" (m)", "")} write${col === "he" || col === "she" ? "s" : ""}`, lat,
         row: "present", col, s: { ...s },
       })),
-      { id: "writex-past-he", ar: "كتب", en: "he wrote", lat: "katab", row: "past", col: "he", s: {} },
+      { id: "writex-past-he", ar: "كتب", en: "he wrote", lat: "katab", row: "past", col: "he", s: pastDone },
     ],
   });
   const others = ["قهوة", "شاي", "خبز", "ماء"].map((ar, i) => ({
