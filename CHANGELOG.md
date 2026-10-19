@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.454 — 19 October 2026
+
+**A card's forms come up in different sessions, not together.**
+
+- A session now takes one form of each card instead of two. A word with a
+  masculine and a feminine no longer has both in every session it comes
+  up in: each form comes round on its own, in its own session.
+- Which form a session takes is the one most overdue, at random between
+  forms equally due. A card met for the first time is met by its main
+  form.
+- The same goes for verbs and for words with pronouns on them: one of
+  their forms per session, the most overdue.
+- Trade-off: each form of a card comes up less often, so a word's
+  feminine, or a verb's other persons, take longer to reach. A session
+  fills the freed places with other cards instead.
+- Unchanged: conversations still take up to two lines per session, and
+  the rules for telling forms apart in a grid or a typed answer.
+- To check by hand: a new word with a feminine, practised a few sessions
+  running. Its masculine should come first, and the feminine in a later
+  session, never both in the same one.
+
 ## 0.453 — 18 October 2026
 
 **A card that has climbed every level is reviewed on its top level only.**

@@ -6382,3 +6382,29 @@ the whole ladder, or a form just on its top, its one askable question not
 yet answered, read as new and slipped past the twenty in learning. Its
 "mastered" is the questions a card is still asked at a four-day gap.
 Tests: `tests/top-level.test.mjs`.
+
+---
+
+## One form of a card per session (0.454)
+
+**19 October 2026** · `MAX_UNITS_PER_FAMILY` in `src/session-layout.ts`;
+`planOf` in `buildSession`, `src/ArabicTrainer.tsx`
+
+A session took two forms of a card: its own form, then the most overdue of
+the rest. The cap of two was set against verbs and pronoun words taking a
+session over, and nobody chose its side effect: on a word with a masculine
+and a feminine, the second place always went to the feminine, so every
+session that met the card asked both. The owner noticed and asked for one
+form per card per session.
+
+**The most overdue form, not the card's own first.** At one, "own form
+first" would have meant the other forms were never asked. So the forms are
+ranked by when they fall due, chance between the ones equally due, and the
+first is taken. The exception is a card never met, whose own form leads, so
+a word is introduced by its main form and not its feminine.
+
+**Cost.** Each form is met in fewer sittings. A verb's cells and a word's
+feminine come round more slowly; the places freed go to other cards.
+Conversations keep their two lines, which is a different rule
+(`MAX_DIALOG_LINES`).
+

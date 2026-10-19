@@ -179,8 +179,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   **The session layout (`src/session-layout.ts`) decides the rest.** Twenty
   questions, or six a minute when timed, a matching grid counting as one
   screen; a short session asks each card again, up to four times; each
-  form asked two ways, at most two forms of a card and two lines of a
-  conversation; at least two kinds of question. The order is easiest first,
+  form asked two ways, one form of a card (the most overdue) and two
+  lines of a conversation; at least two kinds of question. The order is easiest first,
   the shares mixed within each step, never one card twice running nor one
   exercise twice running, no more than two cards of one kind (word,
   sentence, number) running where that can be kept, and a missed question
@@ -231,7 +231,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   name means: a word that keeps failing when it has to be written from its
   meaning is drilled on that and not on the reading it has always got
   right. Everything else a session does still holds — the ladder, the
-  quiet window, what a device can play, two forms of a card at most — with
+  quiet window, what a device can play, one form of a card per session — with
   one exception: it is never refused for want of variety, because the one
   thing you keep failing is a session worth having. `weakness`, `isWeak`
   and `buildWeakSession` in `src/ArabicTrainer.tsx`; the button is live

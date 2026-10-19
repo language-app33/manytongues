@@ -13,7 +13,7 @@
  * - **Length.** 20 questions, or 6 a minute when timed. A matching grid
  *   counts as one screen. A short session asks each card again, up to four
  *   times, with other questions in between.
- * - **Per card.** Each form asked two ways; at most two forms of a card per
+ * - **Per card.** Each form asked two ways; one form of a card per
  *   session; at most two lines of a conversation per session.
  * - **Per session.** At least two kinds of question.
  * - **Order.** Easiest first, with the three shares mixed within each step;
@@ -42,13 +42,15 @@ export const PER_UNIT = 2;
 /*
  * How many forms of one card a session will take.
  *
- * Two. A verb lays out twenty-odd cells and a word with pronouns on it a
+ * One. A verb lays out twenty-odd cells and a word with pronouns on it a
  * dozen, all of them forms of one word; at four a session of verbs was two
- * words and eighteen questions about them. At two, the cells still each get
- * their turn — they are scheduled in their own right and come round on
- * their own — but no single word can be half an evening.
+ * words and eighteen questions about them. At two, a card with a masculine
+ * and a feminine had both in every session it came up in, side by side in
+ * the learner's head if not on the screen. At one, each form is still
+ * scheduled in its own right and comes round on its own, in its own
+ * sitting — the most overdue first (see planOf in ArabicTrainer.tsx).
  */
-export const MAX_UNITS_PER_FAMILY = 2;
+export const MAX_UNITS_PER_FAMILY = 1;
 
 /*
  * The most times one form is asked in one session, when the session has

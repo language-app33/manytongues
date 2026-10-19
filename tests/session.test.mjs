@@ -865,7 +865,34 @@ test("no one card is the whole of a weak session", () => {
   });
   const got = weak([many].concat(deckOf(4)));
   const forms = new Set(got.exercises.map((/** @type {any} */ e) => e.subId || "own"));
-  assert.ok(forms.size <= 2, `${forms.size} forms of one card in the session`);
+  assert.ok(forms.size <= 1, `${forms.size} forms of one card in the session`);
+});
+
+/* A word with a feminine beside its own form, for the two below. */
+const gendered = (/** @type {any} */ own, /** @type {any} */ fem) => word("g1", "منيح", "good", {
+  forms: [
+    { id: "g1", ar: "منيح", en: "good", lat: "mnee7", lang: "ar-PS", s: own },
+    { id: "g1-f", ar: "منيحة", en: "good", lat: "mnee7a", lang: "ar-PS", s: fem },
+  ],
+});
+const formsOfG1 = (/** @type {any} */ got) =>
+  new Set(got.exercises.filter((/** @type {any} */ e) => e.id === "g1").map((/** @type {any} */ e) => e.subId || "own"));
+
+test("a masculine and its feminine are not both in one session", () => {
+  /* Both forms of a card come round, but in different sittings: asked
+     together, the second is answered off the first still in mind. A card
+     never met is met by its own form. */
+  for (let i = 0; i < 10; i += 1) {
+    const got = deal([gendered({}, {})].concat(deckOf(3)));
+    assert.deepEqual([...formsOfG1(got)], ["own"], "the card's own form, alone");
+  }
+});
+
+test("the form a session takes of a card is the one that is due", () => {
+  /* The own form answered and not due for a week; the feminine due now. */
+  const later = { ...withHist([1, 1]), due: Date.now() + 7 * 86400000 };
+  const got = deal([gendered({ ar2en: later, en2ar: later }, { ar2en: withHist([1]) })].concat(deckOf(3)));
+  assert.deepEqual([...formsOfG1(got)], ["g1-f"], "the feminine, which is due, alone");
 });
 
 test("every form with something wrong on it is asked before any is asked twice", () => {
