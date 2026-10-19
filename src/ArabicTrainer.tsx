@@ -255,6 +255,7 @@ import {
   cutAtLength,
   varyTypes,
   requeueMissed,
+  mayFollow,
   fillSession,
 } from "./session-layout.ts";
 export { varyTypes, requeueMissed, mayFollow } from "./session-layout.ts";
@@ -3824,8 +3825,10 @@ export function requeueUnaskable(
        the ladder alone left it in the queue to be drawn with its holes
        empty. */
     const open = askableTypes(resolved.unit, settings);
-    /* Still askable: left exactly as it is, cursor and all. */
-    if (open.includes(ex.type)) {
+    /* Still askable: left exactly as it is, cursor and all. A question
+       following a table is waiting on the table, not unaskable. */
+    const waiting = !!ex.follows && openPastPattern(resolved.unit, settings).includes(ex.type);
+    if (open.includes(ex.type) || waiting) {
       tail.push(ex);
       continue;
     }
@@ -4097,9 +4100,15 @@ function reachedTypes(it: Form, settings: Settings): string[] {
    only `enabledTypes` — which decides whether a card counts as drillable
    at all — left the card in the session and the silent question in it. */
 function openTypes(it: Form, settings: Settings): string[] {
+  return patternFirst(it, openPastPattern(it, settings));
+}
+
+/* What openTypes would say once the tense's table has been got: the one
+   thing a question dealt to follow the table may be asked before it is. */
+function openPastPattern(it: Form, settings: Settings): string[] {
   const cap = RANGE_CAPS.get(it && it.id);
   const open = reachedTypes(it, settings).filter((k) => typeAllowedNow(k, it) && (cap == null || levelOf(k) <= cap));
-  return patternFirst(it, atItsTop(it, settings) ? open.filter((k) => levelOf(k) === topLevelOf(laddered(it, settings))) : open);
+  return atItsTop(it, settings) ? open.filter((k) => levelOf(k) === topLevelOf(laddered(it, settings))) : open;
 }
 
 /*
@@ -4933,12 +4942,15 @@ export function buildSession({
   type Plan = { id: string; subId: string | null; unit: Form; types: string[]; more: string[]; range: boolean };
   const planOf = (c: Card): Plan[] => {
     const { it } = c.card;
-    // Parent first, then whichever sub-items are most overdue.
     const parent = c.card.units.filter((u) => !u.isSub);
-    const subs = inOrder(
-      c.card.units.filter((u) => u.isSub),
-      (u) => dueRank(Math.min(...typesOf(u.unit).map((t) => stateOf(u.unit, t).due || 0)))
-    );
+    const dueOf = (u: Unit) => dueRank(Math.min(...typesOf(u.unit).map((t) => stateOf(u.unit, t).due || 0)));
+    const subs = inOrder(c.card.units.filter((u) => u.isSub), dueOf);
+    /* Which of a card's forms a session takes: the most overdue, chance
+       between the ones equally due — so a masculine and its feminine come
+       round in different sittings rather than always the two together. A
+       card never met is met by its own form first. */
+    const unmet = (u: Unit) => laddered(u.unit, settings).every((t) => stateOf(u.unit, t).phase === "new");
+    const formOf = () => (subs.length ? inOrder(parent.concat(subs), (u) => (!u.isSub && unmet(u) ? -1 : dueOf(u))) : parent);
     /* A scene offers a line or two and not all of itself. Six lines would
        otherwise take a session over between them, and a conversation met
        two lines at a time across three evenings is learnt better than one
@@ -4946,7 +4958,7 @@ export function buildSession({
        them, which is what the card's own unit is. */
     const take = isDialog(it)
       ? parent.concat(subs.slice(0, MAX_DIALOG_LINES))
-      : parent.concat(subs).slice(0, MAX_UNITS_PER_FAMILY);
+      : formOf().slice(0, MAX_UNITS_PER_FAMILY);
     return take.map(({ unit, isSub }) => {
       const own = typesOf(unit);
       const offered = (mode === "weak" ? own : pickableTypes(unit, settings).filter((t) => own.includes(t)))
@@ -5076,7 +5088,11 @@ export function buildSession({
     if (at >= 0) cut = Math.max(cut, at + 1);
   }
 
-  const exercises = withReadThroughs(afterItsUse(questions.slice(0, cut), items, settings, sets), items, settings);
+  const exercises = withReadThroughs(
+    oneNewTable(afterItsUse(questions.slice(0, cut), items, settings, sets), questions.slice(cut), items, settings),
+    items,
+    settings
+  );
   const from = items.filter(inDeck).map((it) => it.id);
   return {
     exercises,
@@ -5247,6 +5263,90 @@ export function afterItsUse(list: Question[], items: Item[], settings: Settings,
     if (!user) continue;
     out.splice(out.indexOf(pattern), 1);
     out.splice(out.indexOf(user) + 1, 0, pattern);
+  }
+  return out;
+}
+
+/*
+ * One new tense a session, and practised in it.
+ *
+ * A table is a whole tense to take in — every person, its form, how it is
+ * said — and two or three in one sitting were too much. And a table only
+ * read is a table half gone by the next sitting. So a session shows at
+ * most one, and asks "Who is it?" of the same tense FOLLOW_GAP questions
+ * after it, in place of the session's last question so the length holds.
+ * The other tables wait for a later session, and their places go to the
+ * questions dealt past the cut.
+ *
+ * Where the table sits too near the end to leave the gap, it is moved back
+ * just far enough. A session too short for the whole gap closes it up
+ * rather than leave the verb out: a deck that small would never have room,
+ * and its tense would never open.
+ *
+ * The practice is dealt locked — nothing about a tense is asked before its
+ * table is got — and kept behind the table in the session: see
+ * behindItsTable.
+ */
+export const FOLLOW_GAP = 3;
+const FOLLOW_TYPES = ["vwho", "vwhorec"];
+
+export function oneNewTable(list: Question[], spare: Question[], items: Item[], settings: Settings): Question[] {
+  const isTable = (q: Question) => typeOf(q.type) === PATTERN_KEY;
+  const tables = list.filter(isTable);
+  if (!tables.length) return list;
+  const followOf = (table: Question): string | null => {
+    const r = resolveUnit(items, table);
+    const unit = r && r.unit;
+    return (unit && FOLLOW_TYPES.find((t) => openPastPattern(unit, settings).includes(t) && fillableAt(unit, t, settings))) || null;
+  };
+  /* The first table that can be practised; failing that the first, shown
+     alone, so a tense with nothing to ask after it still opens. */
+  const table = tables.find((t) => followOf(t)) || tables[0];
+  const type = followOf(table);
+  const out = list.filter((q) => !isTable(q) || q === table);
+  for (const q of spare.filter((x) => !isTable(x) && !x.follows)) {
+    if (out.length >= list.length) break;
+    out.push(q);
+  }
+  if (!type) return out;
+  const practice: Question = { id: table.id, subId: table.subId || null, type, follows: true };
+  let at = out.indexOf(table);
+  const latest = Math.max(0, out.length - FOLLOW_GAP - 2);
+  if (at > latest) {
+    out.splice(at, 1);
+    out.splice(latest, 0, table);
+    at = latest;
+  }
+  /* The last question gives its place — never the table itself. */
+  if (out.length - 1 > at) out.pop();
+  /* The first place the gap allows that does not stand it beside a
+     question it may not follow, else the first the gap allows. */
+  const first = Math.min(at + FOLLOW_GAP + 1, out.length);
+  let put = first;
+  while (put <= out.length && !(mayFollow(out[put - 1], practice) && mayFollow(practice, out[put]))) put += 1;
+  out.splice(put > out.length ? first : put, 0, practice);
+  return out;
+}
+
+/*
+ * A tense's practice kept behind its table.
+ *
+ * "I don't get it" sends the table to the back of the session, and the
+ * practice dealt to follow it is still locked: so it goes straight after
+ * the table's second showing rather than up on its own, before the
+ * learner has said they see how the tense goes.
+ */
+export function behindItsTable(list: Question[], from: number): Question[] {
+  let out = list;
+  for (const practice of list.slice(from).filter((q) => q.follows)) {
+    const at = out.indexOf(practice);
+    let table = -1;
+    out.forEach((q, i) => {
+      if (i >= from && typeOf(q.type) === PATTERN_KEY && q.id === practice.id && (q.subId || null) === (practice.subId || null)) table = i;
+    });
+    if (table < at) continue;
+    out = out.filter((q) => q !== practice);
+    out.splice(table, 0, practice);
   }
   return out;
 }
@@ -12707,7 +12807,7 @@ export default function ArabicTrainer() {
     if (!correct) {
       setSession((s2: any) => ({
         ...s2,
-        exercises: requeueMissed(s2.exercises, qi + 1, exercise),
+        exercises: behindItsTable(requeueMissed(s2.exercises, qi + 1, exercise), qi + 1),
         missed: (s2.missed || 0) + 1,
       }));
     }
