@@ -12,11 +12,11 @@
  */
 import React, { createContext, useContext, useState, useEffect, useId, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
-import type { Card, Deck, Form, GrammarDim, Item, Lang, VerbExample, VerbSpec, VerbTense } from "./types.ts";
+import type { Card, Deck, Form, GrammarDim, Item, Lang, VerbExample, VerbPerson, VerbSpec, VerbTense } from "./types.ts";
 import { MAX_EXAMPLES, asksWish, blankExample, exampleCells, exampleTrouble, examplesRowOf, filledExample, verbExamplesOf, wishOf } from "./examples.ts";
 import { wordsOffered } from "./context-index.ts";
 import { longSentenceOf, sentenceWords, wordCount } from "./sentence-words.ts";
-import { cellsIn, citationOf, citedWord, framesOf, isCell, isFrame, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
+import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf, wordOf } from "./cards.ts";
 import type { Node } from "./shared.tsx";
 import {
@@ -1985,11 +1985,70 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
   const write = (row: string, col: string, patch: Record<string, any>) =>
     onChange(writeCell({ cells, of, mint }, row, col, patch));
 
-  const persons = personsOf(spec);
+  /*
+   * The columns that are another's copy unless the teacher says otherwise
+   * — Arabic's *I (f)* — and which of them this verb keeps apart.
+   *
+   * A verb has one *I*: باكل and أكلت are anybody's. Only a few words have
+   * two, and those are the ones a tick opens the second box for. Opened
+   * where the verb already has a different word written there, since that
+   * is a verb with two; closed, it takes whatever was typed in the second
+   * box away with it, because a box nobody can see is a box nobody would
+   * know was saved. A form's table of pronouns joins nothing.
+   */
+  const joining = of ? [] : personsOf(spec).filter((p) => joinsOf(spec, p));
+  const [apart, setApart] = useState<Set<string>>(
+    () =>
+      new Set(
+        joining
+          .filter((p) => cells.some((c) => c.col === p.id && mine(c) && String(c.ar || "").trim()))
+          .map((p) => p.id),
+      ),
+  );
+  const keepApart = (person: VerbPerson, on: boolean) => {
+    setApart((had) => {
+      const next = new Set(had);
+      if (on) next.add(person.id);
+      else next.delete(person.id);
+      return next;
+    });
+    if (!on) onChange(cells.filter((c) => !(c.col === person.id && mine(c))));
+  };
+  const hidden = new Set(joining.filter((p) => !apart.has(p.id)).map((p) => p.id));
+  const plain = new Set(joining.filter((p) => hidden.has(p.id)).map((p) => joinsOf(spec, p)));
+  const persons = personsOf(spec)
+    .filter((p) => !hidden.has(p.id))
+    .map((p) => (plain.has(p.id) && p.alone ? { ...p, label: p.alone } : p));
   /* A language whose verbs do not vary by person has one column and no
      word for it, and a line reading "any: đã ăn" would be naming something
      the language does not distinguish. */
   const named = persons.some((p) => p.label);
+  /* The tick for each column that joins another, said about the word and
+     not about who says it: "'I' has two forms", and the pair that shows
+     which verbs those are. */
+  const ticks = joining.map((person) => {
+    const to = personsOf(spec).find((p) => p.id === joinsOf(spec, person));
+    const name = (to && (to.alone || to.label)) || person.label;
+    return (
+      <label className="at-tickrow" key={person.id} data-el="verb-two-forms">
+        <input
+          type="checkbox"
+          checked={apart.has(person.id)}
+          onChange={(e) => keepApart(person, e.target.checked)}
+        />
+        <span className="at-tickbody">
+          <b>{`‘${name}’ has two forms`}</b>
+          {person.example ? (
+            <i>
+              {"Like "}
+              <span lang={lang.id} dir={lang.direction}>{person.example}</span>
+              {". Leave it off where one word is said by everyone."}
+            </i>
+          ) : null}
+        </span>
+      </label>
+    );
+  });
   /* A box for the pronunciation only where the language asks for one to be
      written. Huế calls it a note and never drills it, so a column of them
      across a whole table would be twenty-four boxes nothing reads — the
@@ -2001,9 +2060,16 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
      form rather than a section beside it, so there it is a subsection of
      that block — the same thing the form's own fields and "Reference —
      never drilled" are in the blocks above. */
+  /* A row that has fewer columns than the table — a command, said to
+     *you* — offers boxes for those alone, and for any other a word was
+     already written in, so nothing typed is ever out of sight. */
+  const rowPersons = (tense: VerbTense) =>
+    Array.isArray(tense.persons) && tense.persons.length
+      ? persons.filter((p) => tense.persons!.includes(p.id) || !!String((at(tense.id, p.id) || {}).ar || "").trim())
+      : persons;
   const row = (tense: VerbTense, at_: number) => (
     <>
-      {persons.map((person) => {
+      {rowPersons(tense).map((person) => {
             const cell = at(tense.id, person.id);
             /* What to call this one when a label has to name it out loud —
                for a screen reader, and on the recording screen's title.
@@ -2066,6 +2132,7 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
 
   return (
     <>
+      {ticks.length > 0 && <div className="at-mt5">{ticks}</div>}
       {tensesOf(spec).map((tense, at_) => (
         <div className="at-formblock at-mt5" key={tense.id}>
           <div className="at-formhead">
@@ -3907,6 +3974,10 @@ export function initialCells(
   for (const s of subFormsOf(card).filter((s) => isCell(s))) {
     had.push({ ...blankForm(), ...s, id: String(s.id || "") || formName(taken()) });
   }
+  /* And a verb's *I* typed twice opens as the one *I* it is, with the
+     tick for two forms off — see foldJoined. Saving it stores it so. */
+  const folded = foldJoined(had, verbOf(lang)).forms;
+  had.splice(0, had.length, ...folded);
   const cited = Object.values(tablesOf(lang)).find(
     (spec) => citationOf(spec) && cellsIn({ subs: had }, spec).length,
   );
@@ -4024,12 +4095,16 @@ export function tableCellsOf(
   forms: Record<string, any>[],
 ): Record<string, any>[] {
   if (!shownSpec) return [];
-  return cellsIn({ subs: cells }, shownSpec).filter((c) => {
+  const kept = cellsIn({ subs: cells }, shownSpec).filter((c) => {
     const of = String(c.of || "");
     if (!of) return true;
     const owner = forms.find((f) => String(f.id || "") === of);
     return !!owner && !!(String(owner.ar || "").trim() || String(owner.en || "").trim());
   });
+  /* And a second *I* that says what the first one does, which is one *I*
+     typed twice whether or not the tick for two forms is on: saved as the
+     one, with any recording made under the copy kept — see foldJoined. */
+  return foldJoined(kept, shownSpec).forms;
 }
 
 /* ---- what is drilled, and where ----

@@ -36,7 +36,7 @@ import { leadOf, subFormsOf } from "./cards.ts";
 /* And what a row is, for the one rule below that reads one: verbs.ts
    knows what a table is made of and no language at all, which is the
    same direction every other import here goes. */
-import { agreedValue, asSubject, citedCell, colOf, isCell, isRowLead, ownerOf, personsOf, rowIdsOf, rowOf, standsInRows, tensesOf } from "./verbs.ts";
+import { agreedValue, asSubject, citedCell, colOf, isCell, isRowLead, ownerOf, personsFor, personsOf, rowIdsOf, rowOf, standsInRows, tensesOf } from "./verbs.ts";
 import { aboutPerson, ADJECTIVE_IS_SLOT, ADJECTIVE_SLOT, beReadings, fitEnglish, isLent, readAs } from "./variables.ts";
 import type { Value } from "./variables.ts";
 /*
@@ -1742,7 +1742,11 @@ function cellWhereUnsaid(unit: Record<string, any>, card: unknown, lang: Lang): 
     if (tense) bits.push(tense.label || tense.id);
   }
   if (picked.includes("col")) {
-    const person = personsOf(spec).find((p) => p.id === colOf(unit));
+    /* By the name the card's own table gives it: plain "I" on a verb
+       with one. See personsFor. */
+    const person =
+      personsFor(card, spec).find((p) => p.id === colOf(unit)) ||
+      personsOf(spec).find((p) => p.id === colOf(unit));
     if (person) bits.push(unsaidOfPerson(spelledPerson(person.label || person.id), en));
   }
   return bits.join(" · ");
@@ -2577,9 +2581,21 @@ const SUBJECT_PERSONS: VerbPerson[] = [
  */
 const VERB_PRACTICES = ["vpattern", "vread", "vwho", "vwhorec", "vrow", "vshift"];
 
+/*
+ * And since 0.456 the feminine is a copy of the masculine unless a verb
+ * says otherwise. Two boxes on every verb said, to a teacher and to a
+ * learner reading the table, that a woman says باكل differently from a
+ * man — and had the same word typed, recorded and learnt twice. So *I
+ * (f)* `joins` *I (m)*: a verb is one *I*, called plain "I", until the
+ * teacher ticks "'I' has two forms" and writes a different word there.
+ * The column itself stays, because the pronoun أنا the Pronouns screen
+ * writes under it is what makes تعبانة agree with a woman speaker; a
+ * sentence with that pronoun takes the verb's one *I*. See keepsApart in
+ * src/verbs.ts.
+ */
 const AR_SUBJECT_PERSONS: VerbPerson[] = [
-  { id: "i", label: "I (m)", is: MASC_ONE },
-  { id: "i-f", label: "I (f)", is: FEM_ONE },
+  { id: "i", label: "I (m)", alone: "I", is: MASC_ONE },
+  { id: "i-f", label: "I (f)", is: FEM_ONE, joins: "i", example: "رايح / رايحة" },
   ...SUBJECT_PERSONS.slice(1),
 ];
 
@@ -3652,7 +3668,9 @@ export const LANGUAGES: Record<LangId, Lang> = {
         tenses: [
           { id: "present", label: "present" },
           { id: "past", label: "past" },
-          { id: "command", label: "command" },
+          /* Said to *you* and nobody else, so a teacher is offered those
+             three boxes and not six that could never be filled. */
+          { id: "command", label: "command", persons: ["you-m", "you-f", "you-pl"] },
           /* The present without its b- — بدها تاكل, لازم أروح, رح نشوف.
              Last, so a learner part of the way down a verb is not stopped
              at it; and only where a sentence ticks it, since it follows a

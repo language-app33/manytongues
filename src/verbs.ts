@@ -253,6 +253,118 @@ export const tensesOf = (spec: VerbSpec | null | undefined): VerbTense[] =>
 export const personsOf = (spec: VerbSpec | null | undefined): VerbPerson[] =>
   (spec && Array.isArray(spec.persons) ? spec.persons : []).filter((p) => p && str(p.id));
 
+/* ---- a column that is another's copy unless the card says otherwise ---- */
+
+/**
+ * The column a column joins, where it joins one the table has: "i" for
+ * Arabic's *I (f)*. "" for every column that is always its own.
+ */
+export function joinsOf(spec: VerbSpec | null | undefined, person: VerbPerson | null | undefined): string {
+  const to = str(person && person.joins);
+  if (!to || to === str(person && person.id)) return "";
+  return personsOf(spec).some((p) => p.id === to) ? to : "";
+}
+
+/*
+ * A form as the letters that make it one word rather than another.
+ *
+ * The marks on top of the letters are spelling, not a second form: a
+ * teacher who typed باكُل under one *I* and باكل under the other has
+ * typed one word twice. Stripped by what Unicode calls a mark rather than
+ * by a list of any one script's, because this module knows no language —
+ * and only a column that joins another is ever compared this way.
+ */
+const bareLetters = (x: unknown): string => str(x).normalize("NFC").replace(/\p{M}/gu, "");
+
+/**
+ * Whether a card keeps a joining column apart from the one it joins: some
+ * row has a word written in it that is not the word in the column it
+ * joins. That is the whole of the teacher's "'I' has two forms" — a tick
+ * with no different word behind it is one form typed twice, and is read
+ * as one.
+ *
+ * Read off the cells rather than stored, so every card written before
+ * this is read the right way without being opened: one typed twice is
+ * one *I*, and a participle's رايح and رايحة are two.
+ */
+export function keepsApart(
+  card: unknown,
+  spec: VerbSpec | null | undefined,
+  person: VerbPerson | null | undefined,
+): boolean {
+  const to = joinsOf(spec, person);
+  if (!to || !person) return true;
+  return cellsIn(card, spec, "").some((cell) => {
+    if (colOf(cell) !== person.id || !str(field(cell, "ar"))) return false;
+    const mate = cellAt(card, rowOf(cell), to);
+    return !mate || bareLetters(mate.ar) !== bareLetters(field(cell, "ar"));
+  });
+}
+
+/**
+ * The columns one card is laid out in: the table's, less every column that
+ * joins another on a card that does not keep it apart, and with the column
+ * it joins called by its plain name — *I*, rather than *I (m)* beside no
+ * *I (f)*.
+ */
+export function personsFor(card: unknown, spec: VerbSpec | null | undefined): VerbPerson[] {
+  const all = personsOf(spec);
+  const folded = new Set(all.filter((p) => joinsOf(spec, p) && !keepsApart(card, spec, p)).map((p) => p.id));
+  if (!folded.size) return all;
+  const plain = new Set(all.filter((p) => folded.has(p.id)).map((p) => joinsOf(spec, p)));
+  return all
+    .filter((p) => !folded.has(p.id))
+    .map((p) => (plain.has(p.id) && str(p.alone) ? { ...p, label: str(p.alone) } : p));
+}
+
+/**
+ * A card's forms with every copy of a joined column taken out, and what
+ * each one taken out went into.
+ *
+ * What a card is saved as, and what a learner's device holds it as: a
+ * verb with one *I* has one *I* cell, so nothing downstream — the table,
+ * the practices, the count of what is left to learn — has to know that a
+ * second one was ever typed. A recording on the copy is moved onto the
+ * cell it copies where that one has none, so nothing said into a box is
+ * thrown away. `into` names, for each cell taken out, the cell that stays,
+ * so a learner's progress on the copy can be weighed against it.
+ *
+ * Forms that are not cells of this table's own word are left as they are.
+ */
+export function foldJoined<T extends Record<string, any>>(
+  forms: T[],
+  spec: VerbSpec | null | undefined,
+): { forms: T[]; into: Record<string, string> } {
+  const list = forms || [];
+  const rows = rowIdsOf(spec);
+  const holder = { subs: list };
+  const gone = new Map<T, T | null>();
+  for (const person of personsOf(spec)) {
+    const to = joinsOf(spec, person);
+    if (!to || keepsApart(holder, spec, person)) continue;
+    for (const cell of list) {
+      if (!rows.has(rowOf(cell)) || colOf(cell) !== person.id || ownerOf(cell)) continue;
+      gone.set(cell, (cellAt(holder, rowOf(cell), to) as T | null) || null);
+    }
+  }
+  if (!gone.size) return { forms: list, into: {} };
+  const into: Record<string, string> = {};
+  const heard = new Map<T, T>();
+  for (const [copy, mate] of gone) {
+    if (!mate) continue;
+    if (str(copy.id) && str(mate.id)) into[str(copy.id)] = str(mate.id);
+    const clips = (x: T, k: string) => (Array.isArray(x[k]) ? x[k] : []);
+    const had = heard.get(mate) || mate;
+    const lend = (k: string) => (!clips(had, k).length && clips(copy, k).length ? { [k]: clips(copy, k).slice() } : null);
+    const next = { ...had, ...lend("clips"), ...lend("slowClips") } as T;
+    if (next.clips !== had.clips || next.slowClips !== had.slowClips) heard.set(mate, next);
+  }
+  return {
+    forms: list.filter((f) => !gone.has(f)).map((f) => heard.get(f) || f),
+    into,
+  };
+}
+
 /*
  * What a cell means is typed, not composed.
  *
@@ -717,7 +829,14 @@ export function agreedCell(
 ): Form | null {
   const person = personFor(spec, grammar);
   if (!person) return null;
-  return cellAt(card, row, person.id);
+  /* A column the card does not keep apart is the column it joins: a
+     sentence about a woman speaker takes the verb's one *I*. Handed back
+     under the column asked for, so what agrees with the verb after it —
+     an adjective linked to it — still reads a woman speaker. */
+  const to = joinsOf(spec, person);
+  if (!to || keepsApart(card, spec, person)) return cellAt(card, row, person.id);
+  const mate = cellAt(card, row, to);
+  return mate ? ({ ...mate, col: person.id } as Form) : null;
 }
 
 /* ---- which tenses a sentence wants its verbs in ---- */
@@ -865,8 +984,12 @@ export function tableOf(
   of: string = "",
 ): { row: string; col: string; tense: VerbTense; person: VerbPerson; form: Form | null }[] {
   const out = [];
+  /* The columns this card is laid out in — one *I* on a verb that has one
+     word for it. See personsFor. Only the card's own word's table can be
+     joined: a form's table of pronouns has no *I (f)* to fold. */
+  const persons = str(of) ? personsOf(spec) : personsFor(card, spec);
   for (const tense of tensesOf(spec)) {
-    for (const person of personsOf(spec)) {
+    for (const person of persons) {
       out.push({
         row: tense.id,
         col: person.id,

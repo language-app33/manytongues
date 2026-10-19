@@ -10,7 +10,7 @@ import type { Card, Course, Deck, ExerciseState, FlagKind, Form, Item, Lang, Lan
 import { formsOf, leadOf, wordOf } from "./cards.ts";
 import { createPortal } from "react-dom";
 import * as API from "./courses-api.ts";
-import { answerFields, categoryLabel, dimValues, kindOf, LANGUAGES, DEFAULT_LANGUAGE, scriptVars } from "./languages.ts";
+import { answerFields, categoryLabel, dimValues, kindOf, LANGUAGES, DEFAULT_LANGUAGE, scriptVars, verbOf } from "./languages.ts";
 import { isDialog, isText, isTwoSided, linesOf, namedPart, sideOf } from "./dialogs.ts";
 import { asMeaning, cardRef, fillNames, fillsOf, isSentence, mergeMet, slotsOf, splitSlots } from "./variables.ts";
 import { reviewOf } from "./review.ts";
@@ -18,7 +18,7 @@ import type { Reader, TableGroup } from "./card-facts.ts";
 import { askLine, A_SENTENCE, blanksOn, cellTitle, CLIP_KINDS, combosOf, dimsSaid, dimText, EXAMPLES_CEILING,
   examplesOf, fillersOn, IN_NO_DECK, isTableCell, lexicalKeys, lexicalLabel, NO_PART, NOT_DRILLED,
   rowsLine, tablesOn, tableTitle, unnamedOn } from "./card-facts.ts";
-import { colOf, NO_PARTNER, personsOf, rowOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
+import { colOf, foldJoined, NO_PARTNER, personsFor, personsOf, rowOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { isOffline, watchNet } from "./net.ts";
 /* A teacher's numbers and their clock, which arrive with the material and
    become cards on the way in. Reached through the registry, never by
@@ -2520,6 +2520,10 @@ function ReadTable({ group, lang, reader }: {
   reader: Reader;
 }) {
   const word = group.of && group.owner ? String(group.owner.ar || group.owner.en || "") : "";
+  /* A verb's *I* typed twice is read out as the one *I* it is, called
+     plain "I" — see foldJoined. A form's own table joins nothing. */
+  const cells = group.of ? group.cells : foldJoined(group.cells, group.spec).forms;
+  const persons = group.of ? personsOf(group.spec) : personsFor({ subs: cells }, group.spec);
   let row = "";
   return (
     <section className="at-panel">
@@ -2528,7 +2532,7 @@ function ReadTable({ group, lang, reader }: {
         Every cell is a form of the word in its own right: its own
         recordings, its own progress, and asked as its own question.
       </p>
-      {group.cells.map((cell, i) => {
+      {cells.map((cell, i) => {
         const on = rowOf(cell);
         const opens = on !== row;
         row = on;
@@ -2537,7 +2541,7 @@ function ReadTable({ group, lang, reader }: {
         /* A one-row table is named by its own name — "attached pronouns" —
            and a heading repeating it says nothing twice. */
         const heads = opens && rowName !== tableTitle(group.spec);
-        const person = personsOf(group.spec).find((p) => p.id === colOf(cell));
+        const person = persons.find((p) => p.id === colOf(cell));
         return (
           <React.Fragment key={String(cell.id || i)}>
             {heads ? <p className="at-eyebrow at-mt3">{rowName}</p> : null}
@@ -4174,9 +4178,27 @@ export function cardToItem(card: Card, deckTitle: string, courseId: string, deck
   /* The card's own word first, then its alternates — one list, and the
      card's own word answers to the card's own id, which is what every
      question about it has always carried. */
-  const forms = formsOf(card).map((f, i) =>
-    formOf(f, i === 0 ? localIdFor(card.id) : formId(String(f.id || ""), i - 1)),
-  );
+  const named = formsOf(card).map((f, i) => ({
+    f,
+    id: i === 0 ? localIdFor(card.id) : formId(String(f.id || ""), i - 1),
+  }));
+  /* And a verb's *I* typed twice, as the one *I* it is — see foldJoined.
+     Named before the copy goes, so a form after it keeps the name it had;
+     and each cell that stays says which copy it stands for, so the fold
+     can keep whichever of the two the learner had got further with. */
+  const verb = verbOf(LANGUAGES[card.lang]);
+  const lead = named[0];
+  const joined = foldJoined(named.slice(1).map(({ f, id }) => ({ ...f, at: id })), verb);
+  const localOf = (name: string) => (joined.forms.find((c) => String(c.id || "") === name) || {}).at || "";
+  const copies: Record<string, string[]> = {};
+  for (const [copy, kept] of Object.entries(joined.into)) {
+    const was = named.slice(1).find(({ f }) => String(f.id || "") === copy);
+    const to = localOf(kept);
+    if (was && to) (copies[to] = copies[to] || []).push(was.id);
+  }
+  const forms = (lead ? [lead] : [])
+    .concat(joined.forms.map(({ at, ...f }) => ({ f, id: String(at) })))
+    .map(({ f, id }) => ({ ...formOf(f, id), ...(copies[id] ? { joinedFrom: copies[id] } : null) }));
 
   /* A conversation's turns, which are forms with a speaker on them. Named
      the way the other forms are, so a line keeps its progress across a
@@ -4717,14 +4739,52 @@ export function splitFromHeld(fresh: Item, byId: Map<string, Item>): Item {
   return { ...fresh, forms };
 }
 
+/*
+ * A verb whose *I* was typed twice, arriving as the one *I* it is, with
+ * whichever of the two the learner had got further with.
+ *
+ * Until 0.456 every verb had an *I (m)* and an *I (f)* and a learner was
+ * asked both, so on a device that held the card both have a schedule. The
+ * copy is no longer made (see foldJoined), and the cell that stays takes
+ * the copy's schedule where the learner had answered the copy right more
+ * often — the same measure the trainer uses to pick the form a learner
+ * knows best. Never the other way about, and nothing lost from the drawer:
+ * the copy's own record goes with the copy.
+ */
+export function joinHeld(existing: Item, fresh: Item): Item {
+  const had = formsOf(existing);
+  const rightOf = (f: Form | undefined) =>
+    Object.values((f && f.s) || {}).reduce((n, st) => n + ((st && st.right) || 0), 0);
+  const forms = had.map((mine) => {
+    const kept = formsOf(fresh).find((f) => f.id === mine.id);
+    const from: string[] = (kept && kept.joinedFrom) || [];
+    let best = mine;
+    for (const id of from) {
+      const copy = had.find((f) => f.id === id);
+      if (copy && copy.s && rightOf(copy) > rightOf(best)) best = copy;
+    }
+    return best === mine ? mine : { ...mine, s: { ...(best.s || {}) } };
+  });
+  return { ...existing, forms };
+}
+
+/* The record of which copies a cell stands for, which the fold reads and
+   nothing stores. */
+const unjoined = (item: Item): Item =>
+  formsOf(item).some((f) => f.joinedFrom)
+    ? { ...item, forms: formsOf(item).map(({ joinedFrom: _joined, ...f }) => f as Form) }
+    : item;
+
 /* Fold fresh course cards into the person's cards: progress kept, wording
    taken from the teacher, withdrawn cards named so they can be tombstoned —
    and their progress set aside rather than thrown away. */
 export function foldCourses(items: Item[], incoming: Item[], parked: Record<string, Parked> = {}) {
   const byId = new Map(items.map((i) => [i.id, i]));
   const kept: Item[] = [];
-  for (const fresh of incoming) {
-    const existing = byId.get(fresh.id);
+  for (const joined of incoming) {
+    const fresh = unjoined(joined);
+    const held = byId.get(fresh.id);
+    const existing = held ? joinHeld(held, joined) : held;
     if (existing) {
       /* Keep what the student has earned; take the teacher's wording.
          One call, where it used to be the card's own progress and then its

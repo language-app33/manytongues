@@ -214,6 +214,25 @@ export interface VerbPerson {
    * (f)* the picks of *she* would have a feminine noun call for *I*.
    */
   is?: Record<string, string>;
+  /**
+   * The column this one is a copy of, on a card that has not given it a
+   * word of its own. Palestinian Arabic's *I (f)* joins *I (m)*: باكل and
+   * أكلت are anybody's, and only a few words — رايح and رايحة — have two
+   * forms for *I*. So a card is laid out, practised and filled into
+   * sentences with one *I* unless a different word is written under *I
+   * (f)*, and only then are there two. See keepsApart in src/verbs.ts.
+   * Absent on every column that is always its own.
+   */
+  joins?: string;
+  /**
+   * What this column is called while the column that joins it is not kept
+   * apart: *I (m)* is plain *I* on a verb with one form for it. Absent
+   * means `label`, always.
+   */
+  alone?: string;
+  /** Two words that show a teacher what keeping this column apart is
+      for — "رايح / رايحة". Shown under the tick that does it. */
+  example?: string;
 }
 
 /** One row: when it happened, or what mood it is in. */
@@ -245,6 +264,12 @@ export interface VerbTense {
   /** And an example of one, shown to a teacher writing their own — the
       language's, because the word in front of the gap is. */
   sample?: { ar: string; lat?: string; en: string };
+  /**
+   * The only columns this row has, where it has fewer than the table: a
+   * command is said to *you* and to nobody else. The teacher is offered
+   * boxes for these alone. Absent is every column, as it always was.
+   */
+  persons?: string[];
 }
 
 /**
@@ -1370,6 +1395,11 @@ export type Form = Record<string, any> & {
      which adds them beneath the learner's own and never stores the
      field. See handOnCounting. */
   carried?: Record<string, ExerciseState>;
+  /* The forms this one stands for since a copy of it stopped being made —
+     a verb's *I (f)* typed as its *I (m)*. Read by the fold, which keeps
+     whichever schedule the learner had got further with, and never
+     stored. See joinHeld. */
+  joinedFrom?: string[];
   created?: Millis;
   updated?: Millis;
 };
