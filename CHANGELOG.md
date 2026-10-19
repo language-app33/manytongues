@@ -21,13 +21,13 @@ away.**
   place of the session's last question, so sessions stay the same length.
 - "I don't get it" shows the table again later, as before, and "Who is
   it?" now waits until after that second showing.
-- If a session is too short to fit the table and the question a few
-  places apart, the verb waits for a later session. A verb practised by
-  name is the exception: it keeps its table, with the question at the end.
+- If the table would land too near the end to leave a few questions
+  before "Who is it?", it is moved earlier. In a very short session the
+  question comes sooner instead, so a small deck still opens its verbs.
 - Trade-off: a deck with many new verbs takes more sessions to open them
   all, one tense at a time.
-- Trade-off: if the table would land too near the end, it is moved
-  earlier, and may then come before the phrase that uses the verb.
+- Trade-off: a table moved earlier may come before the phrase that uses
+  the verb, where 0.452 put it after.
 - To check by hand: two verbs whose tenses haven't been seen yet, both
   due. A session should show only one table, then "Who is it?" on it about
   four questions later.

@@ -5085,9 +5085,8 @@ export function buildSession({
     if (at >= 0) cut = Math.max(cut, at + 1);
   }
 
-  const named = new Set(taken.filter((x) => x.askedFor).map((x) => x.card.it.id));
   const exercises = withReadThroughs(
-    oneNewTable(afterItsUse(questions.slice(0, cut), items, settings, sets), questions.slice(cut), items, settings, named),
+    oneNewTable(afterItsUse(questions.slice(0, cut), items, settings, sets), questions.slice(cut), items, settings),
     items,
     settings
   );
@@ -5277,9 +5276,9 @@ export function afterItsUse(list: Question[], items: Item[], settings: Settings,
  * questions dealt past the cut.
  *
  * Where the table sits too near the end to leave the gap, it is moved back
- * just far enough; where the session is too short for both, the verb
- * waits. A card the learner asked for by name is never left out: its
- * table stays, and the practice goes on the end.
+ * just far enough. A session too short for the whole gap closes it up
+ * rather than leave the verb out: a deck that small would never have room,
+ * and its tense would never open.
  *
  * The practice is dealt locked — nothing about a tense is asked before its
  * table is got — and kept behind the table in the session: see
@@ -5288,55 +5287,42 @@ export function afterItsUse(list: Question[], items: Item[], settings: Settings,
 export const FOLLOW_GAP = 3;
 const FOLLOW_TYPES = ["vwho", "vwhorec"];
 
-export function oneNewTable(
-  list: Question[],
-  spare: Question[],
-  items: Item[],
-  settings: Settings,
-  named: Set<string> = new Set()
-): Question[] {
+export function oneNewTable(list: Question[], spare: Question[], items: Item[], settings: Settings): Question[] {
   const isTable = (q: Question) => typeOf(q.type) === PATTERN_KEY;
   const tables = list.filter(isTable);
   if (!tables.length) return list;
-  const fillers = spare.filter((q) => !isTable(q) && !q.follows);
-  const n = list.length;
-  /* Without any table, topped back up to the length from past the cut. */
-  const without = (keep: Question | null) => {
-    const out = list.filter((q) => !isTable(q) || q === keep);
-    for (const q of fillers) {
-      if (out.length >= n) break;
-      out.push(q);
-    }
-    return out;
-  };
-  for (const table of tables) {
+  const followOf = (table: Question): string | null => {
     const r = resolveUnit(items, table);
     const unit = r && r.unit;
-    const type = unit && FOLLOW_TYPES.find((t) => openPastPattern(unit, settings).includes(t) && fillableAt(unit, t, settings));
-    if (!type) continue;
-    const practice: Question = { id: table.id, subId: table.subId || null, type, follows: true };
-    const out = without(table);
-    let at = out.indexOf(table);
-    /* The last place the table can stand and still leave the gap, with
-       the practice taking the last question's. */
-    const latest = out.length - FOLLOW_GAP - 2;
-    if (named.has(table.id) && at > latest) return out.concat([practice]);
-    if (latest < 0) continue;
-    if (at > latest) {
-      out.splice(at, 1);
-      out.splice(latest, 0, table);
-      at = latest;
-    }
-    out.pop();
-    /* The first place the gap allows that does not stand it beside a
-       question it may not follow, else the first the gap allows. */
-    const first = at + FOLLOW_GAP + 1;
-    let put = first;
-    while (put <= out.length && !(mayFollow(out[put - 1], practice) && mayFollow(practice, out[put]))) put += 1;
-    out.splice(put > out.length ? first : put, 0, practice);
-    return out;
+    return (unit && FOLLOW_TYPES.find((t) => openPastPattern(unit, settings).includes(t) && fillableAt(unit, t, settings))) || null;
+  };
+  /* The first table that can be practised; failing that the first, shown
+     alone, so a tense with nothing to ask after it still opens. */
+  const table = tables.find((t) => followOf(t)) || tables[0];
+  const type = followOf(table);
+  const out = list.filter((q) => !isTable(q) || q === table);
+  for (const q of spare.filter((x) => !isTable(x) && !x.follows)) {
+    if (out.length >= list.length) break;
+    out.push(q);
   }
-  return without(null);
+  if (!type) return out;
+  const practice: Question = { id: table.id, subId: table.subId || null, type, follows: true };
+  let at = out.indexOf(table);
+  const latest = Math.max(0, out.length - FOLLOW_GAP - 2);
+  if (at > latest) {
+    out.splice(at, 1);
+    out.splice(latest, 0, table);
+    at = latest;
+  }
+  /* The last question gives its place — never the table itself. */
+  if (out.length - 1 > at) out.pop();
+  /* The first place the gap allows that does not stand it beside a
+     question it may not follow, else the first the gap allows. */
+  const first = Math.min(at + FOLLOW_GAP + 1, out.length);
+  let put = first;
+  while (put <= out.length && !(mayFollow(out[put - 1], practice) && mayFollow(practice, out[put]))) put += 1;
+  out.splice(put > out.length ? first : put, 0, practice);
+  return out;
 }
 
 /*

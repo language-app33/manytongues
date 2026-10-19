@@ -9890,7 +9890,10 @@ const openPronounTables = async () => {
   const seen = fresh.met.order.filter((k) => k !== "other");
   check("a new tense is first met as the tense on its own", fresh.met.pattern === 1 && seen[0] === "pattern",
     JSON.stringify(fresh.met));
-  check("and nothing else about the tense is asked before it", seen.every((k) => k === "pattern"), JSON.stringify(seen));
+  check("and nothing else about the tense is asked before it", seen.indexOf("pattern") === 0, JSON.stringify(seen));
+  /* Since 0.454 the table is practised in the same session: "Who is it?"
+     on the same tense, after it, and nothing more. */
+  check("then the same session asks who a form is about, once", seen.join(",") === "pattern,who", JSON.stringify(seen));
   check("and once answered it has no Learn more under it", !fresh.met.patternMore, JSON.stringify(fresh.met));
   check("laid out one row a person, the two spelt alike included", fresh.met.patternRows === 6, JSON.stringify(fresh.met));
   const marked = (fresh.verb && fresh.verb.forms || []).filter((/** @type {any} */ f) => f.row === "present" && f.s && f.s.vpattern && f.s.vpattern.right > 0);

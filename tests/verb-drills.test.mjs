@@ -292,7 +292,8 @@ const verb2 = () => /** @type {any} */ ({
 const at = (/** @type {any[]} */ list, /** @type {(q: any) => boolean} */ f) => list.findIndex(f);
 
 test("a session shows one new tense at most, and asks who it is about a few questions later", () => {
-  const items = [verb(), verb2()].concat(words(12));
+  /* Few enough cards that the session takes both verbs. */
+  const items = [verb(), verb2()].concat(words(6));
   installIndexes(items, settings);
   const got = buildSession({ items, settings, inDeck: () => true });
   const tables = got.exercises.filter((/** @type {any} */ e) => e.type === "vpattern");
@@ -319,7 +320,7 @@ test("the practice takes the last question's place, and a table too near the end
   assert.equal(got.some((/** @type {any} */ q) => q.id === "w6"), false, "the last question gave its place");
 });
 
-test("a session too short for the table and its practice leaves the verb for later", () => {
+test("a session too short for the whole gap closes it up rather than leave the verb out", () => {
   const items = [verb()].concat(words(4));
   installIndexes(items, settings);
   const list = [
@@ -327,16 +328,10 @@ test("a session too short for the table and its practice leaves the verb for lat
     { id: "v1", subId: "p-she", type: "vpattern" },
     { id: "w2", subId: null, type: "ar2en" },
   ];
-  const spare = [{ id: "w3", subId: null, type: "en2ar" }];
-  assert.deepEqual(oneNewTable(list, spare, items, settings).map((/** @type {any} */ q) => q.id), ["w1", "w2", "w3"]);
-});
-
-test("a verb asked for by name keeps its table however short the session", () => {
-  const items = [verb()];
-  installIndexes(items, settings);
-  const list = [{ id: "v1", subId: "p-she", type: "vpattern" }];
-  const got = oneNewTable(list, [], items, settings, new Set(["v1"]));
-  assert.deepEqual(got.map((/** @type {any} */ q) => q.type), ["vpattern", "vwho"]);
+  assert.deepEqual(oneNewTable(list, [], items, settings).map((/** @type {any} */ q) => `${q.id}:${q.type}`),
+    ["v1:vpattern", "w1:ar2en", "v1:vwho"]);
+  /* And a session of the table alone gets its practice after it. */
+  assert.deepEqual(oneNewTable([list[1]], [], items, settings).map((/** @type {any} */ q) => q.type), ["vpattern", "vwho"]);
 });
 
 test("\"I don't get it\" keeps the practice behind the table's second showing", () => {
