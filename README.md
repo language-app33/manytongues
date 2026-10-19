@@ -386,7 +386,11 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   **The tense is seen before it is asked**: until "I get it" has been said
   once, `vpattern` is all a cell is dealt (`patternFirst`) — and where
   the session has a phrase or sentence that uses the verb, the table comes
-  straight after it (`afterItsUse`), with no Learn more under it. Two persons
+  straight after it (`afterItsUse`), with no Learn more under it. **One
+  table a session, and practised in it**: a session keeps one `vpattern`
+  and asks `vwho` of the same tense `FOLLOW_GAP` questions later, in place
+  of its last question (`oneNewTable`); after "I don't get it" that
+  question follows the table's second showing (`behindItsTable`). Two persons
   spelt the same stay two rows and two tiles, either tile is right in
   either place, and either person is right in "who is it?"; "change the
   person" never asks between them. The cell a dictionary cites is asked
