@@ -399,14 +399,16 @@ test("Hebrew marks every person for gender, keeping the old columns under the ma
 
 test("the table is crossed row by row, in teaching order", () => {
   const all = tableOf(toEat, arabic);
-  assert.equal(all.length, tensesOf(arabic).length * personsOf(arabic).length);
+  /* Every column but I (f), which this verb does not keep apart: it has
+     one I — see tests/one-i.test.mjs. */
+  assert.equal(all.length, tensesOf(arabic).length * (personsOf(arabic).length - 1));
   assert.equal(all[0].row, "present");
   assert.equal(all[0].col, "i");
   /* Within a row, the language's own order of persons — so I and you come
      before they, wherever a caller deals from this. */
   assert.deepEqual(
     all.slice(0, 3).map((c) => c.col),
-    ["i", "i-f", "you-m"],
+    ["i", "you-m", "you-f"],
   );
   const { filled, blank } = tableCount(toEat, arabic);
   assert.equal(filled, 8);
