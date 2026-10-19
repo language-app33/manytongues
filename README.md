@@ -57,25 +57,49 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   card two of its eight questions, so waiting on all of them would land
   "learnt" whenever the last straggler happened to come up.
 
-  **And once a form is past everything under its top, the top is all it
-  is asked.** Learnt, Cleared, or back on its top level after a slip there:
-  writing the word from its meaning subsumes the questions below it, so a
-  session deals that form its top questions that are due and nothing else
-  — two at most, as for any form, the rest waiting for the next session —
-  and the form falls due when one of *those* does, not when a recognition
-  question it no longer needs comes round. It is not used as a spare tile
-  in another word's matching grid either, since every tile there is
-  marked. Where none of its top is due and it is dealt anyway — asked for
-  by name, a practice — it is asked its top. Until 0.453 the whole ladder
-  went on being asked, as the guard that a slip lower down would take a
-  card off learnt; with nothing lower asked, the top question is that
-  guard, and a slip there keeps the card on it until it is passed again.
-  A number part held under its top by a weaker member is not on its top
-  and is asked as before. `atItsTop` in the app, read inside its
-  `openTypes`, the door every dealt question and every count of what is
-  waiting goes through; the ladder and the standings do not read it.
-  Passes still wait for a card if a slip further down ever does take it
-  back.
+  **Once a card has climbed, it is reviewed on its top level only**
+  (since 0.453; the owner's rule). The whole of it:
+
+  - *Who.* Any form that has passed every level below its own top —
+    Learnt, Cleared, or back on its top level after missing a top question
+    twice running. A form still below its top is asked as before.
+  - *What.* Only its top-level questions: writing the word from its
+    meaning, from its picture, into its phrase, from its phrase heard,
+    and one per accepted spelling — whichever the card has.
+  - *When.* It is due when one of those top questions is due. Its easier
+    questions no longer make it due, and are left as they were.
+  - *How many.* Only the due top questions, at most two per form (and two
+    forms per card), as for any form; the rest wait for the next session.
+    If none is due but the card is dealt anyway — marked high priority, a
+    practice — it is asked its top questions regardless.
+  - *A slip.* A top question missed twice running takes the card off
+    Learnt and keeps it on its top level until that question is right
+    again. The easier questions do not come back; nothing below the top
+    can be missed, because nothing below it is asked.
+  - *Everywhere.* Every kind of session, the "ready to practise" count,
+    and the matching grid: such a card is not used as an extra tile in
+    another word's grid, since every tile there is marked.
+  - *Unchanged.* What a card shows, the progress figures, how Learnt is
+    earned (two passes on every top question), and the review date kept
+    per question rather than per card — so a slip on one question brings
+    back that question alone.
+  - *Costs, accepted.* A word with no recorded phrase is never asked to be
+    heard again once climbed. Get started, which asks recognition only,
+    has nothing to ask such a card, so on a mostly climbed deck it comes
+    out short. A climbed card takes one place where it took two, so a
+    learner practising many times a day meets it in more sittings, one
+    question each time — about the same number of questions overall.
+  - *Exception.* A number part held under its top by a weaker word is not
+    on its top, and is asked as before.
+
+  In the code: `atItsTop` in the app, read inside its `openTypes` — the
+  one door every dealt question, every due date (`mixCardsOf`), every
+  count of what is waiting and every spare grid tile goes through — and
+  the due-only filter in `planOf`. A card counts as met (in learning, not
+  new) over its whole ladder, so one that has just reached its top is held
+  by the twenty-in-learning limit. The ladder and the standings do not
+  read any of this. Tests: `tests/top-level.test.mjs`; why, and what was
+  weighed: DECISIONS.md, "A card past its lower levels is asked its top".
 
   **One letter out is a typo, not a miss.** On an answer of four letters or
   more — measured in the language's own letters — a spelling a single
