@@ -8,6 +8,30 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.454 — 19 October 2026
+
+**At most one new verb table a session, and it's practised straight
+away.**
+
+- A session now shows "See how this verb changes" for one tense at most.
+  A known verb's next tense opening counts as new too. The other new
+  tenses wait for later sessions, and their places go to other questions.
+- A few questions after the table, the same session asks "Who is it?" on
+  that tense, so the learner recalls what they've just read. It takes the
+  place of the session's last question, so sessions stay the same length.
+- "I don't get it" shows the table again later, as before, and "Who is
+  it?" now waits until after that second showing.
+- If a session is too short to fit the table and the question a few
+  places apart, the verb waits for a later session. A verb practised by
+  name is the exception: it keeps its table, with the question at the end.
+- Trade-off: a deck with many new verbs takes more sessions to open them
+  all, one tense at a time.
+- Trade-off: if the table would land too near the end, it is moved
+  earlier, and may then come before the phrase that uses the verb.
+- To check by hand: two verbs whose tenses haven't been seen yet, both
+  due. A session should show only one table, then "Who is it?" on it about
+  four questions later.
+
 ## 0.453 — 18 October 2026
 
 **A card that has climbed every level is reviewed on its top level only.**

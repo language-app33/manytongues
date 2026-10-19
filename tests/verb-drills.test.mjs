@@ -36,7 +36,7 @@ await build({
     __BUILT_AT__: '"0"',
   },
 });
-const { afterItsUse, buildSession, installIndexes, laddered, marksForAnswer, withRows } = await import(path.join(out, "trainer.js"));
+const { FOLLOW_GAP, afterItsUse, behindItsTable, buildSession, installIndexes, laddered, marksForAnswer, oneNewTable, withRows } = await import(path.join(out, "trainer.js"));
 const { LANGUAGES, EX, TYPES, verbOf, keysFor } = await import("../src/languages.ts");
 const drills = await import("../src/verb-drills.ts");
 const { drillFits, whoChoices, whoIsRight, rowMarks, shiftCue, tenseOf, drillTable } = drills;
@@ -179,8 +179,10 @@ test("a tense is seen before it is asked anything, and dealt once for all its fo
   const got = buildSession({ items, settings, inDeck: () => true });
   const ofVerb = got.exercises.filter((/** @type {any} */ e) => e.id === "v1" && e.subId && e.subId.startsWith("p-"));
   assert.ok(ofVerb.length > 0, "the present is dealt");
-  assert.ok(ofVerb.every((/** @type {any} */ e) => e.type === "vpattern"), `asked ${ofVerb.map((/** @type {any} */ e) => e.type).join(", ")}`);
-  assert.equal(ofVerb.length, 1, "one table for the whole tense");
+  assert.equal(ofVerb[0].type, "vpattern", "the table first");
+  assert.equal(ofVerb.filter((/** @type {any} */ e) => e.type === "vpattern").length, 1, "one table for the whole tense");
+  const after = ofVerb.slice(1);
+  assert.ok(after.every((/** @type {any} */ e) => e.follows), `then only its practice: ${after.map((/** @type {any} */ e) => e.type).join(", ")}`);
 });
 
 test("once the pattern is got, the rest of the tense's questions are open", () => {
@@ -274,4 +276,77 @@ test("with nothing in the session using the verb, the tense stays where it was d
     { id: "w2", subId: null, type: "ar2en" },
   ];
   assert.deepEqual(afterItsUse(list, items, settings), list, "the verb's own questions are not a use of it");
+});
+
+/** A second verb, to have, with a present of its own not yet seen. */
+const verb2 = () => /** @type {any} */ ({
+  id: "v2", tags: [], created: 1, lang: "ar-PS", kind: "word", category: "verb", name: "to drink",
+  forms: [
+    { id: "v2", ar: "شرب", en: "to drink", lat: "shirib", lang: "ar-PS", s: {} },
+    cell("q-i", "بشرب", "I drink", "bashrab", "present", "i"),
+    cell("q-he", "بيشرب", "he drinks", "bishrab", "present", "he"),
+    cell("q-she", "بتشرب", "she drinks", "btishrab", "present", "she"),
+  ],
+});
+
+const at = (/** @type {any[]} */ list, /** @type {(q: any) => boolean} */ f) => list.findIndex(f);
+
+test("a session shows one new tense at most, and asks who it is about a few questions later", () => {
+  const items = [verb(), verb2()].concat(words(12));
+  installIndexes(items, settings);
+  const got = buildSession({ items, settings, inDeck: () => true });
+  const tables = got.exercises.filter((/** @type {any} */ e) => e.type === "vpattern");
+  assert.equal(tables.length, 1, "one table");
+  const t = at(got.exercises, (e) => e.type === "vpattern");
+  const p = at(got.exercises, (e) => e.follows);
+  assert.ok(p > 0, "its practice is dealt");
+  const practice = got.exercises[p];
+  assert.equal(practice.type, "vwho");
+  assert.deepEqual([practice.id, practice.subId], [tables[0].id, tables[0].subId], "about the same tense");
+  assert.ok(p - t > FOLLOW_GAP, `with ${FOLLOW_GAP} questions between, not ${p - t - 1}`);
+});
+
+test("the practice takes the last question's place, and a table too near the end moves back", () => {
+  const items = [verb()].concat(words(8));
+  installIndexes(items, settings);
+  const list = /** @type {any[]} */ ([1, 2, 3, 4, 5, 6].map((i) => ({ id: `w${i}`, subId: null, type: i % 2 ? "ar2en" : "en2ar" })));
+  list.splice(5, 0, { id: "v1", subId: "p-she", type: "vpattern" });
+  const got = oneNewTable(list, [], items, settings);
+  assert.equal(got.length, list.length, "the same length");
+  const t = at(got, (e) => e.type === "vpattern");
+  const p = at(got, (e) => e.follows);
+  assert.ok(t >= 0 && p - t > FOLLOW_GAP, got.map((/** @type {any} */ q) => `${q.id}:${q.type}`).join(" "));
+  assert.equal(got.some((/** @type {any} */ q) => q.id === "w6"), false, "the last question gave its place");
+});
+
+test("a session too short for the table and its practice leaves the verb for later", () => {
+  const items = [verb()].concat(words(4));
+  installIndexes(items, settings);
+  const list = [
+    { id: "w1", subId: null, type: "ar2en" },
+    { id: "v1", subId: "p-she", type: "vpattern" },
+    { id: "w2", subId: null, type: "ar2en" },
+  ];
+  const spare = [{ id: "w3", subId: null, type: "en2ar" }];
+  assert.deepEqual(oneNewTable(list, spare, items, settings).map((/** @type {any} */ q) => q.id), ["w1", "w2", "w3"]);
+});
+
+test("a verb asked for by name keeps its table however short the session", () => {
+  const items = [verb()];
+  installIndexes(items, settings);
+  const list = [{ id: "v1", subId: "p-she", type: "vpattern" }];
+  const got = oneNewTable(list, [], items, settings, new Set(["v1"]));
+  assert.deepEqual(got.map((/** @type {any} */ q) => q.type), ["vpattern", "vwho"]);
+});
+
+test("\"I don't get it\" keeps the practice behind the table's second showing", () => {
+  const table = { id: "v1", subId: "p-she", type: "vpattern" };
+  const practice = { id: "v1", subId: "p-she", type: "vwho", follows: true };
+  const w = (/** @type {number} */ i) => ({ id: `w${i}`, subId: null, type: "ar2en" });
+  /* The table missed at 0, put back at the end by requeueMissed. */
+  const list = [table, w(1), w(2), w(3), w(4), practice, w(5), { ...table, retry: true }];
+  const got = behindItsTable(list, 1);
+  assert.deepEqual(got.map((/** @type {any} */ q) => q.follows ? "practice" : q.type === "vpattern" ? "table" : q.id),
+    ["table", "w1", "w2", "w3", "w4", "w5", "table", "practice"]);
+  assert.deepEqual(behindItsTable(got, 1), got, "already behind it: left alone");
 });

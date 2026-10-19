@@ -1302,6 +1302,13 @@ export interface Question {
    * missed, whatever happens when it comes back.
    */
   retry?: boolean;
+  /**
+   * Set on the question dealt to practise a tense the session has just
+   * shown for the first time. Locked until the table is answered "I get
+   * it", so it is kept behind the table wherever the table goes — see
+   * oneNewTable and behindItsTable in the trainer.
+   */
+  follows?: boolean;
 }
 
 /**
