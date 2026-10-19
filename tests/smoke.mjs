@@ -6836,7 +6836,7 @@ const openPronounTables = async () => {
       "no examples section");
     typeInto(nameBox(), "to eat");
     typeInto(cellNamed("Arabic for subjunctive · she"), "تاكل");
-    typeInto(cellNamed("Arabic for subjunctive · I (m)"), "آكل");
+    typeInto(cellNamed("Arabic for subjunctive · I"), "آكل");
     await sleep(250);
     check("a subjunctive form with no example to be asked in is refused",
       !!saveBtn() && saveBtn().disabled && unmetLines().some((t) => /at least one example/.test(t)),
@@ -6917,7 +6917,7 @@ const openPronounTables = async () => {
       await sleep(120);
     }
     typeInto(cellNamed("Arabic for subjunctive · she"), "");
-    typeInto(cellNamed("Arabic for subjunctive · I (m)"), "");
+    typeInto(cellNamed("Arabic for subjunctive · I"), "");
     await sleep(200);
 
     /* Back to a word, and the one the block was holding is still there —
@@ -9741,7 +9741,7 @@ const openPronounTables = async () => {
     lapses: 0, right: 4, wrong: 0, skips: 0, near: 0, hints: 0, hist: [1, 1, 1, 1], updated: Date.now() - 86400000 };
   /** @type {[string, string, string, string][]} */
   const present = [
-    ["i", "I (m)", "بكتب", "baktub"], ["you-m", "you (m)", "بتكتب", "btiktub"], ["you-f", "you (f)", "بتكتبي", "btiktbi"],
+    ["i", "I", "بكتب", "baktub"], ["you-m", "you (m)", "بتكتب", "btiktub"], ["you-f", "you (f)", "بتكتبي", "btiktbi"],
     ["he", "he", "بيكتب", "biktub"], ["she", "she", "بتكتب", "btiktub"], ["they", "they", "بيكتبوا", "biktbu"],
   ];
   const formOf = Object.fromEntries(present.map(([, label, ar]) => [label, ar]));
