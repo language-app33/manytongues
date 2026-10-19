@@ -176,8 +176,11 @@ test("a tense is seen before it is asked anything, and dealt once for all its fo
   const v = verb();
   const items = [v].concat(words(8));
   installIndexes(items, settings);
-  const got = buildSession({ items, settings, inDeck: () => true });
-  const ofVerb = got.exercises.filter((/** @type {any} */ e) => e.id === "v1" && e.subId && e.subId.startsWith("p-"));
+  /* A session takes one form of the verb, and the cited past is one of
+     them: the first of a few sessions that takes the present. */
+  const ofVerb = Array.from({ length: 20 }, () => buildSession({ items, settings, inDeck: () => true }).exercises
+    .filter((/** @type {any} */ e) => e.id === "v1" && e.subId && e.subId.startsWith("p-")))
+    .find((list) => list.length > 0) || [];
   assert.ok(ofVerb.length > 0, "the present is dealt");
   assert.ok(ofVerb.every((/** @type {any} */ e) => e.type === "vpattern"), `asked ${ofVerb.map((/** @type {any} */ e) => e.type).join(", ")}`);
   assert.equal(ofVerb.length, 1, "one table for the whole tense");
@@ -189,8 +192,11 @@ test("once the pattern is got, the rest of the tense's questions are open", () =
   for (const f of v.forms) if (f.row === "present") f.s = { vpattern: got1 };
   const items = [v].concat(words(8));
   installIndexes(items, settings);
-  const got = buildSession({ items, settings, inDeck: () => true });
-  const ofVerb = got.exercises.filter((/** @type {any} */ e) => e.id === "v1" && e.subId && e.subId.startsWith("p-"));
+  /* A session takes one form of the verb, and the cited past is one of
+     them, so the present is looked for over a few sessions. */
+  const ofVerb = Array.from({ length: 10 }, () => buildSession({ items, settings, inDeck: () => true }).exercises)
+    .flat()
+    .filter((/** @type {any} */ e) => e.id === "v1" && e.subId && e.subId.startsWith("p-"));
   assert.ok(ofVerb.some((/** @type {any} */ e) => e.type !== "vpattern"), `asked ${ofVerb.map((/** @type {any} */ e) => e.type).join(", ")}`);
 });
 

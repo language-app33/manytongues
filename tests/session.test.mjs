@@ -889,9 +889,12 @@ test("a masculine and its feminine are not both in one session", () => {
 });
 
 test("the form a session takes of a card is the one that is due", () => {
-  /* The own form answered and not due for a week; the feminine due now. */
+  /* The own form answered everywhere and not due for a week — a question
+     never asked on a card already met counts as due now — and the feminine
+     due now. */
   const later = { ...withHist([1, 1]), due: Date.now() + 7 * 86400000 };
-  const got = deal([gendered({ ar2en: later, en2ar: later }, { ar2en: withHist([1]) })].concat(deckOf(3)));
+  const own = Object.fromEntries(TYPES.map((/** @type {string} */ t) => [t, later]));
+  const got = deal([gendered(own, { ar2en: withHist([1]) })].concat(deckOf(3)));
   assert.deepEqual([...formsOfG1(got)], ["g1-f"], "the feminine, which is due, alone");
 });
 
