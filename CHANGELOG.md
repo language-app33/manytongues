@@ -8,6 +8,55 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.457 — 19 October 2026
+
+**A verb's tense is learnt as one thing (Arabic and Hebrew).**
+
+- Each tense a teacher has filled in (present, past, command, and so on)
+  now has one progress of its own and climbs the four levels as one card
+  does. Before, every person of every tense was learnt as a separate word,
+  about two dozen of them for a Palestinian verb.
+- Each question about a tense is about one person, picked when the
+  session is made. A different person comes up each time, and a person
+  answered wrong comes back later in the same session.
+- A level of a tense opens after two right answers in a row, and once
+  every person has been answered right on it at least once. Two persons
+  spelt the same (بتكتب is "you (m)" and "she") count as one. "I get it"
+  on the table counts for nobody; reading the forms does.
+- Persons a learner keeps getting wrong come up more often, are named on
+  the verb's screen, and stay out of other cards' sentences until they are
+  right again.
+- The verb's own word (the past "he", like كتب) is no longer met first on
+  its own: it is one person of the past tense.
+- Tenses still open one after another: the next once the one before is
+  cleared, every person included.
+- The verb's screen shows a line for each tense: where it stands, who it
+  is still waiting on, and who keeps going wrong.
+- On the Progress tab and in the ring on the home screen, each filled
+  tense counts as a card of its own ("to write · present").
+- Progress already made carries over: each tense starts where most of its
+  persons were. What was earned on each person is kept, too.
+- In a simulation of one verb among sixty words, answered right every
+  time at three sittings a day, its present was cleared on day 27 and its
+  past on day 42. Under the old rules, no tense was fully cleared within
+  90 days. At one sitting a day the present was cleared on day 88, against
+  none before.
+- **Weak skills is now called Weak spots.** It works as before.
+- Unchanged: Vietnamese verbs; the pronouns on the end of a word; numbers
+  and sentences with blanks. These now follow the same written-down rules
+  as the tenses, with nothing different for learners.
+- Trade-off: a tense can wait on one person it has not been asked yet, so
+  a level may take a sitting or two longer to open than its own answers
+  suggest. Card counts on Progress go up: twenty verbs read as forty to
+  sixty cards.
+- Trade-off: some verbs move up or down once as their progress carries
+  over.
+- To check by hand: open an Arabic verb with a present and a past. Its
+  screen should show a line for each, the past saying it opens once the
+  tense before it is cleared. In a session, questions about the present
+  should each be about a different person. On Progress, under Cards, the
+  verb should appear once per tense.
+
 ## 0.456 — 19 October 2026
 
 **Palestinian Arabic verbs have one "I" unless the word really has two.**

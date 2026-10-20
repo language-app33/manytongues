@@ -6501,3 +6501,93 @@ already holds a word. Arabic's command lists *you (m)*, *you (f)* and
 *you (pl)*. Hebrew is unchanged on both counts. Tests:
 `tests/one-i.test.mjs`.
 
+
+---
+
+## A verb's tense is a skill (0.457)
+
+**19 October 2026** · `src/tense-skills.ts`, `src/skills.ts`; `HELD_UNITS`,
+`castTense`, `personFor`, `quietTenses`, `heldStands`, `TenseLadder`,
+`tenseCardsOf` in `src/ArabicTrainer.tsx`; the tense forms carried in
+`foldCourses` (`src/shared.tsx`) and `mergeItem` (`src/sync.ts`)
+
+**What was wrong.** Every person of every tense was a word of its own —
+its own ladder, its own reviews — so a Palestinian verb was about two dozen
+things to learn and a Hebrew one more, and since 0.455 they came a session
+at a time. The tense practices of 0.451 showed the pattern and then each
+person climbed alone anyway. The owner asked for skills in general, and for
+a verb's tense to be one.
+
+**What changed.** Where a language's verb table lists `practices` (Arabic,
+Hebrew), each row with a person written is a form of the card with
+`tense: row` and no words, made by `withTenses` wherever a card arrives —
+the lift of a stored document, the fold of a teacher's card, an edit — with
+an id made of the card's and the row's. It holds the tense's schedule and
+climbs the ladder; `availableTypes` gives it whatever one of its persons can
+be asked. Its persons and the verb's own word are held (`laddered` is empty
+for them, they are not drillable units), and keep their states. Every
+question about a tense carries the person it is about (`person` on the
+question), drawn in the deal (`drawPerson`), and is cast as that person
+before anything else (`castTense`); grids and backups do the same. An
+answer marks the tense by the question's ids and the person beside it. A
+question about the whole tense marks the tense once — right where every
+person was — and each person, except seeing the pattern, which marks the
+tense alone.
+
+**Choices the owner made.** Of: each tense a skill; the whole verb; as
+before — each tense (1b). Persons going wrong asked more, named on the
+verb's screen, kept out of sentences until right again (2a, 7a, 9b). A tense
+starts where most of its persons are (3a), and the persons' progress is
+kept (10a). A level opens on two right answers running *and* once every
+person has been answered right on it (4b); "Read the forms" counts towards
+that and "I get it" does not (17c); two persons spelt the same count as one
+(18a). The verb's own word is one person of the past, not a word met first
+(5b). The subjunctive is a tense skill too, still asked only in its examples
+(6a). Progress counts each tense the teacher filled in as a card (8b, "only
+for tenses that are actually filled"). Huế unchanged (11a); Arabic and
+Hebrew together (12a). Verbs, sentences and numbers on one set of rules in
+one release (13). "Weak skills" is "Weak spots" (14a). The endings on
+nouns wait (15b); no new skills yet (16).
+
+**Every person, on every level — how.** `capOf` reads the persons' states:
+the first level, from the bottom, where some person who can be asked
+something there has no right answer on it (anything but `vpattern`), twins
+by letters counting for each other. That level goes into the same map that
+holds a number part under its weakest word — `SKILL_CAPS`, read by the
+session, the standings (`cappedAt`) and `atItsTop` — so the line on the
+screen is the line the questions stop at. A capped tense makes no passes
+(`gradingFor`'s `keysOf`), and the next tense opens only once this one is
+cleared and uncapped (`quietTenses`). The draw leans on the same states:
+not asked yet this sitting, wrong on this question, not yet right on its
+level, wrong on anything, least asked; then a seed of the tense, the
+question and its right answers (`skillSeed`).
+
+**Starting where most persons are.** On a tense with nothing answered,
+each bare key is given the middle state of its persons, a person never
+asked counting at the bottom and an even count taking the lower middle
+(`middleState`). Once — a tense answered once is never seeded again.
+
+**Why a form and not a field.** A form's schedule already rides everywhere a
+learner's work goes: the merge between devices, the fold of a refreshed
+card, the drawer of a withdrawn one, the drawer's way back. A field on the
+card would have needed each of those taught. The cost is that everything
+walking a card's forms meets a form with no words, which every reader
+already tolerates (a verb with its past *he* blank has a blank lead), and
+the one merge that would drop it — an older device answering last — keeps
+tense forms from both sides.
+
+**The shared rules.** `src/skills.ts` says the rules once: one schedule and
+no words; drawn from a seed of skill, question and right answers; parts
+known before use; parts marked with the skill; never above what the parts
+allow. Numbers and tenses now share the seed and the cap line. Sentences
+already kept the first four in their own modules and were left as they are —
+nothing about them changes for a learner, so moving their code would have
+been risk with nothing to show for it.
+
+**What it costs.** Each tense's level waits on its slowest person, so a
+person the draw seldom reaches can hold a tense on a level for a sitting or
+two. Progress counts go up — a deck of twenty verbs reads as forty to sixty
+cards. A device still on 0.456 sees tense forms as forms with no words and
+asks nothing of them. The persons' states go on being written, so going
+back would hand learners their per-person progress as it then stood.
+Tests: `tests/tense-skills.test.mjs`.

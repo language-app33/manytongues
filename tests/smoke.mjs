@@ -2447,7 +2447,7 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
       prepTile() ? (prepTile()?.textContent || "").replace(/\s+/g, " ").slice(0, 120) : "(no prep tile)");
     check("the climb over everything is left off, and the sessions tile below has no primary button",
       !homeCard()?.querySelector(".at-climb") && !homeCard()?.querySelector(".at-btn.primary") &&
-        !!buttonNamed(/^(Start session|Practise anyway)$/) && homeCard()?.contains(buttonNamed(/^Weak skills$/) || null),
+        !!buttonNamed(/^(Start session|Practise anyway)$/) && homeCard()?.contains(buttonNamed(/^Weak spots$/) || null),
       (homeCard()?.textContent || "").replace(/\s+/g, " ").slice(0, 120));
     const counter = () => ((document.querySelector(".at-preptoday") || {}).textContent || "");
     check("under it, today's sessions against what today needs, as a count and a row of dots",
@@ -2650,8 +2650,8 @@ const beforeAnswer = schedules();
    nothing to fix it is dimmed and says so on being pressed rather than
    swallowing the press. */
 {
-  const weakBtn = buttonNamed(/^Weak skills$/);
-  check("the home screen offers a weak-skills session", !!weakBtn,
+  const weakBtn = buttonNamed(/^Weak spots$/);
+  check("the home screen offers a weak-spots session", !!weakBtn,
     (document.body.textContent || "").slice(0, 120).replace(/\s+/g, " "));
   const row = weakBtn && weakBtn.closest(".at-row");
   check("and nothing is written beside it either way",
@@ -2668,7 +2668,7 @@ const beforeAnswer = schedules();
     await sleep(200);
     const said = document.querySelector(".at-snack");
     check("and pressing it says why nothing happened, rather than nothing at all",
-      !!said && /no weak skill to fix right now/i.test(said.textContent || ""),
+      !!said && /no weak spot to fix right now/i.test(said.textContent || ""),
       said ? (said.textContent || "").replace(/\s+/g, " ") : "nothing said");
     /* And it started no session: the whole point of the dimming. */
     check("and no session starts from it", !document.querySelector(".at-instruction"),
@@ -8628,8 +8628,8 @@ const openPronounTables = async () => {
   await sleep(1500);
 
   const weakBtn = [...host3.querySelectorAll("button")]
-    .find((b) => /^Weak skills$/.test((b.textContent || "").trim()));
-  check("a card missed twice running lights the weak-skills button",
+    .find((b) => /^Weak spots$/.test((b.textContent || "").trim()));
+  check("a card missed twice running lights the weak-spots button",
     !!weakBtn && weakBtn.getAttribute("aria-disabled") !== "true",
     weakBtn ? "the button is there but dimmed"
       : (host3.textContent || "").slice(0, 90).replace(/\s+/g, " ") || "nothing rendered");
@@ -9910,8 +9910,14 @@ const openPronounTables = async () => {
   check("then the same session asks who a form is about, once", seen.join(",") === "pattern,who", JSON.stringify(seen));
   check("and once answered it has no Learn more under it", !fresh.met.patternMore, JSON.stringify(fresh.met));
   check("laid out one row a person, the two spelt alike included", fresh.met.patternRows === 6, JSON.stringify(fresh.met));
-  const marked = (fresh.verb && fresh.verb.forms || []).filter((/** @type {any} */ f) => f.row === "present" && f.s && f.s.vpattern && f.s.vpattern.right > 0);
-  check("and \"I get it\" counts for every form of the tense", marked.length === 6, `${marked.length} marked`);
+  /* Since 0.457 the tense is one skill: "I get it" is an answer about the
+     tense, and counts for nobody in it. */
+  const forms = (fresh.verb && fresh.verb.forms) || [];
+  const tense = forms.find((/** @type {any} */ f) => f.tense === "present");
+  const marked = forms.filter((/** @type {any} */ f) => f.row === "present" && f.s && f.s.vpattern && f.s.vpattern.right > 0);
+  check("and \"I get it\" counts for the tense", !!tense && !!tense.s && !!tense.s.vpattern && tense.s.vpattern.right > 0,
+    JSON.stringify(tense && tense.s));
+  check("and for no person in it", marked.length === 0, `${marked.length} marked`);
 
   const reading = await walk([verbCard(settled(1, ["vread", "vwho"])), ...others]);
   check("then the forms are read with their pronunciation hidden", reading.met.read > 0 && reading.met.hidden === 6,

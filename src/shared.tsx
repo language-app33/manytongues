@@ -20,6 +20,7 @@ import { askLine, A_SENTENCE, blanksOn, cellTitle, CLIP_KINDS, combosOf, dimsSai
   rowsLine, tablesOn, tableTitle, unnamedOn } from "./card-facts.ts";
 import { colOf, foldJoined, NO_PARTNER, personsFor, personsOf, rowOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { isOffline, watchNet } from "./net.ts";
+import { isTenseForm, withTenses } from "./tense-skills.ts";
 /* A teacher's numbers and their clock, which arrive with the material and
    become cards on the way in. Reached through the registry, never by
    naming a language — see src/numbers/. */
@@ -2528,9 +2529,13 @@ function ReadTable({ group, lang, reader }: {
   return (
     <section className="at-panel">
       <p className="at-eyebrow">{tableTitle(group.spec)}{word ? ` — ${word}` : ""}</p>
+      {/* Where the language offers the practices of a tense, the tense is
+          what is learnt, and each question is about one person of it — see
+          tense-skills.ts. Elsewhere a cell is learnt on its own. */}
       <p className="at-hint">
-        Every cell is a form of the word in its own right: its own
-        recordings, its own progress, and asked as its own question.
+        {!group.of && (group.spec.practices || []).length
+          ? "Each tense is learnt as one thing, with its own progress. Every question about it is about one person, and a person who keeps going wrong comes up more often."
+          : "Every cell is a form of the word in its own right: its own recordings, its own progress, and asked as its own question."}
       </p>
       {cells.map((cell, i) => {
         const on = rowOf(cell);
@@ -2818,7 +2823,7 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
   /* The forms that are not cells of a table: a cell is a form like any
      other and is drawn under the table it sits in, which is what says
      which tense and which person it is. */
-  const loose = forms.filter((f) => !isTableCell(f, L));
+  const loose = forms.filter((f) => !isTableCell(f, L) && !isTenseForm(f));
   const titles = (card.decks || [])
     .map((id: string) => decks.find((d) => d.id === id))
     .map((d) => d && d.title)
@@ -4782,7 +4787,10 @@ export function foldCourses(items: Item[], incoming: Item[], parked: Record<stri
   const byId = new Map(items.map((i) => [i.id, i]));
   const kept: Item[] = [];
   for (const joined of incoming) {
-    const fresh = unjoined(joined);
+    /* With its tenses, where they are skills, so the fold below finds them
+       by name the way it finds every other form — see tense-skills.ts. */
+    const lang = LANGUAGES[String(joined.lang || "")] || null;
+    const fresh = withTenses(unjoined(joined), lang);
     const held = byId.get(fresh.id);
     const existing = held ? joinHeld(held, joined) : held;
     if (existing) {
@@ -4804,7 +4812,7 @@ export function foldCourses(items: Item[], incoming: Item[], parked: Record<stri
          never-answered on the next refresh. They fold by the same rule the
          forms do; a line has carried a name of its own since it was
          written. */
-      kept.push({
+      kept.push(withTenses({
         ...fresh,
         /* Whatever the learner last said about wanting this card next,
            and when they said it — not only a yes. Keeping the yes alone
@@ -4823,13 +4831,13 @@ export function foldCourses(items: Item[], incoming: Item[], parked: Record<stri
         ...(existing.reset ? { reset: existing.reset } : null),
         forms: foldForms(formsOf(existing), formsOf(fresh)),
         ...(fresh.lines ? { lines: foldForms(existing.lines || [], fresh.lines) } : null),
-      });
+      }, lang));
     } else {
       /* A card the device has never held — or one that went away and has
          come back, whose work was set aside rather than thrown out. And a
          card split out of one this device holds starts where that one
          stood: the learner knew it as part of the original. */
-      kept.push(withProgress(uncarried(splitFromHeld(fresh, byId)), parked[fresh.id]));
+      kept.push(withTenses(withProgress(uncarried(splitFromHeld(fresh, byId)), parked[fresh.id]), lang));
     }
   }
 

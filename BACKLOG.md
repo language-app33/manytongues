@@ -101,3 +101,9 @@ recorded pieces, which are two words and not two halves of one.
 The lifts key on the shape of what they find, which is what makes them safe
 to run twice. The version field is written on every save and read by
 nothing. Either give it a meaning or drop it.
+
+## The endings on a noun, as a skill
+
+*My book*, *your book*, *his book* are a table on every noun, and each
+cell is still learnt on its own, the way a verb's persons were until 0.457.
+The owner chose to see how tenses as skills go before doing the same here.

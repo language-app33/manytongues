@@ -191,6 +191,8 @@ import {
   rowOf,
   slotRows,
   subjectSlot,
+  tensesOf,
+  isFrame,
 } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf, withLead } from "./cards.ts";
 import { langsOffAmong } from "./lang-choice.ts";
@@ -332,6 +334,9 @@ import { tickCapitals } from "./capitals.ts";
 import { spellRuns, typoed } from "./spelling.ts";
 import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, whoChoices, whoIsRight } from "./verb-drills.ts";
 import type { Tense } from "./verb-drills.ts";
+import { cappedAt, skillSeed } from "./skills.ts";
+import type { SkillCaps } from "./skills.ts";
+import { capOf, coveredAt, drawPerson, heldByTense, isTenseForm, placesOfTense, rowOfTense, shaky, shakyPlaces, skillTableOf, tenseFormAt, tenseFormsOf, tenseRight, withTenses, PATTERN as TENSE_PATTERN } from "./tense-skills.ts";
 import type { Run } from "./spelling.ts";
 
 /*
@@ -373,6 +378,21 @@ export const cardStandings = (
   among?: Item[],
   keys: (unit: Form, settings: Settings) => string[] = laddered,
 ): Standing[] => {
+  /* A verb whose tenses are skills stands where the tense furthest behind
+     stands, of the ones it can be asked; each tense, counted as a card of
+     its own, stands where its own ladder and its persons put it — see
+     tenseCardsOf and capOf. */
+  const tenses = tenseFormsOf(it);
+  if (tenses.length && !isTenseCard(it)) {
+    /* And the rest of the card — a verb's own sentences, which are asked
+       as the sentences they are — stands beside its tenses. */
+    const each = tenses
+      .map((form) => cardStandings({ ...it, forms: [form] }, settings, among, keys))
+      .concat([cardStandings(restOf(it), settings, among, keys)])
+      .filter((rows) => rows.length);
+    return each.length ? each.reduce((low, rows) => (standingRank(standing(rows)) < standingRank(standing(low)) ? rows : low)) : [];
+  }
+  if (isTenseCard(it)) return cappedAt(standingsOf(it, (u) => keys(u, settings)), SKILL_CAPS.get(leadOf(it).id) ?? null);
   const rows = standingsOf(it, (u) => keys(u, settings));
   if (!among || !rows.length) return rows;
   const words = it.parts ? partsOf(it, among, settings, keys).filter((p) => p.known === false).length : 0;
@@ -389,6 +409,60 @@ export const cardStandings = (
   return cappedAt(kept, weakestLevel(it, among, settings, keys));
 };
 
+/* How far along one standing is, for telling which of a verb's tenses is
+   furthest behind: its level, then how it is going there. */
+const STATUS_RANK: Record<string, number> = { none: 0, paused: 1, learning: 2, cleared: 5, done: 9 };
+const standingRank = (at: Standing | null): number => (at ? at.level * 10 + (STATUS_RANK[at.status] || 0) : -1);
+
+/* A verb with its tenses taken off: its own word and persons, which are
+   held, and whatever else it carries — its own sentences. */
+const restOf = (it: Item): Item => ({ ...it, forms: formsOf(it).filter((f) => !isTenseForm(f)) });
+
+/* Whether a card is one tense of a verb, standing on its own — see
+   tenseCardsOf. */
+const isTenseCard = (it: Item): boolean => formsOf(it).length === 1 && isTenseForm(leadOf(it));
+
+/*
+ * A verb whose tenses are skills, as the cards it counts as: one for each
+ * tense the teacher filled in. Null for every other card, which counts as
+ * itself.
+ *
+ * What the Progress tab and the home screen's ring count: a verb is two
+ * or three things to learn rather than one, and its present learnt beside
+ * a past still being climbed is progress a single tile would hide. Each
+ * stands for its tense under the verb's name and the tense's — "to write ·
+ * present" — with the first person written as its face, and opens the verb
+ * itself (`tenseOf`). Never stored; made where it is counted.
+ */
+export function tenseCardsOf(it: Item): (Item & { tenseOf: string })[] | null {
+  const forms = tenseFormsOf(it);
+  if (!forms.length) return null;
+  const spec = skillTableOf(LANGUAGES[String(it.lang || "")] || null);
+  const name = String(it.name || leadOf(it).en || "").trim();
+  const out: (Item & { tenseOf: string })[] = [];
+  for (const form of forms) {
+    const tense = spec ? placesOfTense(it, spec, form) : null;
+    if (!tense) continue;
+    const label = tense.tense.label || tense.tense.id;
+    const face = tense.places[0].form;
+    out.push({
+      ...it,
+      id: form.id,
+      tenseOf: it.id,
+      name: name ? `${name} · ${label}` : label,
+      forms: [{ ...form, ar: face.ar, lat: face.lat, en: label }],
+    });
+  }
+  /* And the verb itself, where it carries sentences of its own: those are
+     asked as sentences and count as the card they always were. */
+  if (subFormsOf(it).some((f) => isFrame(f) && isAsked(f))) out.push({ ...restOf(it), tenseOf: it.id });
+  return out;
+}
+
+/* Every card as it is counted: a verb whose tenses are skills as its
+   tenses, every other card as itself. */
+export const asCounted = (items: Item[]): Item[] => items.flatMap((it) => tenseCardsOf(it) || [it]);
+
 /*
  * A number part is never further up than the weakest of its members.
  *
@@ -400,22 +474,9 @@ export const cardStandings = (
  * learnt, whatever its own answers say, and every row above it has not
  * been started. Nothing is taken off the part's schedules; the moment the
  * member climbs, the rows come back as they were. The questions above the
- * line wait as well (see RANGE_CAPS), so the screen and the session agree.
+ * line wait as well (see SKILL_CAPS), so the screen and the session agree.
  */
-function cappedAt(rows: Standing[], cap: number | null): Standing[] {
-  if (cap == null || !rows.length) return rows;
-  /* The part's own highest level at or under the member's — a part with
-     nothing on level three stops at two for a member writing figures. */
-  const under = rows.filter((r) => r.level <= cap);
-  const line = under.length ? under[under.length - 1].level : rows[0].level;
-  return rows.map((r) =>
-    r.level > line
-      ? { ...r, status: "none" }
-      : r.level === line && (r.status === "done" || r.status === "cleared")
-      ? { ...r, status: "learning" }
-      : r,
-  );
-}
+/* The line itself is the one every skill draws — see cappedAt in skills.ts. */
 
 /*
  * The level the weakest member of a number part is working on — its
@@ -1255,7 +1316,7 @@ function settingsFor(settings: Settings, unit: Spoken): Settings {
  * there, and a verb's later tenses were dealt before its present was known.
  */
 export function askedUnits(item: Item) {
-  return unitsOf(item).filter(({ unit }) => !isQuiet(unit) && isAsked(unit));
+  return unitsOf(item).filter(({ unit }) => !isQuiet(unit) && !isHeld(unit) && isAsked(unit));
 }
 
 /* And of those, the ones a dealt session looks at: a form needs two
@@ -1521,6 +1582,31 @@ export function fillersIn(unit: Form, key: string, settings: Settings): Filler[]
      * answer differently and this is the seam between them.
      */
     if (card.drill === false) continue;
+    /* A person of a tense held as a skill: the tense is what is credited,
+       by the same rule as any word, and the person beside it — answered
+       right, whether or not anything was due — as the record the tense is
+       read against. */
+    const spec = isHeld(form) ? skillTableOf(LANGUAGES[String(card.lang || "")] || null) : null;
+    const cell = spec ? (form.id === leadOf(card).id ? citedCell(card, spec) : form) : null;
+    const tenseForm = cell ? tenseFormAt(card, rowOf(cell)) : null;
+    if (spec && cell && tenseForm) {
+      out.push({
+        id: card.id,
+        subId: tenseForm.id,
+        asked: laddered(tenseForm, settings).includes(key),
+        ready: (() => {
+          const st = statesOf(tenseForm)[key];
+          return !!st && st.phase !== "new" && stateReady(st);
+        })(),
+      });
+      out.push({
+        id: card.id,
+        subId: cell.id,
+        asked: availableTypes(cell, langOf(settingsFor(settings, cell))).includes(typeOf(key)),
+        ready: false,
+      });
+      continue;
+    }
     out.push({
       id: card.id,
       subId: form.id === card.id ? null : form.id,
@@ -1773,6 +1859,57 @@ function setQuietUnits(quiet: Set<string>) {
 const isQuiet = (unit: Form): boolean => !!unit && QUIET_UNITS.has(unit.id);
 
 /* ------------------------------------------------------------------
+   What a tense holds
+
+   A verb whose tenses are skills is asked through its tenses and nothing
+   else: its persons are what each question is drawn from, and its own
+   word — the past *he*, the cell a dictionary cites — is one of those
+   persons (see tense-skills.ts). So neither is dealt, counted or shown as
+   a thing to learn. Quiet would be the wrong word for them: a quiet form
+   is waiting to open, and these never do. Every state they hold is kept,
+   and the persons go on being written to, as the record each tense is
+   read against.
+   ------------------------------------------------------------------ */
+
+let HELD_UNITS: Set<string> = new Set();
+
+function setHeldUnits(held: Set<string>) {
+  const next = held || new Set();
+  if (next === HELD_UNITS) return;
+  HELD_UNITS = next;
+  forgetTypes();
+}
+
+/* Whether a form is held by a tense: a person of it, or the word of a verb
+   whose tenses are skills. */
+const isHeld = (unit: Form | null | undefined): boolean => !!unit && HELD_UNITS.has(unit.id);
+
+/* Every such form, by id: each verb's own word and every cell of a row it
+   holds as a skill. Read off the cards alone — what is held does not
+   depend on anything the learner has done. */
+export function heldUnitsOf(items: Item[]): Set<string> {
+  const out: Set<string> = new Set();
+  for (const card of items) {
+    if (!tenseFormsOf(card).length) continue;
+    const spec = skillTableOf(LANGUAGES[String(card.lang || "")] || null);
+    if (!spec) continue;
+    out.add(leadOf(card).id);
+    for (const cell of cellsIn(card, spec, "")) if (heldByTense(card, cell, spec)) out.add(cell.id);
+  }
+  return out;
+}
+
+/* The tense a form is, with the card it is on and its persons — null for
+   any form that is not a tense held as a skill. */
+function tenseHeld(unit: Form | null | undefined): { card: Item; spec: VerbSpec; tense: Tense } | null {
+  if (!unit || !isTenseForm(unit)) return null;
+  const card = verbCardOf(unit);
+  const spec = card ? skillTableOf(LANGUAGES[String(card.lang || "")] || null) : null;
+  const tense = card && spec ? placesOfTense(card, spec, unit) : null;
+  return card && spec && tense ? { card, spec, tense } : null;
+}
+
+/* ------------------------------------------------------------------
    Which card a verb's cell is on
 
    The practices of a tense ask about the rest of the tense — the persons
@@ -1790,6 +1927,8 @@ export function verbCardsOf(items: Item[]): Map<string, Item> {
   const out: Map<string, Item> = new Map();
   for (const card of items) {
     for (const cell of cellsOf(card)) out.set(cell.id, card);
+    /* And its tenses held as skills, which are about the card's cells. */
+    for (const tense of tenseFormsOf(card)) out.set(tense.id, card);
   }
   return out;
 }
@@ -2255,11 +2394,41 @@ export function quietUnits(items: Item[], settings: Settings): Set<string> {
         }
         continue;
       }
-      /* Rows that open one at a time: a verb's tenses. */
-      quietRows(card, spec, lang, out);
+      /* Rows that open one at a time: a verb's tenses — held as skills
+         where the language says so, and cell by cell where it does not. */
+      if (spec === skillTableOf(lang) && tenseFormsOf(card).length) quietTenses(card, spec, lang, out);
+      else quietRows(card, spec, lang, out);
     }
   }
   return out;
+}
+
+/*
+ * One tense of a verb is ever new at a time, where the tenses are skills.
+ *
+ * The rule the cells have below, read off the tenses: a tense opens once
+ * the one before it is cleared — up every level, and every person of it
+ * answered right on each — and a tense the teacher left blank is passed
+ * straight through. The verb's own word is held by its tense rather than
+ * met first (see HELD_UNITS), so nothing here stands in for it.
+ */
+function quietTenses(card: Item, spec: VerbSpec, lang: Lang, out: Set<string>) {
+  let open = true;
+  for (const row of tensesOf(spec)) {
+    const form = tenseFormAt(card, row.id);
+    const tense = form ? placesOfTense(card, spec, form) : null;
+    if (!form || !tense) continue;
+    if (!open) {
+      out.add(form.id);
+      continue;
+    }
+    /* Read through availableTypes rather than laddered, for the reason the
+       cells' gate gives below: laddered asks this very set. */
+    const keys = availableTypes(form, lang).flatMap((t) => keysFor(form, t));
+    if (!keys.length) continue;
+    const supports = (cell: Form) => availableTypes(cell, lang);
+    open = cleared(keys, (k) => statesOf(form)[k]) && capOf(tense, keys, supports, lang) == null;
+  }
 }
 
 /*
@@ -2426,6 +2595,32 @@ export function valueIndexOf(items: Item[], settings: Settings): Map<string, Val
  * and is read as a name is. It used to read as never met, and so never
  * stood anywhere.
  */
+/*
+ * Whether a person of a tense held as a skill may stand in a sentence.
+ *
+ * Once the tense is cleared — up every level, every person of it answered
+ * right on each — and not while this person has gone wrong lately: a
+ * sentence only uses what the learner knows, and a person they keep
+ * getting wrong is not that yet. The verb's own word stands for the person
+ * a dictionary cites, and is read through it.
+ *
+ * Read off the tense's own keys rather than through laddered, which asks
+ * the quiet set this is worked out before.
+ */
+function heldStands(card: Item, form: Form, settings: Settings): boolean {
+  const spec = skillTableOf(LANGUAGES[String(card.lang || "")] || null);
+  if (!spec) return false;
+  const lang = langOf(settingsFor(settings, form));
+  const cell = form.id === leadOf(card).id ? citedCell(card, spec) : form;
+  const tenseForm = cell ? tenseFormAt(card, rowOf(cell)) : null;
+  const tense = tenseForm ? placesOfTense(card, spec, tenseForm) : null;
+  if (!cell || !tenseForm || !tense) return false;
+  const keys = availableTypes(tenseForm, lang).flatMap((t) => keysFor(tenseForm, t));
+  if (!keys.length || !cleared(keys, (k) => statesOf(tenseForm)[k])) return false;
+  if (capOf(tense, keys, (c) => availableTypes(c, lang), lang) != null) return false;
+  return !shaky(cell);
+}
+
 export function valueReachOf(
   items: Item[],
   settings: Settings,
@@ -2437,8 +2632,11 @@ export function valueReachOf(
   const map: Map<string, boolean | null> = new Map();
   const forms: Map<string, boolean | null> = new Map();
   const owner: Map<string, { card: Item; form: Form }> = new Map();
-  const clearedOf = (form: Form, drilled: boolean): boolean | null => {
+  const clearedOf = (form: Form, drilled: boolean, card?: Item): boolean | null => {
     if (!drilled || !isAsked(form)) return null;
+    /* A person of a tense held as a skill stands once its tense is cleared
+       and it has not gone wrong lately — see heldStands. */
+    if (card && isHeld(form)) return heldStands(card, form, settings);
     return cleared(laddered(form, settings), (key: string) => statesOf(form)[key]);
   };
   for (const it of items) {
@@ -2450,7 +2648,7 @@ export function valueReachOf(
       const ref = refOf(value);
       if (!ref) continue;
       owner.set(ref, { card: it, form: form as Form });
-      map.set(ref, clearedOf(form as Form, drilled));
+      map.set(ref, clearedOf(form as Form, drilled, it));
     }
     /*
      * And every other form of the card, for the owner index alone.
@@ -2470,7 +2668,7 @@ export function valueReachOf(
     for (const form of formsOf(it)) {
       const ref = form.id === it.id ? it.id : form.id;
       if (!ref) continue;
-      if (!forms.has(ref)) forms.set(ref, clearedOf(form, drilled));
+      if (!forms.has(ref)) forms.set(ref, clearedOf(form, drilled, it));
       if (owner.has(ref)) continue;
       owner.set(ref, { card: it, form });
     }
@@ -2504,6 +2702,7 @@ export function installIndexes(items: Item[], settings: Settings, systems: Syste
   setReviewGate(reviewGateOf(items));
   setNumeralsKnown(numeralsKnownOf(items, settings));
   setVerbCards(verbCardsOf(items));
+  setHeldUnits(heldUnitsOf(items));
   /*
    * The counts before the three walks that read them, and not after.
    *
@@ -2526,7 +2725,7 @@ export function installIndexes(items: Item[], settings: Settings, systems: Syste
   setQuietUnits(quiet);
   setQuietUnits(withFacesWaiting(quiet, items, settings, systems));
   setEasedUnits(easedUnits(items, settings));
-  setRangeCaps(rangeCapsOf(items, settings));
+  setSkillCaps(skillCapsOf(items, settings));
 }
 
 /* ------------------------------------------------------------------
@@ -3637,6 +3836,10 @@ function blankedPhrase(context: any, lang: Lang, blank: string = "____") {
  * moment there is a connection or the recordings have been downloaded.
  */
 function typeAllowedNow(type: string, unit?: Form) {
+  /* A tense held as a skill can be asked this now where one of its persons
+     can: the question goes to that person. */
+  const held = unit && tenseHeld(unit);
+  if (held) return held.tense.places.some((p) => personAsks(p.form, type));
   /* A question that shows a picture has to be able to show it, which
      offline means the picture is on this device — the same rule the
      recordings follow below, for the same reason. */
@@ -3644,6 +3847,52 @@ function typeAllowedNow(type: string, unit?: Form) {
   if (!isListening(type)) return true;
   if (listenOffUntil > Date.now()) return false;
   return canHearHere(unit);
+}
+
+/* Whether a person of a tense held as a skill can be asked this, here and
+   now, as the question it would be about them alone. */
+function personAsks(cell: Form, type: string): boolean {
+  const lang = LANGUAGES[String(cell.lang || "")] || activeLang();
+  return availableTypes(cell, lang).includes(typeOf(type)) && typeAllowedNow(type, cell);
+}
+
+/*
+ * Whom one asking of a tense held as a skill is about, drawn — or the
+ * question unchanged where it is not about one.
+ *
+ * `taken` is who the sitting has asked of this tense already, so two
+ * questions about one tense in a session go to two persons where they can.
+ * The seed moves on a right answer, as a range's does, so a re-render
+ * cannot swap the person under somebody halfway through answering.
+ */
+function personFor(unit: Form | null | undefined, type: string, taken?: Set<string>): Form | null {
+  const held = tenseHeld(unit);
+  if (!held || !unit) return null;
+  const lang = LANGUAGES[String(held.card.lang || "")] || activeLang();
+  const seed = skillSeed(unit.id, type, statesOf(unit)[type]);
+  const place = drawPerson(held.tense, type, (cell) => personAsks(cell, type), seed, lang, taken);
+  return place ? place.form : null;
+}
+
+/* Every question about a tense held as a skill with a person on it, where
+   one is missing — a practice dealt to follow a table, a backup. Each
+   tense's persons are spread across the sitting as the deal spreads them. */
+export function withPersons(list: Question[], items: Item[]): Question[] {
+  const byId = byIdOf(items);
+  const taken: Map<string, Set<string>> = new Map();
+  for (const q of list) if (q.person && q.subId) (taken.get(q.subId) || taken.set(q.subId, new Set()).get(q.subId))!.add(q.person);
+  return list.map((q) => {
+    if (q.person || !q.subId) return q;
+    const card = byId.get(q.id);
+    const unit = card ? subFormsOf(card).find((f) => f.id === q.subId) : null;
+    if (!unit || !isTenseForm(unit)) return q;
+    const seen = taken.get(unit.id) || new Set<string>();
+    taken.set(unit.id, seen);
+    const cell = personFor(unit, q.type, seen);
+    if (!cell) return q;
+    seen.add(cell.id);
+    return { ...q, person: cell.id };
+  });
 }
 
 /* Whether an exercise shows one of the card's pictures — as its prompt, or
@@ -3937,6 +4186,15 @@ function availableTypes(
    */
   const held = own ? TYPE_CACHE.get(it) : null;
   if (held && held.lang === lang.id) return held.types;
+  /* A tense held as a skill can be asked whatever one of its persons can:
+     each question about it is asked of a person — see drawPerson. */
+  const tense = tenseHeld(it);
+  if (tense) {
+    const can = new Set(tense.tense.places.flatMap((p) => availableTypes(p.form, lang)));
+    const types = TYPES.filter((t) => can.has(t));
+    if (own) TYPE_CACHE.set(it, { lang: lang.id, types });
+    return types;
+  }
   /* What its variables can be filled with, if it has any: a hole with
      nothing to put in it is not a question, and a card whose words change
      cannot be the one on a recording. Both are answered inside canAsk. */
@@ -3954,7 +4212,7 @@ function availableTypes(
     ) && (!EX[t].afterNumerals || numeralsKnownFor(it))
       /* A verb practice asks about the tense the form is in, so whether
          it can be asked is a fact about the card — see drillFits. */
-      && (!EX[t].verbDrill || drillFits(verbCardOf(it), it, t, lang))
+      && (!EX[t].verbDrill || drillFits(verbCardOf(it), it, t, lang, isHeld(it)))
       /* Reading or spelling a word another card of the learner's has
          too is asked on that card — see siblingStateOf. */
       && !(WORD_LEFT.has(it.id) && onlyAboutWord(EX[t]))
@@ -4041,6 +4299,9 @@ function ladderedOnceOpen(it: Form, settings: Settings): string[] {
      and the schedule it already had still sitting there for the day it is
      switched back on. */
   if (!isAsked(it)) return [];
+  /* Nor for a person of a tense held as a skill, or the word of such a
+     verb: the tense is what climbs — see HELD_UNITS. */
+  if (isHeld(it)) return [];
   /* And a rung's worth rather than all of it, for a pronoun on the end of a
      word the learner can already write — see easedUnits. Said here because
      this is the list everything downstream reads, so what is dealt, what
@@ -4106,7 +4367,7 @@ function openTypes(it: Form, settings: Settings): string[] {
 /* What openTypes would say once the tense's table has been got: the one
    thing a question dealt to follow the table may be asked before it is. */
 function openPastPattern(it: Form, settings: Settings): string[] {
-  const cap = RANGE_CAPS.get(it && it.id);
+  const cap = SKILL_CAPS.get(it && it.id);
   const open = reachedTypes(it, settings).filter((k) => typeAllowedNow(k, it) && (cap == null || levelOf(k) <= cap));
   return atItsTop(it, settings) ? open.filter((k) => levelOf(k) === topLevelOf(laddered(it, settings))) : open;
 }
@@ -4126,10 +4387,10 @@ function openPastPattern(it: Form, settings: Settings): string[] {
  * further down would need them.
  *
  * A number part held under its top by a weaker member is not on its top
- * and is asked as before (see RANGE_CAPS).
+ * and is asked as before (see SKILL_CAPS).
  */
 function atItsTop(it: Form, settings: Settings): boolean {
-  if (RANGE_CAPS.get(it && it.id) != null) return false;
+  if (SKILL_CAPS.get(it && it.id) != null) return false;
   const ladder = laddered(it, settings);
   const top = topLevelOf(ladder);
   const below = ladder.filter((k) => levelOf(k) < top);
@@ -4163,20 +4424,38 @@ function patternFirst(it: Form, keys: string[]): string[] {
  * Worked out with the rest of the indexes, after the quiet set, since it
  * reads the ladder.
  */
-let RANGE_CAPS: Map<string, number> = new Map();
+let SKILL_CAPS: SkillCaps = new Map();
 
-function setRangeCaps(caps: Map<string, number>) {
-  RANGE_CAPS = caps || new Map();
+function setSkillCaps(caps: Map<string, number>) {
+  SKILL_CAPS = caps || new Map();
 }
 
-export function rangeCapsOf(items: Item[], settings: Settings): Map<string, number> {
+export function skillCapsOf(items: Item[], settings: Settings): Map<string, number> {
   const out: Map<string, number> = new Map();
   for (const it of items) {
+    /* A tense held as a skill is held the same way, on the first level some
+       person of it has not yet been answered right on — see capOf. */
+    for (const form of tenseFormsOf(it)) {
+      const cap = tenseCapOf(form, settings);
+      if (cap != null) out.set(form.id, cap);
+    }
     if (!isRangeSkill(it) || !isDrillable(it, settings)) continue;
     const cap = weakestLevel(it, items, settings);
     if (cap != null) out.set(leadOf(it).id, cap);
   }
   return out;
+}
+
+/*
+ * The level a tense held as a skill waits on until every person of it has
+ * been answered right there, or null — see capOf. Over the keys the tense
+ * climbs and what each person could be asked alone.
+ */
+function tenseCapOf(form: Form, settings: Settings): number | null {
+  const held = tenseHeld(form);
+  if (!held) return null;
+  const lang = langOf(settingsFor(settings, form));
+  return capOf(held.tense, laddered(form, settings), (cell) => availableTypes(cell, lang), lang);
 }
 
 /*
@@ -4736,7 +5015,7 @@ function drawRange(
   /* A face that counts things, asked with a noun beside it — drawn the
      way a range's number is, on a seed that moves on a right answer. */
   if (item && unit && unit.countedAt) {
-    const ask = numbers.face(item, unit, `${unit.id} ${type} ${turnOf(statesOf(unit)[type])}`);
+    const ask = numbers.face(item, unit, skillSeed(unit.id, type, statesOf(unit)[type]));
     return ask ? { ask } : {};
   }
   const range = item && item.range;
@@ -4747,7 +5026,6 @@ function drawRange(
   const times = timeComposerFor(set.numbers.languageId);
   if (!composer) return {};
 
-  const turn = turnOf(statesOf(unit)[type]);
   /* Only a number whose words are recognised — see knownNumbers — and
      among those, towards a word of the part the learner has not kept yet,
      while there is one (see steeredAsk), and anywhere once every word is
@@ -4764,7 +5042,7 @@ function drawRange(
   /* A listening question asks a number somebody recorded, where the
      learner can be asked one: a number nobody recorded is nothing to
      listen to. */
-  const ask = numbers.draw(item, `${item.id} ${type} ${turn}`, waiting, counting, isListening(type));
+  const ask = numbers.draw(item, skillSeed(item.id, type, statesOf(unit)[type]), waiting, counting, isListening(type));
   if (!ask) return {};
 
   if (EX[type] && EX[type].picks !== "word") return { ask };
@@ -4805,7 +5083,7 @@ function drawRange(
  * - **Fix mistakes:** the pool is cards gone wrong in their last outings.
  * - **Not seen lately:** cards not practised for a few days, new ones
  *   included — which come in through the learning share like anywhere else.
- * - **Weak skills:** cards with something going wrong now, asked the
+ * - **Weak spots:** cards with something going wrong now, asked the
  *   questions that went wrong.
  * - **Get started:** recognition questions only.
  * - **Ultimate:** every question each card has open.
@@ -4893,7 +5171,7 @@ export function buildSession({
   }
 
   /* And the mode's own questions: recognition alone for Get started, what
-     went wrong for Weak skills, worst first. */
+     went wrong for Weak spots, worst first. */
   const allowed = (t: string, unit: Form) =>
     mode !== "started" || (EASY_TYPES.includes(typeOf(t)) && typeAllowedNow(t, unit));
   const typesOf = (unit: Form): string[] => {
@@ -4987,15 +5265,26 @@ export function buildSession({
   /* --- interleave, so a unit recurs with a gap rather than back to back --- */
   const deal = (plans: Plan[]): Question[] => {
     const out: Question[] = [];
+    /* Who has been asked of each tense held as a skill, so far. */
+    const persons: Map<string, Set<string>> = new Map();
     const depth = Math.max(0, ...plans.map((p) => p.types.length));
     for (let round = 0; round < depth; round++) {
       for (const p of plans) {
         if (p.types[round]) {
           const type = p.types[round];
+          /* And whom, where it is a tense held as a skill — before the
+             phrase, which is the person's own. Two questions on one tense
+             go to two persons where they can. */
+          const tensed = isTenseForm(p.unit);
+          const seen = tensed ? persons.get(p.unit.id) || new Set<string>() : null;
+          if (seen) persons.set(p.unit.id, seen);
+          const person = tensed ? personFor(p.unit, type, seen || undefined) : null;
+          if (tensed && !person) continue;
+          if (person && seen) seen.add(person.id);
           /* Which phrase, decided when the queue is built rather than at the
              moment of asking, so the question does not change under the
              learner if the cards are refreshed mid-session. */
-          const ctx = p.unit && !onlyNumbers ? pickContext(p.unit, type) : null;
+          const ctx = p.unit && !onlyNumbers ? pickContext(person || p.unit, type) : null;
           /* And which number or time, for the same reason and by the same
              rule: drawn once, here, from a seed that moves on a right
              answer so a missed question comes back unchanged. */
@@ -5008,6 +5297,7 @@ export function buildSession({
             id: p.id,
             subId: p.subId,
             type,
+            ...(person ? { person: person.id } : null),
             ...(ctx ? { ctx: ctx.id } : null),
             ...drawn,
             ...(onlyNumbers ? { within: "numbers" as const } : null),
@@ -5056,7 +5346,7 @@ export function buildSession({
      refused for want of variety when the cards in it support only one
      exercise between them, not when the ladder has opened only one so far.
      Get started draws on two gentle types, one of which needs a recording,
-     so it takes a card on one; and Weak skills is the one session where one
+     so it takes a card on one; and Weak spots is the one session where one
      exercise repeated is exactly what is wanted. */
   const minTypes = mode === "weak" ? 0 : mode === "started" ? 1 : 2;
   const offered = new Set(plans.flatMap((p) => enabledTypes(p.unit, settings).filter((t) => allowed(t, p.unit))));
@@ -5089,7 +5379,7 @@ export function buildSession({
   }
 
   const exercises = withReadThroughs(
-    oneNewTable(afterItsUse(questions.slice(0, cut), items, settings, sets), questions.slice(cut), items, settings),
+    withPersons(oneNewTable(afterItsUse(questions.slice(0, cut), items, settings, sets), questions.slice(cut), items, settings), items),
     items,
     settings
   );
@@ -5145,7 +5435,8 @@ function withGrids(
   const wanting: Map<string, Map<LangId, Form[]>> = new Map();
   for (const ex of list) {
     if (!isGrid(ex.type)) continue;
-    const r = resolveUnit(items, ex);
+    /* A tense held as a skill stands in the grid as the person drawn. */
+    const r = castTense(resolveUnit(items, ex), ex);
     if (!r) continue;
     const byLang = wanting.get(ex.type) || new Map<LangId, Form[]>();
     wanting.set(ex.type, byLang);
@@ -5206,8 +5497,9 @@ function withGrids(
       result.push(ex);
       continue;
     }
-    const r = resolveUnit(items, ex);
-    if (!r) continue;
+    const stored = resolveUnit(items, ex);
+    const r = castTense(stored, ex);
+    if (!r || !stored) continue;
     const key = gridKey(ex.type, r.unit.id);
     const rest = leadOf.get(key);
     if (rest) {
@@ -5216,11 +5508,15 @@ function withGrids(
       continue;
     }
     if (dealt.has(key) || !dropped.has(key)) continue;
-    const pick = substitute(r.unit, queued.get(keyOf(ex)) || new Set());
+    /* Something else to ask, chosen off the form as stored — a tense, not
+       the person it was drawn — and put to a person who can be asked it. */
+    const pick = substitute(stored.unit, queued.get(keyOf(ex)) || new Set());
     if (!pick) continue;
-    const ctx = specOf(pick).needs.includes("contexts") ? pickContext(r.unit, pick) : null;
-    const { mates: _none, ...bare } = ex;
-    result.push({ ...bare, type: pick, ...(ctx ? { ctx: ctx.id } : null) });
+    const person = isTenseForm(stored.unit) ? personFor(stored.unit, pick) : null;
+    if (isTenseForm(stored.unit) && !person) continue;
+    const ctx = specOf(pick).needs.includes("contexts") ? pickContext(person || r.unit, pick) : null;
+    const { mates: _none, person: _was, ...bare } = ex;
+    result.push({ ...bare, type: pick, ...(person ? { person: person.id } : null), ...(ctx ? { ctx: ctx.id } : null) });
   }
   return result;
 }
@@ -5366,7 +5662,7 @@ export function withRows(list: Question[], items: Item[]): Question[] {
     if (!isRowDrill(ex.type)) return true;
     const card = byId.get(ex.id);
     const cell = card && ex.subId ? subFormsOf(card).find((f) => f.id === ex.subId) : null;
-    const key = `${typeOf(ex.type)} ${ex.id} ${rowOf(cell)}`;
+    const key = `${typeOf(ex.type)} ${ex.id} ${rowOf(cell) || rowOfTense(cell)}`;
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
@@ -5447,11 +5743,15 @@ function backupsFor(
         (t) => own.includes(t) && !isListening(t) && !isGrid(t) && (!onlyNumbers || !borrowsPhrase(t))
       );
       if (!type) continue;
-      const ctx = onlyNumbers ? null : pickContext(unit, type);
+      /* A tense held as a skill is asked of a person, whose phrase it is. */
+      const person = isTenseForm(unit) ? personFor(unit, type) : null;
+      if (isTenseForm(unit) && !person) continue;
+      const ctx = onlyNumbers ? null : pickContext(person || unit, type);
       out.push({
         id: it.id,
         subId: isSub ? unit.id : null,
         type,
+        ...(person ? { person: person.id } : null),
         ...(ctx ? { ctx: ctx.id } : null),
         ...(onlyNumbers ? { within: "numbers" as const } : null),
       });
@@ -5849,6 +6149,35 @@ export function marksForAnswer({
    * happens. The first word is marked as any question is.
    */
   const marks: Mark[] = [];
+  /*
+   * A tense held as a skill is marked on itself, by the question's own ids,
+   * and on the person the question was about, beside it — which is the
+   * record its persons are read against: who keeps going wrong, and who
+   * has been answered right on each level. See tense-skills.ts.
+   */
+  const asTense = !!exercise.subId && isTenseForm(subFormsOf(parentItem).find((f) => f.id === exercise.subId));
+  const personId = asTense ? exercise.person || item.id : null;
+  if (asTense && tense && tense.length) {
+    /* Asked of the whole tense: one answer about the tense — right where
+       every person was — and each person on their own. Seeing the pattern
+       is the learner's word for the table and says nothing about anyone in
+       it, so it marks the tense alone. */
+    const pattern = typeOf(exercise.type) === TENSE_PATTERN;
+    const right = pattern ? !!correct : tenseRight(tense);
+    marks.push({
+      id: parentItem.id,
+      subId: exercise.subId || null,
+      rating: pattern ? rating : right ? "good" : "again",
+      correct: right,
+      advance: !practice,
+    });
+    if (!pattern) {
+      for (const m of tense) {
+        marks.push({ id: parentItem.id, subId: m.unit.id, rating: m.right ? "good" : "again", correct: m.right, advance: !practice });
+      }
+    }
+    return marks;
+  }
   if (tense && tense.length) {
     /* A tense asked as a whole is a question about each of its forms, and
        each is marked on its own, the way each word of a grid is: the one
@@ -5883,6 +6212,10 @@ export function marksForAnswer({
         correct: m.right,
         advance: !practice && (lead || stateReady(statesOf(m.unit)[exercise.type])),
       });
+      /* And the person a tense's tile was, beside the tense. */
+      if (lead && personId) {
+        marks.push({ id: parentItem.id, subId: personId, rating: m.right ? "good" : "again", correct: m.right, advance: !practice });
+      }
     }
   } else {
     marks.push({
@@ -5896,6 +6229,10 @@ export function marksForAnswer({
          none of them was filled with anything. */
       filled: (item as Record<string, any>).filled as Record<string, string> | undefined,
     });
+    /* And the person, where it was a tense's question about one. */
+    if (personId) {
+      marks.push({ id: parentItem.id, subId: personId, rating, correct: !!correct, advance: !practice });
+    }
     /*
      * And the words that stood in those blanks.
      *
@@ -6025,7 +6362,7 @@ export function resolveQuestion(asking: Item[], exercise: Question, trial: boole
   return castExample(castGap(
     castRange(
       castMeaning(
-        castTaught(castAnswer(castFill(resolveUnit(asking, exercise), exercise.type, trial), exercise.type), exercise.type),
+        castTaught(castAnswer(castFill(castTense(resolveUnit(asking, exercise), exercise), exercise.type, trial), exercise.type), exercise.type),
         exercise.type,
         exercise,
       ),
@@ -6050,7 +6387,11 @@ export function gradingFor(exercise: Question, settings: Settings) {
        own accord, counts towards the two passes that make it learnt. Per
        form and not per card, because one answer marks several: a word
        standing in somebody else's sentence is credited on its own ladder. */
-    keysOf: (unit: Form) => laddered(unit, settings),
+    keysOf: (unit: Form) =>
+      /* A tense still waiting on a person to be answered right on some
+         level is not up its ladder, whatever its own answers say, so it
+         makes no passes yet — see capOf. */
+      isTenseForm(unit) && SKILL_CAPS.get(unit.id) != null ? [] : laddered(unit, settings),
   };
 }
 
@@ -6282,7 +6623,7 @@ export function isWeak(it: Item, settings: Settings): boolean {
   );
 }
 
-/* A sitting of what is going wrong: Weak skills, under the session mix
+/* A sitting of what is going wrong: Weak spots, under the session mix
    like every other session — see SessionMode. */
 export function buildWeakSession({ items, settings, inDeck, budget, systems, perDay }: {
   items: Item[];
@@ -6295,6 +6636,26 @@ export function buildWeakSession({ items, settings, inDeck, budget, systems, per
   /* Not a dealt session: the screen at the end reads `manual` to know that
      "Keep going" would be a change of subject rather than more of the same. */
   return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "weak" }), manual: true, mode: "weak" };
+}
+
+/*
+ * A tense held as a skill, cast as the person its question is about.
+ *
+ * The tense carries no words; the person drawn when the queue was built
+ * does, and from here on the question is asked of them exactly as it was
+ * of the cell before tenses were skills. What it marks is the tense, by
+ * the question's own ids, and the person beside it — see marksForAnswer.
+ * A question that reaches here with nobody on it is given whoever the
+ * tense would be asked next, so it is never shown empty.
+ */
+function castTense(
+  resolved: { unit: Form; parent: Item; isSub: boolean } | null,
+  ex: Question | null | undefined,
+) {
+  if (!resolved || !ex || !isTenseForm(resolved.unit)) return resolved;
+  const named = ex.person ? subFormsOf(resolved.parent).find((f) => f.id === ex.person) : null;
+  const cell = named || personFor(resolved.unit, ex.type);
+  return cell ? { ...resolved, unit: cell, isSub: true } : resolved;
 }
 
 /* Resolve an exercise back to the item and the specific form it drills. */
@@ -6952,7 +7313,9 @@ function liftItem(stored: Record<string, any>, settings: Record<string, any> = {
   /* And "keeps its capital letters" ticked on a card the old list of words
      kept a capital on, where nobody has answered — see capitals.ts. */
   const it = tickCapitals(lifted) || lifted;
-  return carryToSentences({
+  /* And a verb's tenses held as skills, each starting where most of its
+     persons are the first time — see tense-skills.ts. */
+  return withTenses(carryToSentences({
     ...it,
     tags: Array.isArray(it.tags) ? it.tags : [],
     locked: !!it.locked,
@@ -6999,7 +7362,7 @@ function liftItem(stored: Record<string, any>, settings: Record<string, any> = {
         }
       : null),
     s: undefined,
-  });
+  }), LANGUAGES[String(it.lang || settings.language || DEFAULT_LANGUAGE)] || null);
 }
 
 /*
@@ -10759,6 +11122,9 @@ export default function ArabicTrainer() {
   /* And which card each verb cell is on, for the practices of a tense. */
   const verbCards = useMemo(() => verbCardsOf(asking), [asking]);
   setVerbCards(verbCards);
+  /* And which forms a verb's tenses hold, which are never dealt. */
+  const heldUnits = useMemo(() => heldUnitsOf(asking), [asking]);
+  setHeldUnits(heldUnits);
 
   /* And how many words each language has to pair against.
 
@@ -10813,9 +11179,9 @@ export default function ArabicTrainer() {
   const eased = useMemo(() => easedUnits(asking, settings), [asking, settings]);
   setEasedUnits(eased);
   /* And how far up each number part may be asked, which reads the ladder
-     the lines above settle — see RANGE_CAPS. */
-  const rangeCaps = useMemo(() => rangeCapsOf(asking, settings), [asking, settings]);
-  setRangeCaps(rangeCaps);
+     the lines above settle — see SKILL_CAPS. */
+  const skillCaps = useMemo(() => skillCapsOf(asking, settings), [asking, settings]);
+  setSkillCaps(skillCaps);
 
   /* Every recording the cards refer to, for taking a course offline. */
   const allClipIds = useMemo(() => {
@@ -10992,7 +11358,7 @@ export default function ArabicTrainer() {
     return p && prepStatus(p, shown, settings) === "active" ? p : null;
   }, [settings, shown]);
 
-  /* And how much is going wrong, which is what the Weak skills button is
+  /* And how much is going wrong, which is what the Weak spots button is
      offered on. The same test the session itself picks with — see isWeak —
      so a number here is a session that builds. */
   const weakCount = useMemo(
@@ -12900,9 +13266,13 @@ export default function ArabicTrainer() {
                 }
               : makeSub(draft);
           });
-          next.forms = [lead as Form, ...rest];
+          /* And the tenses held as skills, which the editor never shows
+             and so never hands back: they are the learner's progress, not
+             the card's wording. */
+          const kept = tenseFormsOf(i).filter((t) => !rest.some((x: Form) => x.id === t.id));
+          next.forms = [lead as Form, ...rest, ...kept];
         }
-        return next;
+        return withTenses(next, LANGUAGES[String(next.lang || settings.language || DEFAULT_LANGUAGE)] || null);
       }),
     });
   }
@@ -13404,10 +13774,10 @@ export default function ArabicTrainer() {
                       onClick={() =>
                         weakCount
                           ? beginWeak()
-                          : flash("There is no weak skill to fix right now")
+                          : flash("There is no weak spot to fix right now")
                       }
                     >
-                      Weak skills
+                      Weak spots
                     </Button>
                   </div>
                   <div className="at-row at-mt3">
@@ -14930,7 +15300,8 @@ export function climbOf(cards: Item[], settings: Settings, all: Item[], target: 
   let n = 0;
   let learnt = 0;
   let got = 0;
-  for (const it of cards) {
+  /* A verb whose tenses are skills counts once for each — see asCounted. */
+  for (const it of asCounted(cards)) {
     /* A card that can never be asked is not progress to be short of, and
        a number waiting on its stretch is a card not learnt yet — both as
        towardsLearnt has it, which the Progress tab's decks read too. A
@@ -15195,6 +15566,77 @@ function CardLadder({ card, items, settings }: { card: Item; items?: Item[]; set
   );
 }
 
+/*
+ * The ladder, for a verb whose tenses are skills: a line a tense.
+ *
+ * Each tense climbs on its own, so one line for the verb would say where
+ * the tense furthest behind is and nothing about the others. Under each,
+ * the persons the learner keeps getting wrong — the ones the next sessions
+ * will ask about most — and, where a tense is waiting on somebody to be
+ * answered right before it moves up, who that is. A tense still to open
+ * says so: tenses open one after another, each once the one before it is
+ * cleared.
+ */
+function TenseLadder({ card, items, settings }: { card: Item; items?: Item[]; settings: Settings }) {
+  const tenses = tenseCardsOf(card) || [];
+  const spec = skillTableOf(LANGUAGES[String(card.lang || "")] || null);
+  const lang = langOf(settingsFor(settings, card));
+  const rows = tenses.map((t) => {
+    const form = tenseFormAt(card, rowOfTense(leadOf(t))) as Form;
+    const tense = spec ? placesOfTense(card, spec, form) : null;
+    const levels = cardStandings(t, settings, items);
+    const at = standing(levels);
+    const name = String((tense && (tense.tense.label || tense.tense.id)) || "");
+    const shakyNames = shakyPlaces(tense).map((p) => p.person.label || p.person.id);
+    /* Who the tense is waiting on, where it waits on anybody. */
+    const cap = SKILL_CAPS.get(form.id);
+    const waiting =
+      cap != null && tense
+        ? tense.places
+            .filter((p) => availableTypes(p.form, lang).some((k) => typeOf(k) !== TENSE_PATTERN && levelOf(k) === cap))
+            .filter((p) => !coveredAt(tense, p, cap, lang))
+            .map((p) => p.person.label || p.person.id)
+        : [];
+    return { id: form.id, name, at, open: !isQuiet(form), shakyNames, waiting };
+  });
+  if (!rows.length) return null;
+  return (
+    <Section title="Progress" lede="Each tense is learnt on its own, one after another.">
+      <div className="at-ladder">
+        {rows.map((row) => (
+          <div className="at-ladderrow" key={row.id}>
+            <span className="num" />
+            <span className="nm">{row.name.charAt(0).toUpperCase() + row.name.slice(1)}</span>
+            <span className="st" style={{ color: row.open && row.at ? STATUS_COLOR[row.at.status] : STATUS_COLOR.none }}>
+              {row.open ? standingLabel(row.at) : "Not started"}
+            </span>
+            <span className="ct" />
+          </div>
+        ))}
+      </div>
+      {/* What each tense is waiting on, and who keeps going wrong in it —
+          said under the ladder, a line a tense, only where there is
+          something to say. */}
+      {rows.map((row) =>
+        !row.open ? (
+          <Help key={`${row.id}-shut`}>{cap1(row.name)} opens once the tense before it is cleared.</Help>
+        ) : (
+          <React.Fragment key={`${row.id}-notes`}>
+            {row.waiting.length > 0 && (
+              <Help>{cap1(row.name)} moves up once each person has been answered right on this level. Still to come: {row.waiting.join(", ")}.</Help>
+            )}
+            {row.shakyNames.length > 0 && (
+              <Help>{cap1(row.name)}, going wrong lately: {row.shakyNames.join(", ")}. These come up more often until you get them right.</Help>
+            )}
+          </React.Fragment>
+        ),
+      )}
+    </Section>
+  );
+}
+
+const cap1 = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
 function CardScreen({ card, items, settings, onPriority, onBack, action }: {
   card: Item;
   items: Item[];
@@ -15231,7 +15673,11 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
         reader="both"
       />
 
-      <CardLadder card={live} items={items} settings={settings} />
+      {tenseFormsOf(live).length ? (
+        <TenseLadder card={live} items={items} settings={settings} />
+      ) : (
+        <CardLadder card={live} items={items} settings={settings} />
+      )}
 
       {onPriority && (
         <div className="at-card at-mt4">
@@ -18631,6 +19077,10 @@ function ProgressTab({
    * worked out with their counts: both read the same list of standings, and
    * building it twice is a walk of every card for nothing.
    */
+  /* What is counted: a verb whose tenses are skills as one card a tense —
+     see tenseCardsOf. Each opens the verb. */
+  const counted = useMemo(() => asCounted(items), [items]);
+  const openCard = (it: Item) => setViewing(items.find((c) => c.id === ((it as Item & { tenseOf?: string }).tenseOf || it.id)) || it);
   const progress = useMemo(() => {
     const at: Map<string, Standing | null> = new Map();
     /* How far each card is towards learnt, which is what a deck's
@@ -18644,8 +19094,11 @@ function ProgressTab({
        is waiting on the review that counts towards learnt — see
        `nextPassAt` — and its line names that review. */
     const next: Map<string, Millis> = new Map();
-    for (const it of items) {
-      const rows = cardStandings(it, settings, items);
+    for (const it of counted) {
+      /* A tense still waiting on the one before it is a card not started,
+         as a number waiting on its stretch is — see towardsLearnt. */
+      const asked = cardStandings(it, settings, items);
+      const rows = asked.length || !isTenseCard(it) ? asked : cardStandings(it, settings, items, ladderedOnceOpen);
       const one = standing(rows);
       at.set(it.id, one);
       /* A level a card has no material for is not a level it is short of —
@@ -18662,7 +19115,7 @@ function ProgressTab({
       else if (one && one.status === "done") next.set(it.id, nextReviewAt(it, settings));
     }
     return { at, toward, next };
-  }, [items, settings]);
+  }, [items, counted, settings]);
   const progressOf = progress.at;
 
   /* One tile per level, and one for the cards with nothing above them left
@@ -18675,8 +19128,8 @@ function ProgressTab({
      to say four hundred and once to list them — is a walk of every card
      for nothing. */
   const byBucket = useMemo(() => {
-    const out: Record<string, Item[]> = { all: items, l1: [], l2: [], l3: [], l4: [], cleared: [], done: [] };
-    for (const it of items) {
+    const out: Record<string, Item[]> = { all: counted, l1: [], l2: [], l3: [], l4: [], cleared: [], done: [] };
+    for (const it of counted) {
       const at = progressOf.get(it.id);
       /* A card with nothing it can be asked yet — no meaning, or every
          exercise switched off — belongs to no level and is left out of
@@ -18691,7 +19144,7 @@ function ProgressTab({
       (out[bucket] || []).push(it);
     }
     return out;
-  }, [items, progressOf]);
+  }, [counted, progressOf]);
   /* Which tile is open, or none. One at a time: they are six views of the
      same cards, and two open at once is a screen you have to scroll past
      rather than read. */
@@ -18729,7 +19182,7 @@ function ProgressTab({
    */
   const deckRows = useMemo(() => {
     const held: Map<string, { n: number; learnt: number; got: number }> = new Map();
-    for (const it of items) {
+    for (const it of counted) {
       const toward = progress.toward.get(it.id);
       /* A card that can never be asked is not progress to be short of. */
       if (!toward) continue;
@@ -18749,7 +19202,7 @@ function ProgressTab({
         pct: deckPercent({ n, learnt, got }),
       }))
       .sort((a, b) => b.pct - a.pct || a.name.localeCompare(b.name));
-  }, [items, progress]);
+  }, [counted, progress]);
 
   /* Where the prep stands, for the line beside the button. */
   const prepNow = prep ? prepStatus(prep, items, settings) : null;
@@ -18869,7 +19322,7 @@ function ProgressTab({
           groups={onLevel ? STATUS_RUNS : undefined}
           views={studentViews("student-progress", {
             lang: (it) => langOf(settingsFor(settings, it)),
-            open: (it) => setViewing(it),
+            open: (it) => openCard(it),
             level: (it) => standingShort(progressOf.get(it.id) || null),
           })}
           groupOf={(it: Item) => {
@@ -18920,7 +19373,7 @@ function ProgressTab({
                  tiles in a row the same height, so the row grows to its
                  tallest and the rest stay lined up. */
               className="whole"
-              onClick={() => setViewing(it)}
+              onClick={() => openCard(it)}
             />
           )}
         />

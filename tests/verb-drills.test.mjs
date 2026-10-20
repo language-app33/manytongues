@@ -9,6 +9,11 @@
  * dictionary cites. The three asked of a whole tense mark every form in
  * it from one answer, and the tense is seen before anything else about it
  * is asked.
+ *
+ * The verbs here are written as cells and nothing else, which is how a verb
+ * was asked before 0.457 and how one still is until its tenses are made
+ * (withTenses, on every card a device loads). How the practices are asked
+ * once a tense is a skill is tests/tense-skills.test.mjs.
  */
 
 import { test } from "node:test";
