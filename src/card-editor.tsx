@@ -18,6 +18,7 @@ import { wordsOffered } from "./context-index.ts";
 import { longSentenceOf, sentenceWords, wordCount } from "./sentence-words.ts";
 import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf, wordOf } from "./cards.ts";
+import { cardMatches } from "./search.ts";
 import type { Node } from "./shared.tsx";
 import {
   categoriesOf,
@@ -9992,9 +9993,7 @@ function SentencePicker({ lang, allCards, selfId, onPick, onClose }: {
   );
   const q = typed.trim().toLowerCase();
   const shown = q
-    ? sentences.filter((c) =>
-        [c.name, leadOf(c).ar, leadOf(c).en, leadOf(c).lat].some((x) => String(x || "").toLowerCase().includes(q)),
-      )
+    ? sentences.filter((c) => cardMatches(c, q))
     : sentences;
   const exampleOf = (c: Card) => {
     const part = leadOf(c) as Record<string, any>;

@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.458 — 21 October 2026
+
+**Searching finds a card by any of its forms.**
+
+- Typing a plural, a feminine, a person of a verb, or any other form a
+  card carries now finds the card, in the script, the pronunciation or the
+  meaning. Before, most search boxes looked at the card's own word only,
+  so a card could not be found by the form a learner or teacher
+  remembered.
+- The same rule now applies in every list with a search box: the
+  learner's cards, deck and progress lists, the picker for choosing
+  individual cards, the teacher's card and deck lists, and the sentence
+  picker in the card editor. Each also matches the card's name, its tags,
+  and the lines of a conversation.
+- Trade-off: a search now turns up a few more cards than before, since a
+  word typed may appear in a form or a tag rather than the card's own
+  word.
+
 ## 0.457 — 19 October 2026
 
 **A verb's tense is learnt as one thing (Arabic and Hebrew).**

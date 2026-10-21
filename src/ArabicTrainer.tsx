@@ -195,6 +195,7 @@ import {
   isFrame,
 } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf, withLead } from "./cards.ts";
+import { cardMatches } from "./search.ts";
 import { langsOffAmong } from "./lang-choice.ts";
 import type { LangChoice } from "./lang-choice.ts";
 /* A language's numbers and its clock, reached the way everything else
@@ -15788,17 +15789,7 @@ function ItemsTab({
     const s = q.trim().toLowerCase();
     return items
       .filter((i) => (filterTags.length ? i.tags.some((t) => filterTags.includes(t)) : true))
-      .filter((i) =>
-        s
-          ? leadOf(i).ar.includes(q.trim()) ||
-            leadOf(i).lat.toLowerCase().includes(s) ||
-            leadOf(i).en.toLowerCase().includes(s) ||
-            i.tags.some((t) => t.toLowerCase().includes(s)) ||
-            subFormsOf(i).some(
-              (x) => x.ar.includes(q.trim()) || x.en.toLowerCase().includes(s)
-            )
-          : true
-      )
+      .filter((i) => cardMatches(i, s))
       .slice()
       .sort((a, b) => b.created - a.created);
   }, [items, q, filterTags]);
@@ -15861,15 +15852,7 @@ function ItemsTab({
               ) : null
             }
             empty="No cards match."
-            match={(it, needle) =>
-              leadOf(it).ar.includes(needle) ||
-              leadOf(it).lat.toLowerCase().includes(needle) ||
-              leadOf(it).en.toLowerCase().includes(needle) ||
-              it.tags.some((t) => t.toLowerCase().includes(needle)) ||
-              subFormsOf(it).some(
-                (x) => x.ar.includes(needle) || x.en.toLowerCase().includes(needle)
-              )
-            }
+            match={cardMatches}
             count={
               filtered.length === items.length
                 ? `${plural(items.length, "card")}`
@@ -17280,12 +17263,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   const searched = useMemo(() => {
     const n = q.trim().toLowerCase();
     if (!n) return [];
-    return eligible.filter(
-      (i) =>
-        leadOf(i).ar.includes(q.trim()) ||
-        leadOf(i).en.toLowerCase().includes(n) ||
-        leadOf(i).lat.toLowerCase().includes(n)
-    );
+    return eligible.filter((i) => cardMatches(i, n));
   }, [eligible, q]);
 
   const toggleOne = (id: string) =>
@@ -19019,11 +18997,7 @@ function DeckScreen({
           open: (it) => onCard(it),
           level: (it) => (progressOf.get(it.id) ? standingShort(progressOf.get(it.id) || null) : "Opens later"),
         })}
-        match={(it: Item, needle: string) =>
-          (leadOf(it).ar || "").includes(needle) ||
-          (leadOf(it).lat || "").toLowerCase().includes(needle) ||
-          (leadOf(it).en || "").toLowerCase().includes(needle)
-        }
+        match={cardMatches}
         renderItem={(it: Item) => (
           <CardTile
             card={it}
@@ -19329,11 +19303,7 @@ function ProgressTab({
             const at = progressOf.get(it.id);
             return at ? at.status : "none";
           }}
-          match={(it: Item, needle: string) =>
-            (leadOf(it).ar || "").includes(needle) ||
-            (leadOf(it).lat || "").toLowerCase().includes(needle) ||
-            (leadOf(it).en || "").toLowerCase().includes(needle)
-          }
+          match={cardMatches}
           renderItem={(it: Item) => (
             <CardTile
               card={it}

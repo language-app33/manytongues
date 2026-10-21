@@ -5,6 +5,7 @@ import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
 import { CardEditor, NewCardKind } from "./card-editor.tsx";
 import type { CardShape } from "./card-editor.tsx";
 import { formsOf, leadOf } from "./cards.ts";
+import { cardMatches } from "./search.ts";
 
 /*
  * Whatever is waiting on a yes: the confirmation to show, and what to do
@@ -6554,21 +6555,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   )
                   : "No cards in this deck yet. Make one, or add existing cards from the Cards tab."
               }
-              /* A conversation has no word of its own to search for, so
-                 its turns are searched too: a teacher looking for a scene
-                 remembers a line of it, not the name they gave it. */
-              match={(c, q) =>
-                (leadOf(c).ar || "").toLowerCase().includes(q) ||
-                (leadOf(c).en || "").toLowerCase().includes(q) ||
-                /* And what it is called, where it has a name of its own:
-                   a verb listed as "to eat" is looked for under that. */
-                (c.name || "").toLowerCase().includes(q) ||
-                linesOf(c).some(
-                  (l: any) =>
-                    (l.ar || "").toLowerCase().includes(q) ||
-                    (l.en || "").toLowerCase().includes(q)
-                )
-              }
+              /* Every form of a card, its name and a conversation's
+                 turns — see search.ts. */
+              match={cardMatches}
               /* One way to make a card, whatever kind of card it is. A
                  conversation had a second button here, which made it read
                  as a separate sort of thing to make — and meant the Cards
@@ -7206,19 +7195,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     ? "No cards in the languages switched on."
                     : "No cards yet. Make one — a card is anything to learn, with its meaning."
                 }
-                match={(c, q) =>
-                  (leadOf(c).ar || "").toLowerCase().includes(q) ||
-                  (leadOf(c).en || "").toLowerCase().includes(q) ||
-                  (leadOf(c).lat || "").toLowerCase().includes(q) ||
-                  /* And what it is called, where it has a name of its own:
-                     a verb listed as "to eat" is looked for under that. */
-                  (c.name || "").toLowerCase().includes(q) ||
-                  linesOf(c).some(
-                    (l: any) =>
-                      (l.ar || "").toLowerCase().includes(q) ||
-                      (l.en || "").toLowerCase().includes(q)
-                  )
-                }
+                match={cardMatches}
                 onNew={() => {
                   /* Offered first in the language the switch is on, where
                      it is on one. */
