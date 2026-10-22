@@ -611,6 +611,26 @@ test("a conversation counts as the card it is and matches as the turns it holds"
   assert.equal(r.words[0].contexts.length, 2);
 });
 
+test("coverage reads a card saved in the shape the server stores", () => {
+  /* Since 0.138 a card's text is in its forms and nothing is at the top.
+     Read off the top, every such word was a blank tile under "Not in any
+     phrase yet" and every such phrase matched nothing. */
+  const cards = [
+    { id: "1", kind: "word", forms: [{ id: "1", ar: "كتاب", en: "book", lat: "" }] },
+    { id: "2", kind: "word", forms: [{ id: "2", ar: "شمس", en: "sun", lat: "" }] },
+    { id: "3", forms: [{ id: "3", ar: "الكتاب كبير", en: "the book is big", lat: "" }] },
+  ];
+  const r = contextCoverage(cards, AR);
+  assert.equal(r.counts.word, 2);
+  assert.equal(r.counts.phrase, 1, "a phrase with no `ar` of its own is still a phrase");
+  assert.equal(r.covered, 1, "the book is in the phrase");
+  assert.equal(r.words[0].ar, "كتاب");
+  assert.equal(r.words[0].en, "book");
+  assert.equal(r.words[0].contexts[0].ar, "الكتاب كبير");
+  assert.equal(r.words[1].ar, "شمس", "the word with no phrase still has its word to show");
+  assert.equal(r.words[1].en, "sun");
+});
+
 test("a collection with no phrases at all reports honestly", () => {
   /* The answer this is built to give when it is the true one. */
   const r = contextCoverage([{ id: "1", ar: "كتاب" }, { id: "2", ar: "بيت" }], AR);

@@ -57,6 +57,49 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   card two of its eight questions, so waiting on all of them would land
   "learnt" whenever the last straggler happened to come up.
 
+  **How long the gaps are.** One question — normally the card's top one,
+  writing the word from its meaning — answered right every time, and each
+  review answered the day it falls due:
+
+  <!-- gaps:start -->
+  | answer | comes back in |
+  |---|---|
+  | first time asked | 10 minutes |
+  | second, 10 minutes later — the card is cleared | 1 day |
+  | first review — one pass | 2–3 days |
+  | second review — two passes, the card is learnt | 5–8 days |
+  | third review | 12–21 days |
+  | fourth review | 29–55 days |
+  | fifth review | 69–144 days |
+  | sixth review | 164–365 days |
+  | every review after | 365 days |
+  <!-- gaps:end -->
+
+  So a card cleared tonight is learnt in three or four days at the
+  earliest. From a day on, each gap is the last times the card's ease —
+  2.5 to start, `reschedule` in the scheduler — give or take 5%, so cards
+  learnt together do not all come back together; that spread is why the
+  rows are ranges, and why they widen. A year is the most (`MAX_DAYS`).
+  What moves them:
+
+  - *Answering early* is counted but moves nothing: neither the gap nor
+    the date, and it makes no pass.
+  - *Answering late* is worth what answering on time is; the next gap
+    grows from the one asked for, not the one waited.
+  - *A near miss*, or being told the answer, still adds at least a day,
+    but lowers the ease, so every gap after grows more slowly.
+  - *A miss* halves the gap and asks again in 10 minutes, and every 10
+    minutes after until it is right, when the halved gap stands; it lowers
+    the ease too. (On a question not yet past its first 10 minutes, a miss
+    asks again in 1 minute.) Two running on the top question take the
+    passes back to nought.
+  - *A card already in review* when it cleared — an old card, or one
+    lifted with "too easy" — keeps the gap it had, so its two passes can
+    be further apart than the table's.
+
+  `tests/gaps-readme.test.mjs` replays the table against the scheduler at
+  both ends of the 5%, so it fails if one changes without the other.
+
   **Once a card has climbed, it is reviewed on its top level only**
   (since 0.453; the owner's rule). The whole of it:
 

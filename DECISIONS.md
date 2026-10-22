@@ -6594,7 +6594,7 @@ Tests: `tests/tense-skills.test.mjs`.
 
 ---
 
-## The home line splits the ready count, and never says when to come back (0.459)
+## The home line splits the ready count, and never says when to come back (0.460)
 
 **22 October 2026** · `src/ArabicTrainer.tsx` (`readyOf`, `homeLine`)
 
