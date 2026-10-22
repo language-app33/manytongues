@@ -6591,3 +6591,52 @@ cards. A device still on 0.456 sees tense forms as forms with no words and
 asks nothing of them. The persons' states go on being written, so going
 back would hand learners their per-person progress as it then stood.
 Tests: `tests/tense-skills.test.mjs`.
+
+## A deck's quality
+
+**22 October 2026** · `src/deck-quality.ts`, `src/spaces.tsx`
+
+The owner asked for a score on each deck saying how well built and
+pedagogical it is, and settled its rules question by question before any
+of it was written: teachers only; a number out of 100 in green, amber or
+red, changing at 80 and 50; the three changes worth most folded away on
+the deck's own page; and the weights below.
+
+**Most of it is words met in sentences (55 of 100).** That was the owner's
+starting point — a word card practised on its own and never in a sentence
+is the thing a deck most often gets wrong. Every form a student is asked
+counts, because a form is only asked to fill a gap where that exact form
+is in a sentence (`context-index.ts`, one form per phrase): a sentence with
+*book* gives *books* nothing. The word itself wants two sentences, other
+forms one each — two for every form would have asked dozens of sentences
+of a verb. A card is half its own word and half the rest, and cards count
+equally, so a verb of thirty forms does not swamp thirty nouns.
+
+**A blank counts for exactly the forms it can take.** The owner's rule: a
+sentence card with a blank every form can stand in covers all of them at
+once. Read off the same list review makes (`sentencesOf`), agreement and
+narrowed tenses included, and only the sentences review lets through,
+because those are the only ones a student meets. Links count only once
+confirmed, for the same reason — an unconfirmed one puts nothing in front
+of a student — and are offered as a fix instead.
+
+**The same deck, and the course's words.** A sentence in another deck does
+not count, because a deck can be practised on its own. But a sentence may
+use a word another deck of the course teaches without losing points;
+only a word no deck of the course teaches does. A deck in no course yet
+reads against everything the teacher has.
+
+**The smaller checks share 35 points, 5 each**, and a check with nothing to
+measure hands its points to the rest. A deck with words and no sentences is
+not one of those: it scores low on purpose, which is what the score is for.
+
+**What it costs.** It restates rules rather than running them, as the
+deck's learn-by estimate does: a change to what counts as a context, to
+review or to blanks has to be carried in by hand. Scoring every deck on the
+list meant finding the unknown words of every sentence against every word
+of the course, which through the language's matcher was millions of calls;
+each language now also states its matcher as a key and the keys a token
+can be (`keyed` on the context, tested to agree with the matcher), so it is
+a lookup. The sentences a blank makes were already worked out for review,
+and are now worked out once for both.
+

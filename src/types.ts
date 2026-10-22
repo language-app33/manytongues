@@ -541,6 +541,15 @@ export interface LangContext {
   matches: (token: string, word: string) => boolean;
   tokens?: (text: string) => string[];
   skip?: string[];
+  /**
+   * The same question as `matches`, answered by looking it up: `matches`
+   * is true exactly when `token`'s keys include `word`'s key. For a reader
+   * that asks it of every word of a sentence against every word a course
+   * teaches — the deck's quality, on the list of decks — which is millions
+   * of calls to `matches` and a few thousand lookups this way. Absent means
+   * the reader falls back to `matches`.
+   */
+  keyed?: { word: (word: string) => string; token: (token: string) => string[] };
 }
 
 /** The on-screen keyboard a language offers, where its script wants one. */

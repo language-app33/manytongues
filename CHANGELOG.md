@@ -8,6 +8,34 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.459 — 22 October 2026
+
+**Every deck has a quality score (teachers only).**
+
+- Under Teaching › Decks, each deck now shows "Deck quality" out of 100:
+  green from 80, amber from 50, red below. The deck's own page shows it
+  large, with "What would raise it" folded under it: the three changes
+  that would add the most points, and about how many each adds.
+- Most of the score (55 points) is whether the deck's words are practised
+  inside sentences of the same deck. Every form a student is asked counts:
+  the word itself wants two sentences, and each other form (a plural, a
+  person of a verb) one. A sentence counts once you have confirmed the
+  link, or when the word fills one of its blanks; a sentence card whose
+  blank can take every form covers all of them at once, and one narrowed to
+  some forms covers just those. A verb's own examples count too. Names,
+  and cards there only to fill blanks, are not asked to be in sentences.
+- 10 points are for sentences that are linked to at least one word card
+  and use no word that no deck in the course teaches.
+- 5 points each for: recordings, pictures, pronunciation written, sentences
+  with blanks reviewed, no word on two cards, no sentence longer than
+  about 12 words, and at least one conversation or text. A check that has
+  nothing to measure is left out and its points shared among the others.
+- Trade-off: a deck of words with no sentences scores low on purpose. Only
+  sentences you have approved count, so a sentence card still waiting for
+  review adds nothing until it is reviewed.
+- To check by hand: open a couple of real decks and see whether the score
+  and the suggested changes match your own sense of them.
+
 ## 0.458 — 21 October 2026
 
 **Searching finds a card by any of its forms.**

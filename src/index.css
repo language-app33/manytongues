@@ -1928,6 +1928,18 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-ctxlist { list-style:none; margin:0; padding:0 0 0 12px; border-left:2px solid var(--line); }
 .at-ctxlist li { display:flex; align-items:baseline; gap:8px; flex-wrap:wrap; margin-bottom:4px; font-size:15px; }
 .at-ctxlist em { font-style:normal; font-size:12px; font-weight:600; color: var(--muted); }
+/* A deck's quality: the number in its colour — green from 80, amber from
+   50, red below — on the deck's tile and, large, on its own page. */
+.at-quality { font-weight:700; white-space:nowrap; }
+.at-quality.good, .at-qualityscore.good b { color: var(--jade); }
+.at-quality.fair, .at-qualityscore.fair b { color: var(--brass); }
+.at-quality.poor, .at-qualityscore.poor b { color: var(--rose); }
+.at-qualityscore { margin:0 0 6px; display:flex; align-items:baseline; gap:6px; }
+.at-qualityscore b { font-size: var(--fs-stat); font-weight:800; line-height:1.1; letter-spacing:-.02em; }
+.at-qualityscore span { font-size: var(--fs-sm); color: var(--muted); }
+.at-qualityfixes { list-style:none; margin:10px 0 0; padding:0 0 0 12px; border-left:2px solid var(--line); }
+.at-qualityfixes li { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:8px; font-size: var(--fs-md); }
+.at-qualityfixes b { flex:none; font-size: var(--fs-sm); color: var(--jade); }
 .at-ctxbare { display:flex; flex-wrap:wrap; gap:8px; }
 .at-ctxbare span { display:inline-flex; align-items:baseline; gap:6px; padding:6px 10px;
   border:1px solid var(--line); border-radius:999px; background: var(--well); }

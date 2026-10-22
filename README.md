@@ -1104,6 +1104,32 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
     own version there (`save-system`). There was a separate Publish step
     (`sign-system`, still answered for old builds); it was one decision
     split over two buttons, and the second was the one forgotten.
+- **A deck says how well it is built to be learnt from.** Every deck under
+  Teaching › Decks carries a *Deck quality* out of 100, in green from 80,
+  amber from 50 and red below; the deck's own page shows it large, with the
+  three changes that would raise it most folded under it. Teachers only.
+  The owner's rules, in `src/deck-quality.ts`:
+
+  | part | points | what earns it |
+  |---|---|---|
+  | words met in sentences | 55 | every form a student is asked, in sentences of the same deck: two for the word itself, one for each other form. A card is half its own word and half its other forms, and every card counts the same |
+  | sentences well made | 10 | the share linked to a word card and using no word that no deck of the course teaches |
+  | recordings · pictures · pronunciation · reviewed · no repeats · not too long · a scene | 5 each | the share of forms and sentences with a recording, of words with a picture, of forms and sentences with pronunciation written, of cards with blanks fully reviewed, of words on one card only, of sentences no longer than the language's long mark; and whether there is a conversation or text |
+
+  A sentence is a phrase or sentence card, or a line of a conversation or
+  text. A word is in one through a link the teacher confirmed, a blank it
+  fills — exactly the forms that blank can take, in the sentences review
+  lets through, so one sentence card can cover every form — or a verb's own
+  examples. Names, and cards there only to fill blanks, are not asked to be
+  in sentences, nor are forms switched off. A check with nothing to measure
+  (pronunciation in Vietnamese, review where nothing has a blank) shares its
+  points among the rest; a deck with no sentences is not spared, and a deck
+  with nothing to learn from shows no number. It reads the deck and nothing
+  about students. The sentences a blank makes are the list review already
+  works out, and finding unknown words in a sentence goes through `keyed` on
+  the language's context, a lookup rather than a comparison per word, which
+  is what lets every deck in the list be scored at once. Tests:
+  `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality".
 - **A number is built, not memorised, and so is a time.** A learner who
   knows *forty* and *seven* knows *forty-seven*, so numbers are not cards
   one at a time. A language's numbers are **one document** — the words it

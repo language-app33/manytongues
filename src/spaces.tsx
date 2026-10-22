@@ -72,7 +72,10 @@ import { NumberSystemEditor } from "./number-system-editor.tsx";
 import { PronounsEditor, hasPronouns } from "./pronouns-editor.tsx";
 import type { NumberSystem, TimeSystem } from "./numbers/types.ts";
 import { partsNow } from "./numbers/types.ts";
-import { needsReview, reviewStates, toReview } from "./review.ts";
+import { cardSentences, needsReview, stateFrom, toReview } from "./review.ts";
+import type { PartSentences } from "./review.ts";
+import { deckQuality, FIXES_SHOWN, qualityTone } from "./deck-quality.ts";
+import type { Quality } from "./deck-quality.ts";
 import { inPlayWith, langsToMakeIn, teachingChoices } from "./lang-choice.ts";
 import type { LangChoice } from "./lang-choice.ts";
 import type { ReviewState } from "./review.ts";
@@ -4078,6 +4081,67 @@ function InContext({ cards, languages, langOfCard, busy, onLink, onAddWord, onOp
  * word inside a phrase, and a prop typed `Lang` would make that branch
  * unreachable — which is the opposite of the point.
  */
+/* ------------------------------------------------------------------
+   Deck quality
+
+   How well a deck is built to be learnt from, out of 100 — see
+   deck-quality.ts for what is counted. On each deck in the list as a
+   number in its colour, and on the deck's own page with the few changes
+   that would raise it most, folded away until asked for.
+   ------------------------------------------------------------------ */
+
+function QualityMark({ quality }: { quality?: Quality | null }) {
+  if (!quality || quality.score === null) return null;
+  return (
+    <span className={`at-quality ${qualityTone(quality.score)}`} title="Deck quality, out of 100">
+      {` · Deck quality ${quality.score}`}
+    </span>
+  );
+}
+
+function DeckQuality({ quality }: { quality: Quality }) {
+  const [open, setOpen] = useState(false);
+  if (quality.score === null) {
+    return <Help>Nothing to score yet: add words and sentences that use them.</Help>;
+  }
+  const fixes = quality.fixes.slice(0, FIXES_SHOWN);
+  return (
+    <>
+      <p className={`at-qualityscore ${qualityTone(quality.score)}`}>
+        <b>{quality.score}</b> <span>out of 100</span>
+      </p>
+      <Help>
+        Most of it is whether every word, and every form of it, is practised inside
+        sentences in this deck. The rest is recordings, pictures, pronunciation, reviewed
+        sentences, no repeated words, sentences that aren't too long, and a conversation or
+        text.
+      </Help>
+      {fixes.length > 0 && (
+        <>
+          <Button
+            className="at-mt3"
+            size="sm"
+            icon={open ? "chevronUp" : "chevronDown"}
+            onClick={() => setOpen((v) => !v)}
+          >
+            {open ? "Hide what would raise it" : "What would raise it"}
+          </Button>
+          {open && (
+            <ul className="at-qualityfixes">
+              {fixes.map((f) => (
+                <li key={f.key}>
+                  <span>{f.text}</span>
+                  <b>{`+${Math.max(1, Math.round(f.gain))}`}</b>
+                </li>
+              ))}
+            </ul>
+          )}
+        </>
+      )}
+    </>
+  );
+}
+
 function ContextReport({ cards, lang }: { cards: Card[]; lang: Partial<Lang> }) {
   const [open, setOpen] = useState(false);
   const report = useMemo(() => contextCoverage(cards, lang), [cards, lang]);
@@ -4801,14 +4865,68 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
     return extra.length ? cards.concat(extra as unknown as Card[]) : cards;
   }, [cards, systems]);
+  /* The sentences each card with blanks makes, worked out once: review
+     reads them, and so does each deck's quality. */
+  const sentenceParts: Map<string, PartSentences[]> = useMemo(() => {
+    const out: Map<string, PartSentences[]> = new Map();
+    for (const c of lendable) {
+      if (!c || !needsReview(c)) continue;
+      out.set(String(c.id), cardSentences(c, lendable, languages[String(c.lang || "")] || languages[soleLang]));
+    }
+    return out;
+  }, [lendable, languages, soleLang]);
+  const lentById: Map<string, Card> = useMemo(
+    () => new Map(lendable.map((c) => [String(c.id), c])),
+    [lendable],
+  );
   const reviewMap: Map<string, ReviewState> = useMemo(
-    () => reviewStates(lendable, (c) => languages[String(c.lang || "")] || languages[soleLang]),
-    [lendable, languages, soleLang],
+    () => new Map([...sentenceParts].map(([id, parts]) => [id, stateFrom(lentById.get(id) as Card, parts)])),
+    [sentenceParts, lentById],
   );
   const waitingIds = useMemo(
     () => new Set([...reviewMap].filter(([, st]) => toReview(st)).map(([id]) => id)),
     [reviewMap],
   );
+  /*
+   * How well each deck is built to be learnt from — see deck-quality.ts.
+   *
+   * A sentence may use any word a deck of the same course teaches, so what
+   * counts as known is the cards of every deck in the deck's courses, and
+   * the words the number system writes; a deck in no course yet may use
+   * anything of the teacher's. The sentences a blank makes are the ones
+   * review already worked out.
+   */
+  const qualityOf = useCallback(
+    (deck: Deck, pending = false): Quality => {
+      const held = cards.filter((c) => (c.decks || []).includes(deck.id));
+      const owned = new Set(cards.map((c) => c.id));
+      const linked = new Set(
+        (deck.courses || []).flatMap((l) => (courses.find((c) => c.id === l.courseId) || { decks: [] as string[] }).decks),
+      );
+      const known = linked.size
+        ? lendable.filter((c) => !owned.has(c.id) || (c.decks || []).some((id) => linked.has(id)))
+        : lendable;
+      return deckQuality(held, {
+        lang: langOfDeck(deck),
+        pool: lendable,
+        known,
+        partsOf: (c) => sentenceParts.get(String(c.id)) || [],
+        cardById: (id) => lentById.get(id),
+        pending,
+      });
+    },
+    [cards, courses, lendable, langOfDeck, sentenceParts, lentById],
+  );
+  const qualities: Map<string, Quality> = useMemo(
+    () => (tab === "decks" ? new Map(decks.map((d) => [d.id, qualityOf(d)])) : new Map()),
+    [tab, decks, qualityOf],
+  );
+  /* And the open deck's, with the links nobody has confirmed, which is
+     slower and wanted on that page alone. */
+  const openQuality: Quality | null = useMemo(() => {
+    const d = openDeck ? decks.find((x) => x.id === openDeck) : null;
+    return d ? qualityOf(d, true) : null;
+  }, [openDeck, decks, qualityOf]);
   /* Narrowed then ordered. ItemList's own search runs after this, over what
      is left, so a search inside a filter behaves the way it reads. */
   const shownCards = useMemo(
@@ -6532,6 +6650,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
             {/* The whole deck, whatever the list below is showing: what a
                 deck covers is a fact about the deck, not about the cards a
                 filter has left on screen. */}
+            <Section title="Deck quality" className="at-mt5">
+              {openQuality && <DeckQuality quality={openQuality} />}
+            </Section>
+
             <Section title="In context" className="at-mt5">
               <ContextReport cards={held} lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]} />
             </Section>
@@ -7432,6 +7554,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                         <>
                           <LockMark locked={d.locked} />
                           {`${(langOfDeck(d) || { name: "" }).name} · ${deckSize(d)}${deckWaiting(d)}`}
+                          <QualityMark quality={qualities.get(d.id)} />
                         </>
                       }
                       onOpen={() => setOpenDeck(d.id)}
