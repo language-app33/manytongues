@@ -541,6 +541,15 @@ export interface LangContext {
   matches: (token: string, word: string) => boolean;
   tokens?: (text: string) => string[];
   skip?: string[];
+  /**
+   * The same question as `matches`, answered by looking it up: `matches`
+   * is true exactly when `token`'s keys include `word`'s key. For a reader
+   * that asks it of every word of a sentence against every word a course
+   * teaches — the deck's quality, on the list of decks — which is millions
+   * of calls to `matches` and a few thousand lookups this way. Absent means
+   * the reader falls back to `matches`.
+   */
+  keyed?: { word: (word: string) => string; token: (token: string) => string[] };
 }
 
 /** The on-screen keyboard a language offers, where its script wants one. */
@@ -1302,6 +1311,15 @@ export interface Question {
    */
   ask?: import("./numbers/types.ts").Ask;
   /**
+   * Which person of a tense this asking is about, where the question is
+   * about a tense held as a skill: the cell's id.
+   *
+   * Drawn when the queue is built, as a range's number is and for the same
+   * reason; and carried on the copy a miss puts back, so the person missed
+   * is the person asked again. See drawPerson in tense-skills.ts.
+   */
+  person?: string;
+  /**
    * The wrong answers beside it, already said in words.
    *
    * A range brings its own, because which numbers are worth confusing is
@@ -1400,6 +1418,11 @@ export type Form = Record<string, any> & {
      whichever schedule the learner had got further with, and never
      stored. See joinHeld. */
   joinedFrom?: string[];
+  /* The tense this form *is*, where it is one of a verb's tenses held as a
+     skill: no words of its own, the schedule of the whole tense, and a
+     person of it drawn for every question. The row's id — "present",
+     "past". See src/tense-skills.ts. */
+  tense?: string;
   created?: Millis;
   updated?: Millis;
 };

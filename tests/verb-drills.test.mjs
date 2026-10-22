@@ -9,6 +9,11 @@
  * dictionary cites. The three asked of a whole tense mark every form in
  * it from one answer, and the tense is seen before anything else about it
  * is asked.
+ *
+ * The verbs here are written as cells and nothing else, which is how a verb
+ * was asked before 0.457 and how one still is until its tenses are made
+ * (withTenses, on every card a device loads). How the practices are asked
+ * once a tense is a skill is tests/tense-skills.test.mjs.
  */
 
 import { test } from "node:test";
@@ -16,6 +21,17 @@ import assert from "node:assert/strict";
 import { build } from "esbuild";
 import path from "node:path";
 import { must } from "./helpers.mjs";
+
+/* Seeded before the trainer is imported, as numbers-session does. A
+   session draws one form of each card at random (since 0.455), and about
+   one sitting in seven drew both verbs' cited forms, which have no table
+   by design — so the test of the table and its practice failed that often
+   with nothing wrong. Seeded, it is the same sitting on every run. */
+let rolling = 20261022 >>> 0;
+Math.random = () => {
+  rolling = (Math.imul(rolling, 1664525) + 1013904223) >>> 0;
+  return rolling / 4294967296;
+};
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const out = path.join(here, ".verb-drills-build");

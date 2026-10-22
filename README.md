@@ -57,6 +57,49 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   card two of its eight questions, so waiting on all of them would land
   "learnt" whenever the last straggler happened to come up.
 
+  **How long the gaps are.** One question — normally the card's top one,
+  writing the word from its meaning — answered right every time, and each
+  review answered the day it falls due:
+
+  <!-- gaps:start -->
+  | answer | comes back in |
+  |---|---|
+  | first time asked | 10 minutes |
+  | second, 10 minutes later — the card is cleared | 1 day |
+  | first review — one pass | 2–3 days |
+  | second review — two passes, the card is learnt | 5–8 days |
+  | third review | 12–21 days |
+  | fourth review | 29–55 days |
+  | fifth review | 69–144 days |
+  | sixth review | 164–365 days |
+  | every review after | 365 days |
+  <!-- gaps:end -->
+
+  So a card cleared tonight is learnt in three or four days at the
+  earliest. From a day on, each gap is the last times the card's ease —
+  2.5 to start, `reschedule` in the scheduler — give or take 5%, so cards
+  learnt together do not all come back together; that spread is why the
+  rows are ranges, and why they widen. A year is the most (`MAX_DAYS`).
+  What moves them:
+
+  - *Answering early* is counted but moves nothing: neither the gap nor
+    the date, and it makes no pass.
+  - *Answering late* is worth what answering on time is; the next gap
+    grows from the one asked for, not the one waited.
+  - *A near miss*, or being told the answer, still adds at least a day,
+    but lowers the ease, so every gap after grows more slowly.
+  - *A miss* halves the gap and asks again in 10 minutes, and every 10
+    minutes after until it is right, when the halved gap stands; it lowers
+    the ease too. (On a question not yet past its first 10 minutes, a miss
+    asks again in 1 minute.) Two running on the top question take the
+    passes back to nought.
+  - *A card already in review* when it cleared — an old card, or one
+    lifted with "too easy" — keeps the gap it had, so its two passes can
+    be further apart than the table's.
+
+  `tests/gaps-readme.test.mjs` replays the table against the scheduler at
+  both ends of the 5%, so it fails if one changes without the other.
+
   **Once a card has climbed, it is reviewed on its top level only**
   (since 0.453; the owner's rule). The whole of it:
 
@@ -224,7 +267,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
 
   The custom modes on the Build screen are the same rule over a narrower
   pool or a narrower set of questions: Fix mistakes and Not seen lately
-  narrow the pool, Weak skills narrows it to what is going wrong and asks
+  narrow the pool, Weak spots narrows it to what is going wrong and asks
   the questions that went wrong, Get started asks recognition alone, and
   Ultimate asks every question each card has — every card the mix lets in,
   since it has no length of its own. It lets in every new card, without the
@@ -243,7 +286,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   pack states it in `marking` and nobody is asked to rule on harakat
   before they can read one.
 
-- **What keeps going wrong can be practised on its own.** *Weak skills*,
+- **What keeps going wrong can be practised on its own.** *Weak spots*,
   under Start session on the home screen, deals nothing but the exercises
   that have been missed — wrong twice running, which is the app's own
   definition of a gap rather than a slip and what shuts a level
@@ -262,7 +305,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   exactly when `isWeak` finds something, so pressing it is always a session
   that builds. On the days it finds nothing the button is `off` rather than
   `disabled` — dimmed to the eye and to a screen reader, and still taking
-  the press, which answers with a line saying there is no weak skill to fix
+  the press, which answers with a line saying there is no weak spot to fix
   right now. A dimmed button that swallows the press explains nothing; the
   reason is worth saying at the moment it is asked for, and not before.
 - **A learner can ask for a card.** Marking one *high priority* on its own
@@ -333,7 +376,10 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   verbs out in a table — Arabic in nine persons (one *I* unless a word
   has two: `keepsApart` in `src/verbs.ts`) and three tenses, Huế in
   one person and four markers — each cell of it is a sub-form, drilled and
-  scheduled in its own right by the exercises every other form gets. The
+  scheduled in its own right by the exercises every other form gets. (Where
+  the language offers the practices of a tense, as Arabic and Hebrew do, it
+  is the tense that is drilled and scheduled, and the cells are its persons:
+  see *A tense is learnt as one thing* below. The rows still open in turn.) The
   rows open in the order the language teaches them, one waiting on the one
   above it being cleared, so the past of a verb is not asked until its
   present is known and a lapse closes the rows above. Cleared since 0.368;
@@ -394,11 +440,70 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   question follows the table's second showing (`behindItsTable`). Two persons
   spelt the same stay two rows and two tiles, either tile is right in
   either place, and either person is right in "who is it?"; "change the
-  person" never asks between them. The cell a dictionary cites is asked
-  none of them — it is met before its tense opens. They are on the ladder
+  person" never asks between them. Where the tenses are cells, the cell a
+  dictionary cites is asked none of them — it is met before its tense
+  opens; where they are skills, it is one person of the past and is asked
+  them like the rest. They are on the ladder
   for everybody, so a verb learnt before them goes back to learning until
   they are answered. Nothing is coloured: the table is the pattern. See
   `src/verb-drills.ts`, and `drillFits` for when a cell can be asked one.
+- **A tense is learnt as one thing.** Where a language offers the
+  practices of a tense — Arabic and Hebrew; Huế's verb is one form for
+  everybody and is asked as above — every tense the teacher has filled in is
+  a **skill**, the way a stretch of the number line is: one schedule, one
+  ladder, no words of its own, and a person drawn for every question
+  (`src/tense-skills.ts`). It is stored as a form of the verb card with a
+  `tense` naming its row and nothing else on it, under an id made of the
+  card's and the row's (`withTenses`), so the merge between devices, the
+  fold of the teacher's card and the drawer a withdrawn card waits in carry
+  it as they carry any form. The persons are the cells they always were and
+  keep their own states, and every answer about one is written on it as
+  well as on the tense; they are never dealt, and neither is the verb's own
+  word, which is the past *he* and so one person of the past like any other
+  (`HELD_UNITS` in the trainer). What the persons' states decide is three
+  things:
+
+  * **whom to ask** — somebody not asked yet this sitting, then somebody
+    who went wrong on this very question, then somebody not yet answered
+    right on its level, then whoever has gone wrong on anything, then
+    whoever has been asked it least, split by a seed that moves on a right
+    answer (`drawPerson`). The person rides on the question (`person`), so
+    a miss put back at the end of the session asks the same person again;
+  * **how far up the tense may go** — a level opens on two right answers
+    running, as everywhere, and once every person who can be asked
+    something there has been answered right on it at least once (`capOf`,
+    in the same map that holds a number part below its weakest word). Two
+    persons spelt the same are one word, so a right answer on either
+    counts for both; "I get it" is about the whole table and counts for
+    nobody. A tense held there makes no passes, and the next tense opens
+    only once this one is cleared with every person in it (`quietTenses`);
+  * **who stands in somebody else's sentence** — a person of a tense that
+    is cleared and who has not gone wrong lately (`heldStands`). A sentence
+    answered right credits the tense, by the rule every word is credited
+    by, and the person beside it.
+
+  A question about the whole tense — reading the forms, filling the row —
+  is one answer about the tense, right only where every person was, and an
+  answer about each person on their own. Each tense starts, the first time
+  it is made, where most of its persons are on each question
+  (`middleState`): a learner who had the present half climbed is not sent
+  back to the start, nor handed a tense they had not got.
+
+  A verb shows one line a tense on its own screen, saying where it stands,
+  who it is waiting on and who keeps going wrong (`TenseLadder`), and the
+  Progress tab and the home screen's ring count each tense as a card of its
+  own (`tenseCardsOf`, `asCounted`) — "to write · present" — which opens the
+  verb. Anywhere a verb is one line, it stands where its tense furthest
+  behind stands.
+
+  **And every skill keeps the same rules.** A stretch of numbers, a
+  sentence with blanks and a tense are all a schedule with no words, asked
+  about something drawn fresh from a seed of the skill, the question and
+  its right answers; all of them wait on their parts being known, mark the
+  parts that stood in them, and are never further up than those parts
+  allow. `src/skills.ts` says the rules once and holds the two pieces every
+  kind shares: the seed (`skillSeed`) and the line a skill is held below
+  (`cappedAt`, over one map of where each skill is held).
 - **A word carries the pronouns its language attaches to it.** Arabic and
   Hebrew write *my book* as one word, and the same endings carry a
   preposition — عند is *at*, عندي is *I have*. Those are forms of the word,
@@ -999,6 +1104,32 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
     own version there (`save-system`). There was a separate Publish step
     (`sign-system`, still answered for old builds); it was one decision
     split over two buttons, and the second was the one forgotten.
+- **A deck says how well it is built to be learnt from.** Every deck under
+  Teaching › Decks carries a *Deck quality* out of 100, in green from 80,
+  amber from 50 and red below; the deck's own page shows it large, with the
+  three changes that would raise it most folded under it. Teachers only.
+  The owner's rules, in `src/deck-quality.ts`:
+
+  | part | points | what earns it |
+  |---|---|---|
+  | words met in sentences | 55 | every form a student is asked, in sentences of the same deck: two for the word itself, one for each other form. A card is half its own word and half its other forms, and every card counts the same |
+  | sentences well made | 10 | the share linked to a word card and using no word that no deck of the course teaches |
+  | recordings · pictures · pronunciation · reviewed · no repeats · not too long · a scene | 5 each | the share of forms and sentences with a recording, of words with a picture, of forms and sentences with pronunciation written, of cards with blanks fully reviewed, of words on one card only, of sentences no longer than the language's long mark; and whether there is a conversation or text |
+
+  A sentence is a phrase or sentence card, or a line of a conversation or
+  text. A word is in one through a link the teacher confirmed, a blank it
+  fills — exactly the forms that blank can take, in the sentences review
+  lets through, so one sentence card can cover every form — or a verb's own
+  examples. Names, and cards there only to fill blanks, are not asked to be
+  in sentences, nor are forms switched off. A check with nothing to measure
+  (pronunciation in Vietnamese, review where nothing has a blank) shares its
+  points among the rest; a deck with no sentences is not spared, and a deck
+  with nothing to learn from shows no number. It reads the deck and nothing
+  about students. The sentences a blank makes are the list review already
+  works out, and finding unknown words in a sentence goes through `keyed` on
+  the language's context, a lookup rather than a comparison per word, which
+  is what lets every deck in the list be scored at once. Tests:
+  `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
 - **A number is built, not memorised, and so is a time.** A learner who
   knows *forty* and *seven* knows *forty-seven*, so numbers are not cards
   one at a time. A language's numbers are **one document** — the words it
@@ -1395,6 +1526,13 @@ src/
                    written on, with the composer itself drawing the preview
   verb-drills.ts   one tense of a verb practised as a whole: the table, the
                    persons to choose, the tiles, the person to change to
+  tense-skills.ts  a verb's tense held as a skill: made once a tense is
+                   filled in, started where most of its persons are, held
+                   on a level until every person is answered right there,
+                   and the person each question is drawn for. Pure.
+  skills.ts        the rules every skill keeps — a stretch of numbers, a
+                   sentence with blanks, a tense — said once, with the seed
+                   each draws from and the line each is held below. Pure.
   verbs.ts         a word's forms as a table over the card's own sub-forms —
                    a verb's persons and tenses, or the pronouns a language
                    attaches to the end of a word:

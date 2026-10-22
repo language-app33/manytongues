@@ -111,12 +111,20 @@ export const sameLetters = (a: Form | null | undefined, b: Form | null | undefin
  * front of the card and is met before its tense opens, so a question about
  * its whole tense would be the next tense shown early.
  */
-export function drillFits(card: unknown, cell: Form, type: string, lang: Lang | null | undefined): boolean {
+export function drillFits(
+  card: unknown,
+  cell: Form,
+  type: string,
+  lang: Lang | null | undefined,
+  /* Where the tense is held as a skill, the cited cell is one of its
+     persons like any other and is asked them too — see tense-skills.ts. */
+  citedToo = false,
+): boolean {
   const spec = EX[typeOf(type)];
   if (!spec || !spec.verbDrill) return true;
   const table = drillTable(lang, cell);
   if (!table || !(table.practices || []).includes(typeOf(type))) return false;
-  if (isCitation(table, cell)) return false;
+  if (isCitation(table, cell) && !citedToo) return false;
   const tense = tenseOf(card, table, rowOf(cell));
   if (!tense || tense.places.length < 2) return false;
   if (!tense.places.some((p) => p.form.id === cell.id)) return false;

@@ -1,6 +1,7 @@
 import type { Doc, ExerciseState, Form, Item, Parked, WireDoc } from "./types.ts";
 import { mergeMet } from "./variables.ts";
 import { formsOf } from "./cards.ts";
+import { isTenseForm } from "./tense-skills.ts";
 /*
  * Sync client.
  *
@@ -128,7 +129,16 @@ function mergeItem(a: Item, b: Item): Item {
       s: mergeStates(f.s, twin ? twin.s : {}, reset),
       ...metOf(f, twin || f, reset),
     };
-  });
+  }).concat(
+    /* And a verb's tenses held as skills that only the other side has — a
+       device on an older build answered the card last, and knows nothing
+       of them. They are the learner's work, not the teacher's wording, so
+       they are kept rather than taken from whichever side was edited last.
+       See tense-skills.ts. */
+    formsOf(other)
+      .filter((f) => isTenseForm(f) && !formsOf(base).some((x) => x.id === f.id))
+      .map((f) => (reset ? { ...f, s: mergeStates(f.s, {}, reset) } : f)),
+  );
 
   /* The lines of a dialog, for the same reason: each carries its own
      progress, and a device that drilled line three has work the other one

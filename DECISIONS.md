@@ -6501,3 +6501,163 @@ already holds a word. Arabic's command lists *you (m)*, *you (f)* and
 *you (pl)*. Hebrew is unchanged on both counts. Tests:
 `tests/one-i.test.mjs`.
 
+
+---
+
+## A verb's tense is a skill (0.457)
+
+**19 October 2026** · `src/tense-skills.ts`, `src/skills.ts`; `HELD_UNITS`,
+`castTense`, `personFor`, `quietTenses`, `heldStands`, `TenseLadder`,
+`tenseCardsOf` in `src/ArabicTrainer.tsx`; the tense forms carried in
+`foldCourses` (`src/shared.tsx`) and `mergeItem` (`src/sync.ts`)
+
+**What was wrong.** Every person of every tense was a word of its own —
+its own ladder, its own reviews — so a Palestinian verb was about two dozen
+things to learn and a Hebrew one more, and since 0.455 they came a session
+at a time. The tense practices of 0.451 showed the pattern and then each
+person climbed alone anyway. The owner asked for skills in general, and for
+a verb's tense to be one.
+
+**What changed.** Where a language's verb table lists `practices` (Arabic,
+Hebrew), each row with a person written is a form of the card with
+`tense: row` and no words, made by `withTenses` wherever a card arrives —
+the lift of a stored document, the fold of a teacher's card, an edit — with
+an id made of the card's and the row's. It holds the tense's schedule and
+climbs the ladder; `availableTypes` gives it whatever one of its persons can
+be asked. Its persons and the verb's own word are held (`laddered` is empty
+for them, they are not drillable units), and keep their states. Every
+question about a tense carries the person it is about (`person` on the
+question), drawn in the deal (`drawPerson`), and is cast as that person
+before anything else (`castTense`); grids and backups do the same. An
+answer marks the tense by the question's ids and the person beside it. A
+question about the whole tense marks the tense once — right where every
+person was — and each person, except seeing the pattern, which marks the
+tense alone.
+
+**Choices the owner made.** Of: each tense a skill; the whole verb; as
+before — each tense (1b). Persons going wrong asked more, named on the
+verb's screen, kept out of sentences until right again (2a, 7a, 9b). A tense
+starts where most of its persons are (3a), and the persons' progress is
+kept (10a). A level opens on two right answers running *and* once every
+person has been answered right on it (4b); "Read the forms" counts towards
+that and "I get it" does not (17c); two persons spelt the same count as one
+(18a). The verb's own word is one person of the past, not a word met first
+(5b). The subjunctive is a tense skill too, still asked only in its examples
+(6a). Progress counts each tense the teacher filled in as a card (8b, "only
+for tenses that are actually filled"). Huế unchanged (11a); Arabic and
+Hebrew together (12a). Verbs, sentences and numbers on one set of rules in
+one release (13). "Weak skills" is "Weak spots" (14a). The endings on
+nouns wait (15b); no new skills yet (16).
+
+**Every person, on every level — how.** `capOf` reads the persons' states:
+the first level, from the bottom, where some person who can be asked
+something there has no right answer on it (anything but `vpattern`), twins
+by letters counting for each other. That level goes into the same map that
+holds a number part under its weakest word — `SKILL_CAPS`, read by the
+session, the standings (`cappedAt`) and `atItsTop` — so the line on the
+screen is the line the questions stop at. A capped tense makes no passes
+(`gradingFor`'s `keysOf`), and the next tense opens only once this one is
+cleared and uncapped (`quietTenses`). The draw leans on the same states:
+not asked yet this sitting, wrong on this question, not yet right on its
+level, wrong on anything, least asked; then a seed of the tense, the
+question and its right answers (`skillSeed`).
+
+**Starting where most persons are.** On a tense with nothing answered,
+each bare key is given the middle state of its persons, a person never
+asked counting at the bottom and an even count taking the lower middle
+(`middleState`). Once — a tense answered once is never seeded again.
+
+**Why a form and not a field.** A form's schedule already rides everywhere a
+learner's work goes: the merge between devices, the fold of a refreshed
+card, the drawer of a withdrawn one, the drawer's way back. A field on the
+card would have needed each of those taught. The cost is that everything
+walking a card's forms meets a form with no words, which every reader
+already tolerates (a verb with its past *he* blank has a blank lead), and
+the one merge that would drop it — an older device answering last — keeps
+tense forms from both sides.
+
+**The shared rules.** `src/skills.ts` says the rules once: one schedule and
+no words; drawn from a seed of skill, question and right answers; parts
+known before use; parts marked with the skill; never above what the parts
+allow. Numbers and tenses now share the seed and the cap line. Sentences
+already kept the first four in their own modules and were left as they are —
+nothing about them changes for a learner, so moving their code would have
+been risk with nothing to show for it.
+
+**What it costs.** Each tense's level waits on its slowest person, so a
+person the draw seldom reaches can hold a tense on a level for a sitting or
+two. Progress counts go up — a deck of twenty verbs reads as forty to sixty
+cards. A device still on 0.456 sees tense forms as forms with no words and
+asks nothing of them. The persons' states go on being written, so going
+back would hand learners their per-person progress as it then stood.
+Tests: `tests/tense-skills.test.mjs`.
+
+---
+
+## The home line splits the ready count, and never says when to come back (0.460)
+
+**22 October 2026** · `src/ArabicTrainer.tsx` (`readyOf`, `homeLine`)
+
+0.172 took the count off the home screen because it came with four other
+lines around it. It comes back as one line, at the owner's request, and it
+reads the same reckoning that `data-ready` and the session do. `countReady`
+is now `readyOf` added up: `review` is the met-card half, `fresh` the
+never-met cards the mix has room for, and `behind` says that `roomForNew`
+answered 0 because of `isBehind` and not because the learning cap was
+reached, so the line can say why the new words are missing. The cards the
+line counts are the cards the session deals, so the two cannot disagree.
+
+The owner asked that a learner who is caught up be asked to practise, not
+told when the next review falls. So `nextDueLine` is gone, and the button
+always reads Start session. The line is left off under a prep, which keeps
+its claim to the top of the screen. Tests: the `homeLine` case in
+`tests/session.test.mjs`, and the home line check in the smoke harness.
+
+## A deck's quality (0.461)
+
+**22 October 2026** · `src/deck-quality.ts`, `src/spaces.tsx`
+
+The owner asked for a score on each deck saying how well built and
+pedagogical it is, and settled its rules question by question before any
+of it was written: teachers only; a number out of 100 in green, amber or
+red, changing at 80 and 50; the three changes worth most folded away on
+the deck's own page; and the weights below.
+
+**Most of it is words met in sentences (55 of 100).** That was the owner's
+starting point — a word card practised on its own and never in a sentence
+is the thing a deck most often gets wrong. Every form a student is asked
+counts, because a form is only asked to fill a gap where that exact form
+is in a sentence (`context-index.ts`, one form per phrase): a sentence with
+*book* gives *books* nothing. The word itself wants two sentences, other
+forms one each — two for every form would have asked dozens of sentences
+of a verb. A card is half its own word and half the rest, and cards count
+equally, so a verb of thirty forms does not swamp thirty nouns.
+
+**A blank counts for exactly the forms it can take.** The owner's rule: a
+sentence card with a blank every form can stand in covers all of them at
+once. Read off the same list review makes (`sentencesOf`), agreement and
+narrowed tenses included, and only the sentences review lets through,
+because those are the only ones a student meets. Links count only once
+confirmed, for the same reason — an unconfirmed one puts nothing in front
+of a student — and are offered as a fix instead.
+
+**The same deck, and the course's words.** A sentence in another deck does
+not count, because a deck can be practised on its own. But a sentence may
+use a word another deck of the course teaches without losing points;
+only a word no deck of the course teaches does. A deck in no course yet
+reads against everything the teacher has.
+
+**The smaller checks share 35 points, 5 each**, and a check with nothing to
+measure hands its points to the rest. A deck with words and no sentences is
+not one of those: it scores low on purpose, which is what the score is for.
+
+**What it costs.** It restates rules rather than running them, as the
+deck's learn-by estimate does: a change to what counts as a context, to
+review or to blanks has to be carried in by hand. Scoring every deck on the
+list meant finding the unknown words of every sentence against every word
+of the course, which through the language's matcher was millions of calls;
+each language now also states its matcher as a key and the keys a token
+can be (`keyed` on the context, tested to agree with the matcher), so it is
+a lookup. The sentences a blank makes were already worked out for review,
+and are now worked out once for both.
+

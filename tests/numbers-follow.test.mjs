@@ -42,7 +42,7 @@ await build({
     __BUILT_AT__: '"0"',
   },
 });
-const { buildSession, cardStandings, creditNumbers, installIndexes, laddered, rangeCapsOf, wordsOfDigit } = await import(
+const { buildSession, cardStandings, creditNumbers, installIndexes, laddered, skillCapsOf, wordsOfDigit } = await import(
   path.join(out, "trainer.js")
 );
 const { generate, fileIntoDecks, isRangeSkill, isNumeralCard, numeralId } = await import(
@@ -153,7 +153,7 @@ test("a part is no further up than its weakest member", () => {
   assert.equal(at.level, 1, "further up than eight, which has not been started");
   assert.equal(at.status, "learning");
   /* And it is asked no further up either. */
-  const caps = rangeCapsOf(items, settings);
+  const caps = skillCapsOf(items, settings);
   assert.equal(caps.get(part.forms[0].id), 1);
 
   /* Eight cleared, and the part is where its own answers put it. */
@@ -161,7 +161,7 @@ test("a part is no further up than its weakest member", () => {
   installIndexes(all, settings, SETS);
   const whole = must(all.find((/** @type {any} */ it) => it.id === zeroToNine.id), "0 to 9");
   assert.equal(must(standing(cardStandings(whole, settings, all)), "no standing").status, "done");
-  assert.equal(rangeCapsOf(all, settings).has(whole.forms[0].id), false);
+  assert.equal(skillCapsOf(all, settings).has(whole.forms[0].id), false);
 });
 
 test("once every member is cleared, a part goes straight to its top", () => {

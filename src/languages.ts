@@ -32,7 +32,7 @@ import type {
    have to read. */
 import { DIALOG_KIND, SELF_ALL, isDialog, linesOf, orderIsRight, partAnswers, yourLines } from "./dialogs.ts";
 import { ALT_SEP, answersOf, meaningsOf, splitAlternatives } from "./answers.ts";
-import { leadOf, subFormsOf } from "./cards.ts";
+import { leadOf, subFormsOf, wordOf } from "./cards.ts";
 /* And what a row is, for the one rule below that reads one: verbs.ts
    knows what a table is made of and no language at all, which is the
    same direction every other import here goes. */
@@ -2155,10 +2155,16 @@ export function contextCoverage(cards: Record<string, any>[], lang: Partial<Lang
       }
       continue;
     }
-    const kind = c.kind || guessKind(c.ar || c.en || c.lat, lang);
+    /* The card's word, wherever it is kept. A card saved since 0.138 holds
+       its text in its forms and nothing at the top, so reading `c.ar` here
+       showed every such card as a blank tile and matched no phrase saved
+       since then against anything. */
+    const said = wordOf(c);
+    const card = { id: c.id, ar: said.ar || "", en: said.en || "" };
+    const kind = c.kind || guessKind(said.ar || said.en || said.lat, lang);
     counts[kind] = (counts[kind] || 0) + 1;
-    if (kind === "word") words.push(c);
-    else contexts.push(c);
+    if (kind === "word") words.push(card);
+    else contexts.push(card);
   }
 
   let links = 0;
@@ -2237,12 +2243,18 @@ export function arWordStems(token: string, depth = 2) {
 }
 
 export function arTokenIsWord(token: string, word: string) {
-  const opts = { stripTashkeel: true, ignoreHamza: true, foldTaMarbuta: true };
-  const w = normAr(word, opts);
+  const w = arWordKey(word);
   if (!w) return false;
-  const t = normAr(token, opts);
-  if (!t) return false;
-  return arWordStems(t).includes(w);
+  return arTokenKeys(token).includes(w);
+}
+
+/* The matcher above in two halves, for a reader that looks words up
+   rather than asking of each pair — see `keyed` on LangContext. */
+const AR_MATCH = { stripTashkeel: true, ignoreHamza: true, foldTaMarbuta: true };
+export const arWordKey = (word: string): string => normAr(word, AR_MATCH);
+export function arTokenKeys(token: string): string[] {
+  const t = normAr(token, AR_MATCH);
+  return t ? arWordStems(t) : [];
 }
 
 /* ---- Vietnamese ----
@@ -2250,10 +2262,13 @@ export function arTokenIsWord(token: string, word: string) {
    are kept: ma and má are different words, and treating them as the same
    one would be the same mistake the checker refuses to make. */
 export function viTokenIsWord(token: string, word: string) {
-  const opts = { stripTones: false };
-  const w = normViet(word, opts);
-  return !!w && normViet(token, opts) === w;
+  const w = viWordKey(word);
+  return !!w && viWordKey(token) === w;
 }
+
+/* The matcher above as a key, for a reader that looks words up — see
+   `keyed` on LangContext. A token is a word whole here, so it has one. */
+export const viWordKey = (word: string): string => normViet(word, { stripTones: false });
 
 export function checkViet(given: string, expected: string, settings: Settings) {
   const mode = settings.tones || "either";
@@ -3574,12 +3589,17 @@ export function heWordStems(token: string, depth = 2) {
 }
 
 export function heTokenIsWord(token: string, word: string) {
-  const opts = { stripNiqqud: true, foldFinals: true };
-  const w = normHe(word, opts);
+  const w = heWordKey(word);
   if (!w) return false;
-  const t = normHe(token, opts);
-  if (!t) return false;
-  return heWordStems(t).includes(w);
+  return heTokenKeys(token).includes(w);
+}
+
+/* The matcher above in two halves — see `keyed` on LangContext. */
+const HE_MATCH = { stripNiqqud: true, foldFinals: true };
+export const heWordKey = (word: string): string => normHe(word, HE_MATCH);
+export function heTokenKeys(token: string): string[] {
+  const t = normHe(token, HE_MATCH);
+  return t ? heWordStems(t) : [];
 }
 
 /* Whether a string is written in the language's own script. The importer
@@ -3759,6 +3779,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
        phrases do, which strips the harakat before comparing. */
     context: {
       matches: arTokenIsWord,
+      keyed: { word: arWordKey, token: arTokenKeys },
       skip: ["من", "في", "على", "إلى", "عن", "مع", "هذا", "هذه", "ذلك", "الذي",
              "التي", "أن", "إن", "لا", "ما", "هل", "يا", "قد", "كان", "هو", "هي",
              "أنا", "أنت", "نحن", "كل", "بعض", "عند", "بين", "بعد", "قبل"],
@@ -3920,6 +3941,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
        not — but the tone has to match, because má and ma are two words. */
     context: {
       matches: viTokenIsWord,
+      keyed: { word: viWordKey, token: (token: string) => [viWordKey(token)] },
       skip: ["là", "và", "của", "có", "không", "được", "một", "các", "những",
              "này", "đó", "ở", "cho", "với", "thì", "mà", "rằng", "đã", "sẽ",
              "cũng", "rất", "nhưng", "khi", "để", "về", "ra", "vào"],
@@ -4033,6 +4055,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
     similarityMode: "chars",
     context: {
       matches: heTokenIsWord,
+      keyed: { word: heWordKey, token: heTokenKeys },
       skip: ["של", "את", "על", "עם", "אל", "כי", "לא", "גם", "אבל", "זה", "זאת",
              "הוא", "היא", "אני", "אתה", "אנחנו", "מה", "מי", "כל", "אם", "או"],
     },

@@ -8,6 +8,138 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.461 — 22 October 2026
+
+**Every deck has a quality score (teachers only).**
+
+- Under Teaching › Decks, each deck now shows "Deck quality" out of 100:
+  green from 80, amber from 50, red below. The deck's own page shows it
+  large, with "What would raise it" folded under it: the three changes
+  that would add the most points, and about how many each adds.
+- Most of the score (55 points) is whether the deck's words are practised
+  inside sentences of the same deck. Every form a student is asked counts:
+  the word itself wants two sentences, and each other form (a plural, a
+  person of a verb) one. A sentence counts once you have confirmed the
+  link, or when the word fills one of its blanks; a sentence card whose
+  blank can take every form covers all of them at once, and one narrowed to
+  some forms covers just those. A verb's own examples count too. Names,
+  and cards there only to fill blanks, are not asked to be in sentences.
+- 10 points are for sentences that are linked to at least one word card
+  and use no word that no deck in the course teaches.
+- 5 points each for: recordings, pictures, pronunciation written, sentences
+  with blanks reviewed, no word on two cards, no sentence longer than
+  about 12 words, and at least one conversation or text. A check that has
+  nothing to measure is left out and its points shared among the others.
+- Trade-off: a deck of words with no sentences scores low on purpose. Only
+  sentences you have approved count, so a sentence card still waiting for
+  review adds nothing until it is reviewed.
+- To check by hand: open a couple of real decks and see whether the score
+  and the suggested changes match your own sense of them.
+
+## 0.460 — 22 October 2026
+
+**The home screen says what is waiting.**
+
+- One line above Start session now says what the next session holds. When
+  reviews are due it reads "12 cards ready to review", followed by
+  "· 3 new words waiting" if the session will also bring in new words.
+- When nothing is due, it reads "Nothing to review — ready to learn 3 new
+  words", or, if there are no new words to bring in today, "All caught
+  up", with a nudge that practising now still helps.
+- When a pile of overdue reviews is holding new words back, the line says
+  so: "new words wait until you've caught up".
+- The numbers count every language switched on, and match what Start
+  session will actually deal.
+- The button now always reads Start session. It used to change to
+  "Practise anyway" when nothing was due. The old note at the bottom of
+  the card that gave the time of the next review is gone, so the screen
+  encourages practice instead of telling you to come back later.
+- The line is left off while a prep is on the home screen, which keeps the
+  top of the screen for the prep.
+
+## 0.459 — 22 October 2026
+
+**A deck's "In context" report shows every word again.**
+
+- Opening a deck in the teaching space and showing the pairings listed
+  some words as empty tiles under "Not in any phrase yet". Those were
+  cards saved or edited since 0.138: the report was still reading cards
+  the way they were stored before then, and found nothing on them. Every
+  tile now shows its word and its meaning.
+- The count above it is right again too. Phrases saved since 0.138 looked
+  empty to the report as well, so the words inside them were wrongly
+  counted as being in no phrase, and "0 of 15" could be well short of the
+  truth.
+- To check by hand: open a deck with recently edited cards, show the
+  pairings, and confirm no tile is empty.
+
+## 0.458 — 21 October 2026
+
+**Searching finds a card by any of its forms.**
+
+- Typing a plural, a feminine, a person of a verb, or any other form a
+  card carries now finds the card, in the script, the pronunciation or the
+  meaning. Before, most search boxes looked at the card's own word only,
+  so a card could not be found by the form a learner or teacher
+  remembered.
+- The same rule now applies in every list with a search box: the
+  learner's cards, deck and progress lists, the picker for choosing
+  individual cards, the teacher's card and deck lists, and the sentence
+  picker in the card editor. Each also matches the card's name, its tags,
+  and the lines of a conversation.
+- Trade-off: a search now turns up a few more cards than before, since a
+  word typed may appear in a form or a tag rather than the card's own
+  word.
+
+## 0.457 — 19 October 2026
+
+**A verb's tense is learnt as one thing (Arabic and Hebrew).**
+
+- Each tense a teacher has filled in (present, past, command, and so on)
+  now has one progress of its own and climbs the four levels as one card
+  does. Before, every person of every tense was learnt as a separate word,
+  about two dozen of them for a Palestinian verb.
+- Each question about a tense is about one person, picked when the
+  session is made. A different person comes up each time, and a person
+  answered wrong comes back later in the same session.
+- A level of a tense opens after two right answers in a row, and once
+  every person has been answered right on it at least once. Two persons
+  spelt the same (بتكتب is "you (m)" and "she") count as one. "I get it"
+  on the table counts for nobody; reading the forms does.
+- Persons a learner keeps getting wrong come up more often, are named on
+  the verb's screen, and stay out of other cards' sentences until they are
+  right again.
+- The verb's own word (the past "he", like كتب) is no longer met first on
+  its own: it is one person of the past tense.
+- Tenses still open one after another: the next once the one before is
+  cleared, every person included.
+- The verb's screen shows a line for each tense: where it stands, who it
+  is still waiting on, and who keeps going wrong.
+- On the Progress tab and in the ring on the home screen, each filled
+  tense counts as a card of its own ("to write · present").
+- Progress already made carries over: each tense starts where most of its
+  persons were. What was earned on each person is kept, too.
+- In a simulation of one verb among sixty words, answered right every
+  time at three sittings a day, its present was cleared on day 27 and its
+  past on day 42. Under the old rules, no tense was fully cleared within
+  90 days. At one sitting a day the present was cleared on day 88, against
+  none before.
+- **Weak skills is now called Weak spots.** It works as before.
+- Unchanged: Vietnamese verbs; the pronouns on the end of a word; numbers
+  and sentences with blanks. These now follow the same written-down rules
+  as the tenses, with nothing different for learners.
+- Trade-off: a tense can wait on one person it has not been asked yet, so
+  a level may take a sitting or two longer to open than its own answers
+  suggest. Card counts on Progress go up: twenty verbs read as forty to
+  sixty cards.
+- Trade-off: some verbs move up or down once as their progress carries
+  over.
+- To check by hand: open an Arabic verb with a present and a past. Its
+  screen should show a line for each, the past saying it opens once the
+  tense before it is cleared. In a session, questions about the present
+  should each be about a different person. On Progress, under Cards, the
+  verb should appear once per tense.
+
 ## 0.456 — 19 October 2026
 
 **Palestinian Arabic verbs have one "I" unless the word really has two.**
