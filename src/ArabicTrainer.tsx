@@ -247,7 +247,7 @@ import {
   shuffled,
 } from "./scheduler.ts";
 import type { Move, Standing, Unit } from "./scheduler.ts";
-import { dueAt, mixSession, roomForNew as roomForNewIn } from "./session-mix.ts";
+import { dueAt, isBehind, mixSession, roomForNew as roomForNewIn } from "./session-mix.ts";
 import type { MixCard } from "./session-mix.ts";
 import {
   SESSION_SIZE,
@@ -11238,7 +11238,7 @@ export default function ArabicTrainer() {
    * ready to practice yet", and the line written to explain the wait could
    * never appear because the count it was gated on was never zero.
    */
-  const countReady: (pool: Item[]) => number = useCallback(
+  const readyOf: (pool: Item[]) => Ready = useCallback(
     (all) => {
       /* Not a range waiting on its words: a session would not deal it, so
          it is not ready — see knownNumbers. */
@@ -11267,15 +11267,20 @@ export default function ArabicTrainer() {
          this pool — the same reckoning buildSession does, so the two cannot
          come to disagree. None while the learner is catching up. */
       const fresh = pool.filter((it) => !everMet(it) && !waiting(it, false) && waiting(it, true)).length;
-      const room = roomForNewIn(mixCardsOf(pool, items, settings), {
-        at: now(),
-        places: SESSION_SIZE / PER_UNIT,
-        dayCards: (perDay || 0) / PER_UNIT,
-      });
-      return met + Math.min(fresh, room);
+      const mix = mixCardsOf(pool, items, settings);
+      const pace = { at: now(), places: SESSION_SIZE / PER_UNIT, dayCards: (perDay || 0) / PER_UNIT };
+      /* Behind only matters while there are new cards it is keeping out:
+         the home line says so, and saying it with none waiting is noise. */
+      return { review: met, fresh: Math.min(fresh, roomForNewIn(mix, pace)), behind: fresh > 0 && isBehind(mix, pace) };
     },
     [settings, items, perDay, systems]
   );
+  /* The two halves as one number, which is what decides whether there is
+     anything waiting at all. */
+  const countReady = useCallback((pool: Item[]) => {
+    const r = readyOf(pool);
+    return r.review + r.fresh;
+  }, [readyOf]);
 
   /*
    * The languages this person actually has cards in, with how much of each
@@ -11350,7 +11355,8 @@ export default function ArabicTrainer() {
   /* How much is waiting, in the languages that are switched on: the number
      on the home screen, and what decides whether there is a session to
      start at all. */
-  const readyCount = useMemo(() => countReady(drillable), [drillable, countReady]);
+  const homeWaiting = useMemo(() => readyOf(drillable), [drillable, readyOf]);
+  const readyCount = homeWaiting.review + homeWaiting.fresh;
   /* The prep the home screen offers a session for: one still to come, with
      cards in it not yet learnt. Past its day, or finished, it is Progress's
      to report and the learner's to clear. */
@@ -13732,6 +13738,13 @@ export default function ArabicTrainer() {
                       takes them further — unless a prep has the top tile. */}
                   {!homePrep && <Climb items={shown} settings={settings} />}
 
+                  {/* What the button below will deal, in one line, just
+                      before the learner decides to press it. Left off under
+                      a prep, which has the top of the screen to itself. */}
+                  {!homePrep && drillable.length > 0 && (
+                    <p className="at-homeline">{homeLine(homeWaiting)}</p>
+                  )}
+
                   <div className="at-row">
                     {/* Always live while there is anything to drill. Being
                         due decides what a session leads with, not whether
@@ -13745,7 +13758,7 @@ export default function ArabicTrainer() {
                       onClick={() => begin(false)}
                       disabled={!drillable.length}
                     >
-                      {readyCount ? "Start session" : "Practise anyway"}
+                      Start session
                     </Button>
                   </div>
                   {/* And the other kind of session there is a one-tap case
@@ -13810,12 +13823,6 @@ export default function ArabicTrainer() {
                     </>
                   )}
 
-                  {!readyCount && drillable.length > 0 && (
-                    <Help>
-                      {`Nothing is due. ${nextDueLine(drillable, settings)} Practising now is
-                        welcome and won't move your schedule much.`}
-                    </Help>
-                  )}
                   {!drillable.length && items.length > 0 && (
                     <Notice kind="warn">
                       No card here has two usable exercise types. A card needs the{" "}
@@ -20472,17 +20479,24 @@ function AppPreferences({ settings, setSetting }: {
   );
 }
 
-function nextDueLine(pool: Item[], settings: Settings) {
-  const future: Millis[] = [];
-  for (const it of pool) {
-    for (const { unit } of drillableUnits(it, settings)) {
-      for (const t of enabledTypes(unit, settings)) {
-        const d = stateOf(unit, t).due || 0;
-        if (d > now()) future.push(d);
-      }
-    }
-  }
-  if (!future.length) return "Nothing scheduled.";
-  return `Next exercise in ${formatGap(Math.min(...future) - now())}.`;
+/** What is waiting on the home screen: cards met before with something due,
+    new cards the next session would bring in, and whether new cards are
+    being held back for a pile of overdue reviews. */
+export type Ready = { review: number; fresh: number; behind: boolean };
+
+/*
+ * The one line above Start session. Every case ends somewhere the button
+ * answers: there is always a session to start, so a learner who is caught
+ * up is asked to practise rather than told when to come back.
+ */
+export function homeLine({ review, fresh, behind }: Ready): string {
+  const more = fresh
+    ? ` · ${plural(fresh, "new word")} waiting`
+    : behind
+    ? " · new words wait until you've caught up"
+    : "";
+  if (review) return `${plural(review, "card")} ready to review${more}`;
+  if (fresh) return `Nothing to review — ready to learn ${fresh === 1 ? "a new word" : `${fresh} new words`}`;
+  return "All caught up — a practice session now still helps them stick";
 }
 

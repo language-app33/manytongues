@@ -1129,7 +1129,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   works out, and finding unknown words in a sentence goes through `keyed` on
   the language's context, a lookup rather than a comparison per word, which
   is what lets every deck in the list be scored at once. Tests:
-  `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality".
+  `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
 - **A number is built, not memorised, and so is a time.** A learner who
   knows *forty* and *seven* knows *forty-seven*, so numbers are not cards
   one at a time. A language's numbers are **one document** — the words it
