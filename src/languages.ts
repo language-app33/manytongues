@@ -32,7 +32,7 @@ import type {
    have to read. */
 import { DIALOG_KIND, SELF_ALL, isDialog, linesOf, orderIsRight, partAnswers, yourLines } from "./dialogs.ts";
 import { ALT_SEP, answersOf, meaningsOf, splitAlternatives } from "./answers.ts";
-import { leadOf, subFormsOf } from "./cards.ts";
+import { leadOf, subFormsOf, wordOf } from "./cards.ts";
 /* And what a row is, for the one rule below that reads one: verbs.ts
    knows what a table is made of and no language at all, which is the
    same direction every other import here goes. */
@@ -2155,10 +2155,16 @@ export function contextCoverage(cards: Record<string, any>[], lang: Partial<Lang
       }
       continue;
     }
-    const kind = c.kind || guessKind(c.ar || c.en || c.lat, lang);
+    /* The card's word, wherever it is kept. A card saved since 0.138 holds
+       its text in its forms and nothing at the top, so reading `c.ar` here
+       showed every such card as a blank tile and matched no phrase saved
+       since then against anything. */
+    const said = wordOf(c);
+    const card = { id: c.id, ar: said.ar || "", en: said.en || "" };
+    const kind = c.kind || guessKind(said.ar || said.en || said.lat, lang);
     counts[kind] = (counts[kind] || 0) + 1;
-    if (kind === "word") words.push(c);
-    else contexts.push(c);
+    if (kind === "word") words.push(card);
+    else contexts.push(card);
   }
 
   let links = 0;
