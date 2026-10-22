@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.459 — 22 October 2026
+
+**A deck's "In context" report shows every word again.**
+
+- Opening a deck in the teaching space and showing the pairings listed
+  some words as empty tiles under "Not in any phrase yet". Those were
+  cards saved or edited since 0.138: the report was still reading cards
+  the way they were stored before then, and found nothing on them. Every
+  tile now shows its word and its meaning.
+- The count above it is right again too. Phrases saved since 0.138 looked
+  empty to the report as well, so the words inside them were wrongly
+  counted as being in no phrase, and "0 of 15" could be well short of the
+  truth.
+- To check by hand: open a deck with recently edited cards, show the
+  pairings, and confirm no tile is empty.
+
 ## 0.458 — 21 October 2026
 
 **Searching finds a card by any of its forms.**
