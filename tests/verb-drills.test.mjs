@@ -22,6 +22,17 @@ import { build } from "esbuild";
 import path from "node:path";
 import { must } from "./helpers.mjs";
 
+/* Seeded before the trainer is imported, as numbers-session does. A
+   session draws one form of each card at random (since 0.455), and about
+   one sitting in seven drew both verbs' cited forms, which have no table
+   by design — so the test of the table and its practice failed that often
+   with nothing wrong. Seeded, it is the same sitting on every run. */
+let rolling = 20261022 >>> 0;
+Math.random = () => {
+  rolling = (Math.imul(rolling, 1664525) + 1013904223) >>> 0;
+  return rolling / 4294967296;
+};
+
 const here = path.dirname(new URL(import.meta.url).pathname);
 const out = path.join(here, ".verb-drills-build");
 

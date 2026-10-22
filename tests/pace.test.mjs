@@ -247,14 +247,24 @@ function sitDown(
      wall clock — what is due, what was asked half an hour ago and rests —
      and left alone it would read today's date against cards dated to
      this simulation's calendar, so everything would look overdue and the
-     order would be a shuffle of the whole hand. */
+     order would be a shuffle of the whole hand.
+
+     And its chance from a seed: the session shuffles within each rank, and
+     left to the real Math.random every figure below moved from run to run
+     — enough that a bound measured on one run failed on the next with
+     nothing changed. Seeded off the sitting's own moment, so the same
+     sitting deals the same hand whichever tests run, and in whatever
+     order. */
   const wall = Date.now;
+  const dice = Math.random;
   Date.now = () => at;
+  Math.random = seeded(at / 60000);
   let built;
   try {
     built = buildSession({ items, settings, inDeck: () => true, budget, perDay });
   } finally {
     Date.now = wall;
+    Math.random = dice;
   }
   const day = dayKey(at);
   let cards = items;
