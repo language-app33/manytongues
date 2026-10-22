@@ -861,6 +861,16 @@ check("untouched states are not stored",
    text: the number came off the screen when the climb went on it, and what
    is being tested here is the counting, not the wording. */
 check("every card with something due counts, and a value is never one", homeCard()?.getAttribute("data-ready") === "6", homeCard()?.getAttribute("data-ready") ?? "no home card");
+/* And said in one line above Start session: the reviews and the new words
+   beside them add up to the same count the attribute carries. */
+{
+  const line = (homeCard()?.querySelector(".at-homeline")?.textContent || "").replace(/\s+/g, " ");
+  const m = /^(\d+) cards? ready to review(?: · (\d+) new words? waiting)?/.exec(line);
+  check("the home screen says how many cards are ready to review, above Start session",
+    !!m && Number(m[1]) + Number(m[2] || 0) === 6 &&
+      !!homeCard()?.querySelector(".at-homeline + .at-row"),
+    line || "no line");
+}
 const wire = remoteDocs.get(realToken)?.data;
 /* Sparse means one thing: no state written out for an exercise type that was
    never answered. Keys from an older schema — v2's mean/read/write — ride
@@ -2447,7 +2457,7 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
       prepTile() ? (prepTile()?.textContent || "").replace(/\s+/g, " ").slice(0, 120) : "(no prep tile)");
     check("the climb over everything is left off, and the sessions tile below has no primary button",
       !homeCard()?.querySelector(".at-climb") && !homeCard()?.querySelector(".at-btn.primary") &&
-        !!buttonNamed(/^(Start session|Practise anyway)$/) && homeCard()?.contains(buttonNamed(/^Weak spots$/) || null),
+        !!buttonNamed(/^Start session$/) && homeCard()?.contains(buttonNamed(/^Weak spots$/) || null),
       (homeCard()?.textContent || "").replace(/\s+/g, " ").slice(0, 120));
     const counter = () => ((document.querySelector(".at-preptoday") || {}).textContent || "");
     check("under it, today's sessions against what today needs, as a count and a row of dots",
@@ -10940,7 +10950,7 @@ const openPronounTables = async () => {
       (it.forms || []).some((/** @type {any} */ f) => Object.keys(f.s || {}).length > 0)).length;
   };
 
-  click(named(/^(Start session|Practise anyway)$/));
+  click(named(/^Start session$/));
   await sleep(700);
   const atStart = sent.length;
   await giveUp();

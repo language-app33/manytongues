@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.459 — 22 October 2026
+
+**The home screen says what is waiting.**
+
+- One line above Start session now says what the next session holds. When
+  reviews are due it reads "12 cards ready to review", followed by
+  "· 3 new words waiting" if the session will also bring in new words.
+- When nothing is due, it reads "Nothing to review — ready to learn 3 new
+  words", or, if there are no new words to bring in today, "All caught
+  up", with a nudge that practising now still helps.
+- When a pile of overdue reviews is holding new words back, the line says
+  so: "new words wait until you've caught up".
+- The numbers count every language switched on, and match what Start
+  session will actually deal.
+- The button now always reads Start session. It used to change to
+  "Practise anyway" when nothing was due. The old note at the bottom of
+  the card that gave the time of the next review is gone, so the screen
+  encourages practice instead of telling you to come back later.
+- The line is left off while a prep is on the home screen, which keeps the
+  top of the screen for the prep.
+
 ## 0.458 — 21 October 2026
 
 **Searching finds a card by any of its forms.**

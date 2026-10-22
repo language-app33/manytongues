@@ -2800,6 +2800,9 @@ button.at-stat { transition: border-color 140ms ease; }
 /* No margin of its own underneath: the row of buttons below carries the
    gap, the way every row on that card does. */
 .at-climb { display:flex; align-items:center; gap:16px; }
+/* What Start session will deal, in one line between the climb and the
+   button. The row below still carries the gap underneath. */
+.at-homeline { margin:16px 0 0; font-size: var(--fs-sm); font-weight:700; color: var(--text-soft); }
 /* ---- the prep tile's glance, under its button ----
    Today and the days left side by side in two wells, each a small label, a
    big number and a word under it. Today's dots fill as sessions are done;

@@ -6591,3 +6591,24 @@ cards. A device still on 0.456 sees tense forms as forms with no words and
 asks nothing of them. The persons' states go on being written, so going
 back would hand learners their per-person progress as it then stood.
 Tests: `tests/tense-skills.test.mjs`.
+
+---
+
+## The home line splits the ready count, and never says when to come back (0.459)
+
+**22 October 2026** · `src/ArabicTrainer.tsx` (`readyOf`, `homeLine`)
+
+0.172 took the count off the home screen because it came with four other
+lines around it. It comes back as one line, at the owner's request, and it
+reads the same reckoning that `data-ready` and the session do. `countReady`
+is now `readyOf` added up: `review` is the met-card half, `fresh` the
+never-met cards the mix has room for, and `behind` says that `roomForNew`
+answered 0 because of `isBehind` and not because the learning cap was
+reached, so the line can say why the new words are missing. The cards the
+line counts are the cards the session deals, so the two cannot disagree.
+
+The owner asked that a learner who is caught up be asked to practise, not
+told when the next review falls. So `nextDueLine` is gone, and the button
+always reads Start session. The line is left off under a prep, which keeps
+its claim to the top of the screen. Tests: the `homeLine` case in
+`tests/session.test.mjs`, and the home line check in the smoke harness.
