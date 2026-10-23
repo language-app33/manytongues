@@ -6743,8 +6743,55 @@ again. Numbers and the clock stay with the whole-site backup, because they
 belong to the teacher rather than to a deck. Each chunk re-reads every
 deck and course to check access, which is cheap on a teaching site.
 
+## A teacher's import (0.464)
 
-## A card's status, without the one-screen card editor (0.464)
+**23 October 2026** · `src/imports.ts`, `ImportScreen` and `importFrom` in `src/spaces.tsx`
+
+The other end of 0.462's export. The owner settled its questions before
+it was built. "Already exists" means the same card (the same id, among the
+cards the teacher can see) or the same word in the same language. A same
+card is listed unticked and replaced if ticked. A same word is listed
+unticked and imported beside if ticked. A deck the teacher has is added
+to. A new deck goes in no course. What is imported becomes the importing
+teacher's own. A whole-site backup is accepted too. Afterwards the owner
+asked that every imported card be Ready for review.
+
+**The same word is the deck score's rule, minus the meaning.** The score
+counts a word as repeated when the script word and its English agree. An
+import asks whether you already have the word at all, and one word can
+have two meanings, so it compares the script word (`wordOf`) in the same
+language alone, and shows your card's meaning beside the file's. A card
+with no word, a conversation or a text, is compared by its name. A
+deck is the same if its id is, or failing that its name in its language.
+
+**Written with the calls the editor already makes.** Decks are made with
+create-deck. Recordings and pictures go up with put-clip and put-image,
+which keep one copy of each. Each card goes through save-card, with
+an id to replace and none to make one new, so ownership, a locked deck's
+refusal, number parts and everything else save-card enforces hold for an
+import too. A server endpoint of its own would have been a second way in
+for cards, needing every one of those rules repeated.
+
+**Links follow the cards.** A phrase names its words by id, and an
+imported copy gets a new one. Every mention of an id from the file is
+moved to where that card now is (`remapIds`). A word left out because the
+teacher has it maps to the teacher's card. Cards that name a card made in
+the same import are saved a second time once its id is known.
+
+**Ready for review.** The import sends `status: "review"` with each save
+(`IMPORTED_STATUS`). Since 0.465 the server keeps it: a new card is made
+Ready for review, and a replaced card that students have keeps their
+version while the import waits as its changes, Ready for review.
+
+**What it costs.** A card left as it is still joins the imported deck it is
+in, which is what importing a deck means but is a change to a card nobody
+ticked. An ID already taken in the teacher's cards is dropped instead
+of refusing the card. An import cut short (a lost connection) leaves what
+it had written: the error is shown on the screen, and importing the file
+again finds those cards already there.
+
+
+## A card's status, without the one-screen card editor (0.465)
 
 **23 October 2026** · `card-status`, `save-card`, `teacherView`,
 `studentView` in `server/api/courses.js`; `StatusMenu`, `touchedBy` in

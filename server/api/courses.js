@@ -1570,7 +1570,8 @@ export default async (req) => {
        * sender that names nothing (the card screen, an older build) sends
        * the whole card, as it always did.
        *
-       * `into: "changes"` is the card screen: on a published card, what it
+       * `into: "changes"` is the card screen, and any save asking for a
+       * status (an import): on a published card, what it
        * saves goes into the card's unpublished changes. Every other save —
        * the Pronouns screen, tagging a selection, an older build — writes
        * the published card as it always did, and the same fields are put
@@ -1585,7 +1586,12 @@ export default async (req) => {
       const touched = Array.isArray(body.touched) && existing
         ? [...new Set(body.touched.map((/** @type {unknown} */ k) => String(k)))]
         : null;
-      const intoChanges = body.into === "changes";
+      /* The status a save asks for: Draft (a card made on the card
+         screen) or Ready for review (an import). Asked of an existing
+         card, it is the status of what this save writes — the card, where
+         it has never been published, or else its changes. */
+      const asked = body.status === "draft" || body.status === "review" ? body.status : null;
+      const intoChanges = body.into === "changes" || !!asked;
       const walk = body.walk && typeof body.walk === "object" && existing ? body.walk : null;
       /** The working version, which a save naming its fields is laid over. */
       const base = existing ? workingOf(existing) : null;
@@ -2268,6 +2274,7 @@ export default async (req) => {
           /* Never published: the card is its own draft, and is written as
              any card always was. */
           nextLive = written(live, fields);
+          if (asked) nextLive.status = asked;
         } else if (intoChanges) {
           /* The card screen, on a published card. The header is the one
              part of it that is not a version — see VERSIONED_KEYS — so it
@@ -2298,7 +2305,7 @@ export default async (req) => {
              so. JSON drops it. */
           pending: nextWork && !sameVersion(nextLive, nextWork)
             ? {
-                status: (was && was.status) || "draft",
+                status: asked || (was && was.status) || "draft",
                 card: versionOf(nextWork),
                 updated: Date.now(),
                 by: mine,
@@ -2314,11 +2321,11 @@ export default async (req) => {
           id: newId,
           owner: mine,
           ...fields,
-          /* The card screen makes every card a draft: nobody sees it until
-             it is published. A card made anywhere else — the Pronouns
-             screen, a split, an older build — is published as it always
-             was. */
-          ...(body.status === "draft" ? { status: "draft" } : {}),
+          /* The card screen makes every card a draft, and an import makes
+             it Ready for review: nobody sees it until it is published. A
+             card made anywhere else — the Pronouns screen, a split, an
+             older build — is published as it always was. */
+          ...(asked ? { status: asked } : {}),
           rev: 1,
           created: now,
           updated: now,

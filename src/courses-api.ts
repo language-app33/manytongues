@@ -195,14 +195,15 @@ export const myCards = () => call("my-cards");
  * fields that changed, and only those are written; `into: "changes"` sends
  * the card editor's saves to a published card's unpublished changes;
  * `walk` is a rename or a tag taken off the collection, applied by the
- * server to both of a card's versions; `status: "draft"` makes a new card
- * a draft.
+ * server to both of a card's versions; `status` is the one the save asks
+ * for — Draft for a card made on the card screen, Ready for review for an
+ * import — on the card, or on a published card's changes.
  */
 export type SaveExtra = {
   touched?: string[];
   into?: "changes";
   walk?: { renames?: { from: string; to: string }[]; drops?: string[] };
-  status?: "draft";
+  status?: "draft" | "review";
 };
 export const saveCard = (card: Partial<Card>, decks: string[], extra: SaveExtra = {}) =>
   call("save-card", { body: { card, decks, ...extra } });

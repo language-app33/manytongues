@@ -163,6 +163,7 @@ const PLACES: Record<string, [string, string]> = {
   CourseSettings: [TEACH, "Course settings"],
   DeckEditor: [TEACH, "Deck settings"],
   ExportScreen: [TEACH, "Exporting cards or decks"],
+  ImportScreen: [TEACH, "Importing cards or decks"],
   LockMark: [TEACH, "A locked deck's padlock"],
   DeckPicker: [TEACH, "Choosing which decks"],
   CardEditor: [TEACH, "Editing a card"],

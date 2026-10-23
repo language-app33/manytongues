@@ -360,3 +360,21 @@ test("a draft fills no student's blank", async () => {
   assert.ok(sent.some((/** @type {any} */ c) => c.id === pear.id), "a published value goes with the sentence");
   assert.ok(!sent.some((/** @type {any} */ c) => c.id === apple.id), "a draft does not");
 });
+
+test("an import is Ready for review: a new card is, and a published card's changes are", async () => {
+  const { key, deckId, studentKey } = await classroom("Nour");
+  const made = await api("save-card", { key, body: { card: word("بيت", "house"), decks: [deckId], status: "review" } });
+  assert.equal(made.json.card.status, "review");
+  assert.ok(!(await material(studentKey)).cards.some((/** @type {any} */ c) => c.id === made.json.card.id),
+    "no student has it");
+
+  const card = (await api("save-card", { key, body: { card: word("كتاب", "book"), decks: [deckId] } })).json.card;
+  const replaced = await api("save-card", {
+    key,
+    body: { card: { ...card, forms: [{ ...card.forms[0], en: "a book" }] }, decks: [deckId], status: "review" },
+  });
+  assert.equal(replaced.json.card.status, "published", "the card stays published");
+  assert.equal(replaced.json.card.changes, "review", "and the import waits as its changes");
+  const handed = must((await material(studentKey)).cards.find((/** @type {any} */ c) => c.id === card.id), "the card");
+  assert.equal(handed.forms[0].en, "book");
+});
