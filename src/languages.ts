@@ -2021,6 +2021,48 @@ export function gluedTo(token: string, word: string, lang: Partial<Lang>): { bef
   return { before: chars.slice(0, best.a).join(""), after: chars.slice(end).join("") };
 }
 
+/*
+ * Which of several words a phrase holds, where more than one is found.
+ *
+ * The matcher reads a word with something glued to it as the word, so a
+ * feminine made with ة — فاهمة — is found by the masculine فاهم as surely
+ * as by itself. Taking the first word that matched therefore took the
+ * masculine for every such feminine: the score credited it, and the
+ * gap-fill asked فاهم in "مش ___ة". Where several are found at the place
+ * the first one is, the one that fits it best wins — spelt as the phrase
+ * spells it (marks aside), then one with nothing glued to its end — and
+ * the first only where none fits better, so a word with a possessive or a
+ * prefix on it (كتابك, الوظيفة, وبدك) is still the plain word.
+ *
+ * `words` in the order they are tried; what comes back is the one taken
+ * and where it sits.
+ */
+export function bestWordIn<T>(
+  phrase: string,
+  words: { item: T; word: string }[],
+  lang: Partial<Lang>,
+): { item: T; span: { at: number; len: number } } | null {
+  if (!supportsContext(lang)) return null;
+  const tokens = contextTokens(phrase, lang);
+  const bare = (t: string) => t.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, "");
+  /* Asked of the matcher both ways round, since peeling is not symmetrical:
+     فاهمة peels to فاهم and فاهم does not grow to فاهمة. */
+  const fit = (window: string, word: string) => {
+    const said = bare(window);
+    if (lang.context.matches(said, word) && lang.context.matches(word, said)) return 0;
+    const glued = gluedTo(said, word, lang);
+    return glued && !glued.after ? 1 : 2;
+  };
+  let best: { item: T; span: { at: number; len: number }; rank: number } | null = null;
+  for (const { item, word } of words) {
+    const span = findWordSpan(phrase, word, lang);
+    if (!span || (best && span.at !== best.span.at)) continue;
+    const rank = fit(tokens.slice(span.at, span.at + span.len).join(" "), word);
+    if (!best || rank < best.rank) best = { item, span, rank };
+  }
+  return best && { item: best.item, span: best.span };
+}
+
 /* A card longer than this is not a word anybody is going to find inside a
    sentence, and pairing every card with every window of every other one is
    the sort of work that grows with the square of a deck. */

@@ -18,7 +18,7 @@
  */
 
 import type { Form, Item, Lang } from "./types.ts";
-import { contextTokens, findWordSpan, guessKind, supportsContext, tensedOf } from "./languages.ts";
+import { bestWordIn, contextTokens, findWordSpan, guessKind, supportsContext, tensedOf } from "./languages.ts";
 import { exampleCells, filledExample, verbExamplesOf } from "./examples.ts";
 import { unitsOf } from "./scheduler.ts";
 import { leadOf, wordOf } from "./cards.ts";
@@ -98,10 +98,18 @@ export function buildContextIndex(items: Item[], lang: Lang): Map<string, Contex
     for (const targetId of uses) {
       const target = byId.get(targetId);
       if (!target) continue;
-      for (const { unit } of unitsOf(target)) {
-        if (!unit.ar) continue;
-        const span = findWordSpan(phrase.ar, unit.ar, lang);
-        if (!span) continue;
+      /* One form per phrase: if a phrase contained both the singular and
+         the plural it would be a context for each, but only one is the
+         word the teacher meant — the one the phrase holds. The feminine
+         فاهمة is found by the masculine فاهم too, and taking the first form
+         found asked فاهم in "مش ___ة"; see bestWordIn. */
+      const found = bestWordIn(
+        phrase.ar,
+        unitsOf(target).filter(({ unit }) => unit.ar).map(({ unit }) => ({ item: unit, word: unit.ar })),
+        lang,
+      );
+      if (found) {
+        const { item: unit, span } = found;
         const list = index.get(unit.id) || [];
         list.push({
           id: phrase.id,
@@ -118,10 +126,6 @@ export function buildContextIndex(items: Item[], lang: Lang): Map<string, Contex
           ...(phrase.frame && /\{\{/.test(`${phrase.ar} ${phrase.en || ""}`) ? { frame: phrase.frame } : {}),
         });
         index.set(unit.id, list);
-        /* One form per phrase: if a phrase contained both the singular and
-           the plural it would be a context for each, but the first match
-           is the one the teacher meant. */
-        break;
       }
     }
   }
@@ -180,9 +184,9 @@ function gapIn(written: string, filled: string, word: string, lang: Lang): { at:
  *
  * Every form, not only the word on the front — a verb's conjugations, a
  * noun's plural — because a sentence saying "she wrote" teaches the card
- * for "he wrote" as surely as one saying "he wrote". The forms are tried
- * in the order buildContextIndex tries them, front word first, so the form
- * named here is the one the practice side will blank.
+ * for "he wrote" as surely as one saying "he wrote". The form is picked
+ * the way buildContextIndex picks it (see bestWordIn), so the form named
+ * here is the one the practice side will blank.
  */
 export function wordsOffered(
   text: string,
@@ -198,8 +202,8 @@ export function wordsOffered(
     if (!card || !card.id || card.id === selfId) continue;
     const lead = wordOf(card).ar;
     if (!lead || guessKind(lead, lang) !== "word") continue;
-    const hit = unitsOf(card).find(({ unit }) => unit.ar && findWordSpan(text, unit.ar, lang));
-    if (hit) out.push({ card, form: hit.unit });
+    const hit = bestWordIn(text, unitsOf(card).filter(({ unit }) => unit.ar).map(({ unit }) => ({ item: unit, word: unit.ar })), lang);
+    if (hit) out.push({ card, form: hit.item });
   }
   return out;
 }
