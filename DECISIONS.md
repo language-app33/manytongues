@@ -6661,6 +6661,42 @@ can be (`keyed` on the context, tested to agree with the matcher), so it is
 a lookup. The sentences a blank makes were already worked out for review,
 and are now worked out once for both.
 
+**The conversation is always worth 5 (0.463).** The owner's rule. Sharing a
+missing check's points among every check that applied included the
+conversation, so in a small deck a missing conversation cost up to 20
+points: one well-made, reviewed sentence and nothing else scored 80. Now
+the conversation or text is worth exactly 5 of the 100, and a check with
+nothing to measure shares its points only among the other checks that
+apply, which together are always worth 95. A deck where every check
+applies scores as before. "Add a conversation or a text" always offers 5.
+
+**How a sentence is read (0.463).** What the score counts now follows what
+a student is asked:
+
+- A link credits the form the sentence holds, not the first form the
+  matcher finds. The Arabic matcher reads a feminine made with ة as the
+  masculine plus an ending, so فاهم was credited for every فاهمة. Where
+  several forms are found at one place, the one spelt as the sentence
+  spells it wins, then one with nothing glued to its end; a possessive or
+  prefix glued on (كتابك, الوظيفة, وبدك) still credits the plain form. The
+  gap-fill (`context-index.ts`, one form per phrase) still takes the first
+  form found, so it asks فاهم in "مش ___ة"; left for its own change.
+- A form's accepted answers are read one by one, with `splitForms`, the
+  splitter the drills use. Read whole, the separator glued itself to the
+  last word (تمام was "unknown") and two one-word answers read as a phrase.
+  A sentence card with several answers is one sentence, flawed or too long
+  if any answer is; a word form teaches each of its answers and is met by
+  any of them.
+- Every asked version of a sentence card is read (masculine and feminine,
+  old `subs`), still as one sentence: a word in two versions earns 1.
+- A line picked from a sentence card of the same deck is not a second
+  sentence. A conversation switched off is never dealt to a student, so its
+  lines are not sentences and it does not earn the conversation check.
+  Text with no letter in it ("." or "…") is no sentence and no word.
+- The fixes for a sentence's two flaws each claim only the sentences that
+  fix alone would mend; sentences with both flaws are a fix of their own,
+  since linking them alone, or teaching their words alone, adds nothing.
+
 ## A teacher's export is a backup file (0.462)
 
 **23 October 2026** · `export-plan` and `export-chunk` in `server/api/courses.js`, `buildExport` and `ExportScreen` in `src/spaces.tsx`
@@ -6708,7 +6744,7 @@ belong to the teacher rather than to a deck. Each chunk re-reads every
 deck and course to check access, which is cheap on a teaching site.
 
 
-## A card's status, without the one-screen card editor (0.463)
+## A card's status, without the one-screen card editor (0.464)
 
 **23 October 2026** · `card-status`, `save-card`, `teacherView`,
 `studentView` in `server/api/courses.js`; `StatusMenu`, `touchedBy` in

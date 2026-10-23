@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.463 — 23 October 2026
+## 0.464 — 23 October 2026
 
 **A card is a draft until you publish it.**
 
@@ -35,6 +35,47 @@ and moves once per batch of work you would notice, not once per commit.
 
 To check by hand: the status menu beside Edit on a phone, where the
 screen's header is narrow.
+
+## 0.463 — 23 October 2026
+
+**A deck's quality score reads sentences the way students meet them
+(teachers only).**
+
+- A sentence with a feminine word now counts for the feminine. "آسفة، مش
+  فاهمة." linked to فاهم / فاهمة used to count for فاهم and leave فاهمة at 0
+  sentences; the same happened to every pair made with ة (تعبان / تعبانة,
+  آسف / آسفة). A word with something glued on, such as كتابك or الوظيفة,
+  still counts for the plain word.
+- A card with more than one accepted answer is read answer by answer. A
+  sentence written as "كلشي تمام" or "كله تمام" no longer says it uses a
+  word no deck teaches, and a word card accepting كيف حالَك؟ or كيفَك؟ now
+  teaches كيفك to the other sentences. It is still one sentence; it is too
+  long, or uses an untaught word, if any of its answers does.
+- Every version of a sentence card is read, not just the first, so a
+  masculine and a feminine version both count for their words. One card is
+  still one sentence: a word in both versions counts once.
+- A conversation line picked from a sentence card in the same deck no
+  longer counts as a second sentence. A conversation switched off is no
+  longer counted, since students are never given it. A line with no words
+  in it, such as ".", is not counted as a sentence needing a link, a
+  recording and a pronunciation.
+- The suggestions are honest about sentences with two problems. "Link it"
+  and "teach the word" each claim only what doing that alone would add;
+  sentences that are both unlinked and use an untaught word get their own
+  suggestion, "N sentences need both a link and their words taught".
+- New rule: a conversation or text is always worth 5 of the 100 points.
+  Before, a small deck with no conversation could lose up to 20 for it: one
+  well-made, reviewed sentence on its own scored 80, and now scores 95. A
+  deck where every check applies scores as before.
+- The In context tab offers links for cards saved since 0.138 again, and
+  the "already in N phrases" count after saving a card is right. Both
+  were reading cards the way they were stored before, and found nothing.
+- Trade-off: most decks with feminine pairs or cards with several answers
+  score higher; a deck that leant on a picked line or a switched-off
+  conversation can score lower.
+- To check by hand: open a deck with a feminine pair and a card with two
+  answers and see its score and suggestions; open In context on a recently
+  edited collection and see links offered.
 
 ## 0.462 — 23 October 2026
 

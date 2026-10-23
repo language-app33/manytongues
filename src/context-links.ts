@@ -34,6 +34,7 @@
 import type { Lang } from "./types.ts";
 import { contextTokens, findWordSpan, isFunctionWord, supportsContext } from "./languages.ts";
 import { isDialog, linesOf, speakerName } from "./dialogs.ts";
+import { wordOf } from "./cards.ts";
 
 /*
  * Where a word stops and a phrase begins, in tokens.
@@ -61,14 +62,20 @@ export const EXAMPLES_SHOWN = 3;
    teacher's copy and the learner's differ in everything but these. */
 type Card = Record<string, any>;
 
-const textOf = (card: Card) => String((card && card.ar) || "").trim();
+/* A card's own word and meaning, wherever it keeps them. A card saved
+   since 0.138 holds its text in its forms and nothing at the top, so
+   reading `card.ar` found nothing on it: the In context tab offered no
+   link for any such word or phrase. Read as 0.459 read them for a deck's
+   own report. */
+const textOf = (card: Card) => String((card && wordOf(card).ar) || "").trim();
+const meaningOf = (card: Card) => String((card && wordOf(card).en) || "");
 
 const lengthOf = (card: Card, lang: Lang) => contextTokens(textOf(card), lang).length;
 
 /* What a card is called in a list, keeping it to the fields every shape of
    card has — the teacher's and the learner's copies differ in everything
    else. */
-const named = (card: Card) => ({ id: card.id, ar: textOf(card), en: card.en || "" });
+const named = (card: Card) => ({ id: card.id, ar: textOf(card), en: meaningOf(card) });
 
 /*
  * Everywhere a word could turn up: the teacher's phrases, and the turns of
@@ -131,7 +138,7 @@ export function containersIn(cards: Card[]): Container[] {
       cardId: card.id,
       line: null,
       ar: textOf(card),
-      en: card.en || "",
+      en: meaningOf(card),
       who: "",
       uses: card.uses || [],
     });
