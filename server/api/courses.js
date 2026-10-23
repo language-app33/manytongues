@@ -3210,6 +3210,118 @@ export default async (req) => {
       return json({ ok: true, version: deck.version, cards });
     }
 
+    /* ================= a teacher's export =================
+
+       A card, a few, a deck or several, as a file in the backup's own
+       format: what the administrator's Restore reads, and plain enough to
+       hand to anybody else who wants to read the cards. Fetched in chunks
+       the way a backup is, because recordings are what make it large.
+
+       Only what this teacher may already work on: their own cards, the
+       decks they own or teach, and the cards in those decks — my-cards'
+       and my-decks' rule. Clips and images are named by the hash of their
+       bytes, which only a card already in the export can tell anyone. */
+
+    /** What this teacher may put in an export. */
+    async function exportable() {
+      /** @type {string[]} */
+      const own = (await readJson(store, K.myCards(mine))) || [];
+      const courses = await everyCourse(store);
+      const teaching = new Set(courses.filter((c) => isTeacher(c, mine)).flatMap((c) => c.decks || []));
+      const deckRows = (await readManyJson(store, (await readIndex(store, "decks")).map((id) => K.deck(id))))
+        .filter(Boolean);
+      /* An administrator may take anything, as a backup would. */
+      const admin = !!(me && me.admin);
+      const decks = deckRows.filter((d) => admin || d.owner === mine || teaching.has(d.id));
+      const cards = new Set(own.concat(decks.flatMap((d) => d.cardIds || [])));
+      return { decks: new Map(decks.map((d) => [d.id, d])), cards, admin };
+    }
+
+    if (action === "export-plan") {
+      const may = await exportable();
+      /** @type {string[]} */
+      const askedDecks = (Array.isArray(body.deckIds) ? body.deckIds : []).map(String);
+      /** @type {string[]} */
+      const askedCards = (Array.isArray(body.cardIds) ? body.cardIds : []).map(String);
+      const deckIds = [...new Set(askedDecks)].filter((id) => may.decks.has(id));
+      /* A deck goes with every card in it: a deck put back without them
+         would be an empty deck that says it holds cards. */
+      const wanted = new Set(askedCards.concat(deckIds.flatMap((id) => may.decks.get(id).cardIds || [])));
+      const ids = [...wanted].filter((id) => may.admin || may.cards.has(id));
+      const cards = (await readManyJson(store, ids.map((id) => K.card(id)))).filter(Boolean);
+      const withMedia = body.media !== false;
+      const clips = withMedia ? [...new Set(cards.flatMap(clipsOfCard))] : [];
+      const images = withMedia ? [...new Set(cards.flatMap(imagesOfCard))] : [];
+
+      /* Who each card belongs to, so a restore lists it among its owner's
+         cards again. Only these ids: the restore adds them to the list
+         that is there rather than writing it over. */
+      /** @type {Record<string, string[]>} */
+      const lists = {};
+      for (const c of cards) if (c.owner) (lists[K.myCards(c.owner)] = lists[K.myCards(c.owner)] || []).push(c.id);
+
+      /** @type {{ id: string, kind: string, keys: string[] }[]} */
+      const chunks = [];
+      /** @type {(kind: string, keys: string[], size: number) => void} */
+      const batch = (kind, keys, size) => {
+        for (let i = 0; i < keys.length; i += size) {
+          chunks.push({ id: `${kind}-${chunks.length}`, kind, keys: keys.slice(i, i + size) });
+        }
+      };
+      batch("deck", deckIds.map(K.deck), 40);
+      batch("card", cards.map((c) => K.card(c.id)), 25);
+      batch("clip", clips.map(K.clip), 3);
+      batch("image", images.map(K.image), 2);
+
+      return json({
+        ok: true,
+        manifest: {
+          version: 1,
+          takenAt: Date.now(),
+          by: mine,
+          counts: {
+            users: 0, courses: 0, decks: deckIds.length, cards: cards.length,
+            systems: 0, flags: 0, clips: clips.length, images: images.length, keys: 0,
+          },
+          indexes: { decks: deckIds },
+          chunks: chunks.map((c) => ({ id: c.id, kind: c.kind, keys: c.keys.length })),
+          plan: chunks,
+        },
+        lists,
+        /* What was asked for and is not this teacher's to take. */
+        refused:
+          askedCards.filter((id) => !may.admin && !may.cards.has(id)).length +
+          askedDecks.filter((id) => !may.decks.has(id)).length,
+      });
+    }
+
+    if (action === "export-chunk") {
+      /** @type {string[]} */
+      const keys = (Array.isArray(body.keys) ? body.keys.slice(0, 200) : []).map(String);
+      if (!keys.length) return json({ error: "no-keys" }, 400);
+      const may = await exportable();
+      /* Checked again here rather than trusted from the plan: a chunk is
+         just a list of keys, and anybody can write one. */
+      const allowed = (/** @type {string} */ k) =>
+        k.startsWith("deck:") ? may.decks.has(k.slice(5))
+        : k.startsWith("card:") ? may.admin || may.cards.has(k.slice(5))
+        : /^(clip|image):[a-f0-9]{64}$/.test(k);
+      if (!keys.every(allowed)) return json({ error: "no-access" }, 403);
+      const values = await Promise.all(
+        keys.map((k) =>
+          k.startsWith("clip:") || k.startsWith("image:")
+            ? store.get(k, { type: "text" }).catch(() => null)
+            : readJson(store, k)
+        )
+      );
+      /** @type {Record<string, any>} */
+      const records = {};
+      keys.forEach((k, i) => {
+        if (values[i] !== null && values[i] !== undefined) records[k] = values[i];
+      });
+      return json({ ok: true, records, digest: sha(JSON.stringify(records)), found: Object.keys(records).length });
+    }
+
     /* ================= clips ================= */
 
     if (action === "put-clip") {
@@ -3539,7 +3651,10 @@ export default async (req) => {
           /* An index is the union of what the file says and what is here,
              so restoring an old backup cannot hide accounts, courses or
              decks made since it was taken. */
-          if (k.startsWith("index:") && Array.isArray(v)) {
+          /* And so is a person's list of their cards. A teacher's export
+             carries only the ids of the cards in it, and written over the
+             list it would take every other card of theirs off it. */
+          if ((k.startsWith("index:") || k.startsWith("mycards:")) && Array.isArray(v)) {
             const have = (await readJson(store, k)) || [];
             v = [...new Set(have.concat(v))];
           }

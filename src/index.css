@@ -1722,7 +1722,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    reserved for it would just be a band of empty space. */
 .at-screen.over .at-screenhead { padding-top:14px; }
 .at-screenhead h2 { margin:0; font-size:19px; font-weight:800; }
-.at-screenaction { margin-left:auto; display:inline-flex; align-items:center; flex:0 0 auto; }
+.at-screenaction { margin-left:auto; display:inline-flex; align-items:center; gap:8px; flex:0 0 auto; }
 .at-back { width:38px; height:38px; flex-shrink:0; border-radius:999px; cursor:pointer;
   background:none; border:2px solid var(--line); color: var(--text); font-size:22px; line-height:1; }
 .at-screenbody { flex:1; overflow-y:auto; padding:18px 16px 40px; }
@@ -3986,3 +3986,6 @@ body.at-screening .at-chromebar { display:none; }
    in the Cards tab are, rather than stretching to a share of the row. */
 .at-screenfoot > .at-icon { flex:0 0 auto; width:52px; height:52px; min-height:52px;
   padding:0; box-sizing:border-box; }
+/* And beside a screen's own action, as the card's Export sits beside its
+   Edit: square, and as tall as the button next to it. */
+.at-screenaction > .at-icon { flex:0 0 auto; width:40px; height:40px; padding:0; box-sizing:border-box; }

@@ -740,7 +740,55 @@ export async function buildBackup(onProgress: (done: number, total: number) => v
     ),
     chunks: (whole.chunks || []).filter((c: any) => kinds.has(c.kind)),
   };
+  return writeFile(kept, plan, API.backupChunk, parts, onProgress);
+}
 
+/**
+ * A teacher's cards, decks or both, as a file in the backup's own format —
+ * so an administrator's Restore puts them back as they were, and anybody
+ * else (an AI asked what cards to make next, say) reads the same records a
+ * backup holds. The plan comes from the server, which leaves out whatever
+ * is not this teacher's to take.
+ *
+ * @param media  Whether the recordings and pictures go in, which are
+ *   nearly all of a file's size and nothing a reader of the words wants.
+ */
+export async function buildExport(
+  { cardIds, deckIds, media }: { cardIds: string[]; deckIds: string[]; media: boolean },
+  onProgress: (done: number, total: number) => void
+) {
+  const r = await API.exportPlan(cardIds, deckIds, media);
+  const { plan, ...whole } = r.manifest;
+  const parts = [
+    /* Decks only where one made it in: a file naming a part it holds
+       none of offers that part to Restore for nothing. */
+    ...((whole.counts || {}).decks ? ["decks"] : []),
+    "cards",
+    ...(media ? ["clips"] : []),
+  ];
+  const kept = {
+    ...whole,
+    includes: parts,
+    about:
+      "Cards exported from Taleb33. Each record under card: is one card: its forms (the word or " +
+      "phrase in its script, transliteration and English meaning), grammar and tags. Records " +
+      "under deck: are decks, listing their cards by id in cardIds.",
+  };
+  const built = await writeFile(kept, plan || [], API.exportChunk, parts, onProgress, r.lists || {});
+  return { ...built, refused: r.refused || 0 };
+}
+
+/* The file itself, from a manifest that already says what it holds and a
+   plan of the chunks to fetch for it. `extra` are records the plan does not
+   fetch because the server wrote them out in its answer. */
+async function writeFile(
+  kept: any,
+  plan: any[],
+  fetchChunk: (keys: string[]) => Promise<any>,
+  parts: string[],
+  onProgress: (done: number, total: number) => void,
+  extra: Record<string, any> = {}
+) {
   const digests: Record<string, string> = {};
   const seen = new Set<string>();
   const refs = { decks: new Set<string>(), clips: new Set<string>() };
@@ -754,6 +802,11 @@ export async function buildBackup(onProgress: (done: number, total: number) => v
   );
   let wroteAny = false;
   let done = 0;
+  const leading = JSON.stringify(extra);
+  if (leading.length > 2) {
+    blob = new Blob([blob, leading.slice(1, -1)], { type: "application/json" });
+    wroteAny = true;
+  }
 
   /* Chunks are fetched a few at a time but appended in plan order, so the
      file is the same however the network reorders the answers. */
@@ -777,7 +830,7 @@ export async function buildBackup(onProgress: (done: number, total: number) => v
       const i = cursor++;
       if (i >= plan.length) return;
       const chunk = plan[i];
-      const r = await API.backupChunk(chunk.keys);
+      const r = await fetchChunk(chunk.keys);
       const records = r.records || {};
       digests[chunk.id] = r.digest;
       for (const [key, value] of Object.entries<any>(records)) {
@@ -3192,6 +3245,101 @@ function BackupScreen({
 }
 
 /* ------------------------------------------------------------------
+   A teacher's export
+
+   A card, the cards ticked, a deck or the decks ticked, as one file. The
+   same format a backup is, so the administrator's Restore takes it, and
+   with the recordings left out it is small enough to hand to an AI and
+   ask what to make next. One question only, because that is the one
+   choice there is.
+   ------------------------------------------------------------------ */
+
+type ExportAsk = { cardIds: string[]; deckIds: string[]; name: string; what: string };
+
+/* A name a folder of these can be read by: what it is and when. */
+const exportFileName = (name: string, at: number) =>
+  `${name.toLowerCase().normalize("NFKD").replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "cards"}-${new Date(at)
+    .toISOString()
+    .slice(0, 16)
+    .replace(/[:T]/g, "-")}.json`;
+
+function ExportScreen({ ask, onDone, onClose }: {
+  ask: ExportAsk;
+  onDone: (note: string, tone: "good" | "warn") => void;
+  onClose: () => void;
+}) {
+  const [media, setMedia] = useState(true);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [err, setErr] = useState("");
+  const busy = !!progress;
+
+  const download = async () => {
+    setErr("");
+    setProgress({ done: 0, total: 0 });
+    try {
+      const { blob, manifest, problems, refused } = await buildExport(
+        { cardIds: ask.cardIds, deckIds: ask.deckIds, media },
+        (done, total) => setProgress({ done, total })
+      );
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = exportFileName(ask.name, manifest.takenAt);
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+      const counts = manifest.counts || {};
+      const said = [
+        counts.decks ? plural(counts.decks, "deck") : "",
+        plural(counts.cards || 0, "card"),
+        media && counts.clips ? plural(counts.clips, "recording") : "",
+      ].filter(Boolean).join(", ");
+      const left = refused ? ` ${plural(refused, "item")} not yours to export stayed out.` : "";
+      onDone(`Exported ${said}.${left}${problems.length ? " " + problems.join(" ") : ""}`, refused || problems.length ? "warn" : "good");
+    } catch (e) {
+      setErr(API.explain(e));
+      setProgress(null);
+    }
+  };
+
+  return (
+    <Screen
+      title="Export"
+      onBack={onClose}
+      rise
+      action={
+        <Button variant="primary" size="sm" icon="download" disabled={busy} onClick={download}>
+          {busy ? "Working…" : "Download"}
+        </Button>
+      }
+    >
+      <Help>
+        {ask.what} as one file. An administrator can put it back with Restore, and without the
+        recordings it is small enough to give to an AI and ask what cards to make next.
+      </Help>
+      <Notice kind="error">{err}</Notice>
+      <div className="at-field at-mt4">
+        <CheckList
+          options={[
+            {
+              id: "media",
+              title: "Recordings and pictures",
+              note: "Nearly all of the file's size. Leave them out for a file to read rather than to keep.",
+            },
+          ]}
+          chosen={media ? ["media"] : []}
+          onToggle={(_, on) => setMedia(!on)}
+        />
+      </div>
+      {progress && progress.total > 0 && (
+        <Help>
+          Fetching {progress.done} of {progress.total} parts…
+        </Help>
+      )}
+    </Screen>
+  );
+}
+
+/* ------------------------------------------------------------------
    Clearing the site
 
    The other end of a restore, and the only screen in the app that removes
@@ -4624,6 +4772,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   /* Already teaching something? Then this is a rare errand, folded away. */
   const [joinNote, setJoinNote] = useState("");
   const [selDecks, setSelDecks] = useState(() => new Set<string>());
+  /* What the Export screen is about to put in a file, or null. */
+  const [exportAsk, setExportAsk] = useState<ExportAsk | null>(null);
   const [deckAction, setDeckAction] = useState<"add" | "remove" | null>(null); // "add" | "remove"
   const [pickedDecks, setPickedDecks] = useState<string[]>([]);
   /* The name of a deck being made from the add-to-a-deck screen, or null
@@ -4954,6 +5104,33 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      knows what an entry is. */
   const pickedIds = (ids: Iterable<string>) =>
     pickedCardIds(ids, deckView ? deckView.listed : listedCards);
+  /* The ways into the Export screen: a card, the cards ticked, a deck,
+     the decks ticked. */
+  const exportCards = (ids: string[]) => {
+    const one = ids.length === 1 ? cards.find((c) => c.id === ids[0]) : null;
+    const name = one ? asMeaning(leadOf(one).en) || leadOf(one).ar || "card" : `${ids.length}-cards`;
+    setExportAsk({ cardIds: ids, deckIds: [], name, what: one ? "This card" : `These ${plural(ids.length, "card")}` });
+  };
+  const exportDecks = (ids: string[]) => {
+    const picked = decks.filter((d) => ids.includes(d.id));
+    const name = picked.length === 1 ? picked[0].title : `${picked.length}-decks`;
+    setExportAsk({
+      cardIds: [],
+      deckIds: picked.map((d) => d.id),
+      name,
+      what: picked.length === 1 ? `${picked[0].title} and its cards` : `These ${plural(picked.length, "deck")} and their cards`,
+    });
+  };
+  const exportScreen = exportAsk && (
+    <ExportScreen
+      ask={exportAsk}
+      onClose={() => setExportAsk(null)}
+      onDone={(note, tone) => {
+        setExportAsk(null);
+        snack(note, tone);
+      }}
+    />
+  );
   /* The entry itself: named Pronouns, the words on its face in the order
      the verb table lists them, and a tap opens the screen they are written
      on — the one place they are edited. No Delete on it: eight cards gone
@@ -6588,7 +6765,15 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     const mine = deckView ? deckView.mine : [];
     const listed = deckView ? deckView.listed : [];
     return (
-      <Screen title={d.title} onBack={() => { setOpenDeck(null); setCardAction(null); setTagAction(null); setDeckExtras(null); }}>
+      <Screen
+        title={d.title}
+        onBack={() => { setOpenDeck(null); setCardAction(null); setTagAction(null); setDeckExtras(null); }}
+        action={
+          <Button variant="ghost" size="sm" icon="download" onClick={() => exportDecks([d.id])}>
+            Export
+          </Button>
+        }
+      >
             <Notice kind="error">{error}</Notice>
             <Help>
               {(langOfDeck(d) || {}).name} · {deckSize(d, held.length)}
@@ -6699,6 +6884,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                    offers them too: a lock keeps which cards are in it. */
                 { label: "Add tags", onClick: () => setTagAction("add") },
                 { label: "Remove tags", onClick: () => setTagAction("remove") },
+                { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(pickedIds(picked)) },
                 ...(d.locked ? [] : [{
                   label: "Remove from this deck",
                   onClick: (picked: string[]) => {
@@ -6733,15 +6919,18 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
             title={asMeaning(leadOf(viewing).en) || leadOf(viewing).ar}
             onBack={() => setViewing(null)}
             action={
-              <Button variant="primary" size="sm"
-                onClick={() => {
-                  setEditing({ card: viewing, decks: viewing.decks || [] });
-                  setViewing(null);
-                }}
-              >
-                <Icon name="edit" />
-                Edit
-              </Button>
+              <>
+                <IconButton icon="download" label="Export this card" onClick={() => exportCards([viewing.id])} />
+                <Button variant="primary" size="sm"
+                  onClick={() => {
+                    setEditing({ card: viewing, decks: viewing.decks || [] });
+                    setViewing(null);
+                  }}
+                >
+                  <Icon name="edit" />
+                  Edit
+                </Button>
+              </>
             }
           >
             <ReviewLine state={reviewMap.get(viewing.id)} onOpen={() => setReviewing(viewing)} />
@@ -6768,6 +6957,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         )}
 
         {cardAction === "add" && cardActionScreen(d.id)}
+        {exportScreen}
         {tagAction && tagActionScreen()}
 
         {confirm && confirm.kind === "cards" && (
@@ -7172,15 +7362,18 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   title={asMeaning(leadOf(viewing).en) || leadOf(viewing).ar}
                   onBack={() => setViewing(null)}
                   action={
-                    <Button variant="primary" size="sm"
-                      onClick={() => {
-                        setEditing({ card: viewing, decks: viewing.decks || [] });
-                        setViewing(null);
-                      }}
-          icon="edit"
-        >
-          Edit
-        </Button>
+                    <>
+                      <IconButton icon="download" label="Export this card" onClick={() => exportCards([viewing.id])} />
+                      <Button variant="primary" size="sm"
+                        onClick={() => {
+                          setEditing({ card: viewing, decks: viewing.decks || [] });
+                          setViewing(null);
+                        }}
+                        icon="edit"
+                      >
+                        Edit
+                      </Button>
+                    </>
                   }
                 >
                   <ReviewLine state={reviewMap.get(viewing.id)} onOpen={() => setReviewing(viewing)} />
@@ -7331,6 +7524,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   { label: "Remove from a deck", onClick: () => setCardAction("remove") },
                   { label: "Add tags", onClick: () => setTagAction("add") },
                   { label: "Remove tags", onClick: () => setTagAction("remove") },
+                  { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(pickedIds(picked)) },
                   {
                     label: "Delete",
                     danger: true,
@@ -7490,6 +7684,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 bulkActions={[
                   { label: "Add to a course", onClick: () => setDeckAction("add") },
                   { label: "Remove from a course", onClick: () => setDeckAction("remove") },
+                  { label: "Export", icon: "download", onClick: (ids: string[]) => exportDecks(ids) },
                   /* Only the decks that would change are touched, and the
                      message counts those rather than the selection. */
                   ...(["lock", "unlock"] as const).map((way) => ({
@@ -7564,6 +7759,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                               e.stopPropagation();
                               setNaming(d);
                             }} />
+                          <IconButton icon="download" label="Export deck" onClick={(e: React.MouseEvent) => {
+                              e.stopPropagation();
+                              exportDecks([d.id]);
+                            }} />
                           <IconButton icon="delete" label="Delete deck" danger onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
                               if (d.locked) {
@@ -7606,6 +7805,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               />
             </>
           )}
+
+      {/* Over whichever tab it was asked from: a card, ticked cards or a
+          deck, from the Cards tab or the Decks tab alike. */}
+      {exportScreen}
     </SpaceFrame>
   );
 }

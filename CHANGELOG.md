@@ -8,6 +8,34 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.462 — 23 October 2026
+
+**Teachers can export a card, several cards, or whole decks.**
+
+- In Teaching, a card now has an Export button beside Edit. Ticked cards
+  have Export in the bar along the bottom, in the Cards tab and inside a
+  deck. A deck has Export on its tile in the Decks tab and at the top of
+  its own page, and ticked decks have it in the bar too.
+- Each one opens a short Export screen with one choice: whether to include
+  the recordings and pictures. They are ticked to start with. Download
+  saves a single file named after the card or deck and the time.
+- A deck comes with every card in it. Only your own cards and the decks you
+  own or teach go in; anything else that was ticked is left out, and the
+  message says so.
+- The file is the same kind an administrator's Back up makes, so Admin ›
+  App › Restore a backup accepts it and puts those cards and decks back.
+  Putting it back no longer takes away your other cards: it adds to your
+  list of cards instead of replacing it. A deck that was deleted and then
+  put back has to be added to its courses again.
+- With the recordings left out the file is small and easy to read, so you
+  can give it to an AI and ask what cards to make next. It starts with a
+  short note saying what is in it.
+- Trade-off: a teacher can't bring a file back in themselves; restoring
+  still takes an administrator. Numbers and the clock are not part of a
+  deck's export. They still come only with the whole-site backup.
+- To check by hand: export a real deck with its recordings, and open the
+  file in Restore to see that it says "Checked".
+
 ## 0.461 — 22 October 2026
 
 **Every deck has a quality score (teachers only).**

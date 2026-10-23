@@ -6661,3 +6661,49 @@ can be (`keyed` on the context, tested to agree with the matcher), so it is
 a lookup. The sentences a blank makes were already worked out for review,
 and are now worked out once for both.
 
+## A teacher's export is a backup file (0.462)
+
+**23 October 2026** · `export-plan` and `export-chunk` in `server/api/courses.js`, `buildExport` and `ExportScreen` in `src/spaces.tsx`
+
+The owner asked for a card, ticked cards, a deck or ticked decks to be
+exportable from Teaching, and settled its questions before it was built:
+the file should both restore and be something to hand an AI for advice
+on what to make next; recordings and pictures are a tick box, on to
+start; a deck is exported with its cards, and offered from its own page
+and the Decks list's bulk bar.
+
+**One format, the backup's.** A second, readable format would have been
+a second thing to keep in step with the cards. The backup's records
+are already the cards as stored, and JSON with the recordings left out is
+as readable to an AI as any summary written for it. An `about` line in
+the manifest says what the records are. The admin's Restore takes the
+file as it is, because the file says which parts it holds (`includes`)
+and its counts are what it holds.
+
+**The server says what may go in.** `export-plan` reads the my-cards and
+my-decks rule: the teacher's own cards, decks they own or teach, and
+every card in those decks. Anything else is counted as `refused` and left
+out. `export-chunk` checks every key again rather than trusting the
+plan, and gives out only deck, card, clip and image records. A clip or
+image is named by its hash, so it is reachable only from a card already in
+the export, and the clip endpoint already serves any hash to anyone
+signed in. The chunks are fetched and written to the file by the same
+code as a backup (`writeFile`), so the two files cannot drift apart.
+
+**A restore adds to a person's card list instead of replacing it.** For a
+restored card to show up, its owner's `mycards:` list has to name it, so
+the export carries that list with only the exported ids in it. Written
+over the stored list, that would have taken every other card off it.
+`admin-restore-chunk` now merges `mycards:` the way it already merged
+`index:`. That matches what a restore already promised, that anything
+made since the backup is left alone, and it changes nothing for a
+whole-site file.
+
+**What it costs.** Restoring still needs an administrator; a teacher has
+no import of their own. A restored deck's record is the deck as it was
+exported, but deleting a deck took it out of its courses, and the export
+holds no courses, so a deleted deck put back has to be added to them
+again. Numbers and the clock stay with the whole-site backup, because they
+belong to the teacher rather than to a deck. Each chunk re-reads every
+deck and course to check access, which is cheap on a teaching site.
+

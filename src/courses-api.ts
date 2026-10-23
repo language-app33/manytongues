@@ -239,6 +239,12 @@ export const getImage = (hash: string): Promise<{ ok: true; hash: string; data: 
 
 export const deleteAccount = () => call("delete-account", { body: {} });
 
+/* A teacher's export: the plan for what they asked for, then its records
+   chunk by chunk, the way a backup is fetched. */
+export const exportPlan = (cardIds: string[], deckIds: string[], media: boolean) =>
+  call("export-plan", { body: { cardIds, deckIds, media } });
+export const exportChunk = (keys: string[]) => call("export-chunk", { body: { keys } });
+
 /* ---- admin ---- */
 export const adminOverview = () => call("admin-overview");
 export const backupManifest = () => call("admin-backup-manifest");
