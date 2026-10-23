@@ -190,7 +190,27 @@ export const setDeckParts = (deckId: string, parts: string[]) =>
 export const myCards = () => call("my-cards");
 /* The server calls this field "decks"; sending anything else means the
    card saves but never lands in a deck. */
-export const saveCard = (card: Partial<Card>, decks: string[]) => call("save-card", { body: { card, decks } });
+/**
+ * How a save is made, beside the card — see save-card. `touched` names the
+ * fields that changed, and only those are written; `into: "changes"` sends
+ * the card editor's saves to a published card's unpublished changes;
+ * `walk` is a rename or a tag taken off the collection, applied by the
+ * server to both of a card's versions; `status: "draft"` makes a new card
+ * a draft.
+ */
+export type SaveExtra = {
+  touched?: string[];
+  into?: "changes";
+  walk?: { renames?: { from: string; to: string }[]; drops?: string[] };
+  status?: "draft";
+};
+export const saveCard = (card: Partial<Card>, decks: string[], extra: SaveExtra = {}) =>
+  call("save-card", { body: { card, decks, ...extra } });
+/* A card's status, or its unpublished changes' — see card-status. */
+export const cardStatus = (
+  cardId: string,
+  to: "draft" | "review" | "published" | "discard" | "unpublish",
+): Promise<{ ok: true; card: Card }> => call("card-status", { body: { cardId, to } });
 /* A teacher's say on the sentences a card makes: fingerprints approved,
    struck, or forgotten — see review.ts and review-card on the server. */
 export const reviewCard = (

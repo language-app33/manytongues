@@ -4359,6 +4359,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("a teacher's card still says which decks it lives in",
     !!teachRead && /Where it lives/i.test(teachRead.textContent || ""),
     teachRead ? (teachRead.textContent || "").replace(/\s+/g, " ").slice(0, 120) : "(no readout)");
+  /* And where it stands with students, beside Edit. A card saved before
+     there were statuses is published, and says so. */
+  const statusSel = /** @type {HTMLSelectElement | null} */ ([...document.querySelectorAll(".at-statusmenu select")].pop() || null);
+  check("a teacher's card says where it stands with students, beside Edit",
+    !!statusSel && statusSel.value === "published" &&
+      [...statusSel.options].map((o) => o.textContent).join(" | ") === "Published | Unpublish…",
+    statusSel ? `${statusSel.value}: ${[...statusSel.options].map((o) => o.textContent).join(" | ")}` : "(no status menu)");
 
   const tries = () => /** @type {HTMLButtonElement[]} */ ([...document.querySelectorAll(".at-try")]);
   check("a card in the teaching space lists the exercises it could be asked",
@@ -8494,7 +8501,7 @@ const openPronounTables = async () => {
   await sleep(150);
   const heads = [...document.querySelectorAll(".at-cardtable thead th")].map((th) => (th.textContent || "").trim()).filter(Boolean);
   check("the table view has a column for everything the teacher compares",
-    heads.join(" | ") === "Word | Transliteration | Meaning | Kind | Subtype | Decks | Recording | Review | Created | Modified",
+    heads.join(" | ") === "Word | Transliteration | Meaning | Kind | Subtype | Decks | Status | Recording | Review | Created | Modified",
     heads.join(" | ") || "(no table)");
   check("and a row per card", document.querySelectorAll(".at-cardtable tbody tr[data-card]").length > 0,
     String(document.querySelectorAll(".at-cardtable tbody tr").length));

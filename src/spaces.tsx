@@ -4448,6 +4448,126 @@ export function sortCards(cards: Card[], key: string, newestFirst: boolean = tru
  * A card list's filter as it starts, narrowing nothing — and what "Clear
  * all filters" puts it back to.
  */
+/* Where a card stands with students, said in a list only where it is not
+   simply published: a draft, or a published card with changes waiting. */
+const statusWords = (c: Card): string =>
+  c.status && c.status !== "published"
+    ? c.status === "review" ? "Ready for review" : "Draft"
+    : c.changes === "review"
+      ? "Changes ready for review"
+      : c.changes
+        ? "Changes in draft"
+        : "";
+
+/* What a card carries about itself rather than about the word: never what
+   a save changed. See touchedBy. */
+const SAVE_BOOKKEEPING = new Set([
+  "id", "owner", "lang", "rev", "created", "updated", "decks", "inDecks",
+  "status", "changes", "changed", "review",
+]);
+
+type StatusTo = "draft" | "review" | "published" | "discard" | "unpublish";
+
+/** The status menu's choices, by what the card is now. */
+function statusChoices(card: Card): { value: string; label: string }[] {
+  if (card.status && card.status !== "published") {
+    return [
+      { value: "draft", label: "Draft" },
+      { value: "review", label: "Ready for review" },
+      { value: "published", label: "Publish" },
+    ];
+  }
+  if (!card.changes) {
+    return [
+      { value: "published", label: "Published" },
+      { value: "unpublish", label: "Unpublish…" },
+    ];
+  }
+  return [
+    /* Short, because it is what the menu reads as while it is shut, on a
+       phone, beside the card's name. A card with changes is published:
+       "changes" says both. */
+    { value: "changes:draft", label: "Changes in draft" },
+    { value: "changes:review", label: "Changes ready for review" },
+    { value: "published", label: "Publish changes" },
+    { value: "discard", label: "Discard changes…" },
+    { value: "unpublish", label: "Unpublish…" },
+  ];
+}
+const statusNow = (card: Card): string =>
+  card.status && card.status !== "published" ? card.status : card.changes ? `changes:${card.changes}` : "published";
+
+/**
+ * Draft, Ready for review, Published — beside Edit on a card's screen.
+ *
+ * A menu rather than three buttons, because which choices there are
+ * depends on where the card stands: a published card with changes waiting
+ * has the changes' status to set, and two ways to be done with them. What
+ * it shows is where the card stands now; choosing is doing. The two
+ * choices that throw something away ask first.
+ */
+function StatusMenu({ card, disabled, onStatus }: {
+  card: Card;
+  disabled?: boolean;
+  onStatus: (to: StatusTo) => void;
+}) {
+  const [asking, setAsking] = useState<"discard" | "unpublish" | null>(null);
+  const now = statusNow(card);
+  const pick = (value: string) => {
+    if (value === now) return;
+    if (value === "discard" || value === "unpublish") {
+      setAsking(value);
+      return;
+    }
+    const to = value.startsWith("changes:") ? value.slice("changes:".length) : value;
+    onStatus(to as StatusTo);
+  };
+  return (
+    <>
+      <label className={`at-statusmenu ${card.status && card.status !== "published" ? card.status : card.changes ? "changed" : "published"}`}>
+        <span className="at-sr">Status</span>
+        <select value={now} disabled={disabled} onChange={(e) => pick(e.target.value)}>
+          {statusChoices(card).map((c) => (
+            <option key={c.value} value={c.value}>
+              {c.label}
+            </option>
+          ))}
+        </select>
+        <Icon name="chevronDown" size={16} />
+      </label>
+      {asking === "discard" && (
+        <ConfirmModal
+          title="Discard your changes?"
+          body={<p>The card goes back to what students have now. This can&apos;t be undone.</p>}
+          confirmLabel="Discard changes"
+          onCancel={() => setAsking(null)}
+          onConfirm={() => {
+            setAsking(null);
+            onStatus("discard");
+          }}
+        />
+      )}
+      {asking === "unpublish" && (
+        <ConfirmModal
+          title="Unpublish this card?"
+          body={
+            <p>
+              Students stop seeing it. Their progress on it is kept, and comes back if you publish it
+              again. {card.changes ? "Your changes are kept, as a draft." : "The card is kept, as a draft."}
+            </p>
+          }
+          confirmLabel="Unpublish"
+          onCancel={() => setAsking(null)}
+          onConfirm={() => {
+            setAsking(null);
+            onStatus("unpublish");
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 /* The table view of a teacher's card lists, column by column. */
 const TEACHER_COLUMNS = [
   { key: "word", label: "Word" },
@@ -4456,6 +4576,7 @@ const TEACHER_COLUMNS = [
   { key: "kind", label: "Kind" },
   { key: "subtype", label: "Subtype" },
   { key: "decks", label: "Decks" },
+  { key: "status", label: "Status" },
   { key: "audio", label: "Recording" },
   { key: "review", label: "Review" },
   { key: "created", label: "Created" },
@@ -4684,6 +4805,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const [courseView, setCourseView] = useState<any | null>(null);
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
   const [cards, setCards] = useState<Card[]>(last ? last.cards : []);
+  /* The same, for a save to compare against — see touchedBy. */
+  const cardsNow = useRef(cards);
+  cardsNow.current = cards;
   /* Whether the list of cards holding more than one meaning is open — see
      MeaningSplits. */
   const [splitting, setSplitting] = useState(false);
@@ -5181,7 +5305,12 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     <CardTile
       card={c}
       lang={langOfCard(c)}
-      meta={shortDate(cardAdded(c))}
+      meta={
+        <>
+          {statusWords(c) ? <span className="at-statusbadge">{statusWords(c)}</span> : null}
+          {shortDate(cardAdded(c))}
+        </>
+      }
       onClick={() => setViewing(c)}
       actions={cardActions(c)}
     />
@@ -5223,6 +5352,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           kind: cardKindLabel(c),
           subtype: cardSubtypeLabel(c, langOfCard(c)),
           decks: titles.join(", "),
+          status: statusWords(c) || "Published",
           audio: cardHasAudio(c) ? "Yes" : "",
           review: waitingIds.has(c.id) ? "Waiting" : needsReview(c) ? "Reviewed" : "",
           created: shortDate(c.created),
@@ -5700,15 +5830,42 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   };
 
-  const sendOrKeep = useCallback(async (card: Partial<Card>, decks: string[]) => {
+  /*
+   * A save names what it changed, so the server writes only that and
+   * leaves the rest of the card as it stands — see `touched` in save-card.
+   * Worked out here, against the card as this screen holds it, for every
+   * save that does not say for itself (the card editor does, by sending
+   * the whole card into its changes): tagging a selection, narrowing a
+   * blank, the Pronouns screen. Without it a whole card goes up, and on a
+   * published card with changes waiting, the whole card is the changes —
+   * saving a tag would publish them.
+   */
+  const touchedBy = (card: Partial<Card>, decks: string[]): string[] | undefined => {
+    const was = card.id ? cardsNow.current.find((c) => c.id === card.id) : null;
+    if (!was) return undefined;
+    const keys = new Set([...Object.keys(card), ...Object.keys(was)]);
+    const out = [...keys].filter((k) => !SAVE_BOOKKEEPING.has(k) &&
+      JSON.stringify((card as Record<string, unknown>)[k] ?? null) !== JSON.stringify((was as Record<string, unknown>)[k] ?? null));
+    if ([...(was.decks || [])].sort().join() !== [...decks].sort().join()) out.push("decks");
+    return out;
+  };
+  /* A save straight to the server, naming what it changed — for the
+     screens that do not keep a save for later. */
+  const saveNamed = (card: Partial<Card>, decks: string[]) =>
+    API.saveCard(card, decks, card.id ? { touched: touchedBy(card, decks) } : {});
+  const sendOrKeep = useCallback(async (card: Partial<Card>, decks: string[], given: API.SaveExtra = {}) => {
+    const extra: API.SaveExtra = given.touched || given.walk || given.into || !card.id
+      ? given
+      : { ...given, touched: touchedBy(card, decks) };
     try {
-      return await API.saveCard(card, decks);
+      return await API.saveCard(card, decks, extra);
     } catch (e) {
       if (String((e && (e as Error).message) || e) !== "offline") throw e;
-      keepPending(CARD_OUTBOX, { card, decks });
+      keepPending(CARD_OUTBOX, { card, decks, extra });
       setKept(waitingToSend(CARD_OUTBOX));
       return { kept: true };
     }
+  /* touchedBy reads the cards through a ref, so this is made once. */
   }, []);
 
   /* And send them when there is something to send them down. One at a
@@ -5717,9 +5874,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const sendKeptCards = useCallback(async () => {
     if (isOffline()) return;
     const { sent } = await drainOutbox(CARD_OUTBOX, async (body) => {
-      const held = body as { card: Partial<Card>; decks: string[] };
+      const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra };
       try {
-        absorbSaved(await API.saveCard(held.card, held.decks));
+        absorbSaved(await API.saveCard(held.card, held.decks, held.extra || {}));
         return "sent";
       } catch (e) {
         return String((e && (e as Error).message) || e) === "offline" ? "keep" : "drop";
@@ -5761,6 +5918,28 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     });
     absorbDecks(r.decks);
   }
+
+  /* A card's status, from the menu beside Edit — see StatusMenu. The card
+     on screen is the copy the server answers with. */
+  const setStatus = (card: Card, to: StatusTo) =>
+    run(
+      async () => {
+        const r = await API.cardStatus(card.id, to);
+        absorbSaved(r);
+        setViewing((v) => (v && v.id === r.card.id ? { ...r.card, decks: r.card.decks || v.decks || [] } : v));
+      },
+      to === "published"
+        ? card.status && card.status !== "published"
+          ? "Published — students get it now"
+          : "Changes published — students get them now"
+        : to === "discard"
+          ? "Changes discarded"
+          : to === "unpublish"
+            ? "Unpublished — students no longer see it"
+            : to === "review"
+              ? "Marked ready for review"
+              : "Marked as a draft",
+    );
 
   function absorbDecks(records: Deck[]) {
     if (!Array.isArray(records) || !records.length) return;
@@ -6083,75 +6262,67 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                         ...(typeof capitals === "boolean" ? { capitals } : {}),
                       }),
                 },
-                inDecks
+                inDecks,
+                /* A new card starts as a draft, and a change to a published
+                   card waits for publishing — see "A card's status" in
+                   save-card. Its decks, ID and tags apply at once. */
+                editing.card && editing.card.id ? { into: "changes" } : { status: "draft" },
               );
               absorbSaved(r);
               /*
-               * And the renames the teacher said should follow the name.
+               * And the renames the teacher said should follow the name,
+               * and the tags they took off the collection.
                *
                * The editor holds one card, so it carries the answer out
-               * rather than reaching for the rest: what it hands back is
-               * the names that moved, and this is where every other card
-               * that writes one is rewritten. No bulk write — the same
-               * `sendOrKeep` every card goes through, in a loop, so a
-               * rename made on a train is kept and sent like anything
-               * else.
+               * rather than reaching for the rest: these are the names that
+               * moved, and every other card that writes one is told. The
+               * server rewrites both of that card's versions — what students
+               * have and any changes waiting — since a blank has to find the
+               * name in both. Through `sendOrKeep` like any card, so a
+               * rename made on a train is kept and sent like anything else.
                *
-               * Worked out over a pool rather than the list in hand, so
-               * two renames in one sitting reach the same card twice and
-               * it is saved once, with both.
+               * The tags come off after the renames, so a tag renamed and
+               * then taken off in one sitting comes off where it landed.
+               * Only the tags come off: a sentence that asks for the name
+               * goes on asking for it, which is the honest half of what the
+               * teacher was told before they pressed.
                */
               const saved0 = r && r.card;
+              const renames = (spread || []).filter((x) => x.from !== x.to);
+              const drops = stripped || [];
+              /* Worked out over a pool rather than the list in hand, so a
+                 card the word below is also carried onto gets it on top of
+                 the new name rather than instead of it. */
               const pool = new Map(cards.map((c) => [c.id, c] as [string, Card]));
               const moved = new Set<string>();
-              for (const { from, to } of spread || []) {
-                for (const [id, other] of pool) {
-                  if (saved0 && id === saved0.id) continue;
-                  const next = renamedIn(other, from, to);
-                  if (!next) continue;
-                  pool.set(id, next);
-                  moved.add(id);
-                }
-              }
-              /*
-               * And the groups the teacher took off the collection.
-               *
-               * After the renames and over the same pool, so a tag renamed
-               * and then taken off in one sitting comes off where it
-               * landed, and a card caught by both is written once with
-               * both. Only the tags come off: a sentence that asks for the
-               * name goes on asking for it, which is the honest half of
-               * what the teacher was told before they pressed.
-               */
-              for (const name of stripped || []) {
-                for (const [id, other] of pool) {
-                  if (saved0 && id === saved0.id) continue;
-                  const next = droppedIn(other, name);
-                  if (!next) continue;
-                  pool.set(id, next);
-                  moved.add(id);
-                }
-              }
-              /*
-               * And the word itself, onto the other cards that share it,
-               * where the teacher said so — see CarryAsk. Through the same
-               * pool, so a card a rename also reached is saved once with
-               * both.
-               */
-              for (const id of (carry && carry.ids) || []) {
-                const other = pool.get(id);
-                if (!other) continue;
-                const next1 = carryWordChanges(other, carry!.changes);
-                if (!next1) continue;
+              for (const [id, other] of pool) {
+                if (saved0 && id === saved0.id) continue;
+                let next1: Card | null = other;
+                for (const { from, to } of renames) next1 = renamedIn(next1, from, to) || next1;
+                for (const name of drops) next1 = droppedIn(next1, name) || next1;
+                if (next1 === other) continue;
                 pool.set(id, next1);
                 moved.add(id);
               }
               for (const id of moved) {
                 const one = pool.get(id);
                 if (!one) continue;
-                absorbSaved(
-                  await sendOrKeep({ ...one, id, lang: one.lang || "" }, one.decks || []),
-                );
+                absorbSaved(await sendOrKeep({ id, lang: one.lang || "" }, one.decks || [], { walk: { renames, drops } }));
+              }
+              /*
+               * And the word itself, onto the other cards that share it,
+               * where the teacher said so — see CarryAsk. A change to those
+               * cards' words like any other, so on a published one it waits
+               * with its changes, as this card's does.
+               */
+              for (const id of (carry && carry.ids) || []) {
+                const other = pool.get(id);
+                if (!other) continue;
+                const next1 = carryWordChanges(other, carry!.changes);
+                if (!next1) continue;
+                const keys = Object.keys(next1).filter((k) => JSON.stringify((next1 as any)[k]) !== JSON.stringify((other as any)[k]));
+                absorbSaved(await sendOrKeep({ ...next1, id, lang: next1.lang || "" }, next1.decks || [], { touched: keys, into: "changes" }));
+                moved.add(id);
               }
               /*
                * And straight on to the next card, where the teacher asked
@@ -6202,6 +6373,16 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                    caps used to apply in silence, so the only way to find
                    out was to notice what was gone. */
                 trimmed: (r && r.trimmed) || [],
+                /* And where it stands with students, which a save no
+                   longer settles: a draft, or a published card whose
+                   changes wait. */
+                waits: !saved
+                  ? ""
+                  : saved.status && saved.status !== "published"
+                    ? "draft"
+                    : saved.changes
+                      ? "changes"
+                      : "",
               };
             },
             /* Named, because the editor closes on save: without the word
@@ -6212,7 +6393,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                already written, say so — that is the moment the link is
                worth making, and the alternative is a deck whose coverage
                quietly falls as it grows. */
-            (done: { name: string, kept: boolean, waiting: number, trimmed: string[], moved: number }) =>
+            (done: { name: string, kept: boolean, waiting: number, trimmed: string[], moved: number, waits: string }) =>
               done.kept
                 ? `${done.name} saved on this device — it goes up when you're back online`
                 : done.moved
@@ -6221,6 +6402,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 ? `${done.name} saved — but ${done.trimmed.join(" and ")} did not fit and ${done.trimmed.length === 1 ? "was" : "were"} left out`
                 : done.waiting
                 ? `${done.name} saved · it turns up in ${plural(done.waiting, "phrase")} you have written — confirm them under In context`
+                : done.waits === "draft"
+                ? `${done.name} saved as a draft — students get it once it's published`
+                : done.waits === "changes"
+                ? `${done.name} saved — students get the changes once they're published`
                 : `${done.name} saved`
           )
         }
@@ -6483,7 +6668,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                       ? [...new Set(inNow.concat(pickedDecks))]
                       : inNow.filter((x) => !pickedDecks.includes(x));
                   if (next.length === inNow.length) continue;
-                  absorbSaved(await API.saveCard(card, next));
+                  absorbSaved(await saveNamed(card, next));
                   changed += 1;
                 }
                 setCardAction(null);
@@ -6628,7 +6813,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                       else if (pickedTags.some((name) => !fillNames(next).includes(name))) full += 1;
                     }
                     if (next === card) continue;
-                    absorbSaved(await API.saveCard(next, card.decks || []));
+                    absorbSaved(await saveNamed(next, card.decks || []));
                     changed += 1;
                   }
                   close();
@@ -6733,7 +6918,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     const inNow = card.decks || [];
                     const want = picked.pronouns.includes(card.id);
                     if (want === inNow.includes(d.id)) continue;
-                    absorbSaved(await API.saveCard(card, want ? inNow.concat([d.id]) : inNow.filter((x) => x !== d.id)));
+                    absorbSaved(await saveNamed(card, want ? inNow.concat([d.id]) : inNow.filter((x) => x !== d.id)));
                   }
                   setDeckExtras(null);
                   await refresh();
@@ -6895,7 +7080,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                           const card = cards.find((c) => c.id === id);
                           if (!card) continue;
                           absorbSaved(
-                            await API.saveCard(card, (card.decks || []).filter((x) => x !== d.id))
+                            await saveNamed(card, (card.decks || []).filter((x) => x !== d.id))
                           );
                         }
                         setSelCards(new Set());
@@ -6921,6 +7106,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
             action={
               <>
                 <IconButton icon="download" label="Export this card" onClick={() => exportCards([viewing.id])} />
+                <StatusMenu card={viewing} disabled={busy} onStatus={(to) => setStatus(viewing, to)} />
                 <Button variant="primary" size="sm"
                   onClick={() => {
                     setEditing({ card: viewing, decks: viewing.decks || [] });
@@ -7364,6 +7550,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   action={
                     <>
                       <IconButton icon="download" label="Export this card" onClick={() => exportCards([viewing.id])} />
+                      <StatusMenu card={viewing} disabled={busy} onStatus={(to) => setStatus(viewing, to)} />
                       <Button variant="primary" size="sm"
                         onClick={() => {
                           setEditing({ card: viewing, decks: viewing.decks || [] });
@@ -7556,7 +7743,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                       ...new Set((had || []).concat([word.id])),
                     ];
                     absorbSaved(
-                      await API.saveCard(
+                      await saveNamed(
                         line === null
                           ? { ...card, uses: add(card.uses) }
                           : {

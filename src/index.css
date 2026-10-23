@@ -3989,3 +3989,20 @@ body.at-screening .at-chromebar { display:none; }
 /* And beside a screen's own action, as the card's Export sits beside its
    Edit: square, and as tall as the button next to it. */
 .at-screenaction > .at-icon { flex:0 0 auto; width:40px; height:40px; padding:0; box-sizing:border-box; }
+
+/* A card's status, beside Edit on its screen: a menu that reads as where
+   the card stands. See StatusMenu. */
+.at-statusmenu { position:relative; display:inline-flex; align-items:center; }
+.at-statusmenu select { -webkit-appearance:none; appearance:none; font-family: var(--ui);
+  font-size:13px; font-weight:800; letter-spacing:.02em; text-transform:uppercase;
+  padding:7px 32px 7px 12px; border:2px solid var(--line); border-radius: var(--r-sm);
+  background: var(--raised); color: var(--text); cursor:pointer; max-width:46vw;
+  text-overflow:ellipsis; }
+.at-statusmenu select:disabled { cursor:default; color: var(--faint); }
+.at-statusmenu > .at-ic { position:absolute; inset-inline-end:10px; pointer-events:none; }
+.at-statusmenu.published select { border-color: var(--jade); }
+.at-statusmenu.review select, .at-statusmenu.changed select { border-color: var(--brass); }
+/* And in a list: a card students do not have, or have an older copy of. */
+.at-statusbadge { display:inline-block; margin-inline-end:6px; padding:0 6px; border-radius:999px;
+  border:1px solid var(--brass); color: var(--brass); font-family: var(--ui); font-size:11px;
+  font-weight:800; letter-spacing:.04em; text-transform:uppercase; line-height:1.6; }

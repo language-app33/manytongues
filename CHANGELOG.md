@@ -8,6 +8,34 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.463 — 23 October 2026
+
+**A card is a draft until you publish it.**
+
+- Every card is now Draft, Ready for review or Published, and only
+  published cards reach students. A card you make starts as a draft.
+- A card's screen in Teaching has a status menu beside Edit, where you
+  mark a card ready for review or publish it.
+- Changing a published card doesn't change what students have. Your
+  changes wait, as a draft or ready for review, until you choose Publish
+  changes, or Discard changes to drop them. Unpublish takes a card away
+  from students and keeps it as a draft; their progress on it comes back
+  if you publish it again.
+- A card's decks, its ID and its tags are not part of the changes that
+  wait: changing them applies straight away, for students too, because
+  other cards find a card through them.
+- Card lists show a badge on drafts and on cards with changes waiting,
+  and the table view has a Status column.
+- Every existing card is Published, so students lose nothing. Cards made
+  by the Pronouns screen or by splitting a card's meanings are published
+  straight away, as before, and so are changes made from the lists
+  (tagging cards, adding them to decks).
+- If two teachers change the same card at once, the later save wins, as
+  before.
+
+To check by hand: the status menu beside Edit on a phone, where the
+screen's header is narrow.
+
 ## 0.462 — 23 October 2026
 
 **Teachers can export a card, several cards, or whole decks.**

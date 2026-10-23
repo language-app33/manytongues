@@ -6707,3 +6707,41 @@ again. Numbers and the clock stay with the whole-site backup, because they
 belong to the teacher rather than to a deck. Each chunk re-reads every
 deck and course to check access, which is cheap on a teaching site.
 
+
+## A card's status, without the one-screen card editor (0.463)
+
+**23 October 2026** · `card-status`, `save-card`, `teacherView`,
+`studentView` in `server/api/courses.js`; `StatusMenu`, `touchedBy` in
+`src/spaces.tsx`
+
+**What was wanted.** The statuses from 0.431 — Draft, Ready for review,
+Published — back on beta on their own. 0.431 came off beta the day it went
+up, carrying the statuses and a redesign of the card screen together (one
+screen with locked sections, each saved on its own). The owner asked for
+the statuses only.
+
+**What changed.** The server half of 0.431 is back nearly as it was: a
+card's status, a published card's unpublished changes in `pending`, the
+`card-status` action, and only published cards reaching a student. The
+card screen is today's: the read-out, with the status menu beside Edit,
+and the editor, whose Save sends the whole card with `into: "changes"` (a
+new card with `status: "draft"`). Lists have the badge and the table its
+Status column.
+
+**Choices the owner made.** Changes to a published card wait until they
+are published or discarded, and Unpublish keeps the teacher's work as a
+draft. A card's decks, ID and tags are not part of those changes and
+apply at once, because other cards find a card through them. No question
+when two teachers saved the same part of a card: that came with saving a
+section at a time, so `baseRev`, `force`, `edits` and `changed-elsewhere`
+are not brought back, and the later save wins as it always did.
+
+**What it costs, and what was kept.** Saves from other screens (tagging a
+selection, adding to a deck, the Pronouns screen, splitting meanings)
+write what students have, as they always did, naming the fields they
+changed (`touchedBy`), so that a teacher's copy of a card with changes
+waiting — which *is* the changes — is never sent up whole and published
+by accident. A rename or a tag taken off the collection reaches other
+cards as a `walk`, which the server applies to both versions of each. A
+save kept on the device while offline keeps what it said about itself and
+goes up as sent.
