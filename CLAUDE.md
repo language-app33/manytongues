@@ -77,32 +77,41 @@ of work.
 
 ## How to ask clarifying questions
 
-Whenever there are questions for the owner, before building or at any other
-point, ask them this way, every time:
+Asking is part of every piece of work, without waiting to be told to. When
+anything in a request is unclear or could be read more than one way, ask
+before building on a guess. When everything is clear, do not invent
+questions for the sake of asking; get on with it.
 
-- A numbered list, grouped by topic with sub-numbers: 1a, 1b, 2a, and so on.
-- One question per item, never two in the same item.
+Whenever there are questions for the owner, while brainstorming, before
+building or at any other point, ask them this way, every time:
+
+- Questions are numbered 1, 2, 3, and so on. Numbers are for questions only,
+  never 1a or 1.1 for a question.
+- Questions may be grouped under headings by topic, but the numbering runs
+  on across headings: if the first heading holds 1 and 2, the next starts
+  at 3.
+- One question per number, never two in the same item.
+- Every question offers options, lettered a, b, c under it, so the owner
+  can answer the whole set in a line ("1a, 2b, 3a"). This holds even for an
+  open question: suggest likely answers as options; the owner can still
+  write their own.
+- Every question ends with the recommended option, named by its letter,
+  and a very short reason why — a sentence at most.
 - Concise and non-technical, in the same plain terms as above.
-- Where what the owner said can be read more than one way, and the ways
-  are put back to them, each reading is numbered or named, so the owner
-  can answer with which one is right in a word ("2", or "the second").
 
 ## How to propose fixes
 
 Whenever there is more than one way to fix something, whether in answer to a
-question, in a plan, or offered unprompted, set them out this way, every
-time:
+question, in a plan, or offered unprompted, set them out the same way as
+questions, every time:
 
-- A numbered list, one fix per item, so the owner can answer with a number.
-- Where there are several things to decide at once, each with its own
-  fixes, number the things and letter the fixes under each: 1a, 1b, 2a,
-  2b. Never 1.1 and 1.2, and never a second list restarting at 1 under a
-  numbered heading — every option must have a label of its own, so the
-  owner can answer "1b, 2a" and be understood.
-- Each item says, in the same plain terms as above, what changes for the
+- Each thing to decide is numbered 1, 2, 3, running on across any headings.
+- The fixes for it are lettered a, b, c under it, one fix per letter, so
+  the owner can answer "1b, 2a" and be understood. Never 1.1 and 1.2.
+- Each fix says, in the same plain terms as above, what changes for the
   people using the app and what it costs or gives up.
-- Then a recommendation, naming one of the numbered fixes and saying in a
-  sentence or two why.
+- Each thing to decide ends with the recommended fix, named by its letter,
+  and a very short reason why.
 
 Where there is only one sensible fix, still say which it is and why, rather
 than presenting it as a list of one.
