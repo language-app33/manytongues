@@ -7372,6 +7372,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           <Screen
             title={asMeaning(leadOf(viewing).en) || leadOf(viewing).ar}
             onBack={() => setViewing(null)}
+            actionBelow
             action={
               <>
                 <IconButton icon="download" label="Export this card" onClick={() => exportCards([viewing.id])} />
@@ -7816,6 +7817,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 <Screen
                   title={asMeaning(leadOf(viewing).en) || leadOf(viewing).ar}
                   onBack={() => setViewing(null)}
+                  actionBelow
                   action={
                     <>
                       <IconButton icon="download" label="Export this card" onClick={() => exportCards([viewing.id])} />

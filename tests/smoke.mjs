@@ -4367,6 +4367,14 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
       [...statusSel.options].map((o) => o.textContent).join(" | ") === "Published | Unpublish…",
     statusSel ? `${statusSel.value}: ${[...statusSel.options].map((o) => o.textContent).join(" | ")}` : "(no status menu)");
 
+  /* On a line of its own under the title: beside it, Export, the status
+     and Edit squeezed a sentence's title to a word a line on a phone. */
+  const cardHead = statusSel && statusSel.closest(".at-screenhead");
+  check("and its buttons sit on a line under the card's title",
+    !!cardHead && cardHead.classList.contains("below") &&
+      !!cardHead.querySelector(".at-screenaction .at-statusmenu"),
+    cardHead ? cardHead.className : "(no header)");
+
   const tries = () => /** @type {HTMLButtonElement[]} */ ([...document.querySelectorAll(".at-try")]);
   check("a card in the teaching space lists the exercises it could be asked",
     tries().length > 1, `${tries().length} offered`);

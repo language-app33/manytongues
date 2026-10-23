@@ -3440,10 +3440,15 @@ export function useScrollTop(key: unknown) {
  *   which says it is a step to the side of what is underneath rather than
  *   somewhere new.
  */
-export function Screen({ title, onBack, action, children, footer, backLabel = "Back", rise, className = "" }: {
+export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", rise, className = "" }: {
   title?: Node;
   onBack?: () => void;
   action?: Node;
+  /** Put the action on a line of its own under the title, where there is
+      more than one button and a long title — a card's screen, whose title
+      is the card's words. Beside the title, three buttons squeezed it to a
+      word a line on a phone. */
+  actionBelow?: boolean;
   children?: Node;
   footer?: Node;
   backLabel?: string;
@@ -3516,7 +3521,7 @@ export function Screen({ title, onBack, action, children, footer, backLabel = "B
      inside it escapes the space's layer while staying in the theme. */
   const view = (
     <div className={`at-screen over${rise ? " rise" : ""}${className ? " " + className : ""}`} ref={elRef} role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined}>
-      <div className="at-screenhead">
+      <div className={`at-screenhead${actionBelow ? " below" : ""}`}>
         {onBack ? (
           <button className="at-back" onClick={onBack} aria-label={backLabel}>
             <Icon name="back" />

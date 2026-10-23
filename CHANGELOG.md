@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.466 — 23 October 2026
+
+**A card's buttons sit under its title.**
+
+- On a card's screen in Teaching, Export, the status and Edit are now on
+  a line of their own under the card's title. Beside it, on a phone, they
+  squeezed a long title down to one word a line.
+
+To check by hand: a card with a long title, on a phone.
+
 ## 0.465 — 23 October 2026
 
 **A card is a draft until you publish it.**
