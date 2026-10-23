@@ -93,6 +93,8 @@ import { drainOutbox, keep as keepPending, waiting as waitingToSend } from "./ou
 const CARD_OUTBOX = "card";
 import { buildDialogIndex } from "./dialogs.ts";
 import { flagsToText } from "./flag-export.ts";
+import { IMPORTED_STATUS, matchImport, mediaOf, mentions, readImportFile, remapIds, tickedAtFirst, toSave } from "./imports.ts";
+import type { CardMatch, DeckMatch, ImportFile } from "./imports.ts";
 import { freshStates, unitsOf } from "./scheduler.ts";
 import {
   APP_BUILD,
@@ -3340,6 +3342,182 @@ function ExportScreen({ ask, onDone, onClose }: {
 }
 
 /* ------------------------------------------------------------------
+   A teacher's import
+
+   The other end of Export: a file of cards and decks, read against what
+   the teacher already has before anything is written. Each card says
+   which of three it is — new, already yours, or the same word as a card
+   of yours — and only the new ones are ticked to start with. See
+   imports.ts for the rules, and DECISIONS.md for why.
+   ------------------------------------------------------------------ */
+
+export type ImportPlan = {
+  file: ImportFile;
+  cards: CardMatch[];
+  decks: DeckMatch[];
+  ticked: Set<string>;
+};
+
+function ImportScreen({ cards, decks, langName, busy, failed, onImport, onClose }: {
+  cards: Card[];
+  decks: Deck[];
+  langName: (lang: string) => string;
+  busy?: boolean;
+  /** Why the last import stopped, where it did: some of it may be in. */
+  failed?: string;
+  onImport: (plan: ImportPlan) => void;
+  onClose: () => void;
+}) {
+  const [read, setRead] = useState<{ name: string; file: ImportFile; cards: CardMatch[]; decks: DeckMatch[] } | null>(null);
+  const [ticked, setTicked] = useState<Set<string>>(new Set());
+  const [err, setErr] = useState("");
+
+  const pick = async (f: File) => {
+    setErr("");
+    let parsed: any;
+    try {
+      parsed = JSON.parse(await f.text());
+    } catch (e) {
+      setErr("That file isn't readable as JSON.");
+      return;
+    }
+    const file = readImportFile(parsed);
+    if (typeof file === "string") {
+      setErr(file);
+      return;
+    }
+    const m = matchImport(file, cards, decks);
+    setRead({ name: f.name, file, ...m });
+    setTicked(new Set(m.cards.filter(tickedAtFirst).map((x) => x.card.id)));
+  };
+
+  const toggle = (id: string, on: boolean) =>
+    setTicked((x) => {
+      const next = new Set(x);
+      if (on) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  const listOf = (kind: CardMatch["kind"]) => (read ? read.cards.filter((m) => m.kind === kind) : []);
+  const option = (m: CardMatch, note: Node) => ({
+    id: m.card.id,
+    title: leadOf(m.card).ar || m.card.name || leadOf(m.card).en || "A card",
+    note,
+  });
+  const meaningOf = (c: Card) => asMeaning(leadOf(c).en) || "";
+  const fresh = listOf("new");
+  const same = listOf("same");
+  const twins = listOf("sameWord");
+  const newDecks = read ? read.decks.filter((d) => !d.existing) : [];
+  const nothing = !ticked.size && !newDecks.length;
+
+  return (
+    <Screen
+      title="Import"
+      onBack={onClose}
+      rise
+      action={
+        read ? (
+          <Button
+            variant="primary"
+            size="sm"
+            icon="upload"
+            disabled={busy || nothing}
+            onClick={() => onImport({ file: read.file, cards: read.cards, decks: read.decks, ticked })}
+          >
+            {busy ? "Importing…" : "Import"}
+          </Button>
+        ) : null
+      }
+    >
+      <Help>
+        A file made with Export, here or by another teacher, or a backup of the whole site. Every
+        card is checked against yours first, and nothing is changed until you tap Import.
+      </Help>
+      <div className="at-row at-mt3">
+        <label className="at-btn ghost" style={{ cursor: "pointer" }}>
+          <Icon name="folder" />
+          {read ? "Choose a different file" : "Choose a file"}
+          <input
+            type="file"
+            accept="application/json,.json"
+            className="at-hidden"
+            onChange={(e) => {
+              const f = e.target.files && e.target.files[0];
+              e.target.value = "";
+              if (f) pick(f);
+            }}
+          />
+        </label>
+      </div>
+      <Notice kind="error">{err || failed}</Notice>
+
+      {read && (
+        <>
+          <p className="at-eyebrow at-mt4">{read.name}</p>
+          {read.decks.length > 0 && (
+            <Section title={plural(read.decks.length, "deck")} className="at-mt4">
+              {read.decks.map((d) => (
+                <Help key={d.deck.id}>
+                  <b>{d.deck.title}</b> · {langName(d.deck.lang)} ·{" "}
+                  {d.existing
+                    ? d.existing.locked
+                      ? `you have this deck, but it is locked, so no cards can be added to it`
+                      : `you have this deck: the cards you import are added to it, and nothing is taken out`
+                    : "a new deck, in no course until you add it to one"}
+                </Help>
+              ))}
+            </Section>
+          )}
+
+          {fresh.length > 0 && (
+            <Section title={`New · ${plural(fresh.length, "card")}`} className="at-mt4">
+              <CheckList
+                options={fresh.map((m) => option(m, meaningOf(m.card)))}
+                chosen={[...ticked]}
+                onToggle={toggle}
+              />
+            </Section>
+          )}
+
+          {same.length > 0 && (
+            <Section title={`Already in your cards · ${same.length}`} className="at-mt4">
+              <Help>
+                The same cards, exported from here. Left as they are unless you tick them; a ticked
+                card is replaced by the file&apos;s version.
+              </Help>
+              <CheckList
+                options={same.map((m) => option(m, `${meaningOf(m.card)} · replace yours with the file's`))}
+                chosen={[...ticked]}
+                onToggle={toggle}
+              />
+            </Section>
+          )}
+
+          {twins.length > 0 && (
+            <Section title={`Same word as a card you have · ${twins.length}`} className="at-mt4">
+              <Help>
+                Different cards with a word you already have. Left out unless you tick them; a
+                ticked card is imported as a card of its own, beside yours.
+              </Help>
+              <CheckList
+                options={twins.map((m) =>
+                  option(m, `${meaningOf(m.card)} · yours means ${(m.existing && meaningOf(m.existing)) || "the same"}`)
+                )}
+                chosen={[...ticked]}
+                onToggle={toggle}
+              />
+            </Section>
+          )}
+
+          {nothing && <Help>Nothing ticked and no new deck, so there is nothing to import.</Help>}
+        </>
+      )}
+    </Screen>
+  );
+}
+
+/* ------------------------------------------------------------------
    Clearing the site
 
    The other end of a restore, and the only screen in the app that removes
@@ -4774,6 +4952,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const [selDecks, setSelDecks] = useState(() => new Set<string>());
   /* What the Export screen is about to put in a file, or null. */
   const [exportAsk, setExportAsk] = useState<ExportAsk | null>(null);
+  /* Whether the Import screen is open. */
+  const [importing, setImporting] = useState(false);
   const [deckAction, setDeckAction] = useState<"add" | "remove" | null>(null); // "add" | "remove"
   const [pickedDecks, setPickedDecks] = useState<string[]>([]);
   /* The name of a deck being made from the add-to-a-deck screen, or null
@@ -5121,6 +5301,93 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       what: picked.length === 1 ? `${picked[0].title} and its cards` : `These ${plural(picked.length, "deck")} and their cards`,
     });
   };
+  /*
+   * Writes what the Import screen settled, in the order that lets every
+   * card land where it should: the decks first, so a card can be saved
+   * into them; the recordings and pictures, so a card never points at one
+   * the server has not got; the cards; and last, the cards that name
+   * another card of the file, once that card's new id is known.
+   */
+  async function importFrom({ file, cards: matches, decks: deckMatches, ticked }: ImportPlan) {
+    const deckTo = new Map<string, string>();
+    let madeDecks = 0;
+    for (const m of deckMatches) {
+      if (m.existing) {
+        deckTo.set(m.deck.id, m.existing.id);
+        continue;
+      }
+      const r = await API.createDeck(m.deck.title || "Imported deck", "", m.deck.lang);
+      deckTo.set(m.deck.id, r.deck.id);
+      madeDecks += 1;
+    }
+    const going = matches.filter((m) => ticked.has(m.card.id));
+    const media = mediaOf(going.map((m) => m.card), file);
+    for (const h of media.clips) await API.putClip(h, file.clips[h]);
+    for (const h of media.images) await API.putImage(h, file.images[h]);
+
+    /* Where each card of the file now is. A card left out because you
+       have its word stands in for it, so a phrase that links to it links
+       to yours. */
+    const moved = new Map<string, string>();
+    for (const m of matches) {
+      if (m.kind === "sameWord" && m.existing && !ticked.has(m.card.id)) moved.set(m.card.id, m.existing.id);
+    }
+    const into = (m: CardMatch) => m.inDecks.map((d) => deckTo.get(d)).filter((d): d is string => !!d);
+    const saved: { match: CardMatch; card: Card }[] = [];
+    let unnamed = 0;
+    for (const m of going) {
+      const replacing = m.kind === "same";
+      const decksFor = [...new Set([...(replacing && m.existing ? m.existing.decks || [] : []), ...into(m)])];
+      const body = remapIds(toSave(m.card, replacing ? m.card.id : ""), moved);
+      let r;
+      try {
+        r = await API.saveCard(body, decksFor, IMPORTED_STATUS);
+      } catch (e) {
+        /* Its ID is one a card of yours already answers to. Brought in
+           without it rather than not at all; the count says how many. */
+        if (!(e instanceof Error) || e.message !== "ref-taken") throw e;
+        r = await API.saveCard({ ...body, ref: "" }, decksFor, IMPORTED_STATUS);
+        unnamed += 1;
+      }
+      absorbSaved(r);
+      moved.set(m.card.id, r.card.id);
+      saved.push({ match: m, card: r.card });
+    }
+    const renamed = new Set([...moved].filter(([from, to]) => from !== to).map(([from]) => from));
+    for (const { match, card } of saved) {
+      if (!mentions(match.card, renamed)) continue;
+      absorbSaved(await API.saveCard(remapIds(toSave(card, card.id), moved), card.decks || [], IMPORTED_STATUS));
+    }
+    /* A card you already have, left as it is, still belongs in the deck
+       the file puts it in. */
+    for (const m of matches) {
+      if (m.kind !== "same" || ticked.has(m.card.id) || !m.existing) continue;
+      const had = m.existing.decks || [];
+      const want = [...new Set([...had, ...into(m)])];
+      if (want.length !== had.length) absorbSaved(await API.saveCard(m.existing, want));
+    }
+    setImporting(false);
+    await refresh();
+    const replaced = going.filter((m) => m.kind === "same").length;
+    const said = [
+      going.length - replaced ? `imported ${plural(going.length - replaced, "card")}` : "",
+      replaced ? `replaced ${plural(replaced, "card")}` : "",
+      madeDecks ? `made ${plural(madeDecks, "deck")}` : "",
+      unnamed ? `${unnamed} came in without its ID, which a card of yours already has` : "",
+    ].filter(Boolean).join(", ") || "added your cards to the deck";
+    return `${said.charAt(0).toUpperCase()}${said.slice(1)}.`;
+  }
+  const importScreen = importing && (
+    <ImportScreen
+      cards={cards}
+      decks={decks}
+      langName={(id) => (languages[id as LangId] || { name: id }).name}
+      busy={busy}
+      failed={error}
+      onClose={() => setImporting(false)}
+      onImport={(plan) => run(() => importFrom(plan), (note: string) => note)}
+    />
+  );
   const exportScreen = exportAsk && (
     <ExportScreen
       ask={exportAsk}
@@ -7461,6 +7728,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                    word is on the screen it opens. */
                 tools={
                   <>
+                  <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />
                   {numberLangsOn.length || pronounLangsOn.length ? (
                     <>
                       {numberLangsOn.length ? (
@@ -7678,6 +7946,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     : "No decks yet. Make one, then add it to a course so students can see it."
                 }
                 match={(d, q) => d.title.toLowerCase().includes(q)}
+                tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
                 onNew={() => setNaming("new")}
                 selected={selDecks}
                 onSelectedChange={setSelDecks}
@@ -7809,6 +8078,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       {/* Over whichever tab it was asked from: a card, ticked cards or a
           deck, from the Cards tab or the Decks tab alike. */}
       {exportScreen}
+      {importScreen}
     </SpaceFrame>
   );
 }

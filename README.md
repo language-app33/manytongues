@@ -1549,6 +1549,9 @@ src/
   flag-export.ts   reported problems written out as text to paste elsewhere,
                    each with the card it is about. Pure: the clock, the
                    locale and every name it cannot work out are passed in.
+  imports.ts       a teacher's import read against what they already have:
+                   which cards are new, already theirs, or the same word as
+                   one of theirs, and which decks they have. Pure.
   ArabicTrainer.tsx  the learner's app: scheduler, session builder, screens
   spaces.tsx       the teaching and admin spaces, loaded lazily so a student
                    never downloads them

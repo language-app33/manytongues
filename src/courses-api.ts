@@ -190,7 +190,11 @@ export const setDeckParts = (deckId: string, parts: string[]) =>
 export const myCards = () => call("my-cards");
 /* The server calls this field "decks"; sending anything else means the
    card saves but never lands in a deck. */
-export const saveCard = (card: Partial<Card>, decks: string[]) => call("save-card", { body: { card, decks } });
+/* `status` is the one a save asks the card to have — an import's "ready
+   for review". Sent only where it is asked for, so an ordinary save leaves
+   a card's status to the server. */
+export const saveCard = (card: Partial<Card>, decks: string[], status?: string) =>
+  call("save-card", { body: { card, decks, ...(status ? { status } : null) } });
 /* A teacher's say on the sentences a card makes: fingerprints approved,
    struck, or forgotten — see review.ts and review-card on the server. */
 export const reviewCard = (

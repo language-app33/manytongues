@@ -8,6 +8,39 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.463 — 23 October 2026
+
+**Teachers can import cards and decks.**
+
+- In Teaching, the Cards tab and the Decks tab each have an Import button
+  beside the search. It takes a file made with Export, by you or by another
+  teacher, or a backup of the whole site, from which only the cards and
+  decks are read.
+- Before anything is changed, every card in the file is checked against
+  yours and listed under one of three headings:
+  - **New**: ticked, and imported.
+  - **Already in your cards**: the same card, exported from here. Not
+    ticked; tick one to replace yours with the file's version.
+  - **Same word as a card you have**: a different card with a word you
+    already have in that language, with your card's meaning beside it.
+    Not ticked; tick one to import it as a card of its own.
+- A deck you already have, with the same name in the same language or the
+  very same deck, is added to, and nothing in it is taken out. Any other
+  deck is made, in no course until you add it to one.
+- Imported cards become yours, free to edit. Their recordings and pictures
+  come with them when the file has them. A phrase linked to a word in the
+  file stays linked to that word. If the word was left out because you
+  already have it, the phrase links to your card instead.
+- Every imported card is sent as "Ready for review". Card statuses are being
+  built separately, and until they arrive nothing is stored. Once they
+  arrive, imported cards wait for a teacher before reaching students.
+- Trade-off: a card you already have is still added to an imported deck it
+  is in, even when you leave the card itself as it is. A card whose ID is
+  one a card of yours already answers to comes in without the ID, and the
+  message says how many did.
+- To check by hand: import a deck another teacher exported, and see that
+  the three headings sort its cards the way you would.
+
 ## 0.462 — 23 October 2026
 
 **Teachers can export a card, several cards, or whole decks.**
