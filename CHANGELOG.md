@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.466 — 23 October 2026
+## 0.467 — 23 October 2026
 
 **A card's buttons sit under its title.**
 
@@ -17,6 +17,22 @@ and moves once per batch of work you would notice, not once per commit.
   squeezed a long title down to one word a line.
 
 To check by hand: a card with a long title, on a phone.
+
+## 0.466 — 23 October 2026
+
+**A sentence with a feminine word asks the feminine.**
+
+- In the exercise where a student fills a word into a sentence, a sentence
+  like "آسفة، مش فاهمة." linked to فاهم / فاهمة used to ask for فاهم, with
+  the ة left showing after the gap: "آسفة، مش ____ة.". It now asks for
+  فاهمة, the word the sentence actually has. The same goes for every pair
+  made with ة (تعبان / تعبانة, آسف / آسفة).
+- A word with something glued on, such as كتابك or الوظيفة, is still asked
+  as the plain word, as before.
+- "Words this teaches" in the card editor names the same form the exercise
+  will ask, as the deck quality score already does since 0.463.
+- To check by hand: practise a deck with a feminine sentence linked to a
+  masculine/feminine card, and see the gap asks the feminine.
 
 ## 0.465 — 23 October 2026
 

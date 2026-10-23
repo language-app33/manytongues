@@ -45,7 +45,7 @@ import type { Lang } from "./types.ts";
 import { formsOf, wordOf } from "./cards.ts";
 import { isDialog, linesOf, pickedFrom } from "./dialogs.ts";
 import {
-  contextTokens, findWordSpan, gluedTo, isFunctionWord, kindOf, splitForms, supportsContext, tensedOf,
+  bestWordIn, contextTokens, findWordSpan, isFunctionWord, kindOf, splitForms, supportsContext, tensedOf,
 } from "./languages.ts";
 import { exampleCells, verbExamplesOf } from "./examples.ts";
 import { isAsked } from "./scheduler.ts";
@@ -297,47 +297,12 @@ export function unknownFinder(known: Held[], lang: Lang | null | undefined) {
 
 /* ---- which form a sentence holds ---- */
 
-const bare = (t: string) => t.replace(/^[\p{P}\p{S}]+|[\p{P}\p{S}]+$/gu, "");
-
-/*
- * How well a word fits where it was found: 0 spelt as the text spells it
- * (marks aside), 1 with nothing glued to its end, 2 with something.
- *
- * Asked of the language's own matcher both ways round, since peeling is
- * not symmetrical — فاهمة peels to فاهم and فاهم does not grow to فاهمة.
- */
-function fit(window: string, word: string, lang: Lang): number {
-  const said = bare(window);
-  if (lang.context.matches(said, word) && lang.context.matches(word, said)) return 0;
-  const glued = gluedTo(said, word, lang);
-  return glued && !glued.after ? 1 : 2;
-}
-
-/*
- * The form of a word a text holds, where it holds one.
- *
- * The matcher reads a form with something glued to it as the form, so
- * فاهمة is found by فاهم as surely as by itself — the feminine is the
- * masculine and an ending. Taking the first form that matched therefore
- * credited the masculine for every feminine made with ة. Where several
- * forms are found at the same place, the one that fits it best is the one
- * the text holds; the first only where none fits better, so a word with a
- * possessive or a prefix glued to it — كتابك, الوظيفة, وبدك — still credits
- * the plain form. Each answer of a form is tried.
- */
+/* The form of a word a text holds, where it holds one, trying each answer
+   of each form — see bestWordIn, which the gap-fill asks too. */
 export function formIn<T extends { ar: string }>(text: string, forms: T[], lang: Lang): T | undefined {
-  const hits: { form: T; at: number; rank: number }[] = [];
-  const tokens = contextTokens(text, lang);
-  for (const form of forms) {
-    for (const word of answersIn(form.ar)) {
-      const span = findWordSpan(text, word, lang);
-      if (!span) continue;
-      hits.push({ form, at: span.at, rank: fit(tokens.slice(span.at, span.at + span.len).join(" "), word, lang) });
-    }
-  }
-  if (!hits.length) return undefined;
-  const here = hits.filter((h) => h.at === hits[0].at);
-  return here.reduce((best, h) => (h.rank < best.rank ? h : best)).form;
+  const words = forms.flatMap((form) => answersIn(form.ar).map((word) => ({ item: form, word })));
+  const found = bestWordIn(text, words, lang);
+  return found ? found.item : undefined;
 }
 
 /* ---- the score ---- */

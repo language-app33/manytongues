@@ -6679,8 +6679,10 @@ a student is asked:
   several forms are found at one place, the one spelt as the sentence
   spells it wins, then one with nothing glued to its end; a possessive or
   prefix glued on (كتابك, الوظيفة, وبدك) still credits the plain form. The
-  gap-fill (`context-index.ts`, one form per phrase) still takes the first
-  form found, so it asks فاهم in "مش ___ة"; left for its own change.
+  gap-fill (`context-index.ts`, one form per phrase) took the first form
+  found too, and asked فاهم in "مش ___ة"; since 0.466 both ask the same
+  rule, `bestWordIn` in `languages.ts`, and "Words this teaches" names
+  the form it picks.
 - A form's accepted answers are read one by one, with `splitForms`, the
   splitter the drills use. Read whole, the separator glued itself to the
   last word (تمام was "unknown") and two one-word answers read as a phrase.
