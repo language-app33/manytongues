@@ -6457,8 +6457,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   }
 
-  /* ---- the card editor takes over the screen ---- */
-  if (editing) {
+  /* ---- a card: read, edited or made ----
+     The editor, drawn over whichever list it was opened from rather than
+     in place of it, the way a card read used to be: Back lands on the list
+     where it was left, scrolled where it was scrolled. The screen is
+     portalled to the app's root, so where in the tree it sits decides
+     nothing else. */
+  const cardScreen = editing ? (() => {
     const forDeck = editing.decks[0]
       ? decks.find((d) => d.id === editing.decks[0])
       : decks[0] || { courses: [] };
@@ -6814,7 +6819,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         }
       />
     );
-  }
+  })() : null;
+  /* Where nothing below draws a list to sit over, it is the screen. */
+  if (cardScreen && (pronouning || numbering || (!openDeck && (managingDecks || courseView)))) return cardScreen;
 
   /* ---- filling in the numbers a deck builds from ----
          Sits before the deck screen so that closing it lands back on the
@@ -7465,6 +7472,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
             />
 
 
+        {cardScreen}
         {cardAction === "add" && cardActionScreen(d.id)}
         {exportScreen}
         {tagAction && tagActionScreen()}
@@ -8286,6 +8294,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           deck, from the Cards tab or the Decks tab alike. */}
       {exportScreen}
       {importScreen}
+      {cardScreen}
     </SpaceFrame>
   );
 }
