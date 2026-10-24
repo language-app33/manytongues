@@ -80,7 +80,6 @@ const draft = {
 };
 const written = writtenCard({ word: draft, talk: {
   title: "At the door",
-  setting: "",
   speakers: ["Layla", "Karim"],
   you: null,
   written: [],

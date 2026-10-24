@@ -6435,8 +6435,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                * same revision — and this used to be two objects built in
                * two branches, which is what a separate sort of thing looks
                * like in code. What differs is only what a scene has
-               * instead of a word: its name is the card's English, its
-               * setting is the note, and the turns travel in `lines`.
+               * instead of a word: its name is the card's English, it has
+               * no note, and the turns travel in `lines`.
                *
                * Which is why a scene reaches a student through the same
                * material payload as everything else.
@@ -6447,11 +6447,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   lang: (editLang || {}).id || "",
                   ...(written
                     ? {
-                        /* A scene's name is the card's own word and its
-                           setting the note: a conversation has nothing else
-                           to put in either, and its turns are the lesson. */
+                        /* A scene's name is the card's own word: a
+                           conversation has nothing else to put there, and
+                           its turns are the lesson. It has no note — the
+                           setting it once took is gone, and saying nothing
+                           here clears one an older scene still holds. */
                         forms: [{ ar: "", en: written.title, lat: "" }],
-                        note: written.setting,
+                        note: "",
                         uses: [],
                         speakers: written.speakers,
                         you: written.you,

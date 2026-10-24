@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.468 — 24 October 2026
+
+**A scene has no "Where it happens" any more.**
+
+- Making or editing a conversation or a text no longer asks where it
+  happens (or, for a text, what it is about). A scene is its name, the
+  people in it and its lines.
+- A scene that already had something written there loses it the next time
+  it is saved. Until then it keeps it.
+
+To check by hand: open a conversation and a text in the editor; neither has
+the box, and saving one that had a setting clears it.
+
 ## 0.467 — 23 October 2026
 
 **A card's buttons sit under its title.**
