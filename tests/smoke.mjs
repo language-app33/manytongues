@@ -908,7 +908,7 @@ const click = (el) => el && el.dispatchEvent(new w.MouseEvent("click", { bubbles
 /* The practice ticks under each form are folded since 0.322, under a
    heading that says what is on. Opened wherever a check reads the ticks. */
 const openPractice = async () => {
-  for (const b of [...document.querySelectorAll('.at-drills > button.at-groupfold[aria-expanded="false"]')]) click(b);
+  for (const b of [...document.querySelectorAll('.at-drills > .at-groupfold[aria-expanded="false"]')]) click(b);
   await sleep(150);
 };
 /* Each form in a card's Forms section is folded under its name since
@@ -917,7 +917,7 @@ const openPractice = async () => {
    appears is opened as it appears, once, and a check about the folding
    itself turns this off while it looks. */
 let openFormsAsDrawn = true;
-const formFolds = () => [...document.querySelectorAll("button.at-formfold")];
+const formFolds = () => [...document.querySelectorAll(".at-formfold")];
 const openedFolds = new WeakSet();
 new w.MutationObserver(() => {
   if (!openFormsAsDrawn) return;
@@ -943,7 +943,10 @@ const pickToggle = async (/** @type {string} */ axis, /** @type {string} */ valu
 };
 /** @param {RegExp} re */
 const buttonNamed = (re) =>
-  [...document.querySelectorAll("button")].find((b) => re.test(b.textContent || ""));
+  /* A fold, a play button or a link is pressed to read and keeps working
+     on a locked card, so it is a button by its role rather than its tag —
+     see Pressable. */
+  [...document.querySelectorAll('button, [role="button"].at-pressable')].find((b) => re.test(b.textContent || ""));
 
 /*
  * Play the matching grid, if that is what is up.
@@ -5789,7 +5792,7 @@ const openPronounTables = async () => {
           .find((c) => (c.textContent || "").trim() === "friend") || null);
       const panel = () => (blanks() || document).querySelector(".at-blankfills");
       check("a blank is something to point at, not a label",
-        !!chip() && chip().tagName === "BUTTON",
+        !!chip() && (chip().tagName === "BUTTON" || chip().getAttribute("role") === "button"),
         chip() ? chip().tagName.toLowerCase() : "(no chip)");
       check("and says nothing until it is pointed at", !panel(),
         panel() ? "already open" : "closed");
