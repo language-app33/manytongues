@@ -6925,3 +6925,40 @@ one who wants; the two lines under each example are there to catch those.
 And an example reopened shows its English as a student meets it — *You
 (f) must eat* for *you must eat* — because the pattern, not the typing, is
 what is kept.
+
+## A teacher's card has one screen: the editor, locked (0.474)
+
+**24 October 2026** · `CardEditor`'s `locked`, `onUnlock`, `onRelock`,
+`status`, `about`, `below` in `src/card-editor.tsx`; `Locked`, `Pressable`,
+`Button`'s `reads` in `src/shared.tsx`; `cardScreen` and `openCard` in
+`src/spaces.tsx`
+
+**What was wanted.** In the teaching space, the screen a card is read on
+should be exactly the screen it is edited on, with nothing editable. The
+read-out had to be taught every editor feature a second time and had
+already fallen behind once (see `docs/PROPOSAL-view-only-parity.md`).
+
+**What changed.** A card opens in the editor with every field inside a
+disabled fieldset — so every control stops answering without being told,
+including controls added later. What only helps somebody read is a
+`Pressable` (a span with a button's role), which a fieldset cannot reach:
+the form folds, the table and practice folds, the examples fold, a blank's
+chip, a recording's play button, and a link to another card. The box a
+sentence is typed in is not a form element and reads `Locked`. The header
+outside the fieldset carries Export, the status and Edit; Edit unlocks the
+same mounted editor, and the header becomes the status (off while
+anything is unsaved), Cancel, Save and Save and exit. Cancel draws the
+editor afresh from the card (`opened`), locked, asking first where
+something changed. The editor sits over the list it was opened from, as
+the read-out did, so Back lands where the list was left.
+
+**Choices the owner made.** The whole card unlocks at once, not a section
+at a time (that was 0.431, taken off beta). Save and exit leaves the card
+for the list. Cancel asks before throwing changes away. The review line
+and Try the exercises stay, over and under the card, read or edited.
+
+**What it costs, and what was kept.** The read-out's "Where it lives"
+panel is not repeated: the editor's Decks section, ID and tags say the
+same. Delete is shown only while editing. Students' card screen and the
+administrator's reported card keep the read-out: neither is a teacher's
+editor.

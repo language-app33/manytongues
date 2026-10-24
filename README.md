@@ -1594,9 +1594,17 @@ A few rules the code follows, learned the hard way:
   reaches for a language by name.
 - **One implementation of a thing.** If two versions of a component coexist,
   the goal is to converge on one, not to keep both.
+- **A teacher's card has one screen.** Opening a card in the teaching space
+  shows the editor itself, locked: every field inside a disabled fieldset
+  (`locked` on `CardEditor` in `src/card-editor.tsx`), so reading a card and
+  editing it cannot look different — a field added to the editor is on the
+  reading screen the day it is written. What only helps somebody read (a
+  fold, a recording, a blank's words, a link to another card) is a
+  `Pressable`, which a fieldset cannot reach; a control that is not a form
+  element reads `Locked`. Edit unlocks the card in place.
 - **The saved card is the contract between editing a card and reading one.**
-  Opening a card in the teaching space to look at it shows everything a saved
-  card can hold, not the fields somebody thought worth showing: everything
+  A student's card screen, and an administrator reading a reported card,
+  still use the read-out, which shows everything a saved card can hold, not the fields somebody thought worth showing: everything
   the editor does ends as a card being saved, so a read-out that says
   everything a card holds cannot fall behind it. What each field is called
   lives in `src/card-facts.ts`; a field nothing there names yet is shown raw
