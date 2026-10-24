@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.473 — 24 October 2026
+
+**Save waits until there is something to save.**
+
+- In the card editor, Save and Save and exit stay greyed out until
+  something on the card changes. A new card waits for something to be
+  written; a card you opened waits for an edit. After Save they are grey
+  again until the next change.
+
+To check by hand: open a card in the editor and see both saves greyed
+out; change one letter and see them come on.
+
 ## 0.472 — 24 October 2026
 
 **Save without closing a card, and a card's status where you look for it.**
