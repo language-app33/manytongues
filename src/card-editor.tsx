@@ -47,7 +47,7 @@ import { CONVERSATION, MAX_SPEAKERS, TEXT, isDialog, isText, namedPart, pickedFr
 import type { SceneKind } from "./dialogs.ts";
 import { castFill, castOf, castReport, filledScene, memberBase, memberLabel, newMember, recast, roleIn } from "./cast.ts";
 import { reviewPool, sentencesOf } from "./review.ts";
-import { answerRows, answersOf, packAnswers } from "./answers.ts";
+import { answerRows, answersOf, packAnswers, shownAlternatives } from "./answers.ts";
 import { ADJECTIVE_IS_SLOT, asMeaning, ADJECTIVE_SLOT, cardRef, DEMONSTRATIVE_READING_SLOTS, DEMONSTRATIVE_SLOT, dropRail, fillNames, fillsOf, isLent, isSentence, MAX_FILLS, movedSlot, NOUN_READING_SLOTS, NOUN_SLOT, nounNumberOf, PRONOUN_SLOT, readingBase, readingNames, READING_SLOTS, refClash, renameSlot, RESERVED_READINGS, slotName, slotsIn, slotsOf, slotTrouble, SPEAKER_COLUMNS, splitSlots, withoutSlot, withSlotAt, WORD_SLOT, wordsDir } from "./variables.ts";
 import { agreeingBlanks, combosOf, mainFormOnly, EXAMPLES_CEILING, examplesOf, fillersFor, rowsLine, tensedBlanks, whyStarved } from "./card-facts.ts";
 import type { Value } from "./variables.ts";
@@ -1759,11 +1759,16 @@ function WordsUsed({ lang, text, cards, selfId, chosen, onChange }: {
   };
   /* A verb with its past *he* left blank is listed by the form it does
      have, under the name it was given — "to keep" — since its own word has
-     no English either. */
+     no English either. A card's accepted answers, and its meanings, are
+     shown with the dot between them; printed as stored they ran together
+     with nothing in between. So the dot is theirs here, and "found as" is
+     set off with a dash. */
   const options = suggestions.concat(keptCards).map((c) => ({
     id: String(c.id),
-    title: wordOf(c).ar,
-    note: [leadOf(c).en || String(c.name || "") || wordOf(c).en || "", foundAs(c)].filter(Boolean).join(" · "),
+    title: shownAlternatives(wordOf(c).ar),
+    note: [shownAlternatives(leadOf(c).en) || String(c.name || "") || shownAlternatives(wordOf(c).en), foundAs(c)]
+      .filter(Boolean)
+      .join(" — "),
   }));
 
   return (

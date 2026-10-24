@@ -50,7 +50,7 @@
  */
 
 import type { Form, GrammarDim, Lang, VerbSpec } from "./types.ts";
-import { answersOf, splitAlternatives } from "./answers.ts";
+import { answersOf, shownAlternatives, splitAlternatives } from "./answers.ts";
 import { agreementOf, answerFields, BARE_ROW, blankAdmits, categoryLabel, endRowsOf, GRAMMAR, kindOf, LANGUAGES, lendsForm, lendsInto, tablesOf, tensedOf, verbOf } from "./languages.ts";
 import { formsOf, leadOf } from "./cards.ts";
 import { linesOf, namedPart, speakerName } from "./dialogs.ts";
@@ -632,7 +632,7 @@ const usedWords = (value: unknown, ctx: FactCtx): string[] => {
   if (!ctx.cards) return [`${ids.length}`];
   const words = ids
     .map((id) => (ctx.cards || []).find((c) => str(c.id) === id))
-    .map((c) => (c ? str(leadOf(c).ar) || str(leadOf(c).en) : ""))
+    .map((c) => (c ? shownAlternatives(str(leadOf(c).ar)) || shownAlternatives(str(leadOf(c).en)) : ""))
     .filter(Boolean);
   /* A card that has gone since it was ticked is named by nothing, and the
      count is then all there is to say. */

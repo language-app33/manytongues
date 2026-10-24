@@ -8,6 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.468 — 24 October 2026
+
+**The words a phrase teaches keep their answers apart.**
+
+- Under "Words this teaches", a word card with more than one accepted
+  answer showed them run together, as if they were one word: كتابسفر. They
+  now have a dot between them, كتاب · سفر, both in the editor's list and on
+  the card's own screen. The same goes for a word with more than one
+  meaning.
+- Because the dot now sits between a card's answers, the cards themselves
+  are set apart differently: one to a line on the card's screen, a comma
+  between them under a sentence's lines, and a dash before "found as" in
+  the editor.
+
+To check by hand: a phrase that teaches a word with two accepted answers,
+in the editor and on its screen.
+
 ## 0.467 — 23 October 2026
 
 **A card's buttons sit under its title.**

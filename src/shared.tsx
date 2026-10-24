@@ -3099,14 +3099,16 @@ function ReadTaught({ of, cards, label, panel = false }: {
   const words = cards
     ? ids
         .map((id: string) => (cards || []).find((c: Record<string, any>) => String(c.id) === id))
-        .map((c) => (c ? String(wordOf(c).ar || leadOf(c).en || c.name || "") : ""))
+        .map((c) => (c ? shownAlternatives(wordOf(c).ar) || shownAlternatives(leadOf(c).en) || String(c.name || "") : ""))
         .filter(Boolean)
     : [];
-  const said = words.length ? words.join(" · ") : `${ids.length}`;
+  /* A card's accepted answers are kept apart by the dot, so the cards
+     themselves are kept apart by something else: a comma on a line, a line
+     each in a panel. */
   if (!panel) {
     return (
       <p className="at-hint">
-        {label}: {said}
+        {label}: {words.length ? words.join(", ") : `${ids.length}`}
       </p>
     );
   }
@@ -3118,7 +3120,9 @@ function ReadTaught({ of, cards, label, panel = false }: {
         which is how a word is met in more than one place without anything
         being invented.
       </p>
-      <p className="at-readvalue">{said}</p>
+      {words.length
+        ? words.map((w, i) => <p className="at-readvalue" key={i}>{w}</p>)
+        : <p className="at-readvalue">{ids.length}</p>}
     </section>
   );
 }
