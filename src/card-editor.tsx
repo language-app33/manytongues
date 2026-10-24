@@ -10395,9 +10395,31 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
      what would be saved, and which cards it would be offered to. */
   const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null, exit: boolean } | null>(null);
   const meanings = shape === "word";
+  /*
+   * Whether anything has changed: the card as written now, against the card
+   * as it was when the editor opened — or when it was last saved, since
+   * Save keeps it open. Both saves wait on it, so a card nobody has touched
+   * is not saved again, and a new card waits for something to be written.
+   *
+   * Measured through writtenCard, the same function that writes the save,
+   * so what counts as a change is exactly what a save would send.
+   */
+  const snapshot = JSON.stringify([writtenCard({ word, talk, shape, chosen }), clue.trim(), asksCapitals ? capitals : null]);
+  const [savedAs, setSavedAs] = useState(snapshot);
+  /* What a Save sent, kept until the card comes back saved — the screen
+     hands the editor the saved card, which is what makes it the new
+     starting point. A save that fails leaves the card changed. */
+  const sending = useRef<string | null>(null);
+  useEffect(() => {
+    if (sending.current === null) return;
+    setSavedAs(sending.current);
+    sending.current = null;
+  }, [card]);
+  const changed = snapshot !== savedAs;
   /* `exit` is Save and exit: the card is saved and the editor closes.
      Save alone keeps it open on the card as saved. */
   const save = (next: "meaning" | "word" | null = null, exit = false) => {
+    sending.current = snapshot;
     const written = writtenCard({ word, talk, shape, chosen });
     const extra = {
       clue: meanings ? clue.trim() : "",
@@ -10442,14 +10464,14 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         action={
           <>
             <Button size="sm"
-              disabled={!canSave || busy}
+              disabled={!canSave || !changed || busy}
               onClick={() => save()}
             >
               <Icon name="save" />
               {busy ? "Saving…" : "Save"}
             </Button>
             <Button variant="primary" size="sm"
-              disabled={!canSave || busy}
+              disabled={!canSave || !changed || busy}
               onClick={() => save(null, true)}
             >
               <Icon name="check" />

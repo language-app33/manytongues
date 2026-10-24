@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.473 — 24 October 2026
+## 0.474 — 24 October 2026
 
 **"Words this teaches" finds every word, and one-word replies too.**
 
@@ -26,6 +26,18 @@ Trade-off: a long text now gives a long list to go through.
 
 To check by hand: a long text card offers its later words; a one-word line
 in a conversation offers its word.
+
+## 0.473 — 24 October 2026
+
+**Save waits until there is something to save.**
+
+- In the card editor, Save and Save and exit stay greyed out until
+  something on the card changes. A new card waits for something to be
+  written; a card you opened waits for an edit. After Save they are grey
+  again until the next change.
+
+To check by hand: open a card in the editor and see both saves greyed
+out; change one letter and see them come on.
 
 ## 0.472 — 24 October 2026
 
