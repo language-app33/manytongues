@@ -8,6 +8,32 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.477 — 24 October 2026
+
+**In Teaching, reading a card and editing it are the same screen.**
+
+- Opening a card in Teaching now shows the card editor itself, with every
+  field locked. Anything added to the editor shows up when you read a card
+  too, because it is the same screen. Folds, recordings and links to
+  other cards still work while it is locked.
+- Edit unlocks the whole card in place. While editing, the top of the
+  screen has the status, Cancel, Save and Save and exit. Cancel locks it
+  again — asking first if anything was changed, and then putting the card
+  back as it was saved. Save and exit saves and goes back to the list the
+  card was opened from.
+- The status menu is in the editor too, beside the saves. It is off while
+  there are unsaved changes: save first, then publish.
+- The line about sentences waiting for review sits over the card, and Try
+  the exercises under it, while reading and while editing.
+- The old reading screen's "Where it lives" is not repeated: the editor's
+  own Decks section, ID and tags say the same.
+- Students' card screens, and an administrator reading a reported card,
+  are unchanged.
+
+To check by hand: open a card, play a recording and open a fold while it
+is locked; press Edit, change something, press Cancel and check the card
+is back as it was.
+
 ## 0.476 — 24 October 2026
 
 **"Words this teaches" finds every word, and one-word replies too.**

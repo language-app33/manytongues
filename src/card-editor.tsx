@@ -85,6 +85,8 @@ import {
   Overlay,
   PickSheet,
   DeckSwitch,
+  Locked,
+  Pressable,
   AskedMeanings,
   AskedScript,
 } from "./shared.tsx";
@@ -861,6 +863,9 @@ function BlankText({ value, onChange, onRemove, className = "", style, dir, lang
   const preview = useRef<string | null>(null);
   const [moving, setMoving] = useState(false);
   const tapBlank = useContext(BlankTap);
+  /* Not a form element, so a locked card's fieldset cannot reach it: it
+     is told. See Locked. */
+  const locked = useContext(Locked);
   const text = value || "";
   /* The string as the box draws it: a hole written `{{ Name }}` is one
      pill named `name`, and every offset below is counted against what is
@@ -1076,8 +1081,9 @@ function BlankText({ value, onChange, onRemove, className = "", style, dir, lang
     <div
       ref={mine}
       className={`at-blanktext${className ? " " + className : ""}${moving ? " moving" : ""}`}
-      contentEditable
+      contentEditable={!locked}
       suppressContentEditableWarning
+      aria-readonly={locked || undefined}
       role="textbox"
       aria-multiline="false"
       aria-label={label}
@@ -1086,13 +1092,15 @@ function BlankText({ value, onChange, onRemove, className = "", style, dir, lang
       dir={dir}
       lang={lang}
       style={style}
-      onInput={onInput}
-      onKeyDown={onKeyDown}
+      /* Locked, nothing here may change the words: not a key, a paste, or
+         a pill dragged along. */
+      onInput={locked ? undefined : onInput}
+      onKeyDown={locked ? undefined : onKeyDown}
       onKeyUp={remember}
       onBlur={remember}
-      onPaste={onPaste}
-      onPointerDown={onPointerDown}
-      onClick={onClick}
+      onPaste={locked ? undefined : onPaste}
+      onPointerDown={locked ? undefined : onPointerDown}
+      onClick={locked ? undefined : onClick}
     />
   );
 }
@@ -7335,8 +7343,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
              attached pronouns are opened, with what is written in it said
              under the name — so a card of folded forms still reads as the
              words it holds. */
-          <button
-            type="button"
+          <Pressable
             className="at-groupfold at-formfold"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
@@ -7346,7 +7353,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
               {String(f.ar || "").trim() || String(f.en || "").trim() || (more || formWritten(f) ? "written" : "none yet")}
             </span>
             <Icon name={open ? "chevronUp" : "chevronDown"} size={24} />
-          </button>
+          </Pressable>
         ) : (
           <span className="at-formnum">{title}</span>
         )}
@@ -7747,8 +7754,7 @@ function PronounTable({ word, lang, index: i, form: f }: {
       thing worth knowing without opening it. */
   return (
     <div className="at-part">
-      <button
-        type="button"
+      <Pressable
         className="at-groupline at-groupfold"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -7758,7 +7764,7 @@ function PronounTable({ word, lang, index: i, form: f }: {
           {written ? `${filled} of ${total} written` : "none yet"}
         </span>
         <Icon name={open ? "chevronUp" : "chevronDown"} size={24} />
-      </button>
+      </Pressable>
       {open && (
       <>
       <VerbTable
@@ -7932,8 +7938,7 @@ function DrillChecks({ word, part, label = "How this form can be practiced", of 
        fields rather than as a subsection beside the pronouns. */
     return (
       <div className="at-part at-drills">
-        <button
-          type="button"
+        <Pressable
           className="at-groupline at-groupfold"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
@@ -7941,7 +7946,7 @@ function DrillChecks({ word, part, label = "How this form can be practiced", of 
           <span>{label}</span>
           <span className="at-groupcount">{said.length ? said.join(" · ") : "not practised"}</span>
           <Icon name={open ? "chevronUp" : "chevronDown"} size={24} />
-        </button>
+        </Pressable>
         {open && lede ? (
           <p className="at-hint at-drilllede">
             {drillLede(of)}
@@ -8087,8 +8092,7 @@ function BlankChip({ slot, values, lang }: {
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
-      <button
-        type="button"
+      <Pressable
         className="at-blankchip"
         aria-expanded={open}
         /* The name alone, to a screen reader, is the chip saying nothing a
@@ -8099,7 +8103,7 @@ function BlankChip({ slot, values, lang }: {
         onBlur={() => setOpen(false)}
       >
         {slot}
-      </button>
+      </Pressable>
       {open && (
         <div className="at-blankfills" role="tooltip">
           <p className="at-eyebrow">{`${slot} · ${said}`}</p>
@@ -9042,8 +9046,7 @@ function BlanksBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
                 shut is how many sentences the card is met as, which is the
                 answer a teacher wants oftener than the sentences
                 themselves. */}
-            <button
-              type="button"
+            <Pressable
               className="at-groupline at-groupfold"
               aria-expanded={examplesOpen}
               onClick={() => setExamplesOpen((v) => !v)}
@@ -9053,7 +9056,7 @@ function BlanksBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
                 {combos ? plural(combos, "example") : "none yet"}
               </span>
               <Icon name={examplesOpen ? "chevronUp" : "chevronDown"} size={24} />
-            </button>
+            </Pressable>
             {examplesOpen && (asked.length > 0 ? (
               <>
                 <ol className="at-asked">
@@ -10200,9 +10203,9 @@ function MeaningsBlock({ lang, selfId, lead, allCards, clue, onClue, canAdd, onA
         <span key={c.id}>
           {i ? ", " : ""}
           {onOpen ? (
-            <button type="button" className="at-linkbtn" data-shared={c.id} onClick={() => onOpen(c)}>
+            <Pressable className="at-linkbtn" data-shared={c.id} onClick={() => onOpen(c)}>
               {said} ›
-            </button>
+            </Pressable>
           ) : (
             said
           )}
@@ -10311,7 +10314,16 @@ function CarryAsk({ cards, onAnswer, onCancel }: {
   );
 }
 
-export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null }: {
+/** A line of a card's words said in passing — a title — with each blank as
+    a gap rather than its braces: the braces are how a blank is stored,
+    never how it is shown. */
+const saidPlainly = (text: string): string => text.replace(/\{\{[^}]*\}\}/g, "…").trim();
+
+/** What a card is called on its own screen: what it is listed as. */
+const cardTitle = (card: Card | null): string =>
+  !card ? "Card" : String(card.name || "").trim() || saidPlainly(leadOf(card).en || leadOf(card).ar || "") || "Card";
+
+export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, about, below }: {
   card: Card | null;
   lang: Lang;
   decks: Deck[];
@@ -10339,6 +10351,26 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
    */
   making?: CardShape;
   draft?: Record<string, any> | null;
+  /**
+   * A card read rather than edited: the same screen, with every field
+   * inside a disabled fieldset. In the teaching space this is how a card
+   * opens — reading a card and editing it cannot look different, because
+   * they are the same screen. Edit (`onUnlock`) opens it; Cancel
+   * (`onRelock`) shuts it again, the screen drawing it afresh from the
+   * card so nothing typed is left behind.
+   */
+  locked?: boolean;
+  onUnlock?: () => void;
+  onRelock?: () => void;
+  /** A card's status menu, beside the buttons — off while there are
+      changes, which a status would not carry. See StatusMenu in spaces.tsx. */
+  status?: (off: boolean) => Node;
+  /** Export this card, beside Edit while it is locked. */
+  onExport?: () => void;
+  /** Drawn over the card and under it, and never locked: the line about
+      sentences waiting for review, and the exercises to try. */
+  about?: Node;
+  below?: Node;
 }) {
   /* And from here down there is one kind of card on this screen and it
      does not change. It is the card's own answer where there is a card,
@@ -10416,6 +10448,8 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     sending.current = null;
   }, [card]);
   const changed = snapshot !== savedAs;
+  /* Cancel with changes on the card: asked first. */
+  const [discarding, setDiscarding] = useState(false);
   /* `exit` is Save and exit: the card is saved and the editor closes.
      Save alone keeps it open on the card as saved. */
   const save = (next: "meaning" | "word" | null = null, exit = false) => {
@@ -10450,19 +10484,34 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         /* Named for what is being made, which is settled before this
            opens: a screen for writing a conversation should not be called
            "New card" and then be full of turns. */
-        title={stored ? "Edit card" : `New ${shapeLabel(shape).toLowerCase()}`}
+        title={stored ? cardTitle(card) : `New ${shapeLabel(shape).toLowerCase()}`}
         /* One sheet, ruled into sections — see .at-screen.cardform. The
            editor is the only screen laid out that way, so it is the only
            one that asks for it. */
         className="cardform"
         onBack={onClose}
-        /* Two saves: Save keeps the card open to go on with it, and
-           Save and exit closes it — the one a finished card wants, so it
-           is the primary. On a line under the title, where two buttons
-           have the room. */
+        /* Locked: Export, the status and Edit. Open: the status, Cancel,
+           and two saves — Save keeps the card open to go on with it, and
+           Save and exit closes it, the one a finished card wants, so it is
+           the primary. On a phone, on a line under the title. */
         actionBelow
         action={
+          locked ? (
+            <>
+              {onExport ? <IconButton icon="download" label="Export this card" onClick={onExport} /> : null}
+              {status ? status(false) : null}
+              <Button variant="primary" size="sm" icon="edit" onClick={onUnlock}>
+                Edit
+              </Button>
+            </>
+          ) : (
           <>
+            {stored && status ? status(changed) : null}
+            {stored && onRelock ? (
+              <Button variant="ghost" size="sm" onClick={() => (changed ? setDiscarding(true) : onRelock())}>
+                Cancel
+              </Button>
+            ) : null}
             <Button size="sm"
               disabled={!canSave || !changed || busy}
               onClick={() => save()}
@@ -10478,8 +10527,12 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               Save and exit
             </Button>
           </>
+          )
         }
       >
+          {about}
+          <fieldset className="at-cardlock" disabled={locked}>
+          <Locked.Provider value={locked}>
           {/* Said before the typing rather than after it.
               A save that cannot be made is now kept on the device and sent
               when the connection returns — but a teacher about to write a
@@ -10552,12 +10605,27 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             <WordEditor word={word} lang={lang} allCards={allCards} selfId={selfId} />
           )}
 
-          {stored && onDelete && (
+          {stored && onDelete && !locked && (
             <Button variant="danger" className="at-mt5" onClick={onDelete}>
               Delete this card
             </Button>
           )}
+          </Locked.Provider>
+          </fieldset>
+          {below}
       </Screen>
+      {discarding && (
+        <ConfirmModal
+          title="Discard your changes?"
+          body={<p>The card goes back to how it was last saved.</p>}
+          confirmLabel="Discard changes"
+          onCancel={() => setDiscarding(false)}
+          onConfirm={() => {
+            setDiscarding(false);
+            if (onRelock) onRelock();
+          }}
+        />
+      )}
       <RecordingOverlays word={word} talk={talk} />
       {carrying && (
         <CarryAsk

@@ -889,6 +889,14 @@ check("clip sync uploaded nothing (no blob: URLs)", !calls.some((c) => c.startsW
 check("clip sync did not fetch course recordings as a side effect", !calls.some((c) => c.includes("action=clip")), calls.filter((c) => c.includes("clip")).join(","));
 
 /* ---- the manual session builder, now rendered through Screen ---- */
+
+/** What a card's screen shows, its boxes' words included — a locked
+    editor keeps the card's words in its boxes. */
+/** @param {Element | null | undefined} el */
+const cardSays = (el) => !el ? "" : (el.textContent || "") + " " +
+  [...el.querySelectorAll("input, textarea")].map((i) => /** @type {any} */ (i).value || "").join(" ");
+/** The card on screen, where one is open. */
+const cardOnScreen = () => [...document.querySelectorAll(".at-screen.cardform")].pop() || null;
 /** @param {RegExp} re */
 const clickNamed = (re) => {
   const b = buttonNamed(re);
@@ -900,7 +908,7 @@ const click = (el) => el && el.dispatchEvent(new w.MouseEvent("click", { bubbles
 /* The practice ticks under each form are folded since 0.322, under a
    heading that says what is on. Opened wherever a check reads the ticks. */
 const openPractice = async () => {
-  for (const b of [...document.querySelectorAll('.at-drills > button.at-groupfold[aria-expanded="false"]')]) click(b);
+  for (const b of [...document.querySelectorAll('.at-drills > .at-groupfold[aria-expanded="false"]')]) click(b);
   await sleep(150);
 };
 /* Each form in a card's Forms section is folded under its name since
@@ -909,7 +917,7 @@ const openPractice = async () => {
    appears is opened as it appears, once, and a check about the folding
    itself turns this off while it looks. */
 let openFormsAsDrawn = true;
-const formFolds = () => [...document.querySelectorAll("button.at-formfold")];
+const formFolds = () => [...document.querySelectorAll(".at-formfold")];
 const openedFolds = new WeakSet();
 new w.MutationObserver(() => {
   if (!openFormsAsDrawn) return;
@@ -935,7 +943,11 @@ const pickToggle = async (/** @type {string} */ axis, /** @type {string} */ valu
 };
 /** @param {RegExp} re */
 const buttonNamed = (re) =>
-  [...document.querySelectorAll("button")].find((b) => re.test(b.textContent || ""));
+  /* A fold, a play button or a link is pressed to read and keeps working
+     on a locked card, so it is a button by its role rather than its tag —
+     see Pressable. */
+  /** @type {HTMLButtonElement | undefined} */ ([...document.querySelectorAll('button, [role="button"].at-pressable')]
+    .find((b) => re.test(b.textContent || "")));
 
 /*
  * Play the matching grid, if that is what is up.
@@ -1850,8 +1862,8 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
     check("but not on a first install, which updates nothing",
       /wasControlled/.test(watching), "a first install would reload for nothing");
     check("otherwise it says an update is ready instead of reloading",
-      /markReady\(\)/.test(watching) && /onUpdateReady/.test(src) &&
-        /<TopBanner[\s\S]{0,1200}A new version is ready/.test(src),
+      /* Said in the band across the top since 0.475 — see TopBanner. */
+      /markReady\(\)/.test(watching) && /onUpdateReady/.test(src) && /A new version is ready/.test(src),
       "nothing tells the person an update is waiting");
     check("and never reloads just because the app is put away",
       !/document\.hidden\)\s*\{[^}]*reload/.test(watching), "a reload on leaving the app loses unsaved work");
@@ -4351,15 +4363,15 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   click(phraseTile);
   await sleep(450);
 
-  /* The other half of the same split: the panel the student's card screen
-     drops is the one a teacher came here for, so it is still on this one.
-     The card opens over the space rather than inside its frame, so the
-     readout is taken as the last one in the document — the student's is
-     closed by now. */
-  const teachRead = [...document.querySelectorAll(".at-readout")].pop();
-  check("a teacher's card still says which decks it lives in",
-    !!teachRead && /Where it lives/i.test(teachRead.textContent || ""),
-    teachRead ? (teachRead.textContent || "").replace(/\s+/g, " ").slice(0, 120) : "(no readout)");
+  /* A teacher's card opens in the card editor itself, locked: the same
+     screen as editing it, every field in a disabled fieldset — decks
+     included. The card opens over the space rather than inside its frame,
+     so it is taken as the last one in the document. */
+  const teachRead = [...document.querySelectorAll(".at-screen.cardform")].pop();
+  check("a teacher's card opens in the card editor, locked, decks and all",
+    !!teachRead && !!teachRead.querySelector("fieldset.at-cardlock[disabled]") &&
+      /Decks/.test(teachRead.textContent || "") && !document.querySelector(".at-readout"),
+    teachRead ? (teachRead.textContent || "").replace(/\s+/g, " ").slice(0, 120) : "(no card screen)");
   /* And where it stands with students, beside Edit: the app's own menu
      button, the height of the buttons beside it, opening the app's own
      menu of what can be done from here. A card saved before there were
@@ -4439,11 +4451,11 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("and Continue goes straight back, with no screen in between",
     !/That's the exercise/.test(document.body.textContent || ""),
     (document.body.textContent || "").slice(0, 70).replace(/\s+/g, " "));
-  const landed = [...document.querySelectorAll(".at-readout")].pop();
+  const landed = cardOnScreen();
   check("landing on the card that was being tested",
-    !!landed && (landed.textContent || "").includes("الكتاب كبير") &&
+    !!landed && cardSays(landed).includes("الكتاب كبير") &&
       !document.querySelector(".at-instruction"),
-    landed ? (landed.textContent || "").replace(/\s+/g, " ").slice(0, 70) : "no card open");
+    landed ? cardSays(landed).replace(/\s+/g, " ").slice(0, 70) : "no card open");
   check("with its exercises there to try again",
     document.querySelectorAll(".at-try").length > 1,
     `${document.querySelectorAll(".at-try").length} offered`);
@@ -4457,11 +4469,11 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("leaving a trial asks no questions",
     !buttonNamed(/^Leave$/) && !/Leave this session/.test(document.body.textContent || ""),
     (document.body.textContent || "").slice(0, 80).replace(/\s+/g, " "));
-  const backOnCard = [...document.querySelectorAll(".at-readout")].pop();
+  const backOnCard = cardOnScreen();
   check("and it goes back to the card it was asked about",
-    !!backOnCard && (backOnCard.textContent || "").includes("الكتاب كبير") &&
+    !!backOnCard && cardSays(backOnCard).includes("الكتاب كبير") &&
       !document.querySelector(".at-instruction"),
-    backOnCard ? (backOnCard.textContent || "").replace(/\s+/g, " ").slice(0, 70) : "no card open");
+    backOnCard ? cardSays(backOnCard).replace(/\s+/g, " ").slice(0, 70) : "no card open");
 
   /* And nothing about it was recorded. The card is the teacher's own
      material, not something this device is learning. */
@@ -4791,24 +4803,23 @@ const openPronounTables = async () => {
   click(talkTile);
   await sleep(450);
 
-  /* The readout first: a scene reads as a scene, which is the same
-     question about the same stored card. */
-  const read = [...document.querySelectorAll(".at-readout")].pop();
-  check("opening it shows the whole conversation, not one word of it",
-    !!read && document.querySelectorAll(".at-readout .at-sceneline").length === 3,
-    `${document.querySelectorAll(".at-readout .at-sceneline").length} turns shown`);
-  check("and it says the part is nobody's until the question picks one",
-    !!read && /Not set/.test(read.textContent || ""),
-    read ? (read.textContent || "").replace(/\s+/g, " ").slice(-140) : "(no readout)");
-  /* Read the same way it is practised: one speaker down each side. */
+  /* Opened, it is the conversation editor, locked: the same screen as
+     editing it, with every turn there to read and none of them open to
+     typing until Edit. */
+  const read = cardOnScreen();
+  const turnBoxes = () => /** @type {HTMLInputElement[]} */ ([...document.querySelectorAll("input")]
+    .filter((i) => /^What line \d+ means$/.test(i.getAttribute("aria-label") || "")));
+  check("opening it shows the whole conversation, locked",
+    !!read && turnBoxes().length === 3 && turnBoxes().every((i) => i.matches(":disabled")),
+    `${turnBoxes().length} turns · ${turnBoxes().filter((i) => i.matches(":disabled")).length} locked`);
+  /* Read the same way it is written: one speaker down each side. */
   const readSides = read
-    ? [...read.querySelectorAll(".at-sceneline")].map((el) =>
+    ? [...read.querySelectorAll(".at-formblock")].map((el) =>
         el.classList.contains("side0") ? 0 : el.classList.contains("side1") ? 1 : null
-      )
+      ).filter((x) => x !== null)
     : [];
   check("and the scene reads with one speaker down each side",
-    !!read && !!read.querySelector(".at-scene.sided") && readSides.join("") === "010",
-    readSides.join(",") || "(no turns)");
+    readSides.join("") === "010", readSides.join(",") || "(no turns)");
 
   click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
   await sleep(450);
@@ -4823,9 +4834,10 @@ const openPronounTables = async () => {
     `${heading || "(no title)"} · ${document.querySelectorAll(".at-formblock").length} blocks`);
   /* And it is an editor for a card, which this one happens to be a
      conversation. A screen called "Edit conversation" said the opposite. */
-  check("it is still the card editor, saying which kind of card this is",
-    /^Edit card$/.test(heading.trim()) &&
-      /This card/.test(document.body.textContent || ""),
+  check("it is still the card editor, named for the card, saying which kind of card this is",
+    /At the door/.test(heading.trim()) &&
+      /This card/.test(document.body.textContent || "") &&
+      !document.querySelector(".at-screen.cardform fieldset.at-cardlock[disabled]"),
     heading.trim() || "(no title)");
   /* And written the same way. A column of identical blocks made a teacher
      read the "who says it" picker on every one to see the shape of what
@@ -5782,7 +5794,7 @@ const openPronounTables = async () => {
           .find((c) => (c.textContent || "").trim() === "friend") || null);
       const panel = () => (blanks() || document).querySelector(".at-blankfills");
       check("a blank is something to point at, not a label",
-        !!chip() && chip().tagName === "BUTTON",
+        !!chip() && (chip().tagName === "BUTTON" || chip().getAttribute("role") === "button"),
         chip() ? chip().tagName.toLowerCase() : "(no chip)");
       check("and says nothing until it is pointed at", !panel(),
         panel() ? "already open" : "closed");
