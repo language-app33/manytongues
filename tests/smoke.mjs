@@ -1862,7 +1862,8 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
     check("but not on a first install, which updates nothing",
       /wasControlled/.test(watching), "a first install would reload for nothing");
     check("otherwise it says an update is ready instead of reloading",
-      /markReady\(\)/.test(watching) && /onUpdateReady/.test(src) && /at-updatebar/.test(src),
+      /* Said in the band across the top since 0.475 — see TopBanner. */
+      /markReady\(\)/.test(watching) && /onUpdateReady/.test(src) && /A new version is ready/.test(src),
       "nothing tells the person an update is waiting");
     check("and never reloads just because the app is put away",
       !/document\.hidden\)\s*\{[^}]*reload/.test(watching), "a reload on leaving the app loses unsaved work");
