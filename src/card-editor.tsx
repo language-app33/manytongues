@@ -2238,7 +2238,7 @@ function ExampleFields({ lang, spec, sample, examples, reads, onChange, verbName
    */
   return (
     <div className="at-part at-mt4" data-el="editor-verb-examples">
-      <p className="at-groupline">How these forms are practised</p>
+      <p className="at-groupline">How subjunctive is practised</p>
       <p className="at-hint">
         Students practise these forms inside short examples, never on their own. Write each
         example as you would say it, for any one person, with one of the forms above in it
