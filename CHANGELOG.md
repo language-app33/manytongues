@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.470 — 24 October 2026
+## 0.471 — 24 October 2026
 
 **Save without closing a card, and a card's status where you look for it.**
 
@@ -27,6 +27,17 @@ and moves once per batch of work you would notice, not once per commit.
 To check by hand: Save on a new card, then Save again — the second save
 changes the same card rather than making another. And a card's screen
 on a wide window and on a phone.
+
+## 0.470 — 24 October 2026
+
+**A text's sentences ask for the transliteration before the English.**
+
+- Writing a sentence of a text, or a line of a conversation, the boxes now
+  run Arabic, transliteration, English, the order they are shown in
+  everywhere else in the app. The English used to come second.
+
+To check by hand: open a text card's editor and see the three boxes in
+that order.
 
 ## 0.469 — 24 October 2026
 
