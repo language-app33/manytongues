@@ -6913,7 +6913,7 @@ const openPronounTables = async () => {
     check("and the examples sit inside the subjunctive's own section, each a panel under the explanation",
       !!examplesSection() && examplesSection().classList.contains("at-part") &&
         /subjunctive/i.test(((examplesSection().closest(".at-formblock") || {}).querySelector(".at-formnum") || {}).textContent || "") &&
-        /How these forms are practised/.test(((examplesSection().querySelector(".at-groupline")) || {}).textContent || "") &&
+        /How subjunctive is practised/.test(((examplesSection().querySelector(".at-groupline")) || {}).textContent || "") &&
         !!examplesSection().querySelector('.at-part[data-el="editor-verb-example"] .at-groupline'),
       examplesSection() ? (examplesSection().textContent || "").slice(0, 120) : "no section");
     check("and the explanation shows one, said with a form written above",
