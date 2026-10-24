@@ -946,7 +946,8 @@ const buttonNamed = (re) =>
   /* A fold, a play button or a link is pressed to read and keeps working
      on a locked card, so it is a button by its role rather than its tag —
      see Pressable. */
-  [...document.querySelectorAll('button, [role="button"].at-pressable')].find((b) => re.test(b.textContent || ""));
+  /** @type {HTMLButtonElement | undefined} */ ([...document.querySelectorAll('button, [role="button"].at-pressable')]
+    .find((b) => re.test(b.textContent || "")));
 
 /*
  * Play the matching grid, if that is what is up.
