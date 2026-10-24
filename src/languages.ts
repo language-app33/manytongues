@@ -5206,6 +5206,15 @@ export const levelOf = (key: string): number => {
   return (spec && spec.level) || 1;
 };
 
+/* And their names, as a learner is shown them — over a tile on Progress,
+   and over each group of a card's exercises in the teaching space. */
+export const LEVEL_NAME: Record<number, string> = {
+  1: "What it means",
+  2: "Which word it is",
+  3: "Write it from a cue",
+  4: "Write it from its meaning",
+};
+
 /*
  * Whether this question shows one accepted answer, or keeps them all.
  *

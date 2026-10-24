@@ -10483,7 +10483,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
            one that asks for it. */
         className="cardform"
         onBack={onClose}
-        /* Locked: Export, the status and Edit. Open: the status, Cancel,
+        /* Locked: Export, the status and Edit. Open: Delete, the status, Cancel,
            and two saves — Save keeps the card open to go on with it, and
            Save and exit closes it, the one a finished card wants, so it is
            the primary. On a phone, on a line under the title. */
@@ -10499,6 +10499,12 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             </>
           ) : (
           <>
+            {/* Up here with the card's other actions rather than at the foot
+                of a long form, where it was easy to miss. Still only while
+                editing, as it always was. */}
+            {stored && onDelete ? (
+              <IconButton icon="delete" label="Delete this card" danger onClick={onDelete} />
+            ) : null}
             {stored && status ? status(changed) : null}
             {stored && onRelock ? (
               <Button variant="ghost" size="sm" onClick={() => (changed ? setDiscarding(true) : onRelock())}>
@@ -10598,11 +10604,6 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             <WordEditor word={word} lang={lang} allCards={allCards} selfId={selfId} />
           )}
 
-          {stored && onDelete && !locked && (
-            <Button variant="danger" className="at-mt5" onClick={onDelete}>
-              Delete this card
-            </Button>
-          )}
           </Locked.Provider>
           </fieldset>
           {below}

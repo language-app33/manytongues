@@ -3629,8 +3629,9 @@ body.at-screening .at-chromebar { display:none; }
    Two lines to a button — what it is, and either an invitation or what it
    is waiting for — because the second line is the whole reason the
    disabled ones are shown at all. */
-.at-trylist { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px;
-  margin-top:12px; }
+/* Two to a row, in groups by level, each under its level's name. */
+.at-trylist { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+.at-trylevel + .at-trylevel { margin-top:20px; }
 .at-try { display:flex; flex-direction:column; gap:2px; align-items:flex-start; text-align:start;
   background: var(--surface); border:2px solid var(--line); border-radius: var(--r);
   padding:10px 14px; cursor:pointer; color: var(--text); font-family: var(--ui); width:100%; }

@@ -166,6 +166,7 @@ import {
   keysFor,
   answerOf,
   levelOf,
+  LEVEL_NAME,
   typeOf,
   tablesOf,
   verbOf,
@@ -932,12 +933,8 @@ const now = () => Date.now();
    names, said once here rather than in each screen that shows one.
    ------------------------------------------------------------------ */
 
-const LEVEL_NAME: Record<number, string> = {
-  1: "What it means",
-  2: "Which word it is",
-  3: "Write it from a cue",
-  4: "Write it from its meaning",
-};
+/* LEVEL_NAME, the four names, lives beside levelOf in languages.ts, so the
+   card screen's list of exercises can head its groups with them too. */
 
 /*
  * The same four, written to be read inside a sentence.

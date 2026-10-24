@@ -57,6 +57,8 @@ import {
   DEFAULT_LANGUAGE,
   categoriesOf,
   answerShape,
+  levelOf,
+  LEVEL_NAME,
   scriptVars } from "./languages.ts";
 import { isDialog, linesOf, sceneKindOf } from "./dialogs.ts";
 import { asMeaning, cardRef, droppedIn, fillNames, hasSlots, isSentence, MAX_FILLS, refClash, renamedIn, slotName, slotsOf, taggedIn } from "./variables.ts";
@@ -4057,51 +4059,64 @@ function TryExercises({ card, cards, lang, onTry, back }: {
 
   if (!offers.length) return null;
 
+  /* Grouped by the level each stands on, lowest first: the order a student
+     meets them in. */
+  const levels = [...new Set(offers.map((o) => levelOf(o.type)))].sort((a, b) => a - b);
+
+  const tryButton = (offer: (typeof offers)[number]) => (
+    <button
+      type="button"
+      key={offer.type}
+      className={`at-try${offer.ready ? "" : " out"}`}
+      disabled={!offer.ready || !onTry || !mine}
+      aria-label={
+        offer.ready ? `Try ${offer.label}` : `${offer.label} — needs ${offer.missing.join(" and ")}`
+      }
+      onClick={() => {
+        if (!onTry || !mine) return;
+        /* Which phrase the gap-fill stands the word in. The first
+           one here rather than the rotation a learner gets: a
+           teacher is looking at one question, not meeting a word
+           for the fourth time. */
+        const ctx = (contexts.get(offer.unit.id) || [])[0];
+        onTry({
+          items: material,
+          exercise: {
+            id: mine.id,
+            subId: offer.subId,
+            type: offer.type,
+            ...(ctx ? { ctx: ctx.id } : null),
+          },
+          back: back || { cardId: card.id },
+        });
+      }}
+    >
+      <span className="at-tryname">{offer.label}</span>
+      <span className="at-trywhy">
+        {offer.ready ? "Try it" : `Needs ${offer.missing.join(" and ")}`}
+      </span>
+    </button>
+  );
+
+  /* A section of the card like the ones above it, so it reads as part of
+     the card rather than something hung underneath. Trying one records
+     nothing: this is the teacher's material, not a card anybody here is
+     learning. */
   return (
-    <section className="at-panel at-mt5">
-      <p className="at-eyebrow">Try an exercise</p>
-      <p className="at-hint">
-        What a student is asked, on this card. One question, answered and
-        marked — nothing is recorded, because this is your material rather
-        than a card anybody here is learning.
-      </p>
-      <div className="at-trylist">
-        {offers.map((offer) => (
-          <button
-            type="button"
-            key={offer.type}
-            className={`at-try${offer.ready ? "" : " out"}`}
-            disabled={!offer.ready || !onTry || !mine}
-            aria-label={
-              offer.ready ? `Try ${offer.label}` : `${offer.label} — needs ${offer.missing.join(" and ")}`
-            }
-            onClick={() => {
-              if (!onTry || !mine) return;
-              /* Which phrase the gap-fill stands the word in. The first
-                 one here rather than the rotation a learner gets: a
-                 teacher is looking at one question, not meeting a word
-                 for the fourth time. */
-              const ctx = (contexts.get(offer.unit.id) || [])[0];
-              onTry({
-                items: material,
-                exercise: {
-                  id: mine.id,
-                  subId: offer.subId,
-                  type: offer.type,
-                  ...(ctx ? { ctx: ctx.id } : null),
-                },
-                back: back || { cardId: card.id },
-              });
-            }}
-          >
-            <span className="at-tryname">{offer.label}</span>
-            <span className="at-trywhy">
-              {offer.ready ? "Try it" : `Needs ${offer.missing.join(" and ")}`}
-            </span>
-          </button>
-        ))}
+    <div className="at-formblock">
+      <div className="at-formhead">
+        <span className="at-formnum">Exercises</span>
+        <span className="at-formrole">What a student is asked on this card. Trying one records nothing.</span>
       </div>
-    </section>
+      {levels.map((level) => (
+        <div key={level} className="at-trylevel">
+          <p className="at-label">{LEVEL_NAME[level] || `Level ${level}`}</p>
+          <div className="at-trylist">
+            {offers.filter((o) => levelOf(o.type) === level).map(tryButton)}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
