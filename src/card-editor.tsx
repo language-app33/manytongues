@@ -2185,7 +2185,7 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
  * the other persons will read as, worked out the way a question works it
  * out: the teacher sees it was read right, before saving.
  *
- * Until 0.468 an example was written as the pattern itself — a chip for
+ * Until 0.469 an example was written as the pattern itself — a chip for
  * the gap, three more for the English, and whose wish it was asked apart
  * — and the owner, who writes them, could not follow it. See "A
  * subjunctive example is written as a sentence" in DECISIONS.md.

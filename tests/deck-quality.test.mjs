@@ -449,7 +449,10 @@ test("a line picked from a sentence card of the deck is not a second sentence", 
   assert.deepEqual(metOf(alone, "book"), { "كتاب": 1 }, "without the card in the deck, the line is the sentence");
 });
 
-/* ---- a conversation switched off ---- */
+/* ---- a conversation switched off ----
+   A safeguard: the editor cannot switch a conversation off, so only a
+   hand-made import or a card from before 0.179 could arrive like this.
+   See docs/AUDIT-what-teachers-can-make.md. */
 
 test("a conversation switched off is no sentences and no conversation", () => {
   const book = wordCard("book", ["كتاب"], "noun");
@@ -515,4 +518,32 @@ test("a conversation is worth 5 points whatever else applies", () => {
     lines: [{ ar: "هون", en: "here", who: 0, uses: ["here"], clips: ["c"], lat: "hoon" }] };
   const withScene = deckQuality([frame, scene], { lang: ar, pool: [...known, scene], known, partsOf });
   assert.equal(withScene.score, 100);
+});
+
+/* ---- a form with two answers, recorded and spelt answer by answer ---- */
+
+test("a form with two answers is recorded and spelt only when each answer is", () => {
+  /** @param {any[]} answers @returns {any} */
+  const fineWith = (answers) => ({ id: "fine", lang: "ar-PS", category: "adjective", forms: [{
+    id: "fine", en: "fine", images: ["i"],
+    ar: answers.map((a) => a.text).join(ALT_SEP),
+    lat: answers.map((a) => a.lat).join(ALT_SEP),
+    clips: [...new Set(answers.flatMap((a) => a.clips || []))],
+    answers,
+  }] });
+  const half = fineWith([{ text: "تمام", lat: "tamaam", clips: ["c1"] }, { text: "منيح", lat: "" }]);
+  const q = deckQuality([half], { lang: ar, pool: [half] });
+  assert.equal(checkOf(q, "recordings").share, 0, "the second answer has no voice");
+  assert.equal(checkOf(q, "pronunciation").share, 0, "and no pronunciation");
+
+  const whole = fineWith([{ text: "تمام", lat: "tamaam", clips: ["c1"] }, { text: "منيح", lat: "mniih", clips: ["c2"] }]);
+  const q2 = deckQuality([whole], { lang: ar, pool: [whole] });
+  assert.equal(checkOf(q2, "recordings").share, 1);
+  assert.equal(checkOf(q2, "pronunciation").share, 1);
+
+  /* A card from before answers had recordings of their own shares the
+     form's among them, and reads as it always did. */
+  const old = { id: "old", lang: "ar-PS", category: "adjective", forms: [{
+    id: "old", en: "fine", ar: ["تمام", "منيح"].join(ALT_SEP), lat: ["tamaam", "mniih"].join(ALT_SEP), clips: ["c1"] }] };
+  assert.equal(checkOf(deckQuality([old], { lang: ar, pool: [old] }), "recordings").share, 1);
 });

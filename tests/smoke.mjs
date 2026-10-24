@@ -6867,7 +6867,7 @@ const openPronounTables = async () => {
       !!saveBtn() && saveBtn().disabled && unmetLines().some((t) => /at least one example/.test(t)),
       `${saveBtn() && saveBtn().disabled ? "refused" : "offered"} · ${unmetLines().join(" · ")}`);
     /* The example's boxes are plain boxes, written in as a sentence is
-       said: no chip for a gap, and none for the English. Until 0.468 they
+       said: no chip for a gap, and none for the English. Until 0.469 they
        were a sentence card's, with the gap and three ways of reading the
        verb put in from chips, and the owner could not follow it. */
     const chipsIn = () => (examplesSection() ? examplesSection().querySelectorAll(".at-blankput, .at-blankadd").length : -1);
