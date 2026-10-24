@@ -3257,8 +3257,12 @@ export function BannerHost() {
   return <div className="at-banners" ref={ref} />;
 }
 
-export function TopBanner({ kind = "warn", children }: {
+/* `actions`, where there are any, are a button or two at the end of the
+   band: a message that needs doing something about, like reloading for a
+   new version, carries its buttons with it. */
+export function TopBanner({ kind = "warn", actions, children }: {
   kind?: "warn" | "error";
+  actions?: Node;
   children?: Node;
 }) {
   const [host, setHost] = useState<Element | null>(null);
@@ -3267,9 +3271,10 @@ export function TopBanner({ kind = "warn", children }: {
   }, []);
   if (!children || !host) return null;
   return createPortal(
-    <p className={`at-banner ${kind}`} role={kind === "error" ? "alert" : "status"}>
-      {children}
-    </p>,
+    <div className={`at-banner ${kind}`} role={kind === "error" ? "alert" : "status"}>
+      <span className="what">{children}</span>
+      {actions ? <span className="at-banneracts">{actions}</span> : null}
+    </div>,
     host,
   );
 }
