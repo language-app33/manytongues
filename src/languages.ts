@@ -2203,7 +2203,11 @@ export function contextCoverage(cards: Record<string, any>[], lang: Partial<Lang
        since then against anything. */
     const said = wordOf(c);
     const card = { id: c.id, ar: said.ar || "", en: said.en || "" };
-    const kind = c.kind || guessKind(said.ar || said.en || said.lat, lang);
+    /* Whether it is a word is the teacher's answer where they gave one —
+       see kindOf. Guessed from its spaces, a Vietnamese word of two
+       syllables, and any word with two accepted answers, was counted as a
+       phrase and left out of the words. */
+    const kind = kindOf(c, lang);
     counts[kind] = (counts[kind] || 0) + 1;
     if (kind === "word") words.push(card);
     else contexts.push(card);
@@ -2213,7 +2217,9 @@ export function contextCoverage(cards: Record<string, any>[], lang: Partial<Lang
   const out = words.map((w) => {
     /* Every context, not just the first: the point of the exercise is that
        a word turns up somewhere different each time it comes round. */
-    const found = contexts.filter((c) => findWordSlot(c.ar, w.ar, lang) >= 0);
+    /* Each accepted answer of the word, in each of the phrase's. */
+    const found = contexts.filter((c) =>
+      splitForms(c.ar).some((text) => splitForms(w.ar).some((word) => findWordSlot(text, word, lang) >= 0)));
     links += found.length;
     return { id: w.id, ar: w.ar, en: w.en, contexts: found.map((c) => ({ id: c.id, ar: c.ar, en: c.en })) };
   });

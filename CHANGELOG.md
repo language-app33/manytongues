@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.468 — 24 October 2026
+## 0.470 — 24 October 2026
 
 **"Words this teaches" finds every word, and one-word replies too.**
 
@@ -26,6 +26,67 @@ Trade-off: a long text now gives a long list to go through.
 
 To check by hand: a long text card offers its later words; a one-word line
 in a conversation offers its word.
+
+## 0.469 — 24 October 2026
+
+**A subjunctive example is written as a sentence you would say.**
+
+- On a Palestinian Arabic verb card, the examples under the subjunctive
+  are now three plain boxes. You write one ordinary sentence for any one
+  person, with one of the forms above in it: لازم تاكلي, laazim taakli,
+  "you must eat". There are no chips to tap and no gap to drop in, and
+  "Whose wish is it?" is gone: "I want her to eat" already says whose it is.
+- The app finds the verb and the person, and shows underneath how the
+  example comes out for two other persons ("لازم آكل — I must eat"), so
+  you can see it was understood before saving. Students are asked exactly
+  as before.
+- When the app can't understand an example, one line under it says
+  what's missing, for example "The English says “I”, but تاكل is
+  “she”." The verb can't be saved until it is fixed. As before, a verb
+  with subjunctive forms needs at least one example.
+- Examples written before keep working, and now show as a sentence.
+- Trade-off: the Arabic has to use a form exactly as it is spelt in the
+  table (harakat aside), and the English has to say who (I, she, her…) and
+  use the verb as in its name ("eat" or "to eat"). English like "before
+  she eats" or "let him eat" still can't be written, as before. An example
+  you reopen shows its English the way students see it, so "you must eat"
+  comes back as "You (f) must eat".
+- Sentence cards are unchanged: a blank that takes the subjunctive still
+  uses the person, verb and to + verb chips in its English.
+
+To check by hand: on a verb card, fill in the subjunctive forms, write
+"لازم تاكلي" and "you must eat", and check the two lines under it; then
+change the English to "I must eat" and check the line saying what's wrong.
+
+## 0.468 — 24 October 2026
+
+**Words with more than one accepted answer are practised in sentences.**
+
+- A word card that accepts more than one answer, such as تمام or منيح, or
+  كيف حالَك؟ or كيفَك؟, was never put into a sentence for students to fill
+  in, even when the teacher had linked the sentence to it. Now it is.
+- In a sentence, the right answer is the one the sentence says. In "أنا
+  تمام" the student is asked for تمام, and منيح is marked wrong there.
+  Questions that aren't asked inside a sentence still accept every answer.
+- A sentence card with two accepted answers is shown to students as the
+  one that holds the word, rather than both run together.
+- For teachers, "Words this teaches" in the card editor now offers these
+  words, and the check under a sentence no longer says nothing teaches
+  them. The In context tab and a deck's In context section find them too.
+- Those same screens now go by the word type the teacher picked. A
+  Vietnamese word of two syllables, such as cà phê, was treated there as a
+  phrase, so it was never offered or counted.
+- Deck quality: a word with two answers counts as recorded only once each
+  answer has its own recording, and the same goes for pronunciation.
+- The notes for 0.463 no longer mention switched-off conversations.
+  Teachers can't switch a conversation off, so there was nothing to count.
+- Trade-off: students meet more sentences. A sentence can wait a little
+  longer before it comes up, until the student knows these words, as it
+  already does for every other word. Some deck scores drop where a second
+  answer has no recording.
+- To check by hand: practise a word with two answers that has a linked
+  sentence, and see that the gap asks for the answer the sentence says.
+
 
 ## 0.467 — 23 October 2026
 
@@ -137,10 +198,9 @@ screen's header is narrow.
   masculine and a feminine version both count for their words. One card is
   still one sentence: a word in both versions counts once.
 - A conversation line picked from a sentence card in the same deck no
-  longer counts as a second sentence. A conversation switched off is no
-  longer counted, since students are never given it. A line with no words
-  in it, such as ".", is not counted as a sentence needing a link, a
-  recording and a pronunciation.
+  longer counts as a second sentence. A line with no words in it, such as
+  ".", is not counted as a sentence needing a link, a recording and a
+  pronunciation.
 - The suggestions are honest about sentences with two problems. "Link it"
   and "teach the word" each claim only what doing that alone would add;
   sentences that are both unlinked and use an untaught word get their own
@@ -153,8 +213,7 @@ screen's header is narrow.
   the "already in N phrases" count after saving a card is right. Both
   were reading cards the way they were stored before, and found nothing.
 - Trade-off: most decks with feminine pairs or cards with several answers
-  score higher; a deck that leant on a picked line or a switched-off
-  conversation can score lower.
+  score higher; a deck that leant on a picked line can score lower.
 - To check by hand: open a deck with a feminine pair and a card with two
   answers and see its score and suggestions; open In context on a recently
   edited collection and see links offered.
