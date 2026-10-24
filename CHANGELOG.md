@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.480 — 24 October 2026
+
+**"Found as" keeps its meanings apart too.**
+
+- Under "Words this teaches" in the editor, a word found in the sentence
+  in another of its forms (a plural, a verb's other person) says "found as"
+  with that form's meaning in brackets. Where the form had more than one
+  meaning, they ran together there, as the answers did before 0.479. They
+  now have the dot between them.
+
+To check by hand: a phrase holding the plural of a word whose plural has
+two meanings.
+
 ## 0.479 — 24 October 2026
 
 **The words a phrase teaches keep their answers apart.**
