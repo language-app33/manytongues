@@ -955,8 +955,14 @@ export interface VerbExample {
   en: string;
   /** Whose wish it is, where the English reads `{{verb-to}}` — a column
       of the verb table. See CardForm.wish, which is the same answer for a
-      sentence card's blank. */
+      sentence card's blank. `someone` where the one who wants is nobody
+      in the table: *Mum wants me to eat*. */
   wish?: string;
+  /** The column it was written for: a teacher writes an example as one
+      sentence, said for one person, and reads it back the same way. See
+      readExample. Absent on one written before, which reads back in the
+      first person written. */
+  as?: string;
 }
 
 /**

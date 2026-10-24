@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.468 — 24 October 2026
+## 0.478 — 24 October 2026
 
 **The words a phrase teaches keep their answers apart.**
 
@@ -24,6 +24,199 @@ and moves once per batch of work you would notice, not once per commit.
 
 To check by hand: a phrase that teaches a word with two accepted answers,
 in the editor and on its screen.
+
+## 0.477 — 24 October 2026
+
+**In Teaching, reading a card and editing it are the same screen.**
+
+- Opening a card in Teaching now shows the card editor itself, with every
+  field locked. Anything added to the editor shows up when you read a card
+  too, because it is the same screen. Folds, recordings and links to
+  other cards still work while it is locked.
+- Edit unlocks the whole card in place. While editing, the top of the
+  screen has the status, Cancel, Save and Save and exit. Cancel locks it
+  again — asking first if anything was changed, and then putting the card
+  back as it was saved. Save and exit saves and goes back to the list the
+  card was opened from.
+- The status menu is in the editor too, beside the saves. It is off while
+  there are unsaved changes: save first, then publish.
+- The line about sentences waiting for review sits over the card, and Try
+  the exercises under it, while reading and while editing.
+- The old reading screen's "Where it lives" is not repeated: the editor's
+  own Decks section, ID and tags say the same.
+- Students' card screens, and an administrator reading a reported card,
+  are unchanged.
+
+To check by hand: open a card, play a recording and open a fold while it
+is locked; press Edit, change something, press Cancel and check the card
+is back as it was.
+
+## 0.476 — 24 October 2026
+
+**"Words this teaches" finds every word, and one-word replies too.**
+
+- On a long sentence or text, the list stopped at 24 words and kept
+  whichever cards came first in your collection, not first in the text.
+  The rest went missing with nothing to say so, which looked as if a word
+  was not found because its harakat were different. Every word with a card
+  is now offered, in the order it comes in the text. Harakat never were the
+  cause: عَفْواً and عفواً find each other either way round.
+- A conversation line of one word, like "عفواً", now shows "Words this
+  teaches", so the reply can be ticked as teaching the word's card. Before,
+  the box did not appear on a one-word line at all.
+
+Trade-off: a long text now gives a long list to go through.
+
+To check by hand: a long text card offers its later words; a one-word line
+in a conversation offers its word.
+
+## 0.475 — 24 October 2026
+
+**"A new version is ready" is said in the band across the top.**
+
+- The message that a new version of the app is ready, with its Later and
+  Reload buttons, now shows in the coloured band at the top of the
+  window, the one 0.474 added, instead of floating near the foot of the
+  screen. It no longer waits for the Undo bar to go before showing.
+- As before, it is not shown in the middle of an exercise, where a reload
+  would lose the answer being typed, and Later puts it away.
+
+To check by hand: after a new version is deployed, open the app and see
+the band at the top with Later and Reload; press Later and see it go.
+
+## 0.474 — 24 October 2026
+
+**Work not yet sent is said in a band across the top of the screen.**
+
+- When cards you wrote in Teaching are saved on this device and waiting
+  for a connection, that is now said in a solid coloured band across the
+  very top of the window, above the app's name, the space buttons and the
+  menu, instead of as a line inside the space. Everything else moves down
+  to make room, so the band covers nothing, and it goes as soon as the
+  cards are sent.
+- Problems you reported about a card without a connection are said the
+  same way, in Learning too. Before, they were mentioned only inside the
+  menu at the top right.
+
+To check by hand: on a phone, turn off the connection, write a card in
+Teaching, and see the band appear at the top with the menus below it;
+turn the connection back on and see it go.
+
+## 0.473 — 24 October 2026
+
+**Save waits until there is something to save.**
+
+- In the card editor, Save and Save and exit stay greyed out until
+  something on the card changes. A new card waits for something to be
+  written; a card you opened waits for an edit. After Save they are grey
+  again until the next change.
+
+To check by hand: open a card in the editor and see both saves greyed
+out; change one letter and see them come on.
+
+## 0.472 — 24 October 2026
+
+**Save without closing a card, and a card's status where you look for it.**
+
+- The card editor has two buttons: Save, which saves and keeps the card
+  open to go on with it, and Save and exit, which saves and closes it.
+- On a phone, the editor's two buttons, and Export, the status and Edit
+  on a card's screen, sit on a line under the screen's title. On a wide
+  screen they are back on the title's line, at the right.
+- The status beside Edit is the app's own menu button now, the same
+  height as Export and Edit, and it opens the app's own menu rather than
+  the phone's list of choices.
+- In list view, a draft, or a card with changes waiting, shows its status
+  in a small pill before its word. In table view, Status is the first
+  column. A card students simply have shows nothing there.
+
+To check by hand: Save on a new card, then Save again — the second save
+changes the same card rather than making another. And a card's screen
+on a wide window and on a phone.
+
+## 0.471 — 24 October 2026
+
+**The subjunctive's examples say what they are for.**
+
+- On a verb card, the heading over the subjunctive's examples now reads
+  "How subjunctive is practised" instead of "How these forms are
+  practised".
+
+To check by hand: open a Palestinian Arabic verb card and look under the
+subjunctive.
+
+## 0.470 — 24 October 2026
+
+**A text's sentences ask for the transliteration before the English.**
+
+- Writing a sentence of a text, or a line of a conversation, the boxes now
+  run Arabic, transliteration, English, the order they are shown in
+  everywhere else in the app. The English used to come second.
+
+To check by hand: open a text card's editor and see the three boxes in
+that order.
+
+
+## 0.469 — 24 October 2026
+
+**A subjunctive example is written as a sentence you would say.**
+
+- On a Palestinian Arabic verb card, the examples under the subjunctive
+  are now three plain boxes. You write one ordinary sentence for any one
+  person, with one of the forms above in it: لازم تاكلي, laazim taakli,
+  "you must eat". There are no chips to tap and no gap to drop in, and
+  "Whose wish is it?" is gone: "I want her to eat" already says whose it is.
+- The app finds the verb and the person, and shows underneath how the
+  example comes out for two other persons ("لازم آكل — I must eat"), so
+  you can see it was understood before saving. Students are asked exactly
+  as before.
+- When the app can't understand an example, one line under it says
+  what's missing, for example "The English says “I”, but تاكل is
+  “she”." The verb can't be saved until it is fixed. As before, a verb
+  with subjunctive forms needs at least one example.
+- Examples written before keep working, and now show as a sentence.
+- Trade-off: the Arabic has to use a form exactly as it is spelt in the
+  table (harakat aside), and the English has to say who (I, she, her…) and
+  use the verb as in its name ("eat" or "to eat"). English like "before
+  she eats" or "let him eat" still can't be written, as before. An example
+  you reopen shows its English the way students see it, so "you must eat"
+  comes back as "You (f) must eat".
+- Sentence cards are unchanged: a blank that takes the subjunctive still
+  uses the person, verb and to + verb chips in its English.
+
+To check by hand: on a verb card, fill in the subjunctive forms, write
+"لازم تاكلي" and "you must eat", and check the two lines under it; then
+change the English to "I must eat" and check the line saying what's wrong.
+
+## 0.468 — 24 October 2026
+
+**Words with more than one accepted answer are practised in sentences.**
+
+- A word card that accepts more than one answer, such as تمام or منيح, or
+  كيف حالَك؟ or كيفَك؟, was never put into a sentence for students to fill
+  in, even when the teacher had linked the sentence to it. Now it is.
+- In a sentence, the right answer is the one the sentence says. In "أنا
+  تمام" the student is asked for تمام, and منيح is marked wrong there.
+  Questions that aren't asked inside a sentence still accept every answer.
+- A sentence card with two accepted answers is shown to students as the
+  one that holds the word, rather than both run together.
+- For teachers, "Words this teaches" in the card editor now offers these
+  words, and the check under a sentence no longer says nothing teaches
+  them. The In context tab and a deck's In context section find them too.
+- Those same screens now go by the word type the teacher picked. A
+  Vietnamese word of two syllables, such as cà phê, was treated there as a
+  phrase, so it was never offered or counted.
+- Deck quality: a word with two answers counts as recorded only once each
+  answer has its own recording, and the same goes for pronunciation.
+- The notes for 0.463 no longer mention switched-off conversations.
+  Teachers can't switch a conversation off, so there was nothing to count.
+- Trade-off: students meet more sentences. A sentence can wait a little
+  longer before it comes up, until the student knows these words, as it
+  already does for every other word. Some deck scores drop where a second
+  answer has no recording.
+- To check by hand: practise a word with two answers that has a linked
+  sentence, and see that the gap asks for the answer the sentence says.
+
 
 ## 0.467 — 23 October 2026
 
@@ -135,10 +328,9 @@ screen's header is narrow.
   masculine and a feminine version both count for their words. One card is
   still one sentence: a word in both versions counts once.
 - A conversation line picked from a sentence card in the same deck no
-  longer counts as a second sentence. A conversation switched off is no
-  longer counted, since students are never given it. A line with no words
-  in it, such as ".", is not counted as a sentence needing a link, a
-  recording and a pronunciation.
+  longer counts as a second sentence. A line with no words in it, such as
+  ".", is not counted as a sentence needing a link, a recording and a
+  pronunciation.
 - The suggestions are honest about sentences with two problems. "Link it"
   and "teach the word" each claim only what doing that alone would add;
   sentences that are both unlinked and use an untaught word get their own
@@ -151,8 +343,7 @@ screen's header is narrow.
   the "already in N phrases" count after saving a card is right. Both
   were reading cards the way they were stored before, and found nothing.
 - Trade-off: most decks with feminine pairs or cards with several answers
-  score higher; a deck that leant on a picked line or a switched-off
-  conversation can score lower.
+  score higher; a deck that leant on a picked line can score lower.
 - To check by hand: open a deck with a feminine pair and a card with two
   answers and see its score and suggestions; open In context on a recently
   edited collection and see links offered.
