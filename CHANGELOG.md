@@ -8,6 +8,37 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.468 — 24 October 2026
+
+**A subjunctive example is written as a sentence you would say.**
+
+- On a Palestinian Arabic verb card, the examples under the subjunctive
+  are now three plain boxes. You write one ordinary sentence for any one
+  person, with one of the forms above in it: لازم تاكلي, laazim taakli,
+  "you must eat". There are no chips to tap and no gap to drop in, and
+  "Whose wish is it?" is gone: "I want her to eat" already says whose it is.
+- The app finds the verb and the person, and shows underneath how the
+  example comes out for two other persons ("لازم آكل — I must eat"), so
+  you can see it was understood before saving. Students are asked exactly
+  as before.
+- When the app can't understand an example, one line under it says
+  what's missing, for example "The English says “I”, but تاكل is
+  “she”." The verb can't be saved until it is fixed. As before, a verb
+  with subjunctive forms needs at least one example.
+- Examples written before keep working, and now show as a sentence.
+- Trade-off: the Arabic has to use a form exactly as it is spelt in the
+  table (harakat aside), and the English has to say who (I, she, her…) and
+  use the verb as in its name ("eat" or "to eat"). English like "before
+  she eats" or "let him eat" still can't be written, as before. An example
+  you reopen shows its English the way students see it, so "you must eat"
+  comes back as "You (f) must eat".
+- Sentence cards are unchanged: a blank that takes the subjunctive still
+  uses the person, verb and to + verb chips in its English.
+
+To check by hand: on a verb card, fill in the subjunctive forms, write
+"لازم تاكلي" and "you must eat", and check the two lines under it; then
+change the English to "I must eat" and check the line saying what's wrong.
+
 ## 0.467 — 23 October 2026
 
 **A card's buttons sit under its title.**
