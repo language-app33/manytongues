@@ -7096,21 +7096,21 @@ function TurnBlock({ talk, lang, allCards, selfId, index: i, line: l }: {
         <ScriptInput lang={lang} value={l.ar} onChange={(v) => setLine(i, { ...l, ar: v })} />
       </Field>
 
-      <Field label="English">
-        <input
-          className="at-input"
-          value={l.en}
-          aria-label={`What line ${i + 1} means`}
-          onChange={(e) => setLine(i, { ...l, en: e.target.value })}
-        />
-      </Field>
-
       <Field label={lang.translitLabel}>
         <input
           className="at-input"
           value={l.lat}
           aria-label={`How line ${i + 1} sounds`}
           onChange={(e) => setLine(i, { ...l, lat: e.target.value })}
+        />
+      </Field>
+
+      <Field label="English">
+        <input
+          className="at-input"
+          value={l.en}
+          aria-label={`What line ${i + 1} means`}
+          onChange={(e) => setLine(i, { ...l, en: e.target.value })}
         />
       </Field>
 

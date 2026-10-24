@@ -16727,19 +16727,19 @@ function ItemSheet({ mode, initial, allTags, settings, onSave, onClose, scene = 
                       <div className="at-field">
                         <input
                           className="at-input"
-                          value={ln.en}
-                          placeholder="What it means"
-                          aria-label={`What line ${i + 1} means`}
-                          onChange={(e) => setLine(i, "en", e.target.value)}
+                          value={ln.lat}
+                          placeholder="How it sounds"
+                          aria-label={`How line ${i + 1} sounds`}
+                          onChange={(e) => setLine(i, "lat", e.target.value)}
                         />
                       </div>
                       <div className="at-field">
                         <input
                           className="at-input"
-                          value={ln.lat}
-                          placeholder="How it sounds"
-                          aria-label={`How line ${i + 1} sounds`}
-                          onChange={(e) => setLine(i, "lat", e.target.value)}
+                          value={ln.en}
+                          placeholder="What it means"
+                          aria-label={`What line ${i + 1} means`}
+                          onChange={(e) => setLine(i, "en", e.target.value)}
                         />
                       </div>
                     </div>
