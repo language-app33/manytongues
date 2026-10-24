@@ -5051,7 +5051,20 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
        names. The editor is drawn afresh for it, rather than keeping the
        card it was just showing. */
     opened?: number;
-  } | null>(null);
+    /* A card read rather than edited: the same editor, locked — see
+       CardEditor's `locked`. How a card opens from a list, a deck, a
+       report or a trial; Edit unlocks it in place. */
+    locked?: boolean;
+  } | null>(() => {
+    /* On the way back from a trial, the card the trial was asked about,
+       found in the copy this space had in hand when it left — nothing to
+       fetch, it is the same list the button was pressed from, kept across
+       the round trip. */
+    const c = back && back.cardId && last
+      ? (last.cards || []).find((x: Card) => x.id === back.cardId) || null
+      : null;
+    return c ? { card: c, decks: c.decks || [], locked: true } : null;
+  });
   /*
    * A card being started: everything settled about it so far, and nothing
    * typed yet.
@@ -5080,15 +5093,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const offline = useOffline();
   const [naming, setNaming] = useState<any | null>(null); // "new" | deck
   const [confirm, setConfirm] = useState<Pending | null>(null); // whatever is awaiting a yes
-  /* A card being read rather than edited. On the way back from a trial it
-     is the card the trial was asked about, found in the copy this space had
-     in hand when it left — nothing to fetch, it is the same list the button
-     was pressed from, kept across the round trip. */
-  const [viewing, setViewing] = useState<Card | null>(
-    back && back.cardId && last
-      ? (last.cards || []).find((c: Card) => c.id === back.cardId) || null
-      : null,
-  );
+  /* Open a card to read it: the editor, locked. */
+  const openCard = (c: Card | null | undefined) => {
+    if (c) setEditing({ card: c, decks: c.decks || [], locked: true, opened: Date.now() });
+  };
   const [selCards, setSelCards] = useState(() => new Set<string>());
   const [cardAction, setCardAction] = useState<"add" | "remove" | null>(null); // "add" | "remove"
   /* The same two-way question for group tags: which to put on the
@@ -5626,7 +5634,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           {shortDate(cardAdded(c))}
         </>
       }
-      onClick={() => setViewing(c)}
+      onClick={() => openCard(c)}
       actions={cardActions(c)}
     />
   );
@@ -5673,7 +5681,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           created: shortDate(c.created),
           modified: shortDate(c.updated),
         },
-        open: () => setViewing(c),
+        open: () => openCard(c),
         actions: cardActions(c),
         lead: statusPill(c),
       };
@@ -6242,7 +6250,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       async () => {
         const r = await API.cardStatus(card.id, to);
         absorbSaved(r);
-        setViewing((v) => (v && v.id === r.card.id ? { ...r.card, decks: r.card.decks || v.decks || [] } : v));
+        /* The card on screen is the card as the server answered, drawn
+           afresh — discarding changes or unpublishing changes its words. */
+        setEditing((e) => (e && e.card && e.card.id === r.card.id
+          ? { ...e, card: { ...r.card, decks: r.card.decks || e.card.decks || [] }, decks: r.card.decks || e.decks, opened: Date.now() }
+          : e));
       },
       to === "published"
         ? card.status && card.status !== "published"
@@ -6346,7 +6358,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     const pool = lendable.some((c) => c.id === fresh.id) ? lendable : lendable.concat([fresh]);
     const lang = langOfCard(fresh) || languages[soleLang];
     const took = (card: Card) => {
-      setViewing((v) => (v && v.id === card.id ? { ...v, ...card } : v));
+      setEditing((e) => (e && e.card && e.card.id === card.id ? { ...e, card: { ...e.card, ...card }, opened: Date.now() } : e));
     };
     return (
       <ReviewScreen
@@ -6467,8 +6479,39 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         allCards={lendable}
         making={editing.making}
         draft={editing.draft || null}
+        /* Read, until Edit: the same screen, locked. Cancel draws it afresh
+           from the card, locked again, so nothing typed is left behind. */
+        locked={!!editing.locked && !!editing.card && !!editing.card.id}
+        onUnlock={() => setEditing((e) => (e ? { ...e, locked: false } : e))}
+        onRelock={() => setEditing((e) => (e ? { ...e, locked: true, opened: Date.now() } : e))}
+        status={(off) => {
+          const c = editing.card;
+          return c && c.id ? <StatusMenu card={c} disabled={busy || off} onStatus={(to) => setStatus(c, to)} /> : null;
+        }}
+        onExport={editing.card && editing.card.id ? () => exportCards([editing.card!.id]) : undefined}
+        about={
+          editing.card && editing.card.id ? (
+            <ReviewLine state={reviewMap.get(editing.card.id)} onOpen={() => setReviewing(editing.card)} />
+          ) : null
+        }
+        below={
+          editing.card && editing.card.id ? (
+            <TryExercises
+              /* The card, and the screen it was opened from — a deck's card
+                 list, say, so answering comes back to the card inside the
+                 deck rather than to the space's front door. */
+              back={{ cardId: editing.card.id, tab, deckId: openDeck }}
+              card={editing.card}
+              cards={lendable}
+              lang={editLang || undefined}
+              onTry={onTry}
+            />
+          ) : null
+        }
         onOpenCard={(other) =>
-          setEditing({ card: other, decks: other.decks || [], lang: other.lang || (editLang || {}).id || "", opened: Date.now() })
+          /* Another card the Meanings block names: opened to read, as a
+             card opened from a list is, or to edit where this one was. */
+          setEditing({ card: other, decks: other.decks || [], lang: other.lang || (editLang || {}).id || "", opened: Date.now(), locked: !!editing.locked })
         }
         onSave={({ forms, note, name, examples, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next, exit }) =>
           run(
@@ -6740,7 +6783,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
             : undefined
         }
         confirming={
-          confirm && confirm.kind === "card" && confirm.card ? (
+          exportScreen ? exportScreen : confirm && confirm.kind === "card" && confirm.card ? (
             <ConfirmModal
               title={`Delete "${leadOf(confirm.card).en || leadOf(confirm.card).ar}"?`}
               confirmLabel="Delete the card"
@@ -7421,49 +7464,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               renderItem={cardTile}
             />
 
-        {viewing && (
-          <Screen
-            title={asMeaning(leadOf(viewing).en) || leadOf(viewing).ar}
-            onBack={() => setViewing(null)}
-            actionBelow
-            action={
-              <>
-                <IconButton icon="download" label="Export this card" onClick={() => exportCards([viewing.id])} />
-                <StatusMenu card={viewing} disabled={busy} onStatus={(to) => setStatus(viewing, to)} />
-                <Button variant="primary" size="sm"
-                  onClick={() => {
-                    setEditing({ card: viewing, decks: viewing.decks || [] });
-                    setViewing(null);
-                  }}
-                >
-                  <Icon name="edit" />
-                  Edit
-                </Button>
-              </>
-            }
-          >
-            <ReviewLine state={reviewMap.get(viewing.id)} onOpen={() => setReviewing(viewing)} />
-            <CardReadout
-              card={viewing}
-              lang={langOfCard(viewing)}
-              decks={decks}
-              /* And the rest of the collection, because what is behind a
-                 blank and how many cards wear a tag are facts about the
-                 collection rather than about this card. */
-              cards={lendable}
-            />
-            <TryExercises
-              /* The card, and the screen it was read from — a deck's card
-                 list here, so answering comes back to the card inside the
-                 deck rather than to the space's front door. */
-              back={{ cardId: viewing.id, tab, deckId: openDeck }}
-              card={viewing}
-              cards={lendable}
-              lang={langOfCard(viewing)}
-              onTry={onTry}
-            />
-          </Screen>
-        )}
 
         {cardAction === "add" && cardActionScreen(d.id)}
         {exportScreen}
@@ -7866,43 +7866,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               {cardAction && cardActionScreen()}
               {tagAction && tagActionScreen()}
 
-              {viewing && (
-                <Screen
-                  title={asMeaning(leadOf(viewing).en) || leadOf(viewing).ar}
-                  onBack={() => setViewing(null)}
-                  actionBelow
-                  action={
-                    <>
-                      <IconButton icon="download" label="Export this card" onClick={() => exportCards([viewing.id])} />
-                      <StatusMenu card={viewing} disabled={busy} onStatus={(to) => setStatus(viewing, to)} />
-                      <Button variant="primary" size="sm"
-                        onClick={() => {
-                          setEditing({ card: viewing, decks: viewing.decks || [] });
-                          setViewing(null);
-                        }}
-                        icon="edit"
-                      >
-                        Edit
-                      </Button>
-                    </>
-                  }
-                >
-                  <ReviewLine state={reviewMap.get(viewing.id)} onOpen={() => setReviewing(viewing)} />
-                  <CardReadout
-                    card={viewing}
-                    lang={langOfCard(viewing)}
-                    decks={decks}
-                    cards={lendable}
-                  />
-                  <TryExercises
-                    back={{ cardId: viewing.id, tab, deckId: null }}
-                    card={viewing}
-                    cards={lendable}
-                    lang={langOfCard(viewing)}
-                    onTry={onTry}
-                  />
-                </Screen>
-              )}
 
               {/* What is waiting on the teacher: sentences nobody has read
                   yet, and what students have reported. Said above the list
@@ -8089,7 +8052,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               onAddWord={(text, lang) =>
                 setEditing({ card: null, decks: [], lang: lang.id, draft: { ar: text } })
               }
-              onOpenCard={(id) => setViewing(cards.find((c) => c.id === id) || null)}
+              onOpenCard={(id) => openCard(cards.find((c) => c.id === id))}
             />
           )}
 

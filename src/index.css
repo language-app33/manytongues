@@ -4020,3 +4020,30 @@ body.at-screening .at-chromebar { display:none; }
 .at-statusbadge { display:inline-block; margin-inline-end:6px; padding:0 6px; border-radius:999px;
   border:1px solid var(--brass); color: var(--brass); font-family: var(--ui); font-size:11px;
   font-weight:800; letter-spacing:.04em; text-transform:uppercase; line-height:1.6; }
+
+/* Pressed to read rather than to change — see Pressable. A button to the
+   eye and the hand; not a form control, so a locked card leaves it be. */
+.at-pressable { cursor:pointer; -webkit-user-select:none; user-select:none; }
+.at-pressable[aria-disabled="true"] { cursor:default; }
+.at-pressable:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+.at-btn.at-pressable { display:inline-flex; align-items:center; justify-content:center; }
+.at-btn.at-pressable[aria-disabled="true"] { box-shadow:none; background: var(--raised);
+  border-color: var(--line); color: var(--faint); }
+.at-clipplay.at-pressable { display:inline-flex; align-items:center; justify-content:center;
+  box-sizing:border-box; }
+.at-clipplay.at-pressable[aria-disabled="true"] { opacity:.6; }
+
+/*
+ * A teacher's card, read: the editor itself, inside a disabled fieldset —
+ * see CardEditor's `locked`. A fieldset brings a frame, a gap and a minimum
+ * width of its own; none of them belong here.
+ *
+ * Locked is not greyed out: what is written is read here, and a box of
+ * faded words is a poor way to read it. Only the buttons that would change
+ * something look disabled — which is true, and says so.
+ */
+fieldset.at-cardlock { border:0; padding:0; margin:0; min-inline-size:0; }
+fieldset.at-cardlock:disabled :is(input, textarea, select):disabled { color: var(--text);
+  -webkit-text-fill-color: var(--text); opacity:1; cursor:default; }
+fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] { cursor:default; }
+fieldset.at-cardlock:disabled .at-seg.on:disabled { opacity:1; }
