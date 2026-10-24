@@ -4471,6 +4471,33 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("and adds nothing to the day's count",
     JSON.stringify(after.log) === JSON.stringify(before.log),
     `${JSON.stringify(after.log)} vs ${JSON.stringify(before.log)}`);
+
+  /* ---- Save, and Save and exit ----
+     Save keeps the card open to go on with it; Save and exit closes it.
+     Both save this card, under its own id. */
+  const cardId = (phraseTile && phraseTile.getAttribute("data-card")) || "";
+  clickNamed(/^Edit$/);
+  await sleep(400);
+  const editorOpen = () => !!document.querySelector(".at-screen.cardform");
+  check("Edit opens the card editor, with Save and Save and exit under its title",
+    editorOpen() && !!buttonNamed(/^Save$/) && !!buttonNamed(/^Save and exit$/) &&
+      !!(/** @type {Element} */ (buttonNamed(/^Save and exit$/))).closest(".at-screenhead.below"),
+    editorOpen() ? [...document.querySelectorAll(".at-screen.cardform .at-screenhead button")].map((b) => (b.textContent || "").trim()).join(" | ") : "(no editor)");
+  takeSaves = true;
+  const savesBefore = savedCards.length;
+  clickNamed(/^Save$/);
+  await sleep(500);
+  check("Save saves the card and keeps it open",
+    savedCards.length === savesBefore + 1 && editorOpen(),
+    `${savedCards.length - savesBefore} saved · ${editorOpen() ? "open" : "closed"}`);
+  clickNamed(/^Save and exit$/);
+  await sleep(500);
+  const both = savedCards.slice(savesBefore);
+  check("and Save and exit saves the same card again and closes it",
+    both.length === 2 && !!both[0].id && both[0].id === both[1].id && !editorOpen() &&
+      (!cardId || both[0].id === cardId),
+    `${both.map((c) => c.id).join(", ")} · ${editorOpen() ? "open" : "closed"}`);
+  takeSaves = false;
 }
 
 /* ---- one meaning is one question ----
