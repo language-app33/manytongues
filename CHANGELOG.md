@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.468 — 24 October 2026
+
+**"Words this teaches" finds every word, and one-word replies too.**
+
+- On a long sentence or text, the list stopped at 24 words and kept
+  whichever cards came first in your collection, not first in the text.
+  The rest went missing with nothing to say so, which looked as if a word
+  was not found because its harakat were different. Every word with a card
+  is now offered, in the order it comes in the text. Harakat never were the
+  cause: عَفْواً and عفواً find each other either way round.
+- A conversation line of one word, like "عفواً", now shows "Words this
+  teaches", so the reply can be ticked as teaching the word's card. Before,
+  the box did not appear on a one-word line at all.
+
+Trade-off: a long text now gives a long list to go through.
+
+To check by hand: a long text card offers its later words; a one-word line
+in a conversation offers its word.
+
 ## 0.467 — 23 October 2026
 
 **A card's buttons sit under its title.**

@@ -187,23 +187,34 @@ function gapIn(written: string, filled: string, word: string, lang: Lang): { at:
  * for "he wrote" as surely as one saying "he wrote". The form is picked
  * the way buildContextIndex picks it (see bestWordIn), so the form named
  * here is the one the practice side will blank.
+ *
+ * Every card found, in the order its word comes in the text. This stopped
+ * at 24, in the order the teacher's cards happen to be kept: a long text
+ * lost whichever of its words came later in the collection, with nothing
+ * to say any were missing, and a teacher took the missing عفواً for a
+ * harakat the matcher had not ignored.
+ *
+ * A single word contains nothing, so it is offered nothing — except as a
+ * line of a conversation (`line`), where a reply of one word, عفواً, is
+ * still somewhere that word was really said.
  */
 export function wordsOffered(
   text: string,
   cards: Item[],
   lang: Lang,
   selfId: string = "",
-  most: number = 24,
+  { line = false }: { line?: boolean } = {},
 ): { card: Item; form: Form }[] {
-  if (!supportsContext(lang) || !String(text || "").trim() || guessKind(text, lang) === "word") return [];
-  const out: { card: Item; form: Form }[] = [];
+  if (!supportsContext(lang) || !String(text || "").trim()) return [];
+  if (!line && guessKind(text, lang) === "word") return [];
+  const out: { card: Item; form: Form; at: number }[] = [];
   for (const card of cards || []) {
-    if (out.length >= most) break;
     if (!card || !card.id || card.id === selfId) continue;
     const lead = wordOf(card).ar;
     if (!lead || guessKind(lead, lang) !== "word") continue;
     const hit = bestWordIn(text, unitsOf(card).filter(({ unit }) => unit.ar).map(({ unit }) => ({ item: unit, word: unit.ar })), lang);
-    if (hit) out.push({ card, form: hit.item });
+    if (hit) out.push({ card, form: hit.item, at: hit.span.at });
   }
-  return out;
+  /* Stable, so two cards found at the same word keep the collection's order. */
+  return out.sort((a, b) => a.at - b.at).map(({ card, form }) => ({ card, form }));
 }
