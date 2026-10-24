@@ -1884,10 +1884,6 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   padding:10px 14px; display:flex; align-items:center; gap:14px;
   box-shadow: var(--nav-shadow); max-width: calc(100% - 24px); font-size:13px; }
 .at-undo .what { color: var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-/* The same floating bar, saying a new version is ready. Its sentence is the
-   whole point, so it wraps rather than being cut short on a phone. */
-.at-updatebar { gap:10px; }
-.at-updatebar .what { white-space:normal; color: var(--text); }
 /* The snackbar: the undo bar's shape, because that is already this app's
    way of saying "something floating, and temporary". It sits above
    everything (--z-toast) — a confirmation hidden behind the screen that
@@ -3047,12 +3043,14 @@ button.at-stat { transition: border-color 140ms ease; }
    read from the corner of the eye while doing something else. --- */
 .at-banners { position:fixed; top:0; left:0; right:0; z-index: var(--z-banner); }
 .at-banner { margin:0; padding: var(--s3) var(--s4);
+  display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap: var(--s2) var(--s3);
   font-family: var(--ui); font-size: var(--fs-sm); font-weight:700; line-height:1.45;
   text-align:center; background: var(--brass); color: var(--onbrass);
   box-shadow: 0 2px 10px rgba(0,0,0,.25); }
 .at-banner:first-child { padding-top: calc(var(--s3) + env(safe-area-inset-top)); }
 .at-banner + .at-banner { border-top:1px solid rgba(0,0,0,.18); }
 .at-banner.error { background: var(--rose); color:#FFFFFF; }
+.at-banneracts { display:inline-flex; gap: var(--s2); flex:0 0 auto; }
 /* A word inside a sentence that does something, for the one or two places
    where a full button would be louder than what it offers. It is a real
    button underneath, so it is reachable by keyboard and reads as a control

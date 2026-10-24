@@ -15221,25 +15221,32 @@ export default function ArabicTrainer() {
       )}
 
 
-      {updateWaiting && !updateLater && !inExercise && !(lastDeleted && lastDeleted.length > 0) && (
-        /* Kept off a question in progress and out of the undo bar's way,
-           which sits in the same place. */
-        <div className="at-undo at-updatebar" role="status">
-          <span className="what">A new version is ready. Save your work, then reload.</span>
-          <Button size="sm" onClick={() => setUpdateLater(true)} disabled={updateGoing}>
-            Later
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              setUpdateGoing(true);
-              void applyUpdate();
-            }}
-            disabled={updateGoing}
-          >
-            {updateGoing ? "Reloading…" : "Reload"}
-          </Button>
-        </div>
+      {updateWaiting && !updateLater && !inExercise && (
+        /* In the band across the top, where it is seen, rather than as a
+           floating bar at the foot that sat where the undo bar does and
+           had to wait for it. Still kept off a question in progress: a
+           reload there would lose the answer being typed. */
+        <TopBanner
+          actions={
+            <>
+              <Button size="sm" onClick={() => setUpdateLater(true)} disabled={updateGoing}>
+                Later
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setUpdateGoing(true);
+                  void applyUpdate();
+                }}
+                disabled={updateGoing}
+              >
+                {updateGoing ? "Reloading…" : "Reload"}
+              </Button>
+            </>
+          }
+        >
+          A new version is ready. Save your work, then reload.
+        </TopBanner>
       )}
 
       {/* The three things that float above the app. They appear and vanish

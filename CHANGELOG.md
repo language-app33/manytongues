@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.475 — 24 October 2026
+## 0.476 — 24 October 2026
 
 **"Words this teaches" finds every word, and one-word replies too.**
 
@@ -26,6 +26,20 @@ Trade-off: a long text now gives a long list to go through.
 
 To check by hand: a long text card offers its later words; a one-word line
 in a conversation offers its word.
+
+## 0.475 — 24 October 2026
+
+**"A new version is ready" is said in the band across the top.**
+
+- The message that a new version of the app is ready, with its Later and
+  Reload buttons, now shows in the coloured band at the top of the
+  window, the one 0.474 added, instead of floating near the foot of the
+  screen. It no longer waits for the Undo bar to go before showing.
+- As before, it is not shown in the middle of an exercise, where a reload
+  would lose the answer being typed, and Later puts it away.
+
+To check by hand: after a new version is deployed, open the app and see
+the band at the top with Later and Reload; press Later and see it go.
 
 ## 0.474 — 24 October 2026
 
