@@ -1717,18 +1717,20 @@ function ClipDrop({ label, disabled, onFiles }: {
  * A pairing already accepted stays whichever way the matcher later votes,
  * so improving the matcher can never silently drop a teacher's decision.
  */
-function WordsUsed({ lang, text, cards, selfId, chosen, onChange }: {
+function WordsUsed({ lang, text, cards, selfId, chosen, onChange, line = false }: {
   lang: Lang;
   text: string;
   cards: Card[];
   selfId?: string;
   chosen: string[];
   onChange: (ids: string[]) => void;
+  /** A line of a conversation, which is asked even where it is one word. */
+  line?: boolean;
 }) {
   const kind = guessKind(text, lang);
   const found = useMemo(
-    () => wordsOffered(text, (cards || []) as Item[], lang, selfId) as { card: Card; form: Form }[],
-    [cards, lang, text, selfId],
+    () => wordsOffered(text, (cards || []) as Item[], lang, selfId, { line }) as { card: Card; form: Form }[],
+    [cards, lang, text, selfId, line],
   );
   const suggestions = found.map((m) => m.card);
 
@@ -1738,7 +1740,7 @@ function WordsUsed({ lang, text, cards, selfId, chosen, onChange }: {
   const kept = (chosen || []).filter((id) => !suggestions.some((c) => c.id === id));
   const keptCards = (cards || []).filter((c) => kept.includes(c.id));
 
-  if (!supportsContext(lang) || kind === "word") return null;
+  if (!supportsContext(lang) || !String(text || "").trim() || (kind === "word" && !line)) return null;
   if (!suggestions.length && !keptCards.length) {
     return (
       <div className="at-formblock at-mt5">
@@ -7121,8 +7123,10 @@ function TurnBlock({ talk, lang, allCards, selfId, index: i, line: l }: {
       {/* Which of the teacher's own words this line contains.
           Confirmed here, line by line, because a line is where
           a word actually turns up — and it is what lets a word
-          be practised inside a real exchange. */}
+          be practised inside a real exchange. A reply of one
+          word, عفواً, is asked too. */}
       <WordsUsed
+        line
         lang={lang}
         text={l.ar}
         cards={allCards}

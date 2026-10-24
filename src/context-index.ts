@@ -229,25 +229,36 @@ function gapIn(written: string, filled: string, word: string, lang: Lang): { at:
  * Which cards are words is the teacher's answer where they gave one — see
  * kindOf. Guessed from the spaces in it, every Vietnamese word of two
  * syllables read as a phrase and was never offered here.
+ *
+ * Every card found, in the order its word comes in the text. This stopped
+ * at 24, in the order the teacher's cards happen to be kept: a long text
+ * lost whichever of its words came later in the collection, with nothing
+ * to say any were missing, and a teacher took the missing عفواً for a
+ * harakat the matcher had not ignored.
+ *
+ * A single word contains nothing, so it is offered nothing — except as a
+ * line of a conversation (`line`), where a reply of one word, عفواً, is
+ * still somewhere that word was really said.
  */
 export function wordsOffered(
   text: string,
   cards: Item[],
   lang: Lang,
   selfId: string = "",
-  most: number = 24,
+  { line = false }: { line?: boolean } = {},
 ): { card: Item; form: Form }[] {
   const texts = splitForms(String(text || ""));
-  if (!supportsContext(lang) || !texts.length || guessKind(texts[0], lang) === "word") return [];
-  const out: { card: Item; form: Form }[] = [];
+  if (!supportsContext(lang) || !texts.length) return [];
+  if (!line && guessKind(texts[0], lang) === "word") return [];
+  const out: { card: Item; form: Form; at: number }[] = [];
   for (const card of cards || []) {
-    if (out.length >= most) break;
     if (!card || !card.id || card.id === selfId) continue;
     const lead = wordOf(card).ar;
     if (!lead || kindOf(card, lang) !== "word") continue;
     const words = wordsOfCard(card);
     const hit = texts.map((t) => bestWordIn(t, words, lang)).find(Boolean);
-    if (hit) out.push({ card, form: hit.item.unit });
+    if (hit) out.push({ card, form: hit.item.unit, at: hit.span.at });
   }
-  return out;
+  /* Stable, so two cards found at the same word keep the collection's order. */
+  return out.sort((a, b) => a.at - b.at).map(({ card, form }) => ({ card, form }));
 }
