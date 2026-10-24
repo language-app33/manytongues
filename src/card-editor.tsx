@@ -6865,19 +6865,13 @@ function TableBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
 /* The scene: what it is called, who is in it, and whose part the student
    takes. */
 function SceneBlock({ talk }: { talk: SceneDraft }) {
-  const { canSave, title, setTitle, speakers, setSpeakers, you, setYou, text } = talk;
+  const { title, setTitle, speakers, setSpeakers, you, setYou, text } = talk;
   return (
     <>
     <div className="at-formblock main">
       <div className="at-formhead">
         <span className="at-formnum">{text ? "The text" : "The scene"}</span>
-        {text && <span className="at-formrole">What it is called.</span>}
       </div>
-      {text && (
-        <p className={`at-formneed${canSave ? "" : " unmet"}`}>
-          A name, and one sentence or more.
-        </p>
-      )}
 
       <Field label="What it is called">
         <input
