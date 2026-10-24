@@ -3224,6 +3224,56 @@ export function Overlay({ children }: { children?: Node }) {
   return host ? createPortal(children, host) : null;
 }
 
+/* --- TopBanner ----------------------------------------------------
+   The few things that must not be missed — work saved on this device and
+   not yet sent is the first — said in a solid band across the very top of
+   the window, above the wordmark, the space selector and the corner menu.
+   A Notice inside a tab is read by somebody looking at that tab; this is
+   for what is true of the app however far down the page they are.
+
+   The band lives in one place, BannerHost, which the app draws once at its
+   root; whoever has something to say portals a TopBanner into it, so two
+   at once stack rather than overlap. The host measures itself into
+   --banner-h on the document, and everything pinned to the top of the
+   window — the chrome, a screen, the page itself — moves down by that
+   much, so the band covers nothing. With nothing in it the host is empty,
+   --banner-h is 0, and the layout is exactly what it was without it. */
+export function BannerHost() {
+  const ref: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    const root = document.documentElement;
+    if (!el) return undefined;
+    const measure = () => root.style.setProperty("--banner-h", `${el.offsetHeight}px`);
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => {
+      watch.disconnect();
+      root.style.removeProperty("--banner-h");
+    };
+  }, []);
+  return <div className="at-banners" ref={ref} />;
+}
+
+export function TopBanner({ kind = "warn", children }: {
+  kind?: "warn" | "error";
+  children?: Node;
+}) {
+  const [host, setHost] = useState<Element | null>(null);
+  useEffect(() => {
+    setHost(document.querySelector(".at-banners"));
+  }, []);
+  if (!children || !host) return null;
+  return createPortal(
+    <p className={`at-banner ${kind}`} role={kind === "error" ? "alert" : "status"}>
+      {children}
+    </p>,
+    host,
+  );
+}
+
 /* ==================================================================
    The snackbar
    ==================================================================

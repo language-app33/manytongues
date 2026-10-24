@@ -128,6 +128,7 @@ import {
   SpaceFrame,
   Tile,
   TileNote,
+  TopBanner,
   cardToItem,
   dateTime,
   languageName,
@@ -7687,15 +7688,16 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       error={error}
       busy={busy}
     >
-          {/* Work that is safe but not yet shared. Said here, above every
-              tab, because it is true of the space rather than of whichever
-              list is on screen — and a teacher who has just written a card
-              on a train should be able to see that it is still coming. */}
+          {/* Work that is safe but not yet shared. Said in the band across
+              the top of the window rather than in the space, because it is
+              true of the space rather than of whichever list is on screen —
+              and a teacher who has just written a card on a train should
+              see that it is still coming however far down a list they are. */}
           {kept > 0 && (
-            <Notice kind="warn">
+            <TopBanner>
               {`${plural(kept, "card")} saved on this device, waiting for a connection. `}
               {offline ? "They go up as soon as you're back online." : "Sending…"}
-            </Notice>
+            </TopBanner>
           )}
 
           {tab === "courses" && (

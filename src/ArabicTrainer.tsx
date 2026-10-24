@@ -22,6 +22,7 @@ import {
   Field as FormField,
   FLAG_KINDS,
   FLAG_NOTE_MAX,
+  BannerHost,
   Help,
   Icon,
   IconButton,
@@ -39,6 +40,7 @@ import {
   Stat,
   StickyFoot,
   Tabs,
+  TopBanner,
   plural,
   pairSystems,
   pullCourses,
@@ -13644,6 +13646,18 @@ export default function ArabicTrainer() {
           callback to say it with — the teaching and admin screens above all,
           which had no way to confirm a save. */}
       <SnackbarProvider show={snack.show}>
+      {/* The band across the top for what must not be missed. First, so
+          it is the first thing a screen reader comes to as well. */}
+      <BannerHost />
+      {/* A problem reported without a connection is kept and sent later;
+          until then the learner is told so in the band, not only in the
+          corner menu, where it was easy to never look. */}
+      {toSend > 0 && (
+        <TopBanner>
+          {`${plural(toSend, "report")} saved on this device, waiting for a connection. `}
+          {offline ? "They go up as soon as you're back online." : "Sending…"}
+        </TopBanner>
+      )}
       <div className="at-wrap">
           {/* The same tab strip the teaching and admin spaces use, rather than
               a floating bar of its own. */}
