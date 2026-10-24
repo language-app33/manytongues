@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.474 — 24 October 2026
+## 0.475 — 24 October 2026
 
 **In Teaching, reading a card and editing it are the same screen.**
 
@@ -33,6 +33,24 @@ and moves once per batch of work you would notice, not once per commit.
 To check by hand: open a card, play a recording and open a fold while it
 is locked; press Edit, change something, press Cancel and check the card
 is back as it was.
+
+## 0.474 — 24 October 2026
+
+**Work not yet sent is said in a band across the top of the screen.**
+
+- When cards you wrote in Teaching are saved on this device and waiting
+  for a connection, that is now said in a solid coloured band across the
+  very top of the window, above the app's name, the space buttons and the
+  menu, instead of as a line inside the space. Everything else moves down
+  to make room, so the band covers nothing, and it goes as soon as the
+  cards are sent.
+- Problems you reported about a card without a connection are said the
+  same way, in Learning too. Before, they were mentioned only inside the
+  menu at the top right.
+
+To check by hand: on a phone, turn off the connection, write a card in
+Teaching, and see the band appear at the top with the menus below it;
+turn the connection back on and see it go.
 
 ## 0.473 — 24 October 2026
 

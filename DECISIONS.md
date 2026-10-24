@@ -6926,7 +6926,7 @@ And an example reopened shows its English as a student meets it — *You
 (f) must eat* for *you must eat* — because the pattern, not the typing, is
 what is kept.
 
-## A teacher's card has one screen: the editor, locked (0.474)
+## A teacher's card has one screen: the editor, locked (0.475)
 
 **24 October 2026** · `CardEditor`'s `locked`, `onUnlock`, `onRelock`,
 `status`, `about`, `below` in `src/card-editor.tsx`; `Locked`, `Pressable`,
