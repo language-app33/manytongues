@@ -6692,12 +6692,58 @@ a student is asked:
 - Every asked version of a sentence card is read (masculine and feminine,
   old `subs`), still as one sentence: a word in two versions earns 1.
 - A line picked from a sentence card of the same deck is not a second
-  sentence. A conversation switched off is never dealt to a student, so its
-  lines are not sentences and it does not earn the conversation check.
-  Text with no letter in it ("." or "…") is no sentence and no word.
+  sentence. Text with no letter in it ("." or "…") is no sentence and no
+  word.
 - The fixes for a sentence's two flaws each claim only the sentences that
   fix alone would mend; sentences with both flaws are a fix of their own,
   since linking them alone, or teaching their words alone, adds nothing.
+
+## Words with several answers, in sentences (0.468)
+
+**24 October 2026** · `answerWords`, `phraseAnswers` and `wordsOffered` in `src/context-index.ts`, `castContext` and `pickContext` in `src/ArabicTrainer.tsx`, `src/context-links.ts`, `src/sentence-words.ts`, `contextCoverage` in `src/languages.ts`, `heard` and `spelt` in `src/deck-quality.ts`
+
+Found by the audit in `docs/AUDIT-what-teachers-can-make.md` (findings 4
+to 6), and settled by the owner question by question.
+
+**Each accepted answer is a word to find.** A form's answers are one text
+with a separator between them, and everything that looked for a word
+inside a sentence read that text whole, so it found it nowhere. The
+gap-fill, "Words this teaches", the In context tab, a deck's In context
+section, the editor's sentence check and the learner's own links all read
+each answer on its own now, through `splitForms` or `answersOf`. A phrase
+with two answers is read as each of them too, and shown as the one that
+holds the word, with that answer's own recordings. The score had read
+answers one by one since 0.463, so for a while it credited sentences that
+students never got. The two agree again.
+
+**In a sentence, only the sentence's answer is right.** The owner's
+choice, over accepting any of the word's answers: the sentence was written
+and recorded with one of them. The index notes which answer a sentence
+holds (`answer` on a context). `castContext` narrows the question to it
+before `castAnswer` takes one by its count, so it holds for the typed gap,
+the heard one and the choice. A choice is scheduled per answer, so
+`pickContext` takes a sentence holding the answer being scheduled where
+there is one. Where there isn't, any sentence is used and the question is
+about that sentence's answer, which the second answer's schedule is then
+credited with. That is accepted: the other way leaves such an answer with
+no sentence question at all.
+
+**The word type before the spaces.** `wordsOffered`, `sentenceWords` and
+`contextCoverage` guessed word-or-phrase from the text, which `kindOf` had
+stopped doing for the rest of the app because it turns a Vietnamese word
+of two syllables into a phrase. They ask `kindOf` now. A card with no word
+type is still guessed from its whole text; whether to guess from its first
+answer instead is a question the owner has not answered yet.
+
+**Each answer's recordings.** A form's recordings are the union of its
+answers' (`packAnswers`), so the score called a form recorded as soon as
+one answer was. It now asks every answer of a form with more than one; a
+card from before answers had recordings of their own shares the form's,
+and reads as it did.
+
+**The switched-off conversation.** The rule added in 0.463 stays as a
+safeguard for an imported or very old card. The notes that described it
+to teachers are gone, because no teacher can make one.
 
 ## A teacher's export is a backup file (0.462)
 

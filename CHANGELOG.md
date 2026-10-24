@@ -8,6 +8,35 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.468 — 24 October 2026
+
+**Words with more than one accepted answer are practised in sentences.**
+
+- A word card that accepts more than one answer, such as تمام or منيح, or
+  كيف حالَك؟ or كيفَك؟, was never put into a sentence for students to fill
+  in, even when the teacher had linked the sentence to it. Now it is.
+- In a sentence, the right answer is the one the sentence says. In "أنا
+  تمام" the student is asked for تمام, and منيح is marked wrong there.
+  Questions that aren't asked inside a sentence still accept every answer.
+- A sentence card with two accepted answers is shown to students as the
+  one that holds the word, rather than both run together.
+- For teachers, "Words this teaches" in the card editor now offers these
+  words, and the check under a sentence no longer says nothing teaches
+  them. The In context tab and a deck's In context section find them too.
+- Those same screens now go by the word type the teacher picked. A
+  Vietnamese word of two syllables, such as cà phê, was treated there as a
+  phrase, so it was never offered or counted.
+- Deck quality: a word with two answers counts as recorded only once each
+  answer has its own recording, and the same goes for pronunciation.
+- The notes for 0.463 no longer mention switched-off conversations.
+  Teachers can't switch a conversation off, so there was nothing to count.
+- Trade-off: students meet more sentences. A sentence can wait a little
+  longer before it comes up, until the student knows these words, as it
+  already does for every other word. Some deck scores drop where a second
+  answer has no recording.
+- To check by hand: practise a word with two answers that has a linked
+  sentence, and see that the gap asks for the answer the sentence says.
+
 ## 0.467 — 23 October 2026
 
 **A card's buttons sit under its title.**
@@ -118,10 +147,9 @@ screen's header is narrow.
   masculine and a feminine version both count for their words. One card is
   still one sentence: a word in both versions counts once.
 - A conversation line picked from a sentence card in the same deck no
-  longer counts as a second sentence. A conversation switched off is no
-  longer counted, since students are never given it. A line with no words
-  in it, such as ".", is not counted as a sentence needing a link, a
-  recording and a pronunciation.
+  longer counts as a second sentence. A line with no words in it, such as
+  ".", is not counted as a sentence needing a link, a recording and a
+  pronunciation.
 - The suggestions are honest about sentences with two problems. "Link it"
   and "teach the word" each claim only what doing that alone would add;
   sentences that are both unlinked and use an untaught word get their own
@@ -134,8 +162,7 @@ screen's header is narrow.
   the "already in N phrases" count after saving a card is right. Both
   were reading cards the way they were stored before, and found nothing.
 - Trade-off: most decks with feminine pairs or cards with several answers
-  score higher; a deck that leant on a picked line or a switched-off
-  conversation can score lower.
+  score higher; a deck that leant on a picked line can score lower.
 - To check by hand: open a deck with a feminine pair and a card with two
   answers and see its score and suggestions; open In context on a recently
   edited collection and see links offered.

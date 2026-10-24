@@ -4,6 +4,16 @@
 the app was changed by this audit. Every finding marked *probed* was
 reproduced by running the real code, not by reading it.
 
+> **The owner answered every decision at the end with the recommended
+> option, and all of it is in 0.468.** This document is kept as it was
+> written. The `CHANGELOG.md` entry for 0.468 says what changed for the
+> people using the app; the `DECISIONS.md` entry *Words with several
+> answers, in sentences* says how. The tests in
+> `tests/several-answers.test.mjs` fail on findings 4 and 5 if they are
+> put back, and a test in `tests/deck-quality.test.mjs` does the same for
+> finding 6. The open question about cards with no word type is still
+> open.
+
 ## Why this audit
 
 In 0.463 the deck quality score gained a rule for "a conversation switched
