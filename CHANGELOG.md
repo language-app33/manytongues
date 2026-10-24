@@ -8,6 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.469 — 24 October 2026
+
+**Save without closing a card, and a card's status where you look for it.**
+
+- The card editor has two buttons: Save, which saves and keeps the card
+  open to go on with it, and Save and exit, which saves and closes it.
+  They sit on a line under the screen's title, where both fit on a phone.
+- The status beside Edit is the app's own menu button now, the same
+  height as Export and Edit, and it opens the app's own menu rather than
+  the phone's list of choices.
+- In list view, a draft, or a card with changes waiting, shows its status
+  in a small pill before its word. In table view, Status is the first
+  column. A card students simply have shows nothing there.
+
+To check by hand: Save on a new card, then Save again — the second save
+changes the same card rather than making another.
+
 ## 0.468 — 24 October 2026
 
 **Words with more than one accepted answer are practised in sentences.**

@@ -4359,17 +4359,25 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("a teacher's card still says which decks it lives in",
     !!teachRead && /Where it lives/i.test(teachRead.textContent || ""),
     teachRead ? (teachRead.textContent || "").replace(/\s+/g, " ").slice(0, 120) : "(no readout)");
-  /* And where it stands with students, beside Edit. A card saved before
-     there were statuses is published, and says so. */
-  const statusSel = /** @type {HTMLSelectElement | null} */ ([...document.querySelectorAll(".at-statusmenu select")].pop() || null);
+  /* And where it stands with students, beside Edit: the app's own menu
+     button, the height of the buttons beside it, opening the app's own
+     menu of what can be done from here. A card saved before there were
+     statuses is published, and says so. */
+  const statusBtn = /** @type {HTMLButtonElement | null} */ ([...document.querySelectorAll(".at-statusmenu .at-statusbtn")].pop() || null);
   check("a teacher's card says where it stands with students, beside Edit",
-    !!statusSel && statusSel.value === "published" &&
-      [...statusSel.options].map((o) => o.textContent).join(" | ") === "Published | Unpublish…",
-    statusSel ? `${statusSel.value}: ${[...statusSel.options].map((o) => o.textContent).join(" | ")}` : "(no status menu)");
-
+    !!statusBtn && /Published/.test(statusBtn.textContent || "") && statusBtn.classList.contains("at-btn") &&
+      statusBtn.classList.contains("sm") && !document.querySelector(".at-statusmenu select"),
+    statusBtn ? `${statusBtn.className}: ${statusBtn.textContent}` : "(no status button)");
+  if (statusBtn) click(statusBtn);
+  await sleep(100);
+  const statusLines = [...document.querySelectorAll(".at-statusmenu .at-pickmenu .at-pickline")].map((b) => (b.textContent || "").trim());
+  check("and it opens the app's menu of what can be done from there",
+    statusLines.join(" | ") === "Published | Unpublish…", statusLines.join(" | ") || "(no menu)");
+  if (statusBtn) click(statusBtn);
+  await sleep(100);
   /* On a line of its own under the title: beside it, Export, the status
      and Edit squeezed a sentence's title to a word a line on a phone. */
-  const cardHead = statusSel && statusSel.closest(".at-screenhead");
+  const cardHead = statusBtn && statusBtn.closest(".at-screenhead");
   check("and its buttons sit on a line under the card's title",
     !!cardHead && cardHead.classList.contains("below") &&
       !!cardHead.querySelector(".at-screenaction .at-statusmenu"),
@@ -8509,7 +8517,7 @@ const openPronounTables = async () => {
   await sleep(150);
   const heads = [...document.querySelectorAll(".at-cardtable thead th")].map((th) => (th.textContent || "").trim()).filter(Boolean);
   check("the table view has a column for everything the teacher compares",
-    heads.join(" | ") === "Word | Transliteration | Meaning | Kind | Subtype | Decks | Status | Recording | Review | Created | Modified",
+    heads.join(" | ") === "Status | Word | Transliteration | Meaning | Kind | Subtype | Decks | Recording | Review | Created | Modified",
     heads.join(" | ") || "(no table)");
   check("and a row per card", document.querySelectorAll(".at-cardtable tbody tr[data-card]").length > 0,
     String(document.querySelectorAll(".at-cardtable tbody tr").length));

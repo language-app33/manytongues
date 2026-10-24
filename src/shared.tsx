@@ -1471,6 +1471,8 @@ export interface CardRow {
   cells: Record<string, Node>;
   open?: () => void;
   actions?: Node;
+  /** Drawn first on a line, before the word — a card's status. */
+  lead?: Node;
 }
 export interface CardViews<T> {
   /** Which list this is, for remembering the view it was left at. */
@@ -1614,6 +1616,7 @@ function CardLines<T>({ view, views, page, itemKey, selecting, picked, toggle, h
               )}
               <div className={`at-cardline${on ? " picked" : ""}`} role="button" data-card={id} {...pressable(id, row)}>
                 {tick(on)}
+                {row.lead ? <span className="at-cardline-lead">{row.lead}</span> : null}
                 <span className="at-cardline-word">{row.word}</span>
                 <span className="at-cardline-meaning">{row.meaning}</span>
                 {row.actions && !selecting ? (

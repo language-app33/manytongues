@@ -4637,6 +4637,12 @@ const statusWords = (c: Card): string =>
         ? "Changes in draft"
         : "";
 
+/* The same, as a small pill at the start of a line or a table row, and
+   nothing on a card students simply have. Allowed two lines, so the
+   longest ("Changes ready for review") stays narrow on a phone. */
+const statusPill = (c: Card): React.ReactNode =>
+  statusWords(c) ? <span className="at-statuspill">{statusWords(c)}</span> : null;
+
 /* What a card carries about itself rather than about the word: never what
    a save changed. See touchedBy. */
 const SAVE_BOOKKEEPING = new Set([
@@ -4681,8 +4687,12 @@ const statusNow = (card: Card): string =>
  * A menu rather than three buttons, because which choices there are
  * depends on where the card stands: a published card with changes waiting
  * has the changes' status to set, and two ways to be done with them. What
- * it shows is where the card stands now; choosing is doing. The two
+ * the button says is where the card stands now; choosing is doing. The two
  * choices that throw something away ask first.
+ *
+ * The app's own button and menu, the ones the filters over a card list
+ * use, rather than the phone's picker: the same height as Export and Edit
+ * beside it, and the same look as every other menu in the app.
  */
 function StatusMenu({ card, disabled, onStatus }: {
   card: Card;
@@ -4690,8 +4700,20 @@ function StatusMenu({ card, disabled, onStatus }: {
   onStatus: (to: StatusTo) => void;
 }) {
   const [asking, setAsking] = useState<"discard" | "unpublish" | null>(null);
+  const [open, setOpen] = useState(false);
+  /* The same close-on-anything-else the filter menus use, registered only
+     while it is open. */
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [open]);
   const now = statusNow(card);
+  const choices = statusChoices(card);
+  const shown = (choices.find((c) => c.value === now) || { label: "Published" }).label;
   const pick = (value: string) => {
+    setOpen(false);
     if (value === now) return;
     if (value === "discard" || value === "unpublish") {
       setAsking(value);
@@ -4700,19 +4722,41 @@ function StatusMenu({ card, disabled, onStatus }: {
     const to = value.startsWith("changes:") ? value.slice("changes:".length) : value;
     onStatus(to as StatusTo);
   };
+  const tone = card.status && card.status !== "published" ? card.status : card.changes ? "changed" : "published";
   return (
     <>
-      <label className={`at-statusmenu ${card.status && card.status !== "published" ? card.status : card.changes ? "changed" : "published"}`}>
-        <span className="at-sr">Status</span>
-        <select value={now} disabled={disabled} onChange={(e) => pick(e.target.value)}>
-          {statusChoices(card).map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-        <Icon name="chevronDown" size={16} />
-      </label>
+      <span className="at-statusmenu" onClick={(e) => e.stopPropagation()}>
+        <button
+          type="button"
+          className={`at-btn sm ghost at-menubtn at-statusbtn ${tone}`}
+          aria-label={`Status: ${shown}`}
+          aria-haspopup="menu"
+          aria-expanded={open}
+          disabled={disabled}
+          onClick={() => setOpen((v) => !v)}
+        >
+          {shown}
+          <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
+        </button>
+        {open && (
+          <div className="at-pickmenu at-statuspick" role="menu">
+            {choices.map((c) => (
+              <button
+                key={c.value}
+                type="button"
+                role="menuitem"
+                className={`at-pickline${c.value === now ? " on" : ""}`}
+                onClick={() => pick(c.value)}
+              >
+                <span className="at-pickmark">
+                  {c.value === now ? <Icon name="check" size={16} /> : null}
+                </span>
+                <span className="at-picktext">{c.label}</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </span>
       {asking === "discard" && (
         <ConfirmModal
           title="Discard your changes?"
@@ -4748,13 +4792,15 @@ function StatusMenu({ card, disabled, onStatus }: {
 
 /* The table view of a teacher's card lists, column by column. */
 const TEACHER_COLUMNS = [
+  /* First, so the cards students do not have yet are the ones the eye
+     finds: empty on a published card with nothing waiting. */
+  { key: "status", label: "Status" },
   { key: "word", label: "Word" },
   { key: "lat", label: "Transliteration" },
   { key: "meaning", label: "Meaning" },
   { key: "kind", label: "Kind" },
   { key: "subtype", label: "Subtype" },
   { key: "decks", label: "Decks" },
-  { key: "status", label: "Status" },
   { key: "audio", label: "Recording" },
   { key: "review", label: "Review" },
   { key: "created", label: "Created" },
@@ -5621,7 +5667,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           kind: cardKindLabel(c),
           subtype: cardSubtypeLabel(c, langOfCard(c)),
           decks: titles.join(", "),
-          status: statusWords(c) || "Published",
+          status: statusPill(c),
           audio: cardHasAudio(c) ? "Yes" : "",
           review: waitingIds.has(c.id) ? "Waiting" : needsReview(c) ? "Reviewed" : "",
           created: shortDate(c.created),
@@ -5629,6 +5675,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         },
         open: () => setViewing(c),
         actions: cardActions(c),
+        lead: statusPill(c),
       };
     },
   });
@@ -6423,7 +6470,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         onOpenCard={(other) =>
           setEditing({ card: other, decks: other.decks || [], lang: other.lang || (editLang || {}).id || "", opened: Date.now() })
         }
-        onSave={({ forms, note, name, examples, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next }) =>
+        onSave={({ forms, note, name, examples, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next, exit }) =>
           run(
             async () => {
               const [main, ...subs] = forms;
@@ -6612,8 +6659,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   draft: anotherWordDraft(savedNow, (savedNow.forms || [])[0] || null),
                   opened: Date.now(),
                 });
-              } else {
+              } else if (exit || !savedNow) {
                 setEditing(null);
+              } else {
+                /* Save alone: the editor stays open, on the card as saved,
+                   so the next save is of this card — a new one included,
+                   which has an id from here on. Not drawn afresh: what is
+                   on the screen is what was just saved. */
+                setEditing((e) => (e ? { ...e, card: savedNow, decks: savedNow.decks || [], draft: undefined, making: undefined } : e));
               }
               /* Whether the card just saved turns up in phrases already
                  written. Counted against the list with the new card in
