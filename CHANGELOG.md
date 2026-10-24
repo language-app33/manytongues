@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.472 — 24 October 2026
+## 0.473 — 24 October 2026
 
 **"Words this teaches" finds every word, and one-word replies too.**
 
@@ -26,6 +26,26 @@ Trade-off: a long text now gives a long list to go through.
 
 To check by hand: a long text card offers its later words; a one-word line
 in a conversation offers its word.
+
+## 0.472 — 24 October 2026
+
+**Save without closing a card, and a card's status where you look for it.**
+
+- The card editor has two buttons: Save, which saves and keeps the card
+  open to go on with it, and Save and exit, which saves and closes it.
+- On a phone, the editor's two buttons, and Export, the status and Edit
+  on a card's screen, sit on a line under the screen's title. On a wide
+  screen they are back on the title's line, at the right.
+- The status beside Edit is the app's own menu button now, the same
+  height as Export and Edit, and it opens the app's own menu rather than
+  the phone's list of choices.
+- In list view, a draft, or a card with changes waiting, shows its status
+  in a small pill before its word. In table view, Status is the first
+  column. A card students simply have shows nothing there.
+
+To check by hand: Save on a new card, then Save again — the second save
+changes the same card rather than making another. And a card's screen
+on a wide window and on a phone.
 
 ## 0.471 — 24 October 2026
 

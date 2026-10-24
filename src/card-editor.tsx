@@ -10317,7 +10317,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   decks: Deck[];
   inDecks?: string[];
   allCards: Card[];
-  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, setting: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null }) => void;
+  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, setting: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean }) => void;
   /** Open another of the teacher's cards in place of this one — the
       cards the Meanings block names. */
   onOpenCard?: (card: Card) => void;
@@ -10393,9 +10393,11 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     !(card && SPEAKER_COLUMNS.has(String(card.person || "")));
   /* The question a change to a shared word asks, while it is being asked:
      what would be saved, and which cards it would be offered to. */
-  const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null } | null>(null);
+  const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null, exit: boolean } | null>(null);
   const meanings = shape === "word";
-  const save = (next: "meaning" | "word" | null = null) => {
+  /* `exit` is Save and exit: the card is saved and the editor closes.
+     Save alone keeps it open on the card as saved. */
+  const save = (next: "meaning" | "word" | null = null, exit = false) => {
     const written = writtenCard({ word, talk, shape, chosen });
     const extra = {
       clue: meanings ? clue.trim() : "",
@@ -10405,10 +10407,10 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     const changes = stored && meanings ? wordChanges(card, written.forms as any) : [];
     const others = cardsSharingChange(allCards, { id: selfId, lang: lang.id }, changes);
     if (others.length) {
-      setCarrying({ written, cards: others, changes, next: extra.next });
+      setCarrying({ written, cards: others, changes, next: extra.next, exit });
       return;
     }
-    onSave({ ...written, ...extra, carry: null });
+    onSave({ ...written, ...extra, carry: null, exit });
   };
   /* Whether there is a connection, for the line above the first field. */
   const offline = useOffline();
@@ -10432,14 +10434,28 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
            one that asks for it. */
         className="cardform"
         onBack={onClose}
+        /* Two saves: Save keeps the card open to go on with it, and
+           Save and exit closes it — the one a finished card wants, so it
+           is the primary. On a line under the title, where two buttons
+           have the room. */
+        actionBelow
         action={
-          <Button variant="primary" size="sm"
-            disabled={!canSave || busy}
-            onClick={() => save()}
-          >
-            <Icon name="save" />
-            {busy ? "Saving…" : "Save"}
-          </Button>
+          <>
+            <Button size="sm"
+              disabled={!canSave || busy}
+              onClick={() => save()}
+            >
+              <Icon name="save" />
+              {busy ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="primary" size="sm"
+              disabled={!canSave || busy}
+              onClick={() => save(null, true)}
+            >
+              <Icon name="check" />
+              Save and exit
+            </Button>
+          </>
         }
       >
           {/* Said before the typing rather than after it.
@@ -10526,13 +10542,14 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
           cards={carrying.cards}
           onCancel={() => setCarrying(null)}
           onAnswer={(carry) => {
-            const { written, cards, changes, next } = carrying;
+            const { written, cards, changes, next, exit } = carrying;
             setCarrying(null);
             onSave({
               ...written,
               clue: clue.trim(),
               capitals: asksCapitals ? capitals : undefined,
               next,
+              exit,
               carry: carry ? { ids: cards.map((c) => c.id), changes } : null,
             });
           }}
