@@ -4487,12 +4487,18 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   const saveOff = () => /** @type {any} */ (buttonNamed(/^Save$/))?.disabled && /** @type {any} */ (buttonNamed(/^Save and exit$/))?.disabled;
   check("both saves are off until something changes", !!saveOff(),
     `Save ${(/** @type {any} */ (buttonNamed(/^Save$/)) || {}).disabled ? "off" : "on"}`);
-  /* A change anywhere in the card turns them on: a line in its note. */
-  const noteBox = /** @type {HTMLTextAreaElement | null} */ ([...document.querySelectorAll(".at-screen.cardform textarea")].pop() || null);
-  if (noteBox) {
-    must(Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value"), "the value descriptor").set?.call(noteBox, `${noteBox.value} (smoke)`);
-    noteBox.dispatchEvent(new w.Event("input", { bubbles: true }));
-  }
+  /* A change anywhere in the card turns them on: a word added to the
+     first box with something written in it. */
+  const noteBox = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (
+    [...document.querySelectorAll(".at-screen.cardform input:not([type]), .at-screen.cardform input[type=text], .at-screen.cardform textarea")]
+      .find((b) => !!(/** @type {any} */ (b)).value) || null);
+  /** @param {HTMLInputElement | HTMLTextAreaElement} box @param {string} v */
+  const typeOn = (box, v) => {
+    const proto = box.tagName === "TEXTAREA" ? w.HTMLTextAreaElement.prototype : w.HTMLInputElement.prototype;
+    must(Object.getOwnPropertyDescriptor(proto, "value"), "the value descriptor").set?.call(box, v);
+    box.dispatchEvent(new w.Event("input", { bubbles: true }));
+  };
+  if (noteBox) typeOn(noteBox, `${noteBox.value} x`);
   await sleep(150);
   check("and come on once something has", !!noteBox && !saveOff(), noteBox ? "typed in a box" : "(no box to type in)");
   takeSaves = true;
@@ -4504,10 +4510,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     `${savedCards.length - savesBefore} saved · ${editorOpen() ? "open" : "closed"}`);
   check("and once saved, they are off again until the next change", !!saveOff(),
     `Save ${(/** @type {any} */ (buttonNamed(/^Save$/)) || {}).disabled ? "off" : "on"}`);
-  if (noteBox) {
-    must(Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value"), "the value descriptor").set?.call(noteBox, `${noteBox.value}!`);
-    noteBox.dispatchEvent(new w.Event("input", { bubbles: true }));
-  }
+  if (noteBox) typeOn(noteBox, `${noteBox.value}y`);
   await sleep(150);
   clickNamed(/^Save and exit$/);
   await sleep(500);
