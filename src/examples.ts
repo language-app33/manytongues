@@ -204,10 +204,12 @@ const ANY_SLOT = /\{\{\s*[^{}]*?\s*\}\}/g;
 const keyOf = (word: string): string =>
   String(word || "").normalize("NFKD").replace(/[\p{M}\u0640\u200B-\u200F\uFEFF]/gu, "").toLowerCase();
 
-/* What stands either side of a word without being part of it. Not the
+/* What stands either side of a word without being part of it: any
+   script's punctuation, named by its kind rather than listed, so the
+   Arabic comma and question mark need no place here. Not the
    apostrophe, which a transliteration writes ʿayn with. */
-const OPENS = /^[(«“"[¿¡]+/u;
-const CLOSES = /[.,!?;:،؛؟…»”")\]]+$/u;
+const OPENS = /^(?:(?!['’])[\p{Ps}\p{Pi}\p{Po}])+/u;
+const CLOSES = /(?:(?!['’])[\p{Pe}\p{Pf}\p{Po}])+$/u;
 
 /* A sentence's words, each where it stands with what is around it left
    off. */
