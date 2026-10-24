@@ -129,6 +129,7 @@ const ICONS: Record<string, string> = {
   key:
     "M12.65 10C11.83 7.67 9.61 6 7 6c-3.31 0-6 2.69-6 6s2.69 6 6 6c2.61 0 4.83-1.67 5.65-4H17v4h4v-4h2v-4H12.65zM7 14c-1.1 0-2-.9-2-2s.9-2 2-2 2 .9 2 2-.9 2-2 2z",
   download: "M19 9h-4V3H9v6H5l7 7 7-7zM5 18v2h14v-2H5z",
+  upload: "M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z",
   verify:
     "M14 10H2v2h12v-2zm0-4H2v2h12V6zM2 16h8v-2H2v2zm19.5-4.5L23 13l-6.99 7-4.51-4.5L13 14l3.01 3 5.49-5.5z",
   play: "M8 5v14l11-7z",
@@ -310,7 +311,9 @@ function ClipRow({ hash, label, index, onRemove, load }: {
 
   return (
     <div className="at-clip">
-      <button
+      {/* Pressable rather than a button, so a recording can be played on a
+          locked card. */}
+      <Pressable
         className={`at-clipplay${state === "playing" ? " on" : ""}`}
         onClick={toggle}
         disabled={state === "loading"}
@@ -318,7 +321,7 @@ function ClipRow({ hash, label, index, onRemove, load }: {
         title={state === "playing" ? "Pause" : "Play"}
       >
         {state === "loading" ? "…" : state === "playing" ? "❚❚" : "▶"}
-      </button>
+      </Pressable>
       <span className="at-clipname">
         {label || `Voice ${index + 1}`}
         {error ? ` — ${error}` : ""}
@@ -418,6 +421,56 @@ export function deckSize(d: { cardCount?: number; parts?: string[]; partsWaiting
    Four looks and two sizes. The class strings used to be assembled at
    the call site, which is how "sm ghost" and "ghost sm" both came to
    exist, along with a stray "at-btn" with no variant at all. */
+/*
+ * Whether the screen this sits in is locked: a teacher's card read rather
+ * than edited. See CardEditor's `locked` in card-editor.tsx, which is what
+ * says so.
+ *
+ * A locked card is a disabled fieldset, so every box, tick and button in it
+ * stops answering without being told — including the ones added after this
+ * was written, which is the point. The few controls that only help
+ * somebody *read* — a fold, a recording played, a blank's words shown, a
+ * link to another card — are drawn as Pressable instead, which a fieldset
+ * cannot reach. This context is for the rest: a control that is not a form
+ * element at all (a box typed into through the app's own keypad) and has to
+ * be told.
+ */
+export const Locked = React.createContext(false);
+
+/**
+ * Something pressed to read rather than to change: a fold, a play button, a
+ * chip that shows what fills a blank. A button in every way a person or a
+ * screen reader can tell — focusable, named, answering Enter and Space —
+ * except the one that matters on a locked card: a disabled fieldset does
+ * not disable it.
+ */
+export function Pressable({ onClick, disabled, children, className = "", ...rest }: {
+  onClick?: (e: React.SyntheticEvent) => void;
+  disabled?: boolean;
+  children?: Node;
+  className?: string;
+} & Record<string, any>) {
+  return (
+    <span
+      role="button"
+      tabIndex={disabled ? -1 : 0}
+      aria-disabled={disabled || undefined}
+      className={`at-pressable${className ? " " + className : ""}`}
+      onClick={(e) => {
+        if (!disabled && onClick) onClick(e);
+      }}
+      onKeyDown={(e) => {
+        if (e.key !== "Enter" && e.key !== " ") return;
+        e.preventDefault();
+        if (!disabled && onClick) onClick(e);
+      }}
+      {...rest}
+    >
+      {children}
+    </span>
+  );
+}
+
 export function Button({
   variant = "default",
   size,
@@ -425,6 +478,7 @@ export function Button({
   icon,
   iconSize,
   off,
+  reads,
   className = "",
   children,
   ...rest
@@ -435,6 +489,9 @@ export function Button({
   icon?: string;
   iconSize?: number;
   off?: boolean;
+  /** Pressed to read or to go somewhere, never to change what is on the
+      screen — so it keeps working on a locked card. See Pressable. */
+  reads?: boolean;
   className?: string;
   children?: Node;
 } & Record<string, any>) {
@@ -457,10 +514,17 @@ export function Button({
        beside it and the wrong one where a learner is left tapping a dead
        button and guessing. Both are here; which to reach for is a question
        about whether anything else says why. */
-    <button type="button" className={cls} aria-disabled={off || undefined} {...rest}>
-      {icon ? <Icon name={icon} size={iconSize || (size === "sm" ? 16 : 18)} /> : null}
-      {children}
-    </button>
+    reads ? (
+      <Pressable className={cls} {...rest}>
+        {icon ? <Icon name={icon} size={iconSize || (size === "sm" ? 16 : 18)} /> : null}
+        {children}
+      </Pressable>
+    ) : (
+      <button type="button" className={cls} aria-disabled={off || undefined} {...rest}>
+        {icon ? <Icon name={icon} size={iconSize || (size === "sm" ? 16 : 18)} /> : null}
+        {children}
+      </button>
+    )
   );
 }
 
@@ -1379,8 +1443,8 @@ export function PlayButton({ state, onClick, className = "", label = "Play" }: {
   label?: string;
 }) {
   return (
-    <button
-      type="button"
+    /* Pressable, so a recording plays on a locked card too. */
+    <Pressable
       className={className || "at-clipplay"}
       onClick={onClick}
       disabled={state === "loading"}
@@ -1388,7 +1452,7 @@ export function PlayButton({ state, onClick, className = "", label = "Play" }: {
       title={state === "playing" ? "Pause" : label}
     >
       <Icon name={state === "playing" ? "pause" : "play"} />
-    </button>
+    </Pressable>
   );
 }
 
@@ -1470,6 +1534,8 @@ export interface CardRow {
   cells: Record<string, Node>;
   open?: () => void;
   actions?: Node;
+  /** Drawn first on a line, before the word — a card's status. */
+  lead?: Node;
 }
 export interface CardViews<T> {
   /** Which list this is, for remembering the view it was left at. */
@@ -1613,6 +1679,7 @@ function CardLines<T>({ view, views, page, itemKey, selecting, picked, toggle, h
               )}
               <div className={`at-cardline${on ? " picked" : ""}`} role="button" data-card={id} {...pressable(id, row)}>
                 {tick(on)}
+                {row.lead ? <span className="at-cardline-lead">{row.lead}</span> : null}
                 <span className="at-cardline-word">{row.word}</span>
                 <span className="at-cardline-meaning">{row.meaning}</span>
                 {row.actions && !selecting ? (
@@ -3098,14 +3165,16 @@ function ReadTaught({ of, cards, label, panel = false }: {
   const words = cards
     ? ids
         .map((id: string) => (cards || []).find((c: Record<string, any>) => String(c.id) === id))
-        .map((c) => (c ? String(wordOf(c).ar || leadOf(c).en || c.name || "") : ""))
+        .map((c) => (c ? shownAlternatives(wordOf(c).ar) || shownAlternatives(leadOf(c).en) || String(c.name || "") : ""))
         .filter(Boolean)
     : [];
-  const said = words.length ? words.join(" · ") : `${ids.length}`;
+  /* A card's accepted answers are kept apart by the dot, so the cards
+     themselves are kept apart by something else: a comma on a line, a line
+     each in a panel. */
   if (!panel) {
     return (
       <p className="at-hint">
-        {label}: {said}
+        {label}: {words.length ? words.join(", ") : `${ids.length}`}
       </p>
     );
   }
@@ -3117,7 +3186,9 @@ function ReadTaught({ of, cards, label, panel = false }: {
         which is how a word is met in more than one place without anything
         being invented.
       </p>
-      <p className="at-readvalue">{said}</p>
+      {words.length
+        ? words.map((w, i) => <p className="at-readvalue" key={i}>{w}</p>)
+        : <p className="at-readvalue">{ids.length}</p>}
     </section>
   );
 }
@@ -3218,6 +3289,61 @@ function useAppHost() {
 export function Overlay({ children }: { children?: Node }) {
   const host = useAppHost();
   return host ? createPortal(children, host) : null;
+}
+
+/* --- TopBanner ----------------------------------------------------
+   The few things that must not be missed — work saved on this device and
+   not yet sent is the first — said in a solid band across the very top of
+   the window, above the wordmark, the space selector and the corner menu.
+   A Notice inside a tab is read by somebody looking at that tab; this is
+   for what is true of the app however far down the page they are.
+
+   The band lives in one place, BannerHost, which the app draws once at its
+   root; whoever has something to say portals a TopBanner into it, so two
+   at once stack rather than overlap. The host measures itself into
+   --banner-h on the document, and everything pinned to the top of the
+   window — the chrome, a screen, the page itself — moves down by that
+   much, so the band covers nothing. With nothing in it the host is empty,
+   --banner-h is 0, and the layout is exactly what it was without it. */
+export function BannerHost() {
+  const ref: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
+  useEffect(() => {
+    const el = ref.current;
+    const root = document.documentElement;
+    if (!el) return undefined;
+    const measure = () => root.style.setProperty("--banner-h", `${el.offsetHeight}px`);
+    measure();
+    if (typeof ResizeObserver === "undefined") return undefined;
+    const watch = new ResizeObserver(measure);
+    watch.observe(el);
+    return () => {
+      watch.disconnect();
+      root.style.removeProperty("--banner-h");
+    };
+  }, []);
+  return <div className="at-banners" ref={ref} />;
+}
+
+/* `actions`, where there are any, are a button or two at the end of the
+   band: a message that needs doing something about, like reloading for a
+   new version, carries its buttons with it. */
+export function TopBanner({ kind = "warn", actions, children }: {
+  kind?: "warn" | "error";
+  actions?: Node;
+  children?: Node;
+}) {
+  const [host, setHost] = useState<Element | null>(null);
+  useEffect(() => {
+    setHost(document.querySelector(".at-banners"));
+  }, []);
+  if (!children || !host) return null;
+  return createPortal(
+    <div className={`at-banner ${kind}`} role={kind === "error" ? "alert" : "status"}>
+      <span className="what">{children}</span>
+      {actions ? <span className="at-banneracts">{actions}</span> : null}
+    </div>,
+    host,
+  );
 }
 
 /* ==================================================================
@@ -3439,10 +3565,15 @@ export function useScrollTop(key: unknown) {
  *   which says it is a step to the side of what is underneath rather than
  *   somewhere new.
  */
-export function Screen({ title, onBack, action, children, footer, backLabel = "Back", rise, className = "" }: {
+export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", rise, className = "" }: {
   title?: Node;
   onBack?: () => void;
   action?: Node;
+  /** Put the action on a line of its own under the title, where there is
+      more than one button and a long title — a card's screen, whose title
+      is the card's words. Beside the title, three buttons squeezed it to a
+      word a line on a phone. */
+  actionBelow?: boolean;
   children?: Node;
   footer?: Node;
   backLabel?: string;
@@ -3515,7 +3646,7 @@ export function Screen({ title, onBack, action, children, footer, backLabel = "B
      inside it escapes the space's layer while staying in the theme. */
   const view = (
     <div className={`at-screen over${rise ? " rise" : ""}${className ? " " + className : ""}`} ref={elRef} role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined}>
-      <div className="at-screenhead">
+      <div className={`at-screenhead${actionBelow ? " below" : ""}`}>
         {onBack ? (
           <button className="at-back" onClick={onBack} aria-label={backLabel}>
             <Icon name="back" />

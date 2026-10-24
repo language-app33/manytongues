@@ -50,7 +50,7 @@
  */
 
 import type { Form, GrammarDim, Lang, VerbSpec } from "./types.ts";
-import { answersOf, splitAlternatives } from "./answers.ts";
+import { answersOf, shownAlternatives, splitAlternatives } from "./answers.ts";
 import { agreementOf, answerFields, BARE_ROW, blankAdmits, categoryLabel, endRowsOf, GRAMMAR, kindOf, LANGUAGES, lendsForm, lendsInto, tablesOf, tensedOf, verbOf } from "./languages.ts";
 import { formsOf, leadOf } from "./cards.ts";
 import { linesOf, namedPart, speakerName } from "./dialogs.ts";
@@ -632,7 +632,7 @@ const usedWords = (value: unknown, ctx: FactCtx): string[] => {
   if (!ctx.cards) return [`${ids.length}`];
   const words = ids
     .map((id) => (ctx.cards || []).find((c) => str(c.id) === id))
-    .map((c) => (c ? str(leadOf(c).ar) || str(leadOf(c).en) : ""))
+    .map((c) => (c ? shownAlternatives(str(leadOf(c).ar)) || shownAlternatives(str(leadOf(c).en)) : ""))
     .filter(Boolean);
   /* A card that has gone since it was ticked is named by nothing, and the
      count is then all there is to say. */
@@ -1201,6 +1201,10 @@ export const NOT_SHOWN: [string, string][] = [
   ["card.created", "When the card was made. Shown beside it in the card list, where a date belongs."],
   ["card.updated", "And when it was last saved — the same."],
   ["card.inDecks", "Which decks the server says carry it, which is what `decks` says in words."],
+  ["card.status", "Whether students get it — a draft, ready for review, or published. The card screen says it, beside Edit, and a student's copy is always published."],
+  ["card.changes", "The status of a published card's unpublished changes, on a teacher's copy. Said beside the status, not as a fact about the word."],
+  ["card.changed", "When those changes were last saved. A fact about the changes, not about the word."],
+  ["card.pending", "The unpublished changes as the server stores them. A teacher's copy has them laid over the card already, and a student's never carries them."],
   ["card.kind", "What sort of card it is, from before that was read off the card's own turns and its own words. The shape of this screen is the answer now."],
   ["card.spread", "A rename the teacher said should follow the name into every other card. It travels beside the card being saved and is not part of it."],
   ["card.stripped", "The same for a tag taken off the whole collection."],

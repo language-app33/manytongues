@@ -80,7 +80,6 @@ const draft = {
 };
 const written = writtenCard({ word: draft, talk: {
   title: "At the door",
-  setting: "",
   speakers: ["Layla", "Karim"],
   you: null,
   written: [],
@@ -337,4 +336,12 @@ test("the examples list says which words it shows in their main form alone", asy
   const bare = { ...thisCard, forms: [thisCard.forms[0]] };
   assert.equal(mainFormOnly(ask(undefined), [bare], ar), null);
   assert.equal(mainFormOnly({ id: "w", ar: "{{this}} {{noun}}", en: "" }, [thisCard], ar), null);
+});
+
+test("the words a phrase teaches show each card's accepted answers with a dot between them", () => {
+  const rule = ruleFor("card", "uses");
+  assert.ok(rule && rule.shown);
+  const word = { id: "w1", forms: [{ id: "f1", ar: "كتاب\u001F\nسفر", en: "book" }] };
+  const ctx = /** @type {any} */ ({ cards: [word] });
+  assert.deepEqual(/** @type {NonNullable<typeof rule.shown>} */ (rule.shown)(["w1"], ctx), ["كتاب · سفر"]);
 });

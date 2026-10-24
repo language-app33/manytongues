@@ -5,7 +5,10 @@ app. It started as an Arabic trainer and now also supports Vietnamese (Huế
 dialect); adding another language is a matter of describing it in one file.
 
 Teachers publish decks of cards to a course; students join with a code and
-the material appears on their devices, along with any recordings. Progress
+the material appears on their devices, along with any recordings. A card is
+a **Draft**, **Ready for review** or **Published**, and only a published card
+reaches a student; a published card that is changed keeps its published
+version for students until the changes are published too. Progress
 is tracked per exercise type, not per card, so knowing a word when you read
 it and knowing it when you hear it are scheduled separately.
 
@@ -1549,6 +1552,9 @@ src/
   flag-export.ts   reported problems written out as text to paste elsewhere,
                    each with the card it is about. Pure: the clock, the
                    locale and every name it cannot work out are passed in.
+  imports.ts       a teacher's import read against what they already have:
+                   which cards are new, already theirs, or the same word as
+                   one of theirs, and which decks they have. Pure.
   ArabicTrainer.tsx  the learner's app: scheduler, session builder, screens
   spaces.tsx       the teaching and admin spaces, loaded lazily so a student
                    never downloads them
@@ -1588,9 +1594,17 @@ A few rules the code follows, learned the hard way:
   reaches for a language by name.
 - **One implementation of a thing.** If two versions of a component coexist,
   the goal is to converge on one, not to keep both.
+- **A teacher's card has one screen.** Opening a card in the teaching space
+  shows the editor itself, locked: every field inside a disabled fieldset
+  (`locked` on `CardEditor` in `src/card-editor.tsx`), so reading a card and
+  editing it cannot look different — a field added to the editor is on the
+  reading screen the day it is written. What only helps somebody read (a
+  fold, a recording, a blank's words, a link to another card) is a
+  `Pressable`, which a fieldset cannot reach; a control that is not a form
+  element reads `Locked`. Edit unlocks the card in place.
 - **The saved card is the contract between editing a card and reading one.**
-  Opening a card in the teaching space to look at it shows everything a saved
-  card can hold, not the fields somebody thought worth showing: everything
+  A student's card screen, and an administrator reading a reported card,
+  still use the read-out, which shows everything a saved card can hold, not the fields somebody thought worth showing: everything
   the editor does ends as a card being saved, so a read-out that says
   everything a card holds cannot fall behind it. What each field is called
   lives in `src/card-facts.ts`; a field nothing there names yet is shown raw

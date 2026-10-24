@@ -22,6 +22,7 @@ import {
   Field as FormField,
   FLAG_KINDS,
   FLAG_NOTE_MAX,
+  BannerHost,
   Help,
   Icon,
   IconButton,
@@ -39,6 +40,7 @@ import {
   Stat,
   StickyFoot,
   Tabs,
+  TopBanner,
   plural,
   pairSystems,
   pullCourses,
@@ -139,6 +141,7 @@ import {
   exOf,
   findWordSpan,
   gluedTo,
+  splitForms,
   guessKind,
   inScript,
   kindOf,
@@ -3101,7 +3104,7 @@ function fillContext(c: any): { ar: string; en?: string; lat?: string } | null {
  * that was missed is the one asked again rather than a new one. Random
  * choice would leave one context unseen for a surprisingly long time.
  */
-function pickContext(unit: Form, type: string) {
+export function pickContext(unit: Form, type: string) {
   const list = contextsFor(unit.id).filter((c) =>
     specOf(type) && specOf(type).needs.includes("contextAudio") ? (c.recs || []).length > 0 : true
   ).filter((c) =>
@@ -3110,8 +3113,13 @@ function pickContext(unit: Form, type: string) {
     specOf(type) && specOf(type).needs.includes("examples") ? typeof c.example === "number" : true
   );
   if (!list.length) return null;
+  /* A question about one of a word's accepted answers is asked in a phrase
+     holding that answer, where there is one — see castContext. */
+  const want = showsOneAnswer(type) && keysFor(unit, type).length > 1 ? answerOf(type) : null;
+  const theirs = want === null ? list : list.filter((c) => (c.answer || 0) === want);
+  const from = theirs.length ? theirs : list;
   const seen = turnOf(unit.s && unit.s[type]);
-  return list[seen % list.length];
+  return from[seen % from.length];
 }
 
 /* Which part a learner plays was only ever read by playing a part, which
@@ -6359,11 +6367,37 @@ function castExample(resolved: { unit: Form; parent: Item; isSub: boolean } | nu
   return { ...resolved, unit };
 }
 
+/*
+ * A word with several accepted answers, cast as the one its phrase holds.
+ *
+ * A question asked inside a phrase is about the word the phrase says. In
+ * "أنا تمام", a card accepting تمام or منيح is asked for تمام, and only
+ * تمام is right there: the other is a word the sentence does not say, and
+ * was never recorded in it. The owner's rule, 0.468. Until then the
+ * question took an answer by its own count, or accepted any of them, and
+ * could ask for منيح in a sentence that says تمام.
+ *
+ * Before castAnswer, which then finds one answer and keeps it. A verb's
+ * own examples are not phrases anybody wrote, and are cast by
+ * castExample.
+ */
+function castContext(resolved: { unit: Form; parent: Item; isSub: boolean } | null, ex: Question) {
+  const spec = specOf(typeOf(ex.type));
+  if (!resolved || !ex.ctx || !spec || spec.needs.includes("examples")) return resolved;
+  if (!spec.needs.includes("contexts") && !spec.needs.includes("contextAudio")) return resolved;
+  const context = contextsFor(resolved.unit.id).find((c) => c.id === ex.ctx);
+  if (!context || typeof context.answer !== "number") return resolved;
+  const answer = answerAt(resolved.unit, context.answer, answerFields());
+  if (!answer) return resolved;
+  const unit = oneAnswer(resolved.unit, answer) as Form;
+  return { ...resolved, unit, parent: resolved.isSub ? resolved.parent : withLead(resolved.parent, unit) };
+}
+
 export function resolveQuestion(asking: Item[], exercise: Question, trial: boolean, systems: SystemSet[]) {
   return castExample(castGap(
     castRange(
       castMeaning(
-        castTaught(castAnswer(castFill(castTense(resolveUnit(asking, exercise), exercise), exercise.type, trial), exercise.type), exercise.type),
+        castTaught(castAnswer(castContext(castFill(castTense(resolveUnit(asking, exercise), exercise), exercise.type, trial), exercise), exercise.type), exercise.type),
         exercise.type,
         exercise,
       ),
@@ -13612,6 +13646,18 @@ export default function ArabicTrainer() {
           callback to say it with — the teaching and admin screens above all,
           which had no way to confirm a save. */}
       <SnackbarProvider show={snack.show}>
+      {/* The band across the top for what must not be missed. First, so
+          it is the first thing a screen reader comes to as well. */}
+      <BannerHost />
+      {/* A problem reported without a connection is kept and sent later;
+          until then the learner is told so in the band, not only in the
+          corner menu, where it was easy to never look. */}
+      {toSend > 0 && (
+        <TopBanner>
+          {`${plural(toSend, "report")} saved on this device, waiting for a connection. `}
+          {offline ? "They go up as soon as you're back online." : "Sending…"}
+        </TopBanner>
+      )}
       <div className="at-wrap">
           {/* The same tab strip the teaching and admin spaces use, rather than
               a floating bar of its own. */}
@@ -15175,25 +15221,32 @@ export default function ArabicTrainer() {
       )}
 
 
-      {updateWaiting && !updateLater && !inExercise && !(lastDeleted && lastDeleted.length > 0) && (
-        /* Kept off a question in progress and out of the undo bar's way,
-           which sits in the same place. */
-        <div className="at-undo at-updatebar" role="status">
-          <span className="what">A new version is ready. Save your work, then reload.</span>
-          <Button size="sm" onClick={() => setUpdateLater(true)} disabled={updateGoing}>
-            Later
-          </Button>
-          <Button
-            size="sm"
-            onClick={() => {
-              setUpdateGoing(true);
-              void applyUpdate();
-            }}
-            disabled={updateGoing}
-          >
-            {updateGoing ? "Reloading…" : "Reload"}
-          </Button>
-        </div>
+      {updateWaiting && !updateLater && !inExercise && (
+        /* In the band across the top, where it is seen, rather than as a
+           floating bar at the foot that sat where the undo bar does and
+           had to wait for it. Still kept off a question in progress: a
+           reload there would lose the answer being typed. */
+        <TopBanner
+          actions={
+            <>
+              <Button size="sm" onClick={() => setUpdateLater(true)} disabled={updateGoing}>
+                Later
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setUpdateGoing(true);
+                  void applyUpdate();
+                }}
+                disabled={updateGoing}
+              >
+                {updateGoing ? "Reloading…" : "Reload"}
+              </Button>
+            </>
+          }
+        >
+          A new version is ready. Save your work, then reload.
+        </TopBanner>
       )}
 
       {/* The three things that float above the app. They appear and vanish
@@ -16392,7 +16445,7 @@ function ItemSheet({ mode, initial, allTags, settings, onSave, onClose, scene = 
    * conversation, so it can be seen to be right.
    */
   const usesIn = (text: string) =>
-    wordCards.filter((w: Item) => !!findWordSpan(text, leadOf(w).ar, lang));
+    wordCards.filter((w: Item) => splitForms(leadOf(w).ar).some((word) => !!findWordSpan(text, word, lang)));
 
   const linked = (lines: any[]) =>
     lines
@@ -16695,19 +16748,19 @@ function ItemSheet({ mode, initial, allTags, settings, onSave, onClose, scene = 
                       <div className="at-field">
                         <input
                           className="at-input"
-                          value={ln.en}
-                          placeholder="What it means"
-                          aria-label={`What line ${i + 1} means`}
-                          onChange={(e) => setLine(i, "en", e.target.value)}
+                          value={ln.lat}
+                          placeholder="How it sounds"
+                          aria-label={`How line ${i + 1} sounds`}
+                          onChange={(e) => setLine(i, "lat", e.target.value)}
                         />
                       </div>
                       <div className="at-field">
                         <input
                           className="at-input"
-                          value={ln.lat}
-                          placeholder="How it sounds"
-                          aria-label={`How line ${i + 1} sounds`}
-                          onChange={(e) => setLine(i, "lat", e.target.value)}
+                          value={ln.en}
+                          placeholder="What it means"
+                          aria-label={`What line ${i + 1} means`}
+                          onChange={(e) => setLine(i, "en", e.target.value)}
                         />
                       </div>
                     </div>

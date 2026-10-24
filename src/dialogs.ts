@@ -14,7 +14,6 @@
  *     {
  *       kind: "dialog",
  *       en: "At the door",            the scene, in the learner's language
- *       note: "Two neighbours meet",  the setting, if it needs one
  *       speakers: ["Layla", "Karim"],
  *       you: 1,                       the part the learner takes, or null
  *       lines: [{ id, who: 0, ar, lat, en, recs, uses, s }, ...],

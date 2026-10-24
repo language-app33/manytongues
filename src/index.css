@@ -41,6 +41,10 @@ body {
   /* Keep content clear of the notch and home indicator when installed. */
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
+  /* And clear of the band across the top, while there is one (TopBanner).
+     The band already reaches under the notch, so it is the larger of the
+     two, not both. */
+  padding-top: max(env(safe-area-inset-top), var(--banner-h, 0px));
   overscroll-behavior-y: none;
 }
 /* Stop iOS zooming when you focus a text field. */
@@ -83,6 +87,7 @@ button {
   --z-screen: 140;   /* a full-page screen, a space frame included */
   --z-chrome: 160;   /* brand, space selector, corner menu */
   --z-over: 300;     /* a screen opened on top of another */
+  --z-banner: 350;   /* the band across the top: above any screen, under a dialog */
   --z-modal: 400;
   --z-toast: 500;
 
@@ -475,7 +480,7 @@ button {
   color: var(--muted); }
 .at-codebox b { flex:1; min-width:120px; font-family: ui-monospace, Menlo, monospace;
   font-size:15px; color: var(--brass); user-select:all; }
-.at-mode { position:fixed; top:12px; left:12px; }
+.at-mode { position:fixed; top:calc(12px + var(--banner-h, 0px)); left:12px; }
 /* The app's name, where the space selector used to sit.
 
    It is fixed, so a screen that scrolls passes underneath it — and with
@@ -494,7 +499,7 @@ button {
 
    Still pointer-events:none: it is the app's name, not a button, and
    nothing should be harder to tap for its being behind it. */
-.at-brand { position:fixed; top:12px; left:12px; height:40px;
+.at-brand { position:fixed; top:calc(12px + var(--banner-h, 0px)); left:12px; height:40px;
   display:flex; align-items:center; padding:0 6px; border-radius:10px;
   background: var(--wash);
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
@@ -1521,6 +1526,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   font-size:13px; font-weight:600; color: var(--muted); }
 .at-cardline-meaning .at-lat { font-weight:500; font-style:italic; }
 .at-cardline-acts { display:flex; gap:6px; flex:none; }
+.at-cardline-lead { flex:none; display:flex; }
 
 /* And as a table: everything the list knows about each card, side by side.
    It scrolls sideways inside its own frame where it is wider than the
@@ -1555,7 +1561,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-cktext { display:flex; flex-direction:column; min-width:0; }
 .at-cktext b { font-size:14px; font-weight:700; }
 .at-cktext i { font-style:normal; font-size:12px; color: var(--muted); margin-top:2px; }
-.at-corner { position:fixed; top:12px; right:12px; }
+.at-corner { position:fixed; top:calc(12px + var(--banner-h, 0px)); right:12px; }
 /* A card you can open lifts a little and takes a darker edge under the
    pointer. Pointer devices only: on a touchscreen :hover sticks to the last
    thing tapped. */
@@ -1575,7 +1581,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    absent — the tabs for somebody who only learns, the switch for somebody
    learning one language — so they are laid out beside each other rather
    than each pinned to a corner of its own. */
-.at-chromebar { position:fixed; top:12px; right:60px; display:flex;
+.at-chromebar { position:fixed; top:calc(12px + var(--banner-h, 0px)); right:60px; display:flex;
   align-items:center; gap:8px; }
 .at-spaces { display:flex;
   align-items:center; gap:2px; height:40px; padding:0 3px; border-radius:999px;
@@ -1611,12 +1617,12 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
  * does, and a tall one scrolls inside itself rather than running off the
  * bottom.
  */
-.at-langmenu { position:fixed; top:60px; right:12px;
+.at-langmenu { position:fixed; top:calc(60px + var(--banner-h, 0px)); right:12px;
   /* Per cent rather than vw: for a fixed box the percentage is of the
      window as laid out, where 100vw counts a desktop scrollbar as well and
      would push it that far past the gutter. */
   width: min(300px, calc(100% - 24px));
-  max-height: calc(100vh - 72px);
+  max-height: calc(100vh - 72px - var(--banner-h, 0px));
   max-height: calc(100dvh - 72px);
   overflow-y:auto; background: var(--surface);
   border:2px solid var(--line); border-radius:18px; padding:12px;
@@ -1704,7 +1710,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-cver:not(.stale) .at-cverbtn { border-color: var(--line); color: var(--muted); }
 .at-cver:not(.stale) .at-cverbtn:hover { background: var(--raised); color: var(--text); }
 .at-cverbtn:disabled { opacity:.55; cursor: default; }
-.at-screen { position:fixed; inset:0; z-index: var(--z-screen); background: var(--bg);
+.at-screen { position:fixed; inset:0; top: var(--banner-h, 0px); z-index: var(--z-screen); background: var(--bg);
   display:flex; flex-direction:column; }
 /* A screen opened to do one small thing and come straight back comes up
    from the foot of the window. 140ms is deliberately shorter than a screen
@@ -1722,7 +1728,18 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    reserved for it would just be a band of empty space. */
 .at-screen.over .at-screenhead { padding-top:14px; }
 .at-screenhead h2 { margin:0; font-size:19px; font-weight:800; }
-.at-screenaction { margin-left:auto; display:inline-flex; align-items:center; flex:0 0 auto; }
+.at-screenaction { margin-left:auto; display:inline-flex; align-items:center; gap:8px; flex:0 0 auto; }
+/* The action on a line of its own, under the title rather than beside it:
+   the title keeps the width, and the buttons start where it starts. */
+.at-screenhead.below { flex-wrap:wrap; row-gap:10px; }
+.at-screenhead.below h2 { flex:1 1 0; min-width:0; }
+.at-screenhead.below .at-screenaction { flex:1 0 calc(100% - 50px); margin-left:50px; flex-wrap:wrap; }
+/* Where there is room, back on the title's line at the right, as every
+   other screen has it: the line of their own is for a phone. */
+@media (min-width: 720px) {
+  .at-screenhead.below { flex-wrap:nowrap; }
+  .at-screenhead.below .at-screenaction { flex:0 0 auto; margin-left:auto; flex-wrap:nowrap; }
+}
 .at-back { width:38px; height:38px; flex-shrink:0; border-radius:999px; cursor:pointer;
   background:none; border:2px solid var(--line); color: var(--text); font-size:22px; line-height:1; }
 .at-screenbody { flex:1; overflow-y:auto; padding:18px 16px 40px; }
@@ -1867,10 +1884,6 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   padding:10px 14px; display:flex; align-items:center; gap:14px;
   box-shadow: var(--nav-shadow); max-width: calc(100% - 24px); font-size:13px; }
 .at-undo .what { color: var(--muted); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-/* The same floating bar, saying a new version is ready. Its sentence is the
-   whole point, so it wraps rather than being cut short on a phone. */
-.at-updatebar { gap:10px; }
-.at-updatebar .what { white-space:normal; color: var(--text); }
 /* The snackbar: the undo bar's shape, because that is already this app's
    way of saying "something floating, and temporary". It sits above
    everything (--z-toast) — a confirmation hidden behind the screen that
@@ -3025,6 +3038,19 @@ button.at-stat { transition: border-color 140ms ease; }
 .at-notice.warn { border-color: var(--brass-shade); color: var(--text); }
 .at-notice.ok { border-color: var(--jade-shade); background: var(--jade-soft); color: var(--text); }
 .at-notice.busy { border-style:dashed; }
+/* --- TopBanner: the band across the very top, for what must not be missed.
+   Solid colour edge to edge rather than a Notice's outline, because it is
+   read from the corner of the eye while doing something else. --- */
+.at-banners { position:fixed; top:0; left:0; right:0; z-index: var(--z-banner); }
+.at-banner { margin:0; padding: var(--s3) var(--s4);
+  display:flex; align-items:center; justify-content:center; flex-wrap:wrap; gap: var(--s2) var(--s3);
+  font-family: var(--ui); font-size: var(--fs-sm); font-weight:700; line-height:1.45;
+  text-align:center; background: var(--brass); color: var(--onbrass);
+  box-shadow: 0 2px 10px rgba(0,0,0,.25); }
+.at-banner:first-child { padding-top: calc(var(--s3) + env(safe-area-inset-top)); }
+.at-banner + .at-banner { border-top:1px solid rgba(0,0,0,.18); }
+.at-banner.error { background: var(--rose); color:#FFFFFF; }
+.at-banneracts { display:inline-flex; gap: var(--s2); flex:0 0 auto; }
 /* A word inside a sentence that does something, for the one or two places
    where a full button would be louder than what it offers. It is a real
    button underneath, so it is reachable by keyboard and reads as a control
@@ -3986,3 +4012,52 @@ body.at-screening .at-chromebar { display:none; }
    in the Cards tab are, rather than stretching to a share of the row. */
 .at-screenfoot > .at-icon { flex:0 0 auto; width:52px; height:52px; min-height:52px;
   padding:0; box-sizing:border-box; }
+/* And beside a screen's own action, as the card's Export sits beside its
+   Edit: square, and as tall as the button next to it. */
+.at-screenaction > .at-icon { flex:0 0 auto; width:40px; height:40px; padding:0; box-sizing:border-box; }
+
+/* A card's status, beside Edit on its screen: the app's menu button (see
+   .at-menubtn) and its menu (see .at-pickmenu), hung from the button's
+   left edge, since the button sits at the start of its line. Edged in
+   where the card stands. See StatusMenu. */
+.at-statusmenu { position:relative; display:inline-flex; }
+.at-statusbtn.published { border-color: var(--jade); }
+.at-statusbtn.draft, .at-statusbtn.review, .at-statusbtn.changed { border-color: var(--brass); }
+.at-statuspick { left:0; right:auto; top:calc(100% + 6px); }
+/* At the start of a line or a table row: the badge's words, smaller, and
+   on two lines rather than one long one. */
+.at-statuspill { display:inline-block; max-width:112px; padding:2px 7px; border-radius:8px;
+  border:1px solid var(--brass); color: var(--brass); font-family: var(--ui); font-size:11px;
+  font-weight:700; line-height:1.25; text-align:center; white-space:normal; }
+.at-cardtable .at-cardtable-status { width:1%; }
+/* And in a list: a card students do not have, or have an older copy of. */
+.at-statusbadge { display:inline-block; margin-inline-end:6px; padding:0 6px; border-radius:999px;
+  border:1px solid var(--brass); color: var(--brass); font-family: var(--ui); font-size:11px;
+  font-weight:800; letter-spacing:.04em; text-transform:uppercase; line-height:1.6; }
+
+/* Pressed to read rather than to change — see Pressable. A button to the
+   eye and the hand; not a form control, so a locked card leaves it be. */
+.at-pressable { cursor:pointer; -webkit-user-select:none; user-select:none; }
+.at-pressable[aria-disabled="true"] { cursor:default; }
+.at-pressable:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+.at-btn.at-pressable { display:inline-flex; align-items:center; justify-content:center; }
+.at-btn.at-pressable[aria-disabled="true"] { box-shadow:none; background: var(--raised);
+  border-color: var(--line); color: var(--faint); }
+.at-clipplay.at-pressable { display:inline-flex; align-items:center; justify-content:center;
+  box-sizing:border-box; }
+.at-clipplay.at-pressable[aria-disabled="true"] { opacity:.6; }
+
+/*
+ * A teacher's card, read: the editor itself, inside a disabled fieldset —
+ * see CardEditor's `locked`. A fieldset brings a frame, a gap and a minimum
+ * width of its own; none of them belong here.
+ *
+ * Locked is not greyed out: what is written is read here, and a box of
+ * faded words is a poor way to read it. Only the buttons that would change
+ * something look disabled — which is true, and says so.
+ */
+fieldset.at-cardlock { border:0; padding:0; margin:0; min-inline-size:0; }
+fieldset.at-cardlock:disabled :is(input, textarea, select):disabled { color: var(--text);
+  -webkit-text-fill-color: var(--text); opacity:1; cursor:default; }
+fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] { cursor:default; }
+fieldset.at-cardlock:disabled .at-seg.on:disabled { opacity:1; }
