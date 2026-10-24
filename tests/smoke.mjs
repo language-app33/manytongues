@@ -4483,6 +4483,18 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     editorOpen() && !!buttonNamed(/^Save$/) && !!buttonNamed(/^Save and exit$/) &&
       !!(/** @type {Element} */ (buttonNamed(/^Save and exit$/))).closest(".at-screenhead.below"),
     editorOpen() ? [...document.querySelectorAll(".at-screen.cardform .at-screenhead button")].map((b) => (b.textContent || "").trim()).join(" | ") : "(no editor)");
+  /* Nothing changed yet, so there is nothing to save. */
+  const saveOff = () => /** @type {any} */ (buttonNamed(/^Save$/))?.disabled && /** @type {any} */ (buttonNamed(/^Save and exit$/))?.disabled;
+  check("both saves are off until something changes", !!saveOff(),
+    `Save ${(/** @type {any} */ (buttonNamed(/^Save$/)) || {}).disabled ? "off" : "on"}`);
+  /* A change anywhere in the card turns them on: a line in its note. */
+  const noteBox = /** @type {HTMLTextAreaElement | null} */ ([...document.querySelectorAll(".at-screen.cardform textarea")].pop() || null);
+  if (noteBox) {
+    must(Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value"), "the value descriptor").set?.call(noteBox, `${noteBox.value} (smoke)`);
+    noteBox.dispatchEvent(new w.Event("input", { bubbles: true }));
+  }
+  await sleep(150);
+  check("and come on once something has", !!noteBox && !saveOff(), noteBox ? "typed in a box" : "(no box to type in)");
   takeSaves = true;
   const savesBefore = savedCards.length;
   clickNamed(/^Save$/);
@@ -4490,6 +4502,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("Save saves the card and keeps it open",
     savedCards.length === savesBefore + 1 && editorOpen(),
     `${savedCards.length - savesBefore} saved · ${editorOpen() ? "open" : "closed"}`);
+  check("and once saved, they are off again until the next change", !!saveOff(),
+    `Save ${(/** @type {any} */ (buttonNamed(/^Save$/)) || {}).disabled ? "off" : "on"}`);
+  if (noteBox) {
+    must(Object.getOwnPropertyDescriptor(w.HTMLTextAreaElement.prototype, "value"), "the value descriptor").set?.call(noteBox, `${noteBox.value}!`);
+    noteBox.dispatchEvent(new w.Event("input", { bubbles: true }));
+  }
+  await sleep(150);
   clickNamed(/^Save and exit$/);
   await sleep(500);
   const both = savedCards.slice(savesBefore);
