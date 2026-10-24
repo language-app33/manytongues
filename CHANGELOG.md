@@ -14,7 +14,9 @@ and moves once per batch of work you would notice, not once per commit.
 
 - The card editor has two buttons: Save, which saves and keeps the card
   open to go on with it, and Save and exit, which saves and closes it.
-  They sit on a line under the screen's title, where both fit on a phone.
+- On a phone, the editor's two buttons, and Export, the status and Edit
+  on a card's screen, sit on a line under the screen's title. On a wide
+  screen they are back on the title's line, at the right.
 - The status beside Edit is the app's own menu button now, the same
   height as Export and Edit, and it opens the app's own menu rather than
   the phone's list of choices.
@@ -23,7 +25,8 @@ and moves once per batch of work you would notice, not once per commit.
   column. A card students simply have shows nothing there.
 
 To check by hand: Save on a new card, then Save again — the second save
-changes the same card rather than making another.
+changes the same card rather than making another. And a card's screen
+on a wide window and on a phone.
 
 ## 0.468 — 24 October 2026
 
