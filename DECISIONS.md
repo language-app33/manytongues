@@ -6876,3 +6876,52 @@ by accident. A rename or a tag taken off the collection reaches other
 cards as a `walk`, which the server applies to both versions of each. A
 save kept on the device while offline keeps what it said about itself and
 goes up as sent.
+
+
+## A subjunctive example is written as a sentence (0.469)
+
+**24 October 2026** · `readExample`, `sentenceOf`, `othersOf` in
+`src/examples.ts`; `ExampleFields`, `ExampleDraft` in `src/card-editor.tsx`;
+`storedExamples` in `server/api/courses.js`
+
+**What was wrong.** Since 0.441 a teacher wrote a verb's subjunctive
+example as its pattern: the words round the verb, a chip for the gap in
+the Arabic and again in the transliteration, the English built from three
+chips (person, verb, to + verb), and "Whose wish is it?" asked apart
+where the English said to + verb. Five paragraphs explained it, and the
+owner, who writes these, still could not follow it.
+
+**What changed.** The teacher writes the example as it is said, for one
+person, with one of the forms above in it, and `readExample` makes the
+pattern out of that: the form, found word by word in the Arabic (marks
+left off, nothing glued on peeled away, so بتاكل is not تاكل), is the
+gap; the English is read in one of three shapes, tried in this order —
+*I want her to eat* (whom + to + verb: `{{verb-to}}`, wished by the
+subject before it, `someone` where there is none), *she wants to eat*
+(to + verb: `{{verb-to}}`, her own wish), *she must eat* (who … verb:
+`{{verb-who}}` … `{{verb-plain}}`). To + verb comes first because in *she
+wants to eat* she is the one who wants, and بدها stays put. The person
+settles a form two persons spell alike (تاكل: *you* or *she*); with no
+pronoun, a to + verb sentence is taken as the third person, since a name
+is somebody else. What is read is stored as an example always was, plus
+`as`, who it was written for, so it reads back the same; everything that
+asks one is untouched. The screen holds a stored example as such
+(`kept`) until it is changed, shown filled from the forms as they stand,
+so editing a form above does not break an example nobody touched.
+
+**Choices the owner made.** Of: writing a sentence the app reads; picking
+from a ready-made list; keeping the chips with a shorter explanation —
+the first (1a). A verb with subjunctive forms still needs an example to
+be saved (2a). Sentence cards keep their chips for now (3a): every blank
+there is a chip already, and reading a whole sentence card's English is a
+much bigger job.
+
+**What it costs.** The app has to find the verb: the Arabic must use a
+form as the table spells it, and the English must say who and use the
+verb as in its name. *Before she eats* and *let him eat* cannot be said,
+which was true of the chips too. *I have to eat* is read as somebody's
+wish (*I have her to eat*), and *you want …* takes the first you as the
+one who wants; the two lines under each example are there to catch those.
+And an example reopened shows its English as a student meets it — *You
+(f) must eat* for *you must eat* — because the pattern, not the typing, is
+what is kept.

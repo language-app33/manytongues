@@ -2095,7 +2095,8 @@ export default async (req) => {
           const en = String(ex.en || "").trim().slice(0, 400);
           if (!ar && !lat && !en) continue;
           const wish = idish(ex.wish);
-          out.push({ ar, ...(lat ? { lat } : {}), en, ...(wish ? { wish } : {}) });
+          const as = idish(ex.as);
+          out.push({ ar, ...(lat ? { lat } : {}), en, ...(wish ? { wish } : {}), ...(as ? { as } : {}) });
           if (out.length >= 3) break;
         }
         return out.length ? out : undefined;
