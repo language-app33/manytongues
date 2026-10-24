@@ -6871,11 +6871,13 @@ function SceneBlock({ talk }: { talk: SceneDraft }) {
     <div className="at-formblock main">
       <div className="at-formhead">
         <span className="at-formnum">{text ? "The text" : "The scene"}</span>
-        <span className="at-formrole">{text ? "What it is called." : "What it is and who is in it."}</span>
+        {text && <span className="at-formrole">What it is called.</span>}
       </div>
-      <p className={`at-formneed${canSave ? "" : " unmet"}`}>
-        {text ? "A name, and one sentence or more." : sceneKind ? "A name, and two lines or more." : "A subtype, a name, and two lines or more."}
-      </p>
+      {(text || !sceneKind) && (
+        <p className={`at-formneed${canSave ? "" : " unmet"}`}>
+          {text ? "A name, and one sentence or more." : "A subtype, a name, and two lines or more."}
+        </p>
+      )}
 
       <Field label="What it is called">
         <input
