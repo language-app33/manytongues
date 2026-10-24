@@ -6026,12 +6026,10 @@ export function useSceneDraft({ card, allCards = [] }: { card: Card | null; allC
     const first = blankLine();
     return [{ ...first, who: 0 }, { ...blankLine([first]), who: 1 }];
   });
-  /* The scene's name and its setting are the card's own English and note:
-     a conversation has no word of its own to put in either. */
-  /* A scene's name and its setting are the card's own English and note: a
-     conversation has no word of its own to put in either. */
+  /* A scene's name is the card's own English: a conversation has no word
+     of its own to put there. A scene has no setting any more — see the
+     save, which clears one an older card still holds. */
   const [title, setTitle] = useState(String((card && leadOf(card).en) || ""));
-  const [setting, setSetting] = useState(String((card && card.note) || ""));
   const [recordingLine, setRecordingLine] = useState<number | null>(null);
   const setLine: (i: number, next: any) => void = (i, next) => setLines((x) => x.map((l, j) => (j === i ? next : l)));
   const written = writtenLines(lines);
@@ -6107,8 +6105,6 @@ export function useSceneDraft({ card, allCards = [] }: { card: Card | null; allC
     setLines,
     title,
     setTitle,
-    setting,
-    setSetting,
     recordingLine,
     setRecordingLine,
     setLine,
@@ -6866,16 +6862,16 @@ function TableBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
   );
 }
 
-/* The scene: what it is called, where it happens, who is in it, and
-   whose part the student takes. */
+/* The scene: what it is called, who is in it, and whose part the student
+   takes. */
 function SceneBlock({ talk }: { talk: SceneDraft }) {
-  const { canSave, title, setTitle, setting, setSetting, speakers, setSpeakers, you, setYou, text, sceneKind } = talk;
+  const { canSave, title, setTitle, speakers, setSpeakers, you, setYou, text, sceneKind } = talk;
   return (
     <>
     <div className="at-formblock main">
       <div className="at-formhead">
         <span className="at-formnum">{text ? "The text" : "The scene"}</span>
-        <span className="at-formrole">{text ? "What it is and what it is about." : "What it is and who is in it."}</span>
+        <span className="at-formrole">{text ? "What it is called." : "What it is and who is in it."}</span>
       </div>
       <p className={`at-formneed${canSave ? "" : " unmet"}`}>
         {text ? "A name, and one sentence or more." : sceneKind ? "A name, and two lines or more." : "A subtype, a name, and two lines or more."}
@@ -6887,15 +6883,6 @@ function SceneBlock({ talk }: { talk: SceneDraft }) {
           value={title}
           placeholder={text ? "Our street" : "At the door"}
           onChange={(e) => setTitle(e.target.value)}
-        />
-      </Field>
-
-      <Field label={text ? "What it is about" : "Where it happens"}>
-        <input
-          className="at-input"
-          value={setting}
-          placeholder={text ? "Sami describes where he lives" : "Two neighbours meet in the morning"}
-          onChange={(e) => setSetting(e.target.value)}
         />
       </Field>
 
@@ -9345,7 +9332,6 @@ export function writtenCard({ word, talk, shape, chosen }: {
     scene: scene
       ? {
           title: talk.title.trim(),
-          setting: talk.setting.trim(),
           sceneKind: talk.sceneKind || CONVERSATION,
           speakers: talk.text ? [] : talk.speakers,
           you: talk.text ? null : talk.you,
@@ -10334,7 +10320,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   decks: Deck[];
   inDecks?: string[];
   allCards: Card[];
-  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, setting: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean }) => void;
+  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean }) => void;
   /** Open another of the teacher's cards in place of this one — the
       cards the Meanings block names. */
   onOpenCard?: (card: Card) => void;
