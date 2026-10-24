@@ -13,7 +13,8 @@
 import React, { createContext, useContext, useState, useEffect, useId, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
 import type { Card, Deck, Form, GrammarDim, Item, Lang, VerbExample, VerbPerson, VerbSpec, VerbTense } from "./types.ts";
-import { MAX_EXAMPLES, asksWish, blankExample, exampleCells, exampleTrouble, examplesRowOf, filledExample, verbExamplesOf, wishOf } from "./examples.ts";
+import type { ExampleSentence } from "./examples.ts";
+import { MAX_EXAMPLES, blankSentence, exampleCells, examplesRowOf, filledExample, othersOf, readExample, sentenceOf, verbExamplesOf, wishOf } from "./examples.ts";
 import { wordsOffered } from "./context-index.ts";
 import { longSentenceOf, sentenceWords, wordCount } from "./sentence-words.ts";
 import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
@@ -84,6 +85,8 @@ import {
   Overlay,
   PickSheet,
   DeckSwitch,
+  Locked,
+  Pressable,
   AskedMeanings,
   AskedScript,
 } from "./shared.tsx";
@@ -860,6 +863,9 @@ function BlankText({ value, onChange, onRemove, className = "", style, dir, lang
   const preview = useRef<string | null>(null);
   const [moving, setMoving] = useState(false);
   const tapBlank = useContext(BlankTap);
+  /* Not a form element, so a locked card's fieldset cannot reach it: it
+     is told. See Locked. */
+  const locked = useContext(Locked);
   const text = value || "";
   /* The string as the box draws it: a hole written `{{ Name }}` is one
      pill named `name`, and every offset below is counted against what is
@@ -1075,8 +1081,9 @@ function BlankText({ value, onChange, onRemove, className = "", style, dir, lang
     <div
       ref={mine}
       className={`at-blanktext${className ? " " + className : ""}${moving ? " moving" : ""}`}
-      contentEditable
+      contentEditable={!locked}
       suppressContentEditableWarning
+      aria-readonly={locked || undefined}
       role="textbox"
       aria-multiline="false"
       aria-label={label}
@@ -1085,13 +1092,15 @@ function BlankText({ value, onChange, onRemove, className = "", style, dir, lang
       dir={dir}
       lang={lang}
       style={style}
-      onInput={onInput}
-      onKeyDown={onKeyDown}
+      /* Locked, nothing here may change the words: not a key, a paste, or
+         a pill dragged along. */
+      onInput={locked ? undefined : onInput}
+      onKeyDown={locked ? undefined : onKeyDown}
       onKeyUp={remember}
       onBlur={remember}
-      onPaste={onPaste}
-      onPointerDown={onPointerDown}
-      onClick={onClick}
+      onPaste={locked ? undefined : onPaste}
+      onPointerDown={locked ? undefined : onPointerDown}
+      onClick={locked ? undefined : onClick}
     />
   );
 }
@@ -1716,18 +1725,20 @@ function ClipDrop({ label, disabled, onFiles }: {
  * A pairing already accepted stays whichever way the matcher later votes,
  * so improving the matcher can never silently drop a teacher's decision.
  */
-function WordsUsed({ lang, text, cards, selfId, chosen, onChange }: {
+function WordsUsed({ lang, text, cards, selfId, chosen, onChange, line = false }: {
   lang: Lang;
   text: string;
   cards: Card[];
   selfId?: string;
   chosen: string[];
   onChange: (ids: string[]) => void;
+  /** A line of a conversation, which is asked even where it is one word. */
+  line?: boolean;
 }) {
   const kind = guessKind(text, lang);
   const found = useMemo(
-    () => wordsOffered(text, (cards || []) as Item[], lang, selfId) as { card: Card; form: Form }[],
-    [cards, lang, text, selfId],
+    () => wordsOffered(text, (cards || []) as Item[], lang, selfId, { line }) as { card: Card; form: Form }[],
+    [cards, lang, text, selfId, line],
   );
   const suggestions = found.map((m) => m.card);
 
@@ -1737,7 +1748,7 @@ function WordsUsed({ lang, text, cards, selfId, chosen, onChange }: {
   const kept = (chosen || []).filter((id) => !suggestions.some((c) => c.id === id));
   const keptCards = (cards || []).filter((c) => kept.includes(c.id));
 
-  if (!supportsContext(lang) || kind === "word") return null;
+  if (!supportsContext(lang) || !String(text || "").trim() || (kind === "word" && !line)) return null;
   if (!suggestions.length && !keptCards.length) {
     return (
       <div className="at-formblock at-mt5">
@@ -1944,14 +1955,17 @@ export function writeCell(
   return had ? cells.map((c) => (c === had ? next : c)) : cells.concat([next]);
 }
 
-function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, mint, onChange, onRecord, pronouns, examples, onExamples, verbName = "" }: {
+function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, mint, onChange, onRecord, pronouns, examples, exampleReads = [], exampleForms = [], onExamples, verbName = "" }: {
   lang: Lang;
   spec: VerbSpec;
   /** The verb's examples, where its table has a row practised in them —
-      see VerbExample — and how to change them. */
-  examples?: VerbExample[];
-  onExamples?: (next: VerbExample[]) => void;
-  /** The verb's name, which the examples' English is made from. */
+      see ExampleDraft — what each was read as, the forms they can use,
+      and how to change them. */
+  examples?: ExampleDraft[];
+  exampleReads?: ExampleRead[];
+  exampleForms?: Form[];
+  onExamples?: (next: ExampleDraft[]) => void;
+  /** The verb's name, which the examples' English is found by. */
   verbName?: string;
   /** The pronoun written for each column, where the language has them —
       shown beside the column's name. Only a verb's table: its columns are
@@ -2158,9 +2172,10 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
               spec={spec}
               sample={tense.sample || null}
               examples={examples || []}
+              reads={exampleReads}
               onChange={onExamples}
               verbName={verbName}
-              cells={cells.filter(mine)}
+              cells={exampleForms}
               saysHow={saysHow}
             />
           )}
@@ -2173,47 +2188,57 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
 /*
  * The examples a verb's subjunctive is practised in, under its forms.
  *
- * Up to three, each written once with {{verb}} where the verb goes and
- * met once for every form above it — see VerbExample. The English is not
- * typed per person but put together from three words, because English
- * has no subjunctive and what it needs depends on the word in front of
- * the gap. So under each example is what two of its persons will read
- * as, worked out the way a question works it out: the teacher sees what
- * the student will, before saving.
+ * Up to three, each met once for every form above it — see VerbExample.
+ * Written the way a teacher says one: a sentence, for one person, with one
+ * of the forms above in it — لازم تاكلي, *you must eat*. The app finds the
+ * gap and the person in it (readExample), and under each is what two of
+ * the other persons will read as, worked out the way a question works it
+ * out: the teacher sees it was read right, before saving.
+ *
+ * Until 0.469 an example was written as the pattern itself — a chip for
+ * the gap, three more for the English, and whose wish it was asked apart
+ * — and the owner, who writes them, could not follow it. See "A
+ * subjunctive example is written as a sentence" in DECISIONS.md.
  */
-const NO_EXAMPLE: VerbExample = { ar: "", lat: "", en: "" };
 
-/* The one gap an example's Arabic and transliteration have, and the three
-   ways its English reads the verb in it — offered as chips under each
-   box, as a sentence card's blanks are. No new blank can be made: an
-   example has the verb and nothing else. */
-const EXAMPLE_GAP: BlankWiring = { names: ["verb"] };
-const EXAMPLE_ENGLISH: BlankWiring = { names: ["verb-who", "verb-plain", "verb-to"] };
+/**
+ * One example on the screen. As stored, until the teacher changes it —
+ * shown as the sentence it reads as for the person it was written for,
+ * so it follows the forms above while they are edited — and from the
+ * first change, as the sentence being written, read afresh each time.
+ */
+type ExampleDraft = { kept: VerbExample } | { said: ExampleSentence };
+type ExampleRead = ReturnType<typeof readExample>;
 
-/* What the cross on a pill in an example's box does: takes that one out
-   of that one box. Handed the box's own words and how to change them. */
-const dropIn = (text: string, set: (next: string) => void) => (name: string) => set(withoutSlot(text, name));
+const NO_SENTENCE: ExampleSentence = { ar: "", lat: "", en: "" };
+const blankDraft = (d: ExampleDraft): boolean => ("kept" in d ? false : blankSentence(d.said));
 
-function ExampleFields({ lang, spec, sample, examples, onChange, verbName, cells, saysHow }: {
+function ExampleFields({ lang, spec, sample, examples, reads, onChange, verbName, cells, saysHow }: {
   lang: Lang;
   spec: VerbSpec;
   /** The language's own example of one, for the placeholders. */
   sample: { ar: string; lat?: string; en: string } | null;
-  examples: VerbExample[];
-  onChange: (next: VerbExample[]) => void;
+  examples: ExampleDraft[];
+  /** What each was read as, or what is wrong with it — see readExample. */
+  reads: ExampleRead[];
+  onChange: (next: ExampleDraft[]) => void;
   verbName: string;
-  cells: Record<string, any>[];
+  /** The forms of the row that are written, one of which an example has. */
+  cells: Form[];
   saysHow: boolean;
 }) {
   /* Always one to write in, so the section is never a button alone. */
-  const shown = examples.length ? examples : [NO_EXAMPLE];
-  const write = (at: number, patch: Partial<VerbExample>) =>
-    onChange(shown.map((ex, i) => (i === at ? { ...ex, ...patch } : ex)));
-  const drop = (at: number) => onChange(shown.filter((_, i) => i !== at));
-  const persons = personsOf(spec);
-  /* Two of the forms written, to show what an example comes out as: the
-     first two the teacher has, in the order the table lists them. */
-  const shownCells = exampleCells({ forms: [{}, ...cells] }, spec).slice(0, 2);
+  const drafts: ExampleDraft[] = examples.length ? examples : [{ said: NO_SENTENCE }];
+  const shownOf = (d: ExampleDraft): ExampleSentence =>
+    ("kept" in d ? sentenceOf(d.kept, cells, verbName, spec) : d.said);
+  const write = (at: number, patch: Partial<ExampleSentence>) =>
+    onChange(drafts.map((d, i) => (i === at ? { said: { ...shownOf(d), ...patch } } : d)));
+  const drop = (at: number) => onChange(drafts.filter((_, i) => i !== at));
+  /* The language's example, said for a person written above — "she"
+     where she is, who reads plainest — for the line saying what to write
+     and for the boxes' placeholders. */
+  const sampleCell = cells.find((c) => c.col === "she") || cells[0];
+  const shownSample = sample && sampleCell ? filledExample({ name: verbName }, sampleCell, sample, spec) : null;
   const eat = verbPlainShown(verbName);
   /*
    * A subsection of the subjunctive's own section, as a table's practice
@@ -2223,110 +2248,66 @@ function ExampleFields({ lang, spec, sample, examples, onChange, verbName, cells
    */
   return (
     <div className="at-part at-mt4" data-el="editor-verb-examples">
-      <p className="at-groupline">How these forms are practised</p>
+      <p className="at-groupline">How subjunctive is practised</p>
       <p className="at-hint">
-        Students never see these forms on their own. They practise them inside the examples
-        below, once for every form filled in above.
+        Students practise these forms inside short examples, never on their own. Write each
+        example as you would say it, for any one person, with one of the forms above in it
+        {shownSample ? <>: for example, <span lang={lang.id} dir={lang.direction}>{shownSample.ar}</span> — {shownSample.en}</> : null}.
       </p>
       <p className="at-hint">
-        Write each example once, with a gap where the verb goes: type the words around it, then
-        tap <strong>verb</strong> to drop the gap in
-        {sample ? <>, for example <span lang={lang.id} dir={lang.direction}>{sample.ar.replace(/\{\{\s*verb\s*\}\}/i, "").trim()}</span> + verb</> : null}.
+        In the English, say who (I, she, her…) and write the verb as in its name: {eat}, or
+        to {eat}. The app writes the example out for every other person, and shows you two of
+        them under it.
       </p>
-      <p className="at-hint">In the English, tap the chips to say how the verb reads:</p>
-      <ul className="at-hint at-examplekeys">
-        <li><strong>person</strong>: I, you, she…</li>
-        <li><strong>verb</strong>: {eat} (taken from the verb's name)</li>
-        <li><strong>to + verb</strong>: “to {eat}”, or “her to {eat}” when someone else wants it</li>
-      </ul>
-      <p className="at-hint">
-        The app writes the example out for every person. Under each example you'll see two of
-        them, such as “{sample && shownCells.length
-          ? (() => {
-              const one = filledExample({ name: verbName }, shownCells[0] as Form, sample, spec);
-              return `${one.ar} — ${one.en}`;
-            })()
-          : `… — I must ${eat}`}”.
-      </p>
-      {shown.map((ex, at) => {
-        const trouble = exampleTrouble(ex);
+      {!cells.length && <p className="at-hint">Fill in the forms above first.</p>}
+      {drafts.map((d, at) => {
+        const ex = shownOf(d);
+        const read: ExampleRead = reads[at] || { ok: null, trouble: "" };
         const which = `example ${at + 1}`;
-        const preview = !trouble && !blankExample(ex)
-          ? shownCells.map((cell) => filledExample({ name: verbName }, cell as Form, ex, spec))
-          : [];
+        const others = read.ok ? othersOf(read.ok, cells, verbName, spec) : [];
         return (
           <div className="at-part" key={at} data-el="editor-verb-example">
             <div className="at-examplehead">
               <p className="at-groupline">{cap(which)}</p>
-              {(shown.length > 1 || !blankExample(ex)) && (
+              {(drafts.length > 1 || !blankDraft(d)) && (
                 <Button variant="ghost" size="sm" icon="delete" onClick={() => drop(at)}>
                   Remove
                 </Button>
               )}
             </div>
             <Field label={lang.scriptLabel}>
-              <BlankField wiring={EXAMPLE_GAP} value={ex.ar} onChange={(v) => write(at, { ar: v })} label={lang.scriptLabel} lang={lang} script>
-                {(box) => (
-                  <ScriptInput
-                    lang={lang}
-                    box={box}
-                    label={`${lang.scriptLabel} for ${which}`}
-                    placeholder={sample ? sample.ar.replace(/\{\{\s*verb\s*\}\}/i, "").trim() : undefined}
-                    value={ex.ar}
-                    onChange={(v) => write(at, { ar: v })}
-                    onRemoveBlank={dropIn(ex.ar, (v) => write(at, { ar: v }))}
-                  />
-                )}
-              </BlankField>
+              <ScriptInput
+                lang={lang}
+                label={`${lang.scriptLabel} for ${which}`}
+                placeholder={shownSample ? shownSample.ar : undefined}
+                value={ex.ar}
+                onChange={(v) => write(at, { ar: v })}
+              />
             </Field>
             {saysHow && (
               <Field label={lang.translitLabel}>
-                <BlankField wiring={EXAMPLE_GAP} value={ex.lat || ""} onChange={(v) => write(at, { lat: v })} label={lang.translitLabel} lang={lang}>
-                  {(box) => (
-                    <BlankText
-                      box={box}
-                      className="at-input"
-                      label={`${lang.translitLabel} for ${which}`}
-                      placeholder={sample && sample.lat ? sample.lat.replace(/\{\{\s*verb\s*\}\}/i, "").trim() : lang.translitLabel.toLowerCase()}
-                      value={ex.lat || ""}
-                      onChange={(v) => write(at, { lat: v })}
-                    />
-                  )}
-                </BlankField>
+                <input
+                  className="at-input"
+                  aria-label={`${lang.translitLabel} for ${which}`}
+                  placeholder={shownSample && shownSample.lat ? shownSample.lat : lang.translitLabel.toLowerCase()}
+                  value={ex.lat || ""}
+                  onChange={(e) => write(at, { lat: e.target.value })}
+                />
               </Field>
             )}
             <Field label="English">
-              <BlankField wiring={EXAMPLE_ENGLISH} value={ex.en} onChange={(v) => write(at, { en: v })} label="English" lang={lang}>
-                {(box) => (
-                  <BlankText
-                    box={box}
-                    className="at-input"
-                    label={`English for ${which}`}
-                    placeholder="English"
-                    value={ex.en}
-                    onChange={(v) => write(at, { en: v })}
-                  />
-                )}
-              </BlankField>
+              <input
+                className="at-input"
+                aria-label={`English for ${which}`}
+                placeholder={shownSample ? shownSample.en : "English"}
+                value={ex.en}
+                onChange={(e) => write(at, { en: e.target.value })}
+              />
             </Field>
-            {asksWish(ex) && (
-              <Field label="Whose wish is it?" hint="Who wants, in “to + verb”: I want to eat, I want her to eat.">
-                <select
-                  className="at-input"
-                  aria-label={`Whose wish is it, in ${which}`}
-                  value={wishOf(ex, spec)}
-                  onChange={(e) => write(at, { wish: e.target.value })}
-                >
-                  {persons.map((p) => (
-                    <option key={p.id} value={p.id}>{p.label || p.id}</option>
-                  ))}
-                </select>
-              </Field>
-            )}
-            {trouble && <p className="at-formneed unmet">{trouble}</p>}
-            {preview.length > 0 && (
+            {read.trouble && <p className="at-formneed unmet">{read.trouble}</p>}
+            {others.length > 0 && (
               <ul className="at-hint at-examplekeys" data-el="editor-verb-example-preview">
-                {preview.map((p, i) => (
+                {others.map((p, i) => (
                   <li key={i}>
                     <span lang={lang.id} dir={lang.direction}>{p.ar}</span> — {p.en}
                   </li>
@@ -2336,8 +2317,8 @@ function ExampleFields({ lang, spec, sample, examples, onChange, verbName, cells
           </div>
         );
       })}
-      {shown.length < MAX_EXAMPLES && (
-        <Button variant="ghost" size="sm" icon="add" className="at-mt3" onClick={() => onChange(shown.concat([{ ...NO_EXAMPLE }]))}>
+      {drafts.length < MAX_EXAMPLES && (
+        <Button variant="ghost" size="sm" icon="add" className="at-mt3" onClick={() => onChange(drafts.concat([{ said: { ...NO_SENTENCE } }]))}>
           Add an example
         </Button>
       )}
@@ -4523,9 +4504,10 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
      do not name them — a verb whose word is a cell of its table, and a
      sentence, which is a frame — see the block that asks for it. */
   const [name, setName] = useState(((card && card.name) || "") as string);
-  /* The examples a verb's subjunctive is practised in — see VerbExample.
-     Held as typed, blank ones included, and tidied on the way out. */
-  const [examples, setExamples] = useState<VerbExample[]>(() => verbExamplesOf(card));
+  /* The examples a verb's subjunctive is practised in — see VerbExample
+     and ExampleDraft. Held as typed, blank ones included, and tidied on
+     the way out. */
+  const [examples, setExamples] = useState<ExampleDraft[]>(() => verbExamplesOf(card).map((kept) => ({ kept })));
   /*
    * On the way in to a table that cites a cell — a verb's — the card's own
    * word moves into the cell about to hold it, rather than being left
@@ -4919,17 +4901,23 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
    * A subjunctive form is asked only inside an example — see VerbExample
    * — so a verb with one written and no example would carry a form no
    * question could ever be asked of. That is the save the owner asked to
-   * be stopped. And an example written wrongly is stopped too, said in
-   * the example itself: one with no gap, or with English that comes out
-   * the same for every person, would be asked as nonsense.
+   * be stopped. And an example the app cannot read is stopped too, said
+   * in the example itself: one whose form or person it cannot find would
+   * be asked as nonsense.
    */
   const exampleRow = standsIn ? examplesRowOf(shownSpec) : "";
-  const writtenExamples = exampleRow ? examples.filter((e) => !blankExample(e)) : [];
+  const exampleForms = exampleRow ? exampleCells({ forms: [{}, ...cells] }, shownSpec) as Form[] : [];
+  const exampleReads = examples.map((d): ExampleRead => ("kept" in d
+    ? { ok: d.kept, trouble: "" }
+    : readExample(d.said, exampleForms, name, shownSpec)));
+  const writtenExamples = exampleRow
+    ? exampleReads.flatMap((r) => (r.ok ? [r.ok] : []))
+    : [];
   const subjunctiveWritten = !!exampleRow && tableCells.some(
     (c) => c.row === exampleRow && !String(c.of || "") && String(c.ar || "").trim(),
   );
-  const needsExamples = subjunctiveWritten && !writtenExamples.length;
-  const examplesWrong = writtenExamples.some((e) => !!exampleTrouble(e));
+  const needsExamples = subjunctiveWritten && !examples.some((d) => !blankDraft(d));
+  const examplesWrong = !!exampleRow && exampleReads.some((r) => !!r.trouble);
   /* A form of that row counts as written with its meaning once there is an
      example to mean it in: it has no English box of its own. */
   const meant = (c: { row?: string; en?: string }) =>
@@ -5900,6 +5888,8 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
     examples,
     setExamples,
     exampleRow,
+    exampleForms,
+    exampleReads,
     writtenExamples,
     needsExamples,
     fills,
@@ -6796,7 +6786,7 @@ function PracticeSection({ word }: { word: WordDraft }) {
 }
 
 function TableBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
-  const { shownSpec, parts, cells, setCells, mintCell, setRecordingCell, needsForm, exampleRow, examples, setExamples, name, needsExamples } = word;
+  const { shownSpec, parts, cells, setCells, mintCell, setRecordingCell, needsForm, exampleRow, examples, setExamples, exampleForms, exampleReads, name, needsExamples } = word;
   /* The table's own line of what is drilled — see askParts, which lists
      nothing for a table nobody has written yet. */
   const mine = parts.find((p) => p.id === "table:");
@@ -6820,6 +6810,8 @@ function TableBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
           onRecord={(row, col) => setRecordingCell({ of: "", ofLabel: "", row, col })}
           pronouns={shownSpec === verbOf(lang) ? word.pronounWords : undefined}
           examples={examples}
+          exampleReads={exampleReads}
+          exampleForms={exampleForms}
           onExamples={exampleRow ? setExamples : undefined}
           verbName={name}
         />
@@ -7101,21 +7093,21 @@ function TurnBlock({ talk, lang, allCards, selfId, index: i, line: l }: {
         <ScriptInput lang={lang} value={l.ar} onChange={(v) => setLine(i, { ...l, ar: v })} />
       </Field>
 
-      <Field label="English">
-        <input
-          className="at-input"
-          value={l.en}
-          aria-label={`What line ${i + 1} means`}
-          onChange={(e) => setLine(i, { ...l, en: e.target.value })}
-        />
-      </Field>
-
       <Field label={lang.translitLabel}>
         <input
           className="at-input"
           value={l.lat}
           aria-label={`How line ${i + 1} sounds`}
           onChange={(e) => setLine(i, { ...l, lat: e.target.value })}
+        />
+      </Field>
+
+      <Field label="English">
+        <input
+          className="at-input"
+          value={l.en}
+          aria-label={`What line ${i + 1} means`}
+          onChange={(e) => setLine(i, { ...l, en: e.target.value })}
         />
       </Field>
 
@@ -7126,8 +7118,10 @@ function TurnBlock({ talk, lang, allCards, selfId, index: i, line: l }: {
       {/* Which of the teacher's own words this line contains.
           Confirmed here, line by line, because a line is where
           a word actually turns up — and it is what lets a word
-          be practised inside a real exchange. */}
+          be practised inside a real exchange. A reply of one
+          word, عفواً, is asked too. */}
       <WordsUsed
+        line
         lang={lang}
         text={l.ar}
         cards={allCards}
@@ -7336,8 +7330,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
              attached pronouns are opened, with what is written in it said
              under the name — so a card of folded forms still reads as the
              words it holds. */
-          <button
-            type="button"
+          <Pressable
             className="at-groupfold at-formfold"
             aria-expanded={open}
             onClick={() => setOpen((v) => !v)}
@@ -7347,7 +7340,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
               {String(f.ar || "").trim() || String(f.en || "").trim() || (more || formWritten(f) ? "written" : "none yet")}
             </span>
             <Icon name={open ? "chevronUp" : "chevronDown"} size={24} />
-          </button>
+          </Pressable>
         ) : (
           <span className="at-formnum">{title}</span>
         )}
@@ -7748,8 +7741,7 @@ function PronounTable({ word, lang, index: i, form: f }: {
       thing worth knowing without opening it. */
   return (
     <div className="at-part">
-      <button
-        type="button"
+      <Pressable
         className="at-groupline at-groupfold"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
@@ -7759,7 +7751,7 @@ function PronounTable({ word, lang, index: i, form: f }: {
           {written ? `${filled} of ${total} written` : "none yet"}
         </span>
         <Icon name={open ? "chevronUp" : "chevronDown"} size={24} />
-      </button>
+      </Pressable>
       {open && (
       <>
       <VerbTable
@@ -7933,8 +7925,7 @@ function DrillChecks({ word, part, label = "How this form can be practiced", of 
        fields rather than as a subsection beside the pronouns. */
     return (
       <div className="at-part at-drills">
-        <button
-          type="button"
+        <Pressable
           className="at-groupline at-groupfold"
           aria-expanded={open}
           onClick={() => setOpen((v) => !v)}
@@ -7942,7 +7933,7 @@ function DrillChecks({ word, part, label = "How this form can be practiced", of 
           <span>{label}</span>
           <span className="at-groupcount">{said.length ? said.join(" · ") : "not practised"}</span>
           <Icon name={open ? "chevronUp" : "chevronDown"} size={24} />
-        </button>
+        </Pressable>
         {open && lede ? (
           <p className="at-hint at-drilllede">
             {drillLede(of)}
@@ -8088,8 +8079,7 @@ function BlankChip({ slot, values, lang }: {
       onMouseEnter={() => setOpen(true)}
       onMouseLeave={() => setOpen(false)}
     >
-      <button
-        type="button"
+      <Pressable
         className="at-blankchip"
         aria-expanded={open}
         /* The name alone, to a screen reader, is the chip saying nothing a
@@ -8100,7 +8090,7 @@ function BlankChip({ slot, values, lang }: {
         onBlur={() => setOpen(false)}
       >
         {slot}
-      </button>
+      </Pressable>
       {open && (
         <div className="at-blankfills" role="tooltip">
           <p className="at-eyebrow">{`${slot} · ${said}`}</p>
@@ -9043,8 +9033,7 @@ function BlanksBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
                 shut is how many sentences the card is met as, which is the
                 answer a teacher wants oftener than the sentences
                 themselves. */}
-            <button
-              type="button"
+            <Pressable
               className="at-groupline at-groupfold"
               aria-expanded={examplesOpen}
               onClick={() => setExamplesOpen((v) => !v)}
@@ -9054,7 +9043,7 @@ function BlanksBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
                 {combos ? plural(combos, "example") : "none yet"}
               </span>
               <Icon name={examplesOpen ? "chevronUp" : "chevronDown"} size={24} />
-            </button>
+            </Pressable>
             {examplesOpen && (asked.length > 0 ? (
               <>
                 <ol className="at-asked">
@@ -9290,8 +9279,8 @@ export function writtenCard({ word, talk, shape, chosen }: {
        are saved as something other than what they are about. */
     name: standsIn || shape === "sentence" ? name.trim() : "",
     /* And the examples its subjunctive is practised in, on a verb that
-       has the row — each as written, with whose wish it is settled where
-       its English asks. See VerbExample. */
+       has the row — each as read, with whose wish it is settled where
+       its English asks, and who it was written for. See VerbExample. */
     examples: shape === "word" ? writtenExamples.map((ex: VerbExample) => {
       const wish = wishOf(ex, shownSpec);
       return {
@@ -9299,6 +9288,7 @@ export function writtenCard({ word, talk, shape, chosen }: {
         ...(String(ex.lat || "").trim() ? { lat: String(ex.lat).trim() } : {}),
         en: ex.en.trim(),
         ...(wish ? { wish } : {}),
+        ...(String(ex.as || "").trim() ? { as: String(ex.as).trim() } : {}),
       };
     }) : [],
     decks: chosen,
@@ -10199,9 +10189,9 @@ function MeaningsBlock({ lang, selfId, lead, allCards, clue, onClue, canAdd, onA
         <span key={c.id}>
           {i ? ", " : ""}
           {onOpen ? (
-            <button type="button" className="at-linkbtn" data-shared={c.id} onClick={() => onOpen(c)}>
+            <Pressable className="at-linkbtn" data-shared={c.id} onClick={() => onOpen(c)}>
               {said} ›
-            </button>
+            </Pressable>
           ) : (
             said
           )}
@@ -10310,13 +10300,22 @@ function CarryAsk({ cards, onAnswer, onCancel }: {
   );
 }
 
-export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null }: {
+/** A line of a card's words said in passing — a title — with each blank as
+    a gap rather than its braces: the braces are how a blank is stored,
+    never how it is shown. */
+const saidPlainly = (text: string): string => text.replace(/\{\{[^}]*\}\}/g, "…").trim();
+
+/** What a card is called on its own screen: what it is listed as. */
+const cardTitle = (card: Card | null): string =>
+  !card ? "Card" : String(card.name || "").trim() || saidPlainly(leadOf(card).en || leadOf(card).ar || "") || "Card";
+
+export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, about, below }: {
   card: Card | null;
   lang: Lang;
   decks: Deck[];
   inDecks?: string[];
   allCards: Card[];
-  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null }) => void;
+  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean }) => void;
   /** Open another of the teacher's cards in place of this one — the
       cards the Meanings block names. */
   onOpenCard?: (card: Card) => void;
@@ -10338,6 +10337,26 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
    */
   making?: CardShape;
   draft?: Record<string, any> | null;
+  /**
+   * A card read rather than edited: the same screen, with every field
+   * inside a disabled fieldset. In the teaching space this is how a card
+   * opens — reading a card and editing it cannot look different, because
+   * they are the same screen. Edit (`onUnlock`) opens it; Cancel
+   * (`onRelock`) shuts it again, the screen drawing it afresh from the
+   * card so nothing typed is left behind.
+   */
+  locked?: boolean;
+  onUnlock?: () => void;
+  onRelock?: () => void;
+  /** A card's status menu, beside the buttons — off while there are
+      changes, which a status would not carry. See StatusMenu in spaces.tsx. */
+  status?: (off: boolean) => Node;
+  /** Export this card, beside Edit while it is locked. */
+  onExport?: () => void;
+  /** Drawn over the card and under it, and never locked: the line about
+      sentences waiting for review, and the exercises to try. */
+  about?: Node;
+  below?: Node;
 }) {
   /* And from here down there is one kind of card on this screen and it
      does not change. It is the card's own answer where there is a card,
@@ -10392,9 +10411,35 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     !(card && SPEAKER_COLUMNS.has(String(card.person || "")));
   /* The question a change to a shared word asks, while it is being asked:
      what would be saved, and which cards it would be offered to. */
-  const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null } | null>(null);
+  const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null, exit: boolean } | null>(null);
   const meanings = shape === "word";
-  const save = (next: "meaning" | "word" | null = null) => {
+  /*
+   * Whether anything has changed: the card as written now, against the card
+   * as it was when the editor opened — or when it was last saved, since
+   * Save keeps it open. Both saves wait on it, so a card nobody has touched
+   * is not saved again, and a new card waits for something to be written.
+   *
+   * Measured through writtenCard, the same function that writes the save,
+   * so what counts as a change is exactly what a save would send.
+   */
+  const snapshot = JSON.stringify([writtenCard({ word, talk, shape, chosen }), clue.trim(), asksCapitals ? capitals : null]);
+  const [savedAs, setSavedAs] = useState(snapshot);
+  /* What a Save sent, kept until the card comes back saved — the screen
+     hands the editor the saved card, which is what makes it the new
+     starting point. A save that fails leaves the card changed. */
+  const sending = useRef<string | null>(null);
+  useEffect(() => {
+    if (sending.current === null) return;
+    setSavedAs(sending.current);
+    sending.current = null;
+  }, [card]);
+  const changed = snapshot !== savedAs;
+  /* Cancel with changes on the card: asked first. */
+  const [discarding, setDiscarding] = useState(false);
+  /* `exit` is Save and exit: the card is saved and the editor closes.
+     Save alone keeps it open on the card as saved. */
+  const save = (next: "meaning" | "word" | null = null, exit = false) => {
+    sending.current = snapshot;
     const written = writtenCard({ word, talk, shape, chosen });
     const extra = {
       clue: meanings ? clue.trim() : "",
@@ -10404,10 +10449,10 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     const changes = stored && meanings ? wordChanges(card, written.forms as any) : [];
     const others = cardsSharingChange(allCards, { id: selfId, lang: lang.id }, changes);
     if (others.length) {
-      setCarrying({ written, cards: others, changes, next: extra.next });
+      setCarrying({ written, cards: others, changes, next: extra.next, exit });
       return;
     }
-    onSave({ ...written, ...extra, carry: null });
+    onSave({ ...written, ...extra, carry: null, exit });
   };
   /* Whether there is a connection, for the line above the first field. */
   const offline = useOffline();
@@ -10425,22 +10470,55 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         /* Named for what is being made, which is settled before this
            opens: a screen for writing a conversation should not be called
            "New card" and then be full of turns. */
-        title={stored ? "Edit card" : `New ${shapeLabel(shape).toLowerCase()}`}
+        title={stored ? cardTitle(card) : `New ${shapeLabel(shape).toLowerCase()}`}
         /* One sheet, ruled into sections — see .at-screen.cardform. The
            editor is the only screen laid out that way, so it is the only
            one that asks for it. */
         className="cardform"
         onBack={onClose}
+        /* Locked: Export, the status and Edit. Open: the status, Cancel,
+           and two saves — Save keeps the card open to go on with it, and
+           Save and exit closes it, the one a finished card wants, so it is
+           the primary. On a phone, on a line under the title. */
+        actionBelow
         action={
-          <Button variant="primary" size="sm"
-            disabled={!canSave || busy}
-            onClick={() => save()}
-          >
-            <Icon name="save" />
-            {busy ? "Saving…" : "Save"}
-          </Button>
+          locked ? (
+            <>
+              {onExport ? <IconButton icon="download" label="Export this card" onClick={onExport} /> : null}
+              {status ? status(false) : null}
+              <Button variant="primary" size="sm" icon="edit" onClick={onUnlock}>
+                Edit
+              </Button>
+            </>
+          ) : (
+          <>
+            {stored && status ? status(changed) : null}
+            {stored && onRelock ? (
+              <Button variant="ghost" size="sm" onClick={() => (changed ? setDiscarding(true) : onRelock())}>
+                Cancel
+              </Button>
+            ) : null}
+            <Button size="sm"
+              disabled={!canSave || !changed || busy}
+              onClick={() => save()}
+            >
+              <Icon name="save" />
+              {busy ? "Saving…" : "Save"}
+            </Button>
+            <Button variant="primary" size="sm"
+              disabled={!canSave || !changed || busy}
+              onClick={() => save(null, true)}
+            >
+              <Icon name="check" />
+              Save and exit
+            </Button>
+          </>
+          )
         }
       >
+          {about}
+          <fieldset className="at-cardlock" disabled={locked}>
+          <Locked.Provider value={locked}>
           {/* Said before the typing rather than after it.
               A save that cannot be made is now kept on the device and sent
               when the connection returns — but a teacher about to write a
@@ -10513,25 +10591,41 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             <WordEditor word={word} lang={lang} allCards={allCards} selfId={selfId} />
           )}
 
-          {stored && onDelete && (
+          {stored && onDelete && !locked && (
             <Button variant="danger" className="at-mt5" onClick={onDelete}>
               Delete this card
             </Button>
           )}
+          </Locked.Provider>
+          </fieldset>
+          {below}
       </Screen>
+      {discarding && (
+        <ConfirmModal
+          title="Discard your changes?"
+          body={<p>The card goes back to how it was last saved.</p>}
+          confirmLabel="Discard changes"
+          onCancel={() => setDiscarding(false)}
+          onConfirm={() => {
+            setDiscarding(false);
+            if (onRelock) onRelock();
+          }}
+        />
+      )}
       <RecordingOverlays word={word} talk={talk} />
       {carrying && (
         <CarryAsk
           cards={carrying.cards}
           onCancel={() => setCarrying(null)}
           onAnswer={(carry) => {
-            const { written, cards, changes, next } = carrying;
+            const { written, cards, changes, next, exit } = carrying;
             setCarrying(null);
             onSave({
               ...written,
               clue: clue.trim(),
               capitals: asksCapitals ? capitals : undefined,
               next,
+              exit,
               carry: carry ? { ids: cards.map((c) => c.id), changes } : null,
             });
           }}

@@ -6692,12 +6692,58 @@ a student is asked:
 - Every asked version of a sentence card is read (masculine and feminine,
   old `subs`), still as one sentence: a word in two versions earns 1.
 - A line picked from a sentence card of the same deck is not a second
-  sentence. A conversation switched off is never dealt to a student, so its
-  lines are not sentences and it does not earn the conversation check.
-  Text with no letter in it ("." or "…") is no sentence and no word.
+  sentence. Text with no letter in it ("." or "…") is no sentence and no
+  word.
 - The fixes for a sentence's two flaws each claim only the sentences that
   fix alone would mend; sentences with both flaws are a fix of their own,
   since linking them alone, or teaching their words alone, adds nothing.
+
+## Words with several answers, in sentences (0.468)
+
+**24 October 2026** · `answerWords`, `phraseAnswers` and `wordsOffered` in `src/context-index.ts`, `castContext` and `pickContext` in `src/ArabicTrainer.tsx`, `src/context-links.ts`, `src/sentence-words.ts`, `contextCoverage` in `src/languages.ts`, `heard` and `spelt` in `src/deck-quality.ts`
+
+Found by the audit in `docs/AUDIT-what-teachers-can-make.md` (findings 4
+to 6), and settled by the owner question by question.
+
+**Each accepted answer is a word to find.** A form's answers are one text
+with a separator between them, and everything that looked for a word
+inside a sentence read that text whole, so it found it nowhere. The
+gap-fill, "Words this teaches", the In context tab, a deck's In context
+section, the editor's sentence check and the learner's own links all read
+each answer on its own now, through `splitForms` or `answersOf`. A phrase
+with two answers is read as each of them too, and shown as the one that
+holds the word, with that answer's own recordings. The score had read
+answers one by one since 0.463, so for a while it credited sentences that
+students never got. The two agree again.
+
+**In a sentence, only the sentence's answer is right.** The owner's
+choice, over accepting any of the word's answers: the sentence was written
+and recorded with one of them. The index notes which answer a sentence
+holds (`answer` on a context). `castContext` narrows the question to it
+before `castAnswer` takes one by its count, so it holds for the typed gap,
+the heard one and the choice. A choice is scheduled per answer, so
+`pickContext` takes a sentence holding the answer being scheduled where
+there is one. Where there isn't, any sentence is used and the question is
+about that sentence's answer, which the second answer's schedule is then
+credited with. That is accepted: the other way leaves such an answer with
+no sentence question at all.
+
+**The word type before the spaces.** `wordsOffered`, `sentenceWords` and
+`contextCoverage` guessed word-or-phrase from the text, which `kindOf` had
+stopped doing for the rest of the app because it turns a Vietnamese word
+of two syllables into a phrase. They ask `kindOf` now. A card with no word
+type is still guessed from its whole text; whether to guess from its first
+answer instead is a question the owner has not answered yet.
+
+**Each answer's recordings.** A form's recordings are the union of its
+answers' (`packAnswers`), so the score called a form recorded as soon as
+one answer was. It now asks every answer of a form with more than one; a
+card from before answers had recordings of their own shares the form's,
+and reads as it did.
+
+**The switched-off conversation.** The rule added in 0.463 stays as a
+safeguard for an imported or very old card. The notes that described it
+to teachers are gone, because no teacher can make one.
 
 ## A teacher's export is a backup file (0.462)
 
@@ -6830,3 +6876,89 @@ by accident. A rename or a tag taken off the collection reaches other
 cards as a `walk`, which the server applies to both versions of each. A
 save kept on the device while offline keeps what it said about itself and
 goes up as sent.
+
+
+## A subjunctive example is written as a sentence (0.469)
+
+**24 October 2026** · `readExample`, `sentenceOf`, `othersOf` in
+`src/examples.ts`; `ExampleFields`, `ExampleDraft` in `src/card-editor.tsx`;
+`storedExamples` in `server/api/courses.js`
+
+**What was wrong.** Since 0.441 a teacher wrote a verb's subjunctive
+example as its pattern: the words round the verb, a chip for the gap in
+the Arabic and again in the transliteration, the English built from three
+chips (person, verb, to + verb), and "Whose wish is it?" asked apart
+where the English said to + verb. Five paragraphs explained it, and the
+owner, who writes these, still could not follow it.
+
+**What changed.** The teacher writes the example as it is said, for one
+person, with one of the forms above in it, and `readExample` makes the
+pattern out of that: the form, found word by word in the Arabic (marks
+left off, nothing glued on peeled away, so بتاكل is not تاكل), is the
+gap; the English is read in one of three shapes, tried in this order —
+*I want her to eat* (whom + to + verb: `{{verb-to}}`, wished by the
+subject before it, `someone` where there is none), *she wants to eat*
+(to + verb: `{{verb-to}}`, her own wish), *she must eat* (who … verb:
+`{{verb-who}}` … `{{verb-plain}}`). To + verb comes first because in *she
+wants to eat* she is the one who wants, and بدها stays put. The person
+settles a form two persons spell alike (تاكل: *you* or *she*); with no
+pronoun, a to + verb sentence is taken as the third person, since a name
+is somebody else. What is read is stored as an example always was, plus
+`as`, who it was written for, so it reads back the same; everything that
+asks one is untouched. The screen holds a stored example as such
+(`kept`) until it is changed, shown filled from the forms as they stand,
+so editing a form above does not break an example nobody touched.
+
+**Choices the owner made.** Of: writing a sentence the app reads; picking
+from a ready-made list; keeping the chips with a shorter explanation —
+the first (1a). A verb with subjunctive forms still needs an example to
+be saved (2a). Sentence cards keep their chips for now (3a): every blank
+there is a chip already, and reading a whole sentence card's English is a
+much bigger job.
+
+**What it costs.** The app has to find the verb: the Arabic must use a
+form as the table spells it, and the English must say who and use the
+verb as in its name. *Before she eats* and *let him eat* cannot be said,
+which was true of the chips too. *I have to eat* is read as somebody's
+wish (*I have her to eat*), and *you want …* takes the first you as the
+one who wants; the two lines under each example are there to catch those.
+And an example reopened shows its English as a student meets it — *You
+(f) must eat* for *you must eat* — because the pattern, not the typing, is
+what is kept.
+
+## A teacher's card has one screen: the editor, locked (0.477)
+
+**24 October 2026** · `CardEditor`'s `locked`, `onUnlock`, `onRelock`,
+`status`, `about`, `below` in `src/card-editor.tsx`; `Locked`, `Pressable`,
+`Button`'s `reads` in `src/shared.tsx`; `cardScreen` and `openCard` in
+`src/spaces.tsx`
+
+**What was wanted.** In the teaching space, the screen a card is read on
+should be exactly the screen it is edited on, with nothing editable. The
+read-out had to be taught every editor feature a second time and had
+already fallen behind once (see `docs/PROPOSAL-view-only-parity.md`).
+
+**What changed.** A card opens in the editor with every field inside a
+disabled fieldset — so every control stops answering without being told,
+including controls added later. What only helps somebody read is a
+`Pressable` (a span with a button's role), which a fieldset cannot reach:
+the form folds, the table and practice folds, the examples fold, a blank's
+chip, a recording's play button, and a link to another card. The box a
+sentence is typed in is not a form element and reads `Locked`. The header
+outside the fieldset carries Export, the status and Edit; Edit unlocks the
+same mounted editor, and the header becomes the status (off while
+anything is unsaved), Cancel, Save and Save and exit. Cancel draws the
+editor afresh from the card (`opened`), locked, asking first where
+something changed. The editor sits over the list it was opened from, as
+the read-out did, so Back lands where the list was left.
+
+**Choices the owner made.** The whole card unlocks at once, not a section
+at a time (that was 0.431, taken off beta). Save and exit leaves the card
+for the list. Cancel asks before throwing changes away. The review line
+and Try the exercises stay, over and under the card, read or edited.
+
+**What it costs, and what was kept.** The read-out's "Where it lives"
+panel is not repeated: the editor's Decks section, ID and tags say the
+same. Delete is shown only while editing. Students' card screen and the
+administrator's reported card keep the read-out: neither is a teacher's
+editor.

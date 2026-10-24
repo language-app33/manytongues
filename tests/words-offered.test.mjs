@@ -129,3 +129,19 @@ test("Words this teaches names the form the gap-fill will blank", () => {
   const offered = must(wordsOffered("آسفة، مش فاهمة.", [understand], ar)[0], "offered");
   assert.equal(offered.form.ar, "فاهمة");
 });
+
+/* ---- a long text, and a reply of one word ---- */
+
+test("a long text is offered every word it holds, in the order they come", () => {
+  const nouns = "بيت كتاب ولد بنت شارع مدرسة سيارة باب شباك قلم ورقة طاولة كرسي مطبخ غرفة حمام سوق دكان مكتب جامعة صاحب أخ أخت أب".split(" ");
+  const welcome = card("W", "عَفْواً", "you're welcome");
+  const found = wordsOffered(`عفواً ${nouns.join(" ")}`, [...nouns.map((w, i) => card(`n${i}`, w, w)), welcome], ar);
+  assert.equal(found.length, nouns.length + 1, "none left out past 24");
+  assert.equal(must(found[0], "the first word").card.id, "W", "in the text's order, not the collection's");
+});
+
+test("a conversation's one-word reply is offered its word, whatever its harakat", () => {
+  const welcome = card("W", "عَفْواً", "you're welcome");
+  assert.deepEqual(wordsOffered("عفواً", [welcome], ar), [], "not on a card of its own");
+  assert.deepEqual(wordsOffered("عفواً", [welcome], ar, "", { line: true }).map((m) => m.card.id), ["W"]);
+});
