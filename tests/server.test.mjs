@@ -452,7 +452,7 @@ test("a verb comes back with its subjunctive examples, and a sentence with whose
             { ar: " لازم {{verb}} ", lat: "laazim {{verb}}", en: "{{verb-who}} must {{verb-plain}}" },
             { ar: "", lat: "", en: "" },
             { ar: "بدي {{verb}}", en: "I want {{verb-to}}", wish: "I-F!" },
-            { ar: "رح {{verb}}", en: "{{verb-who}} will {{verb-plain}}" },
+            { ar: "رح {{verb}}", en: "{{verb-who}} will {{verb-plain}}", as: "You-F" },
             { ar: "ممكن {{verb}}", en: "{{verb-who}} can {{verb-plain}}" },
           ],
         },
@@ -464,8 +464,8 @@ test("a verb comes back with its subjunctive examples, and a sentence with whose
   assert.deepEqual(verb.json.card.examples, [
     { ar: "لازم {{verb}}", lat: "laazim {{verb}}", en: "{{verb-who}} must {{verb-plain}}" },
     { ar: "بدي {{verb}}", en: "I want {{verb-to}}", wish: "i-f" },
-    { ar: "رح {{verb}}", en: "{{verb-who}} will {{verb-plain}}" },
-  ], "trimmed, the blank one dropped, whose wish narrowed like an id, three at most");
+    { ar: "رح {{verb}}", en: "{{verb-who}} will {{verb-plain}}", as: "you-f" },
+  ], "trimmed, the blank one dropped, whose wish and who it was written for narrowed like an id, three at most");
   /* Taken off when the teacher takes them all off. */
   const bare = await api("/api/courses?action=save-card", {
     method: "POST", key,

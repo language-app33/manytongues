@@ -18,7 +18,7 @@
  *     overly long sentence, and a conversation or text in the deck.
  *
  * What counts as a sentence: a phrase or sentence card, or one line of a
- * conversation or text that is practised. A card is one sentence however
+ * conversation or text. A card is one sentence however
  * many versions and accepted answers it has, and every one of them is
  * read; a line picked from a sentence card of the deck is that sentence
  * again, and text with no letter in it is no sentence. What counts as a
@@ -43,9 +43,10 @@
 
 import type { Lang } from "./types.ts";
 import { formsOf, wordOf } from "./cards.ts";
+import { answersOf } from "./answers.ts";
 import { isDialog, linesOf, pickedFrom } from "./dialogs.ts";
 import {
-  bestWordIn, contextTokens, findWordSpan, isFunctionWord, kindOf, splitForms, supportsContext, tensedOf,
+  answerFields, bestWordIn, contextTokens, findWordSpan, isFunctionWord, kindOf, splitForms, supportsContext, tensedOf,
 } from "./languages.ts";
 import { exampleCells, verbExamplesOf } from "./examples.ts";
 import { isAsked } from "./scheduler.ts";
@@ -191,8 +192,13 @@ interface Said {
   units: Held[];
 }
 
-/* Whether a conversation or text is practised. One switched off is never
-   put in front of a student, so its lines are no sentences of the deck. */
+/* Whether a conversation or text is practised. A safeguard, and nothing a
+   teacher meets: the editor cannot switch a conversation off (it marks a
+   card practised whenever any part of it is asked, and a conversation's
+   part always is), so only a hand-made import or a card from before
+   0.179 could arrive like this. If one does, it is never put in front of
+   a student, so its lines are no sentences of the deck. See
+   docs/AUDIT-what-teachers-can-make.md. */
 const practised = (card: Held) => card.drill !== false;
 
 function saidIn(cards: Held[], lang: Lang | null | undefined): Said[] {
@@ -226,6 +232,29 @@ function saidIn(cards: Held[], lang: Lang | null | undefined): Said[] {
   }
   return out;
 }
+
+/*
+ * Whether a word, form or sentence has its recordings and its
+ * pronunciation: every accepted answer of it, where it accepts several.
+ *
+ * A recording belongs to the answer it is of (see answers.ts), and a
+ * question about the second answer plays the second answer's voice, so a
+ * form with one of its two answers recorded is short of one. A form keeps
+ * every answer's recordings together as well, and read that way it looked
+ * recorded as soon as either was. A card written before answers had
+ * recordings of their own shares the form's among them, and reads as it
+ * always did.
+ */
+const heard = (unit: Held) => {
+  const answers = answersOf(unit, answerFields());
+  return answers.length > 1
+    ? answers.every((a) => (a.clips || []).length > 0 || (a.slowClips || []).length > 0)
+    : recorded(unit);
+};
+const spelt = (unit: Held) => {
+  const answers = answersOf(unit, answerFields());
+  return answers.length > 1 ? answers.every((a) => !!trim(a.lat)) : !!trim(unit.lat);
+};
 
 const recorded = (unit: Held) =>
   ["clips", "slowClips", "recs"].some((f) => Array.isArray(unit && unit[f]) && unit[f].length > 0);
@@ -380,7 +409,7 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
         /* A verb's own sentence holds the verb in a place of its own. */
         if (own && toMeet.has(String(card.id)) && supportsContext(lang)) {
           for (const f of toMeet.get(String(card.id)) || []) {
-            if (findWordSpan(s.ar, f.ar, lang)) credit(String(card.id), f.ar, key);
+            if (answersIn(f.ar).some((w) => findWordSpan(s.ar, w, lang))) credit(String(card.id), f.ar, key);
           }
         }
       }
@@ -438,11 +467,11 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
     }
   }
   for (const s of said) if (s.units.length) units.push(s.units);
-  const unrecorded = units.filter((u) => u.some((v) => !recorded(v)));
+  const unrecorded = units.filter((u) => u.some((v) => !heard(v)));
   const unpictured = words.filter((c) =>
     !(formsOf(c) as Held[]).some((f) => Array.isArray(f.images) && f.images.length > 0));
   const writesApart = !!(lang && lang.script);
-  const unspelt = units.filter((u) => u.some((v) => !trim(v.lat)));
+  const unspelt = units.filter((u) => u.some((v) => !spelt(v)));
   const reviewing = deck.filter((c) => parts.has(String(c.id)));
   const unreviewed = reviewing.filter((c) => toReview(stateFrom(c, parts.get(String(c.id)) || [])));
   /* A card is a repeat when an earlier one shares an answer and a meaning
