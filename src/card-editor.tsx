@@ -1766,7 +1766,8 @@ function WordsUsed({ lang, text, cards, selfId, chosen, onChange, line = false }
     const m = found.find((x) => x.card.id === c.id);
     const form = m && m.form;
     if (!form || form.ar === wordOf(c).ar) return "";
-    return form.en ? `found as ${form.ar} (${form.en})` : `found as ${form.ar}`;
+    const en = shownAlternatives(form.en);
+    return en ? `found as ${shownAlternatives(form.ar)} (${en})` : `found as ${shownAlternatives(form.ar)}`;
   };
   /* A verb with its past *he* left blank is listed by the form it does
      have, under the name it was given — "to keep" — since its own word has
