@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.481 — 25 October 2026
+
+**A card's screen is tidier: Delete at the top, and its exercises in a
+section of their own.**
+
+- Delete this card has moved from the foot of the form to the top of the
+  screen, as a red bin beside Cancel and Save. As before, it is only there
+  while the card is being edited.
+- "Try an exercise" is now a section called Exercises, headed like the
+  others on the card. Its exercises are grouped under the level each one
+  belongs to, using the level names Progress shows, two to a row.
+- A conversation or a text no longer has the small lines of guidance under
+  its heading ("What it is and who is in it.", "A name, and two lines or
+  more." and the like). It opens with just the heading.
+
+To check by hand: open a saved word card and a conversation, read and
+then edit, and look at the top bar and the Exercises section, on a phone
+as well.
+
 ## 0.480 — 24 October 2026
 
 **"Found as" keeps its meanings apart too.**
