@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.483 — 26 October 2026
+## 0.484 — 26 October 2026
 
 **A card's buttons are icons on its top line, and Meanings moves to
 Settings.**
@@ -29,6 +29,25 @@ Settings.**
 
 To check by hand: a card with a long name on a phone, read and while
 editing; hover over each icon; export a card you are only reading.
+
+## 0.483 — 26 October 2026
+
+**A course's teacher code goes only to its teachers.**
+
+- One of the server's answers about a course, which any student of the
+  course could ask for, still carried the teacher code — the code that
+  makes whoever holds it a teacher of the course. No screen showed it, but
+  it was there to be read. That answer now carries neither code. Teachers
+  still see both codes on their course screen, and the administrator in
+  Administration, as before.
+- Because it could have been read, it is worth replacing every course's
+  teacher code: in Administration, open each course and press New beside
+  its teacher code. Teachers already in a course stay in it; only someone
+  joining afterwards needs the new code.
+
+To check by hand: as a teacher, a course still shows its student and
+teacher codes; in Administration, both codes show and New replaces the
+teacher code.
 
 ## 0.482 — 26 October 2026
 

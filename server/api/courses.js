@@ -3542,7 +3542,11 @@ export default async (req) => {
         };
       });
       decks.sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0));
-      return json({ ok: true, course: { ...course, code: undefined }, decks });
+      /* Neither code, to anybody: whoever is asking is already in. The
+         teacher code is the one that matters — it makes a teacher of
+         whoever holds it, and this answer goes to students. Teachers and
+         the administrator read both codes from my-courses and Admin. */
+      return json({ ok: true, course: { ...course, code: undefined, teacherCode: undefined }, decks });
     }
 
     if (action === "deck-cards") {

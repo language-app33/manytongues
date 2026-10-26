@@ -26,10 +26,14 @@ concurrency:
 jobs:
   check:
     runs-on: ubuntu-latest
-    # Twenty, not ten: from 0.413 the unit tests alone take about seven and
-    # a half minutes on a runner, and the smoke walk-through and build were
-    # being cut off, so every run read "cancelled" rather than red or green.
-    timeout-minutes: 20
+    # Forty-five, not twenty. Twenty was set when the unit tests took about
+    # seven and a half minutes on a runner; by 0.480 the whole run took
+    # sixteen to twenty, and runs on main and beta were being cut off and
+    # reading "cancelled" again. That matters more now that Railway can be
+    # told to wait for this check before deploying main: a run cut off is a
+    # release that never goes live. Public repositories pay nothing for the
+    # minutes, so the limit is only a backstop against a run that hangs.
+    timeout-minutes: 45
 
     steps:
       - uses: actions/checkout@v4
