@@ -3653,6 +3653,9 @@ test("a course's decks are listed to the people in it and to nobody else", () =>
     /* The join code is how somebody gets in, so it is never handed to
        somebody who is already in. */
     assert.equal(asStudent.json.course.code, undefined);
+    /* And the teacher code least of all: a student holding it could join
+       again as a teacher of the course. */
+    assert.equal(asStudent.json.course.teacherCode, undefined, "a student is handed the teacher code");
 
     const asOutsider = await api(`/api/courses?action=course-decks&course=${course.id}`, { key: outsider.key });
     assert.equal(asOutsider.status, 403);
