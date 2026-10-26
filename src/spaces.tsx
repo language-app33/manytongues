@@ -541,6 +541,9 @@ export function CodeBox({ label, code, hint, onNew, busy }: {
   return (
     <div className="at-codeblock">
       <div className="at-codehead">{label}</div>
+      {/* What the code is for, under its name and before the code itself,
+          the way a field is explained in the card editor. */}
+      {hint && <p className="at-fieldlede">{hint}</p>}
       <div className="at-codebox">
         <b>{code || "—"}</b>
         <Button variant="ghost" size="sm"
@@ -554,7 +557,6 @@ export function CodeBox({ label, code, hint, onNew, busy }: {
           <Button variant="ghost" size="sm" disabled={busy} onClick={onNew} icon="refresh">{code ? "Replace" : "Create"}</Button>
         )}
       </div>
-      {hint && <Help>{hint}</Help>}
     </div>
   );
 }
@@ -1210,7 +1212,15 @@ function CourseSettings({
       action={
         <Button variant="danger" size="sm" onClick={onDelete} icon="delete">Delete</Button>
       }
+      className="cardform"
     >
+      {/* Headed and explained the way the card editor is: each part of the
+          course under a heading, with what it is for straight underneath,
+          and each field's explanation before the control it explains. */}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">This course</span>
+        </div>
           {/* A title is a label and nothing hangs off it — decks, people and
               join codes are all keyed by the course's id — so unlike the
               language below, renaming is an ordinary edit and needs no
@@ -1264,7 +1274,14 @@ function CourseSettings({
             )}
           </Field>
 
-          <Field label={<>Language taught {!c.language && <span className="req">not set</span>}</>}>
+          <Field
+            label={<>Language taught {!c.language && <span className="req">not set</span>}</>}
+            lede={c.language && !unlockLang
+              ? null
+              : c.language
+                ? "Changing this converts nothing. Cards already written stay as they are and will be treated as the new language, which is usually wrong."
+                : "Until this is set, decks and cards made for this course fall back to the first language on the list, which is rarely the right one."}
+          >
             {/* Set once, then behind a deliberate act. Changing it later
                 converts nothing — it just relabels every existing card. */}
             {c.language && !unlockLang ? (
@@ -1295,21 +1312,19 @@ function CourseSettings({
                     setUnlockLang(false);
                   }}
                 />
-                <Help>
-                  {c.language
-                    ? "Changing this converts nothing. Cards already written stay as they are and will be treated as the new language, which is usually wrong."
-                    : "Until this is set, decks and cards made for this course fall back to the first language on the list, which is rarely the right one."}
-                </Help>
               </>
             )}
           </Field>
 
-          <p className="at-eyebrow at-mt5">
-            Join codes
-          </p>
-          <Help>
+      </div>
+
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Join codes</span>
+          <span className="at-formrole">
             Two codes: one lets people study, the other lets them teach.
-          </Help>
+          </span>
+        </div>
           <CodeBox
             label="Student code"
             code={c.code}
@@ -1325,13 +1340,16 @@ function CourseSettings({
             hint="Send this privately. It lets someone add and change the material."
           />
 
-          <p className="at-eyebrow at-mt5">
-            Who is in it
-          </p>
-          <Help>
+      </div>
+
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Who is in it</span>
+          <span className="at-formrole">
             Someone can do both. Switch a role off to drop it; switch off the
             last one and they leave the course.
-          </Help>
+          </span>
+        </div>
           <div className="at-list">
             {people.map((h) => (
               <RosterRow
@@ -1387,6 +1405,7 @@ function CourseSettings({
               </Button>
             </div>
           )}
+      </div>
     </Screen>
   );
 }
@@ -3551,6 +3570,7 @@ function ClearScreen({ onClear, onClose }: {
       title="Clear data"
       onBack={onClose}
       rise
+      className="cardform"
       action={
         <Button
           variant="danger"
@@ -3584,7 +3604,10 @@ function ClearScreen({ onClear, onClose }: {
         )}
       </div>
 
-      <Field label="Admin key">
+      <Field
+        label="Admin key"
+        lede="The same key that makes someone an administrator. It lives with whoever runs the deploy, not on the site, which is what makes it worth asking for here."
+      >
         <input
           className="at-input"
           type="password"
@@ -3593,11 +3616,6 @@ function ClearScreen({ onClear, onClose }: {
           placeholder="The key this deploy was set up with"
           onChange={(e) => setKey(e.target.value)}
         />
-        <Help>
-          The same key that makes someone an administrator. It lives with
-          whoever runs the deploy, not on the site, which is what makes it
-          worth asking for here.
-        </Help>
       </Field>
 
       <Notice kind="error">{error}</Notice>
@@ -3824,7 +3842,15 @@ function DeckEditor({
           {busy ? "Saving…" : "Save"}
         </Button>
       }
+      className="cardform"
     >
+      {/* Headed and explained the way the card editor is: each part under a
+          heading with what it is for straight underneath, and each field's
+          explanation before the control it explains. */}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">This deck</span>
+        </div>
           <Field label={<>Title <span className="req">required</span></>}>
             <input
               className="at-input"
@@ -3836,13 +3862,13 @@ function DeckEditor({
           </Field>
 
           {asking && (
-            <>
-              <LanguageRadio languages={choices} value={lang} onChange={setLang} label="Language" />
-              <Help>
-                A deck holds cards in one language, and this sets the script and keyboard its
-                cards are written with.
-              </Help>
-            </>
+            <LanguageRadio
+              languages={choices}
+              value={lang}
+              onChange={setLang}
+              label="Language"
+              lede="A deck holds cards in one language, and this sets the script and keyboard its cards are written with."
+            />
           )}
 
           {!canSave && (
@@ -3859,9 +3885,16 @@ function DeckEditor({
           {/* Locking is about which cards the deck holds, and nothing
               else: the cards can still be corrected, and the deck renamed
               and shared. */}
+      </div>
           {deck && (
-            <>
-              <p className="at-eyebrow at-mt6">Lock</p>
+            <div className="at-formblock">
+              <div className="at-formhead">
+                <span className="at-formnum">Lock</span>
+                <span className="at-formrole">
+                  The cards in it can still be edited. Any teacher who can change this deck can
+                  unlock it.
+                </span>
+              </div>
               <div className="at-cklist">
                 <button
                   className={`at-ck${locked ? " on" : ""}`}
@@ -3876,21 +3909,18 @@ function DeckEditor({
                   </span>
                 </button>
               </div>
-              <Help>
-                The cards in it can still be edited. Any teacher who can change this deck can
-                unlock it.
-              </Help>
-            </>
+            </div>
           )}
 
           {deck && (
-            <>
-              <p className="at-eyebrow at-mt6">
-                Courses using it
-              </p>
-              <Help>
-                Tick a course to share this deck with its students. Untick to take it back.
-              </Help>
+            <div className="at-formblock">
+              <div className="at-formhead">
+                <span className="at-formnum">Courses using it</span>
+                <span className="at-formrole">
+                  Tick a course to share this deck with its students. Untick to take it back.
+                  A deck in no course is yours alone — nobody studying can see it.
+                </span>
+              </div>
               <div className="at-cklist">
                 {(courses || []).map((c) => {
                   const on = picked.has(c.id);
@@ -3924,9 +3954,6 @@ function DeckEditor({
                   </Help>
                 )}
               </div>
-              <Help>
-                A deck in no course is yours alone — nobody studying can see it.
-              </Help>
               {/* The same sentence the other screen that defers its writes
                   uses, in the same words, so the two teach one rule. */}
               {dirty && (
@@ -3936,7 +3963,7 @@ function DeckEditor({
                   Nothing changes until you save.
                 </Help>
               )}
-            </>
+            </div>
           )}
     </Screen>
   );

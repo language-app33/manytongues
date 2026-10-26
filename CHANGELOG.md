@@ -8,6 +8,33 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.488 — 26 October 2026
+
+**Course settings, deck settings, prep mode, clearing data and the number
+screens are laid out like the card editor.**
+
+- Course settings, Deck settings (and New deck), Prep mode, Clear data, and
+  the teacher's number screens — Number system, Telling the time, Correct
+  how a number is said, a number written out, and Check a number — now use
+  the card editor's large section headings and its field-name style.
+- Course settings and Deck settings gain a first heading, "This course" and
+  "This deck", over the name and language, the way the editor heads a card
+  with "This card".
+- Wherever a line explains a section or a field, it now sits straight under
+  the heading, before what it explains: the language of a course or deck,
+  the join codes, who is in a course, locking a deck, the courses using a
+  deck, the day and target of a prep, and the admin key.
+- Lines that react to what was just chosen — "A deck needs a title", "Pick a
+  day from tomorrow on", how many courses are about to change — still come
+  after, next to the thing they are about.
+- The student join code on a teacher's own course page now has its
+  explanation above the code too, since the code box is shared with Course
+  settings.
+
+To check by hand: on a phone, open each of these screens and compare them
+with a card's edit screen — in particular Course settings with its two join
+codes, and a deck's settings with Lock and Courses using it.
+
 ## 0.487 — 26 October 2026
 
 **App preferences is laid out like the card editor too.**

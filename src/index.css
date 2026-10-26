@@ -1345,6 +1345,11 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-codehead { font-size:11px; letter-spacing:.04em; text-transform:uppercase;
   color: var(--muted); font-weight:700; margin-bottom:6px; }
 .at-codeblock .at-hint { margin-top:6px; }
+/* On a screen laid out like the card editor, a code's name is a field's
+   name, at the size and weight the editor gives one. */
+.at-screen.cardform .at-codehead { font-family: var(--ui); font-size:15px; font-weight:800;
+  letter-spacing:.07em; line-height:1.3; margin-bottom:8px; }
+.at-codeblock .at-fieldlede { margin:0 0 10px; }
 /* A full-screen editor sits above the app chrome (200) and below the confirm
    dialogs (400). Screens are portalled to the body, so this z-index is
    authoritative no matter how deeply the screen was opened from.
@@ -4118,3 +4123,16 @@ fieldset.at-cardlock:disabled :is(input, textarea, select):disabled { color: var
   -webkit-text-fill-color: var(--text); opacity:1; cursor:default; }
 fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] { cursor:default; }
 fieldset.at-cardlock:disabled .at-seg.on:disabled { opacity:1; }
+
+/* A Section on a screen laid out like the card editor is headed the way
+   the editor heads its own sections: a band out to the gutters with a rule
+   above, the name at heading size, and what it is for straight under it.
+   The number-system screens are built from Sections rather than the
+   editor's blocks, and read as the same family this way. */
+.at-screen.cardform .at-section { margin:0 -16px; padding:28px 16px 32px;
+  border-top:1px solid var(--line); }
+.at-screen.cardform .at-section > .at-sectiontop > .at-eyebrow { font-size:25px;
+  font-weight:800; letter-spacing:-.015em; line-height:1.15; text-transform:none;
+  color: var(--ink); }
+.at-screen.cardform .at-section .at-sectionlede { margin:4px 0 0; }
+.at-screen.cardform .at-section .at-sectionbody { margin-top:18px; }

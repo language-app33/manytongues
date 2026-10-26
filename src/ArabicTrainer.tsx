@@ -18666,6 +18666,7 @@ function PrepScreen({
     <Screen
       title="Prep mode"
       onBack={onBack}
+      className="cardform"
       /* Save at the foot of the screen, as every other form keeps it, and
          the way to delete the prep at the other end of the same bar —
          an icon, so it is there without competing with Save. */
@@ -18702,7 +18703,11 @@ function PrepScreen({
       <FormField
         label="When is it?"
         htmlFor="at-prep-date"
-        hint={date && !dateOk ? "Pick a day from tomorrow on." : "You'll need to be ready before this day starts."}
+        /* What the day means is said before it is picked, as the card
+           editor explains a field; a day that will not do is said after,
+           against what was picked. */
+        lede="You'll need to be ready before this day starts."
+        hint={date && !dateOk ? "Pick a day from tomorrow on." : null}
       >
         <input
           id="at-prep-date"
@@ -18731,7 +18736,7 @@ function PrepScreen({
       </FormField>
       <FormField
         label="Target level"
-        hint={
+        lede={
           target === "cleared"
             ? "Every card answered right all the way up its levels. Quicker to reach."
             : "Every card cleared, then remembered on two reviews a few days apart."
