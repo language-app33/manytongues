@@ -1038,6 +1038,77 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   margin-bottom:6px; }
 .at-screen.cardform .at-formtile .at-formrole { font-size:13px; line-height:1.5; }
 .at-screen.cardform .at-hint { font-size:14px; line-height:1.6; }
+
+/* --- the card screen's tabs ---------------------------------------
+   Overview, the card's words, Exercises and Settings — see CardTab. The
+   bar stays at the top of the sheet as it scrolls, so moving between tabs
+   is never a scroll back up; it is the sheet's own colour, with the rule
+   the sections use under it. */
+.at-screen.cardform .at-cardtabs { position:sticky; top:0; z-index:3;
+  margin:0 -16px; padding:12px 16px; background: var(--surface);
+  border-bottom:1px solid var(--line); }
+.at-screen.cardform .at-cardtabs .at-nav2 { margin:0; flex-wrap:nowrap;
+  overflow-x:auto; scrollbar-width:none; }
+/* A size down from the space's own tabs, so all four fit across a phone. */
+.at-screen.cardform .at-cardtabs .at-nav2 { gap:4px; }
+.at-screen.cardform .at-cardtabs .at-tab2 { flex:0 0 auto; font-size:12px; padding:8px 11px; }
+/* A change not yet saved on that tab, or a line on it saying what is in
+   the way of saving. Brass, the colour of a thing waiting on the teacher. */
+.at-tabdot { width:8px; height:8px; border-radius:50%; background: var(--brass);
+  flex:0 0 auto; }
+/* The first section of a tab sits under the bar, not under a rule. */
+.at-screen.cardform [role="tabpanel"] > fieldset > .at-formblock:first-child { border-top:0; }
+
+/* --- the card face ------------------------------------------------
+   The card as a student meets it, at the top of Overview: its words large,
+   how they are said and what they mean, beside its picture and recording.
+   Read rather than filled in, so no boxes: type, at reading sizes. */
+.at-cardface { display:flex; flex-direction:column; gap:6px; }
+.at-facerow { display:flex; gap:16px; align-items:flex-start; }
+.at-facemain { flex:1; min-width:0; display:flex; flex-direction:column; gap:4px; }
+.at-faceside { display:flex; flex-direction:column; align-items:center; gap:8px; flex:0 0 auto; }
+.at-faceimg { width:88px; height:88px; object-fit:cover; border-radius: var(--r); }
+.at-faceword { font-size:40px; line-height:1.35; font-weight:600; color: var(--ink); margin:0;
+  overflow-wrap:anywhere; }
+.at-facetitle { font-size:22px; font-weight:800; line-height:1.25; color: var(--ink); margin:0; }
+.at-facelat { font-size:15px; font-style:italic; color: var(--muted); margin:0; }
+.at-facemean { font-size:18px; font-weight:600; color: var(--text); margin:0; }
+.at-facemeta { font-size:13px; font-weight:700; letter-spacing:.04em; color: var(--muted); margin:6px 0 0; }
+.at-facetags { display:flex; flex-wrap:wrap; gap:6px; margin-top:4px; }
+.at-facetag { display:inline-flex; align-items:baseline; gap:6px; padding:4px 10px;
+  border:1px solid var(--line); border-radius:999px; font-size:15px; }
+.at-facetag .at-faceen { font-size:12px; color: var(--muted); }
+.at-facetag.more { color: var(--muted); font-size:13px; }
+.at-faceline { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 10px; margin:4px 0 0; }
+.at-facewho { font-size:12px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color: var(--accent); }
+.at-facear { font-size:22px; color: var(--ink); }
+.at-faceline .at-faceen { font-size:14px; color: var(--muted); }
+/* Whether it is out, how many exercises can be asked, and what would open
+   the most of the rest — and a tap from there to the Exercises tab. */
+.at-faceready { display:flex; align-items:center; gap:6px; margin-top:14px; padding:10px 12px;
+  width:100%; text-align:start; background: var(--raised); border:0; border-radius: var(--r);
+  font-family: var(--ui); font-size:14px; font-weight:600; color: var(--text); cursor:pointer; }
+.at-faceready .at-ic { margin-inline-start:auto; color: var(--muted); flex:0 0 auto; }
+.at-faceready:hover { background: var(--raised-hover); }
+
+/* --- what is practised --------------------------------------------
+   One line per form and per table, at the top of the Exercises tab, with a
+   tick each for on its own and in sentences — see PracticeList. */
+.at-practice { display:flex; flex-direction:column; }
+.at-practicerow { display:grid; grid-template-columns:minmax(0, 1fr) 88px; gap:8px;
+  align-items:center; padding:10px 0; border-top:1px solid var(--line); }
+.at-practice.lends .at-practicerow { grid-template-columns:minmax(0, 1fr) 88px 88px; }
+.at-practicerow > :not(:first-child) { justify-self:center; }
+.at-practicerow.head { border-top:0; padding-top:0; font-size:12px; font-weight:800;
+  letter-spacing:.07em; text-transform:uppercase; color: var(--muted); }
+.at-practicerow.head > :not(:first-child) { text-align:center; }
+.at-practicename { display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 10px; min-width:0; }
+.at-practicetitle { font-size:15px; font-weight:700; color: var(--text); }
+.at-practicenote { font-size:18px; color: var(--ink); }
+.at-practicenote.count { font-size:13px; color: var(--muted); }
+.at-practiceoff { flex:0 0 100%; font-size:12px; color: var(--muted); }
+.at-practicerow.off .at-practicetitle, .at-practicerow.off .at-practicenote { color: var(--muted); }
+.at-practicetick { width:22px; height:22px; accent-color: var(--jade); cursor:pointer; }
 .at-screen.cardform .at-field { margin-bottom:16px; }
 .at-screen.cardform .at-groupline,
 .at-screen.cardform .at-drillhead { font-size:15px; line-height:1.3; }

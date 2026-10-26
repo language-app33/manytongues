@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
 import type { Card, Course, Deck, Flag, Form, Lang, LangId, User } from "./types.ts";
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
-import { CardEditor, NewCardKind } from "./card-editor.tsx";
+import { CardEditor, ExerciseTally, NewCardKind } from "./card-editor.tsx";
 import type { CardShape } from "./card-editor.tsx";
 import { formsOf, leadOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
@@ -4057,6 +4057,29 @@ function TryExercises({ card, cards, lang, onTry, back }: {
     });
   }, [mine, lang, contexts, scenes, values, material]);
 
+  /* How many can be asked, and what would open the most of the rest — for
+     the line under the card's face, on the Overview tab. Each reason is
+     counted by its first clause: "a few more cards like it in this
+     language — words, phrases…" is one thing to do, said at length. */
+  const report = useContext(ExerciseTally);
+  const tally = useMemo(() => {
+    const waiting = new Map<string, number>();
+    for (const o of offers) {
+      if (o.ready) continue;
+      for (const m of o.missing) {
+        const need = String(m).split(" — ")[0];
+        waiting.set(need, (waiting.get(need) || 0) + 1);
+      }
+    }
+    const [need, opens] = [...waiting.entries()].sort((a, b) => b[1] - a[1])[0] || ["", 0];
+    return { ready: offers.filter((o) => o.ready).length, total: offers.length, need, opens };
+  }, [offers]);
+  useEffect(() => {
+    if (!report) return;
+    report(tally);
+    return () => report(null);
+  }, [report, tally]);
+
   if (!offers.length) return null;
 
   /* Grouped by the level each stands on, lowest first: the order a student
@@ -4694,6 +4717,10 @@ function statusChoices(card: Card): { value: string; label: string }[] {
     { value: "unpublish", label: "Unpublish…" },
   ];
 }
+/* The status as the menu reads while it is shut — "Published", "Draft",
+   "Changes in draft" — for the line under the card face. */
+const statusLabel = (card: Card): string =>
+  (statusChoices(card).find((c) => c.value === statusNow(card)) || { label: "Published" }).label;
 const statusNow = (card: Card): string =>
   card.status && card.status !== "published" ? card.status : card.changes ? `changes:${card.changes}` : "published";
 
@@ -4727,7 +4754,7 @@ function StatusMenu({ card, disabled, onStatus }: {
   }, [open]);
   const now = statusNow(card);
   const choices = statusChoices(card);
-  const shown = (choices.find((c) => c.value === now) || { label: "Published" }).label;
+  const shown = statusLabel(card);
   const pick = (value: string) => {
     setOpen(false);
     if (value === now) return;
@@ -6509,6 +6536,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           const c = editing.card;
           return c && c.id ? <StatusMenu card={c} disabled={busy || off} onStatus={(to) => setStatus(c, to)} /> : null;
         }}
+        statusWord={editing.card && editing.card.id ? statusLabel(editing.card) : undefined}
         onExport={editing.card && editing.card.id ? () => exportCards([editing.card!.id]) : undefined}
         about={
           editing.card && editing.card.id ? (

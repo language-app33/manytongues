@@ -6962,3 +6962,54 @@ panel is not repeated: the editor's Decks section, ID and tags say the
 same. Delete is shown only while editing. Students' card screen and the
 administrator's reported card keep the read-out: neither is a teacher's
 editor.
+
+## A teacher's card is four tabs (0.482)
+
+**26 October 2026** · `CardTab`, `TabPanel`, `byTab`, `CardFace`,
+`PracticeList`, `ClueBlock` and `ExerciseTally` in `src/card-editor.tsx`;
+`Tabs`' `dots` in `src/shared.tsx`; `TryExercises` and `statusLabel` in
+`src/spaces.tsx`
+
+**What was wanted.** The card screen was one long sheet of sections at the
+same weight. On a phone the first screen of a word was its type, subtype
+and decks; the word was four sections down; a verb was fifty rows of boxes
+before anything else. The owner wanted it simpler without losing anything.
+
+**What changed.** Four tabs, always opening on the first. *Overview*: a
+card face (the words as a student meets them, a recording to play, the
+picture), a readiness line (status, how many exercises can be asked, the
+one thing that would open most of the rest — tapping it opens Exercises),
+then type, subtype, decks and the two "add another" buttons. *Forms*
+(named for the card: Table, Sentence, Lines, Text): the card's own words.
+*Exercises*: what is practised, then the exercises to try. *Settings*:
+capital letters, the clue, and the ID and tags blanks reach the card by.
+A scene has no Settings tab — it has none of these.
+
+The practice ticks left each form and became one list on the Exercises
+tab, a line per form and per table (`askParts`), each showing the form's
+own words. That list was tried before (0.158) and taken apart because its
+lines were named in the editor's words and could not be matched to the
+form they meant; showing the words is what answers that.
+
+**How the dots work.** One Save covers four tabs, so a tab out of sight
+says when it has something on it: a change not saved, or something in the
+way of saving. Changes are read off the save's own snapshot cut by tab
+(`byTab`) — the practice flags live on the forms, so they are taken off
+the forms and counted on Exercises. What is in the way is the red
+`.at-formneed.unmet` line the block already draws, found in each tab's
+panel; where Save is grey with no such line, it is the card's words that
+are short. Every tab stays mounted and hidden, so a half-typed field
+survives switching and a hidden tab can still be read for its line.
+Following typing and taps instead was tried and dropped: a deletion did
+not register as a change.
+
+**Choices the owner made.** Decks on the first tab, since they change
+most. The second tab named per kind of card. Always open on the first.
+The "add another meaning / word" buttons on the first tab. Each form's
+practice choice on the Exercises tab, above the exercises.
+
+**What it costs.** A practice tick is no longer beside the form it is
+about; the line names the form instead. The clue is a tab away from the
+cards it tells this one apart from; the Meanings block says when one is
+missing and links there.
+

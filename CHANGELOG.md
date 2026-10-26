@@ -8,6 +8,35 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.482 — 26 October 2026
+
+**A card opens on what it is, in four tabs.**
+
+- A card's screen is now four tabs: Overview, its words, Exercises and
+  Settings. It always opens on Overview.
+- Overview starts with the card as a student meets it — the word large,
+  how it is said, what it means, its picture and a play button for its
+  recording — and one line saying whether it is published, how many of
+  its exercises are ready, and the one thing that would open the most of
+  the rest. Tapping that line opens Exercises. Under it: the type of
+  card, its subtype, its decks, and the buttons for another meaning or
+  another word.
+- The second tab is named for the card: Forms on a word, Table on a verb,
+  Sentence on a sentence, Lines on a conversation, Text on a text.
+- Exercises starts with a short list of the card's forms, each with its
+  two ticks — on its own, in sentences — in place of the ticks that used
+  to sit under every form. The exercises to try come after it.
+- Settings holds what most cards never need: capital letters, the clue,
+  and the card's ID and tags. A conversation or a text has no Settings
+  tab.
+- While editing, a tab with an unsaved change or something stopping the
+  save gets a small dot, so nothing is missed on a tab you are not looking
+  at. One Save still saves everything.
+
+To check by hand: open a word, a verb and a conversation, read and then
+edit, on a phone as well; change something on two tabs and look for the
+dots; save and see them go.
+
 ## 0.481 — 25 October 2026
 
 **A card's screen is tidier: Delete at the top, and its exercises in a
