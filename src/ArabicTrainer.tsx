@@ -19602,29 +19602,40 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
     }
   }
 
+  /* Headed and explained the way the card editor is: the section's name at
+     heading size with what it is for under it, and each field's name with
+     its explanation straight underneath, before the control it explains. */
   return (
-    <Section title="Your account">
+    <div className="at-formblock">
+      <div className="at-formhead">
+        <span className="at-formnum">Your account</span>
+      </div>
 
-      <FormField label="Display name">
+      <FormField label="Display name" lede="What teachers and classmates see. Change it whenever you like.">
         <input
           className="at-input"
           defaultValue={me.displayName}
           onBlur={(e) => e.target.value.trim() && onRename(e.target.value.trim())}
         />
-        <Help>
-          What teachers and classmates see. Change it whenever you like.
-        </Help>
       </FormField>
 
-      <FormField label="Handle">
+      <FormField
+        label="Handle"
+        lede="Fixed for good, because course rosters point at it. Safe to share — it identifies you without letting anyone in."
+      >
         <p className="at-handle">{me.handle}</p>
-        <Help>
-          Fixed for good, because course rosters point at it. Safe to share — it identifies you
-          without letting anyone in.
-        </Help>
       </FormField>
 
-      <FormField label="Sign-in key">
+      <FormField
+        label="Sign-in key"
+        lede={
+          <>
+            Five words that sign you in on any device and keep them together.{" "}
+            <em>Never share it</em> — anyone who has it is you. If you lose it, your administrator
+            can issue a new one; you keep your handle, your courses and everything you have learnt.
+          </>
+        }
+      >
         {showKey ? (
           <>
             {/* A real field, so a password manager recognises it and offers to
@@ -19654,13 +19665,8 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
             Show my key
           </Button>
         )}
-        <Help>
-          Five words that sign you in on any device and keep them together.{" "}
-          <em>Never share it</em> — anyone who has it is you. If you lose it, your administrator
-          can issue a new one; you keep your handle, your courses and everything you have learnt.
-        </Help>
       </FormField>
-    </Section>
+    </div>
   );
 }
 
@@ -20197,7 +20203,7 @@ function SettingsScreen({ kind, onClose, ...rest }: {
   const title =
     kind === "account" ? "Account settings" : kind === "guide" ? "How it works" : "App preferences";
   return (
-    <Screen title={title} onBack={onClose}>
+    <Screen title={title} onBack={onClose} className={kind === "account" ? "cardform" : ""}>
       {kind === "account" ? (
         <AccountSettings {...rest} />
       ) : kind === "guide" ? (
@@ -20287,22 +20293,21 @@ function AccountSettings({
     <>
       <AccountPanel me={account} onRename={onRename} />
 
-      <Section title="Storage">
-        <Lede>
-          {stats
-            ? `${plural(stats.count, "recording")}, ${formatBytes(stats.bytes)}${
-                stats.idb ? "" : " — stored in the small text store, so keep an eye on the size"
-              }`
-            : "Counting recordings…"}
-        </Lede>
-        {missing > 0 && (
-          <Help>
-            {`${plural(missing, "recording")} not on this device yet. Until they are, questions that
-              play them are only asked when you're online.`}
-          </Help>
-        )}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Storage</span>
+          <span className="at-formrole">
+            {stats
+              ? `${plural(stats.count, "recording")}, ${formatBytes(stats.bytes)}${
+                  stats.idb ? "" : " — stored in the small text store, so keep an eye on the size"
+                }.`
+              : "Counting recordings…"}
+            {missing > 0 &&
+              ` ${plural(missing, "recording")} not on this device yet. Until they are, questions that play them are only asked when you're online.`}
+          </span>
+        </div>
         {allClipIds.length > 0 && (
-          <div className="at-row at-mt2">
+          <div className="at-row">
             <Button variant="ghost" size="sm"
               disabled={!!warming && !warming.finished}
               onClick={downloadAll} icon="download">{warming && !warming.finished
@@ -20319,19 +20324,20 @@ function AccountSettings({
               : "Everything was already on this device."}
           </Help>
         )}
-      </Section>
+      </div>
 
       {/* Signing out is ordinary housekeeping, not a danger: it leaves
           everything on the server exactly as it is. */}
-      <Section title="Sign out">
-        <Lede>
-          Leaves this device signed out. Nothing on the server changes, and your key brings it all
-          back — so only do this if you have the key written down somewhere.
-        </Lede>
-        <Button className="at-mt3" onClick={() => setLoggingOut(true)}>
-          Log out
-        </Button>
-      </Section>
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Sign out</span>
+          <span className="at-formrole">
+            Leaves this device signed out. Nothing on the server changes, and your key brings it
+            all back — so only do this if you have the key written down somewhere.
+          </span>
+        </div>
+        <Button onClick={() => setLoggingOut(true)}>Log out</Button>
+      </div>
 
       {loggingOut && (
         <ConfirmModal
@@ -20352,52 +20358,50 @@ function AccountSettings({
         />
       )}
 
-      <div className={`at-sub at-danger${dangerOpen ? " open" : ""}`}>
-        <button
-          className="at-dangertoggle"
-          onClick={() => setDangerOpen((v) => !v)}
-          aria-expanded={dangerOpen}
-        >
-          <span className="at-eyebrow">
-            Danger zone
-          </span>
-          <span className="at-chevron">{dangerOpen ? "⌄" : "›"}</span>
-        </button>
+      {/* Headed like the others, with its heading as the button that opens
+          it — the way a folded form opens in the card editor. */}
+      <div className="at-formblock at-dangerblock">
+        <div className="at-formhead">
+          <button
+            className="at-dangertoggle"
+            onClick={() => setDangerOpen((v) => !v)}
+            aria-expanded={dangerOpen}
+          >
+            <span className="at-formnum">Danger zone</span>
+            <Icon name={dangerOpen ? "chevronUp" : "chevronDown"} size={24} />
+          </button>
+          {dangerOpen && (
+            <span className="at-formrole">Everything in here is irreversible.</span>
+          )}
+        </div>
 
         {dangerOpen && (
-          <div className="at-mt4">
+          <>
             {/* Running the site sits here because everything it leads to is
                 irreversible once you're through the door. */}
-            <FormField label="Running this site">
+            <FormField
+              label="Running this site"
+              lede={
+                isAdmin
+                  ? "You create courses, decide who teaches them, and can delete either. Nothing done in there can be taken back."
+                  : "Only needed by whoever runs this site. An administrator key turns this account into the one that manages everyone else's."
+              }
+            >
               {isAdmin ? (
-                <>
-                  <Help className="at-mb3">
-                    You create courses, decide who teaches them, and can delete either. Nothing
-                    done in there can be taken back.
-                  </Help>
-                  <Button size="sm" onClick={onOpenAdmin}>
-                    Open administration
-                  </Button>
-                </>
+                <Button size="sm" onClick={onOpenAdmin}>
+                  Open administration
+                </Button>
               ) : (
-                <>
-                  <Help className="at-mb3">
-                    Only needed by whoever runs this site. An administrator key turns this account
-                    into the one that manages everyone else's.
-                  </Help>
-                  <React.Suspense fallback={<ChunkFallback />}>
-                    <ClaimAdmin onDone={onBecameAdmin} />
-                  </React.Suspense>
-                </>
+                <React.Suspense fallback={<ChunkFallback />}>
+                  <ClaimAdmin onDone={onBecameAdmin} />
+                </React.Suspense>
               )}
             </FormField>
 
-            <FormField label={<>Send every card back to the start, as though never practiced</>}>
-              <Help className="at-mb3">
-                Your cards, forms, decks and recordings all stay. What goes is everything the app
-                has worked out about how well you know them — intervals, ease, difficulty and
-                history. Nothing will be due until you practice it again.
-              </Help>
+            <FormField
+              label="Reset scheduling"
+              lede="Sends every card back to the start, as though never practiced. Your cards, forms, decks and recordings all stay. What goes is everything the app has worked out about how well you know them — intervals, ease, difficulty and history. Nothing will be due until you practice it again."
+            >
               <Button variant="danger" size="sm" onClick={() => setResetting(true)}>
                 Reset scheduling
               </Button>
@@ -20423,15 +20427,13 @@ function AccountSettings({
               />
             )}
 
-            <FormField label="Close this account">
-              <Help className="at-mb3">
-                Removes your account from the server: your handle, your courses, and any decks you
-                made for them. Cards on this device stay until you clear them. There is no undoing
-                it and no way to get the handle back.
-              </Help>
+            <FormField
+              label="Close this account"
+              lede="Removes your account from the server: your handle, your courses, and any decks you made for them. Cards on this device stay until you clear them. There is no undoing it and no way to get the handle back."
+            >
               <CloseAccount onClosed={onCloseAccount} handle={account.handle} />
             </FormField>
-          </div>
+          </>
         )}
       </div>
     </>
