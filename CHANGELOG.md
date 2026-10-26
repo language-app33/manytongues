@@ -8,6 +8,36 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.485 — 26 October 2026
+
+**A Vietnamese card says nothing that belongs to Arabic.**
+
+- The list of subtypes describes each kind of word in Vietnamese terms. It
+  gave Arabic examples (Abu Khaled, Nablus) and promised forms no
+  Vietnamese word has: a verb's persons, an adjective's forms beside a
+  noun. Now a noun mentions its classifier, a verb the đã, đang and sẽ in
+  its table, and a pronoun the family words used as one (anh, chị, em).
+- On the Forms tab, the line under the heading no longer says a form is
+  "such as its plural or its feminine". In Vietnamese a form is one way of
+  saying the word, such as to someone younger or to an elder. Arabic and
+  Hebrew keep their line.
+- The Classifier box is only on nouns, and on a word whose subtype is not
+  chosen yet. It was on every card, verbs, names and sentences included. A
+  box that already has something in it stays, whatever the card is.
+- The Exercises tab no longer lists "Example → choose" on cards that can
+  never be asked it. It asked for "an example on the verb card", which a
+  Vietnamese card has nowhere to write. The same in Arabic and Hebrew: it
+  is listed only on a verb's subjunctive forms, the only ones it asks.
+- A student opening a Vietnamese card no longer reads "Person, animal or
+  thing: a thing" and "Number: N/A". Every card is saved with those
+  whatever its language; they are now left out where the language does not
+  use them and nobody chose them.
+- Choosing a noun blank in a sentence, the note that said "The Arabic is
+  the same in all three" names the card's own language.
+
+To check by hand: on a phone, start a Vietnamese card and read the subtype
+list; make it a verb and see no Classifier box; open a saved Vietnamese
+noun's Exercises tab.
 ## 0.484 — 26 October 2026
 
 **A card's buttons are icons on its top line, and Meanings moves to

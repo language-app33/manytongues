@@ -345,3 +345,20 @@ test("the words a phrase teaches show each card's accepted answers with a dot be
   const ctx = /** @type {any} */ ({ cards: [word] });
   assert.deepEqual(/** @type {NonNullable<typeof rule.shown>} */ (rule.shown)(["w1"], ctx), ["كتاب · سفر"]);
 });
+
+test("a card's page leaves out the grammar its language never asks, where nobody chose it", async () => {
+  const { dimsSaid } = await import("../src/card-facts.ts");
+  const { LANGUAGES } = await import("../src/languages.ts");
+  const fields = (/** @type {any} */ form, /** @type {any} */ lang) => dimsSaid(form, lang).map((d) => d.field);
+  /* What every form is saved with, whatever its language: a number of
+     N/A and a thing. Huế asks neither, and its cards' pages said both. */
+  const saved = { ar: "sách", en: "book", number: "na", gender: "", human: "thing", register: "", classifier: "" };
+  assert.deepEqual(fields(saved, LANGUAGES["vi-Hue"]), []);
+  /* Arabic asks both, so there they are what the card says. */
+  assert.deepEqual(fields(saved, LANGUAGES["ar-PS"]), ["number", "human"]);
+  /* A value somebody chose is shown whatever the language, and so is an
+     axis the language does use. */
+  assert.deepEqual(fields({ ...saved, number: "plural", register: "elder" }, LANGUAGES["vi-Hue"]), ["number", "register"]);
+  /* And without a language, everything held, as before. */
+  assert.deepEqual(fields(saved, undefined), ["number", "human"]);
+});

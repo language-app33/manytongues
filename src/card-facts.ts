@@ -588,9 +588,23 @@ export const dimText = (dim: GrammarDim, value: unknown): string => {
   return opt ? opt[1] : said;
 };
 
-/** The axes a form actually says something about, in GRAMMAR's order. */
-export const dimsSaid = (form: Held | null | undefined): GrammarDim[] =>
-  grammarDims().filter((dim) => !!str(form && form[dim.field]));
+/**
+ * The axes a form actually says something about, in GRAMMAR's order.
+ *
+ * Every form is saved with each axis's default — a number of N/A, a thing
+ * rather than a person — whatever its language, so a Vietnamese card
+ * carried both and its page said so, about a language that has neither.
+ * Given the card's language, an axis it does not use is left out where
+ * that default is all it holds. A value somebody chose is still shown, on
+ * an axis the language has dropped as much as on one it uses.
+ */
+export const dimsSaid = (form: Held | null | undefined, lang?: Lang | null): GrammarDim[] =>
+  grammarDims().filter((dim) => {
+    const said = str(form && form[dim.field]);
+    if (!said) return false;
+    if (!lang || (lang.grammar || []).includes(dim.field)) return true;
+    return said !== dim.default;
+  });
 
 /** The keys a language pack adds beside the axes — Vietnamese's lexical
     field. One list, because both are grammar written flat on a form. */

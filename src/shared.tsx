@@ -2438,7 +2438,7 @@ function ReadGrammar({ of, lang, skipPerCard = false }: {
       above rather than under every form. */
   skipPerCard?: boolean;
 }) {
-  const said = dimsSaid(of).filter((dim) => !(skipPerCard && dim.perCard));
+  const said = dimsSaid(of, lang).filter((dim) => !(skipPerCard && dim.perCard));
   const lex = lexicalKeys().filter((key) => String(of[key] || "").trim());
   if (!said.length && !lex.length) return null;
   return (
@@ -2522,10 +2522,10 @@ function ReadReference({ form, lang }: {
   const answers = answersOf(form, answerFields());
   const already = new Set<string>();
   for (const answer of answers) {
-    for (const dim of dimsSaid(answer as Record<string, any>)) already.add(dim.field);
+    for (const dim of dimsSaid(answer as Record<string, any>, lang)) already.add(dim.field);
     for (const key of lexicalKeys()) if (String((answer as Record<string, any>)[key] || "").trim()) already.add(key);
   }
-  const dims = dimsSaid(form).filter((dim) => !dim.perCard && !already.has(dim.field));
+  const dims = dimsSaid(form, lang).filter((dim) => !dim.perCard && !already.has(dim.field));
   const lex = lexicalKeys().filter((key) => String(form[key] || "").trim() && !already.has(key));
   if (!dims.length && !lex.length) return null;
   return (
@@ -3084,7 +3084,7 @@ function ReadKind({ card, lang }: { card: Record<string, any>; lang: Lang }) {
     ? ""
     : String(card.value);
   const lead = leadOf(card) as Record<string, any>;
-  const perCard = dimsSaid(lead).filter((dim) => dim.perCard);
+  const perCard = dimsSaid(lead, lang).filter((dim) => dim.perCard);
   const name = String(card.name || "").trim();
   /* The number a card out of a number system stands for, as its language
      writes it in figures — the thing a learner meets on a price tag. */

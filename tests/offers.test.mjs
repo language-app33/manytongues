@@ -111,6 +111,20 @@ test("nor is what the language never drills", () => {
   assert.deepEqual(find(bare, "tr2ar").missing, ["the transliteration"]);
 });
 
+test("nor a question about a verb's example, on a card with no form in one", () => {
+  /* Asked only of a form in a row practised in examples, and Huế has no
+     such row — so it was listed on every Vietnamese card as waiting for
+     "an example on the verb card", which nobody there could ever write. */
+  assert.equal(find(offers(word({ ar: "sách", lat: "" }), { lang: vi }), "ex2en"), undefined, "never in Huế");
+  assert.equal(find(offers(word()), "ex2en"), undefined, "nor on an Arabic word, which is never asked it either");
+  /* A subjunctive form is, and is still offered it — ready once an
+     example puts it in a gap. */
+  const cell = word({ id: "s-she", ar: "تاكل", en: "", row: "subjunctive", col: "she" });
+  const example = { id: "eat~ex0", ar: "لازم تاكل", en: "She must eat", recs: [], slot: 1, span: 1, example: 0 };
+  assert.equal(find(offers(cell), "ex2en").ready, false, "offered, and waiting for an example");
+  assert.equal(find(offers(cell, { contexts: [example], mates: 8 }), "ex2en").ready, true);
+});
+
 test("a conversation is offered what a conversation can be asked", () => {
   /** @type {any} */
   const scene = {

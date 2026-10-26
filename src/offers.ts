@@ -351,6 +351,12 @@ export function offersFor({
     /* A verb practice is about a tense, so a card with no cell of a verb
        table is not waiting for one: it is another kind of card. */
     if (spec.verbDrill && !fits.some((u) => drillTable(lang, u.unit))) continue;
+    /* And a question about a verb's example is asked only of a form in a
+       row practised in examples — see canAsk — so a card with none is not
+       waiting for one either. Listed on every card, it asked a Vietnamese
+       teacher for "an example on the verb card", which no Vietnamese verb
+       has anywhere to write. */
+    if (spec.needs.includes("examples") && !fits.some((u) => inExamples(u.unit, lang))) continue;
     if (fits.every((u) => askedInstead(spec, u.unit))) continue;
     /* And the questions only a number system's own cards can carry: what
        they need is made by the app, so a card without it is not waiting for

@@ -1443,3 +1443,37 @@ test("the gap in a phrase is the word: what is glued to it stays on the screen",
   assert.deepEqual(gluedTo("الأخبار", "الأخبار", ar), { before: "", after: "" });
   assert.equal(gluedTo("مش", "بوليس", ar), null);
 });
+
+test("Huế is described in its own terms, not in Arabic's", () => {
+  const vi = LANGUAGES["vi-Hue"];
+  const ar = LANGUAGES["ar-PS"];
+  /* The subtypes are the same kinds, filling the same blanks. */
+  assert.deepEqual(categoriesOf(vi).map((c) => c.id), categoriesOf(ar).map((c) => c.id));
+  /* But nothing a teacher reads about them is borrowed from Arabic: no
+     Palestinian names, and no forms that change beside a noun or for
+     who does something, which no Vietnamese word has. */
+  for (const c of categoriesOf(vi)) {
+    assert.doesNotMatch(c.note, /Khaled|Nablus|Jordan|Sarah|feminine|persons|forms it takes|endings/, `${c.id}: ${c.note}`);
+  }
+  /* Nor is a form a plural or a feminine there. */
+  assert.doesNotMatch(vi.formsNote, /plural|feminine/);
+  assert.match(ar.formsNote, /plural/);
+  /* And its rules compare it to nothing it is not. */
+  for (const rule of vi.rules) assert.doesNotMatch(rule, /Arabic|harakat/, rule);
+});
+
+test("a classifier is asked of a noun, and of a word not yet said to be anything", async () => {
+  const { asksLexical } = await import("../src/languages.ts");
+  const vi = LANGUAGES["vi-Hue"];
+  assert.equal(asksLexical(vi, { category: "noun" }), true);
+  assert.equal(asksLexical(vi, { category: "" }), true, "most new cards, and may well be a noun");
+  for (const kind of ["verb", "adjective", "person", "place", "pronoun", "other"]) {
+    assert.equal(asksLexical(vi, { category: kind }), false, kind);
+  }
+  assert.equal(asksLexical(vi, { category: "", sentence: true }), false, "a sentence's words are other cards");
+  /* One already written is never hidden from the teacher who wrote it. */
+  assert.equal(asksLexical(vi, { category: "verb", value: "con" }), true);
+  assert.equal(asksLexical(vi, { category: "", sentence: true, value: "cái" }), true);
+  /* And a language with no such box has none to show. */
+  assert.equal(asksLexical(LANGUAGES["ar-PS"], { category: "noun" }), false);
+});

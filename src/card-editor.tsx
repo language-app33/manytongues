@@ -22,6 +22,7 @@ import { formsOf, leadOf, subFormsOf, wordOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
 import type { Node } from "./shared.tsx";
 import {
+  asksLexical,
   categoriesOf,
   categoryOf,
   answerDims,
@@ -2865,8 +2866,9 @@ const nounWithBe = (name: string, words?: number): Reading[] => {
   ];
 };
 
-const NOUN_HINT =
-  "Choose what it reads as in English. With \u201cto be\u201d, the app writes \u201cis\u201d after one and \u201care\u201d after more than one \u2014 my house is, my houses are. The Arabic is the same in all three.";
+/* Naming the card's language, which is the one this was written beside. */
+const nounHint = (lang: Lang): string =>
+  `Choose what it reads as in English. With \u201cto be\u201d, the app writes \u201cis\u201d after one and \u201care\u201d after more than one \u2014 my house is, my houses are. The ${lang.scriptLabel} is the same in all three.`;
 
 /*
  * The two ways an adjective blank reads: the word as it is — *a tired
@@ -5312,7 +5314,7 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
       }
       /* And nouns, where one of them has a plural to say *are* after. */
       if (nouns > 0 && (nounsBehind.many.get(name) || 0) > 0) {
-        return { readings: nounWithBe(name, nouns), readingsHint: NOUN_HINT, nounReads: true };
+        return { readings: nounWithBe(name, nouns), readingsHint: nounHint(lang), nounReads: true };
       }
       return {};
     };
@@ -7542,7 +7544,7 @@ function formWritten(f: Record<string, any>): boolean {
     (Array.isArray(f.answers) && f.answers.some((a: any) => a && (said(a.text) || said(a.lat))));
 }
 
-function FormsSection({ folded = false, children }: { folded?: boolean; children?: Node }) {
+function FormsSection({ lang, folded = false, children }: { lang: Lang; folded?: boolean; children?: Node }) {
   const drawn = useRef(false);
   useEffect(() => {
     drawn.current = true;
@@ -7555,10 +7557,8 @@ function FormsSection({ folded = false, children }: { folded?: boolean; children
           about the section written out once per panel. */}
       <div className="at-formhead">
         <span className="at-formnum">Forms</span>
-        <span className="at-formrole">
-          A form is one shape of the word, such as its plural or its
-          feminine.
-        </span>
+        {/* In the language's own terms: a plural means nothing in Huế. */}
+        <span className="at-formrole">{lang.formsNote}</span>
       </div>
       <FoldsForms.Provider value={{ drawn, folded }}>{children}</FoldsForms.Provider>
     </div>
@@ -7582,10 +7582,14 @@ function FormsSection({ folded = false, children }: { folded?: boolean; children
  * should be there rather than quietly gone.
  */
 function ReferenceField({ word, lang }: { word: WordDraft; lang: Lang }) {
-  const { forms, setForm } = word;
+  const { forms, setForm, category, sentence } = word;
   const f = forms[0];
   const lexical = lang && lang.lexical;
   if (!f || !lexical) return null;
+  /* Only on the kinds of word it belongs to — a classifier is a noun's,
+     and a box for one on a verb or a sentence asks for something nobody
+     can write. */
+  if (!asksLexical(lang, { category, sentence, value: (f as any)[lexical.key] })) return null;
   /* No ticks under this one: it is never drilled and never lent, and the
      name across the top is the whole of what there is to say. */
   return (
@@ -9289,7 +9293,7 @@ function WordEditor({ word, lang, allCards, selfId }: {
           blanks.
         </Help>
       ) : null}
-      <FormsSection>
+      <FormsSection lang={lang}>
         {word.forms.map((f, i) => (
           <FormBlock
             key={i}
@@ -9338,7 +9342,7 @@ function VerbEditor({ word, lang, allCards, selfId }: {
     <>
       <TableBlock word={word} lang={lang} />
       {shown.length > 0 && (
-        <FormsSection>
+        <FormsSection lang={lang}>
           {shown.map(({ f, i }) => (
             <FormBlock
               key={i}
@@ -9392,7 +9396,7 @@ function TableEditor({ word, lang, allCards, selfId }: {
           in fewer words and in the language's own. A sentence explaining a
           screen is worth having exactly while the screen cannot say it
           itself. */}
-      <FormsSection>
+      <FormsSection lang={lang}>
         <FormBlock
           word={word}
           lang={lang}
@@ -9450,7 +9454,7 @@ function AttachedEditor({ word, lang, allCards, selfId }: {
 }) {
   return (
     <>
-      <FormsSection>
+      <FormsSection lang={lang}>
         {word.forms.map((f, i) => (
           <FormBlock
             key={i}
@@ -9506,7 +9510,7 @@ function NounEditor({ word, lang, allCards, selfId }: {
   const person = String((forms[0] || {}).human || "") === "person";
   return (
     <>
-      <FormsSection folded={person}>
+      <FormsSection lang={lang} folded={person}>
         {nounBoxList.map((box) => {
           const i = box.key in nounPlaced.at ? nounPlaced.at[box.key] : -1;
           const f = i >= 0 ? forms[i] : emptyBox(box);
