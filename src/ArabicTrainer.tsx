@@ -20200,7 +20200,7 @@ function SettingsScreen({ kind, onClose, ...rest }: {
   const title =
     kind === "account" ? "Account settings" : kind === "guide" ? "How it works" : "App preferences";
   return (
-    <Screen title={title} onBack={onClose} className={kind === "account" ? "cardform" : ""}>
+    <Screen title={title} onBack={onClose} className={kind === "guide" ? "" : "cardform"}>
       {kind === "account" ? (
         <AccountSettings {...rest} />
       ) : kind === "guide" ? (
@@ -20455,7 +20455,13 @@ function AppPreferences({ settings, setSetting }: {
 }) {
   return (
     <>
-      <Section title="Language">
+      {/* Headed and explained the way the card editor and Account settings
+          are: each section's name at heading size, and each field's
+          explanation straight under its name, before the control. */}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Language</span>
+        </div>
         {/* The one screen where a learner would look for this. It could only
             be set by a course before, so someone studying two languages had
             no way to choose which the app was in. */}
@@ -20465,9 +20471,12 @@ function AppPreferences({ settings, setSetting }: {
           onChange={(id) => setSetting("language", id)}
           label="Learning"
         />
-      </Section>
+      </div>
 
-      <Section title="Appearance">
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Appearance</span>
+        </div>
         <FormField label="Theme">
           <Segmented
             options={[{ value: "auto", label: "Follow device" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]}
@@ -20475,20 +20484,26 @@ function AppPreferences({ settings, setSetting }: {
             onChange={(v) => setSetting("theme", v)}
           />
         </FormField>
-        <FormField label="On-screen keys">
+        <FormField
+          label="On-screen keys"
+          lede="Keys for the language you're learning, when your device hasn't got them."
+        >
           <Segmented
             options={[{ value: "auto", label: "When needed" }, { value: "always", label: "Always" }, { value: "never", label: "Never" }]}
             value={(settings.keyboard || "auto")}
             onChange={(v) => setSetting("keyboard", v)}
           />
-          <Help>
-            Keys for the language you're learning, when your device hasn't got them.
-          </Help>
         </FormField>
-      </Section>
+      </div>
 
-      <Section title="Feedback">
-        <FormField label="Sounds">
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Feedback</span>
+        </div>
+        <FormField
+          label="Sounds"
+          lede="The short sounds after an answer. Loud carries on a bus; soft is for a quiet room."
+        >
           <div className="at-row">
             <Segmented
               label="Sounds"
@@ -20520,13 +20535,8 @@ function AppPreferences({ settings, setSetting }: {
               Test
             </Button>
           </div>
-          <Help>
-            The short sounds after an answer. Loud carries on a bus; soft is
-            for a quiet room.
-          </Help>
         </FormField>
-      </Section>
-
+      </div>
     </>
   );
 }

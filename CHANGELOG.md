@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.487 — 26 October 2026
+
+**App preferences is laid out like the card editor too.**
+
+- Language, Appearance and Feedback now have the same large heading as the
+  sections of the card editor and Account settings, and Theme, On-screen
+  keys and Sounds use the same field-name style.
+- The line explaining On-screen keys and Sounds now sits straight under the
+  field's name, before the choices, instead of after them.
+
+To check by hand: open App preferences on a phone and compare it with
+Account settings.
+
 ## 0.486 — 26 October 2026
 
 **Account settings is laid out like the card editor.**
