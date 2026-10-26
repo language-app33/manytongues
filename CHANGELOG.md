@@ -8,6 +8,21 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.486 — 26 October 2026
+
+**Account settings is laid out like the card editor.**
+
+- Each part of Account settings — Your account, Storage, Sign out and the
+  Danger zone — now has the same large heading as the sections of the card
+  editor, and each field inside has the same name style.
+- The line explaining a section or a field now sits straight under its
+  heading, before the box or button it explains, instead of after it.
+- The Danger zone is still shut until opened; its heading is now the thing
+  you tap, the way a folded form opens in the editor.
+
+To check by hand: open Account settings on a phone, open the Danger zone,
+and compare it with a card's edit screen.
+
 ## 0.485 — 26 October 2026
 
 **A Vietnamese card says nothing that belongs to Arabic.**

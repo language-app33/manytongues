@@ -1798,6 +1798,10 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   gap:12px; background:none; border:0; padding:0; cursor:pointer; color:inherit;
   font:inherit; text-align:left; }
 .at-dangertoggle .at-chevron { font-size:18px; line-height:1; color: var(--text-soft); }
+/* In Account settings the danger zone is headed like every other section of
+   that screen, and the heading is the button that opens it. */
+.at-formhead > .at-dangertoggle { flex:1 1 auto; min-width:0; }
+.at-dangerblock .at-dangertoggle > .at-ic { color: var(--text-soft); }
 .at-modalback { position:fixed; inset:0; z-index:400; background: rgba(0,0,0,.55);
   display:flex; align-items:center; justify-content:center; padding:20px; }
 .at-modal { width:100%; max-width:440px; background: var(--surface); border-radius: var(--r-lg);
