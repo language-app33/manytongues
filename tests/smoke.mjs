@@ -958,15 +958,15 @@ const pickToggle = async (/** @type {string} */ axis, /** @type {string} */ valu
     .find((b) => (b.textContent || "").trim() === value));
   await sleep(200);
 };
-/** @param {RegExp} re */
 /* What a button is called out loud: its words, or where it is only an
-   icon — the card screen's top line since 0.483 — its label. */
+   icon — the card screen's top line since 0.484 — its label. */
 const spokenName = (/** @type {Element} */ b) =>
   (b.textContent || "").trim() ? (b.textContent || "") : (b.getAttribute("aria-label") || "");
 /* The open card's own Edit, on its title line — not the Edit on a tile in
    the list behind it, which is an icon named the same. */
 const cardEdit = () => /** @type {any} */ (
   (cardOnScreen() || document).querySelector('.at-screenhead button[aria-label="Edit"]'));
+/** @param {RegExp} re */
 const buttonNamed = (re) =>
   /* A fold, a play button or a link is pressed to read and keeps working
      on a locked card, so it is a button by its role rather than its tag —
@@ -4413,7 +4413,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     statusLines.join(" | ") === "Published | Unpublish…", statusLines.join(" | ") || "(no menu)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
-  /* On the title's own line since 0.483, as icons, each named out loud,
+  /* On the title's own line since 0.484, as icons, each named out loud,
      with Export by the "This card" heading rather than among them. */
   const cardHead = statusBtn && statusBtn.closest(".at-screenhead");
   const headButtons = cardHead ? [...cardHead.querySelectorAll(".at-screenaction button")] : [];
