@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.483 — 26 October 2026
+
+**A card's buttons are icons on its top line, and Meanings moves to
+Settings.**
+
+- The card's buttons are back on the same line as its name, on the right,
+  as icons: the status, Edit, and while editing Delete, Cancel, Save and
+  Save and exit. Each says what it does when you hover over it. The name
+  is cut short to one line to make room, rather than wrapping.
+- The status shows as an icon in its colour: a tick for published, a
+  pencil for a draft, an eye for ready for review, and arrows for changes
+  not yet published. The menu it opens still says it in words.
+- Export is now by the "This card" heading, on the right.
+- The summary at the top of Overview — the card's words, the forms
+  written, its status and how many exercises are ready — is gone.
+  Overview starts with "This card".
+- Meanings, with the clue now back inside it, and the buttons for another
+  meaning or another word, are on the Settings tab.
+
+To check by hand: a card with a long name on a phone, read and while
+editing; hover over each icon; export a card you are only reading.
+
 ## 0.482 — 26 October 2026
 
 **A card opens on what it is, in four tabs.**

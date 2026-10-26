@@ -7013,3 +7013,12 @@ about; the line names the form instead. The clue is a tab away from the
 cards it tells this one apart from; the Meanings block says when one is
 missing and links there.
 
+**0.483.** The card face and readiness line came off Overview at the
+owner's word, and with them `ExerciseTally` and the status in a word.
+The top line went back beside the title, as icons named by `aria-label`
+and `title`; the title is cut to one line (`.at-screen.cardform
+.at-screenhead h2`) instead of the buttons dropping under it. Export moved
+to the "This card" heading as a `reads` button, so it works on a locked
+card. The clue went back inside Meanings, and Meanings — "add another"
+buttons included — moved to Settings.
+

@@ -959,12 +959,20 @@ const pickToggle = async (/** @type {string} */ axis, /** @type {string} */ valu
   await sleep(200);
 };
 /** @param {RegExp} re */
+/* What a button is called out loud: its words, or where it is only an
+   icon — the card screen's top line since 0.483 — its label. */
+const spokenName = (/** @type {Element} */ b) =>
+  (b.textContent || "").trim() ? (b.textContent || "") : (b.getAttribute("aria-label") || "");
+/* The open card's own Edit, on its title line — not the Edit on a tile in
+   the list behind it, which is an icon named the same. */
+const cardEdit = () => /** @type {any} */ (
+  (cardOnScreen() || document).querySelector('.at-screenhead button[aria-label="Edit"]'));
 const buttonNamed = (re) =>
   /* A fold, a play button or a link is pressed to read and keeps working
      on a locked card, so it is a button by its role rather than its tag —
      see Pressable. */
   /** @type {HTMLButtonElement | undefined} */ ([...document.querySelectorAll('button, [role="button"].at-pressable')]
-    .find((b) => re.test(b.textContent || "")));
+    .find((b) => re.test(spokenName(b))));
 
 /*
  * Play the matching grid, if that is what is up.
@@ -4395,9 +4403,9 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      statuses is published, and says so. */
   const statusBtn = /** @type {HTMLButtonElement | null} */ ([...document.querySelectorAll(".at-statusmenu .at-statusbtn")].pop() || null);
   check("a teacher's card says where it stands with students, beside Edit",
-    !!statusBtn && /Published/.test(statusBtn.textContent || "") && statusBtn.classList.contains("at-btn") &&
+    !!statusBtn && /Published/.test(spokenName(statusBtn)) && statusBtn.classList.contains("at-btn") &&
       statusBtn.classList.contains("sm") && !document.querySelector(".at-statusmenu select"),
-    statusBtn ? `${statusBtn.className}: ${statusBtn.textContent}` : "(no status button)");
+    statusBtn ? `${statusBtn.className}: ${spokenName(statusBtn)}` : "(no status button)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
   const statusLines = [...document.querySelectorAll(".at-statusmenu .at-pickmenu .at-pickline")].map((b) => (b.textContent || "").trim());
@@ -4405,13 +4413,22 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     statusLines.join(" | ") === "Published | Unpublish…", statusLines.join(" | ") || "(no menu)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
-  /* On a line of its own under the title: beside it, Export, the status
-     and Edit squeezed a sentence's title to a word a line on a phone. */
+  /* On the title's own line since 0.483, as icons, each named out loud,
+     with Export by the "This card" heading rather than among them. */
   const cardHead = statusBtn && statusBtn.closest(".at-screenhead");
-  check("and its buttons sit on a line under the card's title",
-    !!cardHead && cardHead.classList.contains("below") &&
-      !!cardHead.querySelector(".at-screenaction .at-statusmenu"),
-    cardHead ? cardHead.className : "(no header)");
+  const headButtons = cardHead ? [...cardHead.querySelectorAll(".at-screenaction button")] : [];
+  check("and its buttons are icons on the card's title line, each with a name",
+    !!cardHead && !cardHead.classList.contains("below") &&
+      !!cardHead.querySelector(".at-screenaction .at-statusmenu") &&
+      headButtons.length > 0 && headButtons.every((b) => !(b.textContent || "").trim() && !!b.getAttribute("aria-label")) &&
+      !headButtons.some((b) => /Export/.test(b.getAttribute("aria-label") || "")),
+    headButtons.map((b) => b.getAttribute("aria-label") || (b.textContent || "").trim()).join(" | ") || "(no header)");
+  const exportBtn = /** @type {any} */ ((teachRead || document).querySelector('[aria-label="Export this card"]'));
+  check("and Export sits by the card's “This card” heading, working while it is only read",
+    !!exportBtn && !!exportBtn.closest(".at-formhead") &&
+      /This card/.test(((exportBtn.closest(".at-formhead").querySelector(".at-formnum") || {}).textContent) || "") &&
+      !exportBtn.disabled && !exportBtn.closest("button[disabled]"),
+    exportBtn ? "by the heading" : "(no export)");
 
   const tries = () => /** @type {HTMLButtonElement[]} */ ([...document.querySelectorAll(".at-try")]);
   check("a card in the teaching space lists the exercises it could be asked",
@@ -4506,13 +4523,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      Save keeps the card open to go on with it; Save and exit closes it.
      Both save this card, under its own id. */
   const cardId = (phraseTile && phraseTile.getAttribute("data-card")) || "";
-  clickNamed(/^Edit$/);
+  click(cardEdit());
   await sleep(400);
   const editorOpen = () => !!document.querySelector(".at-screen.cardform");
-  check("Edit opens the card editor, with Save and Save and exit under its title",
+  check("Edit opens the card editor, with Save and Save and exit on its title line",
     editorOpen() && !!buttonNamed(/^Save$/) && !!buttonNamed(/^Save and exit$/) &&
-      !!(/** @type {Element} */ (buttonNamed(/^Save and exit$/))).closest(".at-screenhead.below"),
-    editorOpen() ? [...document.querySelectorAll(".at-screen.cardform .at-screenhead button")].map((b) => (b.textContent || "").trim()).join(" | ") : "(no editor)");
+      !!(/** @type {Element} */ (buttonNamed(/^Save and exit$/))).closest(".at-screenhead"),
+    editorOpen() ? [...document.querySelectorAll(".at-screen.cardform .at-screenhead button")].map(spokenName).join(" | ") : "(no editor)");
   /* Nothing changed yet, so there is nothing to save. */
   const saveOff = () => /** @type {any} */ (buttonNamed(/^Save$/))?.disabled && /** @type {any} */ (buttonNamed(/^Save and exit$/))?.disabled;
   check("both saves are off until something changes", !!saveOff(),
@@ -4838,7 +4855,7 @@ const openPronounTables = async () => {
   check("and the scene reads with one speaker down each side",
     readSides.join("") === "010", readSides.join(",") || "(no turns)");
 
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
 
   /* The bug, in one assertion: which editor came up. */
@@ -7321,7 +7338,7 @@ const openPronounTables = async () => {
   click(savedTile);
   await sleep(450);
   openFormsAsDrawn = false;
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
   check("a form with anything written in it opens already open, its word under its name",
     formFolds().length > 0 && formFolds()[0].getAttribute("aria-expanded") === "true" &&
@@ -7534,7 +7551,7 @@ const openPronounTables = async () => {
     .find((t) => ((t.querySelector(".at-mininame") || {}).textContent || "").trim() === "To eat");
   click(tile);
   await sleep(450);
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
 
   /* Its word is a box of its table, so nothing is left for a Forms
@@ -7590,7 +7607,7 @@ const openPronounTables = async () => {
     .find((t) => ((t.querySelector(".ar") || {}).textContent || "").trim() === "نابلس");
   click(tile);
   await sleep(450);
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
   check("a card saved as a Name still says Name",
     wordKindSaid() === "Name", wordKindSaid() || "(nothing said)");
@@ -7718,7 +7735,7 @@ const openPronounTables = async () => {
     .find((t) => ((t.querySelector(".ar") || {}).textContent || "").trim() === "كتاب");
   click(tile);
   await sleep(450);
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
   const text = () => document.body.textContent || "";
   check("the editor has a Meanings section with a clue",
@@ -7763,7 +7780,7 @@ const openPronounTables = async () => {
     .find((t) => ((t.querySelector(".ar") || {}).textContent || "").trim() === "كبير");
   click(tile);
   await sleep(450);
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
   const box = (/** @type {string} */ label) =>
     /** @type {any} */ ([...document.querySelectorAll("input")]
@@ -7845,7 +7862,7 @@ const openPronounTables = async () => {
     .find((t) => (t.textContent || "").includes("قلم"));
   click(tile);
   await sleep(450);
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
 
   const box = (/** @type {string} */ label) =>

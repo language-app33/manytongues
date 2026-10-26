@@ -162,7 +162,6 @@ const ICONS: Record<string, string> = {
     "M12 17.27 18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z",
   chevronDown: "M7.41 8.59 12 13.17l4.59-4.58L18 10l-6 6-6-6z",
   chevronUp: "M12 8l-6 6 1.41 1.41L12 10.83l4.59 4.58L18 14z",
-  chevronRight: "M10 6 8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z",
   /* A speaker with a line through it, for saying you cannot hear this
      one, and a flag for reporting it. Both were bare text glyphs — ⚑ and
      nothing at all — which set at different weights from each other and

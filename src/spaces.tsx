@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useCallback, useContext, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
 import type { Card, Course, Deck, Flag, Form, Lang, LangId, User } from "./types.ts";
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
-import { CardEditor, ExerciseTally, NewCardKind } from "./card-editor.tsx";
+import { CardEditor, NewCardKind } from "./card-editor.tsx";
 import type { CardShape } from "./card-editor.tsx";
 import { formsOf, leadOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
@@ -4057,29 +4057,6 @@ function TryExercises({ card, cards, lang, onTry, back }: {
     });
   }, [mine, lang, contexts, scenes, values, material]);
 
-  /* How many can be asked, and what would open the most of the rest — for
-     the line under the card's face, on the Overview tab. Each reason is
-     counted by its first clause: "a few more cards like it in this
-     language — words, phrases…" is one thing to do, said at length. */
-  const report = useContext(ExerciseTally);
-  const tally = useMemo(() => {
-    const waiting = new Map<string, number>();
-    for (const o of offers) {
-      if (o.ready) continue;
-      for (const m of o.missing) {
-        const need = String(m).split(" — ")[0];
-        waiting.set(need, (waiting.get(need) || 0) + 1);
-      }
-    }
-    const [need, opens] = [...waiting.entries()].sort((a, b) => b[1] - a[1])[0] || ["", 0];
-    return { ready: offers.filter((o) => o.ready).length, total: offers.length, need, opens };
-  }, [offers]);
-  useEffect(() => {
-    if (!report) return;
-    report(tally);
-    return () => report(null);
-  }, [report, tally]);
-
   if (!offers.length) return null;
 
   /* Grouped by the level each stands on, lowest first: the order a student
@@ -4717,8 +4694,16 @@ function statusChoices(card: Card): { value: string; label: string }[] {
     { value: "unpublish", label: "Unpublish…" },
   ];
 }
+/* Which icon the status menu wears while it is shut: out, a draft not
+   yet out, waiting for review, or out with changes on it not yet out. */
+const STATUS_ICON: Record<string, string> = {
+  published: "verify",
+  draft: "edit",
+  review: "view",
+  changed: "refresh",
+};
 /* The status as the menu reads while it is shut — "Published", "Draft",
-   "Changes in draft" — for the line under the card face. */
+   "Changes in draft". */
 const statusLabel = (card: Card): string =>
   (statusChoices(card).find((c) => c.value === statusNow(card)) || { label: "Published" }).label;
 const statusNow = (card: Card): string =>
@@ -4771,15 +4756,18 @@ function StatusMenu({ card, disabled, onStatus }: {
       <span className="at-statusmenu" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
-          className={`at-btn sm ghost at-menubtn at-statusbtn ${tone}`}
+          className={`at-btn sm ghost at-menubtn at-statusbtn iconly ${tone}`}
           aria-label={`Status: ${shown}`}
+          title={`Status: ${shown}`}
           aria-haspopup="menu"
           aria-expanded={open}
           disabled={disabled}
           onClick={() => setOpen((v) => !v)}
         >
-          {shown}
-          <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
+          {/* An icon on the card's top line, beside the others there, in
+              the colour of where the card stands; the menu says it in
+              words. */}
+          <Icon name={STATUS_ICON[tone] || "verify"} />
         </button>
         {open && (
           <div className="at-pickmenu at-statuspick" role="menu">
@@ -6536,7 +6524,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           const c = editing.card;
           return c && c.id ? <StatusMenu card={c} disabled={busy || off} onStatus={(to) => setStatus(c, to)} /> : null;
         }}
-        statusWord={editing.card && editing.card.id ? statusLabel(editing.card) : undefined}
         onExport={editing.card && editing.card.id ? () => exportCards([editing.card!.id]) : undefined}
         about={
           editing.card && editing.card.id ? (

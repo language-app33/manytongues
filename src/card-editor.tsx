@@ -17,7 +17,7 @@ import type { ExampleSentence } from "./examples.ts";
 import { MAX_EXAMPLES, blankSentence, exampleCells, examplesRowOf, filledExample, othersOf, readExample, sentenceOf, verbExamplesOf, wishOf } from "./examples.ts";
 import { wordsOffered } from "./context-index.ts";
 import { longSentenceOf, sentenceWords, wordCount } from "./sentence-words.ts";
-import { cellsIn, citationOf, citedWord, personsFor, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
+import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf, wordOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
 import type { Node } from "./shared.tsx";
@@ -89,9 +89,7 @@ import {
   Pressable,
   AskedMeanings,
   AskedScript,
-  PlayButton,
   Tabs,
-  useClipPlayer,
 } from "./shared.tsx";
 
 /* A blank form carries every grammatical value any language might use, so a
@@ -6464,7 +6462,7 @@ function SceneKindField({ talk, card }: { talk: SceneDraft; card: Card | null })
   );
 }
 
-function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen, onToggleDeck }: {
+function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen, onToggleDeck, onExport }: {
   card: Card | null;
   lang: Lang;
   scene: boolean;
@@ -6479,6 +6477,8 @@ function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen
   decks: Deck[];
   chosen: string[];
   onToggleDeck: (id: string, on: boolean) => void;
+  /** Export the card, where it can be — on a saved card being read. */
+  onExport?: () => void;
 }) {
   const { aside, storedForms } = word;
   return (
@@ -6497,6 +6497,16 @@ function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen
     <div className="at-formblock">
       <div className="at-formhead">
         <span className="at-formnum">This card</span>
+        {/* Export, with the other facts about the card rather than among
+            the buttons that change it. `reads`, so it works on a card that
+            is only being read — which is the only time it is offered. */}
+        {onExport ? (
+          <span className="at-formacts">
+            <Button reads size="sm" className="iconly" aria-label="Export this card" title="Export this card" onClick={onExport}>
+              <Icon name="download" />
+            </Button>
+          </span>
+        ) : null}
       </div>
 
       {/* What kind of card it is, as a fact on the screen rather than as a
@@ -10047,9 +10057,8 @@ function CapitalsBlock({ on, onChange }: { on: boolean; onChange: (on: boolean) 
 
 /*
  * One card per meaning: the other cards that share this one's word or its
- * meaning, and the two ways to add another. On the Overview tab; the clue
- * that tells them apart is a setting, and is on the Settings tab — see
- * ClueBlock.
+ * meaning, the clue that tells them apart, and the two ways to add
+ * another. On the Settings tab.
  *
  * Which cards share a side is read off what is on the screen, every time,
  * rather than stored — see meanings.ts. So the line follows the typing:
@@ -10062,19 +10071,22 @@ function CapitalsBlock({ on, onChange }: { on: boolean; onChange: (on: boolean) 
  * empty. Both start in no deck: a meaning is put where it belongs, on
  * purpose.
  */
-function MeaningsBlock({ lang, selfId, lead, allCards, clue, canAdd, onAnother, onOpen, onClueTab }: {
+function MeaningsBlock({ lang, selfId, lead, allCards, clue, onClue, canAdd, onAnother, onOpen }: {
   lang: Lang;
   selfId: string;
   lead: Record<string, any>;
   allCards: Card[];
   clue: string;
+  onClue: (text: string) => void;
   canAdd: boolean;
   onAnother: (which: "meaning" | "word") => void;
   onOpen?: (card: Card) => void;
-  /** Go to the Settings tab, where the clue is written. */
-  onClueTab: () => void;
 }) {
-  const shared = useShared(allCards, selfId, lang, lead);
+  const shared = useMemo(
+    () => sharedWith(allCards, { id: selfId, lang: lang.id }, lead as any),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [allCards, selfId, lang.id, lead.ar, lead.en],
+  );
   const named = (list: Card[], field: "en" | "ar") =>
     list.map((c, i) => {
       const said = splitAlternatives(String((leadOf(c) as Record<string, any>)[field] || "")).filter(Boolean)[0] || "(blank)";
@@ -10115,13 +10127,27 @@ function MeaningsBlock({ lang, selfId, lead, allCards, clue, canAdd, onAnother, 
           </span>
         </p>
       )}
-      {/* The clue that tells them apart is a setting, written on the
-          Settings tab — so where it is missing, the way there is here,
-          beside the cards it would tell this one apart from. */}
+      <Field
+        label="Clue"
+        optional
+        lede="A few words saying which meaning this card is. Shown under a question only when another card a student studies shows the same word or the same meaning."
+      >
+        <input
+          className="at-input"
+          value={clue}
+          maxLength={80}
+          placeholder="For example: the plant"
+          aria-label="Clue"
+          onChange={(e) => onClue(e.target.value)}
+        />
+      </Field>
       {sharing && !clue.trim() && (
         <Help>
-          No clue yet, so a question that could mean either card names the other one.{" "}
-          <Pressable className="at-linkbtn" onClick={onClueTab}>Add a clue ›</Pressable>
+          Without a clue, a question that could mean either card names the other one instead
+          {shared.word.length
+            ? ` — “More than one meaning — not ${splitAlternatives(String(leadOf(shared.word[0]).en || "")).filter(Boolean)[0] || "…"}”`
+            : ""}
+          .
         </Help>
       )}
       <div className="at-row at-mt3">
@@ -10142,62 +10168,6 @@ function MeaningsBlock({ lang, selfId, lead, allCards, clue, canAdd, onAnother, 
         </Button>
       </div>
       <Help>Either one saves this card first, then opens the new one.</Help>
-    </div>
-  );
-}
-
-/* The other cards sharing this one's word or its meaning — see sharedWith —
-   asked by both halves of what was one Meanings block. */
-function useShared(allCards: Card[], selfId: string, lang: Lang, lead: Record<string, any>) {
-  return useMemo(
-    () => sharedWith(allCards, { id: selfId, lang: lang.id }, lead as any),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [allCards, selfId, lang.id, lead.ar, lead.en],
-  );
-}
-
-/*
- * Which meaning this card is, in a few words — the other half of the
- * Meanings block, on the Settings tab. Asked of every word, and needed only
- * where another card shares its word or its meaning, which is when the line
- * under it says so.
- */
-function ClueBlock({ lang, selfId, lead, allCards, clue, onClue }: {
-  lang: Lang;
-  selfId: string;
-  lead: Record<string, any>;
-  allCards: Card[];
-  clue: string;
-  onClue: (text: string) => void;
-}) {
-  const shared = useShared(allCards, selfId, lang, lead);
-  const sharing = shared.word.length + shared.meaning.length > 0;
-  return (
-    <div className="at-formblock">
-      <div className="at-formhead">
-        <span className="at-formnum">Clue</span>
-        <span className="at-formrole">
-          A few words saying which meaning this card is. Shown under a question only when another
-          card a student studies shows the same word or the same meaning.
-        </span>
-      </div>
-      <input
-        className="at-input"
-        value={clue}
-        maxLength={80}
-        placeholder="For example: the plant"
-        aria-label="Clue"
-        onChange={(e) => onClue(e.target.value)}
-      />
-      {sharing && !clue.trim() && (
-        <Help>
-          Without a clue, a question that could mean either card names the other one instead
-          {shared.word.length
-            ? ` — “More than one meaning — not ${splitAlternatives(String(leadOf(shared.word[0]).en || "")).filter(Boolean)[0] || "…"}”`
-            : ""}
-          .
-        </Help>
-      )}
     </div>
   );
 }
@@ -10256,15 +10226,6 @@ const cardTitle = (card: Card | null): string =>
 
 type CardTab = "overview" | "content" | "exercises" | "settings";
 
-/** How many of a card's exercises can be asked, and the one thing that
-    would open the most of the rest. */
-export type ExerciseTallied = { ready: number; total: number; need: string; opens: number };
-
-/* Handed to whatever the screen draws on the Exercises tab, which is where
-   the exercises are counted, so the line under the card face can say so
-   without counting them a second time. */
-export const ExerciseTally = createContext<((t: ExerciseTallied | null) => void) | null>(null);
-
 /*
  * What a save would send, cut by the tab each part of it is changed on —
  * so a tab can say it has a change on it, and the whole of it still says
@@ -10312,137 +10273,7 @@ function TabPanel({ id, tab, locked, panel, after, children }: {
   );
 }
 
-/* A sentence's blanks drawn as the pills they are in the editor, rather
-   than as the braces they are stored as. */
-function WithPills({ text }: { text: string }) {
-  const bits = String(text || "").split(/\{\{([^}]+)\}\}/);
-  return (
-    <>
-      {bits.map((b, i) => (i % 2 ? <span key={i} className="at-blankname">{b}</span> : <React.Fragment key={i}>{b}</React.Fragment>))}
-    </>
-  );
-}
-
-/*
- * The card as a student meets it, at the top of the Overview tab: the words
- * large, how they are said and what they mean, a recording to play and the
- * picture — and under it one line saying whether it is out, how many of its
- * exercises can be asked, and what would open the most of the rest.
- *
- * Nothing in it is written in: it follows the fields as they are typed,
- * so a change can be seen without leaving the tab it was made on.
- */
-function CardFace({ shape, layout, lang, word, talk, allCards, ready, onReady }: {
-  shape: CardShape;
-  layout: string;
-  lang: Lang;
-  word: WordDraft;
-  talk: SceneDraft;
-  allCards: Card[];
-  ready: string;
-  onReady: () => void;
-}) {
-  const player = useClipPlayer(async (hash) => (await API.getClip(hash)).data);
-  const script = { lang: lang.id, dir: lang.direction, style: { fontFamily: lang.fontStack } };
-  const tags = (list: { ar: string; en: string }[]) => {
-    const shown = list.filter((t) => t.ar || t.en);
-    if (!shown.length) return null;
-    return (
-      <div className="at-facetags">
-        {shown.slice(0, 8).map((t, i) => (
-          <span className="at-facetag" key={i}>
-            {t.ar ? <bdi {...script}>{t.ar}</bdi> : null}
-            {t.en ? <span className="at-faceen">{t.en}</span> : null}
-          </span>
-        ))}
-        {shown.length > 8 ? <span className="at-facetag more">+{shown.length - 8}</span> : null}
-      </div>
-    );
-  };
-  const taught = word.uses
-    .map((id) => allCards.find((c) => c.id === id))
-    .filter((c): c is Card => !!c)
-    .map((c) => ({ ar: String(leadOf(c).ar || ""), en: String(leadOf(c).en || "") }));
-
-  let body: Node;
-  if (shape === "scene") {
-    const lines = talk.lines.filter((l: any) => String(l.ar || "").trim() || String(l.en || "").trim());
-    body = (
-      <>
-        <p className="at-facetitle">{talk.title.trim() || (talk.text ? "Untitled text" : "Untitled conversation")}</p>
-        <p className="at-facemeta">
-          {[
-            !talk.text && talk.speakers.filter((n: string) => n.trim()).join(", "),
-            plural(lines.length, talk.text ? "sentence" : "line"),
-          ].filter(Boolean).join(" · ")}
-        </p>
-        {lines.slice(0, 2).map((l: any, i: number) => (
-          <p className="at-faceline" key={i}>
-            {!talk.text && talk.speakers[l.who] ? <span className="at-facewho">{talk.speakers[l.who]}</span> : null}
-            <bdi {...script} className="at-facear">{l.ar}</bdi>
-            {l.en ? <span className="at-faceen">{l.en}</span> : null}
-          </p>
-        ))}
-      </>
-    );
-  } else {
-    const lead = (word.forms[0] || {}) as Record<string, any>;
-    const clip = clipsOf(lead)[0];
-    const image = Array.isArray(lead.images) ? String(lead.images[0] || "") : "";
-    const spec = word.shownSpec;
-    /* A verb's table, counted the way it is drawn: a tense that names its
-       own persons has only those. */
-    const boxes = spec && !spec.perForm
-      ? tensesOf(spec).reduce((n, t) => {
-        const people = personsFor({ subs: word.cells }, spec);
-        return n + (Array.isArray(t.persons) && t.persons.length ? people.filter((p) => t.persons!.includes(p.id)).length : people.length);
-      }, 0)
-      : 0;
-    const written = spec && !spec.perForm ? cellsIn({ subs: word.cells }, spec).filter(hasWords).length : 0;
-    const headline = layout === "verb" && word.standsIn ? word.name.trim() : "";
-    body = (
-      <div className="at-facerow">
-        <div className="at-facemain">
-          {headline ? <p className="at-facetitle">{headline}</p> : null}
-          {lead.ar ? (
-            <p className="at-faceword">
-              <bdi {...script}>{shape === "sentence" ? <WithPills text={lead.ar} /> : lead.ar}</bdi>
-            </p>
-          ) : !lead.en && !headline ? (
-            <p className="at-facemeta">Nothing written yet.</p>
-          ) : null}
-          {lead.lat ? <p className="at-facelat">{shape === "sentence" ? <WithPills text={lead.lat} /> : lead.lat}</p> : null}
-          {lead.en && lead.en !== headline ? <p className="at-facemean">{shape === "sentence" ? <WithPills text={lead.en} /> : lead.en}</p> : null}
-          {boxes ? <p className="at-facemeta">{written} of {plural(boxes, "form")} written</p> : null}
-          {layout !== "verb" && layout !== "sentence"
-            ? tags(word.forms.slice(1).map((f: any) => ({ ar: String(f.ar || ""), en: String(f.en || "") })))
-            : null}
-          {taught.length ? <p className="at-facemeta">Teaches</p> : null}
-          {tags(taught)}
-        </div>
-        {clip || image ? (
-          <div className="at-faceside">
-            {image ? <StoredImage hash={image} alt={String(lead.en || "")} className="at-faceimg" /> : null}
-            {clip ? <PlayButton state={player.state as any} onClick={() => player.play(clip.id)} label="Play the recording" /> : null}
-          </div>
-        ) : null}
-      </div>
-    );
-  }
-  return (
-    <div className="at-formblock at-cardface">
-      {body}
-      {ready ? (
-        <Pressable className="at-faceready" onClick={onReady}>
-          {ready}
-          <Icon name="chevronRight" size={18} />
-        </Pressable>
-      ) : null}
-    </div>
-  );
-}
-
-export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, statusWord, onExport, about, below }: {
+export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, about, below }: {
   card: Card | null;
   lang: Lang;
   decks: Deck[];
@@ -10484,15 +10315,10 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   /** A card's status menu, beside the buttons — off while there are
       changes, which a status would not carry. See StatusMenu in spaces.tsx. */
   status?: (off: boolean) => Node;
-  /** The same status in a word — "Published" — for the line under the
-      card face. */
-  statusWord?: string;
   /** Export this card, beside Edit while it is locked. */
   onExport?: () => void;
   /** Drawn over the tabs, and on the Exercises tab, and never locked: the
-      line about sentences waiting for review, and the exercises to try.
-      What is drawn as `below` may say how many of them can be asked
-      through ExerciseTally. */
+      line about sentences waiting for review, and the exercises to try. */
   about?: Node;
   below?: Node;
 }) {
@@ -10664,15 +10490,6 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   const dots = tabList
     .map(([k]) => k as CardTab)
     .filter((k) => pieces[k] !== savedPieces[k] || blocked.includes(k));
-  /* How many of the card's exercises can be asked, as the Exercises tab
-     counted them — see ExerciseTally — for the line under the card face. */
-  const [tally, setTally] = useState<ExerciseTallied | null>(null);
-  const readiness = [
-    stored ? statusWord || "" : "Not saved yet",
-    tally && tally.total ? `${tally.ready} of ${plural(tally.total, "exercise")} ready` : "",
-    tally && tally.opens ? `${cap(tally.need)} would open ${tally.opens} more` : "",
-  ].filter(Boolean).join(" · ");
-
   return (
     /* "over" puts this above the mode selector and the corner menu, so
        editing a card is the only thing on screen. */
@@ -10692,47 +10509,48 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
            one that asks for it. */
         className="cardform"
         onBack={onClose}
-        /* Locked: Export, the status and Edit. Open: Delete, the status, Cancel,
-           and two saves — Save keeps the card open to go on with it, and
-           Save and exit closes it, the one a finished card wants, so it is
-           the primary. On a phone, on a line under the title. */
-        actionBelow
+        /* Icons only, on the title's own line, which gives way to them —
+           the title is cut short rather than wrapped. Locked: the status
+           and Edit; Export is by the "This card" heading, with the other
+           facts about the card. Open: Delete, the status, Cancel, and two
+           saves — Save keeps the card open to go on with it, and Save and
+           exit closes it, the one a finished card wants, so it is the
+           primary. Each says what it does on hover and out loud. */
         action={
           locked ? (
             <>
-              {onExport ? <IconButton icon="download" label="Export this card" onClick={onExport} /> : null}
               {status ? status(false) : null}
-              <Button variant="primary" size="sm" icon="edit" onClick={onUnlock}>
-                Edit
+              <Button variant="primary" size="sm" className="iconly" aria-label="Edit" title="Edit" onClick={onUnlock}>
+                <Icon name="edit" />
               </Button>
             </>
           ) : (
           <>
-            {/* Up here with the card's other actions rather than at the foot
-                of a long form, where it was easy to miss. Still only while
-                editing, as it always was. */}
             {stored && onDelete ? (
-              <IconButton icon="delete" label="Delete this card" danger onClick={onDelete} />
+              <IconButton icon="delete" label="Delete this card" title="Delete this card" danger onClick={onDelete} />
             ) : null}
             {stored && status ? status(changed) : null}
             {stored && onRelock ? (
-              <Button variant="ghost" size="sm" onClick={() => (changed ? setDiscarding(true) : onRelock())}>
-                Cancel
+              <Button variant="ghost" size="sm" className="iconly" aria-label="Cancel" title="Cancel"
+                onClick={() => (changed ? setDiscarding(true) : onRelock())}>
+                <Icon name="close" />
               </Button>
             ) : null}
-            <Button size="sm"
+            <Button size="sm" className="iconly"
+              aria-label={busy ? "Saving…" : "Save"}
+              title={busy ? "Saving…" : "Save"}
               disabled={!canSave || !changed || busy}
               onClick={() => save()}
             >
               <Icon name="save" />
-              {busy ? "Saving…" : "Save"}
             </Button>
-            <Button variant="primary" size="sm"
+            <Button variant="primary" size="sm" className="iconly"
+              aria-label="Save and exit"
+              title="Save and exit"
               disabled={!canSave || !changed || busy}
               onClick={() => save(null, true)}
             >
               <Icon name="check" />
-              Save and exit
             </Button>
           </>
           )
@@ -10758,20 +10576,9 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
           </div>
 
           {/* ---- Overview ----
-              What the card is, in the words a student will meet it, and
-              then the facts about it a teacher changes most: what kind it
-              is and which decks it is in. */}
+              The facts about the card a teacher changes most: what kind
+              it is and which decks it is in. */}
           <TabPanel id="overview" tab={tab} locked={locked} panel={panels.overview}>
-            <CardFace
-              shape={shape}
-              layout={layout}
-              lang={lang}
-              word={word}
-              talk={talk}
-              allCards={allCards}
-              ready={readiness}
-              onReady={() => setTab("exercises")}
-            />
             <KindBlock
               card={card}
               lang={lang}
@@ -10795,20 +10602,8 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               onToggleDeck={(id, on) =>
                 setChosen((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
               }
+              onExport={locked ? onExport : undefined}
             />
-            {meanings && (
-              <MeaningsBlock
-                lang={lang}
-                selfId={selfId}
-                lead={word.forms[0] || {}}
-                allCards={allCards}
-                clue={clue}
-                canAdd={canSave && !busy}
-                onAnother={(which) => save(which)}
-                onOpen={onOpenCard}
-                onClueTab={() => setTab("settings")}
-              />
-            )}
           </TabPanel>
 
           {/* ---- The card's own words ----
@@ -10844,12 +10639,12 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
            
             panel={panels.exercises}
             after={
-              <ExerciseTally.Provider value={setTally}>
+              <>
                 {below}
                 {!stored && (
                   <Help className="at-mt3">Save the card to try its exercises.</Help>
                 )}
-              </ExerciseTally.Provider>
+              </>
             }
           >
             {!scene && (
@@ -10861,22 +10656,26 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
           </TabPanel>
 
           {/* ---- Settings ----
-              What most cards never need: how its English is capitalised,
-              the clue that tells it from a card sharing its word, and how
-              other cards' blanks reach it. A scene has none of these. */}
+              What most cards never need: the other meanings of its word
+              and the clue that tells them apart, how its English is
+              capitalised, and how other cards' blanks reach it. A scene
+              has none of these. */}
           {!scene && (
             <TabPanel id="settings" tab={tab} locked={locked} panel={panels.settings}>
-              {asksCapitals && <CapitalsBlock on={capitals} onChange={setCapitals} />}
               {meanings && (
-                <ClueBlock
+                <MeaningsBlock
                   lang={lang}
                   selfId={selfId}
                   lead={word.forms[0] || {}}
                   allCards={allCards}
                   clue={clue}
                   onClue={setClue}
+                  canAdd={canSave && !busy}
+                  onAnother={(which) => save(which)}
+                  onOpen={onOpenCard}
                 />
               )}
+              {asksCapitals && <CapitalsBlock on={capitals} onChange={setCapitals} />}
               <BlanksBlock word={word} lang={lang} />
             </TabPanel>
           )}
