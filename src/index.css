@@ -4163,3 +4163,18 @@ fieldset.at-cardlock:disabled .at-seg.on:disabled { opacity:1; }
   color: var(--ink); }
 .at-screen.cardform .at-section .at-sectionlede { margin:4px 0 0; }
 .at-screen.cardform .at-section .at-sectionbody { margin-top:18px; }
+
+/* Progress, laid out the same way: one plain sheet, each part a band out
+   to the gutters with a rule above it, its name at the editor's heading
+   size and what it is for straight under it. Only the screen's own parts —
+   the screens that open from it bring their own layout. The first part
+   has nothing above it to be ruled off from, as the editor's first block
+   has none. */
+.at:has(> .at-wrap > .at-ruled) { background: var(--surface); }
+.at-ruled > .at-section { margin:0 -16px; padding:28px 16px 32px;
+  border-top:1px solid var(--line); }
+.at-ruled > .at-section:first-child { border-top:0; padding-top:20px; }
+.at-ruled > .at-section > .at-sectiontop > .at-sectionhead { font-size:25px;
+  font-weight:800; letter-spacing:-.015em; line-height:1.15; color: var(--ink); }
+.at-ruled > .at-section > .at-sectionlede { margin:4px 0 0; }
+.at-ruled > .at-section > .at-sectionbody { margin-top:18px; }
