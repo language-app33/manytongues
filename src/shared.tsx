@@ -5,7 +5,7 @@
  * being parsed by every student on every launch.
  */
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
 import type { Card, Course, Deck, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
 import { formsOf, leadOf, wordOf } from "./cards.ts";
 import { createPortal } from "react-dom";
@@ -505,6 +505,13 @@ export function Button({
   ]
     .filter(Boolean)
     .join(" ");
+  /* The words, in a box of their own. Nothing anywhere sees the box — it
+     is `display: contents` — except a row of buttons, which lets a label
+     longer than the whole row take a second line inside it rather than
+     push the button off the side of the screen. See .at-btnlabel. */
+  const label = children == null || children === false || children === "" ? null : (
+    <span className="at-btnlabel">{children}</span>
+  );
   return (
     /* `off` is disabled with its voice left on: it looks exactly like a
        disabled button and reads as one — aria-disabled is what a screen
@@ -517,12 +524,12 @@ export function Button({
     reads ? (
       <Pressable className={cls} {...rest}>
         {icon ? <Icon name={icon} size={iconSize || (size === "sm" ? 16 : 18)} /> : null}
-        {children}
+        {label}
       </Pressable>
     ) : (
       <button type="button" className={cls} aria-disabled={off || undefined} {...rest}>
         {icon ? <Icon name={icon} size={iconSize || (size === "sm" ? 16 : 18)} /> : null}
-        {children}
+        {label}
       </button>
     )
   );
@@ -1901,7 +1908,7 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
       </button>
 
       {open && (
-        <div className="at-pickmenu">
+        <Popover className="at-pickmenu">
           {options.map((o) => (
             <button
               key={o.value}
@@ -1919,7 +1926,7 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
               {o.note ? <span className="at-picknote">{o.note}</span> : null}
             </button>
           ))}
-        </div>
+        </Popover>
       )}
     </div>
   );
@@ -3504,6 +3511,85 @@ export function modalIsOpen() {
 }
 
 /*
+ * The page under anything that covers it stays where it is.
+ *
+ * A screen, a confirmation or a sheet is laid over the page rather than
+ * replacing it, so the page is still there underneath — and still
+ * scrollable. A card opened from a long list showed a scroll bar as long
+ * as the list, and the wheel walked the hidden list up and down while the
+ * card sat still. Every layer that covers the page holds this while it is
+ * up; the page is locked while any of them is.
+ *
+ * Counted, because they stack: a confirmation over a screen. Each used to
+ * save and restore the body's overflow itself, and two closing out of
+ * order restored each other's saved value.
+ */
+let PAGE_LOCKS = 0;
+export function usePageLock(on = true) {
+  useEffect(() => {
+    if (!on || typeof document === "undefined") return undefined;
+    PAGE_LOCKS++;
+    document.documentElement.classList.add("at-pagelocked");
+    return () => {
+      PAGE_LOCKS = Math.max(0, PAGE_LOCKS - 1);
+      if (!PAGE_LOCKS) document.documentElement.classList.remove("at-pagelocked");
+    };
+  }, [on]);
+}
+
+/*
+ * A menu that hangs off a button and stays on the screen.
+ *
+ * Which way a menu should open was decided in the stylesheet, one menu at
+ * a time, from where its button sat — and a button moves: the card's
+ * status went from the start of a line to the end of the card's top line,
+ * and its menu, still told to open rightward, opened off the side of the
+ * phone. This measures instead. Drawn where the stylesheet puts it, then
+ * moved back in by however far it crosses either side of the window, and
+ * cut to the room left below it, scrolling inside, if it runs off the
+ * foot.
+ *
+ * Every menu that drops from a button is one of these — the filters, a
+ * card's status, the corner menu, the space selector — with its look and
+ * its side left to its own class.
+ */
+const POPOVER_GUTTER = 8;
+export function Popover({ className = "", children, ...rest }: {
+  className?: string;
+  children?: Node;
+} & Record<string, any>) {
+  const ref: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof window === "undefined") return undefined;
+    const fit = () => {
+      el.style.translate = "";
+      el.style.maxHeight = "";
+      const r = el.getBoundingClientRect();
+      if (!r.width && !r.height) return;
+      const wide = document.documentElement.clientWidth || window.innerWidth;
+      const tall = window.innerHeight;
+      let dx = 0;
+      if (r.right > wide - POPOVER_GUTTER) dx = wide - POPOVER_GUTTER - r.right;
+      if (r.left + dx < POPOVER_GUTTER) dx = POPOVER_GUTTER - r.left;
+      if (dx) el.style.translate = `${Math.round(dx)}px 0`;
+      if (r.bottom > tall - POPOVER_GUTTER) {
+        el.style.maxHeight = `${Math.max(120, Math.floor(tall - POPOVER_GUTTER - r.top))}px`;
+        el.style.overflowY = "auto";
+      }
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+  return (
+    <div ref={ref} className={`at-popover${className ? " " + className : ""}`} {...rest}>
+      {children}
+    </div>
+  );
+}
+
+/*
  * The class hides the app chrome, and it used to come off only when the
  * stack emptied. That made one entry outliving its component permanent: the
  * chrome stayed hidden for the rest of the session and only a reload
@@ -3599,6 +3685,8 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
      document rather than trusted. See reconcileScreens. */
   const elRef: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
   const host = useAppHost();
+  /* It covers the page, so the page under it holds still. */
+  usePageLock();
 
   /* A screen scrolls inside itself, so the page-level reset does not reach
      it — and one screen replacing another at the same place in the tree
@@ -3848,14 +3936,12 @@ export function ConfirmModal({
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
     window.addEventListener("keydown", onKey);
     MODALS_OPEN++;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
       MODALS_OPEN = Math.max(0, MODALS_OPEN - 1);
-      document.body.style.overflow = prev;
     };
   }, [onCancel]);
+  usePageLock();
 
   /* Rendered at the app root, for the same reason a Screen is.
 
@@ -4226,7 +4312,7 @@ export function ModeSelector({ mode, modes, onChange }: {
         </span>
       </button>
       {open && (
-        <div className="at-modemenu">
+        <Popover className="at-modemenu">
           {modes.map((m) => (
             <button
               key={m}
@@ -4240,7 +4326,7 @@ export function ModeSelector({ mode, modes, onChange }: {
               {m === mode && <span>✓</span>}
             </button>
           ))}
-        </div>
+        </Popover>
       )}
     </div>
   );
@@ -5177,6 +5263,7 @@ export function PickSheet({ title, lede, className = "", onClose, children }: {
   onClose: () => void;
   children?: Node;
 }) {
+  usePageLock();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);

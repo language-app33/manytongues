@@ -7049,3 +7049,37 @@ no `has`. A recording found once is remembered for the life of the process,
 since recordings never change once written; clearing data forgets what it
 deletes. A damaged recording that is present still counts as present —
 catching that would mean reading every file, and is not attempted.
+
+---
+
+## Layers lock the page; menus measure themselves; a too-long label wraps
+
+**27 October 2026** · `src/shared.tsx` (`usePageLock`, `Popover`, `Button`), `src/index.css`
+
+Three overflows a teacher found on one card screen, each fixed where it was
+shared rather than where it was seen.
+
+*The page under a layer.* A `Screen` is laid over the page, not swapped for
+it, and nothing stopped the page scrolling. The scroll bar in view was the
+cards list's, under the card. Three layers saved and restored the body's
+overflow on their own and `Screen` did nothing; now every layer holds
+`usePageLock`, a count that puts `at-pagelocked` on `<html>`. The count is
+the point: a confirmation over a screen closing first used to hand back the
+other one's saved value.
+
+*Menus.* Each drop-down's side was written in its own CSS from where its
+button sat, and the status button moved from the start of a line to the
+end of one without its menu being told. `Popover` measures after layout and
+translates the menu back inside the window, capping its height if it runs
+off the foot. The CSS still places it — measuring is the backstop, not the
+layout — so the status menu's side was corrected too.
+
+*Labels in a row.* `.at-row` never wraps a label: the row steps its type
+down, then drops a whole button to the next line. A label wider than the
+whole row at the smallest type had nowhere to go and ran off the screen.
+It now wraps, in that case only: the button's `min-width` is `auto` with a
+`max-width` of 100% (the automatic minimum is clamped by the max, where an
+explicit `min-content` beats it), and its words sit in `.at-btnlabel`,
+which asks for its one-line width and wraps below it. Everywhere outside a
+row the box is `display: contents`, so it changes nothing. The cost: a
+raw `<button className="at-btn">` has no such box, so it does not get this.

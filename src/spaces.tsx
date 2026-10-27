@@ -150,6 +150,7 @@ import {
   useOffline,
   useLiveRefresh,
   useSnackbar,
+  Popover,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
 export { LanguageTag, languageName } from "./shared.tsx";
@@ -4807,7 +4808,7 @@ function StatusMenu({ card, disabled, onStatus }: {
           <Icon name={STATUS_ICON[tone] || "verify"} />
         </button>
         {open && (
-          <div className="at-pickmenu at-statuspick" role="menu">
+          <Popover className="at-pickmenu at-statuspick" role="menu">
             {choices.map((c) => (
               <button
                 key={c.value}
@@ -4822,7 +4823,7 @@ function StatusMenu({ card, disabled, onStatus }: {
                 <span className="at-picktext">{c.label}</span>
               </button>
             ))}
-          </div>
+          </Popover>
         )}
       </span>
       {asking === "discard" && (

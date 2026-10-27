@@ -82,10 +82,12 @@ import {
   Segmented,
   plural,
   useOffline,
+  usePageLock,
   ConfirmModal,
   Overlay,
   PickSheet,
   ChoiceSwitch,
+  Popover,
   DeckSwitch,
   Locked,
   Pressable,
@@ -7977,7 +7979,7 @@ function BlankChip({ slot, values, lang }: {
         {slot}
       </Pressable>
       {open && (
-        <div className="at-blankfills" role="tooltip">
+        <Popover className="at-blankfills" role="tooltip">
           <p className="at-eyebrow">{`${slot} · ${said}`}</p>
           {shown.length > 0 && (
             <ul className="at-filllist">
@@ -8005,7 +8007,7 @@ function BlankChip({ slot, values, lang }: {
               without this card being touched.
             </Help>
           )}
-        </div>
+        </Popover>
       )}
     </span>
   );
@@ -8190,6 +8192,7 @@ function TagSheet({ word, rows, maker, full, onClose }: {
   onClose: () => void;
 }) {
   const { fills, addFill, dropFill, renameFill, nameHeld, askStrip, asking, dropping } = word;
+  usePageLock();
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
   /* The box at the top names a new tag and finds an old one: what is typed
      there narrows the list under it, as the blank screen's box does, so a
