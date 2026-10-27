@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.493 — 27 October 2026
+## 0.495 — 27 October 2026
 
 **Progress is laid out like the card editor.**
 
@@ -23,6 +23,45 @@ and moves once per batch of work you would notice, not once per commit.
 
 To check by hand: open Learning > Progress in light and dark, and compare
 it with a card open in the editor.
+
+## 0.494 — 27 October 2026
+
+**App preferences no longer has a Language section.**
+
+- The "Learning" language choice is gone from App preferences, with the
+  Language heading over it. Every card carries its own language, so it
+  changed nothing about what was practised: with one language the app sets
+  it from the course, and with several the language switch in the top bar
+  decides what is practised. All it did was decide which language that
+  switch listed first.
+- The app still keeps a language of its own for the rare thing that
+  carries none, and takes it from the courses, as before. A language
+  picked here in the past no longer holds it: when all of someone's
+  courses are in one language, the app follows them.
+
+To check by hand: open App preferences and see Appearance and Feedback
+only; with courses in two languages, the top bar's switch still chooses
+what is practised.
+
+## 0.493 — 27 October 2026
+
+**Build a session is one screen.**
+
+- Building a session, and changing one you saved, used to take three
+  steps: the mode, then the cards, then the length. All of it is now on a
+  single screen, in sections headed Mode, Cards, Length and Keep this
+  session, laid out the way the card screen is, with the same headings
+  and the same line under each saying what it is for.
+- Everything chosen stays in view, so changing a saved session's length
+  no longer means walking through its mode and cards first.
+- The button at the foot says what is still missing (choose a mode,
+  choose a card, choose a length) until there is nothing left, then
+  starts the session, or saves the changes to a saved one.
+- Ultimate, which has no length to choose, says so under Length.
+
+To check by hand: open Build a session on a phone, choose a mode, some
+cards and a length, and start it; then edit a saved session and save a
+change.
 
 ## 0.492 — 27 October 2026
 

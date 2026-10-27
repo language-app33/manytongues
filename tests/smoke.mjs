@@ -1106,8 +1106,19 @@ const buttonState = (re) => {
 
 check("the manual session builder opens", clickNamed(/Build a session|Choose what to practice|Pick cards/) || true);
 await sleep(300);
-if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
+if (/Build a session/.test(document.body.textContent)) {
   check("session builder rendered in a Screen with its footer", !!document.querySelector(".at-screenfoot, .at-screenhead"));
+
+  /* One screen, laid out as the card editor is: Mode, Cards, Length and
+     keeping it, each a section with the editor's heading and the line
+     under it. */
+  const heads = [...document.querySelectorAll(".at-screen.cardform .at-formblock > .at-formhead > .at-formnum")]
+    .map((h) => h.textContent);
+  check("the builder is one screen, sectioned like the card editor",
+    heads.join("|") === "Mode|Cards|Length|Keep this session" &&
+      document.querySelectorAll(".at-formblock > .at-formhead > .at-formrole").length === 4,
+    heads.join("|"));
+  check("and nothing on it is a step to go through", !buttonNamed(/^Next$/));
 
   /* Nothing is chosen for you. Every step of this used to open with an
      answer already lit — Ultimate on the first screen, twenty questions on
@@ -1116,21 +1127,22 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
   const modeCards = [...document.querySelectorAll(".at-modecard")];
   check("the modes are all offered, none of them chosen", modeCards.length > 1 && !modeCards.some((b) => b.classList.contains("on")),
     `${modeCards.length} modes, ${modeCards.filter((b) => b.classList.contains("on")).map((b) => (b.textContent || "").slice(0, 12)).join(",") || "none"} lit`);
+  check("no card is chosen for you either", !document.querySelector(".at-tagpick.on, .at-minicard.on"));
+  /* Length: two segmented controls, and on opening neither should have a
+     segment lit. */
+  const lit = [...document.querySelectorAll(".at-lengthgroup .on, .at-lengthgroup [aria-checked=true], .at-lengthgroup [aria-selected=true]")];
+  check("no length is chosen for you", lit.length === 0, lit.map((e) => e.textContent).join(","));
 
-  const next = () => buttonState(/^(Next|Choose a mode|Choose at least one card)$/);
-  check("and you cannot go on until you choose one", next().there && next().disabled, next().label || "no button");
-  check("the button says what is missing rather than sitting dead", next().there && /Choose a mode/.test(next().label),
-    next().label);
+  const start = () => buttonState(/^(Start|Choose a mode|Choose at least one card|Choose a length)$/);
+  check("and you cannot start until you choose", start().there && start().disabled, start().label || "no button");
+  check("the button says what is missing rather than sitting dead", /^Choose a mode$/.test(start().label),
+    start().label);
 
   click(modeCards.find((b) => /Regular/.test(b.textContent || "")));
   await sleep(80);
-  check("choosing one lets you go on", next().there && !next().disabled && /^Next$/.test(next().label),
-    next().label);
+  check("choosing a mode moves on to the cards", start().disabled && /^Choose at least one card$/.test(start().label),
+    start().label);
 
-  /* Cards, which had no default and still should not. */
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(120);
-  check("no card is chosen for you either", !document.querySelector(".at-tagpick.on, .at-minicard.on"));
   /* Introductions rather than Everything: the walks further down need the
      climbed cards untouched, and a hand-built session asks a card every
      exercise it has open whether it is due or not — so the one deck none
@@ -1138,14 +1150,6 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
   const everything = [...document.querySelectorAll(".at-tagpickmain")].find((b) => /Introductions/.test(b.textContent));
   click(everything);
   await sleep(80);
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(120);
-
-  /* Length: two segmented controls, and on opening neither should have a
-     segment lit. */
-  const lit = [...document.querySelectorAll(".at-lengthgroup .on, .at-lengthgroup [aria-checked=true], .at-lengthgroup [aria-selected=true]")];
-  check("no length is chosen for you", lit.length === 0, lit.map((e) => e.textContent).join(","));
-  const start = () => buttonState(/^(Start|Choose a length)$/);
   check("and it says so instead of starting a session you did not describe",
     start().there && start().disabled && /Choose a length/.test(start().label),
     start().label || "no button");
@@ -1155,11 +1159,11 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
   check("choosing a length is all that was left", start().there && !start().disabled && /^Start$/.test(start().label),
     start().label);
 
-  /* Keeping it, which is the other half of what the last step is for.
+  /* Keeping it, which is the other half of what the screen is for.
      Several minutes of picking used to be spent again the next morning. */
   const keepBox = [...document.querySelectorAll(".at-formblock")]
     .find((d) => /Keep this session/.test(d.textContent || ""));
-  check("the last step offers to keep the session", !!keepBox,
+  check("the screen offers to keep the session", !!keepBox,
     (document.querySelector(".at-screenbody") || { textContent: "" }).textContent.slice(-90));
   const nameBox = keepBox && keepBox.querySelector("input");
   if (nameBox) {
@@ -1711,21 +1715,17 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
     check("a kept session opens on the Build screen to be changed",
       !!document.querySelector(".at-modecard.on"),
       (document.body.textContent || "").slice(0, 120));
-    clickNamed(/^Next$/);
-    await sleep(120);
     check("with its cards already picked", !!document.querySelector(".at-tagpick.on"),
       (document.body.textContent || "").slice(0, 120));
-    clickNamed(/^Next$/);
-    await sleep(120);
     const renameBox = [...document.querySelectorAll(".at-formblock")]
-      .find((d) => /Name/.test(d.textContent || ""))?.querySelector("input");
+      .find((d) => d.querySelector(".at-formnum")?.textContent === "Name")?.querySelector("input");
     if (renameBox) {
       must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value")?.set, "the input's value setter")
         .call(renameBox, "Friday's verbs");
       renameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
       await sleep(60);
     }
-    check("and its last step saves rather than starts",
+    check("and its button saves rather than starts",
       !!buttonNamed(/^Save changes$/) && !buttonNamed(/^Start$/),
       [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-120));
     clickNamed(/^Save changes$/);
@@ -3446,15 +3446,11 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   await sleep(300);
   click([...document.querySelectorAll(".at-modecard")].find((b) => /Regular/.test(b.textContent || "")));
   await sleep(60);
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(150);
   const deck = [...document.querySelectorAll(".at-tagpickmain")].find((b) => /Scenes/.test(b.textContent || ""));
   check("the scene's own deck is there to practise from", !!deck,
     [...document.querySelectorAll(".at-tagpickmain")].map((b) => (b.textContent || "").slice(0, 12)).join("|"));
   click(deck);
   await sleep(80);
-  clickNamed(/^(Next|Choose at least one card)$/);
-  await sleep(150);
   click([...document.querySelectorAll(".at-lengthgroup button")].find((b) => (b.textContent || "").trim() === "10"));
   await sleep(60);
   clickNamed(/^(Start|Choose a length)$/);
@@ -3724,12 +3720,8 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   await sleep(300);
   click([...document.querySelectorAll(".at-modecard")].find((b) => /Regular/.test(b.textContent || "")));
   await sleep(60);
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(150);
   click([...document.querySelectorAll(".at-tagpickmain")].find((b) => /Introductions/.test(b.textContent || "")));
   await sleep(80);
-  clickNamed(/^(Next|Choose at least one card)$/);
-  await sleep(150);
   const groups = [...document.querySelectorAll(".at-lengthgroup")];
   const minutesGroup = groups.find((g) => /Minutes/.test(g.textContent || ""));
   click(minutesGroup && [...minutesGroup.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "2"));
@@ -3859,13 +3851,9 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await sleep(300);
   click([...document.querySelectorAll(".at-modecard")].find((b) => /Ultimate/.test(b.textContent || "")));
   await sleep(80);
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(150);
   const lesson = [...document.querySelectorAll(".at-tagpickmain")].find((b) => /Lesson 1/.test(b.textContent || ""));
   click(lesson);
   await sleep(80);
-  clickNamed(/^(Next|Choose at least one card|Start|Choose a length)$/);
-  await sleep(200);
   clickNamed(/^(Start|Choose a length)$/);
   await sleep(500);
 
@@ -4164,16 +4152,12 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await sleep(300);
   click([...document.querySelectorAll(".at-modecard")].find((b) => /Ultimate/.test(b.textContent || "")));
   await sleep(80);
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(150);
   const intro = [...document.querySelectorAll(".at-tagpickmain")]
     .find((b) => /Introductions/.test(b.textContent || ""));
   check("the deck the frame is in can be practised on its own", !!intro,
     [...document.querySelectorAll(".at-tagpickmain")].map((b) => (b.textContent || "").slice(0, 20)).join(" | "));
   click(intro);
   await sleep(80);
-  clickNamed(/^(Next|Choose at least one card|Start|Choose a length)$/);
-  await sleep(200);
   clickNamed(/^(Start|Choose a length)$/);
   await sleep(500);
 
@@ -9606,8 +9590,14 @@ const openPronounTables = async () => {
   click(rowNamed(/^App preferences$/));
   await sleep(350);
   const prefsText = ((screenTitled("App preferences") || host6).textContent || "");
-  check("the preferences screen offers the language being learnt, the theme and the sounds",
-    /Language/.test(prefsText) && /Theme/.test(prefsText) && /Sounds/.test(prefsText),
+  check("the preferences screen offers the theme and the sounds",
+    /Theme/.test(prefsText) && /Sounds/.test(prefsText),
+    prefsText.slice(0, 220).replace(/\s+/g, " "));
+  /* And no longer a language to learn: the switch in the top bar is where
+     that is decided, and a second control here changed nothing visible —
+     see AppPreferences. */
+  check("and no Learning language choice, which the top bar's switch replaced",
+    !/Learning/.test(prefsText) && !prefsText.includes("Language"),
     prefsText.slice(0, 220).replace(/\s+/g, " "));
 
   /* And the account screen names who is signed in, which is the one fact
