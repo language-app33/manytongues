@@ -278,6 +278,7 @@ const PLACES: Record<string, [string, string]> = {
   ItemList: [PARTS, "A searchable list"],
   FilterBar: [PARTS, "What Sort or Filter opens onto"],
   FilterMenu: [PARTS, "One filter, in the toolbar"],
+  ModeSelector: [PARTS, "Choosing a mode · drawn nowhere yet"],
   Tabs: [PARTS, "A row of tabs"],
   Screen: [PARTS, "A full screen"],
   SpaceFrame: [PARTS, "The Teaching and Admin frame"],

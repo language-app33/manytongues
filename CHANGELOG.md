@@ -8,6 +8,29 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.493 — 27 October 2026
+
+**Screens, menus and buttons stay inside the window.**
+
+- With a card open, the scroll bar belongs to the card. The page under it
+  — often a long list of cards — no longer scrolls behind it, so a card
+  that fits on the screen no longer shows a long scroll bar, and the wheel
+  no longer moves anything out of sight. The same holds under every
+  full-screen view, question and sheet in the app.
+- A card's status menu opens back across the screen from its button,
+  instead of off the right-hand side of a phone. Every menu that drops
+  from a button — the filters, the corner menu, the space selector, a
+  blank's values — now checks it fits once it opens, and moves back into
+  the window, or scrolls, if it does not.
+- A button whose words are longer than the screen is wide — "Add another
+  meaning of …" and "Add another Vietnamese word for …" on a card with a
+  long name — now takes a second line inside the button instead of
+  running off the side. This applies to every row of buttons, and to the
+  buttons along the foot of a screen.
+
+To check by hand: on a phone, open a card from a long list and scroll;
+open its status menu; open its Settings tab on a card with a long name.
+
 ## 0.492 — 27 October 2026
 
 **ManyTongues has a logo: the dialect map.**
