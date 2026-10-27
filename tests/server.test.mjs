@@ -4599,3 +4599,21 @@ test("a recording the server never received is named to the teacher and the stud
   const later = await api("/api/courses?action=my-material", { key: student.key });
   assert.deepEqual(later.json.missingClips, []);
 });
+
+test("the server says how big recordings and pictures are, and leaves out the ones it does not hold", async () => {
+  const someoneElse = await someone("Omar");
+  const clip = "c".repeat(63) + "3";
+  const image = "d".repeat(63) + "4";
+  const absent = "e".repeat(63) + "5";
+  const clipData = "data:audio/webm;base64," + "A".repeat(400);
+  const imageData = "data:image/png;base64," + "B".repeat(200);
+  await api("/api/courses?action=put-clip", { method: "POST", key: someoneElse.key, body: { hash: clip, data: clipData } });
+  await api("/api/courses?action=put-image", { method: "POST", key: someoneElse.key, body: { hash: image, data: imageData } });
+  const r = await api("/api/courses?action=media-sizes", {
+    method: "POST", key: someoneElse.key, body: { clips: [clip, absent, "not-a-hash"], images: [image, absent] },
+  });
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual(Object.keys(r.json.clips), [clip], "a recording the server lacks was given a size");
+  assert.deepEqual(Object.keys(r.json.images), [image]);
+  assert.ok(r.json.clips[clip] >= clipData.length, "a recording's size is smaller than what was stored");
+});

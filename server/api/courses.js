@@ -193,20 +193,25 @@ const clipsOfCard = (card) => [
  * Clearing data forgets what it deletes — see admin-clear.
  */
 const CLIPS_HERE = new Set();
+/* And the same for pictures, which are stored the same way. */
+const IMAGES_HERE = new Set();
 /**
  * @param {any} store
  * @param {Iterable<string>} hashes
+ * @param {"clip" | "image"} [kind]
  * @returns {Promise<string[]>}
  */
-async function clipsMissing(store, hashes) {
-  const asked = [...new Set(hashes)].filter((h) => typeof h === "string" && /^[a-f0-9]{64}$/.test(h) && !CLIPS_HERE.has(h));
+async function clipsMissing(store, hashes, kind = "clip") {
+  const known = kind === "image" ? IMAGES_HERE : CLIPS_HERE;
+  const keyOf = (/** @type {string} */ h) => (kind === "image" ? K.image(h) : K.clip(h));
+  const asked = [...new Set(hashes)].filter((h) => typeof h === "string" && /^[a-f0-9]{64}$/.test(h) && !known.has(h));
   const missing = /** @type {string[]} */ ([]);
   for (let i = 0; i < asked.length; i += 50) {
     await Promise.all(asked.slice(i, i + 50).map(async (h) => {
       /* The directory store answers without reading the file; any other
          store is asked for the document itself. */
-      const here = typeof store.has === "function" ? await store.has(K.clip(h)) : !!(await store.get(K.clip(h), { type: "text" }));
-      if (here) CLIPS_HERE.add(h);
+      const here = typeof store.has === "function" ? await store.has(keyOf(h)) : !!(await store.get(keyOf(h), { type: "text" }));
+      if (here) known.add(h);
       else missing.push(h);
     }));
   }
@@ -3559,7 +3564,12 @@ export default async (req) => {
          device leaves those out of what it counts as still to download,
          since no download will ever bring them — see clipsMissing. */
       const missingClips = await clipsMissing(store, bundled.flatMap((b) => b.cards.flatMap(clipsOfOne)));
-      return json({ ok: true, version, teaches, courses, decks, cards: bundled, systems, missingClips });
+      const missingImages = await clipsMissing(
+        store,
+        bundled.flatMap((b) => b.cards.flatMap((/** @type {any} */ c) => formsOf(c).flatMap((/** @type {Record<string, any>} */ f) => (Array.isArray(f.images) ? f.images : [])))),
+        "image",
+      );
+      return json({ ok: true, version, teaches, courses, decks, cards: bundled, systems, missingClips, missingImages });
     }
 
     /* Everything in a course is visible to everyone in it. */
@@ -3739,6 +3749,37 @@ export default async (req) => {
       return json({ ok: true, deduplicated: false });
     }
 
+    /*
+     * How big the recordings and pictures named are, as their files.
+     *
+     * Asked by Account settings before a download, so the button can say
+     * roughly how much it will take — on mobile data, or a phone that is
+     * nearly full, that is the thing to know before tapping. Answered off
+     * the directory, without reading anything; a hash the server does not
+     * hold is left out. The bytes are of the file as stored, which is
+     * text, so a little more than the device will keep.
+     */
+    if (action === "media-sizes") {
+      const ok = (/** @type {unknown} */ h) => typeof h === "string" && /^[a-f0-9]{64}$/.test(h);
+      const clipsAsked = (Array.isArray(body.clips) ? body.clips : []).filter(ok).slice(0, 5000);
+      const imagesAsked = (Array.isArray(body.images) ? body.images : []).filter(ok).slice(0, 5000);
+      /** @param {string[]} list @param {(h: string) => string} keyOf */
+      const sizes = async (list, keyOf) => {
+        /** @type {Record<string, number>} */
+        const out = {};
+        for (let i = 0; i < list.length; i += 50) {
+          await Promise.all(list.slice(i, i + 50).map(async (h) => {
+            const n = typeof store.size === "function"
+              ? await store.size(keyOf(h))
+              : ((await store.get(keyOf(h), { type: "text" })) || "").length || null;
+            if (n) out[h] = n;
+          }));
+        }
+        return out;
+      };
+      return json({ ok: true, clips: await sizes(clipsAsked, K.clip), images: await sizes(imagesAsked, K.image) });
+    }
+
     if (action === "clip") {
       const hash = url.searchParams.get("hash") || "";
       if (!/^[a-f0-9]{64}$/.test(hash)) return json({ error: "bad-hash" }, 400);
@@ -3763,6 +3804,7 @@ export default async (req) => {
       const existing = await store.get(K.image(hash), { type: "text" });
       if (existing) return json({ ok: true, deduplicated: true });
       await store.set(K.image(hash), data);
+      IMAGES_HERE.add(hash);
       return json({ ok: true, deduplicated: false });
     }
 
@@ -4147,6 +4189,7 @@ export default async (req) => {
              reachable only from the cards, and cleared before them. */
           for (const h of [...new Set(cards.filter(Boolean).flatMap(imagesOfCard))]) {
             await store.delete(K.image(h));
+            IMAGES_HERE.delete(h);
           }
         }
 

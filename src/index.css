@@ -4101,6 +4101,17 @@ body.at-screening .at-chromebar { display:none; }
 .at-minimeta .at-statusbadge.lost { display:block; width:max-content; max-width:100%; margin-bottom:4px; }
 .at-statuspill + .at-statuspill { margin-inline-start:4px; }
 .at-lostcount { color: var(--rose); font-weight:700; }
+/* What is kept on this device, in Account settings: the figures under
+   the heading's explanation, with the notices and buttons below them
+   spaced as one column. */
+.at-devicefigures { margin:0; font-family: var(--ui); font-size: var(--fs-md); font-weight:700;
+  color: var(--text); font-variant-numeric: tabular-nums; }
+.at-devicefigures ~ .at-notice, .at-devicefigures ~ .at-hint { margin-top:10px; }
+/* The download and remove buttons, one under the other: the download's
+   label carries its size and runs longer than a phone is wide, so it may
+   take two lines rather than run off the side. */
+.at-devicebtns { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-top:14px; }
+.at-devicebtns > .at-btn { max-width:100%; white-space:normal; text-align:left; height:auto; line-height:1.3; }
 .at-cliplist .at-lostclip { margin:-2px 0 4px; color: var(--rose); }
 .at-cardtable .at-cardtable-status { width:1%; }
 /* And in a list: a card students do not have, or have an older copy of. */

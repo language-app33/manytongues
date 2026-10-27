@@ -8,6 +8,39 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.490 — 27 October 2026
+
+**Account settings says plainly what is kept on this device, and lets you
+fetch the rest or clear it.**
+
+- The "Storage" section is now "Recordings and pictures on this device",
+  with "Saved here so you can keep practising without an internet
+  connection." under it. It counts the cards' pictures as well as their
+  recordings, and the space both take. When nothing is kept it says
+  "Nothing saved yet." instead of "0 recordings, —.".
+- What is still to come is said in full: "12 recordings and 3 pictures
+  aren't on this device yet. Until they are, you'll only hear those
+  questions when you're online."
+- The download button is "Download all recordings and pictures (about
+  2 MB)", with the size worked out from the files themselves before you
+  tap. It fetches pictures too now. While it runs it shows a percentage;
+  when it finishes it says "Done. You can now practise everything
+  offline."; if some files fail it says how many, and the button becomes
+  "Try again (about …)".
+- When everything is already here, there is no download button, just
+  "Everything is on this device. You can practise offline."
+- A new "Remove from this device" button clears every saved recording and
+  picture, after asking: "This frees 3.4 MB. Recordings and pictures
+  download again when you practise, so this number will grow back over
+  time."
+- In a browser that gives the app very little room, the section says so
+  in plain words and suggests leaving a private window.
+- Pictures the server doesn't hold are left out of what is still to
+  download, the way recordings have been since 0.489.
+
+To check by hand: on a phone, open Account settings, download, then remove,
+and watch the figures change each time.
+
 ## 0.489 — 27 October 2026
 
 **Recordings: the offline count is right, failed downloads are said, and

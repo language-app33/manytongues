@@ -230,6 +230,23 @@ export function getStore(name) {
     },
 
     /**
+     * How many bytes are stored under the key, or null where nothing is.
+     *
+     * For telling a student how much a download will take before they tap
+     * it — see media-sizes in the courses endpoint. Read off the directory
+     * entry, like `has`.
+     * @param {string} key
+     */
+    async size(key) {
+      try {
+        return (await stat(fileFor(dir, key))).size;
+      } catch (err) {
+        if (err && /** @type {NodeJS.ErrnoException} */ (err).code === "ENOENT") return null;
+        throw err;
+      }
+    },
+
+    /**
      * @param {string} key
      * @param {{ type?: string, consistency?: string }} [_opts] Accepted and ignored, as above.
      */

@@ -4611,8 +4611,9 @@ export type CoursesPulled = Folded & {
   fold: (current: Item[], parked?: Record<string, Parked>) => Folded;
   version: string;
   teaches: boolean;
-  /* The recordings in this material that the server does not hold. */
+  /* The recordings and pictures in this material the server does not hold. */
   missingClips: string[];
+  missingImages: string[];
 };
 
 export async function pullCourses(
@@ -4740,6 +4741,7 @@ export async function pullCourses(
     version: r.version || "",
     teaches: !!r.teaches,
     missingClips: Array.isArray(r.missingClips) ? r.missingClips.filter((h: unknown) => typeof h === "string") : [],
+    missingImages: Array.isArray(r.missingImages) ? r.missingImages.filter((h: unknown) => typeof h === "string") : [],
   };
 }
 

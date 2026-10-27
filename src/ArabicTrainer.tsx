@@ -7874,41 +7874,46 @@ function knownMissing(id: string) {
  * Kept for a day and then looked for again, because the teacher may put
  * it right — a device that still has the recording sends it on its own.
  */
-const LACKS_KEY = "arabic-trainer-server-lacks";
+/* Pictures are kept the same way, under a key of their own. */
+type MediaKind = "clip" | "image";
+const LACKS_KEY: Record<MediaKind, string> = {
+  clip: "arabic-trainer-server-lacks",
+  image: "arabic-trainer-server-lacks-images",
+};
 const LACKS_FOR_MS = 24 * 3600000;
-function readLacks(): Record<string, number> {
+function readLacks(kind: MediaKind): Record<string, number> {
   try {
-    const raw = JSON.parse(localStorage.getItem(LACKS_KEY) || "{}");
+    const raw = JSON.parse(localStorage.getItem(LACKS_KEY[kind]) || "{}");
     return raw && typeof raw === "object" ? raw : {};
   } catch (e) {
     return {};
   }
 }
-function writeLacks(map: Record<string, number>) {
+function writeLacks(kind: MediaKind, map: Record<string, number>) {
   try {
-    localStorage.setItem(LACKS_KEY, JSON.stringify(map));
+    localStorage.setItem(LACKS_KEY[kind], JSON.stringify(map));
   } catch (e) {
     /* Not kept past this launch; the server says again next time. */
   }
 }
-/** The recordings the server lacks, as far as this device knows today. */
-function serverLacks(): Set<string> {
+/** The recordings (or pictures) the server lacks, as far as this device knows today. */
+function serverLacks(kind: MediaKind = "clip"): Set<string> {
   const t = now();
-  return new Set(Object.entries(readLacks()).filter(([, at]) => t - Number(at) < LACKS_FOR_MS).map(([id]) => id));
+  return new Set(Object.entries(readLacks(kind)).filter(([, at]) => t - Number(at) < LACKS_FOR_MS).map(([id]) => id));
 }
 /** Noted one at a time, as downloads are refused. */
-function noteServerLacks(id: string) {
-  const map = readLacks();
+function noteServerLacks(id: string, kind: MediaKind = "clip") {
+  const map = readLacks(kind);
   if (map[id] && now() - map[id] < LACKS_FOR_MS) return;
   map[id] = now();
-  writeLacks(map);
+  writeLacks(kind, map);
   clipsChanged();
 }
 /** Or the server's whole answer for the material, which replaces the last. */
-function setServerLacks(ids: string[]) {
+function setServerLacks(ids: string[], kind: MediaKind = "clip") {
   const map: Record<string, number> = {};
   for (const id of ids) map[id] = now();
-  writeLacks(map);
+  writeLacks(kind, map);
   clipsChanged();
 }
 
@@ -8022,6 +8027,35 @@ async function dropClip(id: string) {
   clipsChanged();
 }
 
+/* The pictures on this device: how many, and how much room they take. */
+async function imageStats() {
+  const all = (await idbRun("readonly", (st) => st.getAll(), IMAGE_STORE)) || [];
+  let bytes = 0;
+  for (const b of all) if (b && b.size) bytes += b.size;
+  return { count: all.length, bytes };
+}
+
+/*
+ * Every recording and picture this device has kept, gone.
+ *
+ * Asked for from Account settings by someone short of room. Nothing is
+ * lost by it: each one is on the server and comes back the next time a
+ * session needs it, which the confirmation says. The text store a browser
+ * without IndexedDB keeps its recordings in is emptied too.
+ */
+async function clearDeviceMedia() {
+  await idbRun("readwrite", (st) => st.clear());
+  await idbRun("readwrite", (st) => st.clear(), IMAGE_STORE);
+  try {
+    const listed = await window.storage.list("audio-");
+    for (const k of (listed && listed.keys) || []) await window.storage.delete(String(k));
+  } catch (e) {
+    /* No text store, or nothing in it. */
+  }
+  IMAGES_HELD.clear();
+  clipsChanged();
+}
+
 async function clipStats() {
   const all = (await idbRun("readonly", (st) => st.getAll())) || [];
   let bytes = 0;
@@ -8043,7 +8077,7 @@ async function warmClips(
   ids: Iterable<string>,
   { concurrency = 3, onProgress }: {
     concurrency?: number;
-    onProgress?: (done: number, fetched: number) => void;
+    onProgress?: (done: number, fetched: number, id: string) => void;
   } = {},
 ) {
   const queue = [...new Set(ids)];
@@ -8066,7 +8100,7 @@ async function warmClips(
         failed += 1;
       }
       done += 1;
-      if (onProgress) onProgress(done, fetched);
+      if (onProgress) onProgress(done, fetched, id);
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, queue.length || 1) }, worker));
@@ -8107,7 +8141,10 @@ function imageBlob(hash: string): Promise<Blob | null> {
         return blob;
       }
     } catch (e) {
-      /* Not reachable now; the next question asks again. */
+      /* Not reachable now; the next question asks again. A picture the
+         server says it does not hold is kept aside, like a recording —
+         see serverLacks. */
+      if (e instanceof Error && e.message === "not-found") noteServerLacks(hash, "image");
     }
     return null;
   })();
@@ -8120,16 +8157,28 @@ function imageBlob(hash: string): Promise<Blob | null> {
 
 /* Fetch whatever pictures are not here yet, a few at a time — before a
    session starts, so its picture questions do not wait on the network. */
-async function warmImages(hashes: Iterable<string>, concurrency = 3) {
+async function warmImages(
+  hashes: Iterable<string>,
+  concurrency = 3,
+  onEach?: (hash: string) => void,
+) {
   const queue = [...new Set(hashes)];
+  let fetched = 0;
+  let failed = 0;
   const worker = async () => {
     for (;;) {
       const h = queue.shift();
       if (h === undefined) return;
-      await imageBlob(h).catch(() => null);
+      const here = await idbRun("readonly", (st) => st.getKey(h), IMAGE_STORE);
+      if (here === undefined || here === null) {
+        if (await imageBlob(h).catch(() => null)) fetched += 1;
+        else if (!serverLacks("image").has(h)) failed += 1;
+      }
+      if (onEach) onEach(h);
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, queue.length || 1) }, worker));
+  return { fetched, failed };
 }
 
 /* One of a card's pictures, drawn once it is here. Its object URL is made
@@ -10339,8 +10388,10 @@ export default function ArabicTrainer() {
    */
   /* And which recordings the server has said it lacks — see serverLacks. */
   const [lacks, setLacks] = useState<Set<string>>(() => serverLacks());
+  const [lacksImages, setLacksImages] = useState<Set<string>>(() => serverLacks("image"));
   const refreshAudible = useCallback(() => {
     setLacks(serverLacks());
+    setLacksImages(serverLacks("image"));
     localClipIds()
       .then((ids) => setAudible(ids))
       .catch(() => {
@@ -11334,6 +11385,16 @@ export default function ArabicTrainer() {
     }
     return ids;
   }, [items, lacks]);
+  /* And every picture, for the same — less the ones the server lacks. */
+  const allImageIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const it of items) {
+      for (const { unit } of unitsOf(it)) {
+        for (const h of Array.isArray(unit.images) ? unit.images : []) if (typeof h === "string" && !lacksImages.has(h)) ids.push(h);
+      }
+    }
+    return ids;
+  }, [items, lacksImages]);
 
   /* How many of them are not here. Read on the home screen while offline,
      and in Account settings beside the button that fetches them. */
@@ -11707,6 +11768,7 @@ export default function ArabicTrainer() {
         setCourseDecks(r.decks);
         setSystems(r.systems);
         setServerLacks(r.missingClips);
+        setServerLacks(r.missingImages, "image");
         /* Kept, so the next launch opens with them rather than with an
            error — and so the check after that can be the cheap one. */
         saveMaterial(account.handle, {
@@ -15265,6 +15327,8 @@ export default function ArabicTrainer() {
             onReset={resetScheduling}
             allClipIds={allClipIds}
             onDevice={audible}
+            allImageIds={allImageIds}
+            imagesOnDevice={visible}
             onDownloaded={refreshAudible}
             /* Signed out, the account screen is still reachable and still
                has to render. What it shows is nobody, not a half-account. */
@@ -20337,6 +20401,186 @@ function SettingsScreen({ kind, onClose, ...rest }: {
   );
 }
 
+/*
+ * Recordings and pictures on this device: what is kept here for practising
+ * offline, what is still to come, and the two things anyone can do about
+ * it — fetch the rest, or clear the lot.
+ *
+ * It was "Storage", with a count of recordings and nothing to act on but a
+ * download button, and it never said whose storage it meant. The heading
+ * now says this device; pictures, kept the same way, are counted with the
+ * recordings; the download says roughly how much it will take before it
+ * is tapped and reports what it could not fetch; and the section can be
+ * emptied, which is safe — everything comes back as it is needed, and the
+ * confirmation says so.
+ */
+function DeviceMedia({ allClipIds, onDevice, allImageIds, imagesOnDevice, onDownloaded }: {
+  allClipIds: string[];
+  onDevice: Set<string> | null;
+  allImageIds: string[];
+  imagesOnDevice: Set<string> | null;
+  onDownloaded?: () => void;
+}) {
+  const [stats, setStats] = useState<{ clips: number; images: number; bytes: number; idb: boolean } | null>(null);
+  /* A download under way or just ended: how far, and how it went. */
+  const [warming, setWarming] = useState<{
+    total: number; done: number; finished?: boolean; fetched?: number; failed?: number;
+  } | null>(null);
+  const [sizes, setSizes] = useState<{ clips: Record<string, number>; images: Record<string, number> } | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const offline = useOffline();
+
+  const readStats = useCallback(async () => {
+    const [c, i, db] = await Promise.all([clipStats(), imageStats(), openClipDb()]);
+    setStats({ clips: c.count, images: i.count, bytes: c.bytes + i.bytes, idb: !!db });
+  }, []);
+  useEffect(() => {
+    void readStats();
+  }, [readStats, onDevice, imagesOnDevice]);
+
+  /* Pictures are only kept where the browser's database is: without it
+     there is nowhere to put them, so none are counted as missing. */
+  const keepsPictures = !stats || stats.idb;
+  const missingClips = useMemo(
+    () => (onDevice ? [...new Set(allClipIds)].filter((id) => !onDevice.has(id)) : []),
+    [allClipIds, onDevice],
+  );
+  const missingImages = useMemo(
+    () => (imagesOnDevice && keepsPictures ? [...new Set(allImageIds)].filter((h) => !imagesOnDevice.has(h)) : []),
+    [allImageIds, imagesOnDevice, keepsPictures],
+  );
+  const missingCount = missingClips.length + missingImages.length;
+
+  /* How big what is missing is, asked of the server as the list changes,
+     for the button to say before it is tapped. The server's figure is of
+     the file as it stores it, as text, which runs a third over what the
+     device keeps. */
+  const missingKey = missingClips.join(",") + "|" + missingImages.join(",");
+  useEffect(() => {
+    if (!missingCount || offline) return;
+    let alive = true;
+    API.mediaSizes(missingClips, missingImages)
+      .then((r) => { if (alive) setSizes({ clips: r.clips || {}, images: r.images || {} }); })
+      .catch(() => { if (alive) setSizes(null); });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingKey, offline]);
+  const sizeOf = (h: string, kind: "clips" | "images") =>
+    sizes && sizes[kind][h] ? Math.round(sizes[kind][h] * 0.75) : 0;
+  const missingBytes = sizes
+    ? missingClips.reduce((n, h) => n + sizeOf(h, "clips"), 0) + missingImages.reduce((n, h) => n + sizeOf(h, "images"), 0)
+    : 0;
+  const about = missingBytes ? ` (about ${formatBytes(missingBytes)})` : "";
+
+  async function downloadAll() {
+    const clips = missingClips;
+    const images = missingImages;
+    /* Measured in bytes where the server said how big each file is, so the
+       percentage moves with the download rather than jumping on a large
+       picture; in files where it did not. */
+    const weight = (h: string, kind: "clips" | "images") => sizeOf(h, kind) || 1;
+    const total = clips.reduce((n, h) => n + weight(h, "clips"), 0) + images.reduce((n, h) => n + weight(h, "images"), 0);
+    let done = 0;
+    setWarming({ total, done: 0 });
+    const c = await warmClips(clips, {
+      onProgress: (_n, _got, id) => {
+        done += weight(id, "clips");
+        setWarming({ total, done });
+      },
+    });
+    const i = await warmImages(images, 3, (h) => {
+      done += weight(h, "images");
+      setWarming({ total, done });
+    });
+    setWarming({ total, done: total, finished: true, fetched: c.fetched + i.fetched, failed: c.failed + i.failed });
+    await readStats();
+    /* More can be heard now, which decides what an offline session may
+       ask. Said here rather than left to the next launch, because the
+       whole point of this button is being about to go offline. */
+    if (onDownloaded) onDownloaded();
+  }
+
+  const busy = !!warming && !warming.finished;
+  const failed = warming && warming.finished ? warming.failed || 0 : 0;
+  const done = !!warming && !!warming.finished && !failed && !missingCount;
+  const held = stats ? stats.clips + stats.images : 0;
+  /* "12 recordings and 3 pictures", leaving out whichever is none. */
+  const both = (clips: number, images: number) =>
+    [clips ? plural(clips, "recording") : "", images ? plural(images, "picture") : ""].filter(Boolean).join(" and ");
+
+  return (
+    <div className="at-formblock">
+      <div className="at-formhead">
+        <span className="at-formnum">Recordings and pictures on this device</span>
+        <span className="at-formrole">Saved here so you can keep practising without an internet connection.</span>
+      </div>
+      <p className="at-devicefigures">
+        {stats ? (held ? `${both(stats.clips, stats.images)}, ${formatBytes(stats.bytes)}` : "Nothing saved yet.") : "Counting…"}
+      </p>
+      {stats && !stats.idb && (
+        <Notice kind="warn">
+          This browser is giving the app very little space, so recordings may stop saving. If you're in a private
+          window, open the app in a normal one.
+        </Notice>
+      )}
+      {missingCount > 0 && !busy && (
+        <Help>
+          {`${both(missingClips.length, missingImages.length)} ${missingCount === 1 ? "isn't" : "aren't"} on this device yet. Until they are, you'll only hear those questions when you're online.`}
+        </Help>
+      )}
+      {failed > 0 && (
+        <Notice kind="warn">
+          {`${plural(failed, "file")} couldn't be downloaded. Check your connection, then try again.`}
+        </Notice>
+      )}
+      {done && <Help>Done. You can now practise everything offline.</Help>}
+      {!missingCount && !done && (allClipIds.length > 0 || allImageIds.length > 0) && (
+        <Help>Everything is on this device. You can practise offline.</Help>
+      )}
+      {(missingCount > 0 || busy || held > 0) && (
+        <div className="at-devicebtns">
+          {(missingCount > 0 || busy) && (
+            <Button variant="ghost" size="sm" disabled={busy} onClick={downloadAll} icon="download">
+              {busy
+                ? `Downloading… ${warming && warming.total ? Math.min(99, Math.floor((warming.done / warming.total) * 100)) : 0}%`
+                : failed
+                ? `Try again${about}`
+                : `Download all recordings and pictures${about}`}
+            </Button>
+          )}
+          {held > 0 && !busy && (
+            <Button variant="ghost" size="sm" onClick={() => setRemoving(true)} icon="delete">
+              Remove from this device
+            </Button>
+          )}
+        </div>
+      )}
+      {removing && (
+        <ConfirmModal
+          title="Remove recordings and pictures from this device?"
+          danger={false}
+          confirmLabel="Remove"
+          body={
+            <p>
+              {`This frees ${stats ? formatBytes(stats.bytes) : "the space they take"}. Recordings and pictures download again when you practise, so this number will grow back over time.`}
+            </p>
+          }
+          onCancel={() => setRemoving(false)}
+          onConfirm={async () => {
+            setRemoving(false);
+            setWarming(null);
+            await clearDeviceMedia();
+            await readStats();
+            if (onDownloaded) onDownloaded();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
 function AccountSettings({
   account,
   onRename,
@@ -20348,6 +20592,8 @@ function AccountSettings({
   onLogOut,
   allClipIds = [],
   onDevice = null,
+  allImageIds = [],
+  imagesOnDevice = null,
   onDownloaded,
 }: {
   account: User & { key: string };
@@ -20362,99 +20608,29 @@ function AccountSettings({
   /** Which recordings are here, so the screen can say how many are not.
       Null before anybody has looked. */
   onDevice?: Set<string> | null;
+  /** And the same for the cards' pictures. */
+  allImageIds?: string[];
+  imagesOnDevice?: Set<string> | null;
   /** Something was downloaded, so what a session may ask has changed. */
   onDownloaded?: () => void;
 }) {
-  /* The storage figures moved here with the section that shows them. */
-  const [stats, setStats] = useState<any | null>(null);
-  const [warming, setWarming] = useState<any | null>(null); // { done, total, fetched }
-
-  async function downloadAll() {
-    const total = new Set(allClipIds).size;
-    setWarming({ done: 0, total, fetched: 0 });
-    const { fetched, failed } = await warmClips(allClipIds, {
-      onProgress: (done, got) => setWarming({ done, total, fetched: got }),
-    });
-    setWarming({ done: total, total, fetched, failed, finished: true });
-    const [st, db] = await Promise.all([clipStats(), openClipDb()]);
-    setStats({ ...st, idb: !!db });
-    /* More can be heard now, which decides what an offline session may
-       ask. Said here rather than left to the next launch, because the
-       whole point of this button is being about to go offline. */
-    if (onDownloaded) onDownloaded();
-  }
-
-  /*
-   * How many of this learner's recordings are not on the device.
-   *
-   * Worth saying out loud on this screen: offline, a card whose recording
-   * is elsewhere is not asked its listening exercises, and somebody about
-   * to get on a train would rather know that now than find a quieter
-   * session waiting for them.
-   */
-  const missing = onDevice
-    ? [...new Set(allClipIds)].filter((id) => !onDevice.has(id)).length
-    : 0;
   /* Shut by default: everything inside it is irreversible, so it shouldn't
      be sitting open where a thumb can reach it. */
   const [dangerOpen, setDangerOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    Promise.all([clipStats(), openClipDb()]).then(([st, db]) => {
-      if (alive) setStats({ ...st, idb: !!db });
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   return (
     <>
       <AccountPanel me={account} onRename={onRename} />
 
-      <div className="at-formblock">
-        <div className="at-formhead">
-          <span className="at-formnum">Storage</span>
-          <span className="at-formrole">
-            {stats
-              ? `${plural(stats.count, "recording")}, ${formatBytes(stats.bytes)}${
-                  stats.idb ? "" : " — stored in the small text store, so keep an eye on the size"
-                }.`
-              : "Counting recordings…"}
-            {missing > 0 &&
-              ` ${plural(missing, "recording")} not on this device yet. Until they are, questions that play them are only asked when you're online.`}
-          </span>
-        </div>
-        {allClipIds.length > 0 && (
-          <div className="at-row">
-            <Button variant="ghost" size="sm"
-              disabled={!!warming && !warming.finished}
-              onClick={downloadAll} icon="download">{warming && !warming.finished
-                ? `Downloading ${warming.done} of ${warming.total}…`
-                : warming && warming.failed && missing > 0
-                ? "Try again"
-                : missing > 0
-                ? `Download ${missing} for offline`
-                : "Download all recordings for offline"}</Button>
-          </div>
-        )}
-        {warming && warming.finished && (
-          warming.failed ? (
-            <Notice kind="warn">
-              {`${plural(warming.failed, "recording")} couldn't be downloaded. Check your connection, then try again.`}
-            </Notice>
-          ) : (
-            <Help>
-              {warming.fetched
-                ? `${plural(warming.fetched, "recording")} downloaded.`
-                : "Everything was already on this device."}
-            </Help>
-          )
-        )}
-      </div>
+      <DeviceMedia
+        allClipIds={allClipIds}
+        onDevice={onDevice}
+        allImageIds={allImageIds}
+        imagesOnDevice={imagesOnDevice}
+        onDownloaded={onDownloaded}
+      />
 
       {/* Signing out is ordinary housekeeping, not a danger: it leaves
           everything on the server exactly as it is. */}
