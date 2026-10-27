@@ -4993,7 +4993,7 @@ const openPronounTables = async () => {
      session builder had been drilling those same words inside those same
      turns all along. */
   const inFrame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const ctxTab = [...inFrame.querySelectorAll("button")].find((b) => /^In context$/.test(b.textContent || ""));
+  const ctxTab = frameButtons(inFrame).find((b) => /^In context$/.test(b.textContent || ""));
   click(ctxTab);
   await sleep(500);
 
@@ -5021,7 +5021,7 @@ const openPronounTables = async () => {
      made it read as a separate sort of thing to make — and meant this tab,
      with only the one New button, could not make one at all. The kind is
      the first field in the editor now. */
-  const toCards = [...inFrame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const toCards = frameButtons(inFrame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(toCards[toCards.length - 1]);
   await sleep(450);
   check("there is no second button for making a conversation",
