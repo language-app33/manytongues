@@ -2608,8 +2608,11 @@ if (/Build a session/.test(document.body.textContent)) {
     return b ? String(b.getAttribute("aria-label")) : "nothing in the chrome bar";
   };
   check("somebody learning two languages gets a switch for them", !!swBtn(), swSaid());
+  /* This person teaches as well, so the one button is both the space and
+     the languages and wears a globe; what it says about the languages is
+     in the label a screen reader and a tooltip get. */
   check("and it says every language is on, without naming any of them",
-    ((swBtn() || {}).textContent || "").trim() === "All", ((swBtn() || {}).textContent || "").trim());
+    /Languages — all 2\b/.test(swSaid()), swSaid());
 
   click(swBtn());
   await sleep(200);
@@ -2627,7 +2630,7 @@ if (/Build a session/.test(document.body.textContent)) {
   click(viRow);
   await sleep(300);
   check("switching one off says which one is left, on the button itself",
-    ((swBtn() || {}).textContent || "").trim() === "AR", ((swBtn() || {}).textContent || "").trim());
+    /Languages — Palestinian Arabic only/.test(swSaid()), swSaid());
   check("and its cards go from the rest of Learning", cardCount() === both - 1,
     `${both} with both, ${cardCount()} with one`);
 
@@ -2647,8 +2650,8 @@ if (/Build a session/.test(document.body.textContent)) {
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);
   check("switching it back on brings its cards back",
-    cardCount() === both && ((swBtn() || {}).textContent || "").trim() === "All",
-    `${cardCount()} cards, button says ${((swBtn() || {}).textContent || "").trim()}`);
+    cardCount() === both && /Languages — all 2\b/.test(swSaid()),
+    `${cardCount()} cards, button says ${swSaid()}`);
   /* Anywhere outside it puts it away. */
   click(document.querySelector(".at-brand"));
   await sleep(200);
@@ -4351,11 +4354,14 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
   await sleep(250);
 
-  /* Into the teaching space, which this person now teaches in. */
+  /* Into the teaching space, which this person now teaches in: from the
+     space and language menu in the bar at the foot of the window. */
+  click(document.querySelector(".at-dock .at-langbtn"));
+  await sleep(200);
   const toTeaching = [...document.querySelectorAll(".at-spacebtn")]
-    .find((b) => /Teaching/i.test(b.getAttribute("aria-label") || ""));
+    .find((b) => /Teaching/i.test(b.textContent || ""));
   check("a teacher can reach the teaching space", !!toTeaching,
-    [...document.querySelectorAll(".at-spacebtn")].map((b) => b.getAttribute("aria-label")).join(","));
+    [...document.querySelectorAll(".at-spacebtn")].map((b) => b.textContent).join(",") || "no space menu");
   click(toTeaching);
   await sleep(700);
 
@@ -10646,12 +10652,17 @@ const openPronounTables = async () => {
   r.render(React.createElement(App));
   await sleep(1500);
 
-  const spaceBtn = (/** @type {RegExp} */ re) =>
-    [...host.querySelectorAll(".at-spacebtn")].find((b) => re.test(b.getAttribute("aria-label") || ""));
+  /* The spaces are in the space and language menu, in the bar at the foot
+     of the window, so the menu is opened to reach them. */
+  const spaceBtn = async (/** @type {RegExp} */ re) => {
+    if (!host.querySelector(".at-spacebtn")) click(host.querySelector(".at-dock .at-langbtn"));
+    await sleep(200);
+    return [...host.querySelectorAll(".at-spacebtn")].find((b) => re.test(b.textContent || ""));
+  };
   /* A teacher opens into Teaching; asked for it all the same, in case this
      device has not yet heard that they teach. */
   if (!host.querySelector(".at-screen.bare")) {
-    click(spaceBtn(/Teaching/i));
+    click(await spaceBtn(/Teaching/i));
     await sleep(900);
   }
   const frame = () => host.querySelector(".at-screen.bare");
@@ -10661,12 +10672,15 @@ const openPronounTables = async () => {
     .map((t) => (t.textContent || "").replace(/\s+/g, " "));
   const hasHouse = () => listed().some((t) => /house/i.test(t));
   const learnOff = () => JSON.stringify((JSON.parse(localStorage.getItem("arabic-trainer:arabic-trainer-v3") || "{}").settings || {}).langsOff);
-  const cardsTab = [...((frame() || host).querySelectorAll("button"))].filter((b) => /^Cards$/.test(b.textContent || "")).pop();
+  const cardsTab = [...host.querySelectorAll(".at-dock [role=tab]"), ...((frame() || host).querySelectorAll("button"))]
+    .filter((b) => /^Cards$/.test(b.textContent || ""))[0];
   click(cardsTab);
   await sleep(500);
 
+  /* Two spaces and two languages: the one button wears a globe, and what it
+     says about the languages is in its label. */
   check("a teacher of two languages gets the language switch above Teaching",
-    !!swBtn() && ((swBtn() || {}).textContent || "").trim() === "All",
+    !!swBtn() && /Languages — all 2\b/.test(String(swBtn()?.getAttribute("aria-label"))),
     swBtn() ? String(swBtn()?.getAttribute("aria-label")) + " · " + (swBtn()?.textContent || "") : "no switch in the bar");
   check("and it lists the cards in both", hasHouse(), listed().length + " cards");
   click(swBtn());
@@ -10684,7 +10698,8 @@ const openPronounTables = async () => {
   check("switching Vietnamese off takes its card out of Teaching's list",
     !hasHouse() && listed().length === shown - 1, `${shown} before, ${listed().length} after`);
   check("and the button says Arabic is what is left",
-    ((swBtn() || {}).textContent || "").trim() === "AR", ((swBtn() || {}).textContent || "").trim());
+    /Languages — [^.]*Arabic only/.test(String(swBtn()?.getAttribute("aria-label"))),
+    String(swBtn()?.getAttribute("aria-label")));
   check("and Learning's own choice is not touched by it", learnOff() === learnWas, `${learnWas} before, ${learnOff()} after`);
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);
