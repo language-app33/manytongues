@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.494 — 27 October 2026
+## 0.495 — 27 October 2026
 
 **A deck's screen in Teaching is laid out like a card's.**
 
@@ -28,6 +28,25 @@ and moves once per batch of work you would notice, not once per commit.
 
 To check by hand: on a phone, open a deck under Teaching › Decks and then a
 card, and compare the two; open a locked deck too.
+
+## 0.494 — 27 October 2026
+
+**App preferences no longer has a Language section.**
+
+- The "Learning" language choice is gone from App preferences, with the
+  Language heading over it. Every card carries its own language, so it
+  changed nothing about what was practised: with one language the app sets
+  it from the course, and with several the language switch in the top bar
+  decides what is practised. All it did was decide which language that
+  switch listed first.
+- The app still keeps a language of its own for the rare thing that
+  carries none, and takes it from the courses, as before. A language
+  picked here in the past no longer holds it: when all of someone's
+  courses are in one language, the app follows them.
+
+To check by hand: open App preferences and see Appearance and Feedback
+only; with courses in two languages, the top bar's switch still chooses
+what is practised.
 
 ## 0.493 — 27 October 2026
 
