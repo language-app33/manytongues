@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.494 — 27 October 2026
+## 0.496 — 27 October 2026
 
 **Build a session uses the card screen's pickers, and keeps a session with a tick.**
 
@@ -37,6 +37,41 @@ To check by hand: on a phone, build a session from one deck and two single
 cards found by search, tick the box, name it and start it; then find it
 under Saved sessions, edit it, and check the deck and cards come back as
 they were chosen.
+
+## 0.495 — 27 October 2026
+
+**Progress is laid out like the card editor.**
+
+- Each part of Progress now has the card editor's large heading, with
+  what it is for straight underneath, and a thin line between one part
+  and the next. The screen is on the same plain sheet as the editor.
+- The lines at the top saying what moved today and this week have a
+  heading of their own, Lately, instead of sitting above everything
+  without one.
+- Nothing on the screen does anything different; the screen is a little
+  longer, so there is slightly more to scroll on a phone.
+
+To check by hand: open Learning > Progress in light and dark, and compare
+it with a card open in the editor.
+
+## 0.494 — 27 October 2026
+
+**App preferences no longer has a Language section.**
+
+- The "Learning" language choice is gone from App preferences, with the
+  Language heading over it. Every card carries its own language, so it
+  changed nothing about what was practised: with one language the app sets
+  it from the course, and with several the language switch in the top bar
+  decides what is practised. All it did was decide which language that
+  switch listed first.
+- The app still keeps a language of its own for the rare thing that
+  carries none, and takes it from the courses, as before. A language
+  picked here in the past no longer holds it: when all of someone's
+  courses are in one language, the app follows them.
+
+To check by hand: open App preferences and see Appearance and Feedback
+only; with courses in two languages, the top bar's switch still chooses
+what is practised.
 
 ## 0.493 — 27 October 2026
 
