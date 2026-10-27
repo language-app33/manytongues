@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.493 — 27 October 2026
+
+**A deck's screen in Teaching is laid out like a card's.**
+
+- Opening a deck under Teaching › Decks now shows the same white sheet,
+  ruled into sections, with the same large headings as a card's screen.
+- It opens on "This deck", with the language and how many cards it holds
+  under the heading, and Export as an icon beside it — where a card keeps
+  its Export by "This card". The worded Export button on the title line is
+  gone.
+- Numbers and pronouns, Deck quality, In context, and a new Cards heading
+  over the list each have a line under the heading saying what they are
+  for. Deck quality's explanation of its score now comes before the score
+  rather than after it.
+- How to use the list ("Tap a card to see it. Tap Select to …") sits under
+  the Cards heading, next to the cards, instead of at the top of the screen.
+- On a locked deck, the line saying it is locked stays under "This deck".
+
+To check by hand: on a phone, open a deck under Teaching › Decks and then a
+card, and compare the two; open a locked deck too.
+
 ## 0.492 — 27 October 2026
 
 **ManyTongues has a logo: the dialect map.**

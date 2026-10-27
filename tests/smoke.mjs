@@ -8563,6 +8563,23 @@ const openPronounTables = async () => {
   check("and the same filter, still in force",
     !!document.querySelector(".at-menubtn.on"),
     [...document.querySelectorAll(".at-menubtn")].map((b) => (b.textContent || "").trim()).join(" | "));
+  /* Laid out like a card's screen: its sections headed at the editor's
+     size, and Export by the "This deck" heading rather than on the title
+     line. */
+  {
+    const deckSheet = [...document.querySelectorAll(".at-screen.cardform")]
+      .find((el) => /Lesson 1/.test((el.querySelector(".at-screenhead h2") || {}).textContent || ""));
+    const deckHeads = deckSheet
+      ? [...deckSheet.querySelectorAll(".at-formnum, .at-section > .at-sectiontop > .at-eyebrow")].map((h) => (h.textContent || "").trim())
+      : [];
+    check("an open deck is headed like a card's screen, This deck to Cards",
+      deckHeads[0] === "This deck" && deckHeads.includes("Deck quality") && deckHeads[deckHeads.length - 1] === "Cards",
+      deckHeads.join(" | ") || "(not laid out like the card editor)");
+    check("and Export sits by its “This deck” heading",
+      !!deckSheet && !!deckSheet.querySelector('.at-formhead [aria-label="Export this deck"]') &&
+        !deckSheet.querySelector(".at-screenaction button"),
+      deckSheet ? named(deckSheet.querySelector(".at-screenaction")).join(" | ") || "(nothing on the title line)" : "(no deck screen)");
+  }
 
   /* Four views, in turn: small tiles, bigger tiles — fewer to a row, each
      with its words set larger, the grid carrying the scale so one variable

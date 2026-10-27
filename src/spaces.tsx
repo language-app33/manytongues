@@ -4472,6 +4472,13 @@ function QualityMark({ quality }: { quality?: Quality | null }) {
   );
 }
 
+/* What the score is made of, said under the Deck quality heading before
+   the score rather than after it, as the card editor explains a section. */
+const QUALITY_LEDE =
+  "Most of it is whether every word, and every form of it, is practised inside sentences in " +
+  "this deck. The rest is recordings, pictures, pronunciation, reviewed sentences, no repeated " +
+  "words, sentences that aren't too long, and a conversation or text.";
+
 function DeckQuality({ quality }: { quality: Quality }) {
   const [open, setOpen] = useState(false);
   if (quality.score === null) {
@@ -4483,12 +4490,6 @@ function DeckQuality({ quality }: { quality: Quality }) {
       <p className={`at-qualityscore ${qualityTone(quality.score)}`}>
         <b>{quality.score}</b> <span>out of 100</span>
       </p>
-      <Help>
-        Most of it is whether every word, and every form of it, is practised inside
-        sentences in this deck. The rest is recordings, pictures, pronunciation, reviewed
-        sentences, no repeated words, sentences that aren't too long, and a conversation or
-        text.
-      </Help>
       {fixes.length > 0 && (
         <>
           <Button
@@ -4591,7 +4592,7 @@ function ContextReport({ cards, lang }: { cards: Card[]; lang: Partial<Lang> }) 
         /* The actionable half. "3 of 4" says how rich the deck is; this says
            which word to record a phrase for next. */
         <div className="at-mt4">
-          <p className="at-eyebrow">Not in any phrase yet</p>
+          <p className="at-label">Not in any phrase yet</p>
           <div className="at-ctxbare">
             {bare.map((w) => (
               <span key={w.id}>
@@ -7437,36 +7438,44 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     return (
       <Screen
         title={d.title}
+        /* Laid out like a card's screen — see .at-screen.cardform: one
+           sheet ruled into sections, each headed at the editor's size with
+           what it is for straight under the heading. */
+        className="cardform"
         onBack={() => { setOpenDeck(null); setCardAction(null); setTagAction(null); setDeckExtras(null); }}
-        action={
-          <Button variant="ghost" size="sm" icon="download" onClick={() => exportDecks([d.id])}>
-            Export
-          </Button>
-        }
       >
             <Notice kind="error">{error}</Notice>
-            <Help>
-              {(langOfDeck(d) || {}).name} · {deckSize(d, held.length)}
-            </Help>
 
-            {d.locked ? (
-              <Help>
-                <Icon name="lock" size={14} /> This deck is locked: no cards can be added to it or taken
-                out of it. Tap a card to see or edit it. To change which cards it holds, unlock it in
-                its settings.
-              </Help>
-            ) : (
-              <Help>
-                Tap a card to see it. Tap Select to add several to another deck, take them out, or delete them.
-              </Help>
-            )}
+            {/* The facts about the deck, headed the way a card's screen
+                heads "This card", with Export by the heading as it is
+                there. */}
+            <div className="at-formblock">
+              <div className="at-formhead">
+                <span className="at-formnum">This deck</span>
+                <span className="at-formacts">
+                  <Button size="sm" className="iconly" aria-label="Export this deck" title="Export this deck"
+                    onClick={() => exportDecks([d.id])}>
+                    <Icon name="download" />
+                  </Button>
+                </span>
+                <span className="at-formrole">
+                  {(langOfDeck(d) || {}).name} · {deckSize(d, held.length)}
+                </span>
+              </div>
+              {d.locked ? (
+                <Help>
+                  <Icon name="lock" size={14} /> This deck is locked: no cards can be added to it or taken
+                  out of it. To change which cards it holds, unlock it in its settings.
+                </Help>
+              ) : null}
+            </div>
 
             {/* What it holds besides cards, and the way in to change it —
                 see extrasScreen. Said in a line rather than listed: the
                 pronouns are among the cards below already. */}
             {(numberPartsOf((langOfDeck(d) || {}).id || d.lang).length > 0 ||
               pronounCardsOf((langOfDeck(d) || {}).id || d.lang).length > 0) && (
-              <Section title="Numbers and pronouns" className="at-mt5">
+              <Section title="Numbers and pronouns" lede="What this deck teaches besides its cards.">
                 <Help>
                   {(() => {
                     const all = numberPartsOf((langOfDeck(d) || {}).id || d.lang);
@@ -7505,14 +7514,25 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
             {/* The whole deck, whatever the list below is showing: what a
                 deck covers is a fact about the deck, not about the cards a
                 filter has left on screen. */}
-            <Section title="Deck quality" className="at-mt5">
+            <Section title="Deck quality" lede={QUALITY_LEDE}>
               {openQuality && <DeckQuality quality={openQuality} />}
             </Section>
 
-            <Section title="In context" className="at-mt5">
+            <Section title="In context" lede="How many of this deck's words are practised inside its phrases.">
               <ContextReport cards={held} lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]} />
             </Section>
 
+            {/* The cards, under a heading of their own like every other
+                part of the screen, with how to use the list said before
+                it rather than at the top of the screen, far above it. */}
+            <Section
+              title="Cards"
+              lede={
+                d.locked
+                  ? "Tap a card to see or edit it."
+                  : "Tap a card to see it. Tap Select to add several to another deck, take them out, or delete them."
+              }
+            >
             <ItemList
               noun="card"
               items={listed}
@@ -7583,7 +7603,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               views={cardViews("teacher-deck")}
               renderItem={cardTile}
             />
-
+            </Section>
 
         {cardScreen}
         {cardAction === "add" && cardActionScreen(d.id)}
