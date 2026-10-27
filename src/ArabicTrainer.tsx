@@ -15434,7 +15434,10 @@ export default function ArabicTrainer() {
           together, so they are decided in one place rather than three. */}
       {!inExercise && (
         <>
-          <div className="at-brand">ManyTongues</div>
+          <div className="at-brand">
+            <img className="at-brandmark" src="/logo.svg" alt="" width={24} height={24} />
+            ManyTongues
+          </div>
           {/* The switch and the space tabs share a bar, so they sit beside
               each other however many of either there are — the tabs are
               not there at all for somebody who only learns, and the switch

@@ -233,6 +233,7 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
       <div className="ob-box">
         {step === "choose" && (
           <>
+            <img className="ob-logo" src="/logo.svg" alt="" width={72} height={72} />
             <h1>ManyTongues</h1>
             {/* What it used to say: "an account only matters if you join a
                 course or use more than one device". Both exits from this

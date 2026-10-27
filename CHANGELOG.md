@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.492 — 27 October 2026
+
+**ManyTongues has a logo: the dialect map.**
+
+- The logo is a handful of hand-drawn, overlapping zones in four colours
+  on dark teal, like a map of where one way of speaking shades into the
+  next, with no hard borders.
+- The browser tab shows the logo on its own, without the name.
+- The icon on a phone's home screen, and the one an installed app uses,
+  is the logo in place of the old Arabic letter.
+- The first screen shows the logo above the name, and the name in the
+  top corner of the app has the logo beside it.
+- A home screen that already has the app may keep the old icon until the
+  app is removed and added again; that is the phone's choice, not the
+  app's.
+
+To check by hand: open the app in a browser and look at the tab; open the
+first screen and the app itself; add it to a phone's home screen.
+
 ## 0.491 — 27 October 2026
 
 **The app is called ManyTongues.**
