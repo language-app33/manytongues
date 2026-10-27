@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.495 — 27 October 2026
+## 0.496 — 27 October 2026
 
 **A deck's screen in Teaching is laid out like a card's.**
 
@@ -28,6 +28,22 @@ and moves once per batch of work you would notice, not once per commit.
 
 To check by hand: on a phone, open a deck under Teaching › Decks and then a
 card, and compare the two; open a locked deck too.
+
+## 0.495 — 27 October 2026
+
+**Progress is laid out like the card editor.**
+
+- Each part of Progress now has the card editor's large heading, with
+  what it is for straight underneath, and a thin line between one part
+  and the next. The screen is on the same plain sheet as the editor.
+- The lines at the top saying what moved today and this week have a
+  heading of their own, Lately, instead of sitting above everything
+  without one.
+- Nothing on the screen does anything different; the screen is a little
+  longer, so there is slightly more to scroll on a phone.
+
+To check by hand: open Learning > Progress in light and dark, and compare
+it with a card open in the editor.
 
 ## 0.494 — 27 October 2026
 

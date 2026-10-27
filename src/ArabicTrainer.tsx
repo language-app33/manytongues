@@ -18661,7 +18661,10 @@ function Lately({ moves }: { moves?: Record<string, DayMoves> }) {
     return { today, week: week === today ? "" : week };
   }, [moves]);
   if (!said.today && !said.week) return null;
+  /* Under a heading of its own, like every other part of Progress: the one
+     unheaded run of text on a screen of headed parts read as stray. */
   return (
+    <Section head title="Lately">
     <div className="at-lately">
       {said.today && (
         <p>
@@ -18674,6 +18677,7 @@ function Lately({ moves }: { moves?: Record<string, DayMoves> }) {
         </p>
       )}
     </div>
+    </Section>
   );
 }
 
@@ -19404,7 +19408,9 @@ function ProgressTab({
   /* Where the prep stands, for the line beside the button. */
   const prepNow = prep ? prepStatus(prep, items, settings) : null;
   return (
-    <>
+    /* One sheet, ruled into parts, the way the card editor is laid out —
+       see .at-ruled. */
+    <div className="at-ruled">
       <Lately moves={moves} />
       {/* Prep mode: getting a set of decks ready by a date, under a heading
           of its own like the other parts of the screen. The button starts
@@ -19659,7 +19665,7 @@ function ProgressTab({
           onBack={() => setViewing(null)}
         />
       )}
-    </>
+    </div>
   );
 }
 
