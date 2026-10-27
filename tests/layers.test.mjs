@@ -47,10 +47,11 @@ for (const [, selectors, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
   for (const sel of selectors.split(",").map((x) => x.trim())) layer[sel] = value;
 }
 
-/* `.at-chromebar` holds the language switch and the space tabs, which used
-   to be `.at-spaces` pinned to a corner of its own. The bar is what is
-   positioned now, so the bar is what carries the layer. */
-const CHROME = [".at-brand", ".at-corner", ".at-mode", ".at-chromebar"];
+/* `.at-dock` is the bar at the foot of the window: a space's sections, the
+   space and language switch, and the corner menu, which each used to be
+   pinned to a corner of their own. The bar is what is positioned now, so
+   the bar is what carries the layer. */
+const CHROME = [".at-brand", ".at-mode", ".at-dock"];
 
 test("every layer token resolves to a number", () => {
   for (const [name, value] of Object.entries(tokens)) {
@@ -76,7 +77,7 @@ test("the chrome sits above a screen — a space frame must not cover it", () =>
   }
 });
 
-test("the chrome is one layer, not four", () => {
+test("the chrome is one layer, not three", () => {
   const values = CHROME.map((sel) => layer[sel]);
   assert.equal(
     new Set(values).size,
@@ -87,7 +88,7 @@ test("the chrome is one layer, not four", () => {
 
 test("a screen opened on top still covers the chrome", () => {
   assert.ok(
-    layer[".at-screen.over"] > layer[".at-corner"],
+    layer[".at-screen.over"] > layer[".at-dock"],
     "an over-screen must be above the chrome, not under it",
   );
 });
@@ -874,33 +875,42 @@ for (const [, selectors, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
   }
 }
 
-test("the language menu cannot leave the window", () => {
-  const rule = declared[".at-langmenu"];
-  assert.ok(rule, ".at-langmenu has no rule at all");
-  /* Fixed is measured against the window. Absolute is measured against
-     whatever it is nested in, which is how this came to be measured
-     against a button near the middle of the screen. */
-  assert.equal(rule.position, "fixed",
-    `it is ${rule.position}: it would be placed by whatever it sits in`);
-  assert.ok(rule.right !== undefined, "it sets no right inset, so its edge is wherever it lands");
-  /* And a width that gives way before the gutter does: a share of the
-     window to fall back on, and no floor a narrow window cannot talk it
-     out of. */
-  assert.match(rule.width || "", /%/,
-    `it is ${rule.width || "unbounded"} wide with no share of the window to fall back on`);
-  assert.ok(!rule["min-width"],
-    `it sets min-width ${rule["min-width"]}, which a narrow window cannot argue with`);
-  /* Tall is the other way out of the window, and there are as many rows
-     here as the learner has languages. */
-  assert.ok(rule["max-height"], "a long list would run off the bottom with nothing to stop it");
-  assert.equal(rule["overflow-y"], "auto", "and it has to scroll inside itself rather than spill");
+/* The bar is pinned to the window, a gutter in from either side, and its
+   right-hand pill is what the two menus hang off — so the pill's right-hand
+   edge is never nearer the window's edge than that gutter. */
+test("the bar the menus hang off is held inside the window", () => {
+  const dock = declared[".at-dock"] || {};
+  assert.equal(dock.position, "fixed", `the bar is ${dock.position}: it would be placed by whatever it sits in`);
+  assert.ok(dock.left !== undefined && dock.right !== undefined,
+    "the bar sets no inset on one side, so its edge is wherever it lands");
+  assert.equal((declared[".at-docksub"] || {}).position, "relative",
+    "the menus have to be measured against the pill they open from");
+  /* Nothing between the pill and its menus may be positioned, or that is
+     what they are measured against instead — the button, near the middle
+     of the bar, which is how the language menu once left the screen. */
+  for (const sel of [".at-langsw", ".at-corner"]) {
+    const position = (declared[sel] || {}).position;
+    assert.ok(!position || position === "static",
+      `${sel} is ${position}, so the menu inside it is placed by it rather than by the pill`);
+  }
 });
 
-/* The corner menu beside it reaches the same place by another route — it
-   is absolute inside .at-corner, which is itself pinned to the corner — so
-   it is not held to the rule above. This is the one thing about it that
-   has to stay true for that to work. */
-test("the corner it hangs off is pinned to the window", () => {
-  assert.equal((declared[".at-corner"] || {}).position, "fixed");
-  assert.equal((declared[".at-cmenu"] || {}).position, "absolute");
-});
+for (const sel of [".at-langmenu", ".at-cmenu"]) {
+  test(`${sel} cannot leave the window`, () => {
+    const rule = declared[sel];
+    assert.ok(rule, `${sel} has no rule at all`);
+    assert.equal(rule.position, "absolute", `it is ${rule.position}: it would not hang off the pill`);
+    assert.equal(rule.right, "0", "it is not aligned to the pill's right-hand edge");
+    assert.ok(rule.bottom !== undefined, "it sets no bottom, so it does not open upward off the bar");
+    /* And a width that gives way before the gutter does: a share of the
+       window to fall back on, and no floor a narrow window cannot talk it
+       out of. */
+    assert.match(rule.width || rule["max-width"] || "", /100vw/,
+      `it is ${rule.width || "unbounded"} wide with no share of the window to fall back on`);
+    /* Tall is the other way out of the window: as many rows as the
+       learner has languages, or the corner menu's on a short landscape
+       phone. */
+    assert.ok(rule["max-height"], "a long menu would run off the top with nothing to stop it");
+    assert.equal(rule["overflow-y"], "auto", "and it has to scroll inside itself rather than spill");
+  });
+}

@@ -7083,3 +7083,31 @@ explicit `min-content` beats it), and its words sit in `.at-btnlabel`,
 which asks for its one-line width and wraps below it. Everywhere outside a
 row the box is `display: contents`, so it changes nothing. The cost: a
 raw `<button className="at-btn">` has no such box, so it does not get this.
+
+---
+
+## A space's sections are handed to the app's bar, not drawn by it
+
+**27 October 2026** · `src/shared.tsx` (`DockContext`, `Tabs`), `src/ArabicTrainer.tsx`
+
+The sections and the corner menu share one bar at the foot of the window.
+The other half of that bar — space, languages, you — is the app's, but
+the sections are each space's: Teaching and Admin keep their tab state
+inside themselves, and the app does not know what they are divided into.
+
+So the app owns an empty slot in the bar and offers it through
+`DockContext`, and a `Tabs` marked `dock` portals itself into it. Each
+space goes on rendering its own tabs exactly as before; only where they
+land has changed. The slot is held in state, not a ref, so strips that
+rendered before it existed render again once it does, and the bar is never
+taken down — hidden during an exercise — so the slot stays the same
+element.
+
+**Why not lift the tabs into the app.** It would mean the app knowing
+every space's sections and their state, which is what SpaceFrame exists
+to keep out of it.
+
+**What it costs.** A tab strip is no longer inside the page it belongs to,
+so anything looking for a space's sections inside its frame — the smoke
+harness did — has to look in the bar as well.
+

@@ -905,6 +905,12 @@ const clickNamed = (re) => {
 };
 /** @param {Element | null | undefined} el */
 const click = (el) => el && el.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }));
+/* A space frame's buttons, its sections first. The sections used to head
+   the frame; they are in the bar at the foot of the window now, outside
+   it, so they are gathered from there and put back where they were. */
+/** @param {Element} frame */
+const frameButtons = (frame) =>
+  [...document.querySelectorAll(".at-dock [role=tab]"), ...frame.querySelectorAll("button")];
 /* The practice ticks are one list on the card's Exercises tab since
    0.482, a line per form and per table. Every tab stays drawn while
    another is shown, so a check reads them without going there; this
@@ -4360,9 +4366,9 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      learner's own nav and card list are still in the document behind it,
      so everything below is looked for inside the frame. */
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   check("the teaching space has a Cards tab of its own", teachTabs.length > 0,
-    [...frame.querySelectorAll('[role="tab"], .at-tab')].map((b) => b.textContent).join("|"));
+    [...document.querySelectorAll('.at-dock [role="tab"]')].map((b) => b.textContent).join("|"));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const teachTiles = [...frame.querySelectorAll(".at-minicard")];
@@ -4564,7 +4570,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
    exercise rather than whichever one a shuffled queue reaches. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -4640,7 +4646,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
    out has no mark on their side at all. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const bookTile = [...frame.querySelectorAll(".at-minicard")]
@@ -4810,7 +4816,7 @@ const openPronounTables = async () => {
    teacher commit to one before the second line is written. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -7313,7 +7319,7 @@ const openPronounTables = async () => {
    has turns, and there would be nowhere to put them. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -7620,7 +7626,7 @@ const openPronounTables = async () => {
 {
   takeSaves = true;
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const btn = /** @type {any} */ ([...frame.querySelectorAll("button")]
+  const btn = /** @type {any} */ (frameButtons(frame)
     .find((b) => b.getAttribute("aria-label") === "Pronouns") || null);
   check("the Cards tab offers Pronouns beside Numbers", !!btn, btn ? "there" : "(no button)");
   click(btn);
@@ -7997,7 +8003,7 @@ const openPronounTables = async () => {
     await sleep(300);
   }
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -8066,7 +8072,7 @@ const openPronounTables = async () => {
    block above is. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const tile = [...frame.querySelectorAll(".at-minicard")]
@@ -8111,7 +8117,7 @@ const openPronounTables = async () => {
    behind the nudge until it is asked for. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const tile = [...frame.querySelectorAll(".at-minicard")]
@@ -8174,7 +8180,7 @@ const openPronounTables = async () => {
    grid on screen. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   /* The word itself, not the phrase that happens to contain it. */
@@ -8230,7 +8236,7 @@ const openPronounTables = async () => {
    queue reaches. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -8312,7 +8318,7 @@ const openPronounTables = async () => {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
   /* The last one in the document: the learner's nav is still behind this. */
   const tabNamed = (/** @type {RegExp} */ re) =>
-    [...frame.querySelectorAll("button")].filter((b) => re.test((b.textContent || "").trim())).pop();
+    frameButtons(frame).filter((b) => re.test((b.textContent || "").trim())).pop();
   const rows = () => [...frame.querySelectorAll(".at-toolbar")];
   const subRow = () => frame.querySelector(".at-toolbar-sub");
   /* The label a button carries, without the count riding inside it: a

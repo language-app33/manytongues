@@ -1,12 +1,42 @@
 # Changelog
 
 What changed in each release, in plain language. The number shown at the
-foot of the top-right menu is the one to look up here.
+foot of the menu behind your initial is the one to look up here.
 
 Releases count: 0.1, 0.2, 0.3 … 0.9, 0.10, 0.11. The second digit is a
 counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
+
+## 0.497 — 27 October 2026
+
+**The sections and the corner menu move to a bar at the foot of the window.**
+
+- The tabs no longer sit loose under the app's name, scrolling away with
+  the page and wrapping onto a second line on a phone. In their place is a
+  bar that floats near the bottom of every page, in reach of a thumb: Home,
+  Progress and Cards in Learning, and each space's own sections in
+  Teaching and Admin. It stays put as the page scrolls under it, and goes
+  away during an exercise, as the tabs did.
+- A smaller bar beside it holds what used to be in the top-right corner.
+  The round button with your initial opens the same menu as before —
+  sync, appearance, account settings, app preferences, how it works and
+  the version — and it now opens upward, off the bar.
+- Choosing a space and choosing which languages are in play are one
+  button and one menu now, instead of two controls. The button shows what
+  you can actually change: the space's icon if only the space can change,
+  the languages' mark ("All", "AR"…) if only they can, a globe if both
+  can. Somebody with one space and one language has nothing to choose, so
+  the button is not there and the initial stands on its own.
+- **Courses is in the corner menu** rather than a tab of its own. It is
+  where you join a course or look one up, not a place you work in every
+  day; one more tap away is the cost.
+- The app's name stays at the top of the page, and scrolls away with it.
+- While cards are ticked for a change to all of them, the tray of actions
+  along the foot of the window takes the bar's place until the ticking is
+  done.
+- On a narrow phone the section names come down a size so they stay on
+  one line; on a wider screen they carry their icons as well.
 
 ## 0.496 — 27 October 2026
 
