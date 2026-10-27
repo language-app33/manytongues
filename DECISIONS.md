@@ -4401,7 +4401,7 @@ pronoun or number modules written since was among them. It reads the
 directory now, ignores comments (an explanation that أنا is *I* is not a
 rule), and looks for Vietnamese as well as Arabic and Hebrew. Two strings
 it had allowed went: the card sheet's placeholder comes from the pack, and
-the first screen's wordmark is the app's name, Taleb33, rather than an
+the first screen's wordmark is the app's own name rather than an
 Arabic word every learner met whatever they were learning. Sentence-ending
 punctuation is read off Unicode's classes rather than a list naming one
 script's question mark.
