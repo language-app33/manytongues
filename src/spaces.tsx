@@ -141,6 +141,9 @@ import {
   shortDate,
   pullAdmin,
   pullTeaching,
+  cardLostRecordings,
+  recordingsOfCard,
+  setLostRecordings,
   recallSpace,
   rememberSpace,
   useFreshSpace,
@@ -4686,6 +4689,12 @@ const statusWords = (c: Card): string =>
 const statusPill = (c: Card): React.ReactNode =>
   statusWords(c) ? <span className="at-statuspill">{statusWords(c)}</span> : null;
 
+/* A card naming a recording the server does not hold — see clipsMissing on
+   the server. Beside the status pill, in the colour of something to fix:
+   students get the card without being able to hear it. */
+const lostPill = (c: Card): React.ReactNode =>
+  cardLostRecordings(c) ? <span className="at-statuspill lost">Recording missing</span> : null;
+
 /* What a card carries about itself rather than about the word: never what
    a save changed. See touchedBy. */
 const SAVE_BOOKKEEPING = new Set([
@@ -4950,6 +4959,7 @@ export function filterCards(
   return cards.filter((c) => {
     if (audio === "with" && !cardHasAudio(c)) return false;
     if (audio === "without" && cardHasAudio(c)) return false;
+    if (audio === "lost" && !cardLostRecordings(c)) return false;
     if (forms === "one" && cardFormCount(c) !== 1) return false;
     if (review === "waiting" && !waiting.has(c.id)) return false;
     if (review === "sentences" && !needsReview(c)) return false;
@@ -5051,7 +5061,7 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
  *   card they pressed the button on comes back as a prop and is read once,
  *   here, at the first render.
  */
-export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onClose }: {
+export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose }: {
   account: User;
   languages: Record<LangId, Lang>;
   settings?: any;
@@ -5063,6 +5073,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   onLangChoices?: (choices: LangChoice[]) => void;
   onTry?: (plan: { items: any[], exercise: any, back: any }) => void;
   resume?: { cardId?: string; tab?: string; deckId?: string | null } | null;
+  /* Sends a recording the server lacks from this device, where the device
+     still has it. True when it went up. */
+  onResend?: (hash: string) => Promise<boolean>;
   onClose: () => void;
 }) {
   /* What this space was showing when it was last left — see lastShown.
@@ -5087,6 +5100,23 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const [courseView, setCourseView] = useState<any | null>(null);
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
   const [cards, setCards] = useState<Card[]>(last ? last.cards : []);
+  /* Which recordings those cards name that the server does not hold, told
+     with the cards. Set for the screens that show it as this renders —
+     see setLostRecordings. */
+  const [missingClips, setMissingClips] = useState<string[]>((last && (last as any).missingClips) || []);
+  setLostRecordings(missingClips);
+  /* And forgotten on the way out, so nothing outside Teaching says it. */
+  useEffect(() => () => setLostRecordings([]), []);
+  const lostCards = useMemo(() => {
+    const lost = new Set(missingClips);
+    return lost.size ? cards.filter((c) => recordingsOfCard(c).some((h) => lost.has(h))).length : 0;
+  }, [cards, missingClips]);
+  /* Held in a ref so the fetch below, which runs once as this opens, does
+     not start again whenever the parent draws a new function. */
+  const resend = useRef(onResend);
+  resend.current = onResend;
+  /* The ones this device has already tried to send, once each per visit. */
+  const resent = useRef(new Set<string>());
   /* The same, for a save to compare against — see touchedBy. */
   const cardsNow = useRef(cards);
   cardsNow.current = cards;
@@ -5211,10 +5241,25 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       /* pullTeaching takes what arrives and says what didn't, so a failing
          call leaves the rest of the screen standing. It is the same fetch
          Sync now makes for this space when it is not the one open. */
-      const fresh = await pullTeaching(account.handle);
+      let fresh = await pullTeaching(account.handle);
+      /* A recording the server lacks may still be on this device — made
+         here, or heard here before it went missing. Sent up again without
+         asking, and the cards asked for again if any went, so the teacher
+         is only told about the ones nothing here can fix. */
+      const sendAgain = resend.current;
+      if (sendAgain && fresh.missingClips.length) {
+        let sent = 0;
+        for (const h of fresh.missingClips) {
+          if (resent.current.has(h)) continue;
+          resent.current.add(h);
+          if (await sendAgain(h).catch(() => false)) sent += 1;
+        }
+        if (sent) fresh = await pullTeaching(account.handle);
+      }
       setCourses(fresh.courses);
       setDecks(fresh.decks);
       setCards(fresh.cards);
+      setMissingClips(fresh.missingClips);
       if (!background || !fresh.failed) setError(fresh.failed ? API.explain(fresh.failed) : "");
       return !fresh.failed;
     } catch (e) {
@@ -5235,8 +5280,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   /* Fed from the state, so a card saved or a deck renamed is what comes
      back next time, not what the last fetch happened to return. */
   useEffect(() => {
-    rememberSpace("teach", account.handle, { courses, decks, cards });
-  }, [account.handle, courses, decks, cards]);
+    rememberSpace("teach", account.handle, { courses, decks, cards, missingClips });
+  }, [account.handle, courses, decks, cards, missingClips]);
 
   /* What Sync now fetched for this space, when this space is the one being
      looked at. See AdminSpace. */
@@ -5688,6 +5733,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       lang={langOfCard(c)}
       meta={
         <>
+          {cardLostRecordings(c) ? <span className="at-statusbadge lost">Recording missing</span> : null}
           {statusWords(c) ? <span className="at-statusbadge">{statusWords(c)}</span> : null}
           {shortDate(cardAdded(c))}
         </>
@@ -5734,14 +5780,19 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           subtype: cardSubtypeLabel(c, langOfCard(c)),
           decks: titles.join(", "),
           status: statusPill(c),
-          audio: cardHasAudio(c) ? "Yes" : "",
+          audio: cardLostRecordings(c) ? "Missing" : cardHasAudio(c) ? "Yes" : "",
           review: waitingIds.has(c.id) ? "Waiting" : needsReview(c) ? "Reviewed" : "",
           created: shortDate(c.created),
           modified: shortDate(c.updated),
         },
         open: () => openCard(c),
         actions: cardActions(c),
-        lead: statusPill(c),
+        lead: (
+          <>
+            {lostPill(c)}
+            {statusPill(c)}
+          </>
+        ),
       };
     },
   });
@@ -5905,6 +5956,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         { value: "any", label: "Any" },
         { value: "with", label: "With" },
         { value: "without", label: "Without" },
+        { value: "lost", label: "Missing from the server" },
       ],
     },
     {
@@ -7766,6 +7818,29 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               {offline ? "They go up as soon as you're back online." : "Sending…"}
             </TopBanner>
           )}
+          {/* Recordings the server does not hold, on cards students have:
+              they get the card and cannot hear it. In the band across the
+              top, like the line above and for the same reason, and on until
+              every one is put right — there is nothing to dismiss, because
+              the fix is the only way to make it true. */}
+          {lostCards > 0 && (
+            <TopBanner
+              kind="error"
+              actions={
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setCardFilter({ ...NO_CARD_FILTER, audio: "lost" });
+                    setTab("cards");
+                  }}
+                >
+                  {lostCards === 1 ? "Show the card" : "Show the cards"}
+                </Button>
+              }
+            >
+              Some recordings didn't reach the server. Record them again so students can hear them.
+            </TopBanner>
+          )}
 
           {tab === "courses" && (
             <CoursesPage
@@ -8295,6 +8370,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                           <LockMark locked={d.locked} />
                           {`${(langOfDeck(d) || { name: "" }).name} · ${deckSize(d)}${deckWaiting(d)}`}
                           <QualityMark quality={qualities.get(d.id)} />
+                          {(() => {
+                            /* How many of its cards have a recording the
+                               server lacks, so it is seen from the list. */
+                            const ids = new Set(d.cardIds || []);
+                            const lost = cards.filter((c) => ids.has(c.id) && cardLostRecordings(c)).length;
+                            return lost ? <span className="at-lostcount">{` · ${plural(lost, "card")} missing a recording`}</span> : null;
+                          })()}
                         </>
                       }
                       onOpen={() => setOpenDeck(d.id)}

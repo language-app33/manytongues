@@ -180,3 +180,12 @@ test("a write leaves no temporary file behind", async () => {
   const left = (await readdir(store.directory)).filter((f) => f.endsWith(".tmp"));
   assert.deepEqual(left, []);
 });
+
+test("has says whether a key is stored, without reading it", async () => {
+  const store = getStore("has-test");
+  assert.equal(await store.has("clip:nothing"), false);
+  await store.set("clip:something", "data:audio/webm;base64,AAAA");
+  assert.equal(await store.has("clip:something"), true);
+  await store.delete("clip:something");
+  assert.equal(await store.has("clip:something"), false);
+});

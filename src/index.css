@@ -4091,6 +4091,17 @@ body.at-screening .at-chromebar { display:none; }
 .at-statuspill { display:inline-block; max-width:112px; padding:2px 7px; border-radius:8px;
   border:1px solid var(--brass); color: var(--brass); font-family: var(--ui); font-size:11px;
   font-weight:700; line-height:1.25; text-align:center; white-space:normal; }
+/* A card whose recording the server does not hold: something to fix, so
+   in the colour the app uses for that rather than a status's brass. */
+.at-statuspill.lost { border-color: var(--rose); color: var(--rose); }
+.at-statusbadge.lost { border-color: var(--rose); color: var(--rose); border-radius:8px; }
+/* On a tile it is said whole, over two lines if it has to: cut short, it
+   read as "Recording m", which says nothing about what to do. */
+.at-minimeta:has(.at-statusbadge.lost) { white-space:normal; overflow:visible; text-overflow:clip; }
+.at-minimeta .at-statusbadge.lost { display:block; width:max-content; max-width:100%; margin-bottom:4px; }
+.at-statuspill + .at-statuspill { margin-inline-start:4px; }
+.at-lostcount { color: var(--rose); font-weight:700; }
+.at-cliplist .at-lostclip { margin:-2px 0 4px; color: var(--rose); }
 .at-cardtable .at-cardtable-status { width:1%; }
 /* And in a list: a card students do not have, or have an older copy of. */
 .at-statusbadge { display:inline-block; margin-inline-end:6px; padding:0 6px; border-radius:999px;

@@ -4557,3 +4557,45 @@ test("a teacher exports a deck or a card, and only their own", async () => {
   assert.ok(mineNow.includes(pot.id), "the card is back");
   assert.ok(mineNow.includes(cup.id), "and the one not in the file is still there");
 });
+
+/* ---- recordings a card names that the server does not hold ---- */
+
+test("a recording the server never received is named to the teacher and the student, until it arrives", async () => {
+  const teacher = await anAdmin("Rana");
+  const here = "a".repeat(63) + "1";
+  const lost = "b".repeat(63) + "2";
+  const put = await api("/api/courses?action=put-clip", {
+    method: "POST", key: teacher.key, body: { hash: here, data: "data:audio/webm;base64,AAAA" },
+  });
+  assert.equal(put.status, 200, put.text);
+  const deck = await api("/api/courses?action=create-deck", {
+    method: "POST", key: teacher.key, body: { title: "Sounds", lang: "ar-PS" },
+  });
+  const card = await api("/api/courses?action=save-card", {
+    method: "POST", key: teacher.key,
+    body: { card: carded({ ar: "باب", en: "door", lat: "baab", clips: [here, lost] }), decks: [deck.json.deck.id] },
+  });
+  assert.equal(card.status, 200, card.text);
+  const course = await aCourse(teacher.key, "Listening");
+  await api("/api/courses?action=attach-deck", {
+    method: "POST", key: teacher.key, body: { deckId: deck.json.deck.id, courseId: course.id },
+  });
+  const student = await someone("Lina");
+  await api("/api/courses?action=assign-student", {
+    method: "POST", key: teacher.key, body: { courseId: course.id, handle: student.handle },
+  });
+
+  const mine = await api("/api/courses?action=my-cards", { key: teacher.key });
+  assert.deepEqual(mine.json.missingClips, [lost], "the teacher was not told which recording is missing");
+  const material = await api("/api/courses?action=my-material", { key: student.key });
+  assert.deepEqual(material.json.missingClips, [lost], "the student's device was not told which recording no download will bring");
+
+  /* Sent up again — as a teacher's device does when it still has it. */
+  await api("/api/courses?action=put-clip", {
+    method: "POST", key: teacher.key, body: { hash: lost, data: "data:audio/webm;base64,BBBB" },
+  });
+  const after = await api("/api/courses?action=my-cards", { key: teacher.key });
+  assert.deepEqual(after.json.missingClips, [], "a recording that has arrived is still reported missing");
+  const later = await api("/api/courses?action=my-material", { key: student.key });
+  assert.deepEqual(later.json.missingClips, []);
+});

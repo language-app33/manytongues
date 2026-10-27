@@ -7805,12 +7805,40 @@ function base64ToBlob(dataUrl: unknown) {
 
 /* --- the API the rest of the app uses --- */
 
+/*
+ * Whoever wants to know that the recordings on this device have changed.
+ *
+ * The app keeps a list of which recordings are here — offline it decides
+ * which questions can be asked, and Account settings counts what is not
+ * here yet. That list was asked for again only at a few moments (launch,
+ * the connection going, a sync's downloads), while recordings were also
+ * saved by a session warming up and by any recording being played. So the
+ * count said a recording was missing after it had arrived, and the
+ * download button, finding nothing to fetch, said everything was already
+ * here. Every write and removal now says so, here, and the list is asked
+ * again once the burst is over.
+ */
+const CLIP_WATCHERS: Set<() => void> = new Set();
+let clipNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+function clipsChanged() {
+  if (clipNoticeTimer) clearTimeout(clipNoticeTimer);
+  clipNoticeTimer = setTimeout(() => {
+    clipNoticeTimer = null;
+    for (const f of CLIP_WATCHERS) f();
+  }, 300);
+}
+
 async function saveClipBlob(id: string, blob: Blob) {
   const ok = await idbRun("readwrite", (st) => st.put(blob, id));
-  if (ok !== undefined) return true;
+  if (ok !== undefined) {
+    clipsChanged();
+    return true;
+  }
   // No IndexedDB: fall back to the text store.
   try {
-    return !!(await window.storage.set(AUDIO_KEY(id), await blobToBase64(blob)));
+    const kept = !!(await window.storage.set(AUDIO_KEY(id), await blobToBase64(blob)));
+    if (kept) clipsChanged();
+    return kept;
   } catch (e) {
     return false;
   }
@@ -7830,6 +7858,58 @@ function knownMissing(id: string) {
     return false;
   }
   return true;
+}
+
+/*
+ * Recordings the server has said it does not hold, kept across launches.
+ *
+ * A card can name a recording that never reached the server, and no
+ * download will bring it. Counted as "not on this device yet", it sat in
+ * Account settings for ever, and the download button that could not fetch
+ * it said everything was already here. The server now says which these
+ * are with the course material (see clipsMissing on the server), and a
+ * download it refuses says so too; both are kept here and left out of
+ * what the app counts and fetches. The teacher hears about it instead.
+ *
+ * Kept for a day and then looked for again, because the teacher may put
+ * it right — a device that still has the recording sends it on its own.
+ */
+const LACKS_KEY = "arabic-trainer-server-lacks";
+const LACKS_FOR_MS = 24 * 3600000;
+function readLacks(): Record<string, number> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LACKS_KEY) || "{}");
+    return raw && typeof raw === "object" ? raw : {};
+  } catch (e) {
+    return {};
+  }
+}
+function writeLacks(map: Record<string, number>) {
+  try {
+    localStorage.setItem(LACKS_KEY, JSON.stringify(map));
+  } catch (e) {
+    /* Not kept past this launch; the server says again next time. */
+  }
+}
+/** The recordings the server lacks, as far as this device knows today. */
+function serverLacks(): Set<string> {
+  const t = now();
+  return new Set(Object.entries(readLacks()).filter(([, at]) => t - Number(at) < LACKS_FOR_MS).map(([id]) => id));
+}
+/** Noted one at a time, as downloads are refused. */
+function noteServerLacks(id: string) {
+  const map = readLacks();
+  if (map[id] && now() - map[id] < LACKS_FOR_MS) return;
+  map[id] = now();
+  writeLacks(map);
+  clipsChanged();
+}
+/** Or the server's whole answer for the material, which replaces the last. */
+function setServerLacks(ids: string[]) {
+  const map: Record<string, number> = {};
+  for (const id of ids) map[id] = now();
+  writeLacks(map);
+  clipsChanged();
 }
 
 /* What this device holds, and nothing else: no network, no side effects. */
@@ -7902,7 +7982,7 @@ async function clipBlob(id: string) {
       const blob = base64ToBlob(r.data);
       if (blob) {
         try {
-          await idbRun("readwrite", (st) => st.put(blob, id));
+          if ((await idbRun("readwrite", (st) => st.put(blob, id))) !== undefined) clipsChanged();
         } catch (e) {
           /* cache is a courtesy; playing matters more */
         }
@@ -7914,7 +7994,12 @@ async function clipBlob(id: string) {
     /* Being unable to reach the server is not the same as the server not
        having it. Only the second is remembered; the first is worth retrying
        when the connection comes back. */
-    if (!(typeof e === "object" && e && "message" in e && e.message === "offline")) MISSING_CLIPS.set(id, now());
+    if (!(typeof e === "object" && e && "message" in e && e.message === "offline")) {
+      MISSING_CLIPS.set(id, now());
+      /* A "not here" from the server, as against a fault, is kept past
+         this launch — see serverLacks. */
+      if (e instanceof Error && e.message === "not-found") noteServerLacks(id);
+    }
   }
   return null;
 }
@@ -7934,6 +8019,7 @@ async function dropClip(id: string) {
   } catch (e) {
     /* already gone */
   }
+  clipsChanged();
 }
 
 async function clipStats() {
@@ -7945,7 +8031,14 @@ async function clipStats() {
 
 /* Fetch whatever recordings the given ids name that aren't here yet, a few
    at a time. Used to warm a session before it starts and, from Account
-   settings, to take a whole course offline. */
+   settings, to take a whole course offline.
+
+   Says how many it fetched and how many it could not. Those were one
+   number, so a download that failed — the connection dropping, or the
+   server not having the file — read as one that had nothing to do, and
+   Account settings said everything was already on the device. A recording
+   the server says it lacks is counted apart, because trying again will not
+   bring it: see serverLacks. */
 async function warmClips(
   ids: Iterable<string>,
   { concurrency = 3, onProgress }: {
@@ -7956,6 +8049,8 @@ async function warmClips(
   const queue = [...new Set(ids)];
   let done = 0;
   let fetched = 0;
+  let failed = 0;
+  let lacking = 0;
   const worker = async () => {
     for (;;) {
       const id = queue.shift();
@@ -7963,16 +8058,19 @@ async function warmClips(
       try {
         if (!(await hasClipLocal(id))) {
           if (await clipBlob(id)) fetched += 1;
+          else if (serverLacks().has(id)) lacking += 1;
+          else failed += 1;
         }
       } catch (e) {
         /* leave it for next time */
+        failed += 1;
       }
       done += 1;
       if (onProgress) onProgress(done, fetched);
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, queue.length || 1) }, worker));
-  return fetched;
+  return { fetched, failed, lacking };
 }
 
 /* ---- pictures ----
@@ -8005,7 +8103,7 @@ function imageBlob(hash: string): Promise<Blob | null> {
       const r = await API.getImage(hash);
       if (r && r.data) {
         const blob = base64ToBlob(r.data);
-        await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE);
+        if ((await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE)) !== undefined) clipsChanged();
         return blob;
       }
     } catch (e) {
@@ -10239,7 +10337,10 @@ export default function ArabicTrainer() {
    * recording it downloads is one more question that can be asked without
    * a connection.
    */
+  /* And which recordings the server has said it lacks — see serverLacks. */
+  const [lacks, setLacks] = useState<Set<string>>(() => serverLacks());
   const refreshAudible = useCallback(() => {
+    setLacks(serverLacks());
     localClipIds()
       .then((ids) => setAudible(ids))
       .catch(() => {
@@ -10252,6 +10353,14 @@ export default function ArabicTrainer() {
       .then((ids) => setVisible(ids))
       .catch(() => {});
   }, []);
+  /* And whenever a recording is saved or removed, wherever that happened —
+     see clipsChanged. */
+  useEffect(() => {
+    CLIP_WATCHERS.add(refreshAudible);
+    return () => {
+      CLIP_WATCHERS.delete(refreshAudible);
+    };
+  }, [refreshAudible]);
   /* What this device was last told about the courses, read once at the
      first render. It is what the three pieces of state below open with, so
      a launch with no connection shows the courses rather than an error. */
@@ -11215,14 +11324,16 @@ export default function ArabicTrainer() {
   const skillCaps = useMemo(() => skillCapsOf(asking, settings), [asking, settings]);
   setSkillCaps(skillCaps);
 
-  /* Every recording the cards refer to, for taking a course offline. */
+  /* Every recording the cards refer to, for taking a course offline —
+     less the ones the server has said it does not hold, which no download
+     will bring and the teacher is told about instead. */
   const allClipIds = useMemo(() => {
     const ids = [];
     for (const it of items) {
-      for (const { unit } of unitsOf(it)) for (const r of unit.recs || []) ids.push(r.id);
+      for (const { unit } of unitsOf(it)) for (const r of unit.recs || []) if (!lacks.has(r.id)) ids.push(r.id);
     }
     return ids;
-  }, [items]);
+  }, [items, lacks]);
 
   /* How many of them are not here. Read on the home screen while offline,
      and in Account settings beside the button that fetches them. */
@@ -11595,6 +11706,7 @@ export default function ArabicTrainer() {
         setMyCourses(r.courses);
         setCourseDecks(r.decks);
         setSystems(r.systems);
+        setServerLacks(r.missingClips);
         /* Kept, so the next launch opens with them rather than with an
            error — and so the check after that can be the cheap one. */
         saveMaterial(account.handle, {
@@ -15104,6 +15216,14 @@ export default function ArabicTrainer() {
                  opening Teaching again tomorrow is opening Teaching, not
                  reopening whatever was last tried. */
               resume={trialBack}
+              /* A recording the server has lost, sent again from this
+                 device if it still holds it. */
+              onResend={async (hash: string) => {
+                const blob = await localClipBlob(hash);
+                if (!blob) return false;
+                await API.putClip(hash, await blobToBase64(blob));
+                return true;
+              }}
               onClose={() => {
                 setTrialBack(null);
                 setSpace("learn");
@@ -20252,10 +20372,10 @@ function AccountSettings({
   async function downloadAll() {
     const total = new Set(allClipIds).size;
     setWarming({ done: 0, total, fetched: 0 });
-    const fetched = await warmClips(allClipIds, {
+    const { fetched, failed } = await warmClips(allClipIds, {
       onProgress: (done, got) => setWarming({ done, total, fetched: got }),
     });
-    setWarming({ done: total, total, fetched, finished: true });
+    setWarming({ done: total, total, fetched, failed, finished: true });
     const [st, db] = await Promise.all([clipStats(), openClipDb()]);
     setStats({ ...st, idb: !!db });
     /* More can be heard now, which decides what an offline session may
@@ -20314,17 +20434,25 @@ function AccountSettings({
               disabled={!!warming && !warming.finished}
               onClick={downloadAll} icon="download">{warming && !warming.finished
                 ? `Downloading ${warming.done} of ${warming.total}…`
+                : warming && warming.failed && missing > 0
+                ? "Try again"
                 : missing > 0
                 ? `Download ${missing} for offline`
                 : "Download all recordings for offline"}</Button>
           </div>
         )}
         {warming && warming.finished && (
-          <Help>
-            {warming.fetched
-              ? `${plural(warming.fetched, "recording")} downloaded.`
-              : "Everything was already on this device."}
-          </Help>
+          warming.failed ? (
+            <Notice kind="warn">
+              {`${plural(warming.failed, "recording")} couldn't be downloaded. Check your connection, then try again.`}
+            </Notice>
+          ) : (
+            <Help>
+              {warming.fetched
+                ? `${plural(warming.fetched, "recording")} downloaded.`
+                : "Everything was already on this device."}
+            </Help>
+          )
         )}
       </div>
 

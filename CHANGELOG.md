@@ -8,6 +8,46 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.489 — 27 October 2026
+
+**Recordings: the offline count is right, failed downloads are said, and
+teachers are told about recordings the server has lost.**
+
+- In Account settings, the line saying how many recordings are not on this
+  device yet now updates as soon as one is saved, including the ones a
+  session downloads before it starts and the ones played during it. It used
+  to lag, so it could say "1 recording not on this device yet" while the
+  Download button, finding nothing to fetch, said everything was already
+  here.
+- When downloading for offline fails for some recordings, usually because
+  the connection dropped, the section now says "N recordings couldn't be
+  downloaded. Check your connection, then try again." and the button
+  becomes Try again. It used to say everything was already on the device.
+- A recording a card names but the server doesn't hold (cards imported
+  without their recordings, an older backup restored, an upload that went
+  wrong) is no longer counted for students as "not on this device yet":
+  no download could ever bring it.
+- Teachers are told instead. Such a card shows a "Recording missing" pill
+  in Teaching › Cards, its deck says how many of its cards are affected,
+  the card editor says "This recording didn't reach the server. Record it
+  again." beside the recording, and a red banner across the top of
+  Teaching says "Some recordings didn't reach the server. Record them
+  again so students can hear them." until every one is fixed. Its button
+  opens Teaching › Cards showing just those cards, using a new
+  "Missing from the server" choice under the Recordings filter.
+- If the teacher's own device still has a lost recording, it sends it to
+  the server again by itself, without anyone having to record it twice.
+- On a card's tile, the status badges are now shown in full over two lines
+  instead of being cut off ("Ready for re…").
+
+Trade-off: a recording that is on the server but damaged still counts as
+there; this only catches recordings that are missing.
+
+To check by hand: open Teaching on a phone with a card whose recording is
+missing (for example, one imported from a file exported without
+recordings), tap the banner's button, and open the card; then, as a
+student, check Account settings no longer counts that recording.
+
 ## 0.488 — 26 October 2026
 
 **Course settings, deck settings, prep mode, clearing data and the number

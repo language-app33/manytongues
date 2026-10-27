@@ -7022,3 +7022,30 @@ to the "This card" heading as a `reads` button, so it works on a locked
 card. The clue went back inside Meanings, and Meanings — "add another"
 buttons included — moved to Settings.
 
+
+## The server says which recordings it does not hold (0.489)
+
+**27 October 2026** · `server/api/courses.js` (`clipsMissing`), `server/store.js` (`has`), `src/ArabicTrainer.tsx` (`serverLacks`), `src/shared.tsx` (`setLostRecordings`)
+
+A card can name a recording that never reached the server: cards imported
+from a file exported without recordings, a restored backup older than the
+recording, an upload that went wrong. Until now the only way to find that
+out was a student's download failing, and that failure was reported as
+"everything was already on this device". A teacher was never told.
+
+The server now answers the question itself, with the teacher's cards and
+with a student's material, by checking for each recording the cards name.
+Students' devices leave those recordings out of what they count and fetch;
+teachers see a pill on the card, a count on the deck, a line beside the
+recording, and a banner across Teaching until every one is fixed. A
+teacher's device that still holds a lost recording sends it again without
+asking.
+
+What it cost: the store gained `has`, a file existence check, so the server
+does not read every recording to find out whether it is there. The store's
+interface was deliberately the small part of Netlify Blobs the endpoints
+used; `clipsMissing` falls back to reading the document where a store has
+no `has`. A recording found once is remembered for the life of the process,
+since recordings never change once written; clearing data forgets what it
+deletes. A damaged recording that is present still counts as present —
+catching that would mean reading every file, and is not attempted.

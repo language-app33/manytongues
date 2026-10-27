@@ -178,6 +178,42 @@ const clipsOfCard = (card) => [
 ];
 
 /*
+ * Which of these recordings the server does not hold.
+ *
+ * A card can name a recording that never reached the server: an upload cut
+ * off by a weak connection, cards brought in from a file exported without
+ * its recordings, or a recording lost to an older backup being restored.
+ * A learner's device could only find that out by failing to download it,
+ * and then said "everything was already on this device"; a teacher never
+ * found out at all. So the server says, and both sides read the answer.
+ *
+ * A recording never changes once written, so one found here is remembered
+ * for the life of the process and not looked for again; one that is not
+ * here is looked for every time, because it may arrive at any moment.
+ * Clearing data forgets what it deletes — see admin-clear.
+ */
+const CLIPS_HERE = new Set();
+/**
+ * @param {any} store
+ * @param {Iterable<string>} hashes
+ * @returns {Promise<string[]>}
+ */
+async function clipsMissing(store, hashes) {
+  const asked = [...new Set(hashes)].filter((h) => typeof h === "string" && /^[a-f0-9]{64}$/.test(h) && !CLIPS_HERE.has(h));
+  const missing = /** @type {string[]} */ ([]);
+  for (let i = 0; i < asked.length; i += 50) {
+    await Promise.all(asked.slice(i, i + 50).map(async (h) => {
+      /* The directory store answers without reading the file; any other
+         store is asked for the document itself. */
+      const here = typeof store.has === "function" ? await store.has(K.clip(h)) : !!(await store.get(K.clip(h), { type: "text" }));
+      if (here) CLIPS_HERE.add(h);
+      else missing.push(h);
+    }));
+  }
+  return missing.sort();
+}
+
+/*
  * The recordings named on one form, narrowed to names a recording can have.
  *
  * A clip is stored under the hash of its own bytes and is fetched by that
@@ -1523,7 +1559,11 @@ export default async (req) => {
         .map((c) => tickCapitals(c) || c);
       /* As a teacher's screens see a card: the version they work on, with
          its status — see teacherView. */
-      return json({ ok: true, cards: cards.map((c) => ({ ...teacherView(c), decks: holding[c.id] || [] })) });
+      /* And which of their recordings the server does not hold, so the
+         teacher hears about it — and a device that still has one can send
+         it again. */
+      const missingClips = await clipsMissing(store, cards.flatMap(clipsOfCard));
+      return json({ ok: true, cards: cards.map((c) => ({ ...teacherView(c), decks: holding[c.id] || [] })), missingClips });
     }
 
     if (action === "save-card") {
@@ -3515,7 +3555,11 @@ export default async (req) => {
         bundled.push({ deckId: d.id, cards: own.concat(values) });
       }
 
-      return json({ ok: true, version, teaches, courses, decks, cards: bundled, systems });
+      /* Which of their recordings the server does not hold: a student's
+         device leaves those out of what it counts as still to download,
+         since no download will ever bring them — see clipsMissing. */
+      const missingClips = await clipsMissing(store, bundled.flatMap((b) => b.cards.flatMap(clipsOfOne)));
+      return json({ ok: true, version, teaches, courses, decks, cards: bundled, systems, missingClips });
     }
 
     /* Everything in a course is visible to everyone in it. */
@@ -3691,6 +3735,7 @@ export default async (req) => {
       const existing = await store.get(K.clip(hash), { type: "text" });
       if (existing) return json({ ok: true, deduplicated: true });
       await store.set(K.clip(hash), data);
+      CLIPS_HERE.add(hash);
       return json({ ok: true, deduplicated: false });
     }
 
@@ -4095,6 +4140,7 @@ export default async (req) => {
           ];
           for (const h of hashes) {
             await store.delete(K.clip(h));
+            CLIPS_HERE.delete(h);
             removed.clips += 1;
           }
           /* The pictures go with the recordings: both are a card's media,

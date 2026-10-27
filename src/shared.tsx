@@ -1477,21 +1477,27 @@ export function ClipList({ clips, onChange, load }: {
         const id = typeof clip === "string" ? clip : clip.id;
         const label = typeof clip === "string" ? null : clip.label;
         return (
-          <ClipRow
-            key={id}
-            hash={id}
-            label={label}
-            index={i}
-            load={load}
-            onRemove={
-              onChange
-                ? () =>
-                    onChange(
-                      list.filter((c) => (typeof c === "string" ? c !== id : c.id !== id))
-                    )
-                : undefined
-            }
-          />
+          <React.Fragment key={id}>
+            <ClipRow
+              hash={id}
+              label={label}
+              index={i}
+              load={load}
+              onRemove={
+                onChange
+                  ? () =>
+                      onChange(
+                        list.filter((c) => (typeof c === "string" ? c !== id : c.id !== id))
+                      )
+                  : undefined
+              }
+            />
+            {/* Said beside the recording itself, in the editor and on the
+                card's own screen alike — see setLostRecordings. */}
+            {isLostRecording(id) && (
+              <p className="at-hint at-lostclip">This recording didn't reach the server. Record it again.</p>
+            )}
+          </React.Fragment>
         );
       })}
     </div>
@@ -4049,6 +4055,32 @@ export async function pullAdmin(handle: string): Promise<import("./types.ts").Ad
   return data;
 }
 
+/*
+ * Recordings a card names that the server does not hold.
+ *
+ * Told by the server with the teacher's cards (see clipsMissing there) and
+ * kept here for the screens that show it — the card list's pill and
+ * filter, the deck list's count, the editor beside the recording itself —
+ * which are scattered across two files and are not all handed the
+ * teaching space's state. TeachSpace sets it as it renders.
+ */
+let LOST_RECORDINGS: Set<string> = new Set();
+export function setLostRecordings(ids: Iterable<string>) {
+  LOST_RECORDINGS = new Set(ids);
+}
+export const isLostRecording = (hash: string) => LOST_RECORDINGS.has(hash);
+/** Every recording a card names: its forms', their answers', its lines'. */
+export function recordingsOfCard(card: any): string[] {
+  const of = (x: any) => [...((x && x.clips) || []), ...((x && x.slowClips) || [])];
+  return [
+    ...formsOf(card).flatMap((f: any) => [...of(f), ...(Array.isArray(f.answers) ? f.answers.flatMap(of) : [])]),
+    ...((card && card.lines) || []).flatMap(of),
+  ].filter((h) => typeof h === "string");
+}
+/** Whether any of them is missing from the server. */
+export const cardLostRecordings = (card: any): number =>
+  LOST_RECORDINGS.size ? new Set(recordingsOfCard(card).filter(isLostRecording)).size : 0;
+
 /* What a teacher has: the courses they teach, their decks, their cards.
    One failing call shouldn't blank the screen, so what arrives is taken
    and what didn't is reported — and what was already held stands in for
@@ -4063,6 +4095,8 @@ export async function pullTeaching(handle: string) {
         : before.courses,
     decks: d.status === "fulfilled" ? d.value.decks || [] : before.decks,
     cards: k.status === "fulfilled" ? k.value.cards || [] : before.cards,
+    /* Which of those cards' recordings the server does not hold. */
+    missingClips: k.status === "fulfilled" ? k.value.missingClips || [] : before.missingClips || [],
   };
   deliverSpace("teach", handle, shown);
   const failed = [c, d, k].find((r) => r.status === "rejected");
@@ -4577,6 +4611,8 @@ export type CoursesPulled = Folded & {
   fold: (current: Item[], parked?: Record<string, Parked>) => Folded;
   version: string;
   teaches: boolean;
+  /* The recordings in this material that the server does not hold. */
+  missingClips: string[];
 };
 
 export async function pullCourses(
@@ -4703,6 +4739,7 @@ export async function pullCourses(
       foldCourses(current, incoming, drawer),
     version: r.version || "",
     teaches: !!r.teaches,
+    missingClips: Array.isArray(r.missingClips) ? r.missingClips.filter((h: unknown) => typeof h === "string") : [],
   };
 }
 
