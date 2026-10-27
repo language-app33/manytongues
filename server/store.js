@@ -36,7 +36,7 @@
  */
 
 import { createHash } from "node:crypto";
-import { link, mkdir, open, readFile, rename, unlink } from "node:fs/promises";
+import { link, mkdir, open, readFile, rename, stat, unlink } from "node:fs/promises";
 import path from "node:path";
 
 /*
@@ -207,6 +207,43 @@ export function getStore(name) {
      */
     async get(key, _opts) {
       return readRaw(key);
+    },
+
+    /**
+     * Whether anything is stored under the key, without reading it.
+     *
+     * For one question: which recordings the server holds. Asked of every
+     * recording a course's cards name, so it has to cost a directory entry
+     * and not a read of a file that can be hundreds of kilobytes. Endpoints
+     * that may run against another store fall back to a read — see
+     * clipsMissing in the courses endpoint.
+     * @param {string} key
+     */
+    async has(key) {
+      try {
+        await stat(fileFor(dir, key));
+        return true;
+      } catch (err) {
+        if (err && /** @type {NodeJS.ErrnoException} */ (err).code === "ENOENT") return false;
+        throw err;
+      }
+    },
+
+    /**
+     * How many bytes are stored under the key, or null where nothing is.
+     *
+     * For telling a student how much a download will take before they tap
+     * it — see media-sizes in the courses endpoint. Read off the directory
+     * entry, like `has`.
+     * @param {string} key
+     */
+    async size(key) {
+      try {
+        return (await stat(fileFor(dir, key))).size;
+      } catch (err) {
+        if (err && /** @type {NodeJS.ErrnoException} */ (err).code === "ENOENT") return null;
+        throw err;
+      }
     },
 
     /**

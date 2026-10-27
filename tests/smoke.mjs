@@ -84,7 +84,7 @@ await build({
 });
 
 const dom = new JSDOM(`<!doctype html><html><body><div id="root"></div></body></html>`, {
-  url: "https://taleb.test/",
+  url: "https://manytongues.test/",
   pretendToBeVisual: true,
 });
 const w = dom.window;
@@ -102,12 +102,12 @@ const w = dom.window;
 const anyGlobal = /** @type {Record<string, any>} */ (/** @type {unknown} */ (globalThis));
 const anyWindow = /** @type {Record<string, any>} */ (/** @type {unknown} */ (w));
 
-for (const k of ["window", "document", "navigator", "HTMLElement", "Node", "Event", "CustomEvent", "localStorage", "sessionStorage", "requestAnimationFrame", "cancelAnimationFrame", "getComputedStyle"]) {
+for (const k of ["window", "document", "navigator", "HTMLElement", "Node", "Event", "CustomEvent", "localStorage", "sessionStorage", "requestAnimationFrame", "cancelAnimationFrame", "getComputedStyle", "MutationObserver"]) {
   Object.defineProperty(globalThis, k, { value: anyWindow[k], configurable: true, writable: true });
 }
 anyWindow.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} });
 anyGlobal.matchMedia = anyWindow.matchMedia;
-w.URL.createObjectURL = () => "blob:https://taleb.test/x";
+w.URL.createObjectURL = () => "blob:https://manytongues.test/x";
 w.URL.revokeObjectURL = () => {};
 globalThis.URL.createObjectURL = w.URL.createObjectURL;
 globalThis.URL.revokeObjectURL = w.URL.revokeObjectURL;
@@ -335,7 +335,7 @@ const savedCards = [];
  * @param {{ method?: string, body?: string, headers?: Record<string, string> }} [opts]
  */
 const fakeFetch = async (input, opts = {}) => {
-  const url = new URL(String(input), "https://taleb.test");
+  const url = new URL(String(input), "https://manytongues.test");
   const method = opts.method || "GET";
   const action = url.searchParams.get("action");
   calls.push(`${method} ${url.pathname}${action ? "?action=" + action : ""}${url.searchParams.get("audio") ? "?audio" : ""}`);
@@ -905,11 +905,28 @@ const clickNamed = (re) => {
 };
 /** @param {Element | null | undefined} el */
 const click = (el) => el && el.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }));
-/* The practice ticks under each form are folded since 0.322, under a
-   heading that says what is on. Opened wherever a check reads the ticks. */
+/* The practice ticks are one list on the card's Exercises tab since
+   0.482, a line per form and per table. Every tab stays drawn while
+   another is shown, so a check reads them without going there; this
+   goes there anyway, the way a teacher would. */
 const openPractice = async () => {
-  for (const b of [...document.querySelectorAll('.at-drills > .at-groupfold[aria-expanded="false"]')]) click(b);
+  const tab = [...document.querySelectorAll(".at-cardtabs [role=tab]")]
+    .find((t) => /^Exercises/i.test((t.textContent || "").trim()));
+  if (tab) click(tab);
   await sleep(150);
+};
+/** The practice list's own rows, on the card on screen. */
+const practiceRows = () => [...((cardOnScreen() || document).querySelectorAll(".at-practicerow:not(.head)"))];
+/**
+ * One tick in it: the row whose title matches, and its "on its own" or
+ * its "in sentences".
+ * @param {RegExp} title
+ * @param {"own" | "lend"} which
+ */
+const practiceTick = (title, which) => {
+  const row = practiceRows().find((r) => title.test(((r.querySelector(".at-practicetitle") || {}).textContent || "").trim()));
+  const ticks = row ? [...row.querySelectorAll("input.at-practicetick")] : [];
+  return /** @type {any} */ ((which === "own" ? ticks[0] : ticks[1]) || null);
 };
 /* Each form in a card's Forms section is folded under its name since
    0.356, unless something is written in it. The checks below write into
@@ -941,13 +958,21 @@ const pickToggle = async (/** @type {string} */ axis, /** @type {string} */ valu
     .find((b) => (b.textContent || "").trim() === value));
   await sleep(200);
 };
+/* What a button is called out loud: its words, or where it is only an
+   icon — the card screen's top line since 0.484 — its label. */
+const spokenName = (/** @type {Element} */ b) =>
+  (b.textContent || "").trim() ? (b.textContent || "") : (b.getAttribute("aria-label") || "");
+/* The open card's own Edit, on its title line — not the Edit on a tile in
+   the list behind it, which is an icon named the same. */
+const cardEdit = () => /** @type {any} */ (
+  (cardOnScreen() || document).querySelector('.at-screenhead button[aria-label="Edit"]'));
 /** @param {RegExp} re */
 const buttonNamed = (re) =>
   /* A fold, a play button or a link is pressed to read and keeps working
      on a locked card, so it is a button by its role rather than its tag —
      see Pressable. */
   /** @type {HTMLButtonElement | undefined} */ ([...document.querySelectorAll('button, [role="button"].at-pressable')]
-    .find((b) => re.test(b.textContent || "")));
+    .find((b) => re.test(spokenName(b))));
 
 /*
  * Play the matching grid, if that is what is up.
@@ -4378,9 +4403,9 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      statuses is published, and says so. */
   const statusBtn = /** @type {HTMLButtonElement | null} */ ([...document.querySelectorAll(".at-statusmenu .at-statusbtn")].pop() || null);
   check("a teacher's card says where it stands with students, beside Edit",
-    !!statusBtn && /Published/.test(statusBtn.textContent || "") && statusBtn.classList.contains("at-btn") &&
+    !!statusBtn && /Published/.test(spokenName(statusBtn)) && statusBtn.classList.contains("at-btn") &&
       statusBtn.classList.contains("sm") && !document.querySelector(".at-statusmenu select"),
-    statusBtn ? `${statusBtn.className}: ${statusBtn.textContent}` : "(no status button)");
+    statusBtn ? `${statusBtn.className}: ${spokenName(statusBtn)}` : "(no status button)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
   const statusLines = [...document.querySelectorAll(".at-statusmenu .at-pickmenu .at-pickline")].map((b) => (b.textContent || "").trim());
@@ -4388,13 +4413,22 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     statusLines.join(" | ") === "Published | Unpublish…", statusLines.join(" | ") || "(no menu)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
-  /* On a line of its own under the title: beside it, Export, the status
-     and Edit squeezed a sentence's title to a word a line on a phone. */
+  /* On the title's own line since 0.484, as icons, each named out loud,
+     with Export by the "This card" heading rather than among them. */
   const cardHead = statusBtn && statusBtn.closest(".at-screenhead");
-  check("and its buttons sit on a line under the card's title",
-    !!cardHead && cardHead.classList.contains("below") &&
-      !!cardHead.querySelector(".at-screenaction .at-statusmenu"),
-    cardHead ? cardHead.className : "(no header)");
+  const headButtons = cardHead ? [...cardHead.querySelectorAll(".at-screenaction button")] : [];
+  check("and its buttons are icons on the card's title line, each with a name",
+    !!cardHead && !cardHead.classList.contains("below") &&
+      !!cardHead.querySelector(".at-screenaction .at-statusmenu") &&
+      headButtons.length > 0 && headButtons.every((b) => !(b.textContent || "").trim() && !!b.getAttribute("aria-label")) &&
+      !headButtons.some((b) => /Export/.test(b.getAttribute("aria-label") || "")),
+    headButtons.map((b) => b.getAttribute("aria-label") || (b.textContent || "").trim()).join(" | ") || "(no header)");
+  const exportBtn = /** @type {any} */ ((teachRead || document).querySelector('[aria-label="Export this card"]'));
+  check("and Export sits by the card's “This card” heading, working while it is only read",
+    !!exportBtn && !!exportBtn.closest(".at-formhead") &&
+      /This card/.test(((exportBtn.closest(".at-formhead").querySelector(".at-formnum") || {}).textContent) || "") &&
+      !exportBtn.disabled && !exportBtn.closest("button[disabled]"),
+    exportBtn ? "by the heading" : "(no export)");
 
   const tries = () => /** @type {HTMLButtonElement[]} */ ([...document.querySelectorAll(".at-try")]);
   check("a card in the teaching space lists the exercises it could be asked",
@@ -4489,13 +4523,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      Save keeps the card open to go on with it; Save and exit closes it.
      Both save this card, under its own id. */
   const cardId = (phraseTile && phraseTile.getAttribute("data-card")) || "";
-  clickNamed(/^Edit$/);
+  click(cardEdit());
   await sleep(400);
   const editorOpen = () => !!document.querySelector(".at-screen.cardform");
-  check("Edit opens the card editor, with Save and Save and exit under its title",
+  check("Edit opens the card editor, with Save and Save and exit on its title line",
     editorOpen() && !!buttonNamed(/^Save$/) && !!buttonNamed(/^Save and exit$/) &&
-      !!(/** @type {Element} */ (buttonNamed(/^Save and exit$/))).closest(".at-screenhead.below"),
-    editorOpen() ? [...document.querySelectorAll(".at-screen.cardform .at-screenhead button")].map((b) => (b.textContent || "").trim()).join(" | ") : "(no editor)");
+      !!(/** @type {Element} */ (buttonNamed(/^Save and exit$/))).closest(".at-screenhead"),
+    editorOpen() ? [...document.querySelectorAll(".at-screen.cardform .at-screenhead button")].map(spokenName).join(" | ") : "(no editor)");
   /* Nothing changed yet, so there is nothing to save. */
   const saveOff = () => /** @type {any} */ (buttonNamed(/^Save$/))?.disabled && /** @type {any} */ (buttonNamed(/^Save and exit$/))?.disabled;
   check("both saves are off until something changes", !!saveOff(),
@@ -4821,7 +4855,7 @@ const openPronounTables = async () => {
   check("and the scene reads with one speaker down each side",
     readSides.join("") === "010", readSides.join(",") || "(no turns)");
 
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
 
   /* The bug, in one assertion: which editor came up. */
@@ -6472,13 +6506,8 @@ const openPronounTables = async () => {
 
       /* What the card's own ticks say about being drilled, before and
          after it joins a group — see `guess` in the draft. */
-      const ownTick = (/** @type {RegExp} */ re) => {
-        const form = [...document.querySelectorAll(".at-formblock")].find((b) =>
-          /^Form 1$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()));
-        const row = form ? [...form.querySelectorAll(".at-drills .at-tickrow")]
-          .find((r) => re.test(r.textContent || "")) : null;
-        return row ? /** @type {any} */ (row.querySelector("input")) : null;
-      };
+      const ownTick = (/** @type {RegExp} */ re) =>
+        practiceTick(/^(The main form|The verb)$/, re.test("On its own") ? "own" : "lend");
       await openPractice();
       check("a card in no group is a question of its own, like any other",
         !!ownTick(/On its own/) && ownTick(/On its own/).checked,
@@ -6499,12 +6528,13 @@ const openPronounTables = async () => {
             !/main form of the card|Another form of the same card/.test(document.body.textContent || ""),
           formsRole ? (formsRole.textContent || "").trim() : "(no Forms heading)");
         await openPractice();
-        const drills = /** @type {any} */ (document.querySelector(".at-formtile.main .at-drills"));
+        const list = /** @type {any} */ ((cardOnScreen() || document).querySelector(".at-practice"));
+        const listHead = list ? list.closest(".at-formblock").querySelector(".at-formrole") : null;
         check("the practice ticks are explained once, under their heading, not in each tick",
-          !!drills && /^Choose where this form comes up in practice\.( Inside sentence cards lets any sentence use it; each sentence chooses which kinds of form it wants\.)?$/.test(
-            ((drills.querySelector(".at-drilllede") || {}).textContent) || "") &&
-            ![...drills.querySelectorAll(".at-tickrow i")].length,
-          drills ? (drills.textContent || "").trim().slice(0, 160) : "(no ticks)");
+          !!listHead && /^Choose where each form comes up in practice\.( Inside sentence cards lets any sentence use it; each sentence chooses which kinds of form it wants\.)?$/.test(
+            (listHead.textContent || "").trim()) &&
+            practiceRows().every((r) => !/Choose where/.test(r.textContent || "")),
+          list ? (list.closest(".at-formblock").textContent || "").trim().slice(0, 160) : "(no ticks)");
         check("a form's heading has Duplicate as an icon, and no recording button",
           !!head && !!head.querySelector('.at-icon[aria-label="Duplicate this form"]') &&
             !/Record/.test(head.textContent || "") && !head.querySelector('[aria-label^="Recordings"]'),
@@ -6734,29 +6764,34 @@ const openPronounTables = async () => {
         parts.length >= 1 && !parts[0].querySelector(":scope > .at-groupline"),
         parts.map((g) => ((g.querySelector(":scope > .at-groupline") || {}).textContent || "").trim() || "(unnamed)")
           .join(" | ") || "(no subsections)");
-      const drills = parts.length ? parts[0].querySelector(".at-drills") : null;
-      check("an ordinary word says what of it is drilled, beside the word", !!drills,
-        [...document.querySelectorAll(".at-formnum, .at-groupline")]
-          .map((n) => n.textContent).join(" | "));
-      /* Its heading is the fold that opens it since 0.322; the name is the
-         heading's first line. */
-      const drillName = () => drills
-        ? ((drills.querySelector(".at-groupfold > span") || {}).textContent || "").trim() : "";
-      check("named for what it answers about, which is this form",
-        /^How this form can be practiced$/.test(drillName()), drillName() || "(no heading)");
-      const only = drills ? [...drills.querySelectorAll(".at-tickrow")] : [];
-      check("two ticks — on its own, and inside sentence cards — both on",
-        only.length === 2 && /On its own/.test(only[0].textContent || "") &&
-          /Inside sentence cards/.test(only[1].textContent || "") &&
-          only.every((r) => /** @type {any} */ (r.querySelector("input")).checked),
-        only.map((r) => (r.querySelector("b") || {}).textContent).join(" | ") || "(no lines)");
+      /* Since 0.482 what is drilled is one list on the Exercises tab, a
+         line per form showing the form's own words — not ticks at the
+         foot of each form. */
+      const list = /** @type {any} */ ((cardOnScreen() || document).querySelector('[role=tabpanel][aria-label="exercises"] .at-practice'));
+      const section = list ? list.closest(".at-formblock") : null;
+      const own = practiceRows()[0];
+      check("an ordinary word says what of it is drilled, on the Exercises tab, a line naming the word",
+        !!list && !!own && /^The main form$/.test(((own.querySelector(".at-practicetitle") || {}).textContent || "").trim()) &&
+          !!(own.querySelector(".at-practicenote") || {}).textContent &&
+          !(formBlock && formBlock.querySelector(".at-practicetick")),
+        practiceRows().map((r) => (r.textContent || "").trim()).join(" | ") || "(no list)");
+      const drillName = () => section
+        ? ((section.querySelector(".at-formnum") || {}).textContent || "").trim() : "";
+      check("named for what it answers about, which is what is practised",
+        /^What is practised$/.test(drillName()), drillName() || "(no heading)");
+      const heads = list ? [...list.querySelectorAll(".at-practicerow.head [role=columnheader]")].map((h) => (h.textContent || "").trim()) : [];
+      const only = own ? [...own.querySelectorAll("input.at-practicetick")] : [];
+      check("two ticks — on its own, and in sentences — both on",
+        only.length === 2 && heads[1] === "On its own" && heads[2] === "In sentences" &&
+          only.every((t) => /** @type {any} */ (t).checked),
+        heads.join(" | ") || "(no lines)");
       /* And the second says what it decides, beside what a sentence
          decides: whether the form may be used at all, where the sentence
          chooses the kinds of form it wants. */
-      check("the line under the ticks says the sentence tick lets any sentence use the form, and each sentence chooses the kinds it wants",
-        !!drills && /Inside sentence cards lets any sentence use it; each sentence chooses which kinds of form it wants\./.test(
-          ((drills.querySelector(".at-drilllede") || {}).textContent) || ""),
-        drills ? ((drills.querySelector(".at-drilllede") || {}).textContent || "").trim() : "(no ticks)");
+      check("the line over the ticks says the sentence tick lets any sentence use the form, and each sentence chooses the kinds it wants",
+        !!section && /Inside sentence cards lets any sentence use it; each sentence chooses which kinds of form it wants\./.test(
+          ((section.querySelector(".at-formrole") || {}).textContent) || ""),
+        section ? ((section.querySelector(".at-formrole") || {}).textContent || "").trim() : "(no ticks)");
     }
 
     const block = (/** @type {RegExp} */ re) =>
@@ -7207,7 +7242,7 @@ const openPronounTables = async () => {
          form, "this form" and "this card" are the same thing, and the
          answer belongs in a section rather than tucked under a field. */
       check("and how it is practised is a section about the card, not a footnote to a form",
-        blockNames().includes("How this card can be practiced") &&
+        blockNames().includes("What is practised") &&
           !/How this form can be practiced/.test(document.body.textContent || ""),
         blockNames().join(" | "));
       const blocksUp = () => [...document.querySelectorAll(".at-formnum")].map((n) => (n.textContent || "").trim());
@@ -7303,7 +7338,7 @@ const openPronounTables = async () => {
   click(savedTile);
   await sleep(450);
   openFormsAsDrawn = false;
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
   check("a form with anything written in it opens already open, its word under its name",
     formFolds().length > 0 && formFolds()[0].getAttribute("aria-expanded") === "true" &&
@@ -7516,7 +7551,7 @@ const openPronounTables = async () => {
     .find((t) => ((t.querySelector(".at-mininame") || {}).textContent || "").trim() === "To eat");
   click(tile);
   await sleep(450);
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
 
   /* Its word is a box of its table, so nothing is left for a Forms
@@ -7572,7 +7607,7 @@ const openPronounTables = async () => {
     .find((t) => ((t.querySelector(".ar") || {}).textContent || "").trim() === "نابلس");
   click(tile);
   await sleep(450);
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
   check("a card saved as a Name still says Name",
     wordKindSaid() === "Name", wordKindSaid() || "(nothing said)");
@@ -7700,7 +7735,7 @@ const openPronounTables = async () => {
     .find((t) => ((t.querySelector(".ar") || {}).textContent || "").trim() === "كتاب");
   click(tile);
   await sleep(450);
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
   const text = () => document.body.textContent || "";
   check("the editor has a Meanings section with a clue",
@@ -7745,7 +7780,7 @@ const openPronounTables = async () => {
     .find((t) => ((t.querySelector(".ar") || {}).textContent || "").trim() === "كبير");
   click(tile);
   await sleep(450);
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
   const box = (/** @type {string} */ label) =>
     /** @type {any} */ ([...document.querySelectorAll("input")]
@@ -7772,10 +7807,8 @@ const openPronounTables = async () => {
   /* And with the table written there are two answers about practice, not
      one: the word, and the shapes beside it. Both in the one section. */
   check("and the practice section holds an answer for the word and one for its other forms",
-    /How this card can be practiced/.test(document.body.textContent || "") &&
-      [...document.querySelectorAll(".at-drillhead")].length === 2,
-    [...document.querySelectorAll(".at-drillhead")]
-      .map((n) => (n.textContent || "").trim()).join(" | ") || "(no heads)");
+    /What is practised/.test(document.body.textContent || "") && practiceRows().length === 2,
+    practiceRows().map((r) => ((r.querySelector(".at-practicetitle") || {}).textContent || "").trim()).join(" | ") || "(no heads)");
   {
     const heads = [...document.querySelectorAll(".at-formnum")].map((n) => (n.textContent || "").trim());
     check("with the word the first of them, named the way they are",
@@ -7829,7 +7862,7 @@ const openPronounTables = async () => {
     .find((t) => (t.textContent || "").includes("قلم"));
   click(tile);
   await sleep(450);
-  click([...document.querySelectorAll("button")].find((b) => /^Edit$/.test((b.textContent || "").trim())));
+  click(cardEdit());
   await sleep(450);
 
   const box = (/** @type {string} */ label) =>
@@ -7889,9 +7922,7 @@ const openPronounTables = async () => {
     const partsOf = () => {
       const block = [...document.querySelectorAll(".at-formblock")].find((b) =>
         /^Singular$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()));
-      /* Not the practice ticks' own panel, which since 0.355 is drawn as
-         a subsection too but is the foot of the one it sits in. */
-      return block ? [...block.querySelectorAll(".at-part:not(.at-drills)")] : [];
+      return block ? [...block.querySelectorAll(".at-part")] : [];
     };
     /* A subsection's own heading, and not one inside it: the pronouns'
        panel sits in the word's, and its fold is a heading the word's
@@ -7906,20 +7937,25 @@ const openPronounTables = async () => {
         !!ends && !!ends.parentElement && ends.parentElement.closest(".at-part") === word,
       named.map((n) => n || "(unnamed)").join(" | ") || "(no subsections)");
     await openPractice();
-    const drillsIn = () => partsOf().map((g) => g.querySelector(":scope > .at-drills"));
+    /* Since 0.482 each of them is a line of the Exercises tab's list —
+       the word, and the pronouns on its end — rather than ticks at the
+       foot of its own subsection. */
+    const drillsIn = () => [
+      practiceRows().find((r) => /^The main form$/.test(((r.querySelector(".at-practicetitle") || {}).textContent || "").trim())),
+      practiceRows().find((r) => /^Its attached pronouns$/.test(((r.querySelector(".at-practicetitle") || {}).textContent || "").trim())),
+    ];
     check("and each of them says for itself what is drilled",
       drillsIn().length === 2 && drillsIn().every(Boolean),
-      drillsIn().map((d) => !!d).join(", "));
-    /* One named tick inside one subsection's ticks. */
+      practiceRows().map((r) => ((r.querySelector(".at-practicetitle") || {}).textContent || "").trim()).join(", ") || "(no list)");
+    /* One named tick on one line. */
     const tickIn = (/** @type {any} */ at, /** @type {RegExp} */ re) => {
-      const row = at ? [...at.querySelectorAll(".at-tickrow")]
-        .find((/** @type {any} */ r) => re.test(r.textContent || "")) : null;
-      return row ? /** @type {any} */ (row.querySelector("input")) : null;
+      const ticks = at ? [...at.querySelectorAll("input.at-practicetick")] : [];
+      return /** @type {any} */ ((re.test("On its own") ? ticks[0] : ticks[1]) || null);
     };
     check("all of it is drilled until somebody says otherwise",
-      drillsIn().every((d) => d && [...d.querySelectorAll(".at-tickrow input")]
+      drillsIn().every((d) => d && [...d.querySelectorAll("input.at-practicetick")]
         .every((/** @type {any} */ t) => t.checked)),
-      drillsIn().map((d) => d ? [...d.querySelectorAll(".at-tickrow input")]
+      drillsIn().map((d) => d ? [...d.querySelectorAll("input.at-practicetick")]
         .map((/** @type {any} */ t) => t.checked).join("/") : "-").join(" | "));
 
     /* Untick the pronouns' own "on its own": the answer is written where
@@ -7935,8 +7971,8 @@ const openPronounTables = async () => {
         !tickIn(back[1], /On its own/).checked &&
         tickIn(back[1], /Inside sentence cards/).checked,
       back.length === 2 && back[1]
-        ? [...back[1].querySelectorAll(".at-tickrow")]
-            .map((/** @type {any} */ r) => `${(r.querySelector("b") || {}).textContent}=${r.querySelector("input").checked}`)
+        ? [...back[1].querySelectorAll("input.at-practicetick")]
+            .map((/** @type {any} */ t) => `${t.getAttribute("aria-label")}=${t.checked}`)
             .join(" | ")
         : "(no ticks)");
     check("and the word itself is still drilled",
@@ -10963,7 +10999,7 @@ const openPronounTables = async () => {
   const fetchBefore = anyGlobal.fetch;
   /** @param {any} input @param {any} [opts] */
   anyWindow.fetch = anyGlobal.fetch = (input, opts = {}) => {
-    const url = new URL(String(input && input.url ? input.url : input), "https://taleb.test/");
+    const url = new URL(String(input && input.url ? input.url : input), "https://manytongues.test/");
     if (url.pathname === "/api/sync" && !url.searchParams.get("audio") &&
         (opts.method || "GET") === "POST" && (opts.headers || {})["x-sync-token"] === quietToken) {
       sent.push(Date.now());

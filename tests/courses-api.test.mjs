@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
  * and completing them would be standing in for a browser rather than
  * saying what this module needs from one. */
 const anyGlobal = /** @type {Record<string, any>} */ (/** @type {unknown} */ (globalThis));
-anyGlobal.window = { location: { origin: "https://taleb.test" } };
+anyGlobal.window = { location: { origin: "https://manytongues.test" } };
 anyGlobal.localStorage = {
   getItem: () => null,
   setItem: () => {},

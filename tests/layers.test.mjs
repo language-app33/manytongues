@@ -384,7 +384,7 @@ test("no rule falls back to one particular language", () => {
   /*
    * And no stylesheet rule may name a script's typeface at all. Those
    * belong to the pack. The wordmark carries its own stack — the
-   * product's name, Taleb33, the same in every course — and must never be
+   * product's name, ManyTongues, the same in every course — and must never be
    * reachable from a script rule.
    */
   const SCRIPT_FACES =

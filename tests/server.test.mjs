@@ -15,7 +15,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { leadOf } from "../src/cards.ts";
 
-const dir = await mkdtemp(path.join(tmpdir(), "taleb-server-"));
+const dir = await mkdtemp(path.join(tmpdir(), "manytongues-server-"));
 process.env.DATA_DIR = dir;
 /*
  * An admin key, so the tests below that claim admin actually get it. Every
@@ -1546,7 +1546,7 @@ test("SIGTERM stops it cleanly, and npm has nothing to report", async () => {
   const { spawn } = await import("node:child_process");
   const here = path.dirname(new URL(import.meta.url).pathname);
   const entry = path.join(here, "..", "server", "index.js");
-  const home = await mkdtemp(path.join(tmpdir(), "taleb-stop-"));
+  const home = await mkdtemp(path.join(tmpdir(), "manytongues-stop-"));
 
   const child = spawn(process.execPath, [entry], {
     /* An explicit port, high and unlikely to be taken: PORT=0 would not mean
@@ -3653,6 +3653,9 @@ test("a course's decks are listed to the people in it and to nobody else", () =>
     /* The join code is how somebody gets in, so it is never handed to
        somebody who is already in. */
     assert.equal(asStudent.json.course.code, undefined);
+    /* And the teacher code least of all: a student holding it could join
+       again as a teacher of the course. */
+    assert.equal(asStudent.json.course.teacherCode, undefined, "a student is handed the teacher code");
 
     const asOutsider = await api(`/api/courses?action=course-decks&course=${course.id}`, { key: outsider.key });
     assert.equal(asOutsider.status, 403);
@@ -4553,4 +4556,64 @@ test("a teacher exports a deck or a card, and only their own", async () => {
   const mineNow = (await api("/api/courses?action=my-cards", { key })).json.cards.map((/** @type {any} */ c) => c.id);
   assert.ok(mineNow.includes(pot.id), "the card is back");
   assert.ok(mineNow.includes(cup.id), "and the one not in the file is still there");
+});
+
+/* ---- recordings a card names that the server does not hold ---- */
+
+test("a recording the server never received is named to the teacher and the student, until it arrives", async () => {
+  const teacher = await anAdmin("Rana");
+  const here = "a".repeat(63) + "1";
+  const lost = "b".repeat(63) + "2";
+  const put = await api("/api/courses?action=put-clip", {
+    method: "POST", key: teacher.key, body: { hash: here, data: "data:audio/webm;base64,AAAA" },
+  });
+  assert.equal(put.status, 200, put.text);
+  const deck = await api("/api/courses?action=create-deck", {
+    method: "POST", key: teacher.key, body: { title: "Sounds", lang: "ar-PS" },
+  });
+  const card = await api("/api/courses?action=save-card", {
+    method: "POST", key: teacher.key,
+    body: { card: carded({ ar: "باب", en: "door", lat: "baab", clips: [here, lost] }), decks: [deck.json.deck.id] },
+  });
+  assert.equal(card.status, 200, card.text);
+  const course = await aCourse(teacher.key, "Listening");
+  await api("/api/courses?action=attach-deck", {
+    method: "POST", key: teacher.key, body: { deckId: deck.json.deck.id, courseId: course.id },
+  });
+  const student = await someone("Lina");
+  await api("/api/courses?action=assign-student", {
+    method: "POST", key: teacher.key, body: { courseId: course.id, handle: student.handle },
+  });
+
+  const mine = await api("/api/courses?action=my-cards", { key: teacher.key });
+  assert.deepEqual(mine.json.missingClips, [lost], "the teacher was not told which recording is missing");
+  const material = await api("/api/courses?action=my-material", { key: student.key });
+  assert.deepEqual(material.json.missingClips, [lost], "the student's device was not told which recording no download will bring");
+
+  /* Sent up again — as a teacher's device does when it still has it. */
+  await api("/api/courses?action=put-clip", {
+    method: "POST", key: teacher.key, body: { hash: lost, data: "data:audio/webm;base64,BBBB" },
+  });
+  const after = await api("/api/courses?action=my-cards", { key: teacher.key });
+  assert.deepEqual(after.json.missingClips, [], "a recording that has arrived is still reported missing");
+  const later = await api("/api/courses?action=my-material", { key: student.key });
+  assert.deepEqual(later.json.missingClips, []);
+});
+
+test("the server says how big recordings and pictures are, and leaves out the ones it does not hold", async () => {
+  const someoneElse = await someone("Omar");
+  const clip = "c".repeat(63) + "3";
+  const image = "d".repeat(63) + "4";
+  const absent = "e".repeat(63) + "5";
+  const clipData = "data:audio/webm;base64," + "A".repeat(400);
+  const imageData = "data:image/png;base64," + "B".repeat(200);
+  await api("/api/courses?action=put-clip", { method: "POST", key: someoneElse.key, body: { hash: clip, data: clipData } });
+  await api("/api/courses?action=put-image", { method: "POST", key: someoneElse.key, body: { hash: image, data: imageData } });
+  const r = await api("/api/courses?action=media-sizes", {
+    method: "POST", key: someoneElse.key, body: { clips: [clip, absent, "not-a-hash"], images: [image, absent] },
+  });
+  assert.equal(r.status, 200, r.text);
+  assert.deepEqual(Object.keys(r.json.clips), [clip], "a recording the server lacks was given a size");
+  assert.deepEqual(Object.keys(r.json.images), [image]);
+  assert.ok(r.json.clips[clip] >= clipData.length, "a recording's size is smaller than what was stored");
 });

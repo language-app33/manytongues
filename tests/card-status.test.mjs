@@ -19,7 +19,7 @@ import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 
-const dir = await mkdtemp(path.join(tmpdir(), "taleb-status-"));
+const dir = await mkdtemp(path.join(tmpdir(), "manytongues-status-"));
 process.env.DATA_DIR = dir;
 process.env.ADMIN_KEY = "test-admin-key";
 const { createApp } = await import("../server/index.js");

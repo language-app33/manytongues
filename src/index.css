@@ -107,7 +107,7 @@ button {
 .at {
   --ui: ui-rounded, "SF Pro Rounded", "Nunito", "Varela Round", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --mono: ui-rounded, "SF Pro Rounded", "Nunito", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  /* The wordmark is the product's own name, Taleb33, the same in every
+  /* The wordmark is the product's own name, ManyTongues, the same in every
      course. It was one Arabic word, which greeted a learner of Hebrew or
      Huế in a script they were not learning; it is the name the corner
      and the browser tab already use. Not the taught script, so it does
@@ -504,7 +504,12 @@ button {
   background: var(--wash);
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
   font-family: var(--ui); font-size:16px;
-  font-weight:800; letter-spacing:.01em; color: var(--text-soft); pointer-events:none; }
+  font-weight:800; letter-spacing:.01em; color: var(--text-soft); pointer-events:none; gap:7px; }
+/* The dialect-map mark: overlapping zones with no hard borders, the way
+   a language actually spreads. It carries its own dark tile, so it reads
+   the same in the light and dark themes. */
+.at-brandmark { display:block; width:24px; height:24px; flex:none; }
+.ob-logo { display:block; width:72px; height:72px; margin:0 auto 14px; }
 .at-modebtn { display:inline-flex; align-items:center; gap:7px; cursor:pointer; border:2px solid var(--line); border-radius:999px; padding:9px 14px; background: var(--nav-bg); backdrop-filter:blur(12px); color: var(--text); font-family: var(--ui); font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; box-shadow: var(--nav-shadow); justify-content:center; }
 .at-modecaret { color: var(--brass); display:inline-flex; transition: transform 150ms; }
 .at-modecaret.up { transform: rotate(180deg); }
@@ -1038,6 +1043,56 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   margin-bottom:6px; }
 .at-screen.cardform .at-formtile .at-formrole { font-size:13px; line-height:1.5; }
 .at-screen.cardform .at-hint { font-size:14px; line-height:1.6; }
+
+/* The card's top line: its name, cut short to one line, and the icons for
+   what can be done to it, on the right. The name gives way, never the
+   icons. */
+.at-screen.cardform .at-screenhead { flex-wrap:nowrap; }
+.at-screen.cardform .at-screenhead h2 { flex:1 1 0; min-width:0; white-space:nowrap;
+  overflow:hidden; text-overflow:ellipsis; }
+.at-screen.cardform .at-screenaction { flex:0 0 auto; margin-left:auto; gap:6px; flex-wrap:nowrap; }
+/* A button that is only its icon: square, the size of the icon buttons. */
+.at-btn.iconly { width:40px; height:40px; padding:0; justify-content:center; flex:0 0 auto; }
+.at-btn.iconly .at-ic { margin:0; }
+
+/* --- the card screen's tabs ---------------------------------------
+   Overview, the card's words, Exercises and Settings — see CardTab. The
+   bar stays at the top of the sheet as it scrolls, so moving between tabs
+   is never a scroll back up; it is the sheet's own colour, with the rule
+   the sections use under it. */
+.at-screen.cardform .at-cardtabs { position:sticky; top:0; z-index:3;
+  margin:0 -16px; padding:12px 16px; background: var(--surface);
+  border-bottom:1px solid var(--line); }
+.at-screen.cardform .at-cardtabs .at-nav2 { margin:0; flex-wrap:nowrap;
+  overflow-x:auto; scrollbar-width:none; }
+/* A size down from the space's own tabs, so all four fit across a phone. */
+.at-screen.cardform .at-cardtabs .at-nav2 { gap:4px; }
+.at-screen.cardform .at-cardtabs .at-tab2 { flex:0 0 auto; font-size:12px; padding:8px 11px; }
+/* A change not yet saved on that tab, or a line on it saying what is in
+   the way of saving. Brass, the colour of a thing waiting on the teacher. */
+.at-tabdot { width:8px; height:8px; border-radius:50%; background: var(--brass);
+  flex:0 0 auto; }
+/* The first section of a tab sits under the bar, not under a rule. */
+.at-screen.cardform [role="tabpanel"] > fieldset > .at-formblock:first-child { border-top:0; }
+
+/* --- what is practised --------------------------------------------
+   One line per form and per table, at the top of the Exercises tab, with a
+   tick each for on its own and in sentences — see PracticeList. */
+.at-practice { display:flex; flex-direction:column; }
+.at-practicerow { display:grid; grid-template-columns:minmax(0, 1fr) 88px; gap:8px;
+  align-items:center; padding:10px 0; border-top:1px solid var(--line); }
+.at-practice.lends .at-practicerow { grid-template-columns:minmax(0, 1fr) 88px 88px; }
+.at-practicerow > :not(:first-child) { justify-self:center; }
+.at-practicerow.head { border-top:0; padding-top:0; font-size:12px; font-weight:800;
+  letter-spacing:.07em; text-transform:uppercase; color: var(--muted); }
+.at-practicerow.head > :not(:first-child) { text-align:center; }
+.at-practicename { display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 10px; min-width:0; }
+.at-practicetitle { font-size:15px; font-weight:700; color: var(--text); }
+.at-practicenote { font-size:18px; color: var(--ink); }
+.at-practicenote.count { font-size:13px; color: var(--muted); }
+.at-practiceoff { flex:0 0 100%; font-size:12px; color: var(--muted); }
+.at-practicerow.off .at-practicetitle, .at-practicerow.off .at-practicenote { color: var(--muted); }
+.at-practicetick { width:22px; height:22px; accent-color: var(--jade); cursor:pointer; }
 .at-screen.cardform .at-field { margin-bottom:16px; }
 .at-screen.cardform .at-groupline,
 .at-screen.cardform .at-drillhead { font-size:15px; line-height:1.3; }
@@ -1295,6 +1350,11 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-codehead { font-size:11px; letter-spacing:.04em; text-transform:uppercase;
   color: var(--muted); font-weight:700; margin-bottom:6px; }
 .at-codeblock .at-hint { margin-top:6px; }
+/* On a screen laid out like the card editor, a code's name is a field's
+   name, at the size and weight the editor gives one. */
+.at-screen.cardform .at-codehead { font-family: var(--ui); font-size:15px; font-weight:800;
+  letter-spacing:.07em; line-height:1.3; margin-bottom:8px; }
+.at-codeblock .at-fieldlede { margin:0 0 10px; }
 /* A full-screen editor sits above the app chrome (200) and below the confirm
    dialogs (400). Screens are portalled to the body, so this z-index is
    authoritative no matter how deeply the screen was opened from.
@@ -1748,6 +1808,10 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   gap:12px; background:none; border:0; padding:0; cursor:pointer; color:inherit;
   font:inherit; text-align:left; }
 .at-dangertoggle .at-chevron { font-size:18px; line-height:1; color: var(--text-soft); }
+/* In Account settings the danger zone is headed like every other section of
+   that screen, and the heading is the button that opens it. */
+.at-formhead > .at-dangertoggle { flex:1 1 auto; min-width:0; }
+.at-dangerblock .at-dangertoggle > .at-ic { color: var(--text-soft); }
 .at-modalback { position:fixed; inset:0; z-index:400; background: rgba(0,0,0,.55);
   display:flex; align-items:center; justify-content:center; padding:20px; }
 .at-modal { width:100%; max-width:440px; background: var(--surface); border-radius: var(--r-lg);
@@ -3629,8 +3693,9 @@ body.at-screening .at-chromebar { display:none; }
    Two lines to a button — what it is, and either an invitation or what it
    is waiting for — because the second line is the whole reason the
    disabled ones are shown at all. */
-.at-trylist { display:grid; grid-template-columns:repeat(auto-fill, minmax(210px, 1fr)); gap:8px;
-  margin-top:12px; }
+/* Two to a row, in groups by level, each under its level's name. */
+.at-trylist { display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px; }
+.at-trylevel + .at-trylevel { margin-top:20px; }
 .at-try { display:flex; flex-direction:column; gap:2px; align-items:flex-start; text-align:start;
   background: var(--surface); border:2px solid var(--line); border-radius: var(--r);
   padding:10px 14px; cursor:pointer; color: var(--text); font-family: var(--ui); width:100%; }
@@ -4022,6 +4087,8 @@ body.at-screening .at-chromebar { display:none; }
    where the card stands. See StatusMenu. */
 .at-statusmenu { position:relative; display:inline-flex; }
 .at-statusbtn.published { border-color: var(--jade); }
+.at-statusbtn.published { color: var(--jade); }
+.at-statusbtn.draft, .at-statusbtn.review, .at-statusbtn.changed { color: var(--brass); }
 .at-statusbtn.draft, .at-statusbtn.review, .at-statusbtn.changed { border-color: var(--brass); }
 .at-statuspick { left:0; right:auto; top:calc(100% + 6px); }
 /* At the start of a line or a table row: the badge's words, smaller, and
@@ -4029,6 +4096,28 @@ body.at-screening .at-chromebar { display:none; }
 .at-statuspill { display:inline-block; max-width:112px; padding:2px 7px; border-radius:8px;
   border:1px solid var(--brass); color: var(--brass); font-family: var(--ui); font-size:11px;
   font-weight:700; line-height:1.25; text-align:center; white-space:normal; }
+/* A card whose recording the server does not hold: something to fix, so
+   in the colour the app uses for that rather than a status's brass. */
+.at-statuspill.lost { border-color: var(--rose); color: var(--rose); }
+.at-statusbadge.lost { border-color: var(--rose); color: var(--rose); border-radius:8px; }
+/* On a tile it is said whole, over two lines if it has to: cut short, it
+   read as "Recording m", which says nothing about what to do. */
+.at-minimeta:has(.at-statusbadge.lost) { white-space:normal; overflow:visible; text-overflow:clip; }
+.at-minimeta .at-statusbadge.lost { display:block; width:max-content; max-width:100%; margin-bottom:4px; }
+.at-statuspill + .at-statuspill { margin-inline-start:4px; }
+.at-lostcount { color: var(--rose); font-weight:700; }
+/* What is kept on this device, in Account settings: the figures under
+   the heading's explanation, with the notices and buttons below them
+   spaced as one column. */
+.at-devicefigures { margin:0; font-family: var(--ui); font-size: var(--fs-md); font-weight:700;
+  color: var(--text); font-variant-numeric: tabular-nums; }
+.at-devicefigures ~ .at-notice, .at-devicefigures ~ .at-hint { margin-top:10px; }
+/* The download and remove buttons, one under the other: the download's
+   label carries its size and runs longer than a phone is wide, so it may
+   take two lines rather than run off the side. */
+.at-devicebtns { display:flex; flex-direction:column; align-items:flex-start; gap:8px; margin-top:14px; }
+.at-devicebtns > .at-btn { max-width:100%; white-space:normal; text-align:left; height:auto; line-height:1.3; }
+.at-cliplist .at-lostclip { margin:-2px 0 4px; color: var(--rose); }
 .at-cardtable .at-cardtable-status { width:1%; }
 /* And in a list: a card students do not have, or have an older copy of. */
 .at-statusbadge { display:inline-block; margin-inline-end:6px; padding:0 6px; border-radius:999px;
@@ -4061,3 +4150,16 @@ fieldset.at-cardlock:disabled :is(input, textarea, select):disabled { color: var
   -webkit-text-fill-color: var(--text); opacity:1; cursor:default; }
 fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] { cursor:default; }
 fieldset.at-cardlock:disabled .at-seg.on:disabled { opacity:1; }
+
+/* A Section on a screen laid out like the card editor is headed the way
+   the editor heads its own sections: a band out to the gutters with a rule
+   above, the name at heading size, and what it is for straight under it.
+   The number-system screens are built from Sections rather than the
+   editor's blocks, and read as the same family this way. */
+.at-screen.cardform .at-section { margin:0 -16px; padding:28px 16px 32px;
+  border-top:1px solid var(--line); }
+.at-screen.cardform .at-section > .at-sectiontop > .at-eyebrow { font-size:25px;
+  font-weight:800; letter-spacing:-.015em; line-height:1.15; text-transform:none;
+  color: var(--ink); }
+.at-screen.cardform .at-section .at-sectionlede { margin:4px 0 0; }
+.at-screen.cardform .at-section .at-sectionbody { margin-top:18px; }

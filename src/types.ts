@@ -625,7 +625,13 @@ export interface Lang {
    * apart counts more words for the same sentence. See sentence-words.ts.
    */
   longSentence?: number;
-  formsLabel: string;
+  /**
+   * The line under a card's Forms heading, saying what a form is in this
+   * language: a plural or a feminine in Arabic, who it is said to in Huế.
+   * It was one line for every language, and told a Vietnamese teacher about
+   * plurals and feminines their language does not have.
+   */
+  formsNote: string;
   fontStack: string;
   keys: LangKeys;
   /** `ctx` is what the card means and whether the question was heard, for
@@ -660,8 +666,12 @@ export interface Lang {
   letter?: (ch: string, settings?: any) => string;
   marking: LangMarking;
   rules: string[];
-  /** Only where the language has one. */
-  lexical?: { key: string; label: string; help: string };
+  /**
+   * Only where the language has one. `on` names the kinds of word it
+   * belongs to — a classifier is a noun's — and a card of another kind is
+   * not shown the box; absent means every kind. See asksLexical.
+   */
+  lexical?: { key: string; label: string; help: string; on?: string[] };
   /**
    * The tables this language lays a word's forms out in, by name.
    *

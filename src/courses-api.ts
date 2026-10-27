@@ -255,6 +255,14 @@ export const getClip = (hash: string): Promise<{ ok: true; hash: string; data: s
 
 /* A card's pictures, stored and fetched the way its recordings are. */
 export const putImage = (hash: string, data: string) => call("put-image", { body: { hash, data } });
+/* How big these recordings and pictures are on the server, by hash — for
+   saying how much a download will take. Hashes it does not hold are left
+   out. */
+export const mediaSizes = (clips: string[], images: string[]): Promise<{
+  ok: true;
+  clips: Record<string, number>;
+  images: Record<string, number>;
+}> => call("media-sizes", { body: { clips, images } });
 export const getImage = (hash: string): Promise<{ ok: true; hash: string; data: string }> =>
   call("image", { params: { hash } });
 

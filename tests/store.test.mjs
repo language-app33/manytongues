@@ -7,7 +7,7 @@ import path from "node:path";
 
 /* The store reads DATA_DIR once, when it is first imported, so the
    temporary directory has to be in place before the import. */
-const dir = await mkdtemp(path.join(tmpdir(), "taleb-store-"));
+const dir = await mkdtemp(path.join(tmpdir(), "manytongues-store-"));
 process.env.DATA_DIR = dir;
 const { getStore, resolveDataRoot } = await import("../server/store.js");
 
@@ -179,4 +179,13 @@ test("a write leaves no temporary file behind", async () => {
   await store.set("doc", "two");
   const left = (await readdir(store.directory)).filter((f) => f.endsWith(".tmp"));
   assert.deepEqual(left, []);
+});
+
+test("has says whether a key is stored, without reading it", async () => {
+  const store = getStore("has-test");
+  assert.equal(await store.has("clip:nothing"), false);
+  await store.set("clip:something", "data:audio/webm;base64,AAAA");
+  assert.equal(await store.has("clip:something"), true);
+  await store.delete("clip:something");
+  assert.equal(await store.has("clip:something"), false);
 });

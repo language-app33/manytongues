@@ -314,7 +314,7 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const server = createApp();
   closeOn(server);
   server.listen(PORT, () => {
-    console.log(`taleb33 listening on ${PORT}`);
+    console.log(`manytongues listening on ${PORT}`);
     console.log(`serving ${DIST}`);
     console.log(`storing data under ${dataRoot} (from ${dataRootFrom})`);
     /* The failure this guards against is silent: accounts are made, courses

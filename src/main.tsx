@@ -58,7 +58,7 @@ class Recovery extends React.Component<RecoveryProps, RecoveryState> {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `taleb33-data-${new Date().toISOString().slice(0, 10)}.json`;
+    a.download = `manytongues-data-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(url), 1000);
   }

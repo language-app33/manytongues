@@ -57,6 +57,8 @@ import {
   DEFAULT_LANGUAGE,
   categoriesOf,
   answerShape,
+  levelOf,
+  LEVEL_NAME,
   scriptVars } from "./languages.ts";
 import { isDialog, linesOf, sceneKindOf } from "./dialogs.ts";
 import { asMeaning, cardRef, droppedIn, fillNames, hasSlots, isSentence, MAX_FILLS, refClash, renamedIn, slotName, slotsOf, taggedIn } from "./variables.ts";
@@ -139,6 +141,9 @@ import {
   shortDate,
   pullAdmin,
   pullTeaching,
+  cardLostRecordings,
+  recordingsOfCard,
+  setLostRecordings,
   recallSpace,
   rememberSpace,
   useFreshSpace,
@@ -228,7 +233,8 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
       <div className="ob-box">
         {step === "choose" && (
           <>
-            <h1>Taleb33</h1>
+            <img className="ob-logo" src="/logo.svg" alt="" width={72} height={72} />
+            <h1>ManyTongues</h1>
             {/* What it used to say: "an account only matters if you join a
                 course or use more than one device". Both exits from this
                 screen are requests to the server, so an account is not
@@ -539,6 +545,9 @@ export function CodeBox({ label, code, hint, onNew, busy }: {
   return (
     <div className="at-codeblock">
       <div className="at-codehead">{label}</div>
+      {/* What the code is for, under its name and before the code itself,
+          the way a field is explained in the card editor. */}
+      {hint && <p className="at-fieldlede">{hint}</p>}
       <div className="at-codebox">
         <b>{code || "—"}</b>
         <Button variant="ghost" size="sm"
@@ -552,7 +561,6 @@ export function CodeBox({ label, code, hint, onNew, busy }: {
           <Button variant="ghost" size="sm" disabled={busy} onClick={onNew} icon="refresh">{code ? "Replace" : "Create"}</Button>
         )}
       </div>
-      {hint && <Help>{hint}</Help>}
     </div>
   );
 }
@@ -773,7 +781,7 @@ export async function buildExport(
     ...whole,
     includes: parts,
     about:
-      "Cards exported from Taleb33. Each record under card: is one card: its forms (the word or " +
+      "Cards exported from ManyTongues. Each record under card: is one card: its forms (the word or " +
       "phrase in its script, transliteration and English meaning), grammar and tags. Records " +
       "under deck: are decks, listing their cards by id in cardIds.",
   };
@@ -1208,7 +1216,15 @@ function CourseSettings({
       action={
         <Button variant="danger" size="sm" onClick={onDelete} icon="delete">Delete</Button>
       }
+      className="cardform"
     >
+      {/* Headed and explained the way the card editor is: each part of the
+          course under a heading, with what it is for straight underneath,
+          and each field's explanation before the control it explains. */}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">This course</span>
+        </div>
           {/* A title is a label and nothing hangs off it — decks, people and
               join codes are all keyed by the course's id — so unlike the
               language below, renaming is an ordinary edit and needs no
@@ -1262,7 +1278,14 @@ function CourseSettings({
             )}
           </Field>
 
-          <Field label={<>Language taught {!c.language && <span className="req">not set</span>}</>}>
+          <Field
+            label={<>Language taught {!c.language && <span className="req">not set</span>}</>}
+            lede={c.language && !unlockLang
+              ? null
+              : c.language
+                ? "Changing this converts nothing. Cards already written stay as they are and will be treated as the new language, which is usually wrong."
+                : "Until this is set, decks and cards made for this course fall back to the first language on the list, which is rarely the right one."}
+          >
             {/* Set once, then behind a deliberate act. Changing it later
                 converts nothing — it just relabels every existing card. */}
             {c.language && !unlockLang ? (
@@ -1293,21 +1316,19 @@ function CourseSettings({
                     setUnlockLang(false);
                   }}
                 />
-                <Help>
-                  {c.language
-                    ? "Changing this converts nothing. Cards already written stay as they are and will be treated as the new language, which is usually wrong."
-                    : "Until this is set, decks and cards made for this course fall back to the first language on the list, which is rarely the right one."}
-                </Help>
               </>
             )}
           </Field>
 
-          <p className="at-eyebrow at-mt5">
-            Join codes
-          </p>
-          <Help>
+      </div>
+
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Join codes</span>
+          <span className="at-formrole">
             Two codes: one lets people study, the other lets them teach.
-          </Help>
+          </span>
+        </div>
           <CodeBox
             label="Student code"
             code={c.code}
@@ -1323,13 +1344,16 @@ function CourseSettings({
             hint="Send this privately. It lets someone add and change the material."
           />
 
-          <p className="at-eyebrow at-mt5">
-            Who is in it
-          </p>
-          <Help>
+      </div>
+
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Who is in it</span>
+          <span className="at-formrole">
             Someone can do both. Switch a role off to drop it; switch off the
             last one and they leave the course.
-          </Help>
+          </span>
+        </div>
           <div className="at-list">
             {people.map((h) => (
               <RosterRow
@@ -1385,6 +1409,7 @@ function CourseSettings({
               </Button>
             </div>
           )}
+      </div>
     </Screen>
   );
 }
@@ -3549,6 +3574,7 @@ function ClearScreen({ onClear, onClose }: {
       title="Clear data"
       onBack={onClose}
       rise
+      className="cardform"
       action={
         <Button
           variant="danger"
@@ -3582,7 +3608,10 @@ function ClearScreen({ onClear, onClose }: {
         )}
       </div>
 
-      <Field label="Admin key">
+      <Field
+        label="Admin key"
+        lede="The same key that makes someone an administrator. It lives with whoever runs the deploy, not on the site, which is what makes it worth asking for here."
+      >
         <input
           className="at-input"
           type="password"
@@ -3591,11 +3620,6 @@ function ClearScreen({ onClear, onClose }: {
           placeholder="The key this deploy was set up with"
           onChange={(e) => setKey(e.target.value)}
         />
-        <Help>
-          The same key that makes someone an administrator. It lives with
-          whoever runs the deploy, not on the site, which is what makes it
-          worth asking for here.
-        </Help>
       </Field>
 
       <Notice kind="error">{error}</Notice>
@@ -3822,7 +3846,15 @@ function DeckEditor({
           {busy ? "Saving…" : "Save"}
         </Button>
       }
+      className="cardform"
     >
+      {/* Headed and explained the way the card editor is: each part under a
+          heading with what it is for straight underneath, and each field's
+          explanation before the control it explains. */}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">This deck</span>
+        </div>
           <Field label={<>Title <span className="req">required</span></>}>
             <input
               className="at-input"
@@ -3834,13 +3866,13 @@ function DeckEditor({
           </Field>
 
           {asking && (
-            <>
-              <LanguageRadio languages={choices} value={lang} onChange={setLang} label="Language" />
-              <Help>
-                A deck holds cards in one language, and this sets the script and keyboard its
-                cards are written with.
-              </Help>
-            </>
+            <LanguageRadio
+              languages={choices}
+              value={lang}
+              onChange={setLang}
+              label="Language"
+              lede="A deck holds cards in one language, and this sets the script and keyboard its cards are written with."
+            />
           )}
 
           {!canSave && (
@@ -3857,9 +3889,16 @@ function DeckEditor({
           {/* Locking is about which cards the deck holds, and nothing
               else: the cards can still be corrected, and the deck renamed
               and shared. */}
+      </div>
           {deck && (
-            <>
-              <p className="at-eyebrow at-mt6">Lock</p>
+            <div className="at-formblock">
+              <div className="at-formhead">
+                <span className="at-formnum">Lock</span>
+                <span className="at-formrole">
+                  The cards in it can still be edited. Any teacher who can change this deck can
+                  unlock it.
+                </span>
+              </div>
               <div className="at-cklist">
                 <button
                   className={`at-ck${locked ? " on" : ""}`}
@@ -3874,21 +3913,18 @@ function DeckEditor({
                   </span>
                 </button>
               </div>
-              <Help>
-                The cards in it can still be edited. Any teacher who can change this deck can
-                unlock it.
-              </Help>
-            </>
+            </div>
           )}
 
           {deck && (
-            <>
-              <p className="at-eyebrow at-mt6">
-                Courses using it
-              </p>
-              <Help>
-                Tick a course to share this deck with its students. Untick to take it back.
-              </Help>
+            <div className="at-formblock">
+              <div className="at-formhead">
+                <span className="at-formnum">Courses using it</span>
+                <span className="at-formrole">
+                  Tick a course to share this deck with its students. Untick to take it back.
+                  A deck in no course is yours alone — nobody studying can see it.
+                </span>
+              </div>
               <div className="at-cklist">
                 {(courses || []).map((c) => {
                   const on = picked.has(c.id);
@@ -3922,9 +3958,6 @@ function DeckEditor({
                   </Help>
                 )}
               </div>
-              <Help>
-                A deck in no course is yours alone — nobody studying can see it.
-              </Help>
               {/* The same sentence the other screen that defers its writes
                   uses, in the same words, so the two teach one rule. */}
               {dirty && (
@@ -3934,7 +3967,7 @@ function DeckEditor({
                   Nothing changes until you save.
                 </Help>
               )}
-            </>
+            </div>
           )}
     </Screen>
   );
@@ -4057,51 +4090,64 @@ function TryExercises({ card, cards, lang, onTry, back }: {
 
   if (!offers.length) return null;
 
+  /* Grouped by the level each stands on, lowest first: the order a student
+     meets them in. */
+  const levels = [...new Set(offers.map((o) => levelOf(o.type)))].sort((a, b) => a - b);
+
+  const tryButton = (offer: (typeof offers)[number]) => (
+    <button
+      type="button"
+      key={offer.type}
+      className={`at-try${offer.ready ? "" : " out"}`}
+      disabled={!offer.ready || !onTry || !mine}
+      aria-label={
+        offer.ready ? `Try ${offer.label}` : `${offer.label} — needs ${offer.missing.join(" and ")}`
+      }
+      onClick={() => {
+        if (!onTry || !mine) return;
+        /* Which phrase the gap-fill stands the word in. The first
+           one here rather than the rotation a learner gets: a
+           teacher is looking at one question, not meeting a word
+           for the fourth time. */
+        const ctx = (contexts.get(offer.unit.id) || [])[0];
+        onTry({
+          items: material,
+          exercise: {
+            id: mine.id,
+            subId: offer.subId,
+            type: offer.type,
+            ...(ctx ? { ctx: ctx.id } : null),
+          },
+          back: back || { cardId: card.id },
+        });
+      }}
+    >
+      <span className="at-tryname">{offer.label}</span>
+      <span className="at-trywhy">
+        {offer.ready ? "Try it" : `Needs ${offer.missing.join(" and ")}`}
+      </span>
+    </button>
+  );
+
+  /* A section of the card like the ones above it, so it reads as part of
+     the card rather than something hung underneath. Trying one records
+     nothing: this is the teacher's material, not a card anybody here is
+     learning. */
   return (
-    <section className="at-panel at-mt5">
-      <p className="at-eyebrow">Try an exercise</p>
-      <p className="at-hint">
-        What a student is asked, on this card. One question, answered and
-        marked — nothing is recorded, because this is your material rather
-        than a card anybody here is learning.
-      </p>
-      <div className="at-trylist">
-        {offers.map((offer) => (
-          <button
-            type="button"
-            key={offer.type}
-            className={`at-try${offer.ready ? "" : " out"}`}
-            disabled={!offer.ready || !onTry || !mine}
-            aria-label={
-              offer.ready ? `Try ${offer.label}` : `${offer.label} — needs ${offer.missing.join(" and ")}`
-            }
-            onClick={() => {
-              if (!onTry || !mine) return;
-              /* Which phrase the gap-fill stands the word in. The first
-                 one here rather than the rotation a learner gets: a
-                 teacher is looking at one question, not meeting a word
-                 for the fourth time. */
-              const ctx = (contexts.get(offer.unit.id) || [])[0];
-              onTry({
-                items: material,
-                exercise: {
-                  id: mine.id,
-                  subId: offer.subId,
-                  type: offer.type,
-                  ...(ctx ? { ctx: ctx.id } : null),
-                },
-                back: back || { cardId: card.id },
-              });
-            }}
-          >
-            <span className="at-tryname">{offer.label}</span>
-            <span className="at-trywhy">
-              {offer.ready ? "Try it" : `Needs ${offer.missing.join(" and ")}`}
-            </span>
-          </button>
-        ))}
+    <div className="at-formblock">
+      <div className="at-formhead">
+        <span className="at-formnum">Exercises</span>
+        <span className="at-formrole">What a student is asked on this card. Trying one records nothing.</span>
       </div>
-    </section>
+      {levels.map((level) => (
+        <div key={level} className="at-trylevel">
+          <p className="at-label">{LEVEL_NAME[level] || `Level ${level}`}</p>
+          <div className="at-trylist">
+            {offers.filter((o) => levelOf(o.type) === level).map(tryButton)}
+          </div>
+        </div>
+      ))}
+    </div>
   );
 }
 
@@ -4644,6 +4690,12 @@ const statusWords = (c: Card): string =>
 const statusPill = (c: Card): React.ReactNode =>
   statusWords(c) ? <span className="at-statuspill">{statusWords(c)}</span> : null;
 
+/* A card naming a recording the server does not hold — see clipsMissing on
+   the server. Beside the status pill, in the colour of something to fix:
+   students get the card without being able to hear it. */
+const lostPill = (c: Card): React.ReactNode =>
+  cardLostRecordings(c) ? <span className="at-statuspill lost">Recording missing</span> : null;
+
 /* What a card carries about itself rather than about the word: never what
    a save changed. See touchedBy. */
 const SAVE_BOOKKEEPING = new Set([
@@ -4679,6 +4731,18 @@ function statusChoices(card: Card): { value: string; label: string }[] {
     { value: "unpublish", label: "Unpublish…" },
   ];
 }
+/* Which icon the status menu wears while it is shut: out, a draft not
+   yet out, waiting for review, or out with changes on it not yet out. */
+const STATUS_ICON: Record<string, string> = {
+  published: "verify",
+  draft: "edit",
+  review: "view",
+  changed: "refresh",
+};
+/* The status as the menu reads while it is shut — "Published", "Draft",
+   "Changes in draft". */
+const statusLabel = (card: Card): string =>
+  (statusChoices(card).find((c) => c.value === statusNow(card)) || { label: "Published" }).label;
 const statusNow = (card: Card): string =>
   card.status && card.status !== "published" ? card.status : card.changes ? `changes:${card.changes}` : "published";
 
@@ -4712,7 +4776,7 @@ function StatusMenu({ card, disabled, onStatus }: {
   }, [open]);
   const now = statusNow(card);
   const choices = statusChoices(card);
-  const shown = (choices.find((c) => c.value === now) || { label: "Published" }).label;
+  const shown = statusLabel(card);
   const pick = (value: string) => {
     setOpen(false);
     if (value === now) return;
@@ -4729,15 +4793,18 @@ function StatusMenu({ card, disabled, onStatus }: {
       <span className="at-statusmenu" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
-          className={`at-btn sm ghost at-menubtn at-statusbtn ${tone}`}
+          className={`at-btn sm ghost at-menubtn at-statusbtn iconly ${tone}`}
           aria-label={`Status: ${shown}`}
+          title={`Status: ${shown}`}
           aria-haspopup="menu"
           aria-expanded={open}
           disabled={disabled}
           onClick={() => setOpen((v) => !v)}
         >
-          {shown}
-          <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
+          {/* An icon on the card's top line, beside the others there, in
+              the colour of where the card stands; the menu says it in
+              words. */}
+          <Icon name={STATUS_ICON[tone] || "verify"} />
         </button>
         {open && (
           <div className="at-pickmenu at-statuspick" role="menu">
@@ -4893,6 +4960,7 @@ export function filterCards(
   return cards.filter((c) => {
     if (audio === "with" && !cardHasAudio(c)) return false;
     if (audio === "without" && cardHasAudio(c)) return false;
+    if (audio === "lost" && !cardLostRecordings(c)) return false;
     if (forms === "one" && cardFormCount(c) !== 1) return false;
     if (review === "waiting" && !waiting.has(c.id)) return false;
     if (review === "sentences" && !needsReview(c)) return false;
@@ -4994,7 +5062,7 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
  *   card they pressed the button on comes back as a prop and is read once,
  *   here, at the first render.
  */
-export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onClose }: {
+export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose }: {
   account: User;
   languages: Record<LangId, Lang>;
   settings?: any;
@@ -5006,6 +5074,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   onLangChoices?: (choices: LangChoice[]) => void;
   onTry?: (plan: { items: any[], exercise: any, back: any }) => void;
   resume?: { cardId?: string; tab?: string; deckId?: string | null } | null;
+  /* Sends a recording the server lacks from this device, where the device
+     still has it. True when it went up. */
+  onResend?: (hash: string) => Promise<boolean>;
   onClose: () => void;
 }) {
   /* What this space was showing when it was last left — see lastShown.
@@ -5030,6 +5101,23 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const [courseView, setCourseView] = useState<any | null>(null);
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
   const [cards, setCards] = useState<Card[]>(last ? last.cards : []);
+  /* Which recordings those cards name that the server does not hold, told
+     with the cards. Set for the screens that show it as this renders —
+     see setLostRecordings. */
+  const [missingClips, setMissingClips] = useState<string[]>((last && (last as any).missingClips) || []);
+  setLostRecordings(missingClips);
+  /* And forgotten on the way out, so nothing outside Teaching says it. */
+  useEffect(() => () => setLostRecordings([]), []);
+  const lostCards = useMemo(() => {
+    const lost = new Set(missingClips);
+    return lost.size ? cards.filter((c) => recordingsOfCard(c).some((h) => lost.has(h))).length : 0;
+  }, [cards, missingClips]);
+  /* Held in a ref so the fetch below, which runs once as this opens, does
+     not start again whenever the parent draws a new function. */
+  const resend = useRef(onResend);
+  resend.current = onResend;
+  /* The ones this device has already tried to send, once each per visit. */
+  const resent = useRef(new Set<string>());
   /* The same, for a save to compare against — see touchedBy. */
   const cardsNow = useRef(cards);
   cardsNow.current = cards;
@@ -5154,10 +5242,25 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       /* pullTeaching takes what arrives and says what didn't, so a failing
          call leaves the rest of the screen standing. It is the same fetch
          Sync now makes for this space when it is not the one open. */
-      const fresh = await pullTeaching(account.handle);
+      let fresh = await pullTeaching(account.handle);
+      /* A recording the server lacks may still be on this device — made
+         here, or heard here before it went missing. Sent up again without
+         asking, and the cards asked for again if any went, so the teacher
+         is only told about the ones nothing here can fix. */
+      const sendAgain = resend.current;
+      if (sendAgain && fresh.missingClips.length) {
+        let sent = 0;
+        for (const h of fresh.missingClips) {
+          if (resent.current.has(h)) continue;
+          resent.current.add(h);
+          if (await sendAgain(h).catch(() => false)) sent += 1;
+        }
+        if (sent) fresh = await pullTeaching(account.handle);
+      }
       setCourses(fresh.courses);
       setDecks(fresh.decks);
       setCards(fresh.cards);
+      setMissingClips(fresh.missingClips);
       if (!background || !fresh.failed) setError(fresh.failed ? API.explain(fresh.failed) : "");
       return !fresh.failed;
     } catch (e) {
@@ -5178,8 +5281,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   /* Fed from the state, so a card saved or a deck renamed is what comes
      back next time, not what the last fetch happened to return. */
   useEffect(() => {
-    rememberSpace("teach", account.handle, { courses, decks, cards });
-  }, [account.handle, courses, decks, cards]);
+    rememberSpace("teach", account.handle, { courses, decks, cards, missingClips });
+  }, [account.handle, courses, decks, cards, missingClips]);
 
   /* What Sync now fetched for this space, when this space is the one being
      looked at. See AdminSpace. */
@@ -5631,6 +5734,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       lang={langOfCard(c)}
       meta={
         <>
+          {cardLostRecordings(c) ? <span className="at-statusbadge lost">Recording missing</span> : null}
           {statusWords(c) ? <span className="at-statusbadge">{statusWords(c)}</span> : null}
           {shortDate(cardAdded(c))}
         </>
@@ -5677,14 +5781,19 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           subtype: cardSubtypeLabel(c, langOfCard(c)),
           decks: titles.join(", "),
           status: statusPill(c),
-          audio: cardHasAudio(c) ? "Yes" : "",
+          audio: cardLostRecordings(c) ? "Missing" : cardHasAudio(c) ? "Yes" : "",
           review: waitingIds.has(c.id) ? "Waiting" : needsReview(c) ? "Reviewed" : "",
           created: shortDate(c.created),
           modified: shortDate(c.updated),
         },
         open: () => openCard(c),
         actions: cardActions(c),
-        lead: statusPill(c),
+        lead: (
+          <>
+            {lostPill(c)}
+            {statusPill(c)}
+          </>
+        ),
       };
     },
   });
@@ -5848,6 +5957,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         { value: "any", label: "Any" },
         { value: "with", label: "With" },
         { value: "without", label: "Without" },
+        { value: "lost", label: "Missing from the server" },
       ],
     },
     {
@@ -7709,6 +7819,29 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               {offline ? "They go up as soon as you're back online." : "Sending…"}
             </TopBanner>
           )}
+          {/* Recordings the server does not hold, on cards students have:
+              they get the card and cannot hear it. In the band across the
+              top, like the line above and for the same reason, and on until
+              every one is put right — there is nothing to dismiss, because
+              the fix is the only way to make it true. */}
+          {lostCards > 0 && (
+            <TopBanner
+              kind="error"
+              actions={
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setCardFilter({ ...NO_CARD_FILTER, audio: "lost" });
+                    setTab("cards");
+                  }}
+                >
+                  {lostCards === 1 ? "Show the card" : "Show the cards"}
+                </Button>
+              }
+            >
+              Some recordings didn't reach the server. Record them again so students can hear them.
+            </TopBanner>
+          )}
 
           {tab === "courses" && (
             <CoursesPage
@@ -8238,6 +8371,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                           <LockMark locked={d.locked} />
                           {`${(langOfDeck(d) || { name: "" }).name} · ${deckSize(d)}${deckWaiting(d)}`}
                           <QualityMark quality={qualities.get(d.id)} />
+                          {(() => {
+                            /* How many of its cards have a recording the
+                               server lacks, so it is seen from the list. */
+                            const ids = new Set(d.cardIds || []);
+                            const lost = cards.filter((c) => ids.has(c.id) && cardLostRecordings(c)).length;
+                            return lost ? <span className="at-lostcount">{` · ${plural(lost, "card")} missing a recording`}</span> : null;
+                          })()}
                         </>
                       }
                       onOpen={() => setOpenDeck(d.id)}

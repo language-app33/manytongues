@@ -546,7 +546,7 @@ export function NumberSystemEditor({
       onClose={leave(() => setFixing(false))}
     />
   ) : timing ? (
-    <Screen title="Telling the time" onBack={leave(() => setTiming(false))} action={saveButton}>
+    <Screen title="Telling the time" onBack={leave(() => setTiming(false))} action={saveButton} className="cardform">
       {note}
       <TimesTab
         lang={lang}
@@ -568,7 +568,7 @@ export function NumberSystemEditor({
     /* Nothing on this screen is edited, so it has no Save: each part, the
        clock and the numbers written out by hand open on a screen of their
        own, and are saved there. */
-    <Screen title="Number system" onBack={leave(onClose)}>
+    <Screen title="Number system" onBack={leave(onClose)} className="cardform">
       <NumbersTab
         lang={lang}
         draft={draft}
@@ -836,7 +836,7 @@ function FixScreen({ lang, draft, render, saveButton, note, onWrite, onCheck, on
   const shown = useMemo(() => SAMPLE.concat(extra), [extra]);
   const written = Object.entries(draft.overrides);
   return (
-    <Screen title="Correct how a number is said" onBack={onClose} action={saveButton}>
+    <Screen title="Correct how a number is said" onBack={onClose} action={saveButton} className="cardform">
       {note}
       <Help>
         The app builds every number out of the words in the parts. Where it gets one wrong, tap
@@ -1908,6 +1908,7 @@ function WrittenOutScreen({ lang, draft, forKey, slots, render, onKeep, onClose 
     <Screen
       title={`${Number.isFinite(value) ? value.toLocaleString("en") : forKey}, written out`}
       onBack={onClose}
+      className="cardform"
       action={
         <Button
           variant="primary"
@@ -2029,7 +2030,7 @@ function TryItScreen({ lang, draft, labels, render, onWrite, onClose }: {
   );
 
   return (
-    <Screen title="Check a number" onBack={onClose}>
+    <Screen title="Check a number" onBack={onClose} className="cardform">
       <Help>
         Type any number up to eleven digits and see exactly what a student would be asked. It is
         the same words the app would use in a question — nothing here is a preview of something

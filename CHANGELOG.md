@@ -8,6 +8,301 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.492 — 27 October 2026
+
+**ManyTongues has a logo: the dialect map.**
+
+- The logo is a handful of hand-drawn, overlapping zones in four colours
+  on dark teal, like a map of where one way of speaking shades into the
+  next, with no hard borders.
+- The browser tab shows the logo on its own, without the name.
+- The icon on a phone's home screen, and the one an installed app uses,
+  is the logo in place of the old Arabic letter.
+- The first screen shows the logo above the name, and the name in the
+  top corner of the app has the logo beside it.
+- A home screen that already has the app may keep the old icon until the
+  app is removed and added again; that is the phone's choice, not the
+  app's.
+
+To check by hand: open the app in a browser and look at the tab; open the
+first screen and the app itself; add it to a phone's home screen.
+
+## 0.491 — 27 October 2026
+
+**The app is called ManyTongues.**
+
+- Everywhere the app shows its name, it now says ManyTongues instead of
+  Taleb33: the first screen, the top of every screen, the browser tab,
+  the invitation to add it to your home screen, and the name it gets once
+  added there. A file of your data saved from the app is named after it
+  too, and so is the note at the top of an exported deck.
+- An app already added to a home screen may keep its old name under the
+  icon until it is removed and added again; that is the phone's choice,
+  not the app's.
+
+To check by hand: open the app in a browser and on a phone; the tab, the
+first screen and the top of the app say ManyTongues.
+
+## 0.490 — 27 October 2026
+
+**Account settings says plainly what is kept on this device, and lets you
+fetch the rest or clear it.**
+
+- The "Storage" section is now "Recordings and pictures on this device",
+  with "Saved here so you can keep practising without an internet
+  connection." under it. It counts the cards' pictures as well as their
+  recordings, and the space both take. When nothing is kept it says
+  "Nothing saved yet." instead of "0 recordings, —.".
+- What is still to come is said in full: "12 recordings and 3 pictures
+  aren't on this device yet. Until they are, you'll only hear those
+  questions when you're online."
+- The download button is "Download all recordings and pictures (about
+  2 MB)", with the size worked out from the files themselves before you
+  tap. It fetches pictures too now. While it runs it shows a percentage;
+  when it finishes it says "Done. You can now practise everything
+  offline."; if some files fail it says how many, and the button becomes
+  "Try again (about …)".
+- When everything is already here, there is no download button, just
+  "Everything is on this device. You can practise offline."
+- A new "Remove from this device" button clears every saved recording and
+  picture, after asking: "This frees 3.4 MB. Recordings and pictures
+  download again when you practise, so this number will grow back over
+  time."
+- In a browser that gives the app very little room, the section says so
+  in plain words and suggests leaving a private window.
+- Pictures the server doesn't hold are left out of what is still to
+  download, the way recordings have been since 0.489.
+
+To check by hand: on a phone, open Account settings, download, then remove,
+and watch the figures change each time.
+
+## 0.489 — 27 October 2026
+
+**Recordings: the offline count is right, failed downloads are said, and
+teachers are told about recordings the server has lost.**
+
+- In Account settings, the line saying how many recordings are not on this
+  device yet now updates as soon as one is saved, including the ones a
+  session downloads before it starts and the ones played during it. It used
+  to lag, so it could say "1 recording not on this device yet" while the
+  Download button, finding nothing to fetch, said everything was already
+  here.
+- When downloading for offline fails for some recordings, usually because
+  the connection dropped, the section now says "N recordings couldn't be
+  downloaded. Check your connection, then try again." and the button
+  becomes Try again. It used to say everything was already on the device.
+- A recording a card names but the server doesn't hold (cards imported
+  without their recordings, an older backup restored, an upload that went
+  wrong) is no longer counted for students as "not on this device yet":
+  no download could ever bring it.
+- Teachers are told instead. Such a card shows a "Recording missing" pill
+  in Teaching › Cards, its deck says how many of its cards are affected,
+  the card editor says "This recording didn't reach the server. Record it
+  again." beside the recording, and a red banner across the top of
+  Teaching says "Some recordings didn't reach the server. Record them
+  again so students can hear them." until every one is fixed. Its button
+  opens Teaching › Cards showing just those cards, using a new
+  "Missing from the server" choice under the Recordings filter.
+- If the teacher's own device still has a lost recording, it sends it to
+  the server again by itself, without anyone having to record it twice.
+- On a card's tile, the status badges are now shown in full over two lines
+  instead of being cut off ("Ready for re…").
+
+Trade-off: a recording that is on the server but damaged still counts as
+there; this only catches recordings that are missing.
+
+To check by hand: open Teaching on a phone with a card whose recording is
+missing (for example, one imported from a file exported without
+recordings), tap the banner's button, and open the card; then, as a
+student, check Account settings no longer counts that recording.
+
+## 0.488 — 26 October 2026
+
+**Course settings, deck settings, prep mode, clearing data and the number
+screens are laid out like the card editor.**
+
+- Course settings, Deck settings (and New deck), Prep mode, Clear data, and
+  the teacher's number screens — Number system, Telling the time, Correct
+  how a number is said, a number written out, and Check a number — now use
+  the card editor's large section headings and its field-name style.
+- Course settings and Deck settings gain a first heading, "This course" and
+  "This deck", over the name and language, the way the editor heads a card
+  with "This card".
+- Wherever a line explains a section or a field, it now sits straight under
+  the heading, before what it explains: the language of a course or deck,
+  the join codes, who is in a course, locking a deck, the courses using a
+  deck, the day and target of a prep, and the admin key.
+- Lines that react to what was just chosen — "A deck needs a title", "Pick a
+  day from tomorrow on", how many courses are about to change — still come
+  after, next to the thing they are about.
+- The student join code on a teacher's own course page now has its
+  explanation above the code too, since the code box is shared with Course
+  settings.
+
+To check by hand: on a phone, open each of these screens and compare them
+with a card's edit screen — in particular Course settings with its two join
+codes, and a deck's settings with Lock and Courses using it.
+
+## 0.487 — 26 October 2026
+
+**App preferences is laid out like the card editor too.**
+
+- Language, Appearance and Feedback now have the same large heading as the
+  sections of the card editor and Account settings, and Theme, On-screen
+  keys and Sounds use the same field-name style.
+- The line explaining On-screen keys and Sounds now sits straight under the
+  field's name, before the choices, instead of after them.
+
+To check by hand: open App preferences on a phone and compare it with
+Account settings.
+
+## 0.486 — 26 October 2026
+
+**Account settings is laid out like the card editor.**
+
+- Each part of Account settings — Your account, Storage, Sign out and the
+  Danger zone — now has the same large heading as the sections of the card
+  editor, and each field inside has the same name style.
+- The line explaining a section or a field now sits straight under its
+  heading, before the box or button it explains, instead of after it.
+- The Danger zone is still shut until opened; its heading is now the thing
+  you tap, the way a folded form opens in the editor.
+
+To check by hand: open Account settings on a phone, open the Danger zone,
+and compare it with a card's edit screen.
+
+## 0.485 — 26 October 2026
+
+**A Vietnamese card says nothing that belongs to Arabic.**
+
+- The list of subtypes describes each kind of word in Vietnamese terms. It
+  gave Arabic examples (Abu Khaled, Nablus) and promised forms no
+  Vietnamese word has: a verb's persons, an adjective's forms beside a
+  noun. Now a noun mentions its classifier, a verb the đã, đang and sẽ in
+  its table, and a pronoun the family words used as one (anh, chị, em).
+- On the Forms tab, the line under the heading no longer says a form is
+  "such as its plural or its feminine". In Vietnamese a form is one way of
+  saying the word, such as to someone younger or to an elder. Arabic and
+  Hebrew keep their line.
+- The Classifier box is only on nouns, and on a word whose subtype is not
+  chosen yet. It was on every card, verbs, names and sentences included. A
+  box that already has something in it stays, whatever the card is.
+- The Exercises tab no longer lists "Example → choose" on cards that can
+  never be asked it. It asked for "an example on the verb card", which a
+  Vietnamese card has nowhere to write. The same in Arabic and Hebrew: it
+  is listed only on a verb's subjunctive forms, the only ones it asks.
+- A student opening a Vietnamese card no longer reads "Person, animal or
+  thing: a thing" and "Number: N/A". Every card is saved with those
+  whatever its language; they are now left out where the language does not
+  use them and nobody chose them.
+- Choosing a noun blank in a sentence, the note that said "The Arabic is
+  the same in all three" names the card's own language.
+
+To check by hand: on a phone, start a Vietnamese card and read the subtype
+list; make it a verb and see no Classifier box; open a saved Vietnamese
+noun's Exercises tab.
+## 0.484 — 26 October 2026
+
+**A card's buttons are icons on its top line, and Meanings moves to
+Settings.**
+
+- The card's buttons are back on the same line as its name, on the right,
+  as icons: the status, Edit, and while editing Delete, Cancel, Save and
+  Save and exit. Each says what it does when you hover over it. The name
+  is cut short to one line to make room, rather than wrapping.
+- The status shows as an icon in its colour: a tick for published, a
+  pencil for a draft, an eye for ready for review, and arrows for changes
+  not yet published. The menu it opens still says it in words.
+- Export is now by the "This card" heading, on the right.
+- The summary at the top of Overview — the card's words, the forms
+  written, its status and how many exercises are ready — is gone.
+  Overview starts with "This card".
+- Meanings, with the clue now back inside it, and the buttons for another
+  meaning or another word, are on the Settings tab.
+
+To check by hand: a card with a long name on a phone, read and while
+editing; hover over each icon; export a card you are only reading.
+
+## 0.483 — 26 October 2026
+
+**A course's teacher code goes only to its teachers.**
+
+- One of the server's answers about a course, which any student of the
+  course could ask for, still carried the teacher code — the code that
+  makes whoever holds it a teacher of the course. No screen showed it, but
+  it was there to be read. That answer now carries neither code. Teachers
+  still see both codes on their course screen, and the administrator in
+  Administration, as before.
+- Because it could have been read, it is worth replacing every course's
+  teacher code: in Administration, open each course and press New beside
+  its teacher code. Teachers already in a course stay in it; only someone
+  joining afterwards needs the new code.
+
+To check by hand: as a teacher, a course still shows its student and
+teacher codes; in Administration, both codes show and New replaces the
+teacher code.
+
+## 0.482 — 26 October 2026
+
+**A card opens on what it is, in four tabs.**
+
+- A card's screen is now four tabs: Overview, its words, Exercises and
+  Settings. It always opens on Overview.
+- Overview starts with the card as a student meets it — the word large,
+  how it is said, what it means, its picture and a play button for its
+  recording — and one line saying whether it is published, how many of
+  its exercises are ready, and the one thing that would open the most of
+  the rest. Tapping that line opens Exercises. Under it: the type of
+  card, its subtype, its decks, and the buttons for another meaning or
+  another word.
+- The second tab is named for the card: Forms on a word, Table on a verb,
+  Sentence on a sentence, Lines on a conversation, Text on a text.
+- Exercises starts with a short list of the card's forms, each with its
+  two ticks — on its own, in sentences — in place of the ticks that used
+  to sit under every form. The exercises to try come after it.
+- Settings holds what most cards never need: capital letters, the clue,
+  and the card's ID and tags. A conversation or a text has no Settings
+  tab.
+- While editing, a tab with an unsaved change or something stopping the
+  save gets a small dot, so nothing is missed on a tab you are not looking
+  at. One Save still saves everything.
+
+To check by hand: open a word, a verb and a conversation, read and then
+edit, on a phone as well; change something on two tabs and look for the
+dots; save and see them go.
+
+## 0.481 — 25 October 2026
+
+**A card's screen is tidier: Delete at the top, and its exercises in a
+section of their own.**
+
+- Delete this card has moved from the foot of the form to the top of the
+  screen, as a red bin beside Cancel and Save. As before, it is only there
+  while the card is being edited.
+- "Try an exercise" is now a section called Exercises, headed like the
+  others on the card. Its exercises are grouped under the level each one
+  belongs to, using the level names Progress shows, two to a row.
+- A conversation or a text no longer has the small lines of guidance under
+  its heading ("What it is and who is in it.", "A name, and two lines or
+  more." and the like). It opens with just the heading.
+
+To check by hand: open a saved word card and a conversation, read and
+then edit, and look at the top bar and the Exercises section, on a phone
+as well.
+
+## 0.480 — 24 October 2026
+
+**"Found as" keeps its meanings apart too.**
+
+- Under "Words this teaches" in the editor, a word found in the sentence
+  in another of its forms (a plural, a verb's other person) says "found as"
+  with that form's meaning in brackets. Where the form had more than one
+  meaning, they ran together there, as the answers did before 0.479. They
+  now have the dot between them.
+
+To check by hand: a phrase holding the plural of a word whose plural has
+two meanings.
+
 ## 0.479 — 24 October 2026
 
 **The words a phrase teaches keep their answers apart.**

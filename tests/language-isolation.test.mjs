@@ -161,7 +161,7 @@ for (const file of APP_FILES) {
 /* Keyed by the same extension-free name APP_FILES uses, so converting a
    file does not silently empty its allowlist. Nothing a learner meets is
    here any more: the card sheet's placeholder now comes from the pack, and
-   the first screen's wordmark is the app's name, Taleb33. */
+   the first screen's wordmark is the app's name, ManyTongues. */
 const ALLOWED_SCRIPT = {
   /* Specimens, which are the point of a gallery. The third is the he-past
      of "to eat" — the form a dictionary lists a verb under, which is what a

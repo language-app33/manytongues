@@ -2364,7 +2364,7 @@ export const GRAMMAR: Record<string, GrammarDim> = {
     options: [
       ["singular", "singular"],
       /* A pair, where a language counts one. Arabic and Hebrew both do —
-         كتابين, שעתיים — and Huế declares no axes at all, so nobody is
+         كتابين, שעתיים — and Huế declares no number at all, so nobody is
          offered it who has no use for it.
 
          Added here rather than appended after "na" because the list is
@@ -2965,6 +2965,29 @@ const PRONOUNED_CATEGORIES: WordCategory[] = WORD_CATEGORIES.map((c) =>
   c.id === "pronoun" ? { ...c, retired: true } : c,
 );
 
+/*
+ * The same list in Huế's words. The kinds and what each fills are the
+ * same; what the teacher is told about each is not. The shared lines were
+ * written beside Arabic — a verb's persons, an adjective's forms beside a
+ * noun, Abu Khaled and Nablus — and none of that is true of a Vietnamese
+ * word: nothing changes for who does it or for what it describes.
+ */
+const VI_CATEGORY_NOTES: Record<string, string> = {
+  noun: "A thing: a book, a house, a morning — with the classifier it takes.",
+  verb: "Something done, laid out in a table with đã, đang and sẽ in front of it.",
+  adjective: "A description: big, red, tired.",
+  demonstrative: "this, that.",
+  preposition: "at, with, for.",
+  pronoun: "I, you, she — and the family words used as them, such as anh, chị and em.",
+  person: "A particular person, or a named animal: Lan, Minh.",
+  place: "A particular place: a city, a country, a street — Huế, Đà Nẵng.",
+  name: "A particular person or place: Lan, Huế.",
+  number: "One, two, three, and the words built on them.",
+};
+const VI_CATEGORIES: WordCategory[] = WORD_CATEGORIES.map((c) =>
+  VI_CATEGORY_NOTES[c.id] ? { ...c, note: VI_CATEGORY_NOTES[c.id] } : c,
+);
+
 /** What a word can be in this language, in the order it is asked. */
 export const categoriesOf = (lang: Lang | null | undefined): WordCategory[] =>
   (lang && lang.categories) || [];
@@ -2976,6 +2999,27 @@ export const categoryOf = (
   id: string | null | undefined,
 ): WordCategory | null =>
   categoriesOf(lang).find((c) => c.id === String(id || "")) || null;
+
+/**
+ * Whether a card is shown its language's lexical box — Huế's classifier.
+ *
+ * On the kinds of word the pack names for it, and on a word whose kind is
+ * not chosen yet, which is most new cards and may well be a noun. Never on
+ * a sentence, whose words are other cards. And always where something is
+ * already written in it, so a box that has a value is never hidden from
+ * the teacher who wrote it.
+ */
+export function asksLexical(
+  lang: Lang | null | undefined,
+  { category, sentence = false, value = "" }: { category?: string | null; sentence?: boolean; value?: unknown },
+): boolean {
+  const lexical = lang && lang.lexical;
+  if (!lexical) return false;
+  if (String(value || "").trim()) return true;
+  if (sentence) return false;
+  const kind = String(category || "");
+  return !kind || !lexical.on || lexical.on.includes(kind);
+}
 
 /**
  * What the teacher is shown for it — "Noun" — and "" where the card has
@@ -3835,7 +3879,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
     /* A romanisation of an Arabic word is a different rendering of it, so
        going between the two is a real exercise. */
     translitDrilled: true,
-    formsLabel: "Other forms — plurals, feminines",
+    formsNote: "A form is one shape of the word, such as its plural or its feminine.",
     fontStack:
       '"Noto Naskh Arabic", "Amiri", "Scheherazade New", "Traditional Arabic", "Geeza Pro", "Al Bayan", serif',
     keys: { rows: AR_KEY_ROWS, extras: AR_EXTRAS, marks: AR_MARKS, marksLabel: "ً ٌ ٍ" },
@@ -3914,8 +3958,9 @@ export const LANGUAGES: Record<LangId, Lang> = {
       ],
     },
     /* A noun is not usable without its classifier, and which one it takes is
-       simply memorised — the job gender does in Arabic. */
-    lexical: { key: "classifier", label: "Classifier", help: "con, cái, cây, quả …" },
+       simply memorised — the job gender does in Arabic. A noun's only: a
+       verb, a name or a sentence has none to write. */
+    lexical: { key: "classifier", label: "Classifier", help: "con, cái, cây, quả …", on: ["noun"] },
     /* Nothing about a verb changes for who is doing it — ăn is ăn whoever
        eats — so there is one column, and it is unlabelled: "đã ăn" is what
        the learner is asked, not "any: đã ăn". What does change is when, and
@@ -3941,8 +3986,8 @@ export const LANGUAGES: Record<LangId, Lang> = {
     /* The same list, and it attaches no pronouns and nothing agrees — so
        a noun here is a noun with nothing laid out under it, and so is an
        adjective, which is what a category naming a table the pack has not
-       got means. */
-    categories: WORD_CATEGORIES,
+       got means. Described in its own words: see VI_CATEGORY_NOTES. */
+    categories: VI_CATEGORIES,
     /* Regular, so eleven boxes and three bare multiplier words; the
        irregularity is all in company. See src/numbers/vi-Hue.ts. */
     composer: composerFor("vi-Hue"),
@@ -4001,7 +4046,9 @@ export const LANGUAGES: Record<LangId, Lang> = {
     /* Each syllable is written apart, so a sentence counts about half as
        many words again as the same sentence would in Arabic. */
     longSentence: 20,
-    formsLabel: "Other forms",
+    /* Nothing is plural or feminine here. What a teacher writes as a second
+       form is the same word said to somebody else — see `register`. */
+    formsNote: "A form is one way of saying the word, such as to someone younger or to an elder.",
     fontStack: '"Be Vietnam Pro", "Noto Sans", system-ui, sans-serif',
     keys: { rows: VI_KEY_ROWS, extras: VI_EXTRAS, marks: VI_MARKS, marksLabel: "◌̀ ◌́ ◌̉" },
     check: (given, expected, settings) => checkViet(given, expected, settings),
@@ -4014,8 +4061,8 @@ export const LANGUAGES: Record<LangId, Lang> = {
        that is typed has to be the right one. */
     marking: { tones: "either" },
     rules: [
-      "Cards hold the Vietnamese spelling, an English meaning, and an optional pronunciation note. Any two of the three are enough to practice it.",
-      "Tone marks work the way harakat do in Arabic: a student may type the word with or without them, but a tone that is typed must be correct. Writing má for mà is wrong; writing ma is merely incomplete.",
+      "Cards hold the Vietnamese spelling and an English meaning, and may carry a pronunciation note, which is kept beside the word and never asked for.",
+      "A student may type a word with or without its tone marks, but a tone that is typed must be correct. Writing má for mà is wrong; writing ma is merely incomplete.",
       "Đ is treated as its own letter rather than a d with a mark, so typing d for đ is not accepted.",
       "The six tones of the northern standard are not those of Huế speech. Cards should carry the spelling as written; the recording is what teaches the tone.",
       "Recordings matter more here than in a language with a phonetic script, so the listening exercises are worth using from the first lesson.",
@@ -4110,7 +4157,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
     /* A romanisation of a Hebrew word is a different rendering of it, so
        going between the two is a real exercise. */
     translitDrilled: true,
-    formsLabel: "Other forms — plurals, feminines",
+    formsNote: "A form is one shape of the word, such as its plural or its feminine.",
     fontStack:
       '"Noto Serif Hebrew", "Noto Sans Hebrew", "Frank Ruehl CLM", "David CLM", "David", "Arial Hebrew", "Times New Roman", serif',
     keys: { rows: HE_KEY_ROWS, extras: HE_EXTRAS, marks: HE_MARKS, marksLabel: "◌ָ ◌ַ ◌ִ" },
@@ -5204,6 +5251,15 @@ export const EASY_TYPES = TYPES.filter((t) => EX[t].gentle);
 export const levelOf = (key: string): number => {
   const spec = EX[typeOf(key)];
   return (spec && spec.level) || 1;
+};
+
+/* And their names, as a learner is shown them — over a tile on Progress,
+   and over each group of a card's exercises in the teaching space. */
+export const LEVEL_NAME: Record<number, string> = {
+  1: "What it means",
+  2: "Which word it is",
+  3: "Write it from a cue",
+  4: "Write it from its meaning",
 };
 
 /*

@@ -864,11 +864,14 @@ export function Segmented<T extends string | number | boolean | null>({
 /**
  * @param props  Each tab is [key, label, iconName].
  */
-export function Tabs({ tabs, value, onChange, label = "Section" }: {
+export function Tabs({ tabs, value, onChange, label = "Section", dots = [] }: {
   tabs: [string, string, string?][];
   value?: string;
   onChange: (key: string) => void;
   label?: string;
+  /** Tabs with something on them worth looking at — the card screen's
+      unsaved changes, say — marked with a dot and said out loud. */
+  dots?: string[];
 }) {
   return (
     <div className="at-nav2" role="tablist" aria-label={label}>
@@ -884,6 +887,7 @@ export function Tabs({ tabs, value, onChange, label = "Section" }: {
         >
           {icon ? <Icon name={icon} size={18} /> : null}
           {text}
+          {dots.includes(k) ? <span className="at-tabdot" aria-label="needs a look" /> : null}
         </button>
       ))}
     </div>
@@ -1473,21 +1477,27 @@ export function ClipList({ clips, onChange, load }: {
         const id = typeof clip === "string" ? clip : clip.id;
         const label = typeof clip === "string" ? null : clip.label;
         return (
-          <ClipRow
-            key={id}
-            hash={id}
-            label={label}
-            index={i}
-            load={load}
-            onRemove={
-              onChange
-                ? () =>
-                    onChange(
-                      list.filter((c) => (typeof c === "string" ? c !== id : c.id !== id))
-                    )
-                : undefined
-            }
-          />
+          <React.Fragment key={id}>
+            <ClipRow
+              hash={id}
+              label={label}
+              index={i}
+              load={load}
+              onRemove={
+                onChange
+                  ? () =>
+                      onChange(
+                        list.filter((c) => (typeof c === "string" ? c !== id : c.id !== id))
+                      )
+                  : undefined
+              }
+            />
+            {/* Said beside the recording itself, in the editor and on the
+                card's own screen alike — see setLostRecordings. */}
+            {isLostRecording(id) && (
+              <p className="at-hint at-lostclip">This recording didn't reach the server. Record it again.</p>
+            )}
+          </React.Fragment>
         );
       })}
     </div>
@@ -2434,7 +2444,7 @@ function ReadGrammar({ of, lang, skipPerCard = false }: {
       above rather than under every form. */
   skipPerCard?: boolean;
 }) {
-  const said = dimsSaid(of).filter((dim) => !(skipPerCard && dim.perCard));
+  const said = dimsSaid(of, lang).filter((dim) => !(skipPerCard && dim.perCard));
   const lex = lexicalKeys().filter((key) => String(of[key] || "").trim());
   if (!said.length && !lex.length) return null;
   return (
@@ -2518,10 +2528,10 @@ function ReadReference({ form, lang }: {
   const answers = answersOf(form, answerFields());
   const already = new Set<string>();
   for (const answer of answers) {
-    for (const dim of dimsSaid(answer as Record<string, any>)) already.add(dim.field);
+    for (const dim of dimsSaid(answer as Record<string, any>, lang)) already.add(dim.field);
     for (const key of lexicalKeys()) if (String((answer as Record<string, any>)[key] || "").trim()) already.add(key);
   }
-  const dims = dimsSaid(form).filter((dim) => !dim.perCard && !already.has(dim.field));
+  const dims = dimsSaid(form, lang).filter((dim) => !dim.perCard && !already.has(dim.field));
   const lex = lexicalKeys().filter((key) => String(form[key] || "").trim() && !already.has(key));
   if (!dims.length && !lex.length) return null;
   return (
@@ -3080,7 +3090,7 @@ function ReadKind({ card, lang }: { card: Record<string, any>; lang: Lang }) {
     ? ""
     : String(card.value);
   const lead = leadOf(card) as Record<string, any>;
-  const perCard = dimsSaid(lead).filter((dim) => dim.perCard);
+  const perCard = dimsSaid(lead, lang).filter((dim) => dim.perCard);
   const name = String(card.name || "").trim();
   /* The number a card out of a number system stands for, as its language
      writes it in figures — the thing a learner meets on a price tag. */
@@ -3687,7 +3697,7 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
  * doing the exclusivity, so a group of these reads as the same furniture
  * as a group of ticks and needs no styling of its own.
  */
-export function RadioGroup<T extends string>({ options, value, onChange, label, name, quiet }: {
+export function RadioGroup<T extends string>({ options, value, onChange, label, name, quiet, lede }: {
   options: { value: T; label: Node; note?: Node }[];
   value?: T | null;
   onChange: (value: T) => void;
@@ -3704,10 +3714,14 @@ export function RadioGroup<T extends string>({ options, value, onChange, label, 
    * one and keeps the other.
    */
   quiet?: boolean;
+  /** What the question means, between its name and the rows — the way
+      Field's `lede` explains a box before it is answered. */
+  lede?: Node;
 }) {
   return (
     <div className="at-field" role="radiogroup" aria-label={label}>
       {!quiet && <label className="at-label">{label}</label>}
+      {lede ? <p className="at-fieldlede">{lede}</p> : null}
       <div className="at-ticklist">
         {options.map((o) => (
           <label className="at-tickrow" key={String(o.value)}>
@@ -3730,16 +3744,19 @@ export function RadioGroup<T extends string>({ options, value, onChange, label, 
 
 /* The languages, through the one above. Two radio groups written out side
    by side is how they came to disagree about their own markup. */
-export function LanguageRadio({ languages, value, onChange, label = "Language", name = "lang" }: {
+export function LanguageRadio({ languages, value, onChange, label = "Language", name = "lang", lede }: {
   languages: Record<string, { id: LangId, name: string }>;
   value?: LangId;
   onChange: (id: LangId) => void;
   label?: string;
   name?: string;
+  /** What the choice is for, under its name — see RadioGroup. */
+  lede?: Node;
 }) {
   return (
     <RadioGroup
       label={label}
+      lede={lede}
       name={name}
       value={value}
       onChange={onChange}
@@ -4038,6 +4055,32 @@ export async function pullAdmin(handle: string): Promise<import("./types.ts").Ad
   return data;
 }
 
+/*
+ * Recordings a card names that the server does not hold.
+ *
+ * Told by the server with the teacher's cards (see clipsMissing there) and
+ * kept here for the screens that show it — the card list's pill and
+ * filter, the deck list's count, the editor beside the recording itself —
+ * which are scattered across two files and are not all handed the
+ * teaching space's state. TeachSpace sets it as it renders.
+ */
+let LOST_RECORDINGS: Set<string> = new Set();
+export function setLostRecordings(ids: Iterable<string>) {
+  LOST_RECORDINGS = new Set(ids);
+}
+export const isLostRecording = (hash: string) => LOST_RECORDINGS.has(hash);
+/** Every recording a card names: its forms', their answers', its lines'. */
+export function recordingsOfCard(card: any): string[] {
+  const of = (x: any) => [...((x && x.clips) || []), ...((x && x.slowClips) || [])];
+  return [
+    ...formsOf(card).flatMap((f: any) => [...of(f), ...(Array.isArray(f.answers) ? f.answers.flatMap(of) : [])]),
+    ...((card && card.lines) || []).flatMap(of),
+  ].filter((h) => typeof h === "string");
+}
+/** Whether any of them is missing from the server. */
+export const cardLostRecordings = (card: any): number =>
+  LOST_RECORDINGS.size ? new Set(recordingsOfCard(card).filter(isLostRecording)).size : 0;
+
 /* What a teacher has: the courses they teach, their decks, their cards.
    One failing call shouldn't blank the screen, so what arrives is taken
    and what didn't is reported — and what was already held stands in for
@@ -4052,6 +4095,8 @@ export async function pullTeaching(handle: string) {
         : before.courses,
     decks: d.status === "fulfilled" ? d.value.decks || [] : before.decks,
     cards: k.status === "fulfilled" ? k.value.cards || [] : before.cards,
+    /* Which of those cards' recordings the server does not hold. */
+    missingClips: k.status === "fulfilled" ? k.value.missingClips || [] : before.missingClips || [],
   };
   deliverSpace("teach", handle, shown);
   const failed = [c, d, k].find((r) => r.status === "rejected");
@@ -4566,6 +4611,9 @@ export type CoursesPulled = Folded & {
   fold: (current: Item[], parked?: Record<string, Parked>) => Folded;
   version: string;
   teaches: boolean;
+  /* The recordings and pictures in this material the server does not hold. */
+  missingClips: string[];
+  missingImages: string[];
 };
 
 export async function pullCourses(
@@ -4692,6 +4740,8 @@ export async function pullCourses(
       foldCourses(current, incoming, drawer),
     version: r.version || "",
     teaches: !!r.teaches,
+    missingClips: Array.isArray(r.missingClips) ? r.missingClips.filter((h: unknown) => typeof h === "string") : [],
+    missingImages: Array.isArray(r.missingImages) ? r.missingImages.filter((h: unknown) => typeof h === "string") : [],
   };
 }
 

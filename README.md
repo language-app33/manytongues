@@ -1,4 +1,4 @@
-# Taleb33
+# ManyTongues
 
 A spaced-repetition app for learning languages, built as a progressive web
 app. It started as an Arabic trainer and now also supports Vietnamese (Huế

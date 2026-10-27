@@ -166,6 +166,7 @@ import {
   keysFor,
   answerOf,
   levelOf,
+  LEVEL_NAME,
   typeOf,
   tablesOf,
   verbOf,
@@ -932,12 +933,8 @@ const now = () => Date.now();
    names, said once here rather than in each screen that shows one.
    ------------------------------------------------------------------ */
 
-const LEVEL_NAME: Record<number, string> = {
-  1: "What it means",
-  2: "Which word it is",
-  3: "Write it from a cue",
-  4: "Write it from its meaning",
-};
+/* LEVEL_NAME, the four names, lives beside levelOf in languages.ts, so the
+   card screen's list of exercises can head its groups with them too. */
 
 /*
  * The same four, written to be read inside a sentence.
@@ -7808,12 +7805,40 @@ function base64ToBlob(dataUrl: unknown) {
 
 /* --- the API the rest of the app uses --- */
 
+/*
+ * Whoever wants to know that the recordings on this device have changed.
+ *
+ * The app keeps a list of which recordings are here — offline it decides
+ * which questions can be asked, and Account settings counts what is not
+ * here yet. That list was asked for again only at a few moments (launch,
+ * the connection going, a sync's downloads), while recordings were also
+ * saved by a session warming up and by any recording being played. So the
+ * count said a recording was missing after it had arrived, and the
+ * download button, finding nothing to fetch, said everything was already
+ * here. Every write and removal now says so, here, and the list is asked
+ * again once the burst is over.
+ */
+const CLIP_WATCHERS: Set<() => void> = new Set();
+let clipNoticeTimer: ReturnType<typeof setTimeout> | null = null;
+function clipsChanged() {
+  if (clipNoticeTimer) clearTimeout(clipNoticeTimer);
+  clipNoticeTimer = setTimeout(() => {
+    clipNoticeTimer = null;
+    for (const f of CLIP_WATCHERS) f();
+  }, 300);
+}
+
 async function saveClipBlob(id: string, blob: Blob) {
   const ok = await idbRun("readwrite", (st) => st.put(blob, id));
-  if (ok !== undefined) return true;
+  if (ok !== undefined) {
+    clipsChanged();
+    return true;
+  }
   // No IndexedDB: fall back to the text store.
   try {
-    return !!(await window.storage.set(AUDIO_KEY(id), await blobToBase64(blob)));
+    const kept = !!(await window.storage.set(AUDIO_KEY(id), await blobToBase64(blob)));
+    if (kept) clipsChanged();
+    return kept;
   } catch (e) {
     return false;
   }
@@ -7833,6 +7858,63 @@ function knownMissing(id: string) {
     return false;
   }
   return true;
+}
+
+/*
+ * Recordings the server has said it does not hold, kept across launches.
+ *
+ * A card can name a recording that never reached the server, and no
+ * download will bring it. Counted as "not on this device yet", it sat in
+ * Account settings for ever, and the download button that could not fetch
+ * it said everything was already here. The server now says which these
+ * are with the course material (see clipsMissing on the server), and a
+ * download it refuses says so too; both are kept here and left out of
+ * what the app counts and fetches. The teacher hears about it instead.
+ *
+ * Kept for a day and then looked for again, because the teacher may put
+ * it right — a device that still has the recording sends it on its own.
+ */
+/* Pictures are kept the same way, under a key of their own. */
+type MediaKind = "clip" | "image";
+const LACKS_KEY: Record<MediaKind, string> = {
+  clip: "arabic-trainer-server-lacks",
+  image: "arabic-trainer-server-lacks-images",
+};
+const LACKS_FOR_MS = 24 * 3600000;
+function readLacks(kind: MediaKind): Record<string, number> {
+  try {
+    const raw = JSON.parse(localStorage.getItem(LACKS_KEY[kind]) || "{}");
+    return raw && typeof raw === "object" ? raw : {};
+  } catch (e) {
+    return {};
+  }
+}
+function writeLacks(kind: MediaKind, map: Record<string, number>) {
+  try {
+    localStorage.setItem(LACKS_KEY[kind], JSON.stringify(map));
+  } catch (e) {
+    /* Not kept past this launch; the server says again next time. */
+  }
+}
+/** The recordings (or pictures) the server lacks, as far as this device knows today. */
+function serverLacks(kind: MediaKind = "clip"): Set<string> {
+  const t = now();
+  return new Set(Object.entries(readLacks(kind)).filter(([, at]) => t - Number(at) < LACKS_FOR_MS).map(([id]) => id));
+}
+/** Noted one at a time, as downloads are refused. */
+function noteServerLacks(id: string, kind: MediaKind = "clip") {
+  const map = readLacks(kind);
+  if (map[id] && now() - map[id] < LACKS_FOR_MS) return;
+  map[id] = now();
+  writeLacks(kind, map);
+  clipsChanged();
+}
+/** Or the server's whole answer for the material, which replaces the last. */
+function setServerLacks(ids: string[], kind: MediaKind = "clip") {
+  const map: Record<string, number> = {};
+  for (const id of ids) map[id] = now();
+  writeLacks(kind, map);
+  clipsChanged();
 }
 
 /* What this device holds, and nothing else: no network, no side effects. */
@@ -7905,7 +7987,7 @@ async function clipBlob(id: string) {
       const blob = base64ToBlob(r.data);
       if (blob) {
         try {
-          await idbRun("readwrite", (st) => st.put(blob, id));
+          if ((await idbRun("readwrite", (st) => st.put(blob, id))) !== undefined) clipsChanged();
         } catch (e) {
           /* cache is a courtesy; playing matters more */
         }
@@ -7917,7 +7999,12 @@ async function clipBlob(id: string) {
     /* Being unable to reach the server is not the same as the server not
        having it. Only the second is remembered; the first is worth retrying
        when the connection comes back. */
-    if (!(typeof e === "object" && e && "message" in e && e.message === "offline")) MISSING_CLIPS.set(id, now());
+    if (!(typeof e === "object" && e && "message" in e && e.message === "offline")) {
+      MISSING_CLIPS.set(id, now());
+      /* A "not here" from the server, as against a fault, is kept past
+         this launch — see serverLacks. */
+      if (e instanceof Error && e.message === "not-found") noteServerLacks(id);
+    }
   }
   return null;
 }
@@ -7937,6 +8024,36 @@ async function dropClip(id: string) {
   } catch (e) {
     /* already gone */
   }
+  clipsChanged();
+}
+
+/* The pictures on this device: how many, and how much room they take. */
+async function imageStats() {
+  const all = (await idbRun("readonly", (st) => st.getAll(), IMAGE_STORE)) || [];
+  let bytes = 0;
+  for (const b of all) if (b && b.size) bytes += b.size;
+  return { count: all.length, bytes };
+}
+
+/*
+ * Every recording and picture this device has kept, gone.
+ *
+ * Asked for from Account settings by someone short of room. Nothing is
+ * lost by it: each one is on the server and comes back the next time a
+ * session needs it, which the confirmation says. The text store a browser
+ * without IndexedDB keeps its recordings in is emptied too.
+ */
+async function clearDeviceMedia() {
+  await idbRun("readwrite", (st) => st.clear());
+  await idbRun("readwrite", (st) => st.clear(), IMAGE_STORE);
+  try {
+    const listed = await window.storage.list("audio-");
+    for (const k of (listed && listed.keys) || []) await window.storage.delete(String(k));
+  } catch (e) {
+    /* No text store, or nothing in it. */
+  }
+  IMAGES_HELD.clear();
+  clipsChanged();
 }
 
 async function clipStats() {
@@ -7948,17 +8065,26 @@ async function clipStats() {
 
 /* Fetch whatever recordings the given ids name that aren't here yet, a few
    at a time. Used to warm a session before it starts and, from Account
-   settings, to take a whole course offline. */
+   settings, to take a whole course offline.
+
+   Says how many it fetched and how many it could not. Those were one
+   number, so a download that failed — the connection dropping, or the
+   server not having the file — read as one that had nothing to do, and
+   Account settings said everything was already on the device. A recording
+   the server says it lacks is counted apart, because trying again will not
+   bring it: see serverLacks. */
 async function warmClips(
   ids: Iterable<string>,
   { concurrency = 3, onProgress }: {
     concurrency?: number;
-    onProgress?: (done: number, fetched: number) => void;
+    onProgress?: (done: number, fetched: number, id: string) => void;
   } = {},
 ) {
   const queue = [...new Set(ids)];
   let done = 0;
   let fetched = 0;
+  let failed = 0;
+  let lacking = 0;
   const worker = async () => {
     for (;;) {
       const id = queue.shift();
@@ -7966,16 +8092,19 @@ async function warmClips(
       try {
         if (!(await hasClipLocal(id))) {
           if (await clipBlob(id)) fetched += 1;
+          else if (serverLacks().has(id)) lacking += 1;
+          else failed += 1;
         }
       } catch (e) {
         /* leave it for next time */
+        failed += 1;
       }
       done += 1;
-      if (onProgress) onProgress(done, fetched);
+      if (onProgress) onProgress(done, fetched, id);
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, queue.length || 1) }, worker));
-  return fetched;
+  return { fetched, failed, lacking };
 }
 
 /* ---- pictures ----
@@ -8008,11 +8137,14 @@ function imageBlob(hash: string): Promise<Blob | null> {
       const r = await API.getImage(hash);
       if (r && r.data) {
         const blob = base64ToBlob(r.data);
-        await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE);
+        if ((await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE)) !== undefined) clipsChanged();
         return blob;
       }
     } catch (e) {
-      /* Not reachable now; the next question asks again. */
+      /* Not reachable now; the next question asks again. A picture the
+         server says it does not hold is kept aside, like a recording —
+         see serverLacks. */
+      if (e instanceof Error && e.message === "not-found") noteServerLacks(hash, "image");
     }
     return null;
   })();
@@ -8025,16 +8157,28 @@ function imageBlob(hash: string): Promise<Blob | null> {
 
 /* Fetch whatever pictures are not here yet, a few at a time — before a
    session starts, so its picture questions do not wait on the network. */
-async function warmImages(hashes: Iterable<string>, concurrency = 3) {
+async function warmImages(
+  hashes: Iterable<string>,
+  concurrency = 3,
+  onEach?: (hash: string) => void,
+) {
   const queue = [...new Set(hashes)];
+  let fetched = 0;
+  let failed = 0;
   const worker = async () => {
     for (;;) {
       const h = queue.shift();
       if (h === undefined) return;
-      await imageBlob(h).catch(() => null);
+      const here = await idbRun("readonly", (st) => st.getKey(h), IMAGE_STORE);
+      if (here === undefined || here === null) {
+        if (await imageBlob(h).catch(() => null)) fetched += 1;
+        else if (!serverLacks("image").has(h)) failed += 1;
+      }
+      if (onEach) onEach(h);
     }
   };
   await Promise.all(Array.from({ length: Math.min(concurrency, queue.length || 1) }, worker));
+  return { fetched, failed };
 }
 
 /* One of a card's pictures, drawn once it is here. Its object URL is made
@@ -10242,7 +10386,12 @@ export default function ArabicTrainer() {
    * recording it downloads is one more question that can be asked without
    * a connection.
    */
+  /* And which recordings the server has said it lacks — see serverLacks. */
+  const [lacks, setLacks] = useState<Set<string>>(() => serverLacks());
+  const [lacksImages, setLacksImages] = useState<Set<string>>(() => serverLacks("image"));
   const refreshAudible = useCallback(() => {
+    setLacks(serverLacks());
+    setLacksImages(serverLacks("image"));
     localClipIds()
       .then((ids) => setAudible(ids))
       .catch(() => {
@@ -10255,6 +10404,14 @@ export default function ArabicTrainer() {
       .then((ids) => setVisible(ids))
       .catch(() => {});
   }, []);
+  /* And whenever a recording is saved or removed, wherever that happened —
+     see clipsChanged. */
+  useEffect(() => {
+    CLIP_WATCHERS.add(refreshAudible);
+    return () => {
+      CLIP_WATCHERS.delete(refreshAudible);
+    };
+  }, [refreshAudible]);
   /* What this device was last told about the courses, read once at the
      first render. It is what the three pieces of state below open with, so
      a launch with no connection shows the courses rather than an error. */
@@ -11218,14 +11375,26 @@ export default function ArabicTrainer() {
   const skillCaps = useMemo(() => skillCapsOf(asking, settings), [asking, settings]);
   setSkillCaps(skillCaps);
 
-  /* Every recording the cards refer to, for taking a course offline. */
+  /* Every recording the cards refer to, for taking a course offline —
+     less the ones the server has said it does not hold, which no download
+     will bring and the teacher is told about instead. */
   const allClipIds = useMemo(() => {
     const ids = [];
     for (const it of items) {
-      for (const { unit } of unitsOf(it)) for (const r of unit.recs || []) ids.push(r.id);
+      for (const { unit } of unitsOf(it)) for (const r of unit.recs || []) if (!lacks.has(r.id)) ids.push(r.id);
     }
     return ids;
-  }, [items]);
+  }, [items, lacks]);
+  /* And every picture, for the same — less the ones the server lacks. */
+  const allImageIds = useMemo(() => {
+    const ids: string[] = [];
+    for (const it of items) {
+      for (const { unit } of unitsOf(it)) {
+        for (const h of Array.isArray(unit.images) ? unit.images : []) if (typeof h === "string" && !lacksImages.has(h)) ids.push(h);
+      }
+    }
+    return ids;
+  }, [items, lacksImages]);
 
   /* How many of them are not here. Read on the home screen while offline,
      and in Account settings beside the button that fetches them. */
@@ -11598,6 +11767,8 @@ export default function ArabicTrainer() {
         setMyCourses(r.courses);
         setCourseDecks(r.decks);
         setSystems(r.systems);
+        setServerLacks(r.missingClips);
+        setServerLacks(r.missingImages, "image");
         /* Kept, so the next launch opens with them rather than with an
            error — and so the check after that can be the cheap one. */
         saveMaterial(account.handle, {
@@ -13709,7 +13880,7 @@ export default function ArabicTrainer() {
               <div className="at-mb3">
                 <Notice kind="info">
                   <span>
-                    Add Taleb33 to your home screen to keep your cards safe and open it like an
+                    Add ManyTongues to your home screen to keep your cards safe and open it like an
                     app.{" "}
                     {install.prompt ? (
                       <button className="at-linkbtn" onClick={() => install.prompt?.prompt()}>
@@ -15107,6 +15278,14 @@ export default function ArabicTrainer() {
                  opening Teaching again tomorrow is opening Teaching, not
                  reopening whatever was last tried. */
               resume={trialBack}
+              /* A recording the server has lost, sent again from this
+                 device if it still holds it. */
+              onResend={async (hash: string) => {
+                const blob = await localClipBlob(hash);
+                if (!blob) return false;
+                await API.putClip(hash, await blobToBase64(blob));
+                return true;
+              }}
               onClose={() => {
                 setTrialBack(null);
                 setSpace("learn");
@@ -15148,6 +15327,8 @@ export default function ArabicTrainer() {
             onReset={resetScheduling}
             allClipIds={allClipIds}
             onDevice={audible}
+            allImageIds={allImageIds}
+            imagesOnDevice={visible}
             onDownloaded={refreshAudible}
             /* Signed out, the account screen is still reachable and still
                has to render. What it shows is nobody, not a half-account. */
@@ -15253,7 +15434,10 @@ export default function ArabicTrainer() {
           together, so they are decided in one place rather than three. */}
       {!inExercise && (
         <>
-          <div className="at-brand">Taleb33</div>
+          <div className="at-brand">
+            <img className="at-brandmark" src="/logo.svg" alt="" width={24} height={24} />
+            ManyTongues
+          </div>
           {/* The switch and the space tabs share a bar, so they sit beside
               each other however many of either there are — the tabs are
               not there at all for somebody who only learns, and the switch
@@ -18669,6 +18853,7 @@ function PrepScreen({
     <Screen
       title="Prep mode"
       onBack={onBack}
+      className="cardform"
       /* Save at the foot of the screen, as every other form keeps it, and
          the way to delete the prep at the other end of the same bar —
          an icon, so it is there without competing with Save. */
@@ -18705,7 +18890,11 @@ function PrepScreen({
       <FormField
         label="When is it?"
         htmlFor="at-prep-date"
-        hint={date && !dateOk ? "Pick a day from tomorrow on." : "You'll need to be ready before this day starts."}
+        /* What the day means is said before it is picked, as the card
+           editor explains a field; a day that will not do is said after,
+           against what was picked. */
+        lede="You'll need to be ready before this day starts."
+        hint={date && !dateOk ? "Pick a day from tomorrow on." : null}
       >
         <input
           id="at-prep-date"
@@ -18734,7 +18923,7 @@ function PrepScreen({
       </FormField>
       <FormField
         label="Target level"
-        hint={
+        lede={
           target === "cleared"
             ? "Every card answered right all the way up its levels. Quicker to reach."
             : "Every card cleared, then remembered on two reviews a few days apart."
@@ -19602,29 +19791,40 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
     }
   }
 
+  /* Headed and explained the way the card editor is: the section's name at
+     heading size with what it is for under it, and each field's name with
+     its explanation straight underneath, before the control it explains. */
   return (
-    <Section title="Your account">
+    <div className="at-formblock">
+      <div className="at-formhead">
+        <span className="at-formnum">Your account</span>
+      </div>
 
-      <FormField label="Display name">
+      <FormField label="Display name" lede="What teachers and classmates see. Change it whenever you like.">
         <input
           className="at-input"
           defaultValue={me.displayName}
           onBlur={(e) => e.target.value.trim() && onRename(e.target.value.trim())}
         />
-        <Help>
-          What teachers and classmates see. Change it whenever you like.
-        </Help>
       </FormField>
 
-      <FormField label="Handle">
+      <FormField
+        label="Handle"
+        lede="Fixed for good, because course rosters point at it. Safe to share — it identifies you without letting anyone in."
+      >
         <p className="at-handle">{me.handle}</p>
-        <Help>
-          Fixed for good, because course rosters point at it. Safe to share — it identifies you
-          without letting anyone in.
-        </Help>
       </FormField>
 
-      <FormField label="Sign-in key">
+      <FormField
+        label="Sign-in key"
+        lede={
+          <>
+            Five words that sign you in on any device and keep them together.{" "}
+            <em>Never share it</em> — anyone who has it is you. If you lose it, your administrator
+            can issue a new one; you keep your handle, your courses and everything you have learnt.
+          </>
+        }
+      >
         {showKey ? (
           <>
             {/* A real field, so a password manager recognises it and offers to
@@ -19654,13 +19854,8 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
             Show my key
           </Button>
         )}
-        <Help>
-          Five words that sign you in on any device and keep them together.{" "}
-          <em>Never share it</em> — anyone who has it is you. If you lose it, your administrator
-          can issue a new one; you keep your handle, your courses and everything you have learnt.
-        </Help>
       </FormField>
-    </Section>
+    </div>
   );
 }
 
@@ -20197,7 +20392,7 @@ function SettingsScreen({ kind, onClose, ...rest }: {
   const title =
     kind === "account" ? "Account settings" : kind === "guide" ? "How it works" : "App preferences";
   return (
-    <Screen title={title} onBack={onClose}>
+    <Screen title={title} onBack={onClose} className={kind === "guide" ? "" : "cardform"}>
       {kind === "account" ? (
         <AccountSettings {...rest} />
       ) : kind === "guide" ? (
@@ -20206,6 +20401,186 @@ function SettingsScreen({ kind, onClose, ...rest }: {
         <AppPreferences {...rest} />
       )}
     </Screen>
+  );
+}
+
+/*
+ * Recordings and pictures on this device: what is kept here for practising
+ * offline, what is still to come, and the two things anyone can do about
+ * it — fetch the rest, or clear the lot.
+ *
+ * It was "Storage", with a count of recordings and nothing to act on but a
+ * download button, and it never said whose storage it meant. The heading
+ * now says this device; pictures, kept the same way, are counted with the
+ * recordings; the download says roughly how much it will take before it
+ * is tapped and reports what it could not fetch; and the section can be
+ * emptied, which is safe — everything comes back as it is needed, and the
+ * confirmation says so.
+ */
+function DeviceMedia({ allClipIds, onDevice, allImageIds, imagesOnDevice, onDownloaded }: {
+  allClipIds: string[];
+  onDevice: Set<string> | null;
+  allImageIds: string[];
+  imagesOnDevice: Set<string> | null;
+  onDownloaded?: () => void;
+}) {
+  const [stats, setStats] = useState<{ clips: number; images: number; bytes: number; idb: boolean } | null>(null);
+  /* A download under way or just ended: how far, and how it went. */
+  const [warming, setWarming] = useState<{
+    total: number; done: number; finished?: boolean; fetched?: number; failed?: number;
+  } | null>(null);
+  const [sizes, setSizes] = useState<{ clips: Record<string, number>; images: Record<string, number> } | null>(null);
+  const [removing, setRemoving] = useState(false);
+  const offline = useOffline();
+
+  const readStats = useCallback(async () => {
+    const [c, i, db] = await Promise.all([clipStats(), imageStats(), openClipDb()]);
+    setStats({ clips: c.count, images: i.count, bytes: c.bytes + i.bytes, idb: !!db });
+  }, []);
+  useEffect(() => {
+    void readStats();
+  }, [readStats, onDevice, imagesOnDevice]);
+
+  /* Pictures are only kept where the browser's database is: without it
+     there is nowhere to put them, so none are counted as missing. */
+  const keepsPictures = !stats || stats.idb;
+  const missingClips = useMemo(
+    () => (onDevice ? [...new Set(allClipIds)].filter((id) => !onDevice.has(id)) : []),
+    [allClipIds, onDevice],
+  );
+  const missingImages = useMemo(
+    () => (imagesOnDevice && keepsPictures ? [...new Set(allImageIds)].filter((h) => !imagesOnDevice.has(h)) : []),
+    [allImageIds, imagesOnDevice, keepsPictures],
+  );
+  const missingCount = missingClips.length + missingImages.length;
+
+  /* How big what is missing is, asked of the server as the list changes,
+     for the button to say before it is tapped. The server's figure is of
+     the file as it stores it, as text, which runs a third over what the
+     device keeps. */
+  const missingKey = missingClips.join(",") + "|" + missingImages.join(",");
+  useEffect(() => {
+    if (!missingCount || offline) return;
+    let alive = true;
+    API.mediaSizes(missingClips, missingImages)
+      .then((r) => { if (alive) setSizes({ clips: r.clips || {}, images: r.images || {} }); })
+      .catch(() => { if (alive) setSizes(null); });
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [missingKey, offline]);
+  const sizeOf = (h: string, kind: "clips" | "images") =>
+    sizes && sizes[kind][h] ? Math.round(sizes[kind][h] * 0.75) : 0;
+  const missingBytes = sizes
+    ? missingClips.reduce((n, h) => n + sizeOf(h, "clips"), 0) + missingImages.reduce((n, h) => n + sizeOf(h, "images"), 0)
+    : 0;
+  const about = missingBytes ? ` (about ${formatBytes(missingBytes)})` : "";
+
+  async function downloadAll() {
+    const clips = missingClips;
+    const images = missingImages;
+    /* Measured in bytes where the server said how big each file is, so the
+       percentage moves with the download rather than jumping on a large
+       picture; in files where it did not. */
+    const weight = (h: string, kind: "clips" | "images") => sizeOf(h, kind) || 1;
+    const total = clips.reduce((n, h) => n + weight(h, "clips"), 0) + images.reduce((n, h) => n + weight(h, "images"), 0);
+    let done = 0;
+    setWarming({ total, done: 0 });
+    const c = await warmClips(clips, {
+      onProgress: (_n, _got, id) => {
+        done += weight(id, "clips");
+        setWarming({ total, done });
+      },
+    });
+    const i = await warmImages(images, 3, (h) => {
+      done += weight(h, "images");
+      setWarming({ total, done });
+    });
+    setWarming({ total, done: total, finished: true, fetched: c.fetched + i.fetched, failed: c.failed + i.failed });
+    await readStats();
+    /* More can be heard now, which decides what an offline session may
+       ask. Said here rather than left to the next launch, because the
+       whole point of this button is being about to go offline. */
+    if (onDownloaded) onDownloaded();
+  }
+
+  const busy = !!warming && !warming.finished;
+  const failed = warming && warming.finished ? warming.failed || 0 : 0;
+  const done = !!warming && !!warming.finished && !failed && !missingCount;
+  const held = stats ? stats.clips + stats.images : 0;
+  /* "12 recordings and 3 pictures", leaving out whichever is none. */
+  const both = (clips: number, images: number) =>
+    [clips ? plural(clips, "recording") : "", images ? plural(images, "picture") : ""].filter(Boolean).join(" and ");
+
+  return (
+    <div className="at-formblock">
+      <div className="at-formhead">
+        <span className="at-formnum">Recordings and pictures on this device</span>
+        <span className="at-formrole">Saved here so you can keep practising without an internet connection.</span>
+      </div>
+      <p className="at-devicefigures">
+        {stats ? (held ? `${both(stats.clips, stats.images)}, ${formatBytes(stats.bytes)}` : "Nothing saved yet.") : "Counting…"}
+      </p>
+      {stats && !stats.idb && (
+        <Notice kind="warn">
+          This browser is giving the app very little space, so recordings may stop saving. If you're in a private
+          window, open the app in a normal one.
+        </Notice>
+      )}
+      {missingCount > 0 && !busy && (
+        <Help>
+          {`${both(missingClips.length, missingImages.length)} ${missingCount === 1 ? "isn't" : "aren't"} on this device yet. Until they are, you'll only hear those questions when you're online.`}
+        </Help>
+      )}
+      {failed > 0 && (
+        <Notice kind="warn">
+          {`${plural(failed, "file")} couldn't be downloaded. Check your connection, then try again.`}
+        </Notice>
+      )}
+      {done && <Help>Done. You can now practise everything offline.</Help>}
+      {!missingCount && !done && (allClipIds.length > 0 || allImageIds.length > 0) && (
+        <Help>Everything is on this device. You can practise offline.</Help>
+      )}
+      {(missingCount > 0 || busy || held > 0) && (
+        <div className="at-devicebtns">
+          {(missingCount > 0 || busy) && (
+            <Button variant="ghost" size="sm" disabled={busy} onClick={downloadAll} icon="download">
+              {busy
+                ? `Downloading… ${warming && warming.total ? Math.min(99, Math.floor((warming.done / warming.total) * 100)) : 0}%`
+                : failed
+                ? `Try again${about}`
+                : `Download all recordings and pictures${about}`}
+            </Button>
+          )}
+          {held > 0 && !busy && (
+            <Button variant="ghost" size="sm" onClick={() => setRemoving(true)} icon="delete">
+              Remove from this device
+            </Button>
+          )}
+        </div>
+      )}
+      {removing && (
+        <ConfirmModal
+          title="Remove recordings and pictures from this device?"
+          danger={false}
+          confirmLabel="Remove"
+          body={
+            <p>
+              {`This frees ${stats ? formatBytes(stats.bytes) : "the space they take"}. Recordings and pictures download again when you practise, so this number will grow back over time.`}
+            </p>
+          }
+          onCancel={() => setRemoving(false)}
+          onConfirm={async () => {
+            setRemoving(false);
+            setWarming(null);
+            await clearDeviceMedia();
+            await readStats();
+            if (onDownloaded) onDownloaded();
+          }}
+        />
+      )}
+    </div>
   );
 }
 
@@ -20220,6 +20595,8 @@ function AccountSettings({
   onLogOut,
   allClipIds = [],
   onDevice = null,
+  allImageIds = [],
+  imagesOnDevice = null,
   onDownloaded,
 }: {
   account: User & { key: string };
@@ -20234,104 +20611,42 @@ function AccountSettings({
   /** Which recordings are here, so the screen can say how many are not.
       Null before anybody has looked. */
   onDevice?: Set<string> | null;
+  /** And the same for the cards' pictures. */
+  allImageIds?: string[];
+  imagesOnDevice?: Set<string> | null;
   /** Something was downloaded, so what a session may ask has changed. */
   onDownloaded?: () => void;
 }) {
-  /* The storage figures moved here with the section that shows them. */
-  const [stats, setStats] = useState<any | null>(null);
-  const [warming, setWarming] = useState<any | null>(null); // { done, total, fetched }
-
-  async function downloadAll() {
-    const total = new Set(allClipIds).size;
-    setWarming({ done: 0, total, fetched: 0 });
-    const fetched = await warmClips(allClipIds, {
-      onProgress: (done, got) => setWarming({ done, total, fetched: got }),
-    });
-    setWarming({ done: total, total, fetched, finished: true });
-    const [st, db] = await Promise.all([clipStats(), openClipDb()]);
-    setStats({ ...st, idb: !!db });
-    /* More can be heard now, which decides what an offline session may
-       ask. Said here rather than left to the next launch, because the
-       whole point of this button is being about to go offline. */
-    if (onDownloaded) onDownloaded();
-  }
-
-  /*
-   * How many of this learner's recordings are not on the device.
-   *
-   * Worth saying out loud on this screen: offline, a card whose recording
-   * is elsewhere is not asked its listening exercises, and somebody about
-   * to get on a train would rather know that now than find a quieter
-   * session waiting for them.
-   */
-  const missing = onDevice
-    ? [...new Set(allClipIds)].filter((id) => !onDevice.has(id)).length
-    : 0;
   /* Shut by default: everything inside it is irreversible, so it shouldn't
      be sitting open where a thumb can reach it. */
   const [dangerOpen, setDangerOpen] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [resetting, setResetting] = useState(false);
 
-  useEffect(() => {
-    let alive = true;
-    Promise.all([clipStats(), openClipDb()]).then(([st, db]) => {
-      if (alive) setStats({ ...st, idb: !!db });
-    });
-    return () => {
-      alive = false;
-    };
-  }, []);
-
   return (
     <>
       <AccountPanel me={account} onRename={onRename} />
 
-      <Section title="Storage">
-        <Lede>
-          {stats
-            ? `${plural(stats.count, "recording")}, ${formatBytes(stats.bytes)}${
-                stats.idb ? "" : " — stored in the small text store, so keep an eye on the size"
-              }`
-            : "Counting recordings…"}
-        </Lede>
-        {missing > 0 && (
-          <Help>
-            {`${plural(missing, "recording")} not on this device yet. Until they are, questions that
-              play them are only asked when you're online.`}
-          </Help>
-        )}
-        {allClipIds.length > 0 && (
-          <div className="at-row at-mt2">
-            <Button variant="ghost" size="sm"
-              disabled={!!warming && !warming.finished}
-              onClick={downloadAll} icon="download">{warming && !warming.finished
-                ? `Downloading ${warming.done} of ${warming.total}…`
-                : missing > 0
-                ? `Download ${missing} for offline`
-                : "Download all recordings for offline"}</Button>
-          </div>
-        )}
-        {warming && warming.finished && (
-          <Help>
-            {warming.fetched
-              ? `${plural(warming.fetched, "recording")} downloaded.`
-              : "Everything was already on this device."}
-          </Help>
-        )}
-      </Section>
+      <DeviceMedia
+        allClipIds={allClipIds}
+        onDevice={onDevice}
+        allImageIds={allImageIds}
+        imagesOnDevice={imagesOnDevice}
+        onDownloaded={onDownloaded}
+      />
 
       {/* Signing out is ordinary housekeeping, not a danger: it leaves
           everything on the server exactly as it is. */}
-      <Section title="Sign out">
-        <Lede>
-          Leaves this device signed out. Nothing on the server changes, and your key brings it all
-          back — so only do this if you have the key written down somewhere.
-        </Lede>
-        <Button className="at-mt3" onClick={() => setLoggingOut(true)}>
-          Log out
-        </Button>
-      </Section>
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Sign out</span>
+          <span className="at-formrole">
+            Leaves this device signed out. Nothing on the server changes, and your key brings it
+            all back — so only do this if you have the key written down somewhere.
+          </span>
+        </div>
+        <Button onClick={() => setLoggingOut(true)}>Log out</Button>
+      </div>
 
       {loggingOut && (
         <ConfirmModal
@@ -20352,52 +20667,50 @@ function AccountSettings({
         />
       )}
 
-      <div className={`at-sub at-danger${dangerOpen ? " open" : ""}`}>
-        <button
-          className="at-dangertoggle"
-          onClick={() => setDangerOpen((v) => !v)}
-          aria-expanded={dangerOpen}
-        >
-          <span className="at-eyebrow">
-            Danger zone
-          </span>
-          <span className="at-chevron">{dangerOpen ? "⌄" : "›"}</span>
-        </button>
+      {/* Headed like the others, with its heading as the button that opens
+          it — the way a folded form opens in the card editor. */}
+      <div className="at-formblock at-dangerblock">
+        <div className="at-formhead">
+          <button
+            className="at-dangertoggle"
+            onClick={() => setDangerOpen((v) => !v)}
+            aria-expanded={dangerOpen}
+          >
+            <span className="at-formnum">Danger zone</span>
+            <Icon name={dangerOpen ? "chevronUp" : "chevronDown"} size={24} />
+          </button>
+          {dangerOpen && (
+            <span className="at-formrole">Everything in here is irreversible.</span>
+          )}
+        </div>
 
         {dangerOpen && (
-          <div className="at-mt4">
+          <>
             {/* Running the site sits here because everything it leads to is
                 irreversible once you're through the door. */}
-            <FormField label="Running this site">
+            <FormField
+              label="Running this site"
+              lede={
+                isAdmin
+                  ? "You create courses, decide who teaches them, and can delete either. Nothing done in there can be taken back."
+                  : "Only needed by whoever runs this site. An administrator key turns this account into the one that manages everyone else's."
+              }
+            >
               {isAdmin ? (
-                <>
-                  <Help className="at-mb3">
-                    You create courses, decide who teaches them, and can delete either. Nothing
-                    done in there can be taken back.
-                  </Help>
-                  <Button size="sm" onClick={onOpenAdmin}>
-                    Open administration
-                  </Button>
-                </>
+                <Button size="sm" onClick={onOpenAdmin}>
+                  Open administration
+                </Button>
               ) : (
-                <>
-                  <Help className="at-mb3">
-                    Only needed by whoever runs this site. An administrator key turns this account
-                    into the one that manages everyone else's.
-                  </Help>
-                  <React.Suspense fallback={<ChunkFallback />}>
-                    <ClaimAdmin onDone={onBecameAdmin} />
-                  </React.Suspense>
-                </>
+                <React.Suspense fallback={<ChunkFallback />}>
+                  <ClaimAdmin onDone={onBecameAdmin} />
+                </React.Suspense>
               )}
             </FormField>
 
-            <FormField label={<>Send every card back to the start, as though never practiced</>}>
-              <Help className="at-mb3">
-                Your cards, forms, decks and recordings all stay. What goes is everything the app
-                has worked out about how well you know them — intervals, ease, difficulty and
-                history. Nothing will be due until you practice it again.
-              </Help>
+            <FormField
+              label="Reset scheduling"
+              lede="Sends every card back to the start, as though never practiced. Your cards, forms, decks and recordings all stay. What goes is everything the app has worked out about how well you know them — intervals, ease, difficulty and history. Nothing will be due until you practice it again."
+            >
               <Button variant="danger" size="sm" onClick={() => setResetting(true)}>
                 Reset scheduling
               </Button>
@@ -20423,15 +20736,13 @@ function AccountSettings({
               />
             )}
 
-            <FormField label="Close this account">
-              <Help className="at-mb3">
-                Removes your account from the server: your handle, your courses, and any decks you
-                made for them. Cards on this device stay until you clear them. There is no undoing
-                it and no way to get the handle back.
-              </Help>
+            <FormField
+              label="Close this account"
+              lede="Removes your account from the server: your handle, your courses, and any decks you made for them. Cards on this device stay until you clear them. There is no undoing it and no way to get the handle back."
+            >
               <CloseAccount onClosed={onCloseAccount} handle={account.handle} />
             </FormField>
-          </div>
+          </>
         )}
       </div>
     </>
@@ -20456,7 +20767,13 @@ function AppPreferences({ settings, setSetting }: {
 }) {
   return (
     <>
-      <Section title="Language">
+      {/* Headed and explained the way the card editor and Account settings
+          are: each section's name at heading size, and each field's
+          explanation straight under its name, before the control. */}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Language</span>
+        </div>
         {/* The one screen where a learner would look for this. It could only
             be set by a course before, so someone studying two languages had
             no way to choose which the app was in. */}
@@ -20466,9 +20783,12 @@ function AppPreferences({ settings, setSetting }: {
           onChange={(id) => setSetting("language", id)}
           label="Learning"
         />
-      </Section>
+      </div>
 
-      <Section title="Appearance">
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Appearance</span>
+        </div>
         <FormField label="Theme">
           <Segmented
             options={[{ value: "auto", label: "Follow device" }, { value: "light", label: "Light" }, { value: "dark", label: "Dark" }]}
@@ -20476,20 +20796,26 @@ function AppPreferences({ settings, setSetting }: {
             onChange={(v) => setSetting("theme", v)}
           />
         </FormField>
-        <FormField label="On-screen keys">
+        <FormField
+          label="On-screen keys"
+          lede="Keys for the language you're learning, when your device hasn't got them."
+        >
           <Segmented
             options={[{ value: "auto", label: "When needed" }, { value: "always", label: "Always" }, { value: "never", label: "Never" }]}
             value={(settings.keyboard || "auto")}
             onChange={(v) => setSetting("keyboard", v)}
           />
-          <Help>
-            Keys for the language you're learning, when your device hasn't got them.
-          </Help>
         </FormField>
-      </Section>
+      </div>
 
-      <Section title="Feedback">
-        <FormField label="Sounds">
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Feedback</span>
+        </div>
+        <FormField
+          label="Sounds"
+          lede="The short sounds after an answer. Loud carries on a bus; soft is for a quiet room."
+        >
           <div className="at-row">
             <Segmented
               label="Sounds"
@@ -20521,13 +20847,8 @@ function AppPreferences({ settings, setSetting }: {
               Test
             </Button>
           </div>
-          <Help>
-            The short sounds after an answer. Loud carries on a bus; soft is
-            for a quiet room.
-          </Help>
         </FormField>
-      </Section>
-
+      </div>
     </>
   );
 }
