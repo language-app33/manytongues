@@ -1,7 +1,7 @@
 {
   "name": "manytongues",
   "private": true,
-  "version": "0.498.0",
+  "version": "0.499.0",
   "type": "module",
   "license": "MIT",
   "scripts": {

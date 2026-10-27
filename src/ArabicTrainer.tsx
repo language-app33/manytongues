@@ -17488,11 +17488,11 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
     const here = new Set(eligible.map((i) => i.id));
     return editing.ids.filter((id) => !here.has(id));
   });
-  /* "" until one of the two is chosen — the same reason the mode starts
-     unset. It used to open on 20 questions already lit, which is a length
-     nobody asked for sitting where the answer goes. */
+  /* A new session opens on 20 questions, the owner's choice of default
+     (0.499): unlike the mode, a length is something most people take as
+     offered. "" only for a kept session that had none — an Ultimate one. */
   const [limitKind, setLimitKind] = useState( // "" | count | time
-    !editing ? "" : editing.minutes ? "time" : editing.count && editing.count < 999 ? "count" : ""
+    !editing ? "count" : editing.minutes ? "time" : editing.count && editing.count < 999 ? "count" : ""
   );
   const [count, setCount] = useState(editing && editing.count && editing.count < 999 ? editing.count : 20);
   const [minutes, setMinutes] = useState(editing && editing.minutes ? editing.minutes : 5);
@@ -17540,13 +17540,16 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
         : "At least two exercise types must be switched on in Settings"
       : "";
   /* What each section still wants, said under it the way the card editor
-     says what a field still needs. The button in the top bar is an icon,
-     and an icon cannot say why it is not lit — these lines do. */
+     says what a field still needs — but only once Start has been tapped
+     while something is missing. Shown from the outset, three warnings
+     greeted a screen nobody had done anything wrong on yet. */
+  const [tried, setTried] = useState(false);
   const need = {
     mode: !mode ? "Choose a mode." : "",
     cards: !picked.size ? "Choose at least one deck or card." : "",
     length: needsLength && !limitKind ? "Choose a length." : "",
   };
+  const said = tried ? need : { mode: "", cards: "", length: "" };
   const problem = need.mode || need.cards || typesShort || need.length;
 
   /* Named after what it is, so a list of them reads without opening any:
@@ -17561,7 +17564,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
     onStart({
       ids: [...picked],
       mode,
-      count: limitKind === "count" ? count : 999,
+      count: needsLength && limitKind === "count" ? count : 999,
       minutes: limitKind === "time" && needsLength ? minutes : 0,
     });
   }
@@ -17575,12 +17578,12 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
       ...described,
       ids: [...described.ids, ...elsewhere],
       mode,
-      count: limitKind === "count" ? count : 999,
+      count: needsLength && limitKind === "count" ? count : 999,
       minutes: limitKind === "time" && needsLength ? minutes : 0,
     });
   }
 
-  const go = editing ? "Save changes" : keeping ? "Save and start" : "Start";
+  const go = editing ? "Save" : "Start";
 
   /* One screen, ruled into sections the way the card editor is — Mode,
      Cards, Length, and keeping it — with the same headings, the same line
@@ -17590,20 +17593,21 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
      are. */
   return (
     <Screen
-      title={editing ? "Edit session" : "Build a session"}
+      title={editing ? "Edit custom session" : "Custom session"}
       className="cardform"
       onBack={onClose}
       action={
+        /* `off` rather than disabled: the tap still arrives, and is answered
+           by each unfilled section saying what it wants. */
         <Button
           variant="primary"
           size="sm"
-          className="iconly"
-          aria-label={go}
-          title={problem || go}
-          disabled={!!problem}
-          onClick={editing ? keep : start}
+          icon={editing ? "save" : "play"}
+          off={!!problem}
+          title={problem || undefined}
+          onClick={() => (problem ? setTried(true) : editing ? keep() : start())}
         >
-          <Icon name={editing ? "check" : "play"} />
+          {go}
         </Button>
       }
     >
@@ -17612,7 +17616,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
       <div className="at-formblock">
         <div className="at-formhead">
           <span className="at-formnum">Mode</span>
-          <span className="at-formrole">The mode sets which exercise types are asked.</span>
+          <span className="at-formrole">The mode sets which exercise types are asked. Cards you&apos;ve already fully learnt are left out.</span>
         </div>
         <ChoiceSwitch
           ask="Mode"
@@ -17624,10 +17628,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
           changeLabel="Change the mode"
           onChange={setMode}
         />
-        {need.mode && <p className="at-formneed unmet">{need.mode}</p>}
-        <Help className="at-mt3">
-          Cards you&apos;ve already fully learnt are left out of every session.
-        </Help>
+        {said.mode && <p className="at-formneed unmet at-mt3">{said.mode}</p>}
       </div>
 
       <div className="at-formblock">
@@ -17678,14 +17679,14 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
             }}
           />
         </FormField>
-        {need.cards && <p className="at-formneed unmet">{need.cards}</p>}
+        {said.cards && <p className="at-formneed unmet">{said.cards}</p>}
         {picked.size > 0 && <Help className="at-mt3">{plural(picked.size, "card")} in this session.</Help>}
       </div>
 
       <div className="at-formblock">
         <div className="at-formhead">
           <span className="at-formnum">Length</span>
-          <span className="at-formrole">One or the other: a number of questions, or a stretch of time.</span>
+          <span className="at-formrole">Pick how long you want the session to be.</span>
         </div>
         {needsLength ? (
           <>
@@ -17717,12 +17718,12 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
               />
             </FormField>
 
-            {need.length && <p className="at-formneed unmet">{need.length}</p>}
+            {said.length && <p className="at-formneed unmet">{said.length}</p>}
             {limitKind && (
               <Help>
                 {limitKind === "count"
                   ? `The session ends after ${count} questions.`
-                  : `A countdown replaces the question count, and the session ends after ${minutes} minutes.`}
+                  : `The session ends after ${minutes} minutes.`}
               </Help>
             )}
           </>
