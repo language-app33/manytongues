@@ -8560,8 +8560,8 @@ const openPronounTables = async () => {
     !!document.querySelector(".at-menubtn.on"),
     [...document.querySelectorAll(".at-menubtn")].map((b) => (b.textContent || "").trim()).join(" | "));
   /* Laid out like a card's screen: its sections headed at the editor's
-     size, and Export by the "This deck" heading rather than on the title
-     line. */
+     size, Deck quality part of "This deck", Export by that heading, and
+     Edit alone on the title line, as on a card being read. */
   {
     const deckSheet = [...document.querySelectorAll(".at-screen.cardform")]
       .find((el) => /Lesson 1/.test((el.querySelector(".at-screenhead h2") || {}).textContent || ""));
@@ -8569,12 +8569,21 @@ const openPronounTables = async () => {
       ? [...deckSheet.querySelectorAll(".at-formnum, .at-section > .at-sectiontop > .at-eyebrow")].map((h) => (h.textContent || "").trim())
       : [];
     check("an open deck is headed like a card's screen, This deck to Cards",
-      deckHeads[0] === "This deck" && deckHeads.includes("Deck quality") && deckHeads[deckHeads.length - 1] === "Cards",
+      deckHeads.join(" | ") === "This deck | Built-in cards | Cards",
       deckHeads.join(" | ") || "(not laid out like the card editor)");
-    check("and Export sits by its “This deck” heading",
+    const thisDeck = deckSheet && deckSheet.querySelector(".at-formblock");
+    const labels = thisDeck ? [...thisDeck.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : [];
+    check("and This deck holds its title, courses, lock and quality",
+      labels.join(" | ") === "Title | Courses | Lock | Deck quality",
+      labels.join(" | ") || "(no This deck)");
+    check("and Export sits by its “This deck” heading, with Edit alone on the title line",
       !!deckSheet && !!deckSheet.querySelector('.at-formhead [aria-label="Export this deck"]') &&
-        !deckSheet.querySelector(".at-screenaction button"),
-      deckSheet ? named(deckSheet.querySelector(".at-screenaction")).join(" | ") || "(nothing on the title line)" : "(no deck screen)");
+        named(deckSheet.querySelector(".at-screenaction")).length === 1 &&
+        !!deckSheet.querySelector('.at-screenaction [aria-label="Edit"]'),
+      deckSheet ? [...deckSheet.querySelectorAll(".at-screenaction button")].map((b) => b.getAttribute("aria-label")).join(" | ") || "(nothing on the title line)" : "(no deck screen)");
+    check("and read, its title cannot be typed into",
+      !!thisDeck && !!thisDeck.querySelector("fieldset:disabled input"),
+      thisDeck ? "the title box is live" : "(no This deck)");
   }
 
   /* Four views, in turn: small tiles, bigger tiles — fewer to a row, each
@@ -8624,9 +8633,16 @@ const openPronounTables = async () => {
   /* ---- and what a deck holds besides cards ----
      Numbers are one document per language, so a deck takes them in parts,
      by name, from a screen of their own. */
-  const addExtras = buttonNamed(/^Add numbers or pronouns$/);
-  check("an open deck offers to add numbers or pronouns", !!addExtras,
-    (document.body.textContent || "").includes("Numbers and pronouns") ? "(section, no button)" : "(no section)");
+  check("read, an open deck offers no way to change its built-in cards",
+    !buttonNamed(/^Choose built-in cards$/), "the button is there before Edit");
+  click(document.querySelector('.at-screenaction [aria-label="Edit"]'));
+  await sleep(250);
+  check("Edit swaps the back arrow for a cross that cancels",
+    !!document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'),
+    [...document.querySelectorAll(".at-screenhead .at-back")].map((b) => b.getAttribute("aria-label")).join(" | "));
+  const addExtras = buttonNamed(/^Choose built-in cards$/);
+  check("and edited, an open deck offers to choose its built-in cards", !!addExtras,
+    (document.body.textContent || "").includes("Built-in cards") ? "(section, no button)" : "(no section)");
   click(addExtras);
   await sleep(300);
   const partRow = (/** @type {RegExp} */ re) =>
@@ -8638,7 +8654,13 @@ const openPronounTables = async () => {
   const box = partRow(/Numbers 0 to 9/);
   click(box && (box.querySelector("input") || box));
   await sleep(150);
-  click(buttonNamed(/^Save$/));
+  const partsBefore = savedParts.length;
+  click(document.querySelector('.at-screenaction [aria-label="Done"]'));
+  await sleep(250);
+  check("and choosing them sends nothing until the deck is saved",
+    savedParts.length === partsBefore && /Numbers 0 to 9/.test(document.body.textContent || ""),
+    JSON.stringify(savedParts.slice(partsBefore)));
+  click(document.querySelector('.at-screenaction [aria-label="Save"]'));
   await sleep(600);
   const sent = savedParts[savedParts.length - 1];
   check("and saving tells the server which parts the deck holds",
