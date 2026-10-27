@@ -1104,6 +1104,35 @@ const buttonState = (re) => {
   return { there: !!b, disabled: !!b && b.disabled, label: (b && b.textContent) || "" };
 };
 
+/* The Build a session screen's pickers, which are the card editor's: the
+   mode is chosen as a card's subtype is, from a sheet of radios, and the
+   decks as a card's decks are, from a sheet of rows. */
+const sessionMode = async (/** @type {RegExp} */ want) => {
+  click([...document.querySelectorAll("button")].find((b) =>
+    /^(Mode\. Not set\. Choose one\.|Change the mode)$/.test(b.getAttribute("aria-label") || "")));
+  await sleep(80);
+  const row = [...document.querySelectorAll('[role="radiogroup"][aria-label="Mode"] .at-tickrow')]
+    .find((r) => want.test(r.textContent || ""));
+  click(row ? row.querySelector("input") : null);
+  await sleep(80);
+  return !!row;
+};
+const sessionDeck = async (/** @type {RegExp} */ want) => {
+  clickNamed(/^(Choose decks|Another deck)$/);
+  await sleep(80);
+  const sheet = document.querySelector('[role="dialog"][aria-label="Decks"]');
+  const row = sheet ? [...sheet.querySelectorAll(".at-deckpick")].find((b) => want.test(b.textContent || "")) : null;
+  click(row);
+  await sleep(60);
+  click(sheet ? sheet.querySelector('[aria-label="Close"]') : null);
+  await sleep(60);
+  return !!row;
+};
+/* What the screen shows as chosen: the mode's shut row, and the pills. */
+const sessionModeSaid = () =>
+  ((document.querySelector(".at-screen.cardform .at-shutrow .at-shutname") || {}).textContent || "").trim();
+const sessionPills = () => [...document.querySelectorAll(".at-screen.cardform .at-deckpill")].map((p) => (p.textContent || "").trim());
+
 check("the manual session builder opens", clickNamed(/Build a session|Choose what to practice|Pick cards/) || true);
 await sleep(300);
 if (/Build a session/.test(document.body.textContent)) {
@@ -1115,7 +1144,7 @@ if (/Build a session/.test(document.body.textContent)) {
   const heads = [...document.querySelectorAll(".at-screen.cardform .at-formblock > .at-formhead > .at-formnum")]
     .map((h) => h.textContent);
   check("the builder is one screen, sectioned like the card editor",
-    heads.join("|") === "Mode|Cards|Length|Keep this session" &&
+    heads.join("|") === "Mode|Cards|Length|Save for later" &&
       document.querySelectorAll(".at-formblock > .at-formhead > .at-formrole").length === 4,
     heads.join("|"));
   check("and nothing on it is a step to go through", !buttonNamed(/^Next$/));
@@ -1124,48 +1153,52 @@ if (/Build a session/.test(document.body.textContent)) {
      answer already lit — Ultimate on the first screen, twenty questions on
      the last — which reads as a decision made rather than one to make, and
      Ultimate is the longest session on offer to hand somebody by default. */
-  const modeCards = [...document.querySelectorAll(".at-modecard")];
-  check("the modes are all offered, none of them chosen", modeCards.length > 1 && !modeCards.some((b) => b.classList.contains("on")),
-    `${modeCards.length} modes, ${modeCards.filter((b) => b.classList.contains("on")).map((b) => (b.textContent || "").slice(0, 12)).join(",") || "none"} lit`);
-  check("no card is chosen for you either", !document.querySelector(".at-tagpick.on, .at-minicard.on"));
+  check("the mode is asked as a card's subtype is, and not answered for you",
+    !!buttonNamed(/^Mode\. Not set\. Choose one\.$/) && !sessionModeSaid(), sessionModeSaid() || "(none)");
+  check("no deck or card is chosen for you either", !sessionPills().length, sessionPills().join("|"));
   /* Length: two segmented controls, and on opening neither should have a
      segment lit. */
   const lit = [...document.querySelectorAll(".at-lengthgroup .on, .at-lengthgroup [aria-checked=true], .at-lengthgroup [aria-selected=true]")];
   check("no length is chosen for you", lit.length === 0, lit.map((e) => e.textContent).join(","));
 
-  const start = () => buttonState(/^(Start|Choose a mode|Choose at least one card|Choose a length)$/);
-  check("and you cannot start until you choose", start().there && start().disabled, start().label || "no button");
-  check("the button says what is missing rather than sitting dead", /^Choose a mode$/.test(start().label),
-    start().label);
+  /* The one button is the card editor's kind: an icon in the top bar, on
+     the right. Being an icon, it cannot say why it is not lit, so each
+     section says what it still wants. */
+  const start = () => buttonState(/^(Start|Save and start)$/);
+  const wants = () => [...document.querySelectorAll(".at-screen.cardform .at-formneed.unmet")].map((p) => p.textContent).join("|");
+  check("the way on is an icon in the top bar", start().there && !!buttonNamed(/^Start$/)?.closest(".at-screenhead"),
+    start().label || "no button");
+  check("and you cannot start until you choose", start().disabled, start().label);
+  check("each section says what it still wants",
+    wants() === "Choose a mode.|Choose at least one deck or card.|Choose a length.", wants());
 
-  click(modeCards.find((b) => /Regular/.test(b.textContent || "")));
-  await sleep(80);
-  check("choosing a mode moves on to the cards", start().disabled && /^Choose at least one card$/.test(start().label),
-    start().label);
+  check("a mode is chosen from the subtype's kind of sheet", await sessionMode(/Regular/));
+  check("and reads as chosen", /Regular/.test(sessionModeSaid()), sessionModeSaid());
 
   /* Introductions rather than Everything: the walks further down need the
      climbed cards untouched, and a hand-built session asks a card every
      exercise it has open whether it is due or not — so the one deck none
      of them is in is the one to practise here. */
-  const everything = [...document.querySelectorAll(".at-tagpickmain")].find((b) => /Introductions/.test(b.textContent));
-  click(everything);
-  await sleep(80);
-  check("and it says so instead of starting a session you did not describe",
-    start().there && start().disabled && /Choose a length/.test(start().label),
-    start().label || "no button");
+  check("a deck is chosen from the sheet a card's decks are chosen in", await sessionDeck(/Introductions/));
+  check("and stands as a pill", sessionPills().some((p) => /Introductions/.test(p)), sessionPills().join("|"));
+  check("so only the length is still wanted", start().disabled && wants() === "Choose a length.", wants());
 
   click([...document.querySelectorAll(".at-lengthgroup button")].find((b) => (b.textContent || "").trim() === "10"));
   await sleep(80);
-  check("choosing a length is all that was left", start().there && !start().disabled && /^Start$/.test(start().label),
-    start().label);
+  check("choosing a length is all that was left", start().there && !start().disabled && !wants(), wants());
 
-  /* Keeping it, which is the other half of what the screen is for.
-     Several minutes of picking used to be spent again the next morning. */
-  const keepBox = [...document.querySelectorAll(".at-formblock")]
-    .find((d) => /Keep this session/.test(d.textContent || ""));
-  check("the screen offers to keep the session", !!keepBox,
-    (document.querySelector(".at-screenbody") || { textContent: "" }).textContent.slice(-90));
-  const nameBox = keepBox && keepBox.querySelector("input");
+  /* Keeping it: a box to tick, and the name asked only once it is. There
+     is no Save of its own — it is kept as it starts. */
+  const keepBox = () => [...document.querySelectorAll(".at-formblock")]
+    .find((d) => /^Save for later$/.test(((d.querySelector(".at-formnum") || {}).textContent || "").trim()));
+  check("the screen offers to keep the session, without asking its name yet",
+    !!keepBox() && !keepBox()?.querySelector("input.at-input"),
+    (keepBox() || { textContent: "(no block)" }).textContent?.slice(0, 90));
+  click(keepBox()?.querySelector('input[type="checkbox"]'));
+  await sleep(80);
+  const nameBox = keepBox()?.querySelector("input.at-input");
+  check("ticking it asks what to call it", !!nameBox);
+  check("and the button says it will be kept", /^Save and start$/.test(start().label), start().label);
   if (nameBox) {
     /* Named, because a list of "Regular · 6 cards" tells nobody which was
        which. */
@@ -1176,17 +1209,11 @@ if (/Build a session/.test(document.body.textContent)) {
     must(setInput, "the input's value setter").call(nameBox, "Thursday's verbs");
     nameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
     await sleep(60);
-    clickNamed(/^Save$/);
-    await sleep(150);
-    check("saving it says so, rather than looking like nothing happened",
-      !!buttonNamed(/^Saved$/), buttonState(/^Saved?$/).label || "no button");
-    check("and Start is still the way on — keeping one is not practising it",
-      start().there && !start().disabled, start().label);
   }
 
   /* The whole point of the walk: it still builds. Two new blocking
      conditions are two new ways to wedge the builder shut. */
-  clickNamed(/^(Start|Choose a length)$/);
+  clickNamed(/^(Start|Save and start)$/);
   await sleep(400);
   check("a hand-built session actually starts", !!document.querySelector(".at-instruction"),
     document.body.textContent.slice(0, 120));
@@ -1713,10 +1740,9 @@ if (/Build a session/.test(document.body.textContent)) {
     click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Edit Thursday's verbs"));
     await sleep(250);
     check("a kept session opens on the Build screen to be changed",
-      !!document.querySelector(".at-modecard.on"),
-      (document.body.textContent || "").slice(0, 120));
-    check("with its cards already picked", !!document.querySelector(".at-tagpick.on"),
-      (document.body.textContent || "").slice(0, 120));
+      /Regular/.test(sessionModeSaid()), sessionModeSaid() || (document.body.textContent || "").slice(0, 120));
+    check("with its deck already picked, as a deck", sessionPills().some((p) => /Introductions/.test(p)),
+      sessionPills().join("|"));
     const renameBox = [...document.querySelectorAll(".at-formblock")]
       .find((d) => d.querySelector(".at-formnum")?.textContent === "Name")?.querySelector("input");
     if (renameBox) {
@@ -3444,13 +3470,8 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   await sleep(300);
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
-  click([...document.querySelectorAll(".at-modecard")].find((b) => /Regular/.test(b.textContent || "")));
-  await sleep(60);
-  const deck = [...document.querySelectorAll(".at-tagpickmain")].find((b) => /Scenes/.test(b.textContent || ""));
-  check("the scene's own deck is there to practise from", !!deck,
-    [...document.querySelectorAll(".at-tagpickmain")].map((b) => (b.textContent || "").slice(0, 12)).join("|"));
-  click(deck);
-  await sleep(80);
+  await sessionMode(/Regular/);
+  check("the scene's own deck is there to practise from", await sessionDeck(/Scenes/), sessionPills().join("|"));
   click([...document.querySelectorAll(".at-lengthgroup button")].find((b) => (b.textContent || "").trim() === "10"));
   await sleep(60);
   clickNamed(/^(Start|Choose a length)$/);
@@ -3718,10 +3739,8 @@ check("no console errors during the session", errors.length === 0, errors.slice(
 
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
-  click([...document.querySelectorAll(".at-modecard")].find((b) => /Regular/.test(b.textContent || "")));
-  await sleep(60);
-  click([...document.querySelectorAll(".at-tagpickmain")].find((b) => /Introductions/.test(b.textContent || "")));
-  await sleep(80);
+  await sessionMode(/Regular/);
+  await sessionDeck(/Introductions/);
   const groups = [...document.querySelectorAll(".at-lengthgroup")];
   const minutesGroup = groups.find((g) => /Minutes/.test(g.textContent || ""));
   click(minutesGroup && [...minutesGroup.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "2"));
@@ -3849,11 +3868,8 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await sleep(300);
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
-  click([...document.querySelectorAll(".at-modecard")].find((b) => /Ultimate/.test(b.textContent || "")));
-  await sleep(80);
-  const lesson = [...document.querySelectorAll(".at-tagpickmain")].find((b) => /Lesson 1/.test(b.textContent || ""));
-  click(lesson);
-  await sleep(80);
+  await sessionMode(/Ultimate/);
+  await sessionDeck(/Lesson 1/);
   clickNamed(/^(Start|Choose a length)$/);
   await sleep(500);
 
@@ -4150,14 +4166,9 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await sleep(300);
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
-  click([...document.querySelectorAll(".at-modecard")].find((b) => /Ultimate/.test(b.textContent || "")));
-  await sleep(80);
-  const intro = [...document.querySelectorAll(".at-tagpickmain")]
-    .find((b) => /Introductions/.test(b.textContent || ""));
-  check("the deck the frame is in can be practised on its own", !!intro,
-    [...document.querySelectorAll(".at-tagpickmain")].map((b) => (b.textContent || "").slice(0, 20)).join(" | "));
-  click(intro);
-  await sleep(80);
+  await sessionMode(/Ultimate/);
+  check("the deck the frame is in can be practised on its own", await sessionDeck(/Introductions/),
+    sessionPills().join(" | "));
   clickNamed(/^(Start|Choose a length)$/);
   await sleep(500);
 
