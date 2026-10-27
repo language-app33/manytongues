@@ -84,7 +84,7 @@ await build({
 });
 
 const dom = new JSDOM(`<!doctype html><html><body><div id="root"></div></body></html>`, {
-  url: "https://taleb.test/",
+  url: "https://manytongues.test/",
   pretendToBeVisual: true,
 });
 const w = dom.window;
@@ -107,7 +107,7 @@ for (const k of ["window", "document", "navigator", "HTMLElement", "Node", "Even
 }
 anyWindow.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} });
 anyGlobal.matchMedia = anyWindow.matchMedia;
-w.URL.createObjectURL = () => "blob:https://taleb.test/x";
+w.URL.createObjectURL = () => "blob:https://manytongues.test/x";
 w.URL.revokeObjectURL = () => {};
 globalThis.URL.createObjectURL = w.URL.createObjectURL;
 globalThis.URL.revokeObjectURL = w.URL.revokeObjectURL;
@@ -335,7 +335,7 @@ const savedCards = [];
  * @param {{ method?: string, body?: string, headers?: Record<string, string> }} [opts]
  */
 const fakeFetch = async (input, opts = {}) => {
-  const url = new URL(String(input), "https://taleb.test");
+  const url = new URL(String(input), "https://manytongues.test");
   const method = opts.method || "GET";
   const action = url.searchParams.get("action");
   calls.push(`${method} ${url.pathname}${action ? "?action=" + action : ""}${url.searchParams.get("audio") ? "?audio" : ""}`);
@@ -10999,7 +10999,7 @@ const openPronounTables = async () => {
   const fetchBefore = anyGlobal.fetch;
   /** @param {any} input @param {any} [opts] */
   anyWindow.fetch = anyGlobal.fetch = (input, opts = {}) => {
-    const url = new URL(String(input && input.url ? input.url : input), "https://taleb.test/");
+    const url = new URL(String(input && input.url ? input.url : input), "https://manytongues.test/");
     if (url.pathname === "/api/sync" && !url.searchParams.get("audio") &&
         (opts.method || "GET") === "POST" && (opts.headers || {})["x-sync-token"] === quietToken) {
       sent.push(Date.now());

@@ -233,7 +233,7 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
       <div className="ob-box">
         {step === "choose" && (
           <>
-            <h1>Taleb33</h1>
+            <h1>ManyTongues</h1>
             {/* What it used to say: "an account only matters if you join a
                 course or use more than one device". Both exits from this
                 screen are requests to the server, so an account is not
@@ -780,7 +780,7 @@ export async function buildExport(
     ...whole,
     includes: parts,
     about:
-      "Cards exported from Taleb33. Each record under card: is one card: its forms (the word or " +
+      "Cards exported from ManyTongues. Each record under card: is one card: its forms (the word or " +
       "phrase in its script, transliteration and English meaning), grammar and tags. Records " +
       "under deck: are decks, listing their cards by id in cardIds.",
   };

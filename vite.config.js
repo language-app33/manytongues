@@ -22,7 +22,7 @@ const VERSION = appVersion();
 /** @returns {import("vite").Plugin} */
 function emitVersion() {
   return {
-    name: "taleb33-version",
+    name: "manytongues-version",
     generateBundle() {
       this.emitFile({
         type: "asset",
@@ -53,8 +53,8 @@ export default defineConfig({
       registerType: "autoUpdate",
       includeAssets: ["icon-512.png"],
       manifest: {
-        name: "Taleb33",
-        short_name: "Taleb33",
+        name: "ManyTongues",
+        short_name: "ManyTongues",
         description: "Spaced repetition for language learning.",
         theme_color: "#141A2A",
         background_color: "#141A2A",

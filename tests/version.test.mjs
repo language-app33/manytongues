@@ -41,7 +41,7 @@ test("with nothing to go on it says so rather than inventing something", async (
   const { mkdtemp } = await import("node:fs/promises");
   const { tmpdir } = await import("node:os");
   const path = await import("node:path");
-  const dir = await mkdtemp(path.join(tmpdir(), "taleb-nogit-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "manytongues-nogit-"));
   const here = path.dirname(new URL(import.meta.url).pathname);
   const out = execFileSync(
     process.execPath,

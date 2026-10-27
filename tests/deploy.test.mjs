@@ -45,7 +45,7 @@ test("the deploy starts the server itself, with nothing in between", () => {
 
 test("and the process it starts stops cleanly when a deploy asks it to", async () => {
   const [cmd, ...args] = startCommand().split(/\s+/);
-  const dir = await mkdtemp(path.join(tmpdir(), "taleb-deploy-"));
+  const dir = await mkdtemp(path.join(tmpdir(), "manytongues-deploy-"));
   /* Spawned without a shell, which is the shape that matters: the signal
      has to reach the thing that was started. */
   const child = spawn(cmd, args, {

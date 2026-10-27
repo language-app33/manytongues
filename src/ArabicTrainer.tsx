@@ -13880,7 +13880,7 @@ export default function ArabicTrainer() {
               <div className="at-mb3">
                 <Notice kind="info">
                   <span>
-                    Add Taleb33 to your home screen to keep your cards safe and open it like an
+                    Add ManyTongues to your home screen to keep your cards safe and open it like an
                     app.{" "}
                     {install.prompt ? (
                       <button className="at-linkbtn" onClick={() => install.prompt?.prompt()}>
@@ -15434,7 +15434,7 @@ export default function ArabicTrainer() {
           together, so they are decided in one place rather than three. */}
       {!inExercise && (
         <>
-          <div className="at-brand">Taleb33</div>
+          <div className="at-brand">ManyTongues</div>
           {/* The switch and the space tabs share a bar, so they sit beside
               each other however many of either there are — the tabs are
               not there at all for somebody who only learns, and the switch

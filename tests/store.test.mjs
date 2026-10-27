@@ -7,7 +7,7 @@ import path from "node:path";
 
 /* The store reads DATA_DIR once, when it is first imported, so the
    temporary directory has to be in place before the import. */
-const dir = await mkdtemp(path.join(tmpdir(), "taleb-store-"));
+const dir = await mkdtemp(path.join(tmpdir(), "manytongues-store-"));
 process.env.DATA_DIR = dir;
 const { getStore, resolveDataRoot } = await import("../server/store.js");
 

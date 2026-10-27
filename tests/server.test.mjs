@@ -15,7 +15,7 @@ import path from "node:path";
 import { createHash } from "node:crypto";
 import { leadOf } from "../src/cards.ts";
 
-const dir = await mkdtemp(path.join(tmpdir(), "taleb-server-"));
+const dir = await mkdtemp(path.join(tmpdir(), "manytongues-server-"));
 process.env.DATA_DIR = dir;
 /*
  * An admin key, so the tests below that claim admin actually get it. Every
@@ -1546,7 +1546,7 @@ test("SIGTERM stops it cleanly, and npm has nothing to report", async () => {
   const { spawn } = await import("node:child_process");
   const here = path.dirname(new URL(import.meta.url).pathname);
   const entry = path.join(here, "..", "server", "index.js");
-  const home = await mkdtemp(path.join(tmpdir(), "taleb-stop-"));
+  const home = await mkdtemp(path.join(tmpdir(), "manytongues-stop-"));
 
   const child = spawn(process.execPath, [entry], {
     /* An explicit port, high and unlikely to be taken: PORT=0 would not mean

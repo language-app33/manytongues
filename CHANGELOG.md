@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.491 — 27 October 2026
+
+**The app is called ManyTongues.**
+
+- Everywhere the app shows its name, it now says ManyTongues instead of
+  Taleb33: the first screen, the top of every screen, the browser tab,
+  the invitation to add it to your home screen, and the name it gets once
+  added there. A file of your data saved from the app is named after it
+  too, and so is the note at the top of an exported deck.
+- An app already added to a home screen may keep its old name under the
+  icon until it is removed and added again; that is the phone's choice,
+  not the app's.
+
+To check by hand: open the app in a browser and on a phone; the tab, the
+first screen and the top of the app say ManyTongues.
+
 ## 0.490 — 27 October 2026
 
 **Account settings says plainly what is kept on this device, and lets you
