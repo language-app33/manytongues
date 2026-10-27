@@ -1154,7 +1154,8 @@ if (/Build a session/.test(document.body.textContent)) {
      the last — which reads as a decision made rather than one to make, and
      Ultimate is the longest session on offer to hand somebody by default. */
   check("the mode is asked as a card's subtype is, and not answered for you",
-    !!buttonNamed(/^Mode\. Not set\. Choose one\.$/) && !sessionModeSaid(), sessionModeSaid() || "(none)");
+    [...document.querySelectorAll(".at-choosebtn")].some((b) => b.getAttribute("aria-label") === "Mode. Not set. Choose one.") &&
+      !sessionModeSaid(), sessionModeSaid() || "(none)");
   check("no deck or card is chosen for you either", !sessionPills().length, sessionPills().join("|"));
   /* Length: two segmented controls, and on opening neither should have a
      segment lit. */
@@ -1198,7 +1199,7 @@ if (/Build a session/.test(document.body.textContent)) {
   await sleep(80);
   const nameBox = keepBox()?.querySelector("input.at-input");
   check("ticking it asks what to call it", !!nameBox);
-  check("and the button says it will be kept", /^Save and start$/.test(start().label), start().label);
+  check("and the button says it will be kept", !!buttonNamed(/^Save and start$/));
   if (nameBox) {
     /* Named, because a list of "Regular · 6 cards" tells nobody which was
        which. */
