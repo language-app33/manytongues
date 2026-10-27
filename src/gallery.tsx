@@ -121,6 +121,7 @@ const PLACES: Record<string, [string, string]> = {
   ArabicTrainer: [LEARN, "The app around everything else"],
   AccountPanel: [LEARN, "Account settings"],
   AccountSettings: [LEARN, "Account settings"],
+  DeviceMedia: [LEARN, "Account settings · Recordings and pictures on this device"],
   CloseAccount: [LEARN, "Account settings · Closing your account"],
   ClaimAdmin: [LEARN, "Account settings · Becoming the administrator"],
   AppPreferences: [LEARN, "App preferences"],
