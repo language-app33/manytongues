@@ -9590,8 +9590,14 @@ const openPronounTables = async () => {
   click(rowNamed(/^App preferences$/));
   await sleep(350);
   const prefsText = ((screenTitled("App preferences") || host6).textContent || "");
-  check("the preferences screen offers the language being learnt, the theme and the sounds",
-    /Language/.test(prefsText) && /Theme/.test(prefsText) && /Sounds/.test(prefsText),
+  check("the preferences screen offers the theme and the sounds",
+    /Theme/.test(prefsText) && /Sounds/.test(prefsText),
+    prefsText.slice(0, 220).replace(/\s+/g, " "));
+  /* And no longer a language to learn: the switch in the top bar is where
+     that is decided, and a second control here changed nothing visible —
+     see AppPreferences. */
+  check("and no Learning language choice, which the top bar's switch replaced",
+    !/Learning/.test(prefsText) && !prefsText.includes("Language"),
     prefsText.slice(0, 220).replace(/\s+/g, " "));
 
   /* And the account screen names who is signed in, which is the one fact

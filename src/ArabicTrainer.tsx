@@ -30,7 +30,6 @@ import {
   KeysButton,
   Lede,
   Notice,
-  LanguageRadio,
   Screen,
   Section,
   Segmented,
@@ -11795,13 +11794,12 @@ export default function ArabicTrainer() {
             courseLangs.push(c.language);
           }
         }
-        /* Adopted, not imposed: a language the person picked themselves in
-           Preferences stays picked. Without this the app switched back on
-           every refresh, forty-five seconds after any change. */
-        const chosen = !!dataRef.current.settings.languageChosen;
+        /* Followed whenever the courses are all in one language. It used to
+           stand aside for a language picked in App preferences; that choice
+           is gone (see AppPreferences), and an old pick kept from it would
+           otherwise hold the app to a language its courses have left. */
         if (
           courseLangs.length === 1 &&
-          !chosen &&
           courseLangs[0] !== dataRef.current.settings.language
         ) {
           const withLang = {
@@ -13585,8 +13583,6 @@ export default function ArabicTrainer() {
       settings: {
         ...settings,
         [k]: v,
-        // A language set by hand is a choice; the courses stop overriding it.
-        ...(k === "language" ? { languageChosen: true } : null),
       },
       settingsUpdated: now(),
     });
@@ -20726,8 +20722,16 @@ function AccountSettings({
 }
 
 /*
- * The whole of what a learner can set: which language, how it looks, and
- * how loud it is.
+ * The whole of what a learner can set: how it looks, and how loud it is.
+ *
+ * There was a Language section here too, a "Learning" choice between the
+ * languages. Every card carries its own language, so it decided nothing
+ * about what was asked: with one language the app set it from the course,
+ * and with several the switch in the top bar decides what is practised,
+ * while this only decided which language that switch listed first. A
+ * setting that changes nothing visible is one people try and conclude is
+ * broken, so it went. The app still keeps a language of its own, for the
+ * rare thing that carries none, and takes it from the courses.
  *
  * There was an Advanced disclosure under this holding six controls over how
  * a session is built and a row of marking leniencies, behind a sentence
@@ -20746,21 +20750,6 @@ function AppPreferences({ settings, setSetting }: {
       {/* Headed and explained the way the card editor and Account settings
           are: each section's name at heading size, and each field's
           explanation straight under its name, before the control. */}
-      <div className="at-formblock">
-        <div className="at-formhead">
-          <span className="at-formnum">Language</span>
-        </div>
-        {/* The one screen where a learner would look for this. It could only
-            be set by a course before, so someone studying two languages had
-            no way to choose which the app was in. */}
-        <LanguageRadio
-          languages={LANGUAGES}
-          value={settings.language || DEFAULT_LANGUAGE}
-          onChange={(id) => setSetting("language", id)}
-          label="Learning"
-        />
-      </div>
-
       <div className="at-formblock">
         <div className="at-formhead">
           <span className="at-formnum">Appearance</span>
