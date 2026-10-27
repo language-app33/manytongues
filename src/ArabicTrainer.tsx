@@ -42,6 +42,7 @@ import {
   TopBanner,
   plural,
   pairSystems,
+  Popover,
   pullCourses,
   shortDate,
   pullAdmin,
@@ -49,6 +50,7 @@ import {
   useInstallOffer,
   useLiveRefresh,
   useOffline,
+  usePageLock,
   useScrollTop,
   useSlowWait,
   useSnackbar,
@@ -17481,13 +17483,9 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+  usePageLock();
 
   /* Tags first: picking one selects everything under it. */
   const tagGroups = useMemo(() => {
@@ -20022,7 +20020,7 @@ function LanguageSwitch({ choices, off, onChange, note }: {
       </button>
 
       {open && (
-        <div className="at-langmenu">
+        <Popover className="at-langmenu">
           <p className="at-eyebrow">Languages</p>
           <div className="at-cklist">
             {choices.map((c) => {
@@ -20048,7 +20046,7 @@ function LanguageSwitch({ choices, off, onChange, note }: {
             })}
           </div>
           <Help>{note}</Help>
-        </div>
+        </Popover>
       )}
     </div>
   );
@@ -20256,7 +20254,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, theme, onTheme, o
       </button>
 
       {open && (
-        <div className="at-cmenu">
+        <Popover className="at-cmenu">
           <div className="at-cwho">
             <span className="at-cavatar">{initialsOf(account && account.displayName)}</span>
             <span className="at-cwhotext">
@@ -20345,7 +20343,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, theme, onTheme, o
 
           <div className="at-crule" />
           <AppVersion />
-        </div>
+        </Popover>
       )}
     </div>
   );

@@ -1802,7 +1802,15 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 }
 .at-back { width:38px; height:38px; flex-shrink:0; border-radius:999px; cursor:pointer;
   background:none; border:2px solid var(--line); color: var(--text); font-size:22px; line-height:1; }
-.at-screenbody { flex:1; overflow-y:auto; padding:18px 16px 40px; }
+.at-screenbody { flex:1; overflow-y:auto; padding:18px 16px 40px;
+  /* Its scrolling ends at its own top and foot, rather than running on
+     into the page under it. */
+  overscroll-behavior: contain; }
+/* The page under a screen, a confirmation or a sheet, held still while one
+   is up — see usePageLock. Without it the page went on scrolling behind
+   the layer, and its scroll bar, as long as whatever list was under it,
+   was the one in view. */
+html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 .at-screeninner { max-width:640px; margin:0 auto; }
 .at-dangertoggle { display:flex; align-items:center; justify-content:space-between; width:100%;
   gap:12px; background:none; border:0; padding:0; cursor:pointer; color:inherit;
@@ -2324,6 +2332,22 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* Direct children only. A row can hold a Segmented, whose own buttons are
    .at-btn too — sizing those from the row's share would hand a three-way
    picker the type of a full-width button. */
+/* A button's words, boxed by Button and invisible to the layout
+   everywhere but in a row: see below. */
+.at-btnlabel { display:contents; }
+/* Except where one label is longer than the whole row is wide, even at the
+   smallest type — a card's own words on the Meanings block's buttons. Then
+   that button takes the row's whole width and its words take a second
+   line, centred, rather than the button running off the side of the
+   screen. `auto` is what lets the cap win: a flex item's automatic minimum
+   is its label's width, held to its max-width; `min-content` would beat
+   any cap. The label asks for its one-line width, so it is that wide
+   wherever there is room and only wraps where there is not. */
+.at-row > .at-btn, .at-screenfoot > .at-btn { min-width:auto; max-width:100%; }
+.at-row > .at-btn > .at-btnlabel, .at-screenfoot > .at-btn > .at-btnlabel {
+  display:inline-flex; flex-wrap:wrap; align-items:center; justify-content:center;
+  column-gap:inherit; row-gap:2px; width:max-content; max-width:100%;
+  white-space:normal; text-align:center; }
 .at-row > .at-btn { white-space: nowrap;
   font-size: clamp(10px, calc(var(--share) * 0.115), 16px);
   padding-inline: clamp(4px, calc(var(--share) * 0.055), 22px);
@@ -4083,14 +4107,16 @@ body.at-screening .at-chromebar { display:none; }
 
 /* A card's status, beside Edit on its screen: the app's menu button (see
    .at-menubtn) and its menu (see .at-pickmenu), hung from the button's
-   left edge, since the button sits at the start of its line. Edged in
-   where the card stands. See StatusMenu. */
+   right edge, since the button sits at the end of the card's top line —
+   so the menu opens back across the screen. Edged in where the card
+   stands. See StatusMenu; Popover keeps it on the screen wherever the
+   button goes next. */
 .at-statusmenu { position:relative; display:inline-flex; }
 .at-statusbtn.published { border-color: var(--jade); }
 .at-statusbtn.published { color: var(--jade); }
 .at-statusbtn.draft, .at-statusbtn.review, .at-statusbtn.changed { color: var(--brass); }
 .at-statusbtn.draft, .at-statusbtn.review, .at-statusbtn.changed { border-color: var(--brass); }
-.at-statuspick { left:0; right:auto; top:calc(100% + 6px); }
+.at-statuspick { left:auto; right:0; top:calc(100% + 6px); }
 /* At the start of a line or a table row: the badge's words, smaller, and
    on two lines rather than one long one. */
 .at-statuspill { display:inline-block; max-width:112px; padding:2px 7px; border-radius:8px;
