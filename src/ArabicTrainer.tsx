@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { renameLangIds } from "./lang-ids.ts";
 import type {
   Course, DayMoves, Deck, Doc, ExerciseSpec, ExerciseState, FlagKind, FlagVerdict, Form, Item,
   Lang, LangId, Millis, Question, SavedSession, Settings, User,
@@ -60,6 +59,7 @@ import {
   useSnackbar,
   useSnackbarState,
 } from "./shared.tsx";
+import { renameLangIds } from "./lang-ids.ts";
 
 /* The onboarding, teaching, admin and course screens are their own chunk,
    fetched on the first tap that opens one of them. A student drilling cards
