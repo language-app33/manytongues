@@ -75,7 +75,7 @@ test("the romanisation takes bi for fi, and keeps the sun letter", () => {
 });
 
 test("other languages are marked as they were", () => {
-  assert.equal(ok("bi", card("fi", "in"), "en2ar", { language: "vi-Hue" }), false);
+  assert.equal(ok("bi", card("fi", "in"), "en2ar", { language: "vi" }), false);
 });
 
 test("what reads as a place", () => {

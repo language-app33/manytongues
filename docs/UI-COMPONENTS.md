@@ -30,7 +30,8 @@ different information from the same data.
 
 ### `Screen` — 22 uses
 The one full-screen shell. Portals into `.at`, owns Escape (only the topmost
-open screen responds), and locks body scroll while open. Every full-screen
+open screen responds), and holds the page under it still while open (see
+`usePageLock`). Every full-screen
 flow goes through this: there is no second way to make one.
 
 ```jsx
@@ -43,7 +44,8 @@ form rather than putting buttons in the flow.
 
 ### `SpaceFrame` — 2 uses
 The Teaching and Admin shells. Full-bleed screen, pending dialog, error line,
-busy line, tab strip, contents.
+busy line, the app's name, contents; its tab strip goes to the bar at the
+foot of the window (`Tabs` with `dock`).
 
 `tabs, tab, onTab, error, busy, label="Section", dialog, children`
 
@@ -88,6 +90,12 @@ instead; treat it as available rather than established.
 `icon="add"`, `iconSize`, plus anything a `<button>` takes.
 
 Pass `icon` rather than an `<Icon>` child — that way the spacing is consistent.
+
+The words are boxed in `.at-btnlabel`, which is `display: contents` and so
+invisible to the layout — except in an `.at-row` or a screen's footer, where
+a label longer than the whole row is wide wraps inside its button instead of
+running off the side of the screen. A raw `<button className="at-btn">` has
+no box and does not get that; use `Button`.
 
 ### `IconButton` — 15 uses
 An icon-only button. `label` is **required** and becomes the accessible name.
@@ -249,6 +257,26 @@ things that can't be undone.
 
 Prefer this over `window.confirm`. The one remaining `window.confirm` is the
 import gate, which genuinely wants a blocking browser dialog.
+
+### `usePageLock(on = true)` — the hook
+Holds the page under a layer still while the layer is up. `Screen`,
+`ConfirmModal` and `PickSheet` already hold it; anything else drawn over
+the whole page — a sheet of its own, an overlay — calls it too. Counted, so
+layers can stack. Without it the page behind goes on scrolling, and its
+scroll bar is the one in view.
+
+### `Popover` — the menu that drops from a button
+`className, children`, plus anything a `<div>` takes.
+
+Every menu that hangs off a button is one: the filter menus, a card's
+status, the corner menu, the space and language menu, a blank's values. Its class
+still says where it hangs and how it looks; `Popover` measures it once it
+is drawn and moves it back inside the window if it crosses either side,
+and cuts it to the room below it, scrolling, if it runs off the foot — or
+to the room above, for one that opens upward off the bar at the foot of
+the window. A
+new drop-down is a `Popover` — never a bare `<div>` with `position:
+absolute`, which is how the status menu came to open off the screen.
 
 ---
 

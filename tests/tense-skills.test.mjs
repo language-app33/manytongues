@@ -20,7 +20,7 @@
  *     tense marks the tense once and each person on their own;
  *   * a tense opens once the one before it is cleared;
  *   * each filled tense counts as a card of its own on Progress (8b);
- *   * Huế's verbs, whose language offers no practices, are left as they are
+ *   * Vietnamese's verbs, whose language offers no practices, are left as they are
  *     (11a).
  */
 
@@ -63,7 +63,7 @@ const { EXAMPLE_TYPES } = await import("../src/offers.ts");
 
 const AR = LANGUAGES["ar-PS"];
 const HE = LANGUAGES["he-IL"];
-const VI = LANGUAGES["vi-Hue"];
+const VI = LANGUAGES["vi"];
 const settings = { language: "ar-PS" };
 
 /** @param {number[]} hist @returns {any} */
@@ -114,12 +114,12 @@ test("each tense the teacher filled in is made once, and a blank one is not", ()
   assert.equal(withTenses(v, AR), v, "made once: the same card back");
 });
 
-test("Hebrew's tenses are skills too; Huế's verbs are left as they are", () => {
+test("Hebrew's tenses are skills too; Vietnamese's verbs are left as they are", () => {
   const he = verb();
   he.lang = "he-IL";
   assert.ok(withTenses(he, HE).forms.some((/** @type {any} */ f) => f.tense), "Hebrew");
-  const hue = { ...verb(), lang: "vi-Hue" };
-  assert.equal(withTenses(hue, VI), hue, "Huế");
+  const hue = { ...verb(), lang: "vi" };
+  assert.equal(withTenses(hue, VI), hue, "Vietnamese");
 });
 
 test("a tense starts where most of its persons are, and the persons keep theirs", () => {

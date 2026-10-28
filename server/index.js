@@ -17,6 +17,7 @@ import { fileURLToPath } from "node:url";
 import courses from "./api/courses.js";
 import sync from "./api/sync.js";
 import { dataRoot, dataRootFrom, dataRootDurable } from "./store.js";
+import { renameStoredLangs } from "./rename-langs.js";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const DIST = process.env.DIST_DIR || path.join(here, "..", "dist");
@@ -311,6 +312,10 @@ function closeOn(server) {
 
 /* Started directly rather than imported by a test. */
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  /* Before anything is served, so no request reads a language by an id the
+     app no longer knows. */
+  const renamed = await renameStoredLangs();
+  if (renamed) console.log(`renamed the language in ${renamed} stored documents`);
   const server = createApp();
   closeOn(server);
   server.listen(PORT, () => {

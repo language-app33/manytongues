@@ -46,7 +46,7 @@ export const FORM_KEYS: FormKey[] = [
    * The face a word wears inside a bigger number for no grammatical
    * reason at all.
    *
-   * Huế is why this exists and not Arabic: *five* is one word on its own
+   * Vietnamese is why this exists and not Arabic: *five* is one word on its own
    * and another after a ten, *one* is one word on its own and another
    * after two tens, and *nought* has a form that means "the place here is
    * empty" — a hundred, nothing, and five. None of that is gender or

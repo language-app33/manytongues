@@ -61,7 +61,7 @@ import { slotsOf } from "../src/variables.ts";
 import { must } from "./helpers.mjs";
 
 const arabic = must(verbOf(LANGUAGES["ar-PS"]), "the Arabic verb table");
-const viet = must(verbOf(LANGUAGES["vi-Hue"]), "the Vietnamese verb table");
+const viet = must(verbOf(LANGUAGES["vi"]), "the Vietnamese verb table");
 
 /* "To eat", as a teacher would leave it: the present filled in, the past
    filled in, and a command that exists for the three persons it can be
@@ -85,7 +85,7 @@ const toEat = {
   ],
 };
 
-/* And "to eat" in Huế, which is one word and three markers. */
+/* And "to eat" in Vietnamese, which is one word and three markers. */
 const toEatViet = {
   id: "an",
   ar: "ăn",
@@ -416,7 +416,7 @@ test("the table is crossed row by row, in teaching order", () => {
 });
 
 test("Vietnamese is the same code over a table one column wide", () => {
-  assert.ok(teachesVerbs(LANGUAGES["vi-Hue"]));
+  assert.ok(teachesVerbs(LANGUAGES["vi"]));
   assert.equal(personsOf(viet).length, 1);
   assert.equal(tensesOf(viet).length, 4);
 
@@ -458,7 +458,7 @@ test("a language that lays out no verbs has no table", () => {
  */
 test("a language says which cell a dictionary would list, or says nothing", () => {
   assert.deepEqual(citationOf(arabic), { row: "past", col: "he" });
-  /* Huế cites the bare verb, which is a card's word and not a cell of
+  /* Vietnamese cites the bare verb, which is a card's word and not a cell of
      anything, so there is nothing to reconcile. */
   assert.equal(citationOf(viet), null);
   assert.equal(citationOf(null), null);
@@ -544,7 +544,7 @@ test("the recordings travel with the word, so the card's face can be heard", () 
 });
 
 test("a language that cites nothing has no cell to take a word from", () => {
-  /* Huế cites the bare verb, which is a word and not a cell — so its card
+  /* Vietnamese cites the bare verb, which is a word and not a cell — so its card
      keeps the block the other two no longer show, and citedWord is never
      reached. The guard is citationOf, and this is what it answers. */
   assert.equal(citationOf(viet), null);
@@ -597,13 +597,13 @@ test("a card's cells belong to the table that declares their row", () => {
 });
 
 test("and a language that attaches none has no such table", () => {
-  assert.equal(attachedOf(LANGUAGES["vi-Hue"]), null);
-  assert.equal(takesAttached(LANGUAGES["vi-Hue"]), false);
+  assert.equal(attachedOf(LANGUAGES["vi"]), null);
+  assert.equal(takesAttached(LANGUAGES["vi"]), false);
   assert.equal(takesAttached(LANGUAGES["ar-PS"]), true);
   assert.equal(takesAttached(LANGUAGES["he-IL"]), true);
   /* Asked of nothing, it comes back empty rather than throwing — the same
      answer every function here gives a half-written draft. */
-  assert.deepEqual(cellsIn(null, attachedOf(LANGUAGES["vi-Hue"])), []);
+  assert.deepEqual(cellsIn(null, attachedOf(LANGUAGES["vi"])), []);
   assert.equal(hasCells({ subs: [] }, null), false);
 });
 
@@ -899,7 +899,7 @@ test("and a word of a kind that has no tenses is untouched by the narrowing", ()
     "a name in a blank that verbs also fill is in no tense at all");
 });
 
-test("none of it knows what a tense is: Huế narrows by its own rows", () => {
+test("none of it knows what a tense is: Vietnamese narrows by its own rows", () => {
   const marked = { id: "vi-past", row: "past", col: "any", ar: "đã ăn", en: "ate", lat: "" };
   const plain = { id: "vi-plain", row: "plain", col: "any", ar: "ăn", en: "eat", lat: "" };
   assert.equal(standsInRows(viet, marked, ["past"]), true);

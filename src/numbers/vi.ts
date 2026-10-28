@@ -1,5 +1,5 @@
 /*
- * Huế Vietnamese numbers.
+ * Vietnamese numbers.
  *
  * Fourteen boxes against the Semitic pair's sixty, because the language is
  * regular: *five hundred* really is *five* and *hundred* said one after
@@ -203,7 +203,7 @@ export const liftViCard = (old: { word: string; cells: Record<string, string> })
 };
 
 export const viComposer: Composer = {
-  id: "vi-Hue",
+  id: "vi",
   version: VI_COMPOSER_VERSION,
   requiredSlots: () => VI_SLOTS,
   liftCard: liftViCard,

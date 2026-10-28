@@ -23,7 +23,7 @@ import { LANGUAGES, checkAnswer, contextCoverage } from "../src/languages.ts";
 import { ALT_SEP } from "../src/answers.ts";
 
 const ar = LANGUAGES["ar-PS"];
-const vi = LANGUAGES["vi-Hue"];
+const vi = LANGUAGES["vi"];
 
 /** @param {string[]} xs */
 const two = (...xs) => xs.join(ALT_SEP);
@@ -36,8 +36,8 @@ const imFine = sentence("s1", "أنا تمام", ["fine"]);
 const allWell = sentence("s2", "كلشي منيح هون", ["fine"]);
 
 /* A Vietnamese noun of two syllables, which the teacher said is a noun. */
-const coffee = { id: "coffee", lang: "vi-Hue", category: "noun", created: 1, forms: [{ id: "coffee", ar: "cà phê", en: "coffee", lat: "" }] };
-const drink = { id: "drink", lang: "vi-Hue", uses: ["coffee"], created: 2, forms: [{ id: "drink", ar: "tôi uống cà phê", en: "I drink coffee", lat: "" }] };
+const coffee = { id: "coffee", lang: "vi", category: "noun", created: 1, forms: [{ id: "coffee", ar: "cà phê", en: "coffee", lat: "" }] };
+const drink = { id: "drink", lang: "vi", uses: ["coffee"], created: 2, forms: [{ id: "drink", ar: "tôi uống cà phê", en: "I drink coffee", lat: "" }] };
 
 /* ---- the gap-fill ---- */
 
@@ -69,7 +69,7 @@ test("Words this teaches offers a word by any of its answers, and a word the tea
   assert.deepEqual(wordsOffered("tôi uống cà phê", /** @type {any} */ ([coffee]), /** @type {any} */ (vi)).map((o) => o.card.id), ["coffee"]);
   /* With no word type, a card is still guessed from its text: the question
      the owner has still to answer. */
-  const unsaid = { id: "x", lang: "vi-Hue", forms: [{ id: "x", ar: "cà phê", en: "coffee", lat: "" }] };
+  const unsaid = { id: "x", lang: "vi", forms: [{ id: "x", ar: "cà phê", en: "coffee", lat: "" }] };
   assert.deepEqual(wordsOffered("tôi uống cà phê", /** @type {any} */ ([unsaid]), /** @type {any} */ (vi)), []);
 });
 

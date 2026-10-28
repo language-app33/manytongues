@@ -91,7 +91,7 @@ export const pronounCardFor = (cards: Card[], langId: string, person: string): C
 
 /**
  * Whether a language has pronouns to write: a verb table whose columns are
- * people. A language whose verbs do not change with the person — Huế —
+ * people. A language whose verbs do not change with the person — Vietnamese —
  * declares one column, and there is nothing for a pronoun to pick.
  */
 export const hasPronouns = (lang: Lang | null | undefined): boolean =>

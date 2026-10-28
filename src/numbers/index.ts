@@ -16,12 +16,12 @@ import { arComposer } from "./ar-PS.ts";
 import { arTimeComposer } from "./ar-PS.time.ts";
 import { heComposer } from "./he-IL.ts";
 import { heTimeComposer } from "./he-IL.time.ts";
-import { viComposer } from "./vi-Hue.ts";
+import { viComposer } from "./vi.ts";
 
 const COMPOSERS: Record<string, Composer> = {
   "ar-PS": arComposer,
   "he-IL": heComposer,
-  "vi-Hue": viComposer,
+  "vi": viComposer,
 };
 
 const TIME_COMPOSERS: Record<string, TimeComposer> = {

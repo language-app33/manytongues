@@ -46,7 +46,7 @@ test("each card is new, the same card, or the same word", () => {
 });
 
 test("a word in another language is not the same word", () => {
-  const file = /** @type {any} */ (readImportFile(fileOf([card("k2", "bàn", "table", { lang: "vi-Hue" })])));
+  const file = /** @type {any} */ (readImportFile(fileOf([card("k2", "bàn", "table", { lang: "vi" })])));
   const { cards } = matchImport(file, /** @type {any[]} */ ([card("k9", "bàn", "table")]), []);
   assert.equal(cards[0].kind, "new");
 });
@@ -55,7 +55,7 @@ test("a deck you have is added to, by id or by its name in its language", () => 
   const decks = [
     { id: "d1", title: "Kitchen", lang: "ar-PS", cardIds: ["k1"] },
     { id: "d2", title: " home ", lang: "ar-PS", cardIds: [] },
-    { id: "d3", title: "Home", lang: "vi-Hue", cardIds: [] },
+    { id: "d3", title: "Home", lang: "vi", cardIds: [] },
   ];
   const file = /** @type {any} */ (readImportFile(fileOf([card("k1", "طنجرة", "pot")], decks)));
   const mine = /** @type {any[]} */ ([

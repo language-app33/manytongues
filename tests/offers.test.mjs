@@ -14,7 +14,7 @@ import { offersFor, canAsk, unmetNeeds } from "../src/offers.ts";
 import { EX, LANGUAGES, exOf } from "../src/languages.ts";
 
 const ar = LANGUAGES["ar-PS"];
-const vi = LANGUAGES["vi-Hue"];
+const vi = LANGUAGES["vi"];
 
 /** @returns {any} */
 const word = (/** @type {Record<string, any>} */ over = {}) => ({
@@ -112,10 +112,10 @@ test("nor is what the language never drills", () => {
 });
 
 test("nor a question about a verb's example, on a card with no form in one", () => {
-  /* Asked only of a form in a row practised in examples, and Huế has no
+  /* Asked only of a form in a row practised in examples, and Vietnamese has no
      such row — so it was listed on every Vietnamese card as waiting for
      "an example on the verb card", which nobody there could ever write. */
-  assert.equal(find(offers(word({ ar: "sách", lat: "" }), { lang: vi }), "ex2en"), undefined, "never in Huế");
+  assert.equal(find(offers(word({ ar: "sách", lat: "" }), { lang: vi }), "ex2en"), undefined, "never in Vietnamese");
   assert.equal(find(offers(word()), "ex2en"), undefined, "nor on an Arabic word, which is never asked it either");
   /* A subjunctive form is, and is still offered it — ready once an
      example puts it in a gap. */

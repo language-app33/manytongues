@@ -7,6 +7,7 @@
  * something a person can read.
  */
 import type { Card, Flag, LangId, User } from "./types.ts";
+import { renameLangIds } from "./lang-ids.ts";
 
 const ENDPOINT = "/api/courses";
 const KEY_STORE = "arabic-account";
@@ -107,7 +108,9 @@ async function call(
     throw new Error(res.ok ? "bad-response" : `http-${res.status}`);
   }
   if (!res.ok) throw new Error(data.error || `http-${res.status}`);
-  return data;
+  /* Material written under a language's old id, by a device still on an
+     older build, reads as the language it is now. See lang-ids.ts. */
+  return renameLangIds(data);
 }
 
 /* ---- accounts ---- */

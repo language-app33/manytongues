@@ -2364,7 +2364,7 @@ export const GRAMMAR: Record<string, GrammarDim> = {
     options: [
       ["singular", "singular"],
       /* A pair, where a language counts one. Arabic and Hebrew both do —
-         كتابين, שעתיים — and Huế declares no number at all, so nobody is
+         كتابين, שעתיים — and Vietnamese declares no number at all, so nobody is
          offered it who has no use for it.
 
          Added here rather than appended after "na" because the list is
@@ -2459,7 +2459,7 @@ export const GRAMMAR: Record<string, GrammarDim> = {
      can mean something: every kind of word a teacher can name lists the
      axes it is asked about and none lists this one, so it is offered on
      phrases and sentences and never on a noun. What each value is called
-     is the pack's — Huế says it with its own address terms. */
+     is the pack's — Vietnamese says it with its own address terms. */
   register: {
     label: "Said to",
     field: "register",
@@ -2639,7 +2639,7 @@ const SUBJECT_PERSONS: VerbPerson[] = [
  * The verb practices a language with a verb table of many persons offers:
  * the tense on its own, read through, who a form is about (read and
  * heard), sorted into its persons, and changed from one person to
- * another. Arabic and Hebrew declare all of them; Huế's verb has one form
+ * another. Arabic and Hebrew declare all of them; Vietnamese's verb has one form
  * for everybody and declares none.
  */
 const VERB_PRACTICES = ["vpattern", "vread", "vwho", "vwhorec", "vrow", "vshift"];
@@ -2836,7 +2836,7 @@ const HE_AGREEMENT: VerbSpec = {
    noun and a preposition the pronouns that go on their end, an adjective
    its feminine and plural, a number its feminine; the rest are the word
    and whatever forms the teacher writes. A category naming a table the
-   pack has not got — a noun in Huế, which attaches nothing — simply has
+   pack has not got — a noun in Vietnamese, which attaches nothing — simply has
    none, and an axis the pack has not got is not asked either. */
 const WORD_CATEGORIES: WordCategory[] = [
   {
@@ -2966,7 +2966,7 @@ const PRONOUNED_CATEGORIES: WordCategory[] = WORD_CATEGORIES.map((c) =>
 );
 
 /*
- * The same list in Huế's words. The kinds and what each fills are the
+ * The same list in Vietnamese's words. The kinds and what each fills are the
  * same; what the teacher is told about each is not. The shared lines were
  * written beside Arabic — a verb's persons, an adjective's forms beside a
  * noun, Abu Khaled and Nablus — and none of that is true of a Vietnamese
@@ -3001,7 +3001,7 @@ export const categoryOf = (
   categoriesOf(lang).find((c) => c.id === String(id || "")) || null;
 
 /**
- * Whether a card is shown its language's lexical box — Huế's classifier.
+ * Whether a card is shown its language's lexical box — Vietnamese's classifier.
  *
  * On the kinds of word the pack names for it, and on a word whose kind is
  * not chosen yet, which is most new cards and may well be a noun. Never on
@@ -3499,9 +3499,10 @@ export const quizAttrOf = (lang: Lang): Derived | null => attrsOf(lang).find((a)
 
 export const groupAttrOf = (lang: Lang): Derived | null => attrsOf(lang).find((a) => a.groups) || null;
 
-/* Collapse a value to the class it is graded in. Huế does not distinguish
-   hỏi from ngã in speech, so a listening exercise must not either — but the
-   spelling does distinguish them, so this is never applied to typing. */
+/* Collapse a value to the class it is graded in. A pack whose accent ran
+   two values together in speech would say so in its classes, so a listening
+   exercise did not tell them apart — but the spelling still would, so this
+   is never applied to typing. Vietnamese declares one class per tone. */
 export function gradeClass(attr: Derived, value: string) {
   if (!attr || !attr.classes) return value;
   /* Held by name: the guard above does not reach inside the closure. */
@@ -3854,7 +3855,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
         /* What to call the words this gathers, in Arabic's own terms. The
            app renders this sentence and does not compose one, because the
            relation it describes is not the same relation in every
-           language: here it is a shared root, in Huế it is a shared
+           language: here it is a shared root, in Vietnamese it is a shared
            spelling with a different tone. */
         heading: "Built on the same root",
       },
@@ -3922,10 +3923,10 @@ export const LANGUAGES: Record<LangId, Lang> = {
     ],
   },
 
-  "vi-Hue": {
-    id: "vi-Hue",
-    name: "Huế Vietnamese",
-    nativeName: "tiếng Huế",
+  "vi": {
+    id: "vi",
+    name: "Vietnamese",
+    nativeName: "tiếng Việt",
     direction: "ltr",
     scriptLabel: "Vietnamese",
     /* The language's own name for itself, which in a Latin-written
@@ -3981,7 +3982,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
         ],
         gate: "rows",
       },
-      number: numberTableOf("vi-Hue"),
+      number: numberTableOf("vi"),
     },
     /* The same list, and it attaches no pronouns and nothing agrees — so
        a noun here is a noun with nothing laid out under it, and so is an
@@ -3989,8 +3990,8 @@ export const LANGUAGES: Record<LangId, Lang> = {
        got means. Described in its own words: see VI_CATEGORY_NOTES. */
     categories: VI_CATEGORIES,
     /* Regular, so eleven boxes and three bare multiplier words; the
-       irregularity is all in company. See src/numbers/vi-Hue.ts. */
-    composer: composerFor("vi-Hue"),
+       irregularity is all in company. See src/numbers/vi.ts. */
+    composer: composerFor("vi"),
     verdicts: {
       partial: "Right letters, wrong tone",
       missing: "Letters right — add the tone marks",
@@ -4005,14 +4006,16 @@ export const LANGUAGES: Record<LangId, Lang> = {
         compute: viTone,
         groups: false,
         quizzable: true,
-        /* Huế merges hỏi and ngã in speech. The spelling keeps them apart, so
-           this applies to listening only — never to what a student types.
-           A northern pack would list six here and change nothing else. */
+        /* One class per tone mark. Accents differ — several merge hỏi and
+           ngã in speech — but the spelling keeps all six apart, and the pack
+           teaches no one accent: which one a student hears is the
+           teacher's choice, made in the recordings. */
         classes: [
           { id: "ngang", label: "Ngang — level", merges: ["ngang"] },
           { id: "huyen", label: "Huyền — falling", merges: ["huyen"] },
           { id: "sac", label: "Sắc — rising", merges: ["sac"] },
-          { id: "hoi", label: "Hỏi / Ngã — dipping", merges: ["hoi", "nga"] },
+          { id: "hoi", label: "Hỏi — dipping", merges: ["hoi"] },
+          { id: "nga", label: "Ngã — broken", merges: ["nga"] },
           { id: "nang", label: "Nặng — heavy", merges: ["nang"] },
         ],
       },
@@ -4064,7 +4067,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
       "Cards hold the Vietnamese spelling and an English meaning, and may carry a pronunciation note, which is kept beside the word and never asked for.",
       "A student may type a word with or without its tone marks, but a tone that is typed must be correct. Writing má for mà is wrong; writing ma is merely incomplete.",
       "Đ is treated as its own letter rather than a d with a mark, so typing d for đ is not accepted.",
-      "The six tones of the northern standard are not those of Huế speech. Cards should carry the spelling as written; the recording is what teaches the tone.",
+      "Accents differ in how they say the six tones, and some run two of them together. Cards carry the standard spelling; the teacher's recordings teach the tone in whichever accent the teacher has chosen.",
       "Recordings matter more here than in a language with a phonetic script, so the listening exercises are worth using from the first lesson.",
       "The on-screen keys carry the vowels Vietnamese needs and a row of tone marks, for students without a Vietnamese keyboard.",
     ],

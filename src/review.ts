@@ -222,7 +222,7 @@ type Owner = { card: Held; form: Held };
  * teacher left blank, is a sentence not asked rather than one asked
  * wrong. A verb with no other blank beside it has nothing to agree with
  * and takes its turns as before; so does a verb in a language whose
- * table has one column — Huế's *ăn* is *ăn* whoever eats, and there is
+ * table has one column — Vietnamese's *ăn* is *ăn* whoever eats, and there is
  * nothing for a subject to pick.
  *
  * **What a word agrees with is never another word that agrees.** In

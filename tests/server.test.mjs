@@ -956,7 +956,7 @@ test("a deck's phrases are sent with the cards that fill their variables", async
   await api("/api/courses?action=save-card", {
     method: "POST", key,
     body: {
-      card: carded({ ar: "Tâm", en: "Tam" }, [], { lang: "vi-HUE", fills: "friend", drill: false }),
+      card: carded({ ar: "Tâm", en: "Tam" }, [], { lang: "vi", fills: "friend", drill: false }),
       decks: [],
     },
   });

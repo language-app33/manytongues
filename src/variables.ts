@@ -80,7 +80,7 @@ export const WORD_SLOT = "word";
  * A pronoun, read three ways in English.
  *
  * Palestinian Arabic says *I am tired* as أنا تعبان — *I*, then *tired*,
- * with the *am* understood — and Hebrew and Huế drop it in the same
+ * with the *am* understood — and Hebrew and Vietnamese drop it in the same
  * places. So one pronoun card answers to three English phrasings: *I* in
  * "I like coffee", *I am* in "I am tired", and *am I* in "am I tired?",
  * where English turns the pair round and the language does not. A frame

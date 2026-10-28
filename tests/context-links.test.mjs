@@ -15,7 +15,7 @@ import { linkReport, pairsIn, unknownWords, MINE_FROM_TOKENS } from "../src/cont
 import { LANGUAGES } from "../src/languages.ts";
 
 const ar = LANGUAGES["ar-PS"];
-const vi = LANGUAGES["vi-Hue"];
+const vi = LANGUAGES["vi"];
 
 /** @param {Record<string, any>} x */
 const card = (x) => ({ en: "", uses: [], ...x });
