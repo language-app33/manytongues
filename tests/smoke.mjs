@@ -1846,20 +1846,10 @@ if (/Build a session/.test(document.body.textContent)) {
     (ver && ver.textContent) || "");
   check("it says when, so two deploys in a day are distinguishable",
     !!verWhen && /\d/.test(verWhen.textContent || ""), (verWhen && verWhen.textContent) || "");
-  /* Three looks, side by side, one lit — rather than one button that
-     cycled and made you tap twice to go back one. */
-  const appearance = document.querySelector(".at-cseg .at-segmented");
-  const looks = appearance ? [...appearance.querySelectorAll("button")] : [];
-  check("Appearance is one picker with its options side by side",
-    looks.length === 3, `${looks.length} options`);
-  /* One control, not three buttons: the options are inside the track,
-     which is the element carrying the picker's own name. */
-  check("and they are inside the track rather than beside it",
-    looks.every((b) => b.parentElement === appearance && b.classList.contains("at-seg")),
-    looks.map((b) => b.className).join(" | "));
-  check("and exactly one of them is lit",
-    looks.filter((b) => b.getAttribute("aria-pressed") === "true").length === 1,
-    looks.map((b) => `${b.textContent}:${b.getAttribute("aria-pressed")}`).join(" "));
+  /* The look is chosen in App preferences, and only there. */
+  check("the menu no longer carries a second Appearance picker",
+    !document.querySelector(".at-cmenu .at-segmented"),
+    document.querySelector(".at-cmenu .at-segmented") ? "still there" : "gone");
 
   const verBtn = ver && ver.querySelector(".at-cverbtn");
   check("nothing to reload when it is the deployed one",
@@ -2670,21 +2660,13 @@ if (/Build a session/.test(document.body.textContent)) {
   const cardCount = () =>
     Number(((document.querySelector("button.at-rung") || {}).textContent || "").trim().match(/^\d+/));
   const both = cardCount();
-  const swBtn = () => document.querySelector(".at-langbtn");
-  const swSaid = () => {
-    const b = swBtn();
-    return b ? String(b.getAttribute("aria-label")) : "nothing in the chrome bar";
-  };
-  check("somebody learning two languages gets a switch for them", !!swBtn(), swSaid());
-  /* This person teaches as well, so the one button is both the space and
-     the languages and wears a globe; what it says about the languages is
-     in the label a screen reader and a tooltip get. */
-  check("and it says every language is on, without naming any of them",
-    /Languages — all 2\b/.test(swSaid()), swSaid());
+  /* The languages are at the top of the menu behind your initial. */
+  const swBtn = () => document.querySelector(".at-cornerbtn");
+  const rows = () => [...document.querySelectorAll(".at-cmenu .at-ck")];
+  const swSaid = () => rows().map((r) => `${(r.querySelector("b") || {}).textContent}:${r.getAttribute("aria-checked")}`).join(", ");
 
   click(swBtn());
   await sleep(200);
-  const rows = () => [...document.querySelectorAll(".at-langmenu .at-ck")];
   check("pressing it opens the languages being learnt", rows().length === 2,
     rows().map((r) => (r.textContent || "").replace(/\s+/g, " ")).join(" · ") || "nothing opened");
   check("with every one of them ticked to start with",
@@ -2697,8 +2679,8 @@ if (/Build a session/.test(document.body.textContent)) {
     rows().map((r) => (r.textContent || "").replace(/\s+/g, " ")).join(" · "));
   click(viRow);
   await sleep(300);
-  check("switching one off says which one is left, on the button itself",
-    /Languages — Palestinian Arabic only/.test(swSaid()), swSaid());
+  check("switching one off leaves only the other ticked",
+    /Arabic:true/.test(swSaid()) && /Vietnamese:false/.test(swSaid()), swSaid());
   check("and its cards go from the rest of Learning", cardCount() === both - 1,
     `${both} with both, ${cardCount()} with one`);
 
@@ -2718,14 +2700,14 @@ if (/Build a session/.test(document.body.textContent)) {
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);
   check("switching it back on brings its cards back",
-    cardCount() === both && /Languages — all 2\b/.test(swSaid()),
+    cardCount() === both && !/:false/.test(swSaid()),
     `${cardCount()} cards, button says ${swSaid()}`);
   /* Anywhere outside it puts it away. */
   click(document.querySelector(".at-brand"));
   await sleep(200);
   check("and pressing away from it closes it",
-    !document.querySelector(".at-langmenu"),
-    document.querySelector(".at-langmenu") ? "still open" : "put away");
+    !document.querySelector(".at-cmenu"),
+    document.querySelector(".at-cmenu") ? "still open" : "put away");
 
   click(buttonNamed(/^Home$/));
   await sleep(300);
@@ -4409,7 +4391,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
 
   /* Into the teaching space, which this person now teaches in: from the
      space and language menu in the bar at the foot of the window. */
-  click(document.querySelector(".at-dock .at-langbtn"));
+  click(document.querySelector(".at-dock .at-cornerbtn"));
   await sleep(200);
   const toTeaching = [...document.querySelectorAll(".at-spacebtn")]
     .find((b) => /Teaching/i.test(b.textContent || ""));
@@ -10801,7 +10783,7 @@ const openPronounTables = async () => {
   /* The spaces are in the space and language menu, in the bar at the foot
      of the window, so the menu is opened to reach them. */
   const spaceBtn = async (/** @type {RegExp} */ re) => {
-    if (!host.querySelector(".at-spacebtn")) click(host.querySelector(".at-dock .at-langbtn"));
+    if (!host.querySelector(".at-spacebtn")) click(host.querySelector(".at-dock .at-cornerbtn"));
     await sleep(200);
     return [...host.querySelectorAll(".at-spacebtn")].find((b) => re.test(b.textContent || ""));
   };
@@ -10812,8 +10794,8 @@ const openPronounTables = async () => {
     await sleep(900);
   }
   const frame = () => host.querySelector(".at-screen.bare");
-  const swBtn = () => host.querySelector(".at-langbtn");
-  const rows = () => [...host.querySelectorAll(".at-langmenu .at-ck")];
+  const swBtn = () => host.querySelector(".at-cornerbtn");
+  const rows = () => [...host.querySelectorAll(".at-cmenu .at-ck")];
   const listed = () => [...((frame() || host).querySelectorAll(".at-minicard"))]
     .map((t) => (t.textContent || "").replace(/\s+/g, " "));
   const hasHouse = () => listed().some((t) => /house/i.test(t));
@@ -10823,11 +10805,9 @@ const openPronounTables = async () => {
   click(cardsTab);
   await sleep(500);
 
-  /* Two spaces and two languages: the one button wears a globe, and what it
-     says about the languages is in its label. */
-  check("a teacher of two languages gets the language switch above Teaching",
-    !!swBtn() && /Languages — all 2\b/.test(String(swBtn()?.getAttribute("aria-label"))),
-    swBtn() ? String(swBtn()?.getAttribute("aria-label")) + " · " + (swBtn()?.textContent || "") : "no switch in the bar");
+  /* The languages are at the top of the menu behind your initial. */
+  check("a teacher of two languages has the menu that holds the language switch",
+    !!swBtn(), "no menu button in the bar");
   check("and it lists the cards in both", hasHouse(), listed().length + " cards");
   click(swBtn());
   await sleep(200);
@@ -10835,17 +10815,18 @@ const openPronounTables = async () => {
     rows().length === 2 && rows().some((r) => /Vietnamese/.test(r.textContent || "")),
     rows().map((r) => (r.textContent || "").replace(/\s+/g, " ")).join(" · ") || "nothing opened");
   check("and says what switching one off does here",
-    /out of Teaching/.test((host.querySelector(".at-langmenu") || {}).textContent || ""),
-    ((host.querySelector(".at-langmenu") || {}).textContent || "").slice(0, 80));
+    /out of Teaching/.test((host.querySelector(".at-cmenu") || {}).textContent || ""),
+    ((host.querySelector(".at-cmenu") || {}).textContent || "").slice(0, 80));
   const shown = listed().length;
   const learnWas = learnOff();
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);
   check("switching Vietnamese off takes its card out of Teaching's list",
     !hasHouse() && listed().length === shown - 1, `${shown} before, ${listed().length} after`);
-  check("and the button says Arabic is what is left",
-    /Languages — [^.]*Arabic only/.test(String(swBtn()?.getAttribute("aria-label"))),
-    String(swBtn()?.getAttribute("aria-label")));
+  check("and Arabic is what is left ticked",
+    rows().filter((r) => r.getAttribute("aria-checked") === "true").map((r) => r.textContent || "").join("|").includes("Arabic")
+      && rows().filter((r) => r.getAttribute("aria-checked") === "true").length === 1,
+    rows().map((r) => `${r.textContent}:${r.getAttribute("aria-checked")}`).join(", "));
   check("and Learning's own choice is not touched by it", learnOff() === learnWas, `${learnWas} before, ${learnOff()} after`);
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);

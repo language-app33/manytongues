@@ -8,6 +8,54 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.507 — 28 October 2026
+
+**Every card has a name, and the top of a card or deck says what you are doing.**
+
+- The top bar of a card says Card while you read it, Edit card while you
+  edit it and Create card while you make one. A deck's says Deck, Edit
+  deck or Create deck. The name is no longer in the top bar.
+- Every card has a name, whatever its kind: it is the first thing in
+  "This card", and a card cannot be saved without one. Nothing fills it
+  in for you, because it is asked before anything else is written. A
+  scene's name is what used to be its title.
+- Cards made before this keep being listed by their words until they are
+  next edited, when they are asked for a name before they can be saved.
+- A deck's Title is now called Deck name.
+
+To check by hand: open a card and a deck, read them and edit them, and
+look at the top bar; make a new card of each kind and see Save stay off
+until it has a name; edit an old word card and give it one.
+
+## 0.506 — 28 October 2026
+
+**Space and languages move into the menu behind your initial.**
+
+- Choosing the space (Learning, Teaching, Admin) and which languages are
+  in play now happens at the top of the menu behind your initial, "You",
+  so the bar at the foot of the window no longer has a Space item.
+- That menu no longer has its own Appearance switch: the look is chosen
+  in App preferences, where it already was.
+- Every item in the bar is now the same width, as wide as the widest; on
+  a narrow phone they shrink together. Their names are a touch smaller and
+  lighter, their icons a touch smaller, and the bar a little shorter.
+
+## 0.505 — 28 October 2026
+
+**The bar at the foot of the window is one bar again, and easier to read.**
+
+- The sections, the space and language button, and the button with your
+  initial now sit together in one see-through bar, shared out evenly,
+  instead of a bar and two round buttons beside it.
+- Every item has its icon above its name, in larger type. The section you
+  are on is green, on a faint green ground; the others are white rather
+  than grey.
+- The space and language item is named after what it changes ("Space",
+  or "Languages" when only the languages can change), and your initial is
+  named "You".
+- On a narrow phone the names come down a size, rather than wrap, when a
+  space has more items than fit.
+
 ## 0.504 — 28 October 2026
 
 **Fewer buttons at the top of a card while editing it.**

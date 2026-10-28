@@ -1638,96 +1638,67 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 }
 .at-deckcard[data-open], .at-minicard { cursor: pointer; }
 /* ---- the bar at the foot of the window ----
-   Two pills that float over the page: the space's own sections, and a
-   smaller one a few pixels off it for what is true wherever you are —
-   which space and which languages, and you. Over the page rather than in
-   it, so whatever is on screen scrolls underneath; the page and a space
-   frame both leave room for it at the end (.at's padding, and
+   One pill that floats over the page: the space's own sections, then the
+   space and languages, then you. Over the page rather than in it, so
+   whatever is on screen scrolls underneath; the page and a space frame
+   both leave room for it at the end (.at's padding, and
    .at-screen.bare .at-screenbody's).
 
-   The row itself lets taps through, so the strips of page either side of
-   the pills stay pressable; the pills take them back. */
+   The row around it lets taps through, so the strips of page either side
+   of the pill stay pressable; the pill takes them back. */
 .at-dock { position:fixed; left:12px; right:12px;
   bottom: calc(12px + env(safe-area-inset-bottom));
-  display:flex; justify-content:center; align-items:stretch; gap:6px;
-  pointer-events:none; }
+  display:flex; justify-content:center; pointer-events:none; }
 .at-dock.off { display:none; }
 .at-dock > * { pointer-events:auto; }
-/* The two round buttons beside the sections share a holder, and it is what
-   both their menus hang off: its right-hand edge is never nearer the
-   window's edge than the bar's gutter, so a menu aligned to it and no wider
-   than the window less two gutters cannot leave the window on either side,
-   on a phone or on a desktop. The holder draws nothing; each button is its
-   own round pill, as tall as the sections and the same gap apart. */
-.at-docksub { position:relative; display:flex; align-items:center; gap:6px; }
-.at-dockmain, .at-langbtn, .at-docksub .at-cornerbtn {
-  background: var(--nav-bg); border:2px solid var(--line);
+/* The pill, and what both menus hang off: its right-hand edge is never
+   nearer the window's edge than the bar's gutter, so a menu aligned to it
+   and no wider than the window less two gutters cannot leave the window
+   on either side, on a phone or on a desktop. See-through and blurred,
+   with a soft shadow and hardly an edge, so the page reads through it. */
+/* A grid of equal columns, each as wide as the widest item, so the items
+   are one size whatever their names. */
+.at-dockbar { position:relative; display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:2px;
+  min-width:0; max-width:100%; padding:6px; border-radius:999px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  border:1px solid color-mix(in srgb, var(--line) 60%, transparent);
   box-shadow: var(--nav-shadow);
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
-.at-dockmain { display:flex; align-items:center; gap:2px; padding:5px; border-radius:999px; }
-/* A space with no sections — none yet, or a screen that has none — leaves
-   no empty pill behind. */
-.at-dockmain:empty { display:none; }
-.at-dockmain { min-width:0; }
-.at-docktabs { display:flex; gap:2px; min-width:0; flex:1 1 auto; }
-/* A section is its icon with its name under it, near the foot of the bar,
-   in the app's sentence case; the current one is lifted, like a selected
-   choice anywhere else in the app. */
-.at-docktabs .at-tab2 { flex:1 1 0; min-width:0; height:54px; flex-direction:column;
-  justify-content:flex-end; gap:3px; padding:0 12px 7px; border:0; border-radius:999px;
-  background:none; font-size:12px; line-height:1; letter-spacing:0; text-transform:none;
-  white-space:nowrap; }
-.at-docktabs .at-tab2 > svg { flex:none; }
-.at-docktabs .at-tab2.on { background: var(--raised); color: var(--ink); }
-/* On a phone the bar runs the width of the window and the sections share
-   it out, and the names come down a size on the narrowest screens rather
-   than wrap. */
+  -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); }
+/* The holders inside the pill draw nothing and take no room, so every item
+   is a sibling in the one row and they share it out evenly. */
+.at-dockmain, .at-docksub, .at-docktabs, .at-corner { display:contents; }
+/* An item: its icon, and its name under it near the foot of the pill. The
+   current section is the accent colour on a faint wash of it; the rest are
+   in the page's own ink, not greyed out. */
+.at-dockitem, .at-docktabs .at-tab2 { min-width:0; height:56px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:4px; padding:0 14px; border:0; border-radius:999px; background:none; cursor:pointer;
+  color: var(--text); font-family: var(--ui); font-size:14px; font-weight:600; line-height:1;
+  letter-spacing:0; text-transform:none; white-space:nowrap; }
+.at-docktabs .at-tab2 > svg { flex:none; width:24px; height:24px; }
+.at-docktabs .at-tab2.on { color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.at-dockitem:hover, .at-docktabs .at-tab2:not(.on):hover, .at-dockitem.open { background: var(--press); }
+.at-docklabel { display:block; }
+/* On a phone the pill runs the width of the window and the names come down
+   a size rather than wrap when a space has more items than fit. */
 @media (max-width: 599px) {
-  .at-dockmain { flex:1 1 auto; }
-  /* Shared by what each name needs rather than equally: "In context"
-     wants more of the bar than "App" does. */
-  .at-docktabs .at-tab2 { flex:1 1 auto; padding:0 5px 7px; overflow:hidden;
-    font-size: clamp(10.5px, 2.9vw, 12px); }
+  /* Across the window, the columns still equal, shrinking together. */
+  .at-dock { justify-content:stretch; }
+  .at-dockbar { flex:1 1 auto; grid-auto-columns: minmax(0, 1fr); }
+  .at-dockitem, .at-docktabs .at-tab2 { padding:0 4px; overflow:hidden;
+    font-size: clamp(11px, 3.4vw, 14px); }
 }
-/* ---- which languages are in play ----
-   An icon and a mark: the mark is the state, so the button says which
-   language is on when only one is, how many when it is some, and "All"
-   when there is nothing to say. */
-/* Not positioned, so the menu it opens is placed against the holder it sits
-   in (.at-docksub) rather than against the button. */
-.at-langsw { position:static; display:flex; }
-.at-langbtn { display:inline-flex; align-items:center; justify-content:center; width:68px; height:68px;
-  padding:0; border-radius:999px; cursor:pointer;
-  color: var(--muted); font-family: var(--ui); font-size:13px; font-weight:800;
-  letter-spacing:.04em; }
-.at-langbtn:hover, .at-langbtn.open { background: var(--raised); color: var(--text); border-color: var(--tab-stroke); }
-/* Narrowed to something is a state worth seeing from across the screen,
-   the way a filter that is doing something is anywhere else. */
-.at-langbtn.on { color: var(--accent); }
-.at-langmark { line-height:1; }
-/*
- * Hung off the pill rather than off the button.
- *
- * It used to grow leftward from the language button itself, which sat left
- * of the space tabs and the corner menu, and on a phone that put its left
- * edge off the screen. The pill's right-hand edge is held a gutter in from
- * the window by the bar, so a menu aligned to it and never wider than the
- * window less two gutters fits on both sides at any width. It opens upward,
- * off the bar, and a tall one scrolls inside itself rather than running
- * off the top.
- */
-.at-langmenu { position:absolute; bottom: calc(100% + 14px); right:0;
-  width: min(340px, calc(100vw - 24px));
-  max-height: calc(100vh - 120px - env(safe-area-inset-bottom));
-  max-height: calc(100dvh - 120px - env(safe-area-inset-bottom));
-  overflow-y:auto; background: var(--surface);
-  border:2px solid var(--line); border-radius:18px; padding:18px;
-  box-shadow: var(--nav-shadow); }
-.at-langmenu .at-eyebrow { margin:0 0 12px; }
+/* ---- which space and which languages ----
+   At the top of the menu behind your initial, for somebody with a choice
+   of either. */
+.at-place { padding:10px 10px 4px; }
+.at-place .at-eyebrow { margin:0 0 12px; }
 /* What switching a language off does, said under its heading, before the
    list it is about. */
-.at-langmenu .at-hint { margin:-4px 0 12px; }
-.at-langmenu .at-crule { margin:18px 0; }
+.at-place .at-hint { margin:-4px 0 12px; }
+.at-place .at-crule { margin:18px 0; }
+.at-place + .at-cline { margin-top:6px; border-top:2px solid var(--line); border-radius:0; }
 /* The spaces, side by side in the menu: a choice of one, the current one
    lifted. */
 .at-spacepick { display:grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap:4px;
@@ -1737,24 +1708,22 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   justify-content:center; gap:7px; min-width:0; padding:0 13px;
   font-family: var(--ui); font-size:13px; font-weight:800; }
 .at-spacebtn.on { background: var(--raised); color: var(--ink); border-color: var(--tab-stroke); }
-.at-cornerbtn { position:relative; width:40px; height:40px; border-radius:999px; cursor:pointer;
-  display:inline-flex; align-items:center; justify-content:center;
-  background: var(--nav-bg); border:2px solid var(--line); color: var(--text);
-  font-family: var(--ui); font-size:13px; font-weight:800; backdrop-filter:blur(12px);
-  box-shadow: var(--nav-shadow); }
 .at-cdot { width:9px; height:9px; border-radius:50%; background: var(--jade); flex-shrink:0; }
 .at-cdot.syncing { background: var(--brass); }
 .at-cdot.error, .at-cdot.off { background: var(--rose); }
-.at-cornerbtn .at-cdot { position:absolute; top:-2px; right:-2px; width:12px; height:12px;
-  border:2px solid var(--bg); }
-/* In the bar it is a round pill of its own, as tall as the sections. */
-.at-docksub .at-cornerbtn { width:68px; height:68px; font-size:16px; }
-.at-docksub .at-cornerbtn .at-cdot { top:3px; right:3px; border-color: var(--surface); }
+/* You, in the bar: your initial in a small round of its own, where the
+   sections have their icons, with the sync dot on its shoulder. */
+.at-cornerav { position:relative; width:26px; height:26px; border-radius:999px; flex:none;
+  display:inline-flex; align-items:center; justify-content:center;
+  background: var(--brass); color: var(--onbrass); font-size:13px; font-weight:800; }
+.at-cornerav .at-cdot { position:absolute; top:-3px; right:-4px; width:12px; height:12px;
+  border:2px solid var(--surface); }
 /* The menu grows to fit its rows, so it needs a ceiling: the version line
    underneath carries a build, a date and sometimes a whole sentence about
    a newer deploy, and without this the menu would widen past the screen
    and take its left-hand edge with it. */
 .at-cmenu { position:absolute; bottom: calc(100% + 14px); right:0; min-width:250px;
+  width: min(340px, calc(100vw - 24px));
   max-width: calc(100vw - 24px);
   max-height: calc(100vh - 120px - env(safe-area-inset-bottom));
   max-height: calc(100dvh - 120px - env(safe-area-inset-bottom)); overflow-y:auto; background: var(--surface);
