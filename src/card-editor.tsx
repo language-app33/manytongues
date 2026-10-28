@@ -86,6 +86,7 @@ import {
   ConfirmModal,
   Overlay,
   PickSheet,
+  ChoiceSwitch,
   Popover,
   DeckSwitch,
   Locked,
@@ -6166,25 +6167,6 @@ const SUBTYPE_LEDE = "Each subtype has specific fields, forms, structures, etc."
 
 function WordKind({ word }: { word: WordDraft }) {
   const { category, chooseCategory, categoryOffer, categorySaid, pronounOf } = word;
-  const [open, setOpen] = useState(false);
-  /* The list, in a sheet of its own — see PickSheet. Choosing shuts it,
-     because choosing is the whole of what it was open for, and what
-     follows from the answer is a table appearing on the screen behind. */
-  const sheet = open ? (
-    <PickSheet title="What subtype" lede={SUBTYPE_LEDE} className="at-kindsheet" onClose={() => setOpen(false)}>
-      <RadioGroup
-        quiet
-        label="What subtype"
-        name="card-category"
-        options={categoryOffer}
-        value={category}
-        onChange={(v) => {
-          chooseCategory(v);
-          setOpen(false);
-        }}
-      />
-    </PickSheet>
-  ) : null;
   /* The answer, even where it is no longer one of the answers offered: a
      retired kind is still what the card is until somebody changes it. */
   const said = categoryOffer.find((c) => c.value === category) || categorySaid || null;
@@ -6251,54 +6233,33 @@ function WordKind({ word }: { word: WordDraft }) {
   }
   /* Shut is the state an answered question sits in, and the pencil is the
      way back into it — so the list is on screen only while it is being
-     read, and the answer is on screen the rest of the time. */
-  if (said) {
-    return (
-      <div className="at-field at-mt3">
-        <label className="at-label">What subtype</label>
-        <p className="at-fieldlede">{SUBTYPE_LEDE}</p>
-        <div className="at-shutrow">
-          <Icon name="tune" />
-          <span className="at-shutname">{said.label}</span>
-          <IconButton
-            icon="edit"
-            label="Change what subtype this card is"
-            onClick={() => setOpen(true)}
-          />
-        </div>
-        {/* A kind no longer offered: the card keeps working as it is, and
-            this is the nudge to move it across when there is a moment. */}
-        {retired && (
-          <Help>
-            {category === "name"
-              ? "Name is no longer offered for new cards. When you can, choose Person or Place instead."
-              : category === "pronoun"
-                ? "Pronoun is no longer offered for new cards. Pronouns are now written once for the language, on the Pronouns screen beside Numbers in Cards."
-                : `${said.label} is no longer offered for new cards. When you can, choose another subtype.`}
-          </Help>
-        )}
-        {sheet}
-      </div>
-    );
-  }
+     read, and the answer is on screen the rest of the time. ChoiceSwitch
+     is that shape, shared with the Build a session screen's mode. */
   return (
-    <div className="at-field at-mt3">
-      <label className="at-label">What subtype</label>
-      <p className="at-fieldlede">{SUBTYPE_LEDE}</p>
-      <div className="at-chooser">
-        <button
-          className="at-choosebtn"
-          aria-expanded={open}
-          aria-label="What subtype. Not set. Choose one."
-          onClick={() => setOpen(true)}
-        >
-          <Icon name="tune" size={16} />
-          <span className="at-choosemark">Not set</span>
-          <Icon name="chevronDown" size={16} />
-        </button>
-      </div>
-      {sheet}
-    </div>
+    <ChoiceSwitch
+      ask="What subtype"
+      label="What subtype"
+      lede={SUBTYPE_LEDE}
+      icon="tune"
+      name="card-category"
+      options={categoryOffer}
+      value={category}
+      said={said ? said.label : undefined}
+      changeLabel="Change what subtype this card is"
+      onChange={chooseCategory}
+    >
+      {/* A kind no longer offered: the card keeps working as it is, and
+          this is the nudge to move it across when there is a moment. */}
+      {said && retired && (
+        <Help>
+          {category === "name"
+            ? "Name is no longer offered for new cards. When you can, choose Person or Place instead."
+            : category === "pronoun"
+              ? "Pronoun is no longer offered for new cards. Pronouns are now written once for the language, on the Pronouns screen beside Numbers in Cards."
+              : `${said.label} is no longer offered for new cards. When you can, choose another subtype.`}
+        </Help>
+      )}
+    </ChoiceSwitch>
   );
 }
 

@@ -206,6 +206,7 @@ const PLACES: Record<string, [string, string]> = {
   StripAsk: [TEACH, "Editing a card · taking a tag off every card"],
   RecordingOverlays: [TEACH, "Editing a card · recording a form"],
   DeckSwitch: [TEACH, "Editing a card · which decks it is in"],
+  ChoiceSwitch: [TEACH, "Editing a card · its subtype, and a built session's mode"],
   BlankNameBox: [TEACH, "Editing a card · naming a blank nobody has named yet"],
   VerbTable: [TEACH, "Filling in a verb's forms"],
   Alternatives: [TEACH, "Editing a card · several accepted answers"],

@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.497 — 27 October 2026
+## 0.500 — 27 October 2026
 
 **The sections and the corner menu move to a bar at the foot of the window.**
 
@@ -37,6 +37,80 @@ and moves once per batch of work you would notice, not once per commit.
   done.
 - On a narrow phone the section names come down a size so they stay on
   one line; on a wider screen they carry their icons as well.
+## 0.499 — 27 October 2026
+
+**Custom session: clearer button, quieter screen, 20 questions to start.**
+
+- The screen is called Custom session (Edit custom session when changing
+  a saved one).
+- The button in the top bar says Start beside its play icon. When editing
+  a saved session it says Save, with a save icon.
+- Nothing is marked as missing when the screen opens. Tapping Start before
+  it is ready starts nothing; it shows "Choose a mode." or "Choose at least
+  one deck or card." only under the sections still to fill in, and each
+  goes away once that section is filled.
+- Length now starts on 20 questions, and says "Pick how long you want the
+  session to be." Picking minutes instead says "The session ends after 5
+  minutes." (or however many). Ultimate still has no length and is not cut
+  to 20.
+- The numbers for questions and for minutes are now the same size.
+- Under Mode, one line: "The mode sets which exercise types are asked.
+  Cards you've already fully learnt are left out."
+
+To check by hand: on a phone, open Custom session and tap Start straight
+away; then compare the two rows of numbers under Length; then edit a saved
+session and look at the button.
+
+## 0.498 — 27 October 2026
+
+**Build a session uses the card screen's pickers, and keeps a session with a tick.**
+
+- The mode is chosen the way a card's subtype is: a button that opens the
+  list of modes in a sheet, and once one is chosen, its name with a pencil
+  to change it.
+- Decks are chosen the way a card's decks are: a button that opens the
+  list of decks, and the chosen ones shown as pills, each with a cross to
+  take it out. Single cards are chosen the same way, from a second list
+  with a search box at the top, and also show as pills. A session can mix
+  both.
+- The Everything row is gone. Choosing every deck does the same, and a
+  card that is in no deck can still be chosen on its own.
+- Keeping a session is now a tick box, "Save this session to reuse", under
+  a section called Save for later. The name box only appears once it is
+  ticked, and the session is saved when it starts. There is no separate
+  Save button to remember any more. Left without a name, it is called
+  after its mode and size, as before.
+- The Start button is now an icon in the top bar, on the right, like the
+  card screen's saves. Its name changes to "Save and start" when the box
+  is ticked, and to "Save changes" when editing a saved session. Because
+  an icon can't say what is missing, each section says what it still
+  needs ("Choose a mode.") until it has it.
+
+To check by hand: on a phone, build a session from one deck and two single
+cards found by search, tick the box, name it and start it; then find it
+under Saved sessions, edit it, and check the deck and cards come back as
+they were chosen.
+
+## 0.497 — 27 October 2026
+
+**A deck's screen in Teaching is laid out like a card's.**
+
+- Opening a deck under Teaching › Decks now shows the same white sheet,
+  ruled into sections, with the same large headings as a card's screen.
+- It opens on "This deck", with the language and how many cards it holds
+  under the heading, and Export as an icon beside it — where a card keeps
+  its Export by "This card". The worded Export button on the title line is
+  gone.
+- Numbers and pronouns, Deck quality, In context, and a new Cards heading
+  over the list each have a line under the heading saying what they are
+  for. Deck quality's explanation of its score now comes before the score
+  rather than after it.
+- How to use the list ("Tap a card to see it. Tap Select to …") sits under
+  the Cards heading, next to the cards, instead of at the top of the screen.
+- On a locked deck, the line saying it is locked stays under "This deck".
+
+To check by hand: on a phone, open a deck under Teaching › Decks and then a
+card, and compare the two; open a locked deck too.
 
 ## 0.496 — 27 October 2026
 

@@ -5343,7 +5343,7 @@ export interface DeckWords {
   none: string;
 }
 
-export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
+export function DeckSwitch({ decks, chosen, onToggle, of = "card", words, title = "Decks", find, size = deckSize }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
@@ -5358,10 +5358,22 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
       deck" would be the wrong sentence there. Each one left out is the
       card's. */
   words?: Partial<DeckWords>;
+  /** The sheet's title, where what is picked from it is not decks — the
+      Build a session screen picks single cards with the same pills. */
+  title?: string;
+  /** A search box at the top of the sheet, for a list too long to read
+      down: what it says in the box, and whether a row answers the search. */
+  find?: { placeholder: string; match: (id: string, q: string) => boolean };
+  /** The small line under each row's name, or nothing. A deck says how
+      big it is; a single card has nothing to add. */
+  size?: ((d: Pick<Deck, "cardCount">) => Node) | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
 
   const all = decks || [];
+  const wanted = q.trim().toLowerCase();
+  const listed = find && wanted ? all.filter((d) => find.match(d.id, wanted)) : all;
   const inThese = all.filter((d) => chosen.includes(d.id));
   const say: DeckWords = {
     first: `Add this ${of} to a deck`,
@@ -5425,13 +5437,24 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
           more than one; the pills behind it change as it does. */}
       {open && (
         <PickSheet
-          title="Decks"
+          title={title}
           lede={say.lede}
           className="at-decksheet"
           onClose={() => setOpen(false)}
         >
+          {find && (
+            <input
+              className="at-input at-mb3"
+              placeholder={find.placeholder}
+              aria-label={find.placeholder}
+              value={q}
+              dir="auto"
+              onChange={(e) => setQ(e.target.value)}
+            />
+          )}
           <div className="at-deckpicks">
-            {all.map((d) => {
+            {find && wanted && !listed.length && <Help>Nothing matches that.</Help>}
+            {listed.map((d) => {
               const on = chosen.includes(d.id);
               return (
                 <button
@@ -5443,7 +5466,7 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
                 >
                   <span className="at-tickbody">
                     <b>{d.title}</b>
-                    <i>{deckSize(d)}</i>
+                    {size ? <i>{size(d)}</i> : null}
                   </span>
                   {/* What tapping it does, rather than a tick saying what
                       is already true: the row is the verb. A locked deck
@@ -5458,6 +5481,85 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
             })}
           </div>
           {say.note && <Help>{say.note}</Help>}
+        </PickSheet>
+      )}
+    </div>
+  );
+}
+
+/*
+ * One answer from a list, asked the way the card editor asks a card's
+ * subtype: while nothing is chosen, a button saying so; once something is,
+ * the answer, read, with a pencil on the end that opens the list again.
+ * The list is in a sheet of its own and choosing shuts it, because
+ * choosing is the whole of what it was open for.
+ *
+ * Shared so the Build a session screen asks for its mode in the same
+ * shape the card editor asks for a subtype — see WordKind, which hands
+ * this the parts that are not locked.
+ */
+export function ChoiceSwitch<T extends string>({ ask, label, lede, icon, name, options, value, said, changeLabel, onChange, sheetClass = "at-kindsheet", className = "at-field at-mt3", children }: {
+  /** The question, as the sheet is titled and a screen reader says it. */
+  ask: string;
+  /** The question over the box, or nothing where a heading already asks. */
+  label?: string;
+  lede?: string;
+  icon: string;
+  /** What makes the sheet's radios exclusive. Unique on the screen. */
+  name: string;
+  options: { value: T; label: Node; note?: Node }[];
+  value?: T | "" | null;
+  /** The answer as shown, where it is not one of the options on offer —
+      a subtype since retired is still what the card is. */
+  said?: Node;
+  /** What the pencil says, out loud and on hover. */
+  changeLabel: string;
+  onChange: (value: T) => void;
+  sheetClass?: string;
+  className?: string;
+  /** Said under the answer — a retired subtype's nudge. */
+  children?: Node;
+}) {
+  const [open, setOpen] = useState(false);
+  const shown = said ?? (options.find((o) => o.value === value) || { label: null }).label;
+  return (
+    <div className={className}>
+      {label ? <label className="at-label">{label}</label> : null}
+      {lede ? <p className="at-fieldlede">{lede}</p> : null}
+      {shown ? (
+        <div className="at-shutrow">
+          <Icon name={icon} />
+          <span className="at-shutname">{shown}</span>
+          <IconButton icon="edit" label={changeLabel} onClick={() => setOpen(true)} />
+        </div>
+      ) : (
+        <div className="at-chooser">
+          <button
+            className="at-choosebtn"
+            aria-expanded={open}
+            aria-label={`${ask}. Not set. Choose one.`}
+            onClick={() => setOpen(true)}
+          >
+            <Icon name={icon} size={16} />
+            <span className="at-choosemark">Not set</span>
+            <Icon name="chevronDown" size={16} />
+          </button>
+        </div>
+      )}
+      {children}
+      {open && (
+        <PickSheet title={ask} lede={lede} className={sheetClass} onClose={() => setOpen(false)}>
+          <RadioGroup
+            quiet
+            label={ask}
+            name={name}
+            options={options}
+            value={value || null}
+            onChange={(v) => {
+              onChange(v);
+              setOpen(false);
+            }}
+          />
         </PickSheet>
       )}
     </div>

@@ -16,6 +16,8 @@ import {
   cardSubtypeLabel,
   cardWords,
   DeckSwitch,
+  ChoiceSwitch,
+  CheckList,
   ClipList,
   ConfirmModal,
   Empty,
@@ -17464,15 +17466,38 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
     [items]
   );
 
-  /* No mode until one is chosen. A pre-selected card looks like an answer
+  /* The decks, by the tag their cards carry, biggest first. */
+  const tagGroups: [string, Item[]][] = useMemo(() => {
+    const m = new Map<string, Item[]>();
+    for (const it of eligible) for (const t of it.tags) {
+      if (!m.has(t)) m.set(t, []);
+      (m.get(t) as Item[]).push(it);
+    }
+    return [...m.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+  }, [eligible]);
+
+  /* No mode until one is chosen. A pre-selected answer looks like one
      already given, so the Mode section gets read as "confirm this" rather
      than "pick one" — and Ultimate, which is the longest session on offer,
      is the last one to hand somebody by default. */
   const [mode, setMode] = useState(editing ? editing.mode : "");
-  const [picked, setPicked] = useState(() => {
-    if (!editing) return new Set<string>();
-    return new Set(cardsOfSaved(editing, eligible).map((i) => i.id));
+  /*
+   * What is picked, two ways, as the two pickers show it: whole decks, and
+   * single cards. A kept session is read back into the same two — what it
+   * kept as a deck is a deck again, and Everything is every deck and every
+   * card in none — so opening one to change it shows what was chosen in
+   * the shape it was chosen in.
+   */
+  const [opened] = useState(() => {
+    if (!editing) return { decks: [] as string[], cards: [] as string[] };
+    const picked = new Set(cardsOfSaved(editing, eligible).map((i) => i.id));
+    const kept = describeSaved({ picked, groups: new Map(tagGroups), all: eligible });
+    return kept.everything
+      ? { decks: tagGroups.map(([n]) => n), cards: eligible.filter((i) => !i.tags.length).map((i) => i.id) }
+      : { decks: kept.decks, cards: kept.ids };
   });
+  const [decks, setDecks] = useState<string[]>(opened.decks);
+  const [cards, setCards] = useState<string[]>(opened.cards);
   /* The kept cards this screen cannot show — another language's, under the
      switch, or one that has gone — carried through a save untouched, so
      changing the length of a session does not quietly take cards out of it. */
@@ -17481,22 +17506,19 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
     const here = new Set(eligible.map((i) => i.id));
     return editing.ids.filter((id) => !here.has(id));
   });
-  const [openTag, setOpenTag] = useState<string | null>(null);
-  /* "" until one of the two is chosen — the same reason the mode starts
-     unset. It used to open on 20 questions already lit, which is a length
-     nobody asked for sitting where the answer goes. */
+  /* A new session opens on 20 questions, the owner's choice of default
+     (0.499): unlike the mode, a length is something most people take as
+     offered. "" only for a kept session that had none — an Ultimate one. */
   const [limitKind, setLimitKind] = useState( // "" | count | time
-    !editing ? "" : editing.minutes ? "time" : editing.count && editing.count < 999 ? "count" : ""
+    !editing ? "count" : editing.minutes ? "time" : editing.count && editing.count < 999 ? "count" : ""
   );
   const [count, setCount] = useState(editing && editing.count && editing.count < 999 ? editing.count : 20);
   const [minutes, setMinutes] = useState(editing && editing.minutes ? editing.minutes : 5);
-  /* What it would be called, and what was last kept under that name. Held
-     as the description rather than as a flag, so changing the length or
-     the cards after saving offers the button again — what is on screen is
-     no longer what was kept. */
+  /* Keeping it is a box to tick, and the name is asked only once it is:
+     a session nobody means to keep should not be asked what it is called.
+     Editing one, it is kept already, so there is no box — only the name. */
+  const [keeping, setKeeping] = useState(false);
   const [name, setName] = useState(editing ? editing.name : "");
-  const [savedSpec, setSavedSpec] = useState("");
-  const [q, setQ] = useState("");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
@@ -17505,41 +17527,19 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   }, [onClose]);
   usePageLock();
 
-  /* Tags first: picking one selects everything under it. */
-  const tagGroups = useMemo(() => {
-    const m = new Map();
-    for (const it of eligible) for (const t of it.tags) {
-      if (!m.has(t)) m.set(t, []);
-      m.get(t).push(it);
-    }
-    return [...m.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
-  }, [eligible]);
+  const picked = useMemo(() => {
+    const on = new Set(cards);
+    for (const [n, group] of tagGroups) if (decks.includes(n)) group.forEach((i) => on.add(i.id));
+    return on;
+  }, [decks, cards, tagGroups]);
 
-  const searched = useMemo(() => {
-    const n = q.trim().toLowerCase();
-    if (!n) return [];
-    return eligible.filter((i) => cardMatches(i, n));
-  }, [eligible, q]);
-
-  const toggleOne = (id: string) =>
-    setPicked((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-
-  const tagState = (group: Item[]) => {
-    const on = group.filter((i) => picked.has(i.id)).length;
-    return on === 0 ? "none" : on === group.length ? "all" : "some";
+  const byId = useMemo(() => new Map(eligible.map((i) => [i.id, i])), [eligible]);
+  /* A card is named on its pill and in the list the way the old picker
+     named it: its own word, then what it means. */
+  const cardTitle = (it: Item) => {
+    const lead = firstOfEach(leadOf(it));
+    return [lead.ar, asMeaning(lead.en)].filter(Boolean).join(" · ");
   };
-
-  const toggleTag = (group: Item[]) =>
-    setPicked((prev) => {
-      const next = new Set(prev);
-      const all = group.every((i) => next.has(i.id));
-      group.forEach((i) => (all ? next.delete(i.id) : next.add(i.id)));
-      return next;
-    });
 
   /* Ultimate is the one mode with no length to choose — it asks every
      question of every card the session mix lets in — so its Length section
@@ -17551,223 +17551,160 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
      for a session that then refuses to build — and refused for one that
      would have been fine. */
   const needTypes = mode === "started" ? 1 : 2;
-  const problem =
-    !mode
-      ? "Choose a mode"
-      : picked.size === 0
-      ? "Choose at least one card"
-      : typeCount < needTypes
+  const typesShort =
+    mode && typeCount < needTypes
       ? mode === "started"
         ? "Get started needs one of the gentle exercise types switched on"
         : "At least two exercise types must be switched on in Settings"
-      : needsLength && !limitKind
-      ? "Choose a length"
       : "";
-
-  /*
-   * A reason short enough to be a label, or nothing.
-   *
-   * Saying why a button is disabled on the button itself is the right
-   * shape for "Choose a mode" and the wrong one for "At least two exercise
-   * types must be switched on in Settings" — that is a sentence, and a
-   * sentence on a button either wraps or shrinks to something nobody can
-   * read. The long ones are shown at the top instead, where there is room
-   * for them, and the button keeps its verb. The short ones still go on
-   * the button: a disabled control with no reason given is the one people
-   * tap twice and then give up on.
-   */
-  const LABEL_LIMIT = 26;
-  const onButton = (reason: string) =>
-    reason && reason.length <= LABEL_LIMIT ? reason : "";
-  const spelledOut = problem.length > LABEL_LIMIT ? problem : "";
+  /* What each section still wants, said under it the way the card editor
+     says what a field still needs — but only once Start has been tapped
+     while something is missing. Shown from the outset, three warnings
+     greeted a screen nobody had done anything wrong on yet. */
+  const [tried, setTried] = useState(false);
+  const need = {
+    mode: !mode ? "Choose a mode." : "",
+    cards: !picked.size ? "Choose at least one deck or card." : "",
+    length: needsLength && !limitKind ? "Choose a length." : "",
+  };
+  const said = tried ? need : { mode: "", cards: "", length: "" };
+  const problem = need.mode || need.cards || typesShort || need.length;
 
   /* Named after what it is, so a list of them reads without opening any:
      the mode is the shape of the session and the count is its size. */
   const suggestion = mode
     ? `${(MODES as Record<string, { label: string }>)[mode].label} · ${plural(picked.size, "card")}`
     : "";
-  /* A deck whose box is ticked is kept as the deck, not as the cards it
-     holds today, so the session takes in what is added to it later. */
-  const described = describeSaved({ picked, groups: new Map(tagGroups), all: eligible });
-  const spec = JSON.stringify({
-    name: name.trim() || suggestion,
-    ...described,
-    mode,
-    limitKind,
-    count,
-    minutes,
-  });
-  const saved = !!savedSpec && savedSpec === spec;
 
   function start() {
+    /* Ticked, it is kept as it is started — there is no Save to forget. */
+    if (keeping) keep();
     onStart({
       ids: [...picked],
       mode,
-      count: limitKind === "count" ? count : 999,
+      count: needsLength && limitKind === "count" ? count : 999,
       minutes: limitKind === "time" && needsLength ? minutes : 0,
     });
   }
 
   function keep() {
+    /* A deck whose box is ticked is kept as the deck, not as the cards it
+       holds today, so the session takes in what is added to it later. */
+    const described = describeSaved({ picked, groups: new Map(tagGroups), all: eligible });
     onSave({
       name: name.trim() || (editing && editing.name) || suggestion,
       ...described,
       ids: [...described.ids, ...elsewhere],
       mode,
-      count: limitKind === "count" ? count : 999,
+      count: needsLength && limitKind === "count" ? count : 999,
       minutes: limitKind === "time" && needsLength ? minutes : 0,
     });
   }
 
+  const go = editing ? "Save" : "Start";
+
   /* One screen, ruled into sections the way the card editor is — Mode,
-     Cards, Length, and keeping it — with the same headings and the same
-     line under each saying what it is for. It was three steps, one at a
-     time, which hid what had been chosen on the others and made changing
-     a kept session's length a walk through its mode and cards first. */
+     Cards, Length, and keeping it — with the same headings, the same line
+     under each, and the same pickers: the mode is chosen as a card's
+     subtype is, and decks and cards as a card's decks are. Its one
+     button is in the top bar, on the right, as the card editor's saves
+     are. */
   return (
     <Screen
-      title={editing ? "Edit session" : "Build a session"}
+      title={editing ? "Edit custom session" : "Custom session"}
       className="cardform"
       onBack={onClose}
-      footer={
-        <Button variant="primary" disabled={!!problem} onClick={editing ? keep : start}>
-          {onButton(problem) || (editing ? "Save changes" : "Start")}
+      action={
+        /* `off` rather than disabled: the tap still arrives, and is answered
+           by each unfilled section saying what it wants. */
+        <Button
+          variant="primary"
+          size="sm"
+          icon={editing ? "save" : "play"}
+          off={!!problem}
+          title={problem || undefined}
+          onClick={() => (problem ? setTried(true) : editing ? keep() : start())}
+        >
+          {go}
         </Button>
       }
     >
-      {spelledOut && <Notice kind="warn">{spelledOut}</Notice>}
+      {typesShort && <Notice kind="warn">{typesShort}</Notice>}
 
       <div className="at-formblock">
         <div className="at-formhead">
           <span className="at-formnum">Mode</span>
-          <span className="at-formrole">The mode sets which exercise types are asked.</span>
+          <span className="at-formrole">The mode sets which exercise types are asked. Cards you&apos;ve already fully learnt are left out.</span>
         </div>
-        <div className="at-modelist">
-          {Object.entries(MODES).map(([key, m]) => (
-            <button
-              key={key}
-              className={`at-modecard${mode === key ? " on" : ""}`}
-              onClick={() => setMode(key)}
-            >
-              <b>{m.label}</b>
-              <span>{m.blurb}</span>
-            </button>
-          ))}
-        </div>
-        <Help className="at-mt3">
-          Cards you&apos;ve already fully learnt are left out of every session.
-        </Help>
+        <ChoiceSwitch
+          ask="Mode"
+          icon="tune"
+          name="session-mode"
+          className="at-field"
+          options={Object.entries(MODES).map(([key, m]) => ({ value: key, label: m.label, note: m.blurb }))}
+          value={mode}
+          changeLabel="Change the mode"
+          onChange={setMode}
+        />
+        {said.mode && <p className="at-formneed unmet at-mt3">{said.mode}</p>}
       </div>
 
       <div className="at-formblock">
         <div className="at-formhead">
           <span className="at-formnum">Cards</span>
-          <span className="at-formrole">Pick whole tags, or search for individual cards below.</span>
+          <span className="at-formrole">Pick whole decks, single cards, or both.</span>
         </div>
-
-        <div className="at-taglist">
-          {tagGroups.map(([name, group]) => {
-            const st = tagState(group);
-            return (
-              <div className={`at-tagpick${st !== "none" ? " on" : ""}`} key={name}>
-                <div className="at-tagpickrow">
-                  <button className="at-tagpickmain" onClick={() => toggleTag(group)}>
-                    <span className={`at-box ${st}`}>
-                      {st === "all" ? "✓" : st === "some" ? "–" : ""}
-                    </span>
-                    <span className="nm">{name}</span>
-                    <span className="ct">
-                      {group.filter((i: Item) => picked.has(i.id)).length}/{group.length}
-                    </span>
-                  </button>
-                  <button
-                    className="at-tagpickmore"
-                    onClick={() => setOpenTag(openTag === name ? null : name)}
-                    aria-label="Choose individually"
-                  >
-                    {openTag === name ? "▾" : "▸"}
-                  </button>
-                </div>
-                {openTag === name && (
-                  <div className="at-tagpickcards">
-                    {group.map((it: Item) => (
-                      <button
-                        key={it.id}
-                        className={`at-minicard${picked.has(it.id) ? " on" : ""}`}
-                        onClick={() => toggleOne(it.id)}
-                      >
-                        {firstOfEach(leadOf(it)).ar && (
-                          <span className="ar" lang={activeLang().id} dir={activeLang().direction}>
-                            {firstOfEach(leadOf(it)).ar}
-                          </span>
-                        )}
-                        <span className="en">{asMeaning(firstOfEach(leadOf(it)).en)}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-
-          <div className={`at-tagpick${eligible.every((i) => picked.has(i.id)) ? " on" : ""}`}>
-            <div className="at-tagpickrow">
-            <button
-              className="at-tagpickmain"
-              onClick={() =>
-                setPicked((prev) =>
-                  eligible.every((i) => prev.has(i.id))
-                    ? new Set()
-                    : new Set(eligible.map((i) => i.id))
-                )
-              }
-            >
-              <span className={`at-box ${eligible.every((i) => picked.has(i.id)) ? "all" : picked.size ? "some" : "none"}`}>
-                {eligible.every((i) => picked.has(i.id)) ? "✓" : picked.size ? "–" : ""}
-              </span>
-              <span className="nm">Everything</span>
-              <span className="ct">
-                {picked.size}/{eligible.length}
-              </span>
-            </button>
-            </div>
-          </div>
-        </div>
-
-        <FormField label="Or find one card" className="at-mt5">
-          <input
-            className="at-input"
-            placeholder="Search"
-            value={q}
-            dir="auto"
-            onChange={(e) => setQ(e.target.value)}
+        <FormField label="Decks">
+          <DeckSwitch
+            decks={tagGroups.map(([n, group]) => ({ id: n, title: n, cardCount: group.length }))}
+            chosen={decks}
+            onToggle={(id, wasOn) => setDecks((d) => (wasOn ? d.filter((x) => x !== id) : d.concat([id])))}
+            words={{
+              first: "Choose decks",
+              drop: (title) => `Take ${title} out of this session`,
+              lede: "Every card in a deck you choose is in the session.",
+              note: "",
+              none: "No decks yet. Single cards can still be chosen below.",
+            }}
           />
         </FormField>
-        {q.trim() && (
-          <div className="at-tagpickcards at-mt1">
-            {searched.map((it) => (
-              <button
-                key={it.id}
-                className={`at-minicard${picked.has(it.id) ? " on" : ""}`}
-                onClick={() => toggleOne(it.id)}
-              >
-                {firstOfEach(leadOf(it)).ar && (
-                  <span className="ar" lang={activeLang().id} dir={activeLang().direction}>
-                    {firstOfEach(leadOf(it)).ar}
-                  </span>
-                )}
-                <span className="en">{asMeaning(firstOfEach(leadOf(it)).en)}</span>
-              </button>
-            ))}
-            {!searched.length && <Help>Nothing matches that.</Help>}
-          </div>
-        )}
+        <FormField label="Cards" className="at-mt5">
+          <DeckSwitch
+            title="Cards"
+            size={null}
+            decks={(() => {
+              /* The chosen ones first, in the order they were chosen, so
+                 the pills read in that order. */
+              const on = cards.map((id) => byId.get(id)).filter(Boolean) as Item[];
+              const off = eligible.filter((i) => !cards.includes(i.id));
+              return on.concat(off).map((i) => ({ id: i.id, title: cardTitle(i) }));
+            })()}
+            chosen={cards}
+            onToggle={(id, wasOn) => setCards((c) => (wasOn ? c.filter((x) => x !== id) : c.concat([id])))}
+            find={{
+              placeholder: "Search",
+              match: (id, q) => {
+                const it = byId.get(id);
+                return !!it && cardMatches(it, q);
+              },
+            }}
+            words={{
+              first: "Choose cards",
+              drop: (title) => `Take ${title} out of this session`,
+              lede: "Single cards, on top of any decks chosen above.",
+              note: "",
+              none: "No cards to practise yet.",
+            }}
+          />
+        </FormField>
+        {said.cards && <p className="at-formneed unmet">{said.cards}</p>}
+        {picked.size > 0 && <Help className="at-mt3">{plural(picked.size, "card")} in this session.</Help>}
       </div>
 
       <div className="at-formblock">
         <div className="at-formhead">
           <span className="at-formnum">Length</span>
-          <span className="at-formrole">One or the other: a number of questions, or a stretch of time.</span>
+          <span className="at-formrole">Pick how long you want the session to be.</span>
         </div>
         {needsLength ? (
           <>
@@ -17799,11 +17736,12 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
               />
             </FormField>
 
+            {said.length && <p className="at-formneed unmet">{said.length}</p>}
             {limitKind && (
               <Help>
                 {limitKind === "count"
                   ? `The session ends after ${count} questions.`
-                  : `A countdown replaces the question count, and the session ends after ${minutes} minutes.`}
+                  : `The session ends after ${minutes} minutes.`}
               </Help>
             )}
           </>
@@ -17815,14 +17753,11 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
       {/*
         * Keeping it.
         *
-        * Building one of these is several minutes of picking, and until now
-        * all of it was spent again the next morning. What is kept is the
-        * description — the cards, the mode, the length — so a card edited
-        * since is practised as it now reads.
-        *
-        * An extra rather than the way on: Start is still the button, and a
-        * session nobody saves behaves exactly as it did. Editing, the name
-        * is all there is to this: the footer saves.
+        * Building one of these is several minutes of picking, and before
+        * sessions could be kept all of it was spent again the next morning. What is kept is the
+        * description — the decks, the cards, the mode, the length — so a
+        * card edited since is practised as it now reads. Ticked, it is
+        * kept when it starts; there is no Save of its own to forget.
         */}
       {editing ? (
         <div className="at-formblock">
@@ -17842,33 +17777,28 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
       ) : (
         <div className="at-formblock">
           <div className="at-formhead">
-            <span className="at-formnum">Keep this session</span>
-            <span className="at-formrole">It will be under Saved sessions, beside Build a session.</span>
+            <span className="at-formnum">Save for later</span>
+            <span className="at-formrole">Keep this session under Saved sessions, to start again whenever you like.</span>
           </div>
-          <FormField label="Name" optional>
-            <input
-              className="at-input"
-              placeholder={suggestion}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </FormField>
-          <div className="at-row at-mt3">
-            <Button
-              variant="ghost"
-              icon={saved ? "check" : "save"}
-              disabled={!!problem || saved}
-              onClick={() => {
-                keep();
-                setSavedSpec(spec);
-              }}
-            >
-              {saved ? "Saved" : "Save"}
-            </Button>
-          </div>
-          {/* Which is not the same as having started it: somebody who saves
-              and then leaves has kept the session and practised nothing. */}
-          {saved && <Help>Kept. Start it now, or find it later under Saved sessions.</Help>}
+          <CheckList
+            options={[{
+              id: "keep",
+              title: "Save this session to reuse",
+              note: "It is saved when you start it.",
+            }]}
+            chosen={keeping ? ["keep"] : []}
+            onToggle={(_, wasOn) => setKeeping(!wasOn)}
+          />
+          {keeping && (
+            <FormField label="Name" optional className="at-mt5" lede={suggestion ? `Left empty, it is called “${suggestion}”.` : undefined}>
+              <input
+                className="at-input"
+                placeholder={suggestion || "Thursday's verbs"}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </FormField>
+          )}
         </div>
       )}
     </Screen>
