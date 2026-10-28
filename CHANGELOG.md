@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.510 — 28 October 2026
+
+**Progress and Cards lose their headings; the You menu is shorter.**
+
+- Progress and Cards no longer have a title at the top: the section lit
+  in the bar says where you are.
+- On Progress, Prep mode is now at the bottom, after your decks.
+- In the menu behind your initial, the languages are listed by name
+  alone, without how many cards each has, so the list is shorter. The
+  note under Languages now says what the choice does in plain words — in
+  Learning, "Select the languages you see in your cards, progress, and
+  anything you practice"; in Teaching, "Select the languages you see in
+  your courses, decks, and cards. This doesn't change anything for your
+  students."
+- The menu's dividers are gone, except the one above the version.
+
 ## 0.509 — 28 October 2026
 
 **Every card has a name, and the top of a card or deck says what you are doing.**

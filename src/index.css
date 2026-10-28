@@ -1697,8 +1697,8 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* What switching a language off does, said under its heading, before the
    list it is about. */
 .at-place .at-hint { margin:-4px 0 12px; }
-.at-place .at-crule { margin:18px 0; }
-.at-place + .at-cline { margin-top:6px; border-top:2px solid var(--line); border-radius:0; }
+/* The two parts are set apart by space rather than a rule. */
+.at-place .at-spacepick { margin-bottom:18px; }
 /* The spaces, side by side in the menu: a choice of one, the current one
    lifted. */
 .at-spacepick { display:grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap:4px;
@@ -4279,6 +4279,8 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
   padding:0 12px; gap:12px; font-size:32px; color: var(--text); }
 .at-brand.at-brand-home .at-brandmark { width:48px; height:48px; }
 .at.on-home { padding-top:104px; }
+/* Progress and Cards have no heading over them, so no room is kept for one. */
+.at.untitled { padding-top:18px; }
 .at-tabtitle { position:absolute; top:calc(12px + var(--banner-h, 0px)); left:0; right:0;
   margin:0; height:40px; display:flex; align-items:center; justify-content:center;
   font-family: var(--ui); font-size:22px; font-weight:800; color: var(--text); pointer-events:none; }

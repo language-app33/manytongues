@@ -13798,7 +13798,9 @@ export default function ArabicTrainer() {
 
   return (
     <div
-      className={`at ${theme}${!inExercise && space === "learn" && tab === "home" ? " on-home" : ""}${inExercise ? " in-exercise" : ""}${kbOpen ? " kb-open" : ""}${
+      className={`at ${theme}${!inExercise && space === "learn" && tab === "home" ? " on-home" : ""}${
+        !inExercise && space === "learn" && (tab === "progress" || tab === "items") ? " untitled" : ""
+      }${inExercise ? " in-exercise" : ""}${kbOpen ? " kb-open" : ""}${
         inExercise && session.pausedAt ? " paused" : ""
       }`}
       /* Every rule that lays out the language being learnt reads these two.
@@ -15441,19 +15443,16 @@ export default function ArabicTrainer() {
 
       {/* The app's name heads the learning page and scrolls away with it;
           a space frame carries its own. */}
-      {/* Home has it large and centred, as the page's title; every other tab
-          is headed with its own name in its place. */}
+      {/* Home has it large and centred, as the page's title. Progress and
+          Cards go without a heading, the section in the bar being the
+          title; Courses, reached from the menu, is headed with its name. */}
       {!inExercise && space === "learn" && tab === "home" && (
         <div className="at-brand at-brand-home">
           <img className="at-brandmark" src="/logo.svg" alt="" width={48} height={48} />
           ManyTongues
         </div>
       )}
-      {!inExercise && space === "learn" && tab !== "home" && (
-        <h1 className="at-tabtitle">
-          {({ progress: "Progress", items: "Cards", courses: "Courses" } as Record<string, string>)[tab] || ""}
-        </h1>
-      )}
+      {!inExercise && space === "learn" && tab === "courses" && <h1 className="at-tabtitle">Courses</h1>}
 
       {/* The bar at the foot of the window. Always mounted, so the slot the
           sections portal into stays the same element; hidden rather than
@@ -15504,8 +15503,8 @@ export default function ArabicTrainer() {
                   onLangs: (next) => setSetting(space === "teach" ? "teachLangsOff" : "langsOff", next),
                   note:
                     space === "teach"
-                      ? "What you switch off here is out of Teaching — your courses, decks and cards in it — until you switch it back on. Your students see everything as before."
-                      : "What you switch off here is out of the whole of Learning — your cards, your progress and anything you practise — until you switch it back on.",
+                      ? "Select the languages you see in your courses, decks, and cards. This doesn't change anything for your students."
+                      : "Select the languages you see in your cards, progress, and anything you practice.",
                 }}
                 onCourses={() => {
                   setTrialBack(null);
@@ -19366,28 +19365,6 @@ function ProgressTab({
        see .at-ruled. */
     <div className="at-ruled">
       <Lately moves={moves} />
-      {/* Prep mode: getting a set of decks ready by a date, under a heading
-          of its own like the other parts of the screen. The button starts
-          one, or opens the one there is; the line beside it says what is
-          being prepped for. */}
-      <Section head title="Prep mode" lede="Get some decks ready by a set date, like an exam or the start of a class.">
-        <div className="at-prepbar">
-          <Button variant="ghost" onClick={() => setPrepOpen(true)} aria-haspopup="dialog">
-            {prep ? "Edit prep mode" : "Start prep mode"}
-          </Button>
-          {prep && (
-            <Help className="at-prepnote">
-              {prepNow === "past"
-                ? `${prep.name} has come — edit the prep or delete it.`
-                : prepNow === "done"
-                ? `Ready for ${prep.name}: every card is ${prep.target === "cleared" ? "cleared" : "learnt"}.`
-                : `Prepping for ${prep.name} · ${
-                    prepDaysLeft(prep.date) === 1 ? "1 day left" : `${prepDaysLeft(prep.date)} days left`
-                  }`}
-            </Help>
-          )}
-        </div>
-      </Section>
       <Section
         head
         title="The ladder"
@@ -19578,6 +19555,29 @@ function ProgressTab({
           </div>
         </Section>
       )}
+      {/* Prep mode: getting a set of decks ready by a date, under a heading
+          of its own like the other parts of the screen, last, after the
+          decks it is about. The button starts
+          one, or opens the one there is; the line beside it says what is
+          being prepped for. */}
+      <Section head title="Prep mode" lede="Get some decks ready by a set date, like an exam or the start of a class.">
+        <div className="at-prepbar">
+          <Button variant="ghost" onClick={() => setPrepOpen(true)} aria-haspopup="dialog">
+            {prep ? "Edit prep mode" : "Start prep mode"}
+          </Button>
+          {prep && (
+            <Help className="at-prepnote">
+              {prepNow === "past"
+                ? `${prep.name} has come — edit the prep or delete it.`
+                : prepNow === "done"
+                ? `Ready for ${prep.name}: every card is ${prep.target === "cleared" ? "cleared" : "learnt"}.`
+                : `Prepping for ${prep.name} · ${
+                    prepDaysLeft(prep.date) === 1 ? "1 day left" : `${prepDaysLeft(prep.date)} days left`
+                  }`}
+            </Help>
+          )}
+        </div>
+      </Section>
 
       {items.length === 0 && (
         <Empty title="Nothing to show yet">{noCardsYet(myCourses.length)}</Empty>
@@ -19936,7 +19936,6 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note }: {
           </div>
         </>
       )}
-      {spacesToo && langsToo && <div className="at-crule" />}
       {langsToo && (
         <>
           <p className="at-eyebrow">Languages</p>
@@ -19951,15 +19950,14 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note }: {
                   role="checkbox"
                   aria-checked={chosen}
                   /* Not disabled: the last one on is pressable and simply
-                     holds. The line under each language is only its card
-                     count, whatever its state. Ticking keeps the menu open:
+                     holds. Just its name, to keep the list short. Ticking
+                     keeps the menu open:
                      you are usually ticking more than one. */
                   onClick={() => toggle(c.id)}
                 >
                   <span className="at-ckbox">{chosen ? "✓" : ""}</span>
                   <span className="at-cktext">
                     <b>{c.name}</b>
-                    <i>{plural(c.total, "card")}</i>
                   </span>
                 </button>
               );
@@ -20185,7 +20183,6 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
             </button>
           </div>
 
-          <div className="at-crule" />
 
           <button
             className="at-cline"

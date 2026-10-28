@@ -2692,8 +2692,8 @@ if (/Build a session/.test(document.body.textContent)) {
   check("the last language on cannot be switched off",
     !!arRow && arRow.getAttribute("aria-checked") === "true" && cardCount() === both - 1,
     `${arRow ? arRow.getAttribute("aria-checked") : "no row"}, ${cardCount()} cards`);
-  check("and the row still says only how many cards it has",
-    /^\s*✓?\s*Palestinian Arabic\s*\d+ cards?\s*$/.test((arRow || {}).textContent || ""),
+  check("and the row says only the language's name",
+    /^\s*✓?\s*Palestinian Arabic\s*$/.test((arRow || {}).textContent || ""),
     ((arRow || {}).textContent || "").replace(/\s+/g, " "));
 
   /* And back on again, which is the state everything else expects. */
@@ -2703,7 +2703,8 @@ if (/Build a session/.test(document.body.textContent)) {
     cardCount() === both && !/:false/.test(swSaid()),
     `${cardCount()} cards, button says ${swSaid()}`);
   /* Anywhere outside it puts it away. */
-  click(document.querySelector(".at-brand, .at-tabtitle"));
+  /* Progress has no heading now, so the press lands on the page itself. */
+  click(document.querySelector(".at-brand, .at-tabtitle") || document.querySelector(".at"));
   await sleep(200);
   check("and pressing away from it closes it",
     !document.querySelector(".at-cmenu"),
@@ -10823,7 +10824,7 @@ const openPronounTables = async () => {
     rows().length === 2 && rows().some((r) => /Vietnamese/.test(r.textContent || "")),
     rows().map((r) => (r.textContent || "").replace(/\s+/g, " ")).join(" · ") || "nothing opened");
   check("and says what switching one off does here",
-    /out of Teaching/.test((host.querySelector(".at-cmenu") || {}).textContent || ""),
+    /doesn't change anything for your students/.test((host.querySelector(".at-cmenu") || {}).textContent || ""),
     ((host.querySelector(".at-cmenu") || {}).textContent || "").slice(0, 80));
   const shown = listed().length;
   const learnWas = learnOff();
