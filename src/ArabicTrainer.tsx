@@ -15458,11 +15458,10 @@ export default function ArabicTrainer() {
           .concat(teaches || (account && account.admin) ? ["teach"] : [])
           .concat(account && account.admin ? ["admin"] : []);
         const choices = space === "learn" ? langChoices : space === "teach" ? teachChoices : [];
-        const picking = spaces.length > 1 || (choices && choices.length > 1);
         return (
           <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
             <div className="at-dockmain" ref={setDockSlot} />
-            <div className={`at-docksub${picking ? "" : " bare"}`}>
+            <div className="at-docksub">
               <PlaceSwitch
                 space={space}
                 spaces={spaces}
@@ -19969,9 +19968,9 @@ function PlaceSwitch({ space, spaces, onSpace, choices, off, onLangs, note }: {
         onClick={() => setOpen((v) => !v)}
       >
         {spacesToo && langsToo ? (
-          <Icon name="language" size={20} />
+          <Icon name="language" size={22} />
         ) : spacesToo ? (
-          <Icon name={SPACE_ICON[space]} size={20} />
+          <Icon name={SPACE_ICON[space]} size={22} />
         ) : (
           <span className="at-langmark">{mark}</span>
         )}
@@ -20005,6 +20004,7 @@ function PlaceSwitch({ space, spaces, onSpace, choices, off, onLangs, note }: {
           {langsToo && (
             <>
               <p className="at-eyebrow">Languages</p>
+              <Help>{note}</Help>
               <div className="at-cklist">
                 {choices.map((c) => {
                   const chosen = !off.includes(c.id);
@@ -20028,7 +20028,6 @@ function PlaceSwitch({ space, spaces, onSpace, choices, off, onLangs, note }: {
                   );
                 })}
               </div>
-              <Help>{note}</Help>
             </>
           )}
         </Popover>
