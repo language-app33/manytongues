@@ -411,6 +411,9 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
   const [open, setOpen] = useState<number | null>(null);
   const commit = onCommit;
   const edit = onEdit;
+  /* Read, the grammar is said rather than offered, and a recording that
+     is there is opened to be listened to rather than to be made. */
+  const locked = useContext(Locked);
   const grammarOf = (row: Answer) =>
     dims.map((d) => labelFor({ [d.field]: row[d.field] }, lang)).filter(Boolean).join(" ");
   return (
@@ -512,7 +515,10 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               is one of the accepted answers, said out loud, and a card
               that accepts two had one set of clips over the pair. */}
           <div className="at-answerabout">
-            {dims.length > 0 && (
+            {dims.length > 0 && locked && grammarOf(row) && (
+              <span className="at-answergram">{grammarOf(row)}</span>
+            )}
+            {dims.length > 0 && !locked && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -537,6 +543,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
                    reading as the smaller of the two. Both keep the same
                    box, because the row stretches them together. */
                 className="at-answerrec"
+                reads={locked && clipsOf(row).length > 0}
                 /* Nothing to record until there is a word to say. The same
                    rule a cell of a table follows — see CellFields. */
                 disabled={!String(row.text || "").trim()}
@@ -1349,6 +1356,8 @@ export function ImageScreen({ title, images, onChange, onClose }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const full = images.length >= MAX_IMAGES;
+  /* Opened from a card being read: the pictures, and no way to change them. */
+  const locked = useContext(Locked);
 
   async function add(file: File | undefined | null) {
     if (!file) return;
@@ -1409,22 +1418,26 @@ export function ImageScreen({ title, images, onChange, onClose }: {
             {images.map((h, i) => (
               <figure className="at-imgtile" key={h}>
                 <StoredImage hash={h} alt={`Image ${i + 1}`} />
-                <IconButton
-                  icon="delete"
-                  label={`Remove image ${i + 1}`}
-                  onClick={() => onChange(images.filter((x) => x !== h))}
-                />
+                {!locked && (
+                  <IconButton
+                    icon="delete"
+                    label={`Remove image ${i + 1}`}
+                    onClick={() => onChange(images.filter((x) => x !== h))}
+                  />
+                )}
               </figure>
             ))}
           </div>
         ) : (
           <p className="at-hint">No image yet.</p>
         )}
-        <div className="at-chips" style={{ marginTop: 12 }}>
-          {picker("Choose an image", "image", false)}
-          {picker("Take a photo", "camera", true)}
-        </div>
-        {full && <Help>That is as many as one form may have. Remove one to add another.</Help>}
+        {!locked && (
+          <div className="at-chips" style={{ marginTop: 12 }}>
+            {picker("Choose an image", "image", false)}
+            {picker("Take a photo", "camera", true)}
+          </div>
+        )}
+        {!locked && full && <Help>That is as many as one form may have. Remove one to add another.</Help>}
       </section>
     </Screen>
   );
@@ -1445,6 +1458,14 @@ function Recordings({ form, onOpen }: {
   onOpen: () => void;
 }) {
   const made = clipsOf(form);
+  const locked = useContext(Locked);
+  if (locked) {
+    return (
+      <Field label="Recordings">
+        {made.length ? <ClipList clips={made} /> : <Help>None.</Help>}
+      </Field>
+    );
+  }
   return (
     <Field label="Recordings">
       {/* What the field is for, under the name of it and above the button
@@ -1493,6 +1514,9 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
   onClose: () => void;
 }) {
   const [recording, setRecording] = useState<"clips" | "slowClips" | "">("");
+  /* Opened from a card being read: the takes, to listen to, and nothing
+     that makes or removes one. */
+  const locked = useContext(Locked);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -1586,11 +1610,15 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
       rise
       backLabel="Back to the card"
     >
+      {locked ? (
+        <Help>The recordings on this card. Press Edit on the card to add or remove one.</Help>
+      ) : (
       <Help>
         You can make one at regular speed, a slow one, or both — or neither:
         a card with no recording is still a card, it just cannot be
         practiced by ear.
       </Help>
+      )}
       <Notice kind="error">{error}</Notice>
 
       {CLIP_KINDS.map((kind) => {
@@ -1605,11 +1633,14 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
                 are is the heading directly above them. */}
             <ClipList
               clips={list.map((id, i) => ({ id, label: `Take ${i + 1}` }))}
-              onChange={(next) =>
+              onChange={locked ? undefined : (next) =>
                 put(kind.key, next.map((c) => (typeof c === "string" ? c : c.id)))
               }
             />
+            {locked && !list.length && <Help>None.</Help>}
 
+            {!locked && (
+            <>
             <div className="at-chips" style={{ marginTop: list.length ? 10 : 0 }}>
               {mine ? (
                 <Button variant="danger" size="sm" onClick={end} icon="pause">
@@ -1638,6 +1669,8 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
               disabled={!!busy || !!recording}
               onFiles={(files) => store(files, kind.key)}
             />
+            </>
+            )}
           </section>
         );
       })}
@@ -1901,6 +1934,7 @@ function CellFields({ lang, cell, which, saysHow, asksEnglish = true, onChange, 
   onChange: (patch: Record<string, any>) => void;
   onRecord: () => void;
 }) {
+  const locked = useContext(Locked);
   const written = !!(cell && String(cell.ar || "").trim());
   const heard = cell ? clipsOf(cell).length : 0;
   return (
@@ -1932,13 +1966,26 @@ function CellFields({ lang, cell, which, saysHow, asksEnglish = true, onChange, 
           />
         )}
       </div>
-      <IconButton
-        icon="mic"
-        label={heard ? `${plural(heard, "recording")} · ${which}` : `Record ${which}`}
-        className={`at-cellmic${heard ? " on" : ""}`}
-        disabled={!written}
-        onClick={onRecord}
-      />
+      {/* Read, a cell's recordings are opened to be listened to; with none,
+          there is nothing to open and the button is not there. */}
+      {locked && heard ? (
+        <Pressable
+          className="at-icon at-cellmic on"
+          title={`${plural(heard, "recording")} · ${which}`}
+          aria-label={`${plural(heard, "recording")} · ${which}`}
+          onClick={onRecord}
+        >
+          <Icon name="mic" />
+        </Pressable>
+      ) : (
+        <IconButton
+          icon="mic"
+          label={heard ? `${plural(heard, "recording")} · ${which}` : `Record ${which}`}
+          className={`at-cellmic${heard ? " on" : ""}`}
+          disabled={!written}
+          onClick={onRecord}
+        />
+      )}
     </>
   );
 }
@@ -7278,6 +7325,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
      out does not shut under the teacher's fingers. */
   const drawn = useContext(FoldsForms);
   const folds = !!drawn;
+  const locked = useContext(Locked);
   const [open, setOpen] = useState(() =>
     !drawn || (!drawn.folded && (drawn.drawn.current || more || formWritten(f))));
   const [rows, setRows] = useState(() => answerRows(f, fields));
@@ -7389,6 +7437,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
               icon="image"
               iconSize={17}
               className="at-answerrec"
+              reads={locked && images.length > 0}
               aria-label={`${of ? `Images for ${of}` : "Images"} — ${images.length ? `${images.length} added` : "none yet"}`}
               onClick={() => setSeeing(true)}
             >
@@ -8107,6 +8156,7 @@ function TagList({ word, rows, maker, full, open, onOpen, onClose }: {
   onOpen: () => void;
   onClose: () => void;
 }) {
+  const locked = useContext(Locked);
   const { fills, defaultTags, ownFills } = word;
   /* Only the default tags this card actually has, as plain labels: nothing
      on them can be pressed — the answer is the kind of card, above. */
@@ -8152,6 +8202,8 @@ function TagList({ word, rows, maker, full, open, onOpen, onClose }: {
             );
           })}
         </div>
+      ) : locked ? (
+        <p className="at-hint">None.</p>
       ) : null}
       <div>
         {/* Drawn as the deck button at the top of the card is — the same
@@ -10050,6 +10102,7 @@ function MeaningsBlock({ lang, selfId, lead, allCards, clue, onClue, canAdd, onA
   onAnother: (which: "meaning" | "word") => void;
   onOpen?: (card: Card) => void;
 }) {
+  const locked = useContext(Locked);
   const shared = useMemo(
     () => sharedWith(allCards, { id: selfId, lang: lang.id }, lead as any),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -10135,7 +10188,7 @@ function MeaningsBlock({ lang, selfId, lead, allCards, clue, onClue, canAdd, onA
             : `Add another ${lang.scriptLabel} word for this meaning`}
         </Button>
       </div>
-      <Help>Either one saves this card first, then opens the new one.</Help>
+      {!locked && <Help>Either one saves this card first, then opens the new one.</Help>}
     </div>
   );
 }
@@ -10660,7 +10713,11 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
           }}
         />
       )}
-      <RecordingOverlays word={word} talk={talk} />
+      {/* Opened from a cell or a line while the card is read, they only
+          play — see RecordingScreen. */}
+      <Locked.Provider value={locked}>
+        <RecordingOverlays word={word} talk={talk} />
+      </Locked.Provider>
       {carrying && (
         <CarryAsk
           cards={carrying.cards}

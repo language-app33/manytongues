@@ -5144,6 +5144,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   /* The open deck, being edited: null while it is only read. */
   const [deckDraft, setDeckDraft] = useState<DeckDraft | null>(null);
   const [discardingDeck, setDiscardingDeck] = useState(false);
+  const [lockAsk, setLockAsk] = useState(false);
   /* And which language, where the teacher has more than one to choose
      from. The same two-step the New card button takes, for the same
      reason and through the same control. */
@@ -7503,24 +7504,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   )}
                 </Field>
 
-                {/* Locking is about which cards the deck holds, and nothing
-                    else: the cards can still be corrected, and the deck
-                    renamed and shared. */}
-                <Field label="Lock" lede="The cards in it can still be edited. Any teacher who can change this deck can unlock it.">
-                  <div className="at-cklist">
-                    <button
-                      className={`at-ck${shown.locked ? " on" : ""}`}
-                      aria-pressed={shown.locked}
-                      onClick={() => edit({ locked: !shown.locked })}
-                    >
-                      <span className="at-ckbox">{shown.locked ? "✓" : ""}</span>
-                      <span className="at-cktext">
-                        <b>Lock this deck</b>
-                        <i>No cards can be added to it or taken out of it until it is unlocked.</i>
-                      </span>
-                    </button>
-                  </div>
-                </Field>
               </fieldset>
 
               {/* The whole deck, whatever the list below is showing: what a
@@ -7577,6 +7560,17 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 screen and its own Edit. */}
             <Section
               title="Cards"
+              /* Locking is about which cards the deck holds, and nothing
+                 else — the cards can still be corrected, the deck renamed
+                 and shared — so its button is by the cards. It says what it
+                 would do, is dimmed while the deck is only read, and asks
+                 first; what it asks is part of the edit, saved with it. */
+              action={
+                <Button size="sm" icon={shown.locked ? "unlock" : "lock"} disabled={!editing}
+                  onClick={() => setLockAsk(true)}>
+                  {shown.locked ? "Unlock" : "Lock"}
+                </Button>
+              }
               lede={
                 d.locked
                   ? "This deck is locked, so no cards can be added to it or taken out. Tap a card to see or edit it."
@@ -7610,8 +7604,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                  as a separate sort of thing to make — and meant the Cards
                  tab, with only the one button, could not make one at all.
                  Which kind is asked on the way in, before the editor. */
-              /* Nothing new goes into a locked deck. */
+              /* Nothing new goes into a locked deck: New is dimmed, and
+                 pressed, says why. */
               onNew={d.locked ? undefined : () => setMaking({ decks: [d.id], lang: (langOfDeck(d) || {}).id })}
+              newOff={d.locked ? () => snack("This deck is locked, so no cards can be added. Unlock it to add one.", "warn") : undefined}
               selected={selCards}
               onSelectedChange={setSelCards}
               bulkActions={[
@@ -7669,6 +7665,33 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         {cardAction === "add" && cardActionScreen(d.id)}
         {exportScreen}
         {tagAction && tagActionScreen()}
+
+        {lockAsk && (
+          <ConfirmModal
+            title={shown.locked ? "Unlock this deck?" : "Lock this deck?"}
+            danger={false}
+            body={
+              shown.locked ? (
+                <p>
+                  Cards can be added to it and taken out of it again. The change is made when you
+                  save the deck.
+                </p>
+              ) : (
+                <p>
+                  No cards can be added to it or taken out of it until it is unlocked. The cards in it
+                  can still be edited, and the deck renamed and shared. The change is made when you
+                  save the deck.
+                </p>
+              )
+            }
+            confirmLabel={shown.locked ? "Unlock" : "Lock"}
+            onCancel={() => setLockAsk(false)}
+            onConfirm={() => {
+              setLockAsk(false);
+              edit({ locked: !shown.locked });
+            }}
+          />
+        )}
 
         {discardingDeck && (
           <ConfirmModal

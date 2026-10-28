@@ -309,6 +309,9 @@ let materialDecks = [];
 /* What the deck screen's Numbers and pronouns asked the server to keep. */
 /** @type {any[]} */
 const savedParts = [];
+/* What the deck screen's Lock asked the server to do. */
+/** @type {any[]} */
+const lockedDecks = [];
 /* The accounts the first screen asked to have made, so a walk of it can
    check what was sent rather than only what the screen then showed. */
 /** @type {any[]} */
@@ -444,6 +447,11 @@ const fakeFetch = async (input, opts = {}) => {
       });
     }
     /* Which parts of the numbers a deck holds, as the screen saved them. */
+    if (action === "lock-deck") {
+      const body = JSON.parse(opts.body || "{}");
+      lockedDecks.push(body);
+      return json({ ok: true });
+    }
     if (action === "set-deck-parts") {
       const body = JSON.parse(opts.body || "{}");
       savedParts.push(body);
@@ -8578,8 +8586,8 @@ const openPronounTables = async () => {
       deckHeads.join(" | ") || "(not laid out like the card editor)");
     const thisDeck = deckSheet && deckSheet.querySelector(".at-formblock");
     const labels = thisDeck ? [...thisDeck.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : [];
-    check("and This deck holds its title, courses, lock and quality",
-      labels.join(" | ") === "Title | Courses | Lock | Deck quality",
+    check("and This deck holds its title, courses and quality",
+      labels.join(" | ") === "Title | Courses | Deck quality",
       labels.join(" | ") || "(no This deck)");
     check("and Export sits by its “This deck” heading, with Edit alone on the title line",
       !!deckSheet && !!deckSheet.querySelector('.at-formhead [aria-label="Export this deck"]') &&
@@ -8671,6 +8679,35 @@ const openPronounTables = async () => {
   check("and saving tells the server which parts the deck holds",
     !!sent && sent.deckId === "d1" && JSON.stringify(sent.parts) === JSON.stringify(["numbers:0-9"]),
     JSON.stringify(savedParts));
+
+  /* ---- and locking it ----
+     A button by the Cards heading, dimmed while the deck is read; pressed
+     while editing, it asks, and what it asks is saved with the deck. */
+  await sleep(300);
+  const lockBtn = () => [...document.querySelectorAll(".at-section")]
+    .filter((sec) => /^Cards$/.test((sec.querySelector(".at-sectiontop .at-eyebrow") || {}).textContent || ""))
+    .map((sec) => /** @type {HTMLButtonElement | null} */ (sec.querySelector(".at-sectiontop button")))[0] || null;
+  check("a deck being read has a dimmed Lock button by its Cards heading",
+    !!lockBtn() && /^Lock$/.test((lockBtn()?.textContent || "").trim()) && !!lockBtn()?.disabled,
+    lockBtn() ? `${(lockBtn()?.textContent || "").trim()} · ${lockBtn()?.disabled ? "dimmed" : "live"}` : "(no button by Cards)");
+  click(document.querySelector('.at-screenaction [aria-label="Edit"]'));
+  await sleep(250);
+  click(lockBtn());
+  await sleep(200);
+  const lockModal = document.querySelector(".at-modal");
+  check("and edited, pressing it explains what locking does before it does it",
+    !!lockModal && /Lock this deck\?/.test(lockModal.textContent || "") && /No cards can be added/.test(lockModal.textContent || ""),
+    lockModal ? (lockModal.textContent || "").slice(0, 80) : "(no question)");
+  click(lockModal && [...lockModal.querySelectorAll("button")].find((b) => /^Lock$/.test((b.textContent || "").trim())));
+  await sleep(200);
+  check("and agreeing turns it to Unlock, sending nothing yet",
+    /^Unlock$/.test((lockBtn()?.textContent || "").trim()) && lockedDecks.length === 0,
+    `${(lockBtn()?.textContent || "").trim()} · ${JSON.stringify(lockedDecks)}`);
+  click(document.querySelector('.at-screenaction [aria-label="Save"]'));
+  await sleep(600);
+  check("and Save locks the deck",
+    lockedDecks.length === 1 && lockedDecks[0].deckId === "d1" && lockedDecks[0].locked === true,
+    JSON.stringify(lockedDecks));
 }
 
 /* ---- a deck whose cards accept two spellings ----

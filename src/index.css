@@ -3782,6 +3782,9 @@ body.at-screening .at-chromebar { display:none; }
    more type and a shade more padding; the row stretches them to a shared
    height, so the pair still lines up. */
 .at-answerabout > .at-answerrec { font-size:13px; padding:6px 11px; }
+/* Read, the grammar is said in words where its button was. */
+.at-answergram { display:inline-flex; align-items:center; font-size:12px; font-weight:700;
+  letter-spacing:.04em; text-transform:uppercase; color: var(--muted); padding:4px 2px; }
 .at-answerdims { display:flex; flex-direction:column; gap:6px; margin-top:8px;
   padding:8px 12px; background: var(--well); border-radius: var(--r-sm);
   container-type: inline-size; }
@@ -4174,10 +4177,44 @@ body.at-screening .at-chromebar { display:none; }
  * something look disabled — which is true, and says so.
  */
 fieldset.at-cardlock { border:0; padding:0; margin:0; min-inline-size:0; }
-fieldset.at-cardlock:disabled :is(input, textarea, select):disabled { color: var(--text);
-  -webkit-text-fill-color: var(--text); opacity:1; cursor:default; }
-fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] { cursor:default; }
-fieldset.at-cardlock:disabled .at-seg.on:disabled { opacity:1; }
+/* What can be typed into once Edit is pressed is a step quieter while it is
+   read — the box's rule and ground lighter, its words a shade softer — so
+   reading and editing look different at a glance, and the words are still
+   read without effort. An empty box keeps no example in it: an example in
+   a box nobody can type into reads as an answer. Mixed towards the sheet,
+   so the same rule holds in the dark. */
+fieldset.at-cardlock:disabled {
+  --lock-line: color-mix(in srgb, var(--line) 50%, var(--surface));
+  --lock-well: color-mix(in srgb, var(--well) 45%, var(--surface));
+}
+fieldset.at-cardlock:disabled :is(input, textarea, select):disabled,
+fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] {
+  color: var(--text-soft); -webkit-text-fill-color: var(--text-soft); opacity:1; cursor:default;
+  border-color: var(--lock-line); background: var(--lock-well); }
+fieldset.at-cardlock:disabled :is(input, textarea)::placeholder { color: transparent;
+  -webkit-text-fill-color: transparent; }
+/* A tick, a choice of a few and an unset subtype show what was chosen, so
+   they stay, in the same quieter dress. */
+fieldset.at-cardlock:disabled :is(.at-ck, .at-seg, .at-choosebtn, .at-shutrow, .at-tickrow) {
+  border-color: var(--lock-line); background: var(--lock-well); color: var(--text-soft);
+  opacity:1; cursor:default; }
+fieldset.at-cardlock:disabled .at-ck.on { background: var(--lock-well); }
+fieldset.at-cardlock:disabled .at-ckbox { border-color: var(--lock-line); }
+/* The chosen one of a few still reads as chosen: the sheet's own ground
+   lifted out of the quieter track, with its words at full strength. */
+fieldset.at-cardlock:disabled .at-seg.on { background: var(--jade-bg); color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--accent); }
+fieldset.at-cardlock:disabled .at-choosebtn > .at-ic:last-child { display:none; }
+fieldset.at-cardlock:disabled input[type="checkbox"]:disabled { opacity:.55; }
+/* Every other button in a card or deck being read changes it — adds a
+   form, an answer, a deck, a recording; checks an ID; opens the on-screen
+   keys — and is not there until Edit is pressed. What only reads or plays
+   (folding a form, playing a recording, opening the ones there are) is a
+   Pressable, not a button, and stays. See Button's `reads`. */
+fieldset.at-cardlock:disabled button:not(:is(.at-ck, .at-seg, .at-choosebtn, .at-groupfold)) {
+  display:none; }
+/* A pill whose way out has gone is as wide on the right as on the left. */
+fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:16px; }
 
 /* A Section on a screen laid out like the card editor is headed the way
    the editor heads its own sections: a band out to the gutters with a rule

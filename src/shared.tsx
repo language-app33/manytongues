@@ -1956,6 +1956,7 @@ export function ItemList<T>({
   size = "large",
   views,
   onNew,
+  newOff,
   searchBelow,
   renderItem,
   selected,
@@ -2012,6 +2013,9 @@ export function ItemList<T>({
       draws the tiles as they are. See CardViews. */
   views?: CardViews<T>;
   onNew?: () => void;
+  /** Where nothing new can go in — a locked deck — New is drawn dimmed,
+      and pressing it calls this to say why rather than doing nothing. */
+  newOff?: () => void;
   renderItem: (item: T, state: { selecting: boolean; selected: boolean }) => Node;
   selected?: Set<string>;
   onSelectedChange?: (chosen: Set<string>) => void;
@@ -2179,8 +2183,9 @@ export function ItemList<T>({
       style={trayH ? ({ "--bulk-h": `${trayH}px` } as React.CSSProperties) : undefined}
     >
       <div className="at-toolbar at-toolbar-top">
-        {onNew && (
-          <button className="at-btn primary" onClick={onNew}>
+        {(onNew || newOff) && (
+          <button className={`at-btn primary${newOff ? " off" : ""}`} aria-disabled={newOff ? true : undefined}
+            onClick={newOff || onNew}>
             <Icon name="add" />
             New {noun}
           </button>
