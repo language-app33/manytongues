@@ -166,7 +166,6 @@ const PLACES: Record<string, [string, string]> = {
   ExportScreen: [TEACH, "Exporting cards or decks"],
   ImportScreen: [TEACH, "Importing cards or decks"],
   LockMark: [TEACH, "A locked deck's padlock"],
-  DeckPicker: [TEACH, "Choosing which decks"],
   CardEditor: [TEACH, "Editing a card"],
   WordEditor: [TEACH, "Editing a card · a word or phrase"],
   VerbEditor: [TEACH, "Editing a card · a verb"],

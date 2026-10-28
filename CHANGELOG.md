@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.511 — 28 October 2026
+
+**A course's screen is laid out like a deck's, and its decks are chosen the
+same way a deck's courses are.**
+
+- In Teaching, a course opens on one sheet headed "Course", in the same
+  style as a deck's or a card's screen: This course (its name and
+  language), then Join code, then People (teachers and students), then
+  Decks.
+- The course's decks are shown as their names, each with a cross to take
+  it out; "Another deck" opens the list of your decks, with a search, to
+  add one. A change is saved as you tap it — there is no Edit or Save on
+  this screen — and a deck's name opens the deck.
+- The separate "Manage decks" screen, with its ticks and its own Save, is
+  gone.
+
 ## 0.510 — 28 October 2026
 
 **Progress and Cards lose their headings; the You menu is shorter.**

@@ -5353,13 +5353,15 @@ export interface DeckWords {
   another: string;
 }
 
-export function DeckSwitch({ decks, chosen, onToggle, of = "card", words, title = "Decks", find, size = deckSize }: {
+export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
   decks: Pick<Deck, "id" | "title" | "locked" | "cardCount">[];
   chosen: string[];
   onToggle: (id: string, wasOn: boolean) => void;
+  /** Where a pill's name opens what it names — a course's decks do. */
+  onOpen?: (id: string) => void;
   /** What is being put in decks, as the row and the sheet name it — a
       card, or a part of a language's numbers. */
   of?: string;
@@ -5405,7 +5407,13 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words, title 
       <div className="at-deckpills">
         {inThese.map((d) => (
           <span className="at-deckpill" key={d.id}>
-            <span className="nm">{d.title}</span>
+            {onOpen ? (
+              <button type="button" className="nm" onClick={() => onOpen(d.id)}>
+                {d.title}
+              </button>
+            ) : (
+              <span className="nm">{d.title}</span>
+            )}
             {/* A locked deck keeps its cards: a padlock where the way out
                 would be, saying why there isn't one. */}
             {d.locked ? (

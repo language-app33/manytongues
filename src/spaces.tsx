@@ -3676,96 +3676,6 @@ function ClearScreen({ onClear, onClose }: {
   );
 }
 
-/* ------------------------------------------------------------------
-   Choosing which decks a course carries
-
-   Which courses hold a deck is the courses' say — the deck's own list of
-   them arrives worked out from the courses, so it is what students are
-   sent (see linksOf on the server) — and deck settings is still where a
-   single deck says which courses it belongs to. But when the question comes
-   from the other direction — "what should this course teach?" — sending
-   someone off to visit each deck in turn is the wrong shape. Same data,
-   same two calls underneath; this just asks the question the other way
-   round, and only writes what actually changed.
-   ------------------------------------------------------------------ */
-
-function DeckPicker({ course, decks, langOfDeck, busy, onSave, onClose }: {
-  course: Course;
-  decks: Deck[];
-  langOfDeck: (deck: Deck) => string;
-  busy?: boolean;
-  onSave: (added: string[], removed: string[]) => void;
-  onClose: () => void;
-}) {
-  const inCourse: (d: Deck) => boolean = (d) => (d.courses || []).some((l) => l.courseId === course.id);
-  const [chosen, setChosen] = useState(() => new Set(decks.filter(inCourse).map((d) => d.id)));
-  const [query, setQuery] = useState("");
-
-  const was = new Set(decks.filter(inCourse).map((d) => d.id));
-  const added = [...chosen].filter((id) => !was.has(id));
-  const removed = [...was].filter((id) => !chosen.has(id));
-  const dirty = added.length + removed.length > 0;
-
-  const q = query.trim().toLowerCase();
-  const shown = q ? decks.filter((d) => d.title.toLowerCase().includes(q)) : decks;
-
-  return (
-    <Screen
-      title={"Decks in this course"}
-      onBack={onClose}
-      action={
-        <Button variant="primary" size="sm"
-          disabled={!dirty || busy}
-          onClick={() => onSave(added, removed)}
-        >
-          <Icon name="save" />
-          {busy ? "Saving…" : "Save"}
-        </Button>
-      }
-    >
-          <Help>
-            Tick the decks {course.title} should teach. Students see them at their next check.
-          </Help>
-
-          <div className="at-toolbar at-toolbar-top">
-            <input
-              className="at-input at-search"
-              type="search"
-              placeholder="Search decks"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-            />
-          </div>
-
-          <CheckList
-            options={shown.map((d) => ({
-              id: d.id,
-              title: d.title,
-              note: `${langOfDeck(d)} · ${deckSize(d)}`,
-            }))}
-            chosen={[...chosen]}
-            onToggle={(id) =>
-              setChosen((prev) => {
-                const next = new Set(prev);
-                if (next.has(id)) next.delete(id);
-                else next.add(id);
-                return next;
-              })
-            }
-            empty={query ? `No decks match "${query}".` : "You have no decks yet."}
-          />
-
-          {dirty && (
-            <Help>
-              {added.length ? `${added.length} to add. ` : ""}
-              {removed.length ? `${removed.length} to remove. ` : ""}
-              Nothing changes until you save.
-            </Help>
-          )}
-    </Screen>
-  );
-}
-
 /* A padlock ahead of a deck's small print, where the deck is locked. */
 function LockMark({ locked }: { locked?: boolean }) {
   if (!locked) return null;
@@ -5131,7 +5041,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const [pickedTags, setPickedTags] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [newCardLang, setNewCardLang] = useState<LangId | null>(null);
-  const [managingDecks, setManagingDecks] = useState<string | null>(null); // a course id
   /* The language whose numbers are being filled in, where one is.
      A language rather than a deck: the words a language builds its numbers
      out of are a fact about the language, not about any one deck, and the
@@ -6862,7 +6771,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   })() : null;
   /* Where nothing below draws a list to sit over, it is the screen. */
-  if (cardScreen && (pronouning || numbering || (!openDeck && (managingDecks || courseView)))) return cardScreen;
+  if (cardScreen && (pronouning || numbering || (!openDeck && courseView))) return cardScreen;
 
   /* ---- filling in the numbers a deck builds from ----
          Sits before the deck screen so that closing it lands back on the
@@ -7765,42 +7674,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   }
 
-  /* ---- one course, full screen ---- */
-  /* Sits before the course view so that closing it lands back on the course
-     rather than the course list. */
-  if (managingDecks) {
-    const c = courses.find((x) => x.id === managingDecks);
-    if (!c) {
-      setManagingDecks(null);
-      return null;
-    }
-    return (
-      <DeckPicker
-        course={c}
-        decks={decks}
-        langOfDeck={(d) => (langOfDeck(d) || {}).name || ""}
-        busy={busy}
-        onClose={() => setManagingDecks(null)}
-        onSave={(added, removed) =>
-          run(
-            async () => {
-              for (const id of added) await API.attachDeck(id, c.id);
-              for (const id of removed) await API.detachDeck(id, c.id);
-              setManagingDecks(null);
-              await refresh();
-            },
-            /* Both halves happen in one save, so say what changed rather
-               than "saved" and leave someone counting rows to check. */
-            [added.length && `${plural(added.length, "deck")} added`,
-             removed.length && `${plural(removed.length, "deck")} removed`]
-              .filter(Boolean)
-              .join(", ") || "Nothing to change"
-          )
-        }
-      />
-    );
-  }
-
   if (courseView) {
     const c = courses.find((x) => x.id === courseView);
     if (!c) {
@@ -7808,126 +7681,110 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       return null;
     }
     const mine = decks.filter((d) => (d.courses || []).some((l) => l.courseId === c.id));
-  const addedOn: (d: Deck) => any = (d) => {
-      const link = (d.courses || []).find((l: any) => l.courseId === c.id);
-      return link && link.addedAt ? new Date(link.addedAt).toLocaleDateString() : null;
-    };
+    const people = (title: string, list: string[], none: string) => (
+      <Field label={`${title} · ${list.length}`}>
+        {list.length ? (
+          list.map((h) => (
+            <div className="at-person" key={h}>
+              <span className="at-avatar">{h.slice(0, 2).toUpperCase()}</span>
+              <span className="at-personname">
+                <PersonName handle={h} me={account.handle} />
+              </span>
+            </div>
+          ))
+        ) : (
+          <Help>{none}</Help>
+        )}
+      </Field>
+    );
     return (
-      <Screen title={c.title} onBack={() => setCourseView(null)}>
+      /* Laid out like a deck's screen — see .at-screen.cardform: one sheet
+         ruled into sections, each headed at the editor's size with what it
+         is for under the heading. Nothing here waits for Edit: a deck added
+         or taken out is saved as it is tapped. */
+      <Screen title="Course" className="cardform" onBack={() => setCourseView(null)}>
             <Notice kind="error">{error}</Notice>
 
-            <p className="at-coursemeta">
-              {languageName(languages, c.language)}
-              <span> · </span>
-              {plural(c.students.length, "student")}
-              <span> · </span>
-              {plural(mine.length, "deck")}
-            </p>
-
-            {/* --- what the course teaches --- */}
-            <section className="at-panel">
-              <p className="at-eyebrow">Decks in this course</p>
-              <Help>
-                {mine.length
-                  ? "Tap one to open it. Manage decks changes which are in this course."
-                  : "This course has no decks yet, so students see nothing. Add some with Manage decks."}
-              </Help>
-              <Button size="sm"
-                style={{ marginBottom: 12 }}
-                onClick={() => setManagingDecks(c.id)}
-          icon="folder"
-        >
-          Manage decks
-        </Button>
-              <div className="at-decklist2">
-                {mine.map((d) => (
-                  <Tile
-                    key={d.id}
-                    title={d.title}
-                    meta={
-                      <>
-                        <LockMark locked={d.locked} />
-                        {`${(langOfDeck(d) || { name: "" }).name} · ${deckSize(d)}${deckWaiting(d)}`}
-                      </>
-                    }
-                    onOpen={() => setOpenDeck(d.id)}
-                    footer={
-                      /* Here the useful fact is when it joined this course,
-                         not which courses hold it. */
-                      <TileNote live>
-                        {addedOn(d) ? <>Added <b>{addedOn(d)}</b></> : <>In this course</>}
-                      </TileNote>
-                    }
-                  />
-                ))}
-                {!mine.length && (
-                  <Help>
-                    No decks yet. Make one under Decks, then add it to this course.
-                  </Help>
-                )}
+            <div className="at-formblock">
+              <div className="at-formhead">
+                <span className="at-formnum">This course</span>
               </div>
-            </section>
+              <Field label="Course name">
+                <p className="at-fieldvalue">{c.title}</p>
+              </Field>
+              <Field label="Language">
+                <p className="at-fieldvalue">{languageName(languages, c.language)}</p>
+              </Field>
+            </div>
 
-            {/* --- who is in it --- */}
-            <section className="at-panel">
-              <p className="at-eyebrow">People</p>
-              <Help>
-                Your administrator adds and removes people.
-              </Help>
-
-              <p className="at-subhead">
-                Teachers · {c.teachers.length}
-              </p>
-              {c.teachers.length ? (
-                c.teachers.map((h) => (
-                  <div className="at-person" key={h}>
-                    <span className="at-avatar">{h.slice(0, 2).toUpperCase()}</span>
-                    <span className="at-personname">
-                      <PersonName handle={h} me={account.handle} />
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <Help>
-                  Nobody yet.
-                </Help>
-              )}
-
-              <p className="at-subhead">
-                Students · {c.students.length}
-              </p>
-              {c.students.length ? (
-                c.students.map((h) => (
-                  <div className="at-person" key={h}>
-                    <span className="at-avatar">{h.slice(0, 2).toUpperCase()}</span>
-                    <span className="at-personname">
-                      <PersonName handle={h} me={account.handle} />
-                    </span>
-                  </div>
-                ))
-              ) : (
-                <Help>
-                  Nobody has joined yet. Share the student code below.
-                </Help>
-              )}
-            </section>
-
-            {/* --- how people get in ---
-                 Only the student code lives here. The teacher code hands over
-                 control of the material, so who holds it is the
-                 administrator's decision to make, in the admin space. */}
-            <section className="at-panel">
-              <p className="at-eyebrow">Join code</p>
-              <Help>
-                This is the code students join with. Teacher codes are your
-                administrator's to hand out.
-              </Help>
+            {/* Only the student code lives here. The teacher code hands over
+                control of the material, so who holds it is the
+                administrator's decision to make, in the admin space. */}
+            <div className="at-formblock">
+              <div className="at-formhead">
+                <span className="at-formnum">Join code</span>
+                <span className="at-formrole">
+                  This is the code students join with. Teacher codes are your
+                  administrator's to hand out.
+                </span>
+              </div>
               <CodeBox
                 label="Student code"
                 code={c.code}
                 hint="Share this with a class so they can join and study."
               />
-            </section>
+            </div>
+
+            <div className="at-formblock">
+              <div className="at-formhead">
+                <span className="at-formnum">People</span>
+                <span className="at-formrole">Your administrator adds and removes people.</span>
+              </div>
+              {people("Teachers", c.teachers, "Nobody yet.")}
+              {people("Students", c.students, "Nobody has joined yet. Share the student code above.")}
+            </div>
+
+            {/* What the course teaches, as a deck says which courses carry
+                it: the names, each with its way out, and the way to add
+                another on the end of the row. A name opens its deck. */}
+            <div className="at-formblock">
+              <div className="at-formhead">
+                <span className="at-formnum">Decks</span>
+                <span className="at-formrole">
+                  {mine.length
+                    ? "Students in this course see these decks. Tap one to open it."
+                    : "This course has no decks yet, so students see nothing."}
+                </span>
+              </div>
+              <DeckSwitch
+                decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
+                chosen={mine.map((d) => d.id)}
+                onOpen={(id) => setOpenDeck(id)}
+                onToggle={(id, on) => {
+                  const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
+                  run(
+                    async () => {
+                      if (on) await API.detachDeck(id, c.id);
+                      else await API.attachDeck(id, c.id);
+                      await refresh();
+                    },
+                    on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
+                  );
+                }}
+                find={{
+                  placeholder: "Search decks",
+                  match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
+                }}
+                words={{
+                  first: "Add a deck to this course",
+                  another: "Another deck",
+                  drop: (t) => `Take ${t} out of this course`,
+                  lede: `Choose the decks ${c.title} teaches. Students see them at their next check.`,
+                  note: "",
+                  none: "You have no decks yet. Make one under Decks, then add it to this course.",
+                }}
+              />
+            </div>
       </Screen>
     );
   }
