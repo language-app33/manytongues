@@ -13798,7 +13798,7 @@ export default function ArabicTrainer() {
 
   return (
     <div
-      className={`at ${theme}${inExercise ? " in-exercise" : ""}${kbOpen ? " kb-open" : ""}${
+      className={`at ${theme}${!inExercise && space === "learn" && tab === "home" ? " on-home" : ""}${inExercise ? " in-exercise" : ""}${kbOpen ? " kb-open" : ""}${
         inExercise && session.pausedAt ? " paused" : ""
       }`}
       /* Every rule that lays out the language being learnt reads these two.
@@ -13943,7 +13943,7 @@ export default function ArabicTrainer() {
                     left off, so the one number on the screen is the one the
                     learner set themselves. */}
                 {homePrep && (
-                  <div className="at-card at-preptile at-mb3">
+                  <div className="at-home at-preptile">
                     <Climb items={shown.filter(prepDeckOf(homePrep.decks))} settings={settings} target={homePrep.target} />
                     <div className="at-row">
                       <Button variant="primary" onClick={() => begin(false, prepDeckOf(homePrep.decks))}>
@@ -13959,7 +13959,7 @@ export default function ArabicTrainer() {
                     />
                   </div>
                 )}
-                <div className="at-card" data-ready={readyCount}>
+                <div className="at-home" data-ready={readyCount}>
                   {/* How far along the learner is, above the button that
                       takes them further — unless a prep has the top tile. */}
                   {!homePrep && <Climb items={shown} settings={settings} />}
@@ -15441,11 +15441,18 @@ export default function ArabicTrainer() {
 
       {/* The app's name heads the learning page and scrolls away with it;
           a space frame carries its own. */}
-      {!inExercise && space === "learn" && (
-        <div className="at-brand">
-          <img className="at-brandmark" src="/logo.svg" alt="" width={24} height={24} />
+      {/* Home has it large and centred, as the page's title; every other tab
+          is headed with its own name in its place. */}
+      {!inExercise && space === "learn" && tab === "home" && (
+        <div className="at-brand at-brand-home">
+          <img className="at-brandmark" src="/logo.svg" alt="" width={48} height={48} />
           ManyTongues
         </div>
+      )}
+      {!inExercise && space === "learn" && tab !== "home" && (
+        <h1 className="at-tabtitle">
+          {({ progress: "Progress", items: "Cards", courses: "Courses" } as Record<string, string>)[tab] || ""}
+        </h1>
       )}
 
       {/* The bar at the foot of the window. Always mounted, so the slot the

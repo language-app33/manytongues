@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.507 — 28 October 2026
+## 0.509 — 28 October 2026
 
 **Every card has a name, and the top of a card or deck says what you are doing.**
 
@@ -29,6 +29,26 @@ and moves once per batch of work you would notice, not once per commit.
 To check by hand: open a card and a deck, read them and edit them, and
 look at the top bar; make a new card of each kind and see Save stay off
 until it has a name; edit an old word card and give it one.
+
+## 0.508 — 28 October 2026
+
+**Home has a proper title, and its content is no longer in a box.**
+
+- The ManyTongues name and logo head the home screen, twice the size and
+  centred, instead of sitting small in the top-left corner.
+- The other tabs are headed with their own name — Progress, Cards,
+  Courses — centred in the same place.
+- The progress ring, the line about what is waiting and the session
+  buttons sit straight on the page in one centred column, with space
+  between them instead of a bordered card. With a prep set, its part and
+  the everyday part are divided by a thin line.
+## 0.507 — 28 October 2026
+
+**In context is hidden in Teaching for now.**
+
+- The bar in the teaching space no longer offers In context; it shows
+  Courses, Decks and Cards. It is set aside rather than removed, and will
+  come back.
 
 ## 0.506 — 28 October 2026
 

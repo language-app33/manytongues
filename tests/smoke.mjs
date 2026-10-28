@@ -800,7 +800,7 @@ process.on("unhandledRejection", died);
 
 /* The home screen opens on the climb — the ring and the band beside it —
    rather than on a count of what is due. */
-const homeCard = () => document.querySelector(".at-card[data-ready]");
+const homeCard = () => document.querySelector(".at-home[data-ready]");
 check("app rendered the home screen", !!homeCard() && !!document.querySelector(".at-climb"), text.slice(0, 80).replace(/\s+/g, " "));
 check("and it says how far along the collection is, drawn and in words",
   /\d+ of \d+ cards? learnt/.test(text.replace(/\s+/g, " ")) &&
@@ -2703,7 +2703,7 @@ if (/Build a session/.test(document.body.textContent)) {
     cardCount() === both && !/:false/.test(swSaid()),
     `${cardCount()} cards, button says ${swSaid()}`);
   /* Anywhere outside it puts it away. */
-  click(document.querySelector(".at-brand"));
+  click(document.querySelector(".at-brand, .at-tabtitle"));
   await sleep(200);
   check("and pressing away from it closes it",
     !document.querySelector(".at-cmenu"),
@@ -5049,27 +5049,32 @@ const openPronounTables = async () => {
      turns all along. */
   const inFrame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
   const ctxTab = frameButtons(inFrame).find((b) => /^In context$/.test(b.textContent || ""));
-  click(ctxTab);
-  await sleep(500);
+  /* In context is hidden for now, on the owner's word. These checks come
+     back with it, when the tab is offered again. */
+  check("In context is not offered in the bar for now", !ctxTab, ctxTab ? "still there" : "hidden");
+  if (ctxTab) {
+    click(ctxTab);
+    await sleep(500);
 
-  const rows = [...inFrame.querySelectorAll(".at-findrow")].map((r) => (r.textContent || "").replace(/\s+/g, " "));
-  const turnRow = rows.find((t) => t.includes("وين الكتاب"));
-  check("a turn of a conversation is offered as somewhere a word turns up",
-    !!turnRow, rows.slice(0, 3).join(" // ") || "no rows at all");
-  check("and it reads as a turn, with the person who says it",
-    !!turnRow && /Layla says/.test(turnRow), turnRow || "(no row)");
-  /* The counterpart: the word is no longer listed as turning up nowhere.
-     Matched on the whole word rather than on the text of the panel — the
-     phrase card "الكتاب كبير" is two tokens, so it is word-shaped itself
-     and legitimately bare, and it has the word inside it. */
-  const barePanel = [...inFrame.querySelectorAll(".at-panel")]
-    .find((p) => /Words in no phrase/.test((p.querySelector(".at-eyebrow") || {}).textContent || ""));
-  const bareWords = barePanel
-    ? [...barePanel.querySelectorAll(".at-tag")].map((b) => (b.textContent || "").trim())
-    : [];
-  check("a word said in a conversation is not a word in no phrase",
-    !!barePanel && !bareWords.includes("كتاب"),
-    bareWords.join(" | ") || "(nothing bare)");
+    const rows = [...inFrame.querySelectorAll(".at-findrow")].map((r) => (r.textContent || "").replace(/\s+/g, " "));
+    const turnRow = rows.find((t) => t.includes("وين الكتاب"));
+    check("a turn of a conversation is offered as somewhere a word turns up",
+      !!turnRow, rows.slice(0, 3).join(" // ") || "no rows at all");
+    check("and it reads as a turn, with the person who says it",
+      !!turnRow && /Layla says/.test(turnRow), turnRow || "(no row)");
+    /* The counterpart: the word is no longer listed as turning up nowhere.
+       Matched on the whole word rather than on the text of the panel — the
+       phrase card "الكتاب كبير" is two tokens, so it is word-shaped itself
+       and legitimately bare, and it has the word inside it. */
+    const barePanel = [...inFrame.querySelectorAll(".at-panel")]
+      .find((p) => /Words in no phrase/.test((p.querySelector(".at-eyebrow") || {}).textContent || ""));
+    const bareWords = barePanel
+      ? [...barePanel.querySelectorAll(".at-tag")].map((b) => (b.textContent || "").trim())
+      : [];
+    check("a word said in a conversation is not a word in no phrase",
+      !!barePanel && !bareWords.includes("كتاب"),
+      bareWords.join(" | ") || "(nothing bare)");
+  }
 
   /* ---- one way to make a card, whatever kind of card it is ----
      A conversation had a button of its own in a deck's card list, which
