@@ -7086,9 +7086,42 @@ raw `<button className="at-btn">` has no such box, so it does not get this.
 
 ---
 
+## A deck is read and edited on one screen, as a card is
+
+**27 October 2026** · `src/spaces.tsx` (the open deck in `TeachSpace`, `NewDeck`, `DeckDraft`)
+
+Deck settings was its own screen, reached from a pencil on each deck, and
+the deck's own screen could not change anything about the deck. A card had
+already gone the other way (0.474): one screen, read until Edit is pressed,
+the edit's own controls held still in a disabled fieldset while it is read.
+The owner asked for the deck to work exactly the same, so the settings
+screen is gone and its title, lock and courses live under "This deck".
+
+What an edit holds is a draft (`DeckDraft`) and nothing reaches the server
+until Save — including the deck's built-in cards, which used to save from
+their own sheet. Save writes the lock last when it goes on and first when
+it comes off, so pronoun cards going in or out of the deck in the same save
+are not refused by it.
+
+Two things were left outside the edit on purpose. The card list works the
+same read or edited, saving as it always did: each card has its own screen
+and its own Edit, so holding the list behind the deck's would add a step and
+protect nothing; a locked deck still takes no cards in or out. And Deck
+quality is read in both, outside the fieldset, because its buttons only show
+more of it.
+
+Unlike a card, the deck's way out while editing is a cross in place of the
+back arrow rather than a Cancel beside Save, and Delete is at the foot of
+the screen rather than on the title line: the owner's choice, to keep the
+title line to the one action. A new deck opens the same screen already
+being edited, asking only what a deck needs to exist; courses and cards
+come once it is saved, when it opens as itself.
+
+---
+
 ## A space's sections are handed to the app's bar, not drawn by it
 
-**27 October 2026** · `src/shared.tsx` (`DockContext`, `Tabs`), `src/ArabicTrainer.tsx`
+**28 October 2026** · `src/shared.tsx` (`DockContext`, `Tabs`), `src/ArabicTrainer.tsx`
 
 The sections and the corner menu share one bar at the foot of the window.
 The other half of that bar — space, languages, you — is the app's, but

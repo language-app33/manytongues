@@ -151,6 +151,7 @@ import {
   useLiveRefresh,
   useSnackbar,
   Popover,
+  DeckSwitch,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
 export { LanguageTag, languageName } from "./shared.tsx";
@@ -3798,181 +3799,109 @@ function lockedNote(titles: Set<string>): string {
    at the top right — so the two feel like one app rather than two.
    ------------------------------------------------------------------ */
 
-function DeckEditor({
-  deck,
+/*
+ * A new deck: the deck's own screen as it is while being edited — the cross
+ * that cancels where the back arrow is, Save on the right, and "This deck"
+ * asking for what a deck needs before it exists. Everything else about a
+ * deck (its courses, its lock, what it holds) is on the deck's screen once
+ * it is saved, as a card's exercises wait for the card to be saved.
+ */
+function NewDeck({
   choices,
   mustAsk,
   initialLang,
   busy,
-  courses,
-  languages,
   onSave,
   onClose,
 }: {
-  deck: Deck | null;
   choices: Record<LangId, Lang>;
   mustAsk?: boolean;
   initialLang?: LangId;
   busy?: boolean;
-  courses?: Course[];
-  languages: Record<LangId, Lang>;
-  onSave: (title: string, lang: LangId, picked: string[], locked: boolean) => void;
+  onSave: (title: string, lang: LangId) => void;
   onClose: () => void;
 }) {
-  const [title, setTitle] = useState((deck && deck.title) || "");
-  const [locked, setLocked] = useState(!!(deck && deck.locked));
-  const [lang, setLang] = useState((deck && deck.lang) || initialLang || "");
-  /* Which courses are ticked, held here rather than read off the deck.
-     Read off the deck it could not change: the deck handed in is the copy
-     taken when the screen opened, so a tick saved to the server left the
-     box exactly as it was until you closed the screen and came back. */
-  const wasIn = (deck && deck.courses ? deck.courses : []).map((l) => l.courseId);
-  const [picked, setPicked] = useState(() => new Set(wasIn));
-  const added = [...picked].filter((id) => !wasIn.includes(id));
-  const removed = wasIn.filter((id) => !picked.has(id));
-  const dirty = added.length > 0 || removed.length > 0;
-  const asking = !deck && mustAsk;
-  const canSave = title.trim() && (!asking || lang);
+  const [title, setTitle] = useState("");
+  const [lang, setLang] = useState(initialLang || "");
+  const [discarding, setDiscarding] = useState(false);
+  const canSave = title.trim() && (!mustAsk || lang);
+  const changed = !!title.trim() || (!!mustAsk && !!lang);
 
   return (
+    <>
     <Screen
-      title={deck ? "Deck settings" : "New deck"}
-      onBack={onClose}
+      title="New deck"
+      onBack={() => (changed ? setDiscarding(true) : onClose())}
+      backIcon="close"
+      backLabel="Cancel"
       action={
-        <Button variant="primary" size="sm"
+        <Button variant="primary" size="sm" className="iconly"
+          aria-label={busy ? "Saving…" : "Save"}
+          title={busy ? "Saving…" : "Save"}
           disabled={!canSave || busy}
-          onClick={() => onSave(title.trim(), lang, [...picked], locked)}
-          icon="save"
+          onClick={() => onSave(title.trim(), lang)}
         >
-          {busy ? "Saving…" : "Save"}
+          <Icon name="save" />
         </Button>
       }
       className="cardform"
     >
-      {/* Headed and explained the way the card editor is: each part under a
-          heading with what it is for straight underneath, and each field's
-          explanation before the control it explains. */}
       <div className="at-formblock">
         <div className="at-formhead">
           <span className="at-formnum">This deck</span>
         </div>
-          <Field label={<>Title <span className="req">required</span></>}>
-            <input
-              className="at-input"
-              placeholder="e.g. Week 3 · Verbs"
-              value={title}
-              autoFocus
-              onChange={(e) => setTitle(e.target.value)}
-            />
-          </Field>
+        <Field label={<>Title <span className="req">required</span></>}>
+          <input
+            className="at-input"
+            placeholder="e.g. Week 3 · Verbs"
+            value={title}
+            autoFocus
+            onChange={(e) => setTitle(e.target.value)}
+          />
+        </Field>
 
-          {asking && (
-            <LanguageRadio
-              languages={choices}
-              value={lang}
-              onChange={setLang}
-              label="Language"
-              lede="A deck holds cards in one language, and this sets the script and keyboard its cards are written with."
-            />
-          )}
+        {mustAsk && (
+          <LanguageRadio
+            languages={choices}
+            value={lang}
+            onChange={setLang}
+            label="Language"
+            lede="A deck holds cards in one language, and this sets the script and keyboard its cards are written with."
+          />
+        )}
 
-          {!canSave && (
-            <Help>
-              {!title.trim() ? "A deck needs a title." : "Choose the language it holds."}
-            </Help>
-          )}
-
-          {/* Which courses carry it. Ticking one used to reach the server on
-              the tap and announce itself as done, which made Save mean two
-              different things on one screen — and gave a student a deck
-              before the teacher had finished deciding. Now it is a choice
-              like the title, and the screen saves once. */}
-          {/* Locking is about which cards the deck holds, and nothing
-              else: the cards can still be corrected, and the deck renamed
-              and shared. */}
+        {!canSave && (
+          <Help>
+            {!title.trim() ? "A deck needs a title." : "Choose the language it holds."}
+          </Help>
+        )}
+        <Help className="at-mt3">Save the deck to add cards to it and share it with a course.</Help>
       </div>
-          {deck && (
-            <div className="at-formblock">
-              <div className="at-formhead">
-                <span className="at-formnum">Lock</span>
-                <span className="at-formrole">
-                  The cards in it can still be edited. Any teacher who can change this deck can
-                  unlock it.
-                </span>
-              </div>
-              <div className="at-cklist">
-                <button
-                  className={`at-ck${locked ? " on" : ""}`}
-                  aria-pressed={locked}
-                  disabled={busy}
-                  onClick={() => setLocked((v) => !v)}
-                >
-                  <span className="at-ckbox">{locked ? "✓" : ""}</span>
-                  <span className="at-cktext">
-                    <b>Lock this deck</b>
-                    <i>No cards can be added to it or taken out of it until it is unlocked.</i>
-                  </span>
-                </button>
-              </div>
-            </div>
-          )}
-
-          {deck && (
-            <div className="at-formblock">
-              <div className="at-formhead">
-                <span className="at-formnum">Courses using it</span>
-                <span className="at-formrole">
-                  Tick a course to share this deck with its students. Untick to take it back.
-                  A deck in no course is yours alone — nobody studying can see it.
-                </span>
-              </div>
-              <div className="at-cklist">
-                {(courses || []).map((c) => {
-                  const on = picked.has(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      className={`at-ck${on ? " on" : ""}`}
-                      disabled={busy}
-                      onClick={() =>
-                        setPicked((was) => {
-                          const next = new Set(was);
-                          if (on) next.delete(c.id);
-                          else next.add(c.id);
-                          return next;
-                        })
-                      }
-                    >
-                      <span className="at-ckbox">{on ? "✓" : ""}</span>
-                      <span className="at-cktext">
-                        <b>{c.title}</b>
-                        <i>
-                          {languageName(languages, c.language)} · {plural(c.students.length, "student")}
-                        </i>
-                      </span>
-                    </button>
-                  );
-                })}
-                {!(courses || []).length && (
-                  <Help>
-                    You aren't teaching a course yet.
-                  </Help>
-                )}
-              </div>
-              {/* The same sentence the other screen that defers its writes
-                  uses, in the same words, so the two teach one rule. */}
-              {dirty && (
-                <Help>
-                  {added.length ? `${plural(added.length, "course")} to add. ` : ""}
-                  {removed.length ? `${plural(removed.length, "course")} to remove. ` : ""}
-                  Nothing changes until you save.
-                </Help>
-              )}
-            </div>
-          )}
     </Screen>
+    {discarding && (
+      <ConfirmModal
+        title="Discard this deck?"
+        body={<p>Nothing has been saved yet.</p>}
+        confirmLabel="Discard"
+        onCancel={() => setDiscarding(false)}
+        onConfirm={() => {
+          setDiscarding(false);
+          onClose();
+        }}
+      />
+    )}
+    </>
   );
 }
+
+/* What can be changed about a saved deck, held while it is being edited:
+   nothing reaches the server until Save, as on a card. */
+type DeckDraft = { title: string; locked: boolean; courses: string[]; parts: string[]; pronouns: string[] };
+
+const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
+const sameDraft = (a: DeckDraft, b: DeckDraft) =>
+  a.title.trim() === b.title.trim() && a.locked === b.locked &&
+  sameSet(a.courses, b.courses) && sameSet(a.parts, b.parts) && sameSet(a.pronouns, b.pronouns);
 
 /*
  * How much of a deck can already be practiced in context.
@@ -5182,7 +5111,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   /* Whether there is a connection, so the editor can say so before the
      typing rather than after it. */
   const offline = useOffline();
-  const [naming, setNaming] = useState<any | null>(null); // "new" | deck
+  const [naming, setNaming] = useState<"new" | null>(null);
   const [confirm, setConfirm] = useState<Pending | null>(null); // whatever is awaiting a yes
   /* Open a card to read it: the editor, locked. */
   const openCard = (c: Card | null | undefined) => {
@@ -5212,6 +5141,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      screen is shut, and otherwise what is ticked on it so far — the parts
      of the numbers by range id, and the pronoun cards by card id. */
   const [deckExtras, setDeckExtras] = useState<{ parts: string[]; pronouns: string[] } | null>(null);
+  /* The open deck, being edited: null while it is only read. */
+  const [deckDraft, setDeckDraft] = useState<DeckDraft | null>(null);
+  const [discardingDeck, setDiscardingDeck] = useState(false);
   /* And which language, where the teacher has more than one to choose
      from. The same two-step the New card button takes, for the same
      reason and through the same control. */
@@ -6515,38 +6447,26 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   }
 
-  /* ---- naming a deck takes over the screen, like a card ---- */
+  /* ---- a new deck takes over the screen, like a new card ----
+     Saved, it opens as the deck itself: that is where its courses, its
+     lock and its cards are. */
   if (naming) {
-    const existing = naming === "new" ? null : naming;
     return (
-      <DeckEditor
-        deck={existing}
+      <NewDeck
         choices={choicesOn}
         mustAsk={mustAskOn}
         initialLang={knownOn.length === 1 ? soleLangOn : ""}
         busy={busy}
-        courses={courses}
-        languages={languages}
         onClose={() => setNaming(null)}
-        /* Everything the screen holds, written in one go. The courses used
-           to be written on the tap, which is why the screen had both a Save
-           button and changes that ignored it. */
-        onSave={(title, lang, picked, locked) =>
+        onSave={(title, lang) =>
           run(
             async () => {
-              if (!existing) {
-                await API.createDeck(title, "", lang || soleLangOn);
-              } else {
-                if (title !== existing.title) await API.renameDeck(existing.id, title);
-                if (locked !== !!existing.locked) await API.lockDeck(existing.id, locked);
-                const was = (existing.courses || []).map((l: any) => l.courseId);
-                for (const id of picked) if (!was.includes(id)) await API.attachDeck(existing.id, id);
-                for (const id of was) if (!picked.includes(id)) await API.detachDeck(existing.id, id);
-              }
+              const r = await API.createDeck(title, "", lang || soleLangOn);
               setNaming(null);
               await refresh();
+              if (r && r.deck && r.deck.id) setOpenDeck(r.deck.id);
             },
-            `${title} ${existing ? "saved" : "created"}`
+            `${title} created`
           )
         }
       />
@@ -7346,6 +7266,52 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     const order = group ? group.members : [];
     return order.map((id) => own.find((c) => c.id === id)).filter(Boolean) as Card[];
   };
+  /* What a saved deck holds of the things the screen can change, in the
+     shape a draft of it takes — so starting to edit is copying this, and
+     whether anything has changed is comparing against it. */
+  const draftOf = (d: Deck): DeckDraft => {
+    const langId = (langOfDeck(d) || {}).id || d.lang;
+    return {
+      title: d.title,
+      locked: !!d.locked,
+      courses: (d.courses || []).map((l: any) => l.courseId),
+      parts: partsNow(d.parts || []),
+      pronouns: pronounCardsOf(langId).filter((c) => (c.decks || []).includes(d.id)).map((c) => c.id),
+    };
+  };
+
+  /* Everything an edit holds, written in one go when it is saved — the
+     lock last when it is going on and first when it is coming off, so
+     cards going in or out of the deck in the same save are not refused
+     by it. */
+  const saveDeck = (d: Deck, now: DeckDraft) => {
+    const was = draftOf(d);
+    const langId = (langOfDeck(d) || {}).id || d.lang;
+    const title = now.title.trim();
+    return run(
+      async () => {
+        if (title !== d.title) await API.renameDeck(d.id, title);
+        if (!now.locked && was.locked) await API.lockDeck(d.id, false);
+        for (const id of now.courses) if (!was.courses.includes(id)) await API.attachDeck(d.id, id);
+        for (const id of was.courses) if (!now.courses.includes(id)) await API.detachDeck(d.id, id);
+        if (!sameSet(now.parts, was.parts)) await API.setDeckParts(d.id, now.parts);
+        for (const card of pronounCardsOf(langId)) {
+          const inNow = card.decks || [];
+          const want = now.pronouns.includes(card.id);
+          if (want === inNow.includes(d.id)) continue;
+          absorbSaved(await saveNamed(card, want ? inNow.concat([d.id]) : inNow.filter((x) => x !== d.id)));
+        }
+        if (now.locked && !was.locked) await API.lockDeck(d.id, true);
+        setDeckDraft(null);
+        await refresh();
+      },
+      `${title} saved`
+    );
+  };
+
+  /* The deck's built-in cards, chosen on a sheet of their own while the
+     deck is being edited. Done hands the choice back to the edit, which
+     is saved with everything else. */
   const extrasScreen = (d: Deck) => {
     const langId = (langOfDeck(d) || {}).id || d.lang;
     const parts = numberPartsOf(langId);
@@ -7354,14 +7320,23 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     const toggle = (key: "parts" | "pronouns") => (id: string, on: boolean) =>
       setDeckExtras({ ...picked, [key]: on ? picked[key].filter((x) => x !== id) : picked[key].concat([id]) });
     return (
-      <Screen title="Numbers and pronouns" onBack={() => setDeckExtras(null)}>
+      <Screen title="Built-in cards" onBack={() => setDeckExtras(null)} backIcon="close" backLabel="Cancel"
+        className="cardform"
+        action={
+          <Button variant="primary" size="sm" className="iconly" aria-label="Done" title="Done"
+            onClick={() => {
+              if (deckDraft) setDeckDraft({ ...deckDraft, parts: picked.parts, pronouns: picked.pronouns });
+              setDeckExtras(null);
+            }}
+          >
+            <Icon name="check" />
+          </Button>
+        }
+      >
         <Notice kind="error">{error}</Notice>
         {parts.length > 0 && (
-          <Section title="Numbers">
-            <Help>
-              Tick the parts this deck teaches. Each part brings the number words it needs. Students get
-              only the parts that are in one of their decks.
-            </Help>
+          <Section title="Numbers"
+            lede="Tick the parts this deck teaches. Each part brings the number words it needs. Students get only the parts that are in one of their decks.">
             <CheckList
               options={parts.map((r) => ({ id: r.id, title: r.label }))}
               chosen={picked.parts}
@@ -7370,7 +7345,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           </Section>
         )}
         {pronouns.length > 0 && (
-          <Section title="Pronouns" className="at-mt5">
+          <Section title="Pronouns">
             <CheckList
               options={pronouns.map((c) => ({
                 id: c.id,
@@ -7387,36 +7362,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
             Nothing to add yet. Write this language's numbers or pronouns from the Cards tab first.
           </Help>
         )}
-        <div className="at-row at-mt5">
-          <Button variant="ghost" icon="close" onClick={() => setDeckExtras(null)}>
-            Cancel
-          </Button>
-          <Button
-            variant="primary"
-            icon="check"
-            disabled={busy}
-            onClick={() =>
-              run(
-                async () => {
-                  const had = partsNow(d.parts || []);
-                  const same = had.length === picked.parts.length && had.every((x) => picked.parts.includes(x));
-                  if (!same) await API.setDeckParts(d.id, picked.parts);
-                  for (const card of pronouns) {
-                    const inNow = card.decks || [];
-                    const want = picked.pronouns.includes(card.id);
-                    if (want === inNow.includes(d.id)) continue;
-                    absorbSaved(await saveNamed(card, want ? inNow.concat([d.id]) : inNow.filter((x) => x !== d.id)));
-                  }
-                  setDeckExtras(null);
-                  await refresh();
-                },
-                "Saved"
-              )
-            }
-          >
-            Save
-          </Button>
-        </div>
+        <Help className="at-mt3">Nothing changes until you save the deck.</Help>
       </Screen>
     );
   };
@@ -7427,6 +7373,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     const d = decks.find((x) => x.id === openDeck);
     if (!d) {
       setOpenDeck(null);
+      setDeckDraft(null);
       return null;
     }
     if (deckExtras) return extrasScreen(d);
@@ -7436,6 +7383,33 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     const held = deckView ? deckView.held : [];
     const mine = deckView ? deckView.mine : [];
     const listed = deckView ? deckView.listed : [];
+    const langId = (langOfDeck(d) || {}).id || d.lang;
+    /* Read and edited on one screen, as a card is: what is shown is the
+       saved deck until Edit is pressed, and the draft after. */
+    const editing = !!deckDraft;
+    const shown = deckDraft || draftOf(d);
+    const changed = !!deckDraft && !sameDraft(deckDraft, draftOf(d));
+    const edit = (patch: Partial<DeckDraft>) => deckDraft && setDeckDraft({ ...deckDraft, ...patch });
+    const hasExtras = numberPartsOf(langId).length > 0 || pronounCardsOf(langId).length > 0;
+    const askDelete = () => {
+      if (d.locked) {
+        snack(lockedDeleteNote([d.title]), "warn");
+        return;
+      }
+      setConfirm({
+        kind: "deck",
+        title: `Delete ${d.title}?`,
+        confirmLabel: "Delete the deck",
+        confirmWord: d.title,
+        body: (
+          <p>
+            Its {plural(d.cardCount || held.length, "card")} go with it, out of every course and out of
+            the apps of everyone studying it. There is no undoing this.
+          </p>
+        ),
+        action: () => API.deleteDeck(d.id),
+      });
+    };
     return (
       <Screen
         title={d.title}
@@ -7443,18 +7417,46 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
            sheet ruled into sections, each headed at the editor's size with
            what it is for straight under the heading. */
         className="cardform"
-        onBack={() => { setOpenDeck(null); setCardAction(null); setTagAction(null); setDeckExtras(null); }}
+        /* Being edited, the way out is Cancel — a cross where the back
+           arrow was, asking first when there is something to lose. */
+        onBack={
+          editing
+            ? () => (changed ? setDiscardingDeck(true) : setDeckDraft(null))
+            : () => { setOpenDeck(null); setCardAction(null); setTagAction(null); setDeckExtras(null); }
+        }
+        backIcon={editing ? "close" : "back"}
+        backLabel={editing ? "Cancel" : "Back"}
+        /* Edit, as on a card being read; Save while editing, which goes
+           back to reading the deck. */
+        action={
+          editing ? (
+            <Button variant="primary" size="sm" className="iconly"
+              aria-label={busy ? "Saving…" : "Save"}
+              title={busy ? "Saving…" : "Save"}
+              disabled={!shown.title.trim() || !changed || busy}
+              onClick={() => deckDraft && saveDeck(d, deckDraft)}
+            >
+              <Icon name="save" />
+            </Button>
+          ) : (
+            <Button variant="primary" size="sm" className="iconly" aria-label="Edit" title="Edit"
+              onClick={() => setDeckDraft(draftOf(d))}>
+              <Icon name="edit" />
+            </Button>
+          )
+        }
       >
             <Notice kind="error">{error}</Notice>
 
             {/* The facts about the deck, headed the way a card's screen
                 heads "This card", with Export by the heading as it is
-                there. */}
+                there. Read, they are the edit's own controls held still —
+                the card's way — and its quality is read either way. */}
             <div className="at-formblock">
               <div className="at-formhead">
                 <span className="at-formnum">This deck</span>
                 <span className="at-formacts">
-                  <Button size="sm" className="iconly" aria-label="Export this deck" title="Export this deck"
+                  <Button reads size="sm" className="iconly" aria-label="Export this deck" title="Export this deck"
                     onClick={() => exportDecks([d.id])}>
                     <Icon name="download" />
                   </Button>
@@ -7463,74 +7465,121 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   {(langOfDeck(d) || {}).name} · {deckSize(d, held.length)}
                 </span>
               </div>
-              {d.locked ? (
-                <Help>
-                  <Icon name="lock" size={14} /> This deck is locked: no cards can be added to it or taken
-                  out of it. To change which cards it holds, unlock it in its settings.
-                </Help>
-              ) : null}
+              <fieldset className="at-cardlock" disabled={!editing}>
+                <Field label={<>Title{editing ? <> <span className="req">required</span></> : null}</>}>
+                  <input
+                    className="at-input"
+                    placeholder="e.g. Week 3 · Verbs"
+                    value={shown.title}
+                    onChange={(e) => edit({ title: e.target.value })}
+                  />
+                  {editing && !shown.title.trim() && <Help>A deck needs a title.</Help>}
+                </Field>
+
+                {/* Which courses carry it, as a card says which decks it
+                    is in: the names, each with its way out, and the way to
+                    add another on the end of the row. */}
+                <Field label="Courses" lede="Students in these courses see this deck.">
+                  {!editing && !shown.courses.length ? (
+                    <Help>Not in a course yet — nobody can see it.</Help>
+                  ) : (
+                    <DeckSwitch
+                      decks={courses.map((c) => ({ id: c.id, title: c.title }))}
+                      chosen={shown.courses}
+                      onToggle={(id, on) =>
+                        edit({ courses: on ? shown.courses.filter((x) => x !== id) : shown.courses.concat([id]) })
+                      }
+                      title="Courses"
+                      size={null}
+                      words={{
+                        first: "Add this deck to a course",
+                        another: "Another course",
+                        drop: (t) => `Take this deck out of ${t}`,
+                        lede: "Choose the courses whose students see this deck.",
+                        note: "",
+                        none: "You aren't teaching a course yet.",
+                      }}
+                    />
+                  )}
+                </Field>
+
+                {/* Locking is about which cards the deck holds, and nothing
+                    else: the cards can still be corrected, and the deck
+                    renamed and shared. */}
+                <Field label="Lock" lede="The cards in it can still be edited. Any teacher who can change this deck can unlock it.">
+                  <div className="at-cklist">
+                    <button
+                      className={`at-ck${shown.locked ? " on" : ""}`}
+                      aria-pressed={shown.locked}
+                      onClick={() => edit({ locked: !shown.locked })}
+                    >
+                      <span className="at-ckbox">{shown.locked ? "✓" : ""}</span>
+                      <span className="at-cktext">
+                        <b>Lock this deck</b>
+                        <i>No cards can be added to it or taken out of it until it is unlocked.</i>
+                      </span>
+                    </button>
+                  </div>
+                </Field>
+              </fieldset>
+
+              {/* The whole deck, whatever the list below is showing: what a
+                  deck covers is a fact about the deck, not about the cards
+                  a filter has left on screen. How much of it is practised
+                  in context is part of the same score, so it is read under
+                  it rather than under a heading of its own. */}
+              <Field label="Deck quality" lede={QUALITY_LEDE}>
+                {openQuality && <DeckQuality quality={openQuality} />}
+                <div className="at-mt4">
+                  <ContextReport cards={held} lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]} />
+                </div>
+              </Field>
             </div>
 
-            {/* What it holds besides cards, and the way in to change it —
-                see extrasScreen. Said in a line rather than listed: the
-                pronouns are among the cards below already. */}
-            {(numberPartsOf((langOfDeck(d) || {}).id || d.lang).length > 0 ||
-              pronounCardsOf((langOfDeck(d) || {}).id || d.lang).length > 0) && (
-              <Section title="Numbers and pronouns" lede="What this deck teaches besides its cards.">
+            {/* What it holds besides its own cards, which come with the
+                language rather than being written for this deck — numbers
+                and pronouns today, whatever a language brings tomorrow.
+                Said in a line rather than listed: the pronouns are among
+                the cards below already. Chosen while editing, on a sheet of
+                their own — see extrasScreen. */}
+            {hasExtras && (
+              <Section title="Built-in cards" lede="Cards that come with the language, such as numbers and pronouns.">
                 <Help>
                   {(() => {
-                    const all = numberPartsOf((langOfDeck(d) || {}).id || d.lang);
-                    const named = partsNow(d.parts || [])
+                    const all = numberPartsOf(langId);
+                    const named = shown.parts
                       .map((id) => (all.find((r) => r.id === id) || { label: "" }).label)
                       .filter(Boolean);
-                    const pron = pronounCardsOf((langOfDeck(d) || {}).id || d.lang).filter((c) =>
-                      (c.decks || []).includes(d.id)
-                    ).length;
+                    const pron = shown.pronouns.length;
                     const said = named.concat(pron ? [plural(pron, "pronoun")] : []);
                     return said.length ? said.join(" · ") : "None in this deck yet.";
                   })()}
                 </Help>
-                {!d.locked && (
+                {editing && !shown.locked && (
                   <div className="at-row at-mt3">
                     <Button
                       variant="ghost"
                       size="sm"
                       icon="add"
-                      onClick={() =>
-                        setDeckExtras({
-                          parts: partsNow(d.parts || []),
-                          pronouns: pronounCardsOf((langOfDeck(d) || {}).id || d.lang)
-                            .filter((c) => (c.decks || []).includes(d.id))
-                            .map((c) => c.id),
-                        })
-                      }
+                      onClick={() => setDeckExtras({ parts: shown.parts, pronouns: shown.pronouns })}
                     >
-                      Add numbers or pronouns
+                      Choose built-in cards
                     </Button>
                   </div>
                 )}
               </Section>
             )}
 
-            {/* The whole deck, whatever the list below is showing: what a
-                deck covers is a fact about the deck, not about the cards a
-                filter has left on screen. */}
-            <Section title="Deck quality" lede={QUALITY_LEDE}>
-              {openQuality && <DeckQuality quality={openQuality} />}
-            </Section>
-
-            <Section title="In context" lede="How many of this deck's words are practised inside its phrases.">
-              <ContextReport cards={held} lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]} />
-            </Section>
-
             {/* The cards, under a heading of their own like every other
                 part of the screen, with how to use the list said before
-                it rather than at the top of the screen, far above it. */}
+                it rather than at the top of the screen, far above it. The
+                list works the same read or edited: each card has its own
+                screen and its own Edit. */}
             <Section
               title="Cards"
               lede={
                 d.locked
-                  ? "Tap a card to see or edit it."
+                  ? "This deck is locked, so no cards can be added to it or taken out. Tap a card to see or edit it."
                   : "Tap a card to see it. Tap Select to add several to another deck, take them out, or delete them."
               }
             >
@@ -7606,10 +7655,53 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
             />
             </Section>
 
+            {/* At the foot while editing, away from Save, as the deck list
+                keeps it on the deck's own row. */}
+            {editing && (
+              <div className="at-row at-mt5">
+                <Button variant="danger" icon="delete" onClick={askDelete}>
+                  Delete this deck
+                </Button>
+              </div>
+            )}
+
         {cardScreen}
         {cardAction === "add" && cardActionScreen(d.id)}
         {exportScreen}
         {tagAction && tagActionScreen()}
+
+        {discardingDeck && (
+          <ConfirmModal
+            title="Discard your changes?"
+            body={<p>The deck goes back to how it was last saved.</p>}
+            confirmLabel="Discard changes"
+            onCancel={() => setDiscardingDeck(false)}
+            onConfirm={() => {
+              setDiscardingDeck(false);
+              setDeckDraft(null);
+            }}
+          />
+        )}
+
+        {confirm && confirm.kind === "deck" && (
+          <ConfirmModal
+            title={confirm.title}
+            body={confirm.body}
+            confirmLabel={confirm.confirmLabel}
+            confirmWord={confirm.confirmWord}
+            busy={busy}
+            onCancel={() => setConfirm(null)}
+            onConfirm={() =>
+              run(async () => {
+                await confirm.action();
+                setConfirm(null);
+                setDeckDraft(null);
+                setOpenDeck(null);
+                await refresh();
+              })
+            }
+          />
+        )}
 
         {confirm && confirm.kind === "cards" && (
           <ConfirmModal
@@ -7729,12 +7821,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                       </>
                     }
                     onOpen={() => setOpenDeck(d.id)}
-                    actions={
-                      <IconButton icon="edit" label="Deck settings" onClick={(e: React.MouseEvent) => {
-                          e.stopPropagation();
-                          setNaming(d);
-                        }} />
-                    }
                     footer={
                       /* Here the useful fact is when it joined this course,
                          not which courses hold it. */
@@ -8404,10 +8490,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                       onOpen={() => setOpenDeck(d.id)}
                       actions={
                         <>
-                          <IconButton icon="edit" label="Deck settings" onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation();
-                              setNaming(d);
-                            }} />
                           <IconButton icon="download" label="Export deck" onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
                               exportDecks([d.id]);

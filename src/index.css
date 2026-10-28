@@ -4241,6 +4241,9 @@ fieldset.at-cardlock:disabled .at-seg.on:disabled { opacity:1; }
    editor's blocks, and read as the same family this way. */
 .at-screen.cardform .at-section { margin:0 -16px; padding:28px 16px 32px;
   border-top:1px solid var(--line); }
+/* And the first of them has nothing above it to be ruled off from, as the
+   editor's first block has none. */
+.at-screen.cardform .at-screeninner > .at-section:first-child { border-top:0; }
 .at-screen.cardform .at-section > .at-sectiontop > .at-eyebrow { font-size:25px;
   font-weight:800; letter-spacing:-.015em; line-height:1.15; text-transform:none;
   color: var(--ink); }

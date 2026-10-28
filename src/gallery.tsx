@@ -162,7 +162,7 @@ const PLACES: Record<string, [string, string]> = {
   TeachSpace: [TEACH, "The Teaching space"],
   CoursesPage: [TEACH, "The Courses tab"],
   CourseSettings: [TEACH, "Course settings"],
-  DeckEditor: [TEACH, "Deck settings"],
+  NewDeck: [TEACH, "Making a new deck"],
   ExportScreen: [TEACH, "Exporting cards or decks"],
   ImportScreen: [TEACH, "Importing cards or decks"],
   LockMark: [TEACH, "A locked deck's padlock"],

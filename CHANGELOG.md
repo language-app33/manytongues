@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.500 — 27 October 2026
+## 0.501 — 28 October 2026
 
 **The sections and the corner menu move to a bar at the foot of the window.**
 
@@ -37,6 +37,42 @@ and moves once per batch of work you would notice, not once per commit.
   done.
 - On a narrow phone the section names come down a size so they stay on
   one line; on a wider screen they carry their icons as well.
+## 0.500 — 28 October 2026
+
+**A deck is read and edited on one screen, the way a card is.**
+
+- Opening a deck under Teaching › Decks shows it as it is saved, with an
+  Edit button at the top right. Its title, courses and lock are shown in
+  the same boxes and ticks you edit them with, held still until you press
+  Edit. Deck settings is no longer a separate screen, and the pencil on
+  each deck in the Decks list, and in a course's list of decks, is gone:
+  open the deck and press Edit.
+- While editing, the back arrow becomes a cross that cancels; if anything
+  has changed it asks "Discard your changes?" first. Save, at the top
+  right, writes everything at once and goes back to reading the deck.
+- "This deck" now says which courses the deck is in, as tags like the
+  decks on a card, or "Not in a course yet — nobody can see it". While
+  editing, "Another course" adds one and the × on a tag takes it out.
+- Deck quality is part of "This deck", after the lock, and what used to be
+  "In context" (how many words appear in a phrase, and the pairings) sits
+  under the score rather than under a heading of its own.
+- "Numbers and pronouns" is now "Built-in cards", "Cards that come with
+  the language, such as numbers and pronouns." They are chosen while
+  editing, with "Choose built-in cards", and saved with the deck rather
+  than on their own.
+- Delete this deck is at the foot of the screen while editing; it is
+  still on each deck in the Decks list too. A locked deck still cannot be
+  deleted.
+- The card list works the same whether the deck is being edited or not,
+  and a locked deck still takes no cards in or out.
+- New deck opens the same screen, already being edited, asking for the
+  title (and the language, where there is a choice). Saved, it opens as
+  the deck itself, where its courses and cards are added.
+
+To check by hand: on a phone, open a deck, press Edit, change its title,
+add a course and tick a part of the numbers, then Save; edit again and
+cancel after a change; make a new deck; open a locked deck and edit it.
+
 ## 0.499 — 27 October 2026
 
 **Custom session: clearer button, quieter screen, 20 questions to start.**

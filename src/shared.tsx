@@ -3689,7 +3689,7 @@ export function useScrollTop(key: unknown) {
  *   which says it is a step to the side of what is underneath rather than
  *   somewhere new.
  */
-export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", rise, className = "" }: {
+export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", backIcon = "back", rise, className = "" }: {
   title?: Node;
   onBack?: () => void;
   action?: Node;
@@ -3706,6 +3706,9 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
       way — `cardform` is the card editor, whose sections run the full width
       of the sheet. The stylesheet is where that layout lives; this is only
       how a screen says which one it is. */
+  /** The way out's icon. A cross where leaving is cancelling — a deck
+      being edited — rather than going back. */
+  backIcon?: string;
   className?: string;
 }) {
   const self: React.MutableRefObject<{ el: Element | null, close?: () => void }> = useRef({ el: null });
@@ -3774,8 +3777,8 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
     <div className={`at-screen over${rise ? " rise" : ""}${className ? " " + className : ""}`} ref={elRef} role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined}>
       <div className={`at-screenhead${actionBelow ? " below" : ""}`}>
         {onBack ? (
-          <button className="at-back" onClick={onBack} aria-label={backLabel}>
-            <Icon name="back" />
+          <button className="at-back" onClick={onBack} aria-label={backLabel} title={backIcon === "back" ? undefined : backLabel}>
+            <Icon name={backIcon} />
           </button>
         ) : (
           <span className="at-back" aria-hidden="true" style={{ visibility: "hidden" }} />
@@ -5341,6 +5344,8 @@ export interface DeckWords {
   note: string;
   /** Where there are no decks to choose. */
   none: string;
+  /** The button once something is chosen. */
+  another: string;
 }
 
 export function DeckSwitch({ decks, chosen, onToggle, of = "card", words, title = "Decks", find, size = deckSize }: {
@@ -5381,6 +5386,7 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words, title 
     lede: `Choose the decks this ${of} belongs to.`,
     note: `A student sees this ${of} only where it is in a deck their course uses.`,
     none: `You have no decks yet. Make one under Decks, then this ${of} can go in it.`,
+    another: "Another deck",
     ...words,
   };
 
@@ -5424,7 +5430,7 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words, title 
             onClick={() => setOpen(true)}
           >
             <Icon name="add" size={17} />
-            {inThese.length ? "Another deck" : say.first}
+            {inThese.length ? say.another : say.first}
           </button>
         )}
 
