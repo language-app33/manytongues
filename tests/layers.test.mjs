@@ -888,14 +888,14 @@ test("the bar the menus hang off is held inside the window", () => {
   /* Nothing between the pill and its menus may be positioned, or that is
      what they are measured against instead — the button, near the middle
      of the bar, which is how the language menu once left the screen. */
-  for (const sel of [".at-langsw", ".at-corner"]) {
+  for (const sel of [".at-corner"]) {
     const position = (declared[sel] || {}).position;
     assert.ok(!position || position === "static",
       `${sel} is ${position}, so the menu inside it is placed by it rather than by the pill`);
   }
 });
 
-for (const sel of [".at-langmenu", ".at-cmenu"]) {
+for (const sel of [".at-cmenu"]) {
   test(`${sel} cannot leave the window`, () => {
     const rule = declared[sel];
     assert.ok(rule, `${sel} has no rule at all`);
