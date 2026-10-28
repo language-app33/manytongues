@@ -22,6 +22,9 @@ and moves once per batch of work you would notice, not once per commit.
 - Cards made before this keep being listed by their words until they are
   next edited, when they are asked for a name before they can be saved.
 - A deck's Title is now called Deck name.
+- A card's status button, beside Edit, says the status in words
+  (Published, Draft…) and opens like the other menus, rather than being
+  a coloured icon on its own.
 
 To check by hand: open a card and a deck, read them and edit them, and
 look at the top bar; make a new card of each kind and see Save stay off

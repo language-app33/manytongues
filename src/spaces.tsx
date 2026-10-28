@@ -4724,7 +4724,7 @@ function StatusMenu({ card, disabled, onStatus }: {
       <span className="at-statusmenu" onClick={(e) => e.stopPropagation()}>
         <button
           type="button"
-          className={`at-btn sm ghost at-menubtn at-statusbtn iconly ${tone}`}
+          className={`at-btn sm ghost at-menubtn at-statusbtn ${tone}`}
           aria-label={`Status: ${shown}`}
           title={`Status: ${shown}`}
           aria-haspopup="menu"
@@ -4732,10 +4732,11 @@ function StatusMenu({ card, disabled, onStatus }: {
           disabled={disabled}
           onClick={() => setOpen((v) => !v)}
         >
-          {/* An icon on the card's top line, beside the others there, in
-              the colour of where the card stands; the menu says it in
-              words. */}
-          <Icon name={STATUS_ICON[tone] || "verify"} />
+          {/* Where the card stands, in words and in its colour, opening
+              like the other menus on the screen. */}
+          <Icon name={STATUS_ICON[tone] || "verify"} size={16} />
+          {shown}
+          <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
         </button>
         {open && (
           <Popover className="at-pickmenu at-statuspick" role="menu">

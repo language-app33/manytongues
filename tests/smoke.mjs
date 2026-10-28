@@ -4435,7 +4435,8 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   const statusBtn = /** @type {HTMLButtonElement | null} */ ([...document.querySelectorAll(".at-statusmenu .at-statusbtn")].pop() || null);
   check("a teacher's card says where it stands with students, beside Edit",
     !!statusBtn && /Published/.test(spokenName(statusBtn)) && statusBtn.classList.contains("at-btn") &&
-      statusBtn.classList.contains("sm") && !document.querySelector(".at-statusmenu select"),
+      statusBtn.classList.contains("sm") && !document.querySelector(".at-statusmenu select") &&
+      /Published/.test(statusBtn.textContent || "") && !statusBtn.classList.contains("iconly"),
     statusBtn ? `${statusBtn.className}: ${spokenName(statusBtn)}` : "(no status button)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
@@ -4448,10 +4449,12 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      with Export by the "This card" heading rather than among them. */
   const cardHead = statusBtn && statusBtn.closest(".at-screenhead");
   const headButtons = cardHead ? [...cardHead.querySelectorAll(".at-screenaction button")] : [];
-  check("and its buttons are icons on the card's title line, each with a name",
+  /* Icons, each named — but the status, which says itself in words. */
+  check("and its buttons are icons on the card's title line, each with a name, the status in words",
     !!cardHead && !cardHead.classList.contains("below") &&
       !!cardHead.querySelector(".at-screenaction .at-statusmenu") &&
-      headButtons.length > 0 && headButtons.every((b) => !(b.textContent || "").trim() && !!b.getAttribute("aria-label")) &&
+      headButtons.length > 0 && headButtons.every((b) => !!b.getAttribute("aria-label") &&
+        (b.classList.contains("at-statusbtn") || !(b.textContent || "").trim())) &&
       !headButtons.some((b) => /Export/.test(b.getAttribute("aria-label") || "")),
     headButtons.map((b) => b.getAttribute("aria-label") || (b.textContent || "").trim()).join(" | ") || "(no header)");
   const exportBtn = /** @type {any} */ ((teachRead || document).querySelector('[aria-label="Export this card"]'));
