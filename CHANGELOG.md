@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.506 — 28 October 2026
+
+**Home has a proper title, and its content is no longer in a box.**
+
+- The ManyTongues name and logo head the home screen, twice the size and
+  centred, instead of sitting small in the top-left corner.
+- The other tabs are headed with their own name — Progress, Cards,
+  Courses — centred in the same place.
+- The progress ring, the line about what is waiting and the session
+  buttons sit straight on the page in one centred column, with space
+  between them instead of a bordered card. With a prep set, its part and
+  the everyday part are divided by a thin line.
+
 ## 0.505 — 28 October 2026
 
 **The bar at the foot of the window is one bar again, and easier to read.**

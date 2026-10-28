@@ -800,7 +800,7 @@ process.on("unhandledRejection", died);
 
 /* The home screen opens on the climb — the ring and the band beside it —
    rather than on a count of what is due. */
-const homeCard = () => document.querySelector(".at-card[data-ready]");
+const homeCard = () => document.querySelector(".at-home[data-ready]");
 check("app rendered the home screen", !!homeCard() && !!document.querySelector(".at-climb"), text.slice(0, 80).replace(/\s+/g, " "));
 check("and it says how far along the collection is, drawn and in words",
   /\d+ of \d+ cards? learnt/.test(text.replace(/\s+/g, " ")) &&
@@ -2707,7 +2707,7 @@ if (/Build a session/.test(document.body.textContent)) {
     cardCount() === both && /Languages — all 2\b/.test(swSaid()),
     `${cardCount()} cards, button says ${swSaid()}`);
   /* Anywhere outside it puts it away. */
-  click(document.querySelector(".at-brand"));
+  click(document.querySelector(".at-brand, .at-tabtitle"));
   await sleep(200);
   check("and pressing away from it closes it",
     !document.querySelector(".at-langmenu"),

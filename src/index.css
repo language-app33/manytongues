@@ -4287,3 +4287,21 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
   font-weight:800; letter-spacing:-.015em; line-height:1.15; color: var(--ink); }
 .at-ruled > .at-section > .at-sectionlede { margin:4px 0 0; }
 .at-ruled > .at-section > .at-sectionbody { margin-top:18px; }
+
+/* ---- the home screen ----
+   The app's name heads it, large and centred, as the page's title; the
+   other tabs carry their own name in the same place. The content under it
+   sits on the page itself rather than in a card: one centred column, its
+   parts set apart by space alone. */
+.at-brand.at-brand-home { left:0; right:0; margin:0 auto; width:max-content; height:64px;
+  padding:0 12px; gap:12px; font-size:32px; color: var(--text); }
+.at-brand.at-brand-home .at-brandmark { width:48px; height:48px; }
+.at.on-home { padding-top:104px; }
+.at-tabtitle { position:absolute; top:calc(12px + var(--banner-h, 0px)); left:0; right:0;
+  margin:0; height:40px; display:flex; align-items:center; justify-content:center;
+  font-family: var(--ui); font-size:22px; font-weight:800; color: var(--text); pointer-events:none; }
+.at-home { text-align:center; padding:8px 0; }
+.at-home > :first-child { margin-top:0; }
+.at-home + .at-home { margin-top:28px; padding-top:28px; border-top:1px solid var(--line); }
+.at-home .at-row { max-width:420px; margin-inline:auto; }
+.at.kb-open .at-home { padding:0; }
