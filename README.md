@@ -1471,7 +1471,7 @@ Environment variables:
 
 ### Version numbers
 
-Two numbers appear at the foot of the top-right menu, and they answer
+Two numbers appear at the foot of the menu behind your initial, and they answer
 different questions.
 
 The **release** — `0.1`, `0.2`, `0.3` — is what you are on. It lives in

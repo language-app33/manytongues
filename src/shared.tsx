@@ -5,7 +5,7 @@
  * being parsed by every student on every launch.
  */
 
-import React, { useState, useEffect, useRef, useMemo, useCallback } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
 import type { Card, Course, Deck, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
 import { formsOf, leadOf, wordOf } from "./cards.ts";
 import { createPortal } from "react-dom";
@@ -505,6 +505,13 @@ export function Button({
   ]
     .filter(Boolean)
     .join(" ");
+  /* The words, in a box of their own. Nothing anywhere sees the box — it
+     is `display: contents` — except a row of buttons, which lets a label
+     longer than the whole row take a second line inside it rather than
+     push the button off the side of the screen. See .at-btnlabel. */
+  const label = children == null || children === false || children === "" ? null : (
+    <span className="at-btnlabel">{children}</span>
+  );
   return (
     /* `off` is disabled with its voice left on: it looks exactly like a
        disabled button and reads as one — aria-disabled is what a screen
@@ -517,12 +524,12 @@ export function Button({
     reads ? (
       <Pressable className={cls} {...rest}>
         {icon ? <Icon name={icon} size={iconSize || (size === "sm" ? 16 : 18)} /> : null}
-        {children}
+        {label}
       </Pressable>
     ) : (
       <button type="button" className={cls} aria-disabled={off || undefined} {...rest}>
         {icon ? <Icon name={icon} size={iconSize || (size === "sm" ? 16 : 18)} /> : null}
-        {children}
+        {label}
       </button>
     )
   );
@@ -862,9 +869,18 @@ export function Segmented<T extends string | number | boolean | null>({
    The trainer, the teaching space and the admin space each had their
    own copy of this, and only one of them said which tab was current. */
 /**
+ * The main half of the bar that floats at the foot of the window, for a
+ * space's own sections to be shown in. The app owns the bar, because the
+ * other half — languages and spaces, and the corner menu — is the app's;
+ * the sections are each space's, so a space hands its tab strip over
+ * rather than the app knowing what the spaces are divided into.
+ */
+export const DockContext = createContext<HTMLElement | null>(null);
+
+/**
  * @param props  Each tab is [key, label, iconName].
  */
-export function Tabs({ tabs, value, onChange, label = "Section", dots = [] }: {
+export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock = false }: {
   tabs: [string, string, string?][];
   value?: string;
   onChange: (key: string) => void;
@@ -872,9 +888,14 @@ export function Tabs({ tabs, value, onChange, label = "Section", dots = [] }: {
   /** Tabs with something on them worth looking at — the card screen's
       unsaved changes, say — marked with a dot and said out loud. */
   dots?: string[];
+  /** A space's own sections, shown in the bar at the foot of the window
+      rather than at the top of the page. Where there is no bar — the
+      component gallery — they stay where they are. */
+  dock?: boolean;
 }) {
-  return (
-    <div className="at-nav2" role="tablist" aria-label={label}>
+  const slot = useContext(DockContext);
+  const strip = (
+    <div className={dock && slot ? "at-docktabs" : "at-nav2"} role="tablist" aria-label={label}>
       {tabs.map(([k, text, icon]) => (
         <button
           key={k}
@@ -892,6 +913,7 @@ export function Tabs({ tabs, value, onChange, label = "Section", dots = [] }: {
       ))}
     </div>
   );
+  return dock && slot ? createPortal(strip, slot) : strip;
 }
 
 /* --- Stat ---------------------------------------------------------
@@ -986,8 +1008,15 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
       {dialog}
       <div className="at-screenbody" ref={bodyRef}>
         <div className="at-screeninner">
+          {/* The app's name heads the space and scrolls away with it, as it
+              does in Learning. The space's sections are in the bar at the
+              foot of the window. */}
+          <div className="at-brand">
+            <img className="at-brandmark" src="/logo.svg" alt="" width={24} height={24} />
+            ManyTongues
+          </div>
           <Notice kind="error">{error}</Notice>
-          <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} />
+          <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} dock />
           {children}
         </div>
       </div>
@@ -1901,7 +1930,7 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
       </button>
 
       {open && (
-        <div className="at-pickmenu">
+        <Popover className="at-pickmenu">
           {options.map((o) => (
             <button
               key={o.value}
@@ -1919,7 +1948,7 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
               {o.note ? <span className="at-picknote">{o.note}</span> : null}
             </button>
           ))}
-        </div>
+        </Popover>
       )}
     </div>
   );
@@ -1949,6 +1978,7 @@ export function ItemList<T>({
   size = "large",
   views,
   onNew,
+  newOff,
   searchBelow,
   renderItem,
   selected,
@@ -2005,6 +2035,9 @@ export function ItemList<T>({
       draws the tiles as they are. See CardViews. */
   views?: CardViews<T>;
   onNew?: () => void;
+  /** Where nothing new can go in — a locked deck — New is drawn dimmed,
+      and pressing it calls this to say why rather than doing nothing. */
+  newOff?: () => void;
   renderItem: (item: T, state: { selecting: boolean; selected: boolean }) => Node;
   selected?: Set<string>;
   onSelectedChange?: (chosen: Set<string>) => void;
@@ -2172,8 +2205,9 @@ export function ItemList<T>({
       style={trayH ? ({ "--bulk-h": `${trayH}px` } as React.CSSProperties) : undefined}
     >
       <div className="at-toolbar at-toolbar-top">
-        {onNew && (
-          <button className="at-btn primary" onClick={onNew}>
+        {(onNew || newOff) && (
+          <button className={`at-btn primary${newOff ? " off" : ""}`} aria-disabled={newOff ? true : undefined}
+            onClick={newOff || onNew}>
             <Icon name="add" />
             New {noun}
           </button>
@@ -3504,6 +3538,91 @@ export function modalIsOpen() {
 }
 
 /*
+ * The page under anything that covers it stays where it is.
+ *
+ * A screen, a confirmation or a sheet is laid over the page rather than
+ * replacing it, so the page is still there underneath — and still
+ * scrollable. A card opened from a long list showed a scroll bar as long
+ * as the list, and the wheel walked the hidden list up and down while the
+ * card sat still. Every layer that covers the page holds this while it is
+ * up; the page is locked while any of them is.
+ *
+ * Counted, because they stack: a confirmation over a screen. Each used to
+ * save and restore the body's overflow itself, and two closing out of
+ * order restored each other's saved value.
+ */
+let PAGE_LOCKS = 0;
+export function usePageLock(on = true) {
+  useEffect(() => {
+    if (!on || typeof document === "undefined") return undefined;
+    PAGE_LOCKS++;
+    document.documentElement.classList.add("at-pagelocked");
+    return () => {
+      PAGE_LOCKS = Math.max(0, PAGE_LOCKS - 1);
+      if (!PAGE_LOCKS) document.documentElement.classList.remove("at-pagelocked");
+    };
+  }, [on]);
+}
+
+/*
+ * A menu that hangs off a button and stays on the screen.
+ *
+ * Which way a menu should open was decided in the stylesheet, one menu at
+ * a time, from where its button sat — and a button moves: the card's
+ * status went from the start of a line to the end of the card's top line,
+ * and its menu, still told to open rightward, opened off the side of the
+ * phone. This measures instead. Drawn where the stylesheet puts it, then
+ * moved back in by however far it crosses either side of the window, and
+ * cut to the room left below it, scrolling inside, if it runs off the
+ * foot.
+ *
+ * Every menu that drops from a button is one of these — the filters, a
+ * card's status, the corner menu, the space selector — with its look and
+ * its side left to its own class.
+ */
+const POPOVER_GUTTER = 8;
+export function Popover({ className = "", children, ...rest }: {
+  className?: string;
+  children?: Node;
+} & Record<string, any>) {
+  const ref: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || typeof window === "undefined") return undefined;
+    const fit = () => {
+      el.style.translate = "";
+      el.style.maxHeight = "";
+      const r = el.getBoundingClientRect();
+      if (!r.width && !r.height) return;
+      const wide = document.documentElement.clientWidth || window.innerWidth;
+      const tall = window.innerHeight;
+      let dx = 0;
+      if (r.right > wide - POPOVER_GUTTER) dx = wide - POPOVER_GUTTER - r.right;
+      if (r.left + dx < POPOVER_GUTTER) dx = POPOVER_GUTTER - r.left;
+      if (dx) el.style.translate = `${Math.round(dx)}px 0`;
+      if (r.bottom > tall - POPOVER_GUTTER) {
+        el.style.maxHeight = `${Math.max(120, Math.floor(tall - POPOVER_GUTTER - r.top))}px`;
+        el.style.overflowY = "auto";
+      }
+      /* A menu that opens upward, off the bar at the foot of the window,
+         runs out of room at the top instead. */
+      if (r.top < POPOVER_GUTTER) {
+        el.style.maxHeight = `${Math.max(120, Math.floor(r.bottom - POPOVER_GUTTER))}px`;
+        el.style.overflowY = "auto";
+      }
+    };
+    fit();
+    window.addEventListener("resize", fit);
+    return () => window.removeEventListener("resize", fit);
+  }, []);
+  return (
+    <div ref={ref} className={`at-popover${className ? " " + className : ""}`} {...rest}>
+      {children}
+    </div>
+  );
+}
+
+/*
  * The class hides the app chrome, and it used to come off only when the
  * stack emptied. That made one entry outliving its component permanent: the
  * chrome stayed hidden for the rest of the session and only a reload
@@ -3575,7 +3694,7 @@ export function useScrollTop(key: unknown) {
  *   which says it is a step to the side of what is underneath rather than
  *   somewhere new.
  */
-export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", rise, className = "" }: {
+export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", backIcon = "back", rise, className = "" }: {
   title?: Node;
   onBack?: () => void;
   action?: Node;
@@ -3592,6 +3711,9 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
       way — `cardform` is the card editor, whose sections run the full width
       of the sheet. The stylesheet is where that layout lives; this is only
       how a screen says which one it is. */
+  /** The way out's icon. A cross where leaving is cancelling — a deck
+      being edited — rather than going back. */
+  backIcon?: string;
   className?: string;
 }) {
   const self: React.MutableRefObject<{ el: Element | null, close?: () => void }> = useRef({ el: null });
@@ -3599,6 +3721,8 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
      document rather than trusted. See reconcileScreens. */
   const elRef: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
   const host = useAppHost();
+  /* It covers the page, so the page under it holds still. */
+  usePageLock();
 
   /* A screen scrolls inside itself, so the page-level reset does not reach
      it — and one screen replacing another at the same place in the tree
@@ -3658,8 +3782,8 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
     <div className={`at-screen over${rise ? " rise" : ""}${className ? " " + className : ""}`} ref={elRef} role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined}>
       <div className={`at-screenhead${actionBelow ? " below" : ""}`}>
         {onBack ? (
-          <button className="at-back" onClick={onBack} aria-label={backLabel}>
-            <Icon name="back" />
+          <button className="at-back" onClick={onBack} aria-label={backLabel} title={backIcon === "back" ? undefined : backLabel}>
+            <Icon name={backIcon} />
           </button>
         ) : (
           <span className="at-back" aria-hidden="true" style={{ visibility: "hidden" }} />
@@ -3848,14 +3972,12 @@ export function ConfirmModal({
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
     window.addEventListener("keydown", onKey);
     MODALS_OPEN++;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
     return () => {
       window.removeEventListener("keydown", onKey);
       MODALS_OPEN = Math.max(0, MODALS_OPEN - 1);
-      document.body.style.overflow = prev;
     };
   }, [onCancel]);
+  usePageLock();
 
   /* Rendered at the app root, for the same reason a Screen is.
 
@@ -4226,7 +4348,7 @@ export function ModeSelector({ mode, modes, onChange }: {
         </span>
       </button>
       {open && (
-        <div className="at-modemenu">
+        <Popover className="at-modemenu">
           {modes.map((m) => (
             <button
               key={m}
@@ -4240,7 +4362,7 @@ export function ModeSelector({ mode, modes, onChange }: {
               {m === mode && <span>✓</span>}
             </button>
           ))}
-        </div>
+        </Popover>
       )}
     </div>
   );
@@ -5177,6 +5299,7 @@ export function PickSheet({ title, lede, className = "", onClose, children }: {
   onClose: () => void;
   children?: Node;
 }) {
+  usePageLock();
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
@@ -5226,15 +5349,19 @@ export interface DeckWords {
   note: string;
   /** Where there are no decks to choose. */
   none: string;
+  /** The button once something is chosen. */
+  another: string;
 }
 
-export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
+export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
   decks: Pick<Deck, "id" | "title" | "locked" | "cardCount">[];
   chosen: string[];
   onToggle: (id: string, wasOn: boolean) => void;
+  /** Where a pill's name opens what it names — a course's decks do. */
+  onOpen?: (id: string) => void;
   /** What is being put in decks, as the row and the sheet name it — a
       card, or a part of a language's numbers. */
   of?: string;
@@ -5243,10 +5370,22 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
       deck" would be the wrong sentence there. Each one left out is the
       card's. */
   words?: Partial<DeckWords>;
+  /** The sheet's title, where what is picked from it is not decks — the
+      Build a session screen picks single cards with the same pills. */
+  title?: string;
+  /** A search box at the top of the sheet, for a list too long to read
+      down: what it says in the box, and whether a row answers the search. */
+  find?: { placeholder: string; match: (id: string, q: string) => boolean };
+  /** The small line under each row's name, or nothing. A deck says how
+      big it is; a single card has nothing to add. */
+  size?: ((d: Pick<Deck, "cardCount">) => Node) | null;
 }) {
   const [open, setOpen] = useState(false);
+  const [q, setQ] = useState("");
 
   const all = decks || [];
+  const wanted = q.trim().toLowerCase();
+  const listed = find && wanted ? all.filter((d) => find.match(d.id, wanted)) : all;
   const inThese = all.filter((d) => chosen.includes(d.id));
   const say: DeckWords = {
     first: `Add this ${of} to a deck`,
@@ -5254,6 +5393,7 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
     lede: `Choose the decks this ${of} belongs to.`,
     note: `A student sees this ${of} only where it is in a deck their course uses.`,
     none: `You have no decks yet. Make one under Decks, then this ${of} can go in it.`,
+    another: "Another deck",
     ...words,
   };
 
@@ -5267,7 +5407,13 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
       <div className="at-deckpills">
         {inThese.map((d) => (
           <span className="at-deckpill" key={d.id}>
-            <span className="nm">{d.title}</span>
+            {onOpen ? (
+              <button type="button" className="nm" onClick={() => onOpen(d.id)}>
+                {d.title}
+              </button>
+            ) : (
+              <span className="nm">{d.title}</span>
+            )}
             {/* A locked deck keeps its cards: a padlock where the way out
                 would be, saying why there isn't one. */}
             {d.locked ? (
@@ -5297,7 +5443,7 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
             onClick={() => setOpen(true)}
           >
             <Icon name="add" size={17} />
-            {inThese.length ? "Another deck" : say.first}
+            {inThese.length ? say.another : say.first}
           </button>
         )}
 
@@ -5310,13 +5456,24 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
           more than one; the pills behind it change as it does. */}
       {open && (
         <PickSheet
-          title="Decks"
+          title={title}
           lede={say.lede}
           className="at-decksheet"
           onClose={() => setOpen(false)}
         >
+          {find && (
+            <input
+              className="at-input at-mb3"
+              placeholder={find.placeholder}
+              aria-label={find.placeholder}
+              value={q}
+              dir="auto"
+              onChange={(e) => setQ(e.target.value)}
+            />
+          )}
           <div className="at-deckpicks">
-            {all.map((d) => {
+            {find && wanted && !listed.length && <Help>Nothing matches that.</Help>}
+            {listed.map((d) => {
               const on = chosen.includes(d.id);
               return (
                 <button
@@ -5328,7 +5485,7 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
                 >
                   <span className="at-tickbody">
                     <b>{d.title}</b>
-                    <i>{deckSize(d)}</i>
+                    {size ? <i>{size(d)}</i> : null}
                   </span>
                   {/* What tapping it does, rather than a tick saying what
                       is already true: the row is the verb. A locked deck
@@ -5343,6 +5500,85 @@ export function DeckSwitch({ decks, chosen, onToggle, of = "card", words }: {
             })}
           </div>
           {say.note && <Help>{say.note}</Help>}
+        </PickSheet>
+      )}
+    </div>
+  );
+}
+
+/*
+ * One answer from a list, asked the way the card editor asks a card's
+ * subtype: while nothing is chosen, a button saying so; once something is,
+ * the answer, read, with a pencil on the end that opens the list again.
+ * The list is in a sheet of its own and choosing shuts it, because
+ * choosing is the whole of what it was open for.
+ *
+ * Shared so the Build a session screen asks for its mode in the same
+ * shape the card editor asks for a subtype — see WordKind, which hands
+ * this the parts that are not locked.
+ */
+export function ChoiceSwitch<T extends string>({ ask, label, lede, icon, name, options, value, said, changeLabel, onChange, sheetClass = "at-kindsheet", className = "at-field at-mt3", children }: {
+  /** The question, as the sheet is titled and a screen reader says it. */
+  ask: string;
+  /** The question over the box, or nothing where a heading already asks. */
+  label?: string;
+  lede?: string;
+  icon: string;
+  /** What makes the sheet's radios exclusive. Unique on the screen. */
+  name: string;
+  options: { value: T; label: Node; note?: Node }[];
+  value?: T | "" | null;
+  /** The answer as shown, where it is not one of the options on offer —
+      a subtype since retired is still what the card is. */
+  said?: Node;
+  /** What the pencil says, out loud and on hover. */
+  changeLabel: string;
+  onChange: (value: T) => void;
+  sheetClass?: string;
+  className?: string;
+  /** Said under the answer — a retired subtype's nudge. */
+  children?: Node;
+}) {
+  const [open, setOpen] = useState(false);
+  const shown = said ?? (options.find((o) => o.value === value) || { label: null }).label;
+  return (
+    <div className={className}>
+      {label ? <label className="at-label">{label}</label> : null}
+      {lede ? <p className="at-fieldlede">{lede}</p> : null}
+      {shown ? (
+        <div className="at-shutrow">
+          <Icon name={icon} />
+          <span className="at-shutname">{shown}</span>
+          <IconButton icon="edit" label={changeLabel} onClick={() => setOpen(true)} />
+        </div>
+      ) : (
+        <div className="at-chooser">
+          <button
+            className="at-choosebtn"
+            aria-expanded={open}
+            aria-label={`${ask}. Not set. Choose one.`}
+            onClick={() => setOpen(true)}
+          >
+            <Icon name={icon} size={16} />
+            <span className="at-choosemark">Not set</span>
+            <Icon name="chevronDown" size={16} />
+          </button>
+        </div>
+      )}
+      {children}
+      {open && (
+        <PickSheet title={ask} lede={lede} className={sheetClass} onClose={() => setOpen(false)}>
+          <RadioGroup
+            quiet
+            label={ask}
+            name={name}
+            options={options}
+            value={value || null}
+            onChange={(v) => {
+              onChange(v);
+              setOpen(false);
+            }}
+          />
         </PickSheet>
       )}
     </div>

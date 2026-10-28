@@ -17,6 +17,8 @@ import {
   cardSubtypeLabel,
   cardWords,
   DeckSwitch,
+  ChoiceSwitch,
+  CheckList,
   ClipList,
   ConfirmModal,
   Empty,
@@ -31,19 +33,20 @@ import {
   KeysButton,
   Lede,
   Notice,
-  LanguageRadio,
   Screen,
   Section,
   Segmented,
   fromDeck,
   serverCardId,
   SnackbarProvider,
+  DockContext,
   Stat,
   StickyFoot,
   Tabs,
   TopBanner,
   plural,
   pairSystems,
+  Popover,
   pullCourses,
   shortDate,
   pullAdmin,
@@ -51,6 +54,7 @@ import {
   useInstallOffer,
   useLiveRefresh,
   useOffline,
+  usePageLock,
   useScrollTop,
   useSlowWait,
   useSnackbar,
@@ -10339,6 +10343,10 @@ export default function ArabicTrainer() {
   const accountAdmin = !!(account && account.admin);
   /* A teacher opens into teaching; everyone else into learning. */
   const [space, setSpace] = useState(() => (loadTeaches() ? "teach" : "learn"));
+  /* Where a space's sections go in the bar at the foot of the window. State
+     rather than a ref, so the tab strips that portal into it render again
+     once it exists. */
+  const [dockSlot, setDockSlot] = useState<HTMLElement | null>(null);
   const [screen, setScreen] = useState<string | null>(null); // null | "account" | "prefs"
   /* Remembered, because it decides whether the Teaching option exists at all.
      Deriving it only from a fresh network call meant a slow or failed request
@@ -11794,13 +11802,12 @@ export default function ArabicTrainer() {
             courseLangs.push(c.language);
           }
         }
-        /* Adopted, not imposed: a language the person picked themselves in
-           Preferences stays picked. Without this the app switched back on
-           every refresh, forty-five seconds after any change. */
-        const chosen = !!dataRef.current.settings.languageChosen;
+        /* Followed whenever the courses are all in one language. It used to
+           stand aside for a language picked in App preferences; that choice
+           is gone (see AppPreferences), and an old pick kept from it would
+           otherwise hold the app to a language its courses have left. */
         if (
           courseLangs.length === 1 &&
-          !chosen &&
           courseLangs[0] !== dataRef.current.settings.language
         ) {
           const withLang = {
@@ -13584,8 +13591,6 @@ export default function ArabicTrainer() {
       settings: {
         ...settings,
         [k]: v,
-        // A language set by hand is a choice; the courses stop overriding it.
-        ...(k === "language" ? { languageChosen: true } : null),
       },
       settingsUpdated: now(),
     });
@@ -13794,7 +13799,9 @@ export default function ArabicTrainer() {
 
   return (
     <div
-      className={`at ${theme}${inExercise ? " in-exercise" : ""}${kbOpen ? " kb-open" : ""}${
+      className={`at ${theme}${!inExercise && space === "learn" && tab === "home" ? " on-home" : ""}${
+        !inExercise && space === "learn" && (tab === "progress" || tab === "items") ? " untitled" : ""
+      }${inExercise ? " in-exercise" : ""}${kbOpen ? " kb-open" : ""}${
         inExercise && session.pausedAt ? " paused" : ""
       }`}
       /* Every rule that lays out the language being learnt reads these two.
@@ -13818,6 +13825,7 @@ export default function ArabicTrainer() {
           callback to say it with — the teaching and admin screens above all,
           which had no way to confirm a save. */}
       <SnackbarProvider show={snack.show}>
+      <DockContext.Provider value={dockSlot}>
       {/* The band across the top for what must not be missed. First, so
           it is the first thing a screen reader comes to as well. */}
       <BannerHost />
@@ -13831,15 +13839,18 @@ export default function ArabicTrainer() {
         </TopBanner>
       )}
       <div className="at-wrap">
-          {/* The same tab strip the teaching and admin spaces use, rather than
-              a floating bar of its own. */}
+          {/* The same tab strip the teaching and admin spaces use, shown in
+              the bar at the foot of the window like theirs. Courses is not
+              one of them: it is reached from the corner menu, since it is
+              somewhere you go to join or look something up rather than a
+              place you work in every day. */}
           {!inExercise && space === "learn" && (
             <Tabs
+              dock
               tabs={[
                 ["home", "Home", "school"],
                 ["progress", "Progress", "verify"],
                 ["items", "Cards", "cards"],
-                ["courses", "Courses", "folder"],
               ]}
               value={tab}
               label="Part of the app"
@@ -13935,7 +13946,7 @@ export default function ArabicTrainer() {
                     left off, so the one number on the screen is the one the
                     learner set themselves. */}
                 {homePrep && (
-                  <div className="at-card at-preptile at-mb3">
+                  <div className="at-home at-preptile">
                     <Climb items={shown.filter(prepDeckOf(homePrep.decks))} settings={settings} target={homePrep.target} />
                     <div className="at-row">
                       <Button variant="primary" onClick={() => begin(false, prepDeckOf(homePrep.decks))}>
@@ -13951,7 +13962,7 @@ export default function ArabicTrainer() {
                     />
                   </div>
                 )}
-                <div className="at-card" data-ready={readyCount}>
+                <div className="at-home" data-ready={readyCount}>
                   {/* How far along the learner is, above the button that
                       takes them further — unless a prep has the top tile. */}
                   {!homePrep && <Climb items={shown} settings={settings} />}
@@ -15431,75 +15442,89 @@ export default function ArabicTrainer() {
         </TopBanner>
       )}
 
-      {/* The three things that float above the app. They appear and vanish
-          together, so they are decided in one place rather than three. */}
-      {!inExercise && (
-        <>
-          <div className="at-brand">
-            <img className="at-brandmark" src="/logo.svg" alt="" width={24} height={24} />
-            ManyTongues
-          </div>
-          {/* The switch and the space tabs share a bar, so they sit beside
-              each other however many of either there are — the tabs are
-              not there at all for somebody who only learns, and the switch
-              is not there for somebody learning one language. */}
-          <div className="at-chromebar">
-            {space === "learn" && (
-              <LanguageSwitch
-                choices={langChoices}
-                off={langsOff}
-                onChange={(next) => setSetting("langsOff", next)}
-                note="What you switch off here is out of the whole of Learning — your cards, your progress and anything you practise — until you switch it back on."
-              />
-            )}
-            {space === "teach" && (
-              <LanguageSwitch
-                choices={teachChoices}
-                off={teachLangsOff}
-                onChange={(next) => setSetting("teachLangsOff", next)}
-                note="What you switch off here is out of Teaching — your courses, decks and cards in it — until you switch it back on. Your students see everything as before."
-              />
-            )}
-            <SpaceSwitch
-              space={space}
-              spaces={["learn"]
-                .concat(teaches || (account && account.admin) ? ["teach"] : [])
-                .concat(account && account.admin ? ["admin"] : [])}
-              /* Choosing a space is arriving at it, not resuming it: the
-                 card a trial was asked about is reopened on the way back
-                 from that one question and nowhere else. */
-              onSpace={(to: string) => {
-                setTrialBack(null);
-                setSpace(to);
-              }}
-            />
-          </div>
-          <CornerMenu
-            account={account}
-            /* The dot stands for the whole action, so it stays lit until
-               every part of it is done — this device's cards, the courses,
-               and the spaces this person belongs to. */
-            syncState={
-              offline
-                ? "off"
-                : spacesBusy || (syncState === "idle" && courseBusy)
-                ? "syncing"
-                : syncState
-            }
-            /* Why, in words, rather than the one sentence that used to
-               stand for every way this can go wrong. */
-            syncNote={syncNote}
-            onSyncNow={syncEverything}
-            theme={settings.theme || "auto"}
-            onTheme={(v) => setSetting("theme", v)}
-            onAccount={() => setScreen("account")}
-            onGuide={() => setScreen("guide")}
-            onPrefs={() => setScreen("prefs")}
-          />
-        </>
+      {/* The app's name heads the learning page and scrolls away with it;
+          a space frame carries its own. */}
+      {/* Home has it large and centred, as the page's title. Progress and
+          Cards go without a heading, the section in the bar being the
+          title; Courses, reached from the menu, is headed with its name. */}
+      {!inExercise && space === "learn" && tab === "home" && (
+        <div className="at-brand at-brand-home">
+          <img className="at-brandmark" src="/logo.svg" alt="" width={48} height={48} />
+          ManyTongues
+        </div>
       )}
+      {!inExercise && space === "learn" && tab === "courses" && <h1 className="at-tabtitle">Courses</h1>}
+
+      {/* The bar at the foot of the window. Always mounted, so the slot the
+          sections portal into stays the same element; hidden rather than
+          taken down during an exercise. Two halves: the space's own
+          sections, and beside them what is true wherever you are — which
+          space and which languages, and you. */}
+      {(() => {
+        const spaces = ["learn"]
+          .concat(teaches || (account && account.admin) ? ["teach"] : [])
+          .concat(account && account.admin ? ["admin"] : []);
+        const choices = space === "learn" ? langChoices : space === "teach" ? teachChoices : [];
+        return (
+          <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
+            {/* One bar: the space's sections, then the space and languages,
+                then you. The holders inside it draw nothing, so every item
+                is a sibling in the one row and they share it evenly. */}
+            <div className="at-dockbar">
+            <div className="at-dockmain" ref={setDockSlot} />
+            <div className="at-docksub">
+              <CornerMenu
+                account={account}
+                /* The dot stands for the whole action, so it stays lit until
+                   every part of it is done — this device's cards, the courses,
+                   and the spaces this person belongs to. */
+                syncState={
+                  offline
+                    ? "off"
+                    : spacesBusy || (syncState === "idle" && courseBusy)
+                    ? "syncing"
+                    : syncState
+                }
+                /* Why, in words, rather than the one sentence that used to
+                   stand for every way this can go wrong. */
+                syncNote={syncNote}
+                onSyncNow={syncEverything}
+                place={{
+                  space,
+                  spaces,
+                  /* Choosing a space is arriving at it, not resuming it: the
+                     card a trial was asked about is reopened on the way back
+                     from that one question and nowhere else. */
+                  onSpace: (to: string) => {
+                    setTrialBack(null);
+                    setSpace(to);
+                  },
+                  choices,
+                  off: space === "teach" ? teachLangsOff : langsOff,
+                  onLangs: (next) => setSetting(space === "teach" ? "teachLangsOff" : "langsOff", next),
+                  note:
+                    space === "teach"
+                      ? "Select the languages you see in your courses, decks, and cards. This doesn't change anything for your students."
+                      : "Select the languages you see in your cards, progress, and anything you practice.",
+                }}
+                onCourses={() => {
+                  setTrialBack(null);
+                  setSpace("learn");
+                  setTab("courses");
+                  setSession(null);
+                }}
+                onAccount={() => setScreen("account")}
+                onGuide={() => setScreen("guide")}
+                onPrefs={() => setScreen("prefs")}
+              />
+            </div>
+            </div>
+          </nav>
+        );
+      })()}
 
       {snack.node}
+      </DockContext.Provider>
       </SnackbarProvider>
     </div>
   );
@@ -17366,7 +17391,7 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
     <Screen title="Saved sessions" onBack={onClose}>
       {!list.length && (
         <Empty title="Nothing saved yet">
-          Build a session, and the last step offers to keep it.
+          Build a session, and the screen offers to keep it.
         </Empty>
       )}
 
@@ -17431,8 +17456,8 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
 
 /*
  * `editing` opens it on a session already kept, to change it rather than
- * start one: every step is filled in with what was kept, and the last one
- * saves over it instead of starting. The answers being there already is the
+ * start one: every section is filled in with what was kept, and the button
+ * at the foot saves over it instead of starting. The answers being there already is the
  * one case where a lit choice is not a guess on the learner's behalf.
  */
 function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave, onClose }: {
@@ -17449,16 +17474,38 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
     [items]
   );
 
-  const [step, setStep] = useState(0);
-  /* No mode until one is chosen. A pre-selected card looks like an answer
-     already given, so the first screen gets read as "confirm this" rather
+  /* The decks, by the tag their cards carry, biggest first. */
+  const tagGroups: [string, Item[]][] = useMemo(() => {
+    const m = new Map<string, Item[]>();
+    for (const it of eligible) for (const t of it.tags) {
+      if (!m.has(t)) m.set(t, []);
+      (m.get(t) as Item[]).push(it);
+    }
+    return [...m.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
+  }, [eligible]);
+
+  /* No mode until one is chosen. A pre-selected answer looks like one
+     already given, so the Mode section gets read as "confirm this" rather
      than "pick one" — and Ultimate, which is the longest session on offer,
      is the last one to hand somebody by default. */
   const [mode, setMode] = useState(editing ? editing.mode : "");
-  const [picked, setPicked] = useState(() => {
-    if (!editing) return new Set<string>();
-    return new Set(cardsOfSaved(editing, eligible).map((i) => i.id));
+  /*
+   * What is picked, two ways, as the two pickers show it: whole decks, and
+   * single cards. A kept session is read back into the same two — what it
+   * kept as a deck is a deck again, and Everything is every deck and every
+   * card in none — so opening one to change it shows what was chosen in
+   * the shape it was chosen in.
+   */
+  const [opened] = useState(() => {
+    if (!editing) return { decks: [] as string[], cards: [] as string[] };
+    const picked = new Set(cardsOfSaved(editing, eligible).map((i) => i.id));
+    const kept = describeSaved({ picked, groups: new Map(tagGroups), all: eligible });
+    return kept.everything
+      ? { decks: tagGroups.map(([n]) => n), cards: eligible.filter((i) => !i.tags.length).map((i) => i.id) }
+      : { decks: kept.decks, cards: kept.ids };
   });
+  const [decks, setDecks] = useState<string[]>(opened.decks);
+  const [cards, setCards] = useState<string[]>(opened.cards);
   /* The kept cards this screen cannot show — another language's, under the
      switch, or one that has gone — carried through a save untouched, so
      changing the length of a session does not quietly take cards out of it. */
@@ -17467,379 +17514,265 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
     const here = new Set(eligible.map((i) => i.id));
     return editing.ids.filter((id) => !here.has(id));
   });
-  const [openTag, setOpenTag] = useState<string | null>(null);
-  /* "" until one of the two is chosen — the same reason the mode starts
-     unset. It used to open on 20 questions already lit, which is a length
-     nobody asked for sitting where the answer goes. */
+  /* A new session opens on 20 questions, the owner's choice of default
+     (0.499): unlike the mode, a length is something most people take as
+     offered. "" only for a kept session that had none — an Ultimate one. */
   const [limitKind, setLimitKind] = useState( // "" | count | time
-    !editing ? "" : editing.minutes ? "time" : editing.count && editing.count < 999 ? "count" : ""
+    !editing ? "count" : editing.minutes ? "time" : editing.count && editing.count < 999 ? "count" : ""
   );
   const [count, setCount] = useState(editing && editing.count && editing.count < 999 ? editing.count : 20);
   const [minutes, setMinutes] = useState(editing && editing.minutes ? editing.minutes : 5);
-  /* What it would be called, and what was last kept under that name. Held
-     as the description rather than as a flag, so changing the length or
-     the cards after saving offers the button again — what is on screen is
-     no longer what was kept. */
+  /* Keeping it is a box to tick, and the name is asked only once it is:
+     a session nobody means to keep should not be asked what it is called.
+     Editing one, it is kept already, so there is no box — only the name. */
+  const [keeping, setKeeping] = useState(false);
   const [name, setName] = useState(editing ? editing.name : "");
-  const [savedSpec, setSavedSpec] = useState("");
-  const [q, setQ] = useState("");
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
     window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
+    return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
+  usePageLock();
 
-  /* Tags first: picking one selects everything under it. */
-  const tagGroups = useMemo(() => {
-    const m = new Map();
-    for (const it of eligible) for (const t of it.tags) {
-      if (!m.has(t)) m.set(t, []);
-      m.get(t).push(it);
-    }
-    return [...m.entries()].sort((a, b) => b[1].length - a[1].length || a[0].localeCompare(b[0]));
-  }, [eligible]);
+  const picked = useMemo(() => {
+    const on = new Set(cards);
+    for (const [n, group] of tagGroups) if (decks.includes(n)) group.forEach((i) => on.add(i.id));
+    return on;
+  }, [decks, cards, tagGroups]);
 
-  const searched = useMemo(() => {
-    const n = q.trim().toLowerCase();
-    if (!n) return [];
-    return eligible.filter((i) => cardMatches(i, n));
-  }, [eligible, q]);
-
-  const toggleOne = (id: string) =>
-    setPicked((prev) => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
-
-  const tagState = (group: Item[]) => {
-    const on = group.filter((i) => picked.has(i.id)).length;
-    return on === 0 ? "none" : on === group.length ? "all" : "some";
+  const byId = useMemo(() => new Map(eligible.map((i) => [i.id, i])), [eligible]);
+  /* A card is named on its pill and in the list the way the old picker
+     named it: its own word, then what it means. */
+  const cardTitle = (it: Item) => {
+    const lead = firstOfEach(leadOf(it));
+    return [lead.ar, asMeaning(lead.en)].filter(Boolean).join(" · ");
   };
 
-  const toggleTag = (group: Item[]) =>
-    setPicked((prev) => {
-      const next = new Set(prev);
-      const all = group.every((i) => next.has(i.id));
-      group.forEach((i) => (all ? next.delete(i.id) : next.add(i.id)));
-      return next;
-    });
-
   /* Ultimate is the one mode with no length to choose — it asks every
-     question of every card the session mix lets in — but the last step is
-     still there for it, because
-     keeping the session is offered from the same place. Three steps
-     whatever the mode also means the count stops changing under somebody
-     halfway through it. */
+     question of every card the session mix lets in — so its Length section
+     says so rather than offering a choice that would be ignored. */
   const needsLength = mode !== "ultimate";
-  const steps = ["Mode", "Cards", "Finish"];
-  const last = step === steps.length - 1;
 
   const typeCount = typesForMode(mode).length;
   /* Matches the minimum buildManualSession uses, or Start would be offered
      for a session that then refuses to build — and refused for one that
      would have been fine. */
   const needTypes = mode === "started" ? 1 : 2;
-  const problem =
-    !mode
-      ? "Choose a mode"
-      : picked.size === 0
-      ? "Choose at least one card"
-      : typeCount < needTypes
+  const typesShort =
+    mode && typeCount < needTypes
       ? mode === "started"
         ? "Get started needs one of the gentle exercise types switched on"
         : "At least two exercise types must be switched on in Settings"
-      : needsLength && !limitKind
-      ? "Choose a length"
       : "";
-
-  /* What is missing to leave *this* step, which is not the same as what is
-     missing to start: being told to pick cards while still choosing a mode
-     answers a question that has not been asked yet. The button says it
-     rather than sitting dead — a disabled control with no reason given is
-     the one people tap twice and then give up on. */
-  const stepProblem =
-    step === 0 && !mode
-      ? "Choose a mode"
-      : step === 1 && picked.size === 0
-      ? "Choose at least one card"
-      : "";
-
-  /*
-   * A reason short enough to be a label, or nothing.
-   *
-   * Saying why a button is disabled on the button itself is the right
-   * shape for "Choose a mode" and the wrong one for "At least two exercise
-   * types must be switched on in Settings" — that is a sentence, and a
-   * sentence on a button either wraps or shrinks to something nobody can
-   * read. The long ones are shown above the footer instead, where there is
-   * room for them, and the button keeps its verb.
-   */
-  const LABEL_LIMIT = 26;
-  const onButton = (reason: string) =>
-    reason && reason.length <= LABEL_LIMIT ? reason : "";
-  const spelledOut = [stepProblem, last ? problem : ""].find(
-    (r) => r && r.length > LABEL_LIMIT
-  );
+  /* What each section still wants, said under it the way the card editor
+     says what a field still needs — but only once Start has been tapped
+     while something is missing. Shown from the outset, three warnings
+     greeted a screen nobody had done anything wrong on yet. */
+  const [tried, setTried] = useState(false);
+  const need = {
+    mode: !mode ? "Choose a mode." : "",
+    cards: !picked.size ? "Choose at least one deck or card." : "",
+    length: needsLength && !limitKind ? "Choose a length." : "",
+  };
+  const said = tried ? need : { mode: "", cards: "", length: "" };
+  const problem = need.mode || need.cards || typesShort || need.length;
 
   /* Named after what it is, so a list of them reads without opening any:
      the mode is the shape of the session and the count is its size. */
   const suggestion = mode
     ? `${(MODES as Record<string, { label: string }>)[mode].label} · ${plural(picked.size, "card")}`
     : "";
-  /* A deck whose box is ticked is kept as the deck, not as the cards it
-     holds today, so the session takes in what is added to it later. */
-  const described = describeSaved({ picked, groups: new Map(tagGroups), all: eligible });
-  const spec = JSON.stringify({
-    name: name.trim() || suggestion,
-    ...described,
-    mode,
-    limitKind,
-    count,
-    minutes,
-  });
-  const saved = !!savedSpec && savedSpec === spec;
 
   function start() {
+    /* Ticked, it is kept as it is started — there is no Save to forget. */
+    if (keeping) keep();
     onStart({
       ids: [...picked],
       mode,
-      count: limitKind === "count" ? count : 999,
+      count: needsLength && limitKind === "count" ? count : 999,
       minutes: limitKind === "time" && needsLength ? minutes : 0,
     });
   }
 
   function keep() {
+    /* A deck whose box is ticked is kept as the deck, not as the cards it
+       holds today, so the session takes in what is added to it later. */
+    const described = describeSaved({ picked, groups: new Map(tagGroups), all: eligible });
     onSave({
       name: name.trim() || (editing && editing.name) || suggestion,
       ...described,
       ids: [...described.ids, ...elsewhere],
       mode,
-      count: limitKind === "count" ? count : 999,
+      count: needsLength && limitKind === "count" ? count : 999,
       minutes: limitKind === "time" && needsLength ? minutes : 0,
     });
   }
 
+  const go = editing ? "Save" : "Start";
+
+  /* One screen, ruled into sections the way the card editor is — Mode,
+     Cards, Length, and keeping it — with the same headings, the same line
+     under each, and the same pickers: the mode is chosen as a card's
+     subtype is, and decks and cards as a card's decks are. Its one
+     button is in the top bar, on the right, as the card editor's saves
+     are. */
   return (
     <Screen
-      title={editing ? `Edit · ${steps[step]}` : steps[step]}
-      onBack={() => (step === 0 ? onClose() : setStep(step - 1))}
+      title={editing ? "Edit custom session" : "Custom session"}
+      className="cardform"
+      onBack={onClose}
       action={
-        <span className="at-sheetnote">
-                  {step + 1} of {steps.length}
-                </span>
-      }
-      footer={
-        <>
-              {step > 0 && (
-                <Button variant="ghost" onClick={() => setStep(step - 1)}>
-                  Back
-                </Button>
-              )}
-              {!last ? (
-                <Button variant="primary"
-                  disabled={!!stepProblem}
-                  onClick={() => setStep(step + 1)}
-                >
-                  {onButton(stepProblem) || "Next"}
-                </Button>
-              ) : (
-                <Button variant="primary" disabled={!!problem} onClick={editing ? keep : start}>
-                  {onButton(problem) || (editing ? "Save changes" : "Start")}
-                </Button>
-              )}
-        </>
+        /* `off` rather than disabled: the tap still arrives, and is answered
+           by each unfilled section saying what it wants. */
+        <Button
+          variant="primary"
+          size="sm"
+          icon={editing ? "save" : "play"}
+          off={!!problem}
+          title={problem || undefined}
+          onClick={() => (problem ? setTried(true) : editing ? keep() : start())}
+        >
+          {go}
+        </Button>
       }
     >
-      {spelledOut && <Notice kind="warn">{spelledOut}</Notice>}
+      {typesShort && <Notice kind="warn">{typesShort}</Notice>}
 
-      {step === 0 && (
-        <div className="at-modelist">
-          {Object.entries(MODES).map(([key, m]) => (
-            <button
-              key={key}
-              className={`at-modecard${mode === key ? " on" : ""}`}
-              onClick={() => setMode(key)}
-            >
-              <b>{m.label}</b>
-              <span>{m.blurb}</span>
-            </button>
-          ))}
-          <Help>
-            Exercise types are set by the mode. Cards you've already fully learnt are left out
-            of every session.
-          </Help>
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Mode</span>
+          <span className="at-formrole">The mode sets which exercise types are asked. Cards you&apos;ve already fully learnt are left out.</span>
         </div>
-      )}
+        <ChoiceSwitch
+          ask="Mode"
+          icon="tune"
+          name="session-mode"
+          className="at-field"
+          options={Object.entries(MODES).map(([key, m]) => ({ value: key, label: m.label, note: m.blurb }))}
+          value={mode}
+          changeLabel="Change the mode"
+          onChange={setMode}
+        />
+        {said.mode && <p className="at-formneed unmet at-mt3">{said.mode}</p>}
+      </div>
 
-      {step === 1 && (
-        <>
-          <Help>
-            Pick whole tags, or search for individual cards below.
-          </Help>
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Cards</span>
+          <span className="at-formrole">Pick whole decks, single cards, or both.</span>
+        </div>
+        <FormField label="Decks">
+          <DeckSwitch
+            decks={tagGroups.map(([n, group]) => ({ id: n, title: n, cardCount: group.length }))}
+            chosen={decks}
+            onToggle={(id, wasOn) => setDecks((d) => (wasOn ? d.filter((x) => x !== id) : d.concat([id])))}
+            words={{
+              first: "Choose decks",
+              drop: (title) => `Take ${title} out of this session`,
+              lede: "Every card in a deck you choose is in the session.",
+              note: "",
+              none: "No decks yet. Single cards can still be chosen below.",
+            }}
+          />
+        </FormField>
+        <FormField label="Cards" className="at-mt5">
+          <DeckSwitch
+            title="Cards"
+            size={null}
+            decks={(() => {
+              /* The chosen ones first, in the order they were chosen, so
+                 the pills read in that order. */
+              const on = cards.map((id) => byId.get(id)).filter(Boolean) as Item[];
+              const off = eligible.filter((i) => !cards.includes(i.id));
+              return on.concat(off).map((i) => ({ id: i.id, title: cardTitle(i) }));
+            })()}
+            chosen={cards}
+            onToggle={(id, wasOn) => setCards((c) => (wasOn ? c.filter((x) => x !== id) : c.concat([id])))}
+            find={{
+              placeholder: "Search",
+              match: (id, q) => {
+                const it = byId.get(id);
+                return !!it && cardMatches(it, q);
+              },
+            }}
+            words={{
+              first: "Choose cards",
+              drop: (title) => `Take ${title} out of this session`,
+              lede: "Single cards, on top of any decks chosen above.",
+              note: "",
+              none: "No cards to practise yet.",
+            }}
+          />
+        </FormField>
+        {said.cards && <p className="at-formneed unmet">{said.cards}</p>}
+        {picked.size > 0 && <Help className="at-mt3">{plural(picked.size, "card")} in this session.</Help>}
+      </div>
 
-          <div className="at-taglist">
-            {tagGroups.map(([name, group]) => {
-              const st = tagState(group);
-              return (
-                <div className={`at-tagpick${st !== "none" ? " on" : ""}`} key={name}>
-                  <div className="at-tagpickrow">
-                    <button className="at-tagpickmain" onClick={() => toggleTag(group)}>
-                      <span className={`at-box ${st}`}>
-                        {st === "all" ? "✓" : st === "some" ? "–" : ""}
-                      </span>
-                      <span className="nm">{name}</span>
-                      <span className="ct">
-                        {group.filter((i: Item) => picked.has(i.id)).length}/{group.length}
-                      </span>
-                    </button>
-                    <button
-                      className="at-tagpickmore"
-                      onClick={() => setOpenTag(openTag === name ? null : name)}
-                      aria-label="Choose individually"
-                    >
-                      {openTag === name ? "▾" : "▸"}
-                    </button>
-                  </div>
-                  {openTag === name && (
-                    <div className="at-tagpickcards">
-                      {group.map((it: Item) => (
-                        <button
-                          key={it.id}
-                          className={`at-minicard${picked.has(it.id) ? " on" : ""}`}
-                          onClick={() => toggleOne(it.id)}
-                        >
-                          {firstOfEach(leadOf(it)).ar && (
-                            <span className="ar" lang={activeLang().id} dir={activeLang().direction}>
-                              {firstOfEach(leadOf(it)).ar}
-                            </span>
-                          )}
-                          <span className="en">{asMeaning(firstOfEach(leadOf(it)).en)}</span>
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Length</span>
+          <span className="at-formrole">Pick how long you want the session to be.</span>
+        </div>
+        {needsLength ? (
+          <>
+            <FormField label="Number of questions" className="at-lengthgroup">
+              <Segmented
+                size={null}
+                label="How many exercises"
+                options={COUNT_CHOICES.map((n) => ({ value: n, label: String(n) }))}
+                value={limitKind === "count" ? count : null}
+                onChange={(n) => {
+                  setLimitKind("count");
+                  setCount(n);
+                }}
+              />
+            </FormField>
 
-            <div className={`at-tagpick${eligible.every((i) => picked.has(i.id)) ? " on" : ""}`}>
-              <div className="at-tagpickrow">
-              <button
-                className="at-tagpickmain"
-                onClick={() =>
-                  setPicked((prev) =>
-                    eligible.every((i) => prev.has(i.id))
-                      ? new Set()
-                      : new Set(eligible.map((i) => i.id))
-                  )
-                }
-              >
-                <span className={`at-box ${eligible.every((i) => picked.has(i.id)) ? "all" : picked.size ? "some" : "none"}`}>
-                  {eligible.every((i) => picked.has(i.id)) ? "✓" : picked.size ? "–" : ""}
-                </span>
-                <span className="nm">Everything</span>
-                <span className="ct">
-                  {picked.size}/{eligible.length}
-                </span>
-              </button>
-              </div>
-            </div>
-          </div>
+            <div className="at-lengthor">or</div>
 
-          <FormField label="Or find one card" className="at-mt5">
-            <input
-              className="at-input"
-              placeholder="Search"
-              value={q}
-              dir="auto"
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </FormField>
-          {q.trim() && (
-            <div className="at-tagpickcards at-mt1">
-              {searched.map((it) => (
-                <button
-                  key={it.id}
-                  className={`at-minicard${picked.has(it.id) ? " on" : ""}`}
-                  onClick={() => toggleOne(it.id)}
-                >
-                  {firstOfEach(leadOf(it)).ar && (
-                    <span className="ar" lang={activeLang().id} dir={activeLang().direction}>
-                      {firstOfEach(leadOf(it)).ar}
-                    </span>
-                  )}
-                  <span className="en">{asMeaning(firstOfEach(leadOf(it)).en)}</span>
-                </button>
-              ))}
-              {!searched.length && <Help>Nothing matches that.</Help>}
-            </div>
-          )}
-        </>
-      )}
+            <FormField label="Minutes" className="at-lengthgroup">
+              <Segmented
+                size={null}
+                label="How many minutes"
+                options={TIME_CHOICES.map((n) => ({ value: n, label: String(n) }))}
+                value={limitKind === "time" ? minutes : null}
+                onChange={(n) => {
+                  setLimitKind("time");
+                  setMinutes(n);
+                }}
+              />
+            </FormField>
 
-      {step === 2 && needsLength && (
-        <>
-          <div className="at-lengthgroup">
-            <p className="at-label">Number of questions</p>
-            <Segmented
-              size={null}
-              label="How many exercises"
-              options={COUNT_CHOICES.map((n) => ({ value: n, label: String(n) }))}
-              value={limitKind === "count" ? count : null}
-              onChange={(n) => {
-                setLimitKind("count");
-                setCount(n);
-              }}
-            />
-          </div>
-
-          <div className="at-lengthor">or</div>
-
-          <div className="at-lengthgroup">
-            <p className="at-label">Minutes</p>
-            <Segmented
-              size={null}
-              label="How many minutes"
-              options={TIME_CHOICES.map((n) => ({ value: n, label: String(n) }))}
-              value={limitKind === "time" ? minutes : null}
-              onChange={(n) => {
-                setLimitKind("time");
-                setMinutes(n);
-              }}
-            />
-          </div>
-
-          <Help>
-            {limitKind === "count"
-              ? `The session ends after ${count} questions.`
-              : limitKind === "time"
-              ? `A countdown replaces the question count, and the session ends after ${minutes} minutes.`
-              : "One or the other: a number of questions, or a stretch of time."}
-          </Help>
-        </>
-      )}
+            {said.length && <p className="at-formneed unmet">{said.length}</p>}
+            {limitKind && (
+              <Help>
+                {limitKind === "count"
+                  ? `The session ends after ${count} questions.`
+                  : `The session ends after ${minutes} minutes.`}
+              </Help>
+            )}
+          </>
+        ) : (
+          <Help>Ultimate asks every question of every card, so it has no length to choose.</Help>
+        )}
+      </div>
 
       {/*
-        * Keeping it, which is the other half of what this step is for.
+        * Keeping it.
         *
-        * Building one of these is several minutes of picking, and until now
-        * all of it was spent again the next morning. What is kept is the
-        * description — the cards, the mode, the length — so a card edited
-        * since is practised as it now reads.
-        *
-        * An extra rather than the way on: Start is still the button, and a
-        * session nobody saves behaves exactly as it did.
+        * Building one of these is several minutes of picking, and before
+        * sessions could be kept all of it was spent again the next morning. What is kept is the
+        * description — the decks, the cards, the mode, the length — so a
+        * card edited since is practised as it now reads. Ticked, it is
+        * kept when it starts; there is no Save of its own to forget.
         */}
-      {/* Editing, the name is all there is to this: the footer saves. */}
-      {step === 2 && editing && (
-        <div className="at-formblock at-mt5">
+      {editing ? (
+        <div className="at-formblock">
+          <div className="at-formhead">
+            <span className="at-formnum">Name</span>
+            <span className="at-formrole">What it is called under Saved sessions.</span>
+          </div>
           <FormField label="Name">
             <input
               className="at-input"
@@ -17849,37 +17782,31 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
             />
           </FormField>
         </div>
-      )}
-
-      {step === 2 && !editing && (
-        <div className="at-formblock at-mt5">
-          <FormField
-            label="Keep this session"
-            hint="It will be under Saved sessions, beside Build a session."
-          >
-            <input
-              className="at-input"
-              placeholder={suggestion}
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-            />
-          </FormField>
-          <div className="at-row at-mt3">
-            <Button
-              variant="ghost"
-              icon={saved ? "check" : "save"}
-              disabled={!!problem || saved}
-              onClick={() => {
-                keep();
-                setSavedSpec(spec);
-              }}
-            >
-              {saved ? "Saved" : "Save"}
-            </Button>
+      ) : (
+        <div className="at-formblock">
+          <div className="at-formhead">
+            <span className="at-formnum">Save for later</span>
+            <span className="at-formrole">Keep this session under Saved sessions, to start again whenever you like.</span>
           </div>
-          {/* Which is not the same as having started it: somebody who saves
-              and then leaves has kept the session and practised nothing. */}
-          {saved && <Help>Kept. Start it now, or find it later under Saved sessions.</Help>}
+          <CheckList
+            options={[{
+              id: "keep",
+              title: "Save this session to reuse",
+              note: "It is saved when you start it.",
+            }]}
+            chosen={keeping ? ["keep"] : []}
+            onToggle={(_, wasOn) => setKeeping(!wasOn)}
+          />
+          {keeping && (
+            <FormField label="Name" optional className="at-mt5" lede={suggestion ? `Left empty, it is called “${suggestion}”.` : undefined}>
+              <input
+                className="at-input"
+                placeholder={suggestion || "Thursday's verbs"}
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+              />
+            </FormField>
+          )}
         </div>
       )}
     </Screen>
@@ -18688,7 +18615,10 @@ function Lately({ moves }: { moves?: Record<string, DayMoves> }) {
     return { today, week: week === today ? "" : week };
   }, [moves]);
   if (!said.today && !said.week) return null;
+  /* Under a heading of its own, like every other part of Progress: the one
+     unheaded run of text on a screen of headed parts read as stray. */
   return (
+    <Section head title="Lately">
     <div className="at-lately">
       {said.today && (
         <p>
@@ -18701,6 +18631,7 @@ function Lately({ moves }: { moves?: Record<string, DayMoves> }) {
         </p>
       )}
     </div>
+    </Section>
   );
 }
 
@@ -19431,30 +19362,10 @@ function ProgressTab({
   /* Where the prep stands, for the line beside the button. */
   const prepNow = prep ? prepStatus(prep, items, settings) : null;
   return (
-    <>
+    /* One sheet, ruled into parts, the way the card editor is laid out —
+       see .at-ruled. */
+    <div className="at-ruled">
       <Lately moves={moves} />
-      {/* Prep mode: getting a set of decks ready by a date, under a heading
-          of its own like the other parts of the screen. The button starts
-          one, or opens the one there is; the line beside it says what is
-          being prepped for. */}
-      <Section head title="Prep mode" lede="Get some decks ready by a set date, like an exam or the start of a class.">
-        <div className="at-prepbar">
-          <Button variant="ghost" onClick={() => setPrepOpen(true)} aria-haspopup="dialog">
-            {prep ? "Edit prep mode" : "Start prep mode"}
-          </Button>
-          {prep && (
-            <Help className="at-prepnote">
-              {prepNow === "past"
-                ? `${prep.name} has come — edit the prep or delete it.`
-                : prepNow === "done"
-                ? `Ready for ${prep.name}: every card is ${prep.target === "cleared" ? "cleared" : "learnt"}.`
-                : `Prepping for ${prep.name} · ${
-                    prepDaysLeft(prep.date) === 1 ? "1 day left" : `${prepDaysLeft(prep.date)} days left`
-                  }`}
-            </Help>
-          )}
-        </div>
-      </Section>
       <Section
         head
         title="The ladder"
@@ -19645,6 +19556,29 @@ function ProgressTab({
           </div>
         </Section>
       )}
+      {/* Prep mode: getting a set of decks ready by a date, under a heading
+          of its own like the other parts of the screen, last, after the
+          decks it is about. The button starts
+          one, or opens the one there is; the line beside it says what is
+          being prepped for. */}
+      <Section head title="Prep mode" lede="Get some decks ready by a set date, like an exam or the start of a class.">
+        <div className="at-prepbar">
+          <Button variant="ghost" onClick={() => setPrepOpen(true)} aria-haspopup="dialog">
+            {prep ? "Edit prep mode" : "Start prep mode"}
+          </Button>
+          {prep && (
+            <Help className="at-prepnote">
+              {prepNow === "past"
+                ? `${prep.name} has come — edit the prep or delete it.`
+                : prepNow === "done"
+                ? `Ready for ${prep.name}: every card is ${prep.target === "cleared" ? "cleared" : "learnt"}.`
+                : `Prepping for ${prep.name} · ${
+                    prepDaysLeft(prep.date) === 1 ? "1 day left" : `${prepDaysLeft(prep.date)} days left`
+                  }`}
+            </Help>
+          )}
+        </div>
+      </Section>
 
       {items.length === 0 && (
         <Empty title="Nothing to show yet">{noCardsYet(myCourses.length)}</Empty>
@@ -19686,7 +19620,7 @@ function ProgressTab({
           onBack={() => setViewing(null)}
         />
       )}
-    </>
+    </div>
   );
 }
 
@@ -19945,106 +19879,68 @@ const initialsOf = (name?: string | null) =>
 const SPACE_LABEL: Record<string, string> = { learn: "Learning", teach: "Teaching", admin: "Admin" };
 const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", admin: "tune" };
 
-/* Which part of the app you are in, sitting beside the account menu.
-   Someone who only studies has one space, so there is nothing to choose and
-   the control does not appear at all. */
-/* Which part of the app you are in, sat beside the account menu.
-   A row rather than a dropdown: there are at most three, and moving this out
-   of the menu was about reaching them in one tap. Shown only to people with
-   somewhere to go — a student who only studies sees nothing. */
-/* The two letters a language is known by, off the front of its id, which
-   is where its ISO code is: ar-PS is AR, vi is VI. Enough to say which
-   one is on when only one is, in the room a button has. */
-const langTag = (id: LangId) => String(id || "").split("-")[0].toUpperCase();
 
 /*
- * Which of the languages you are learning are in play.
+ * Which space you are in, and which of its languages are in play: the top
+ * of the menu behind your initial.
  *
- * Only for somebody learning more than one — one language needs no switch,
- * and an app that showed one anyway would be asking a question with a
- * single answer. What it decides holds everywhere in the learning space:
- * the cards you can list, what Progress counts, what is ready, and what a
- * session is dealt from.
+ * Each half is only there for somebody with a choice to make — more than
+ * one space, or more than one language in this space. What the languages
+ * decide holds everywhere in the space: the cards you can list, what
+ * Progress counts, what is ready, and what a session is dealt from.
  *
- * The button is an icon and a mark, because it lives in the chrome beside
- * the space switcher where there is room for nothing else — and the mark
- * is the whole of the state rather than a decoration: which one, when it
- * is one; how many, when it is some; that there is nothing to say, when it
- * is all of them. The rest is in the label a screen reader and a tooltip
- * both get.
- *
- * You cannot switch the last one off. An app with no languages in it is a
- * blank screen with no way of telling why, and the row says so rather than
- * just refusing.
+ * You cannot switch the last language off. An app with no languages in it
+ * is a blank screen with no way of telling why, and the row says so rather
+ * than just refusing.
  */
-function LanguageSwitch({ choices, off, onChange, note }: {
+function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note }: {
+  space: string;
+  spaces: string[];
+  /** Choosing a space also puts the menu away, which is the caller's. */
+  onSpace: (space: string) => void;
   choices: LangChoice[];
   off: LangId[];
-  onChange: (off: LangId[]) => void;
+  onLangs: (off: LangId[]) => void;
   /* What switching one off does, in the space it is switched in. */
   note: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const mine: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
+  const spacesToo = !!spaces && spaces.length > 1;
+  const langsToo = !!choices && choices.length > 1;
+  if (!spacesToo && !langsToo) return null;
 
-  /*
-   * Anywhere outside puts it away, and "outside" is asked of the click
-   * rather than of who saw it.
-   *
-   * On the way down rather than on the way up, and reading the target
-   * rather than relying on the event reaching the window at all: the
-   * corner menu beside this one stops clicks inside itself from
-   * travelling, so a menu that waited for one to arrive stayed open behind
-   * it and the two sat over each other in the corner. Ticking a language
-   * keeps this open, which is what the check on `mine` is for — you are
-   * usually ticking more than one.
-   */
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      const at = e.target;
-      if (mine.current && at instanceof Node && mine.current.contains(at)) return;
-      setOpen(false);
-    };
-    document.addEventListener("click", close, true);
-    return () => document.removeEventListener("click", close, true);
-  }, [open]);
-
-  /* After the hooks, which have to run on every render. */
-  if (!choices || choices.length < 2) return null;
-
-  const on = choices.filter((c) => !off.includes(c.id));
-  const all = on.length === choices.length;
+  const on = langsToo ? choices.filter((c) => !off.includes(c.id)) : [];
   const only = on.length === 1;
-  const mark = all ? "All" : only ? langTag(on[0].id) : String(on.length);
-  const said = all
-    ? `all ${choices.length}`
-    : only
-    ? `${on[0].name} only`
-    : `${on.length} of ${choices.length}`;
-
   const toggle = (id: LangId) => {
     const isOff = off.includes(id);
     if (!isOff && only) return; // the last one on stays on
-    onChange(isOff ? off.filter((x) => x !== id) : off.concat([id]));
+    onLangs(isOff ? off.filter((x) => x !== id) : off.concat([id]));
   };
 
   return (
-    <div className="at-langsw" ref={mine}>
-      <button
-        className={`at-langbtn${all ? "" : " on"}`}
-        aria-expanded={open}
-        aria-label={`Languages — ${said}. Choose which.`}
-        title={`Languages — ${said}`}
-        onClick={() => setOpen((v) => !v)}
-      >
-        <Icon name="language" size={18} />
-        <span className="at-langmark">{mark}</span>
-      </button>
-
-      {open && (
-        <div className="at-langmenu">
+    <div className="at-place">
+      {spacesToo && (
+        <>
+          <p className="at-eyebrow">Space</p>
+          <div className="at-spacepick" role="radiogroup" aria-label="Space">
+            {spaces.map((sp) => (
+              <button
+                key={sp}
+                role="radio"
+                aria-checked={space === sp}
+                className={`at-spacebtn${space === sp ? " on" : ""}`}
+                onClick={() => onSpace(sp)}
+              >
+                <Icon name={SPACE_ICON[sp]} size={18} />
+                {SPACE_LABEL[sp]}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {langsToo && (
+        <>
           <p className="at-eyebrow">Languages</p>
+          <Help>{note}</Help>
           <div className="at-cklist">
             {choices.map((c) => {
               const chosen = !off.includes(c.id);
@@ -20055,47 +19951,21 @@ function LanguageSwitch({ choices, off, onChange, note }: {
                   role="checkbox"
                   aria-checked={chosen}
                   /* Not disabled: the last one on is pressable and simply
-                     holds. The line under each language is only its card
-                     count, whatever its state. */
+                     holds. Just its name, to keep the list short. Ticking
+                     keeps the menu open:
+                     you are usually ticking more than one. */
                   onClick={() => toggle(c.id)}
                 >
                   <span className="at-ckbox">{chosen ? "✓" : ""}</span>
                   <span className="at-cktext">
                     <b>{c.name}</b>
-                    <i>{plural(c.total, "card")}</i>
                   </span>
                 </button>
               );
             })}
           </div>
-          <Help>{note}</Help>
-        </div>
+        </>
       )}
-    </div>
-  );
-}
-
-function SpaceSwitch({ space, spaces, onSpace }: {
-  space: string;
-  spaces: string[];
-  onSpace: (space: string) => void;
-}) {
-  if (!spaces || spaces.length < 2) return null;
-  return (
-    <div className="at-spaces" role="tablist" aria-label="Part of the app">
-      {spaces.map((sp) => (
-        <button
-          key={sp}
-          role="tab"
-          aria-selected={space === sp}
-          aria-label={SPACE_LABEL[sp]}
-          title={SPACE_LABEL[sp]}
-          className={`at-spacebtn${space === sp ? " on" : ""}`}
-          onClick={() => onSpace(sp)}
-        >
-          <Icon name={SPACE_ICON[sp]} size={18} />
-        </button>
-      ))}
     </div>
   );
 }
@@ -20243,15 +20113,19 @@ function AppVersion() {
   );
 }
 
-function CornerMenu({ account, syncState, syncNote, onSyncNow, theme, onTheme, onAccount, onPrefs, onGuide }: {
+function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onAccount, onPrefs, onGuide }: {
   account: User | null;
   syncState?: string;
   /** What to say about it. Worked out by the app, which is the only thing
       that knows whether this was the connection or the passphrase. */
   syncNote?: string;
   onSyncNow: () => void;
-  theme?: string;
-  onTheme: (theme: string) => void;
+  /** Which space and which languages: at the top of the menu, for
+      somebody with a choice of either. */
+  place: React.ComponentProps<typeof PlacePicker>;
+  /** The courses you are in, and joining another: Learning's Courses
+      page, which has no section of its own in the bar. */
+  onCourses: () => void;
   onAccount: () => void;
   onPrefs: () => void;
   onGuide: () => void;
@@ -20268,16 +20142,19 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, theme, onTheme, o
   return (
     <div className="at-corner" onClick={(e) => e.stopPropagation()}>
       <button
-        className="at-cornerbtn"
+        className="at-cornerbtn at-dockitem"
         onClick={() => setOpen((v) => !v)}
         aria-label="You and your settings"
       >
-        {initialsOf(account && account.displayName)}
-        <span className={`at-cdot ${syncState}`} />
+        <span className="at-cornerav">
+          {initialsOf(account && account.displayName)}
+          <span className={`at-cdot ${syncState}`} />
+        </span>
+        <span className="at-docklabel">You</span>
       </button>
 
       {open && (
-        <div className="at-cmenu">
+        <Popover className="at-cmenu">
           <div className="at-cwho">
             <span className="at-cavatar">{initialsOf(account && account.displayName)}</span>
             <span className="at-cwhotext">
@@ -20285,6 +20162,14 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, theme, onTheme, o
               <i>{(account && account.handle) || ""}</i>
             </span>
           </div>
+
+          <PlacePicker
+            {...place}
+            onSpace={(sp: string) => {
+              setOpen(false);
+              place.onSpace(sp);
+            }}
+          />
 
           {/* The row states where sync has got to; the button is the only
               thing that starts one. It used to be the whole row, so
@@ -20299,34 +20184,19 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, theme, onTheme, o
             </button>
           </div>
 
-          {/* Choosing between three looks, not doing a thing: the options
-              sit side by side and the current one is lit, rather than one
-              button cycling through them and leaving you to tap twice to
-              go back one. */}
-          <div className="at-cline as-field">
+
+          <button
+            className="at-cline"
+            onClick={() => {
+              setOpen(false);
+              onCourses();
+            }}
+          >
             <span className="at-cico">
-              <Icon name="theme" size={18} />
+              <Icon name="folder" size={18} />
             </span>
-            <span className="at-clinetext">Appearance</span>
-          </div>
-          <div className="at-cseg">
-            <Segmented
-              label="Appearance"
-              /* The menu gives it a fixed width to fill; compact would sit
-                 short of the rows above and below it. */
-              size={null}
-              options={[
-                { value: "auto", label: "Device" },
-                { value: "light", label: "Light" },
-                { value: "dark", label: "Dark" },
-              ]}
-              value={theme || "auto"}
-              onChange={onTheme}
-            />
-          </div>
-
-          <div className="at-crule" />
-
+            <span className="at-clinetext">Courses</span>
+          </button>
           <button
             className="at-cline"
             onClick={() => {
@@ -20366,7 +20236,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, theme, onTheme, o
 
           <div className="at-crule" />
           <AppVersion />
-        </div>
+        </Popover>
       )}
     </div>
   );
@@ -20751,8 +20621,16 @@ function AccountSettings({
 }
 
 /*
- * The whole of what a learner can set: which language, how it looks, and
- * how loud it is.
+ * The whole of what a learner can set: how it looks, and how loud it is.
+ *
+ * There was a Language section here too, a "Learning" choice between the
+ * languages. Every card carries its own language, so it decided nothing
+ * about what was asked: with one language the app set it from the course,
+ * and with several the switch in the top bar decides what is practised,
+ * while this only decided which language that switch listed first. A
+ * setting that changes nothing visible is one people try and conclude is
+ * broken, so it went. The app still keeps a language of its own, for the
+ * rare thing that carries none, and takes it from the courses.
  *
  * There was an Advanced disclosure under this holding six controls over how
  * a session is built and a row of marking leniencies, behind a sentence
@@ -20771,21 +20649,6 @@ function AppPreferences({ settings, setSetting }: {
       {/* Headed and explained the way the card editor and Account settings
           are: each section's name at heading size, and each field's
           explanation straight under its name, before the control. */}
-      <div className="at-formblock">
-        <div className="at-formhead">
-          <span className="at-formnum">Language</span>
-        </div>
-        {/* The one screen where a learner would look for this. It could only
-            be set by a course before, so someone studying two languages had
-            no way to choose which the app was in. */}
-        <LanguageRadio
-          languages={LANGUAGES}
-          value={settings.language || DEFAULT_LANGUAGE}
-          onChange={(id) => setSetting("language", id)}
-          label="Learning"
-        />
-      </div>
-
       <div className="at-formblock">
         <div className="at-formhead">
           <span className="at-formnum">Appearance</span>

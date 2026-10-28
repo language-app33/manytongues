@@ -82,9 +82,12 @@ import {
   Segmented,
   plural,
   useOffline,
+  usePageLock,
   ConfirmModal,
   Overlay,
   PickSheet,
+  ChoiceSwitch,
+  Popover,
   DeckSwitch,
   Locked,
   Pressable,
@@ -408,6 +411,9 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
   const [open, setOpen] = useState<number | null>(null);
   const commit = onCommit;
   const edit = onEdit;
+  /* Read, the grammar is said rather than offered, and a recording that
+     is there is opened to be listened to rather than to be made. */
+  const locked = useContext(Locked);
   const grammarOf = (row: Answer) =>
     dims.map((d) => labelFor({ [d.field]: row[d.field] }, lang)).filter(Boolean).join(" ");
   return (
@@ -509,7 +515,10 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               is one of the accepted answers, said out loud, and a card
               that accepts two had one set of clips over the pair. */}
           <div className="at-answerabout">
-            {dims.length > 0 && (
+            {dims.length > 0 && locked && grammarOf(row) && (
+              <span className="at-answergram">{grammarOf(row)}</span>
+            )}
+            {dims.length > 0 && !locked && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -534,6 +543,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
                    reading as the smaller of the two. Both keep the same
                    box, because the row stretches them together. */
                 className="at-answerrec"
+                reads={locked && clipsOf(row).length > 0}
                 /* Nothing to record until there is a word to say. The same
                    rule a cell of a table follows — see CellFields. */
                 disabled={!String(row.text || "").trim()}
@@ -1346,6 +1356,8 @@ export function ImageScreen({ title, images, onChange, onClose }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const full = images.length >= MAX_IMAGES;
+  /* Opened from a card being read: the pictures, and no way to change them. */
+  const locked = useContext(Locked);
 
   async function add(file: File | undefined | null) {
     if (!file) return;
@@ -1406,22 +1418,26 @@ export function ImageScreen({ title, images, onChange, onClose }: {
             {images.map((h, i) => (
               <figure className="at-imgtile" key={h}>
                 <StoredImage hash={h} alt={`Image ${i + 1}`} />
-                <IconButton
-                  icon="delete"
-                  label={`Remove image ${i + 1}`}
-                  onClick={() => onChange(images.filter((x) => x !== h))}
-                />
+                {!locked && (
+                  <IconButton
+                    icon="delete"
+                    label={`Remove image ${i + 1}`}
+                    onClick={() => onChange(images.filter((x) => x !== h))}
+                  />
+                )}
               </figure>
             ))}
           </div>
         ) : (
           <p className="at-hint">No image yet.</p>
         )}
-        <div className="at-chips" style={{ marginTop: 12 }}>
-          {picker("Choose an image", "image", false)}
-          {picker("Take a photo", "camera", true)}
-        </div>
-        {full && <Help>That is as many as one form may have. Remove one to add another.</Help>}
+        {!locked && (
+          <div className="at-chips" style={{ marginTop: 12 }}>
+            {picker("Choose an image", "image", false)}
+            {picker("Take a photo", "camera", true)}
+          </div>
+        )}
+        {!locked && full && <Help>That is as many as one form may have. Remove one to add another.</Help>}
       </section>
     </Screen>
   );
@@ -1442,6 +1458,14 @@ function Recordings({ form, onOpen }: {
   onOpen: () => void;
 }) {
   const made = clipsOf(form);
+  const locked = useContext(Locked);
+  if (locked) {
+    return (
+      <Field label="Recordings">
+        {made.length ? <ClipList clips={made} /> : <Help>None.</Help>}
+      </Field>
+    );
+  }
   return (
     <Field label="Recordings">
       {/* What the field is for, under the name of it and above the button
@@ -1490,6 +1514,9 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
   onClose: () => void;
 }) {
   const [recording, setRecording] = useState<"clips" | "slowClips" | "">("");
+  /* Opened from a card being read: the takes, to listen to, and nothing
+     that makes or removes one. */
+  const locked = useContext(Locked);
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
@@ -1583,11 +1610,15 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
       rise
       backLabel="Back to the card"
     >
+      {locked ? (
+        <Help>The recordings on this card. Press Edit on the card to add or remove one.</Help>
+      ) : (
       <Help>
         You can make one at regular speed, a slow one, or both — or neither:
         a card with no recording is still a card, it just cannot be
         practiced by ear.
       </Help>
+      )}
       <Notice kind="error">{error}</Notice>
 
       {CLIP_KINDS.map((kind) => {
@@ -1602,11 +1633,14 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
                 are is the heading directly above them. */}
             <ClipList
               clips={list.map((id, i) => ({ id, label: `Take ${i + 1}` }))}
-              onChange={(next) =>
+              onChange={locked ? undefined : (next) =>
                 put(kind.key, next.map((c) => (typeof c === "string" ? c : c.id)))
               }
             />
+            {locked && !list.length && <Help>None.</Help>}
 
+            {!locked && (
+            <>
             <div className="at-chips" style={{ marginTop: list.length ? 10 : 0 }}>
               {mine ? (
                 <Button variant="danger" size="sm" onClick={end} icon="pause">
@@ -1635,6 +1669,8 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
               disabled={!!busy || !!recording}
               onFiles={(files) => store(files, kind.key)}
             />
+            </>
+            )}
           </section>
         );
       })}
@@ -1898,6 +1934,7 @@ function CellFields({ lang, cell, which, saysHow, asksEnglish = true, onChange, 
   onChange: (patch: Record<string, any>) => void;
   onRecord: () => void;
 }) {
+  const locked = useContext(Locked);
   const written = !!(cell && String(cell.ar || "").trim());
   const heard = cell ? clipsOf(cell).length : 0;
   return (
@@ -1929,13 +1966,26 @@ function CellFields({ lang, cell, which, saysHow, asksEnglish = true, onChange, 
           />
         )}
       </div>
-      <IconButton
-        icon="mic"
-        label={heard ? `${plural(heard, "recording")} · ${which}` : `Record ${which}`}
-        className={`at-cellmic${heard ? " on" : ""}`}
-        disabled={!written}
-        onClick={onRecord}
-      />
+      {/* Read, a cell's recordings are opened to be listened to; with none,
+          there is nothing to open and the button is not there. */}
+      {locked && heard ? (
+        <Pressable
+          className="at-icon at-cellmic on"
+          title={`${plural(heard, "recording")} · ${which}`}
+          aria-label={`${plural(heard, "recording")} · ${which}`}
+          onClick={onRecord}
+        >
+          <Icon name="mic" />
+        </Pressable>
+      ) : (
+        <IconButton
+          icon="mic"
+          label={heard ? `${plural(heard, "recording")} · ${which}` : `Record ${which}`}
+          className={`at-cellmic${heard ? " on" : ""}`}
+          disabled={!written}
+          onClick={onRecord}
+        />
+      )}
     </>
   );
 }
@@ -4526,19 +4576,14 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
    * word stays the word, and the cells are forms of it rather than a
    * stand-in for it.
    *
-   * And the word's English becomes what the card is called, where nothing
-   * is called anything yet. A verb is listed as its name and has to have
-   * one, and the meaning just typed into a word about to become a verb —
-   * "to eat" — is that name in the overwhelming majority of cases. Never
-   * over a name somebody has written, and never from a card that has said
-   * nothing: what this cannot do is invent one.
+   * The name is not touched: it is asked first, before any word is
+   * written, and is the teacher's own answer.
    */
   const chooseCategory = (next: string) => {
     setCategory(next);
     const spec = specOf(lang, tableFor(lang, next));
     if (!citationOf(spec)) return;
     setCells((x) => seedCited(x, forms[0], spec, forms));
-    setName((was) => was.trim() || String((forms[0] || {}).en || "").trim());
   };
   /* Which blanks this card fills, where it is a value rather than
      something to learn: "Raphael" fills `name`, and every phrase with a
@@ -5718,12 +5763,12 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
   /* What the card is short of, where it is a verb the table stands in for:
      the two things such a card is held to, each said where it is asked for
      rather than both at the foot of the table. */
-  const needsName = standsIn && !name.trim();
+  const needsName = !name.trim();
   const needsForm = standsIn && !tableCells.some(
     (c) => String(c.ar || "").trim() && meant(c),
   );
   const canSave = (standsIn ? canSaveVerb(name, tableCells, trouble, meant) : canSaveWord(main, trouble))
-    && refOk && !strayHoles.length && !needsExamples && !examplesWrong;
+    && !needsName && refOk && !strayHoles.length && !needsExamples && !examplesWrong;
 
   /* Another form, named so that its own cells can point at it. No number
      override beyond the name: blankForm takes the language's declared
@@ -6164,25 +6209,6 @@ const SUBTYPE_LEDE = "Each subtype has specific fields, forms, structures, etc."
 
 function WordKind({ word }: { word: WordDraft }) {
   const { category, chooseCategory, categoryOffer, categorySaid, pronounOf } = word;
-  const [open, setOpen] = useState(false);
-  /* The list, in a sheet of its own — see PickSheet. Choosing shuts it,
-     because choosing is the whole of what it was open for, and what
-     follows from the answer is a table appearing on the screen behind. */
-  const sheet = open ? (
-    <PickSheet title="What subtype" lede={SUBTYPE_LEDE} className="at-kindsheet" onClose={() => setOpen(false)}>
-      <RadioGroup
-        quiet
-        label="What subtype"
-        name="card-category"
-        options={categoryOffer}
-        value={category}
-        onChange={(v) => {
-          chooseCategory(v);
-          setOpen(false);
-        }}
-      />
-    </PickSheet>
-  ) : null;
   /* The answer, even where it is no longer one of the answers offered: a
      retired kind is still what the card is until somebody changes it. */
   const said = categoryOffer.find((c) => c.value === category) || categorySaid || null;
@@ -6249,54 +6275,33 @@ function WordKind({ word }: { word: WordDraft }) {
   }
   /* Shut is the state an answered question sits in, and the pencil is the
      way back into it — so the list is on screen only while it is being
-     read, and the answer is on screen the rest of the time. */
-  if (said) {
-    return (
-      <div className="at-field at-mt3">
-        <label className="at-label">What subtype</label>
-        <p className="at-fieldlede">{SUBTYPE_LEDE}</p>
-        <div className="at-shutrow">
-          <Icon name="tune" />
-          <span className="at-shutname">{said.label}</span>
-          <IconButton
-            icon="edit"
-            label="Change what subtype this card is"
-            onClick={() => setOpen(true)}
-          />
-        </div>
-        {/* A kind no longer offered: the card keeps working as it is, and
-            this is the nudge to move it across when there is a moment. */}
-        {retired && (
-          <Help>
-            {category === "name"
-              ? "Name is no longer offered for new cards. When you can, choose Person or Place instead."
-              : category === "pronoun"
-                ? "Pronoun is no longer offered for new cards. Pronouns are now written once for the language, on the Pronouns screen beside Numbers in Cards."
-                : `${said.label} is no longer offered for new cards. When you can, choose another subtype.`}
-          </Help>
-        )}
-        {sheet}
-      </div>
-    );
-  }
+     read, and the answer is on screen the rest of the time. ChoiceSwitch
+     is that shape, shared with the Build a session screen's mode. */
   return (
-    <div className="at-field at-mt3">
-      <label className="at-label">What subtype</label>
-      <p className="at-fieldlede">{SUBTYPE_LEDE}</p>
-      <div className="at-chooser">
-        <button
-          className="at-choosebtn"
-          aria-expanded={open}
-          aria-label="What subtype. Not set. Choose one."
-          onClick={() => setOpen(true)}
-        >
-          <Icon name="tune" size={16} />
-          <span className="at-choosemark">Not set</span>
-          <Icon name="chevronDown" size={16} />
-        </button>
-      </div>
-      {sheet}
-    </div>
+    <ChoiceSwitch
+      ask="What subtype"
+      label="What subtype"
+      lede={SUBTYPE_LEDE}
+      icon="tune"
+      name="card-category"
+      options={categoryOffer}
+      value={category}
+      said={said ? said.label : undefined}
+      changeLabel="Change what subtype this card is"
+      onChange={chooseCategory}
+    >
+      {/* A kind no longer offered: the card keeps working as it is, and
+          this is the nudge to move it across when there is a moment. */}
+      {said && retired && (
+        <Help>
+          {category === "name"
+            ? "Name is no longer offered for new cards. When you can, choose Person or Place instead."
+            : category === "pronoun"
+              ? "Pronoun is no longer offered for new cards. Pronouns are now written once for the language, on the Pronouns screen beside Numbers in Cards."
+              : `${said.label} is no longer offered for new cards. When you can, choose another subtype.`}
+        </Help>
+      )}
+    </ChoiceSwitch>
   );
 }
 
@@ -6464,7 +6469,7 @@ function SceneKindField({ talk, card }: { talk: SceneDraft; card: Card | null })
   );
 }
 
-function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen, onToggleDeck, onExport }: {
+function KindBlock({ card, lang, scene, shape, word, talk, decks, chosen, onToggleDeck, onExport }: {
   card: Card | null;
   lang: Lang;
   scene: boolean;
@@ -6475,7 +6480,6 @@ function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen
       the two it is — the wording is all that turns on the answer. Decided
       by the editor, which is where the kinds of card are told apart; null
       on a card named by its own word. See NameBlock. */
-  naming: "verb" | "sentence" | null;
   decks: Deck[];
   chosen: string[];
   onToggleDeck: (id: string, on: boolean) => void;
@@ -6518,6 +6522,11 @@ function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen
           answered question on this screen wears — the answer, read, with
           what would open it again on the end. What is on that end here is
           a padlock, because nothing opens it. */}
+      {/* ---- what it is called ----
+          First, before anything else is written: every card has a name,
+          whatever its kind, and it is its own answer rather than one taken
+          from another box — so nothing fills it in. */}
+      <NameBlock word={word} talk={talk} scene={!!scene} />
       <Field label="What type of card" lede="The type of card cannot be changed">
         <div className="at-shutrow">
           <Icon name="cards" />
@@ -6544,15 +6553,6 @@ function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen
           Asked only of a word: a conversation has turns where a word
           has forms, and there is nothing for a table to lay out. */}
       {scene ? <SceneKindField talk={talk} card={card} /> : <WordKind word={word} />}
-      {/* ---- and what it is called ----
-
-          Directly under the subtype, because it is the same sort of thing:
-          one fact about the whole card, settled once and then read. It
-          belongs to the card rather than to any of its words — which is
-          exactly why the card's own words cannot supply it — so it is asked
-          here with the other facts about the card, and not in a framed
-          section of its own halfway down the screen. */}
-      {naming && <NameBlock word={word} of={naming} />}
       {/* And what follows from the answer that is about the word rather
           than about its forms — see WordGrammar. Under the kind because it
           is asked on the strength of it: a noun is asked whether it is a
@@ -6631,67 +6631,25 @@ const storedHelp = (spec: VerbSpec | null): string => {
  * text box in it, standing between the card and its words, read as a stage
  * of the form rather than as the label it is.
  */
-function NameBlock({ word, of }: { word: WordDraft; of: "verb" | "sentence" }) {
-  const { shownSpec, name, setName, needsName } = word;
-  const verb = of === "verb";
-  /* A verb only where the table stands in for the card's own word. Where a
-     language cites nothing — Vietnamese cites the bare verb — the card has a word
-     of its own and is named by it. A sentence always: every one of them is
-     a frame, which is the whole of what a sentence is. */
-  if (verb && (!shownSpec || !citationOf(shownSpec))) return null;
+function NameBlock({ word, talk, scene }: { word: WordDraft; talk: SceneDraft; scene: boolean }) {
+  /* A scene's name is its title, kept where it always was. */
+  const value = scene ? talk.title : word.name;
+  const set = scene ? talk.setTitle : word.setName;
   return (
-    /* ---- what to call it ----
-
-       A verb in a language with no infinitive has no one word of its
-       own: it is a table, and every box in it is a form. So a list had
-       to show one of those boxes — "past · he" — and a deck of verbs
-       read as a column of he-pasts, each naming one form rather than
-       the verb the card is about. A sentence is listed as itself,
-       braces and all: "{{name}} is heavy" names the shape of the card
-       rather than what it is for, and every frame in a deck reads as
-       the hole in it. Nothing is wrong with either card; neither
-       simply has a name of its own to be listed under.
-
-       **Which is why a verb is asked for one and a sentence is not.**
-       A sentence that goes unnamed is listed as the sentence, which is
-       its own words and says something; a verb that goes unnamed would
-       be listed as whichever box somebody happened to fill in first.
-       So the one that has nowhere to fall back to is the one it is
-       required of — see canSaveVerb, which is where that is settled.
-
-       Not the block 0.114 took away. That one asked for the script,
-       the pronunciation, the English and the recordings a second
-       time, and the two copies had to be kept in step by hand. This
-       asks for one thing the card cannot supply, and nothing is
-       drilled on it: it is a label, and the microcopy says so. */
     <Field
-      label="Name"
+      label={<>Name <span className="req">required</span></>}
       lede="How this card is listed and searched."
-      className="at-mt3"
     >
       <input
         className="at-input"
-        value={name}
-        placeholder={verb ? "to eat" : "saying where you live"}
-        onChange={(e) => setName(e.target.value)}
+        value={value}
+        placeholder={scene ? (talk.text ? "Our street" : "At the door") : "saying where you live"}
+        onChange={(e) => set(e.target.value)}
       />
       {/* Only while it is in the way, like every other line that unblocks
           Save on this screen: a demand standing there before anybody has
           typed reads as a telling-off for opening the screen. */}
-      {needsName && (
-        <p className="at-formneed unmet">
-          A verb is listed as its name, so it needs one — nothing else on
-          the card can stand for the whole of it.
-        </p>
-      )}
-      {!verb && (
-        <Help>
-          Without one it is listed as the sentence itself, blanks and all
-          — which names the shape of the card rather than what it is for.
-          Nobody is ever asked this: what is practised is the sentence
-          with its blanks filled in.
-        </Help>
-      )}
+      {!value.trim() && <p className="at-formneed unmet">Every card needs a name.</p>}
     </Field>
   );
 }
@@ -6906,22 +6864,13 @@ function TableBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
 /* The scene: what it is called, who is in it, and whose part the student
    takes. */
 function SceneBlock({ talk }: { talk: SceneDraft }) {
-  const { title, setTitle, speakers, setSpeakers, you, setYou, text } = talk;
+  const { speakers, setSpeakers, you, setYou, text } = talk;
   return (
     <>
     <div className="at-formblock main">
       <div className="at-formhead">
         <span className="at-formnum">{text ? "The text" : "The scene"}</span>
       </div>
-
-      <Field label="What it is called">
-        <input
-          className="at-input"
-          value={title}
-          placeholder={text ? "Our street" : "At the door"}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-      </Field>
 
       {/* Nobody speaks a text, so there is nobody to name and no part to
           play. */}
@@ -7315,6 +7264,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
      out does not shut under the teacher's fingers. */
   const drawn = useContext(FoldsForms);
   const folds = !!drawn;
+  const locked = useContext(Locked);
   const [open, setOpen] = useState(() =>
     !drawn || (!drawn.folded && (drawn.drawn.current || more || formWritten(f))));
   const [rows, setRows] = useState(() => answerRows(f, fields));
@@ -7426,6 +7376,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
               icon="image"
               iconSize={17}
               className="at-answerrec"
+              reads={locked && images.length > 0}
               aria-label={`${of ? `Images for ${of}` : "Images"} — ${images.length ? `${images.length} added` : "none yet"}`}
               onClick={() => setSeeing(true)}
             >
@@ -8016,7 +7967,7 @@ function BlankChip({ slot, values, lang }: {
         {slot}
       </Pressable>
       {open && (
-        <div className="at-blankfills" role="tooltip">
+        <Popover className="at-blankfills" role="tooltip">
           <p className="at-eyebrow">{`${slot} · ${said}`}</p>
           {shown.length > 0 && (
             <ul className="at-filllist">
@@ -8044,7 +7995,7 @@ function BlankChip({ slot, values, lang }: {
               without this card being touched.
             </Help>
           )}
-        </div>
+        </Popover>
       )}
     </span>
   );
@@ -8144,6 +8095,7 @@ function TagList({ word, rows, maker, full, open, onOpen, onClose }: {
   onOpen: () => void;
   onClose: () => void;
 }) {
+  const locked = useContext(Locked);
   const { fills, defaultTags, ownFills } = word;
   /* Only the default tags this card actually has, as plain labels: nothing
      on them can be pressed — the answer is the kind of card, above. */
@@ -8189,6 +8141,8 @@ function TagList({ word, rows, maker, full, open, onOpen, onClose }: {
             );
           })}
         </div>
+      ) : locked ? (
+        <p className="at-hint">None.</p>
       ) : null}
       <div>
         {/* Drawn as the deck button at the top of the card is — the same
@@ -8229,6 +8183,7 @@ function TagSheet({ word, rows, maker, full, onClose }: {
   onClose: () => void;
 }) {
   const { fills, addFill, dropFill, renameFill, nameHeld, askStrip, asking, dropping } = word;
+  usePageLock();
   const [renaming, setRenaming] = useState<{ from: string; to: string } | null>(null);
   /* The box at the top names a new tag and finds an old one: what is typed
      there narrows the list under it, as the blank screen's box does, so a
@@ -9178,7 +9133,7 @@ export function writtenCard({ word, talk, shape, chosen }: {
   chosen: string[];
 }) {
   const scene = shape === "scene";
-  const { shownSpec, ownForms, tableCells, keptFrames = [], forms, note, standsIn, name, uses, fills, category, refName, spread, stripped, writtenExamples = [] } = word;
+  const { shownSpec, ownForms, tableCells, keptFrames = [], forms, note, name, uses, fills, category, refName, spread, stripped, writtenExamples = [] } = word;
   /* And the verb's own sentences back on the end, exactly as they were
      found: this screen does not write them, so the whole of what it owes
      them is not to lose them — see initialFrames. */
@@ -9199,9 +9154,9 @@ export function writtenCard({ word, talk, shape, chosen }: {
        every sentence passes through while it is being written, and the one
        the old reading could not hold. */
     sentence: shape === "sentence",
-    /* And what to call it, where its own words do not: the two cards that
-       are saved as something other than what they are about. */
-    name: standsIn || shape === "sentence" ? name.trim() : "",
+    /* And what to call it: every card has a name of its own. A scene's is
+       its title, saved with the scene. */
+    name: scene ? "" : name.trim(),
     /* And the examples its subjunctive is practised in, on a verb that
        has the row — each as read, with whose wish it is settled where
        its English asks, and who it was written for. See VerbExample. */
@@ -10086,6 +10041,7 @@ function MeaningsBlock({ lang, selfId, lead, allCards, clue, onClue, canAdd, onA
   onAnother: (which: "meaning" | "word") => void;
   onOpen?: (card: Card) => void;
 }) {
+  const locked = useContext(Locked);
   const shared = useMemo(
     () => sharedWith(allCards, { id: selfId, lang: lang.id }, lead as any),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -10171,7 +10127,7 @@ function MeaningsBlock({ lang, selfId, lead, allCards, clue, onClue, canAdd, onA
             : `Add another ${lang.scriptLabel} word for this meaning`}
         </Button>
       </div>
-      <Help>Either one saves this card first, then opens the new one.</Help>
+      {!locked && <Help>Either one saves this card first, then opens the new one.</Help>}
     </div>
   );
 }
@@ -10208,15 +10164,6 @@ function CarryAsk({ cards, onAnswer, onCancel }: {
     />
   );
 }
-
-/** A line of a card's words said in passing — a title — with each blank as
-    a gap rather than its braces: the braces are how a blank is stored,
-    never how it is shown. */
-const saidPlainly = (text: string): string => text.replace(/\{\{[^}]*\}\}/g, "…").trim();
-
-/** What a card is called on its own screen: what it is listed as. */
-const cardTitle = (card: Card | null): string =>
-  !card ? "Card" : String(card.name || "").trim() || saidPlainly(leadOf(card).en || leadOf(card).ar || "") || "Card";
 
 /* ------------------------------------------------------------------
    The card screen's tabs
@@ -10405,6 +10352,8 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   const changed = snapshot !== savedAs;
   /* Cancel with changes on the card: asked first. */
   const [discarding, setDiscarding] = useState(false);
+  const quit = () => (stored && onRelock ? onRelock() : onClose());
+  const leave = () => (changed ? setDiscarding(true) : quit());
   /* `exit` is Save and exit: the card is saved and the editor closes.
      Save alone keeps it open on the card as saved. */
   const save = (next: "meaning" | "word" | null = null, exit = false) => {
@@ -10507,19 +10456,26 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         /* Named for what is being made, which is settled before this
            opens: a screen for writing a conversation should not be called
            "New card" and then be full of turns. */
-        title={stored ? cardTitle(card) : `New ${shapeLabel(shape).toLowerCase()}`}
+        /* What is being done, not which card: the name is the first
+           thing in "This card". */
+        title={locked ? "Card" : stored ? "Edit card" : "Create card"}
         /* One sheet, ruled into sections — see .at-screen.cardform. The
            editor is the only screen laid out that way, so it is the only
            one that asks for it. */
         className="cardform"
-        onBack={onClose}
+        /* Being edited, the way out is Cancel, as on a deck — a cross
+           where the back arrow was, asking first when there is something
+           to lose. A stored card goes back to being read; a new one
+           closes. */
+        onBack={locked ? onClose : leave}
+        backIcon={locked ? "back" : "close"}
+        backLabel={locked ? "Back" : "Cancel"}
         /* Icons only, on the title's own line, which gives way to them —
            the title is cut short rather than wrapped. Locked: the status
            and Edit; Export is by the "This card" heading, with the other
-           facts about the card. Open: Delete, the status, Cancel, and two
-           saves — Save keeps the card open to go on with it, and Save and
-           exit closes it, the one a finished card wants, so it is the
-           primary. Each says what it does on hover and out loud. */
+           facts about the card. Open: Delete and Save, which keeps the
+           card open to go on with it — the status is for a card being
+           read. Each says what it does on hover and out loud. */
         action={
           locked ? (
             <>
@@ -10533,28 +10489,13 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             {stored && onDelete ? (
               <IconButton icon="delete" label="Delete this card" title="Delete this card" danger onClick={onDelete} />
             ) : null}
-            {stored && status ? status(changed) : null}
-            {stored && onRelock ? (
-              <Button variant="ghost" size="sm" className="iconly" aria-label="Cancel" title="Cancel"
-                onClick={() => (changed ? setDiscarding(true) : onRelock())}>
-                <Icon name="close" />
-              </Button>
-            ) : null}
-            <Button size="sm" className="iconly"
+            <Button variant="primary" size="sm" className="iconly"
               aria-label={busy ? "Saving…" : "Save"}
               title={busy ? "Saving…" : "Save"}
               disabled={!canSave || !changed || busy}
               onClick={() => save()}
             >
               <Icon name="save" />
-            </Button>
-            <Button variant="primary" size="sm" className="iconly"
-              aria-label="Save and exit"
-              title="Save and exit"
-              disabled={!canSave || !changed || busy}
-              onClick={() => save(null, true)}
-            >
-              <Icon name="check" />
             </Button>
           </>
           )
@@ -10590,17 +10531,6 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               shape={shape}
               word={word}
               talk={talk}
-              /* Whether the card's own words name it, decided here with the
-                 rest of what tells the kinds apart: a sentence never names
-                 itself, and a verb does not where the table stands in for
-                 its word. Everything else is listed under its own word. */
-              naming={
-                layout === "sentence"
-                  ? "sentence"
-                  : layout === "verb" && word.standsIn
-                    ? "verb"
-                    : null
-              }
               decks={decks || []}
               chosen={chosen}
               onToggleDeck={(id, on) =>
@@ -10687,16 +10617,20 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
       {discarding && (
         <ConfirmModal
           title="Discard your changes?"
-          body={<p>The card goes back to how it was last saved.</p>}
+          body={<p>{stored ? "The card goes back to how it was last saved." : "The card is not made."}</p>}
           confirmLabel="Discard changes"
           onCancel={() => setDiscarding(false)}
           onConfirm={() => {
             setDiscarding(false);
-            if (onRelock) onRelock();
+            quit();
           }}
         />
       )}
-      <RecordingOverlays word={word} talk={talk} />
+      {/* Opened from a cell or a line while the card is read, they only
+          play — see RecordingScreen. */}
+      <Locked.Provider value={locked}>
+        <RecordingOverlays word={word} talk={talk} />
+      </Locked.Provider>
       {carrying && (
         <CarryAsk
           cards={carrying.cards}

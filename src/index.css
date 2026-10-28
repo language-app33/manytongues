@@ -454,7 +454,9 @@ button {
    heading — which is what lets five of them stay this size on one row of
    a phone. The type still grows with the track, as every segmented
    row's does, from a larger floor to a larger ceiling. */
-.at-lengthgroup .at-seg { font-size: clamp(16px, calc(var(--seg) * 0.3), 24px);
+/* Sized off a five-wide row whichever row it is in, so the four counts
+   and the five minutes are the same size of number. */
+.at-lengthgroup .at-seg { font-size: clamp(16px, calc((100cqi - 12px) / 5 * 0.3), 24px);
   min-height:52px; }
 .at-lengthor { font-family: var(--ui); font-size:12px; font-weight:800; letter-spacing:.1em;
   text-transform:uppercase; color: var(--faint); text-align:center; margin:6px 0 14px; }
@@ -499,7 +501,7 @@ button {
 
    Still pointer-events:none: it is the app's name, not a button, and
    nothing should be harder to tap for its being behind it. */
-.at-brand { position:fixed; top:calc(12px + var(--banner-h, 0px)); left:12px; height:40px;
+.at-brand { position:absolute; top:calc(12px + var(--banner-h, 0px)); left:12px; height:40px;
   display:flex; align-items:center; padding:0 6px; border-radius:10px;
   background: var(--wash);
   -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
@@ -595,6 +597,11 @@ button {
 .at-chooser.deckwrap { display:block; width:100%; }
 .at-deckpills { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
 .at-deckpills > .at-hint { margin:0; }
+/* A pill whose name opens what it names: the name is the button. */
+.at-deckpill button.nm { background:none; border:0; padding:0; margin:0; cursor:pointer;
+  color:inherit; font:inherit; text-align:start; }
+/* A fact held still on a screen with nothing to edit, at a field's size. */
+.at-fieldvalue { margin:0; font-size:15px; font-weight:600; color: var(--text); }
 .at-deckpill { display:inline-flex; align-items:center; gap:4px; max-width:100%;
   min-height:48px; padding-inline:16px 4px; border-radius:999px;
   border:2px solid var(--accent); background: var(--jade-bg); color: var(--text);
@@ -1621,7 +1628,6 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-cktext { display:flex; flex-direction:column; min-width:0; }
 .at-cktext b { font-size:14px; font-weight:700; }
 .at-cktext i { font-style:normal; font-size:12px; color: var(--muted); margin-top:2px; }
-.at-corner { position:fixed; top:calc(12px + var(--banner-h, 0px)); right:12px; }
 /* A card you can open lifts a little and takes a darker edge under the
    pointer. Pointer devices only: on a touchscreen :hover sticks to the last
    thing tapped. */
@@ -1636,79 +1642,96 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   transition: border-color 140ms ease, transform 140ms ease;
 }
 .at-deckcard[data-open], .at-minicard { cursor: pointer; }
-/* Sat immediately left of the account button, same height, same rhythm. */
-/* The bar the language switch and the space tabs share. Either can be
-   absent — the tabs for somebody who only learns, the switch for somebody
-   learning one language — so they are laid out beside each other rather
-   than each pinned to a corner of its own. */
-.at-chromebar { position:fixed; top:calc(12px + var(--banner-h, 0px)); right:60px; display:flex;
-  align-items:center; gap:8px; }
-.at-spaces { display:flex;
-  align-items:center; gap:2px; height:40px; padding:0 3px; border-radius:999px;
-  background: var(--nav-bg); border:2px solid var(--line);
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
-/* ---- which languages are in play ----
-   An icon and a mark: the mark is the state, so the button says which
-   language is on when only one is, how many when it is some, and "All"
-   when there is nothing to say. */
-.at-langsw { position:relative; }
-.at-langbtn { display:inline-flex; align-items:center; gap:5px; height:40px; padding:0 11px 0 9px;
-  border-radius:999px; cursor:pointer; background: var(--nav-bg); border:2px solid var(--line);
-  color: var(--muted); font-family: var(--ui); font-size:12px; font-weight:800;
-  letter-spacing:.04em; -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px); }
-/* Narrowed to something is a state worth seeing from across the screen,
-   the way a filter that is doing something is anywhere else. */
-.at-langbtn.on { border-color: var(--accent); color: var(--ink); }
-.at-langmark { line-height:1; }
-/*
- * Pinned to the window rather than hung off the button.
- *
- * It used to be `absolute; right:0` inside the switch, so it grew leftward
- * from wherever the switch happened to sit — and the switch sits left of
- * the space tabs, which sit left of the corner menu. On a phone that put
- * its left edge off the screen: the tabs and the corner take about 184px
- * of the right-hand side, so a 260px menu needed 444px of window before it
- * fitted, and every phone in portrait is narrower than that. Somebody
- * learning two languages and also teaching saw it worst, because the third
- * tab pushed the anchor further left again.
- *
- * So it hangs off the right of the window, like the corner menu's own
- * panel, and the two now line up. The width gives way before the gutter
- * does, and a tall one scrolls inside itself rather than running off the
- * bottom.
- */
-.at-langmenu { position:fixed; top:calc(60px + var(--banner-h, 0px)); right:12px;
-  /* Per cent rather than vw: for a fixed box the percentage is of the
-     window as laid out, where 100vw counts a desktop scrollbar as well and
-     would push it that far past the gutter. */
-  width: min(300px, calc(100% - 24px));
-  max-height: calc(100vh - 72px - var(--banner-h, 0px));
-  max-height: calc(100dvh - 72px);
-  overflow-y:auto; background: var(--surface);
-  border:2px solid var(--line); border-radius:18px; padding:12px;
-  box-shadow: var(--nav-shadow); }
-.at-langmenu .at-eyebrow { margin:0 0 8px; }
-.at-langmenu .at-hint { margin-bottom:0; }
-.at-spacebtn { width:34px; height:32px; border:0; border-radius:999px; cursor:pointer;
+/* ---- the bar at the foot of the window ----
+   One pill that floats over the page: the space's own sections, then the
+   space and languages, then you. Over the page rather than in it, so
+   whatever is on screen scrolls underneath; the page and a space frame
+   both leave room for it at the end (.at's padding, and
+   .at-screen.bare .at-screenbody's).
+
+   The row around it lets taps through, so the strips of page either side
+   of the pill stay pressable; the pill takes them back. */
+.at-dock { position:fixed; left:12px; right:12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  display:flex; justify-content:center; pointer-events:none; }
+.at-dock.off { display:none; }
+.at-dock > * { pointer-events:auto; }
+/* The pill, and what both menus hang off: its right-hand edge is never
+   nearer the window's edge than the bar's gutter, so a menu aligned to it
+   and no wider than the window less two gutters cannot leave the window
+   on either side, on a phone or on a desktop. See-through and blurred,
+   with a soft shadow and hardly an edge, so the page reads through it. */
+/* A grid of equal columns, each as wide as the widest item, so the items
+   are one size whatever their names. */
+.at-dockbar { position:relative; display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:2px;
+  min-width:0; max-width:100%; padding:6px; border-radius:999px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+  border:1px solid color-mix(in srgb, var(--line) 60%, transparent);
+  box-shadow: var(--nav-shadow);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4); backdrop-filter: blur(18px) saturate(1.4); }
+/* The holders inside the pill draw nothing and take no room, so every item
+   is a sibling in the one row and they share it out evenly. */
+.at-dockmain, .at-docksub, .at-docktabs, .at-corner { display:contents; }
+/* An item: its icon, and its name under it near the foot of the pill. The
+   current section is the accent colour on a faint wash of it; the rest are
+   in the page's own ink, not greyed out. */
+.at-dockitem, .at-docktabs .at-tab2 { min-width:0; height:56px;
+  display:flex; flex-direction:column; align-items:center; justify-content:center;
+  gap:4px; padding:0 14px; border:0; border-radius:999px; background:none; cursor:pointer;
+  color: var(--text); font-family: var(--ui); font-size:14px; font-weight:600; line-height:1;
+  letter-spacing:0; text-transform:none; white-space:nowrap; }
+.at-docktabs .at-tab2 > svg { flex:none; width:24px; height:24px; }
+.at-docktabs .at-tab2.on { color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 18%, transparent); }
+.at-dockitem:hover, .at-docktabs .at-tab2:not(.on):hover, .at-dockitem.open { background: var(--press); }
+.at-docklabel { display:block; }
+/* On a phone the pill runs the width of the window and the names come down
+   a size rather than wrap when a space has more items than fit. */
+@media (max-width: 599px) {
+  /* Across the window, the columns still equal, shrinking together. */
+  .at-dock { justify-content:stretch; }
+  .at-dockbar { flex:1 1 auto; grid-auto-columns: minmax(0, 1fr); }
+  .at-dockitem, .at-docktabs .at-tab2 { padding:0 4px; overflow:hidden;
+    font-size: clamp(11px, 3.4vw, 14px); }
+}
+/* ---- which space and which languages ----
+   At the top of the menu behind your initial, for somebody with a choice
+   of either. */
+.at-place { padding:10px 10px 4px; }
+.at-place .at-eyebrow { margin:0 0 12px; }
+/* What switching a language off does, said under its heading, before the
+   list it is about. */
+.at-place .at-hint { margin:-4px 0 12px; }
+/* The two parts are set apart by space rather than a rule. */
+.at-place .at-spacepick { margin-bottom:18px; }
+/* The spaces, side by side in the menu: a choice of one, the current one
+   lifted. */
+.at-spacepick { display:grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap:4px;
+  padding:4px; border-radius:14px; background: var(--well); border:1px solid var(--line); }
+.at-spacebtn { height:44px; border:1px solid transparent; border-radius:10px; cursor:pointer;
   background:none; color: var(--muted); display:inline-flex; align-items:center;
-  justify-content:center; }
-.at-spacebtn.on { background: var(--raised); color: var(--ink); }
-.at-cornerbtn { position:relative; width:40px; height:40px; border-radius:999px; cursor:pointer;
-  display:inline-flex; align-items:center; justify-content:center;
-  background: var(--nav-bg); border:2px solid var(--line); color: var(--text);
-  font-family: var(--ui); font-size:13px; font-weight:800; backdrop-filter:blur(12px);
-  box-shadow: var(--nav-shadow); }
+  justify-content:center; gap:7px; min-width:0; padding:0 13px;
+  font-family: var(--ui); font-size:13px; font-weight:800; }
+.at-spacebtn.on { background: var(--raised); color: var(--ink); border-color: var(--tab-stroke); }
 .at-cdot { width:9px; height:9px; border-radius:50%; background: var(--jade); flex-shrink:0; }
 .at-cdot.syncing { background: var(--brass); }
 .at-cdot.error, .at-cdot.off { background: var(--rose); }
-.at-cornerbtn .at-cdot { position:absolute; top:-2px; right:-2px; width:12px; height:12px;
-  border:2px solid var(--bg); }
+/* You, in the bar: your initial in a small round of its own, where the
+   sections have their icons, with the sync dot on its shoulder. */
+.at-cornerav { position:relative; width:26px; height:26px; border-radius:999px; flex:none;
+  display:inline-flex; align-items:center; justify-content:center;
+  background: var(--brass); color: var(--onbrass); font-size:13px; font-weight:800; }
+.at-cornerav .at-cdot { position:absolute; top:-3px; right:-4px; width:12px; height:12px;
+  border:2px solid var(--surface); }
 /* The menu grows to fit its rows, so it needs a ceiling: the version line
    underneath carries a build, a date and sometimes a whole sentence about
    a newer deploy, and without this the menu would widen past the screen
    and take its left-hand edge with it. */
-.at-cmenu { position:absolute; top:50px; right:0; min-width:250px;
-  max-width: calc(100vw - 24px); background: var(--surface);
+.at-cmenu { position:absolute; bottom: calc(100% + 14px); right:0; min-width:250px;
+  width: min(340px, calc(100vw - 24px));
+  max-width: calc(100vw - 24px);
+  max-height: calc(100vh - 120px - env(safe-area-inset-bottom));
+  max-height: calc(100dvh - 120px - env(safe-area-inset-bottom)); overflow-y:auto; background: var(--surface);
   border:2px solid var(--line); border-radius:18px; padding:8px;
   box-shadow:0 14px 40px rgba(0,0,0,.45); }
 .at-cwho { display:flex; align-items:center; gap:11px; padding:10px 10px 12px; }
@@ -1802,7 +1825,15 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 }
 .at-back { width:38px; height:38px; flex-shrink:0; border-radius:999px; cursor:pointer;
   background:none; border:2px solid var(--line); color: var(--text); font-size:22px; line-height:1; }
-.at-screenbody { flex:1; overflow-y:auto; padding:18px 16px 40px; }
+.at-screenbody { flex:1; overflow-y:auto; padding:18px 16px 40px;
+  /* Its scrolling ends at its own top and foot, rather than running on
+     into the page under it. */
+  overscroll-behavior: contain; }
+/* The page under a screen, a confirmation or a sheet, held still while one
+   is up — see usePageLock. Without it the page went on scrolling behind
+   the layer, and its scroll bar, as long as whatever list was under it,
+   was the one in view. */
+html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 .at-screeninner { max-width:640px; margin:0 auto; }
 .at-dangertoggle { display:flex; align-items:center; justify-content:space-between; width:100%;
   gap:12px; background:none; border:0; padding:0; cursor:pointer; color:inherit;
@@ -1822,7 +1853,11 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-modalbody strong { color: var(--text); }
 /* A space with no heading of its own: the selector in the corner is the
    title and the way out, so the body just has to clear it. */
-.at-screen.bare .at-screenbody { padding-top: calc(18px + 52px); }
+/* A space heads itself with the app's name, in the flow so it scrolls
+   away, and leaves room at the end for the bar at the foot of the window. */
+.at-screen.bare .at-screenbody { padding-top:12px;
+  padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+.at-screen.bare .at-brand { position:static; width:max-content; margin:0 0 14px -6px; }
 /* Present to the browser, invisible to the eye: password managers need a
    username field to attach an entry to. */
 .at-hiddenuser { position:absolute; width:1px; height:1px; padding:0; margin:-1px;
@@ -2324,6 +2359,22 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* Direct children only. A row can hold a Segmented, whose own buttons are
    .at-btn too — sizing those from the row's share would hand a three-way
    picker the type of a full-width button. */
+/* A button's words, boxed by Button and invisible to the layout
+   everywhere but in a row: see below. */
+.at-btnlabel { display:contents; }
+/* Except where one label is longer than the whole row is wide, even at the
+   smallest type — a card's own words on the Meanings block's buttons. Then
+   that button takes the row's whole width and its words take a second
+   line, centred, rather than the button running off the side of the
+   screen. `auto` is what lets the cap win: a flex item's automatic minimum
+   is its label's width, held to its max-width; `min-content` would beat
+   any cap. The label asks for its one-line width, so it is that wide
+   wherever there is room and only wraps where there is not. */
+.at-row > .at-btn, .at-screenfoot > .at-btn { min-width:auto; max-width:100%; }
+.at-row > .at-btn > .at-btnlabel, .at-screenfoot > .at-btn > .at-btnlabel {
+  display:inline-flex; flex-wrap:wrap; align-items:center; justify-content:center;
+  column-gap:inherit; row-gap:2px; width:max-content; max-width:100%;
+  white-space:normal; text-align:center; }
 .at-row > .at-btn { white-space: nowrap;
   font-size: clamp(10px, calc(var(--share) * 0.115), 16px);
   padding-inline: clamp(4px, calc(var(--share) * 0.055), 22px);
@@ -3225,7 +3276,7 @@ button.at-stat { transition: border-color 140ms ease; }
    the wordmark behind — with no way back to the learning space but a
    reload. A screen opened on top (--z-over) is still above them, and
    .at-screening hides them there anyway. */
-.at-brand, .at-corner, .at-mode, .at-chromebar { z-index: var(--z-chrome); }
+.at-brand, .at-mode, .at-dock { z-index: var(--z-chrome); }
 .at-modalback { z-index: var(--z-modal); }
 /* Everything the chrome hides while a screen is open, in one rule
    rather than one per overlay. */
@@ -3233,9 +3284,12 @@ button.at-stat { transition: border-color 140ms ease; }
    It used to be three rules in three places, so a fourth overlay was always
    going to be forgotten. */
 body.at-screening .at-brand,
-body.at-screening .at-corner,
 body.at-screening .at-mode,
-body.at-screening .at-chromebar { display:none; }
+body.at-screening .at-dock { display:none; }
+/* Ticking cards for a bulk change brings up a tray of its own across the
+   foot of the window, with the actions on what is ticked; the bar steps
+   aside for it until the ticking is done. */
+body:has(.at-bulkfloat) .at-dock { display:none; }
 /* ---- edge margins ------------------------------------------------
    at-hint, at-field and the paragraphs carry a margin so they space
    themselves in a run. At the start or end of a container that margin is
@@ -3756,6 +3810,9 @@ body.at-screening .at-chromebar { display:none; }
    more type and a shade more padding; the row stretches them to a shared
    height, so the pair still lines up. */
 .at-answerabout > .at-answerrec { font-size:13px; padding:6px 11px; }
+/* Read, the grammar is said in words where its button was. */
+.at-answergram { display:inline-flex; align-items:center; font-size:12px; font-weight:700;
+  letter-spacing:.04em; text-transform:uppercase; color: var(--muted); padding:4px 2px; }
 .at-answerdims { display:flex; flex-direction:column; gap:6px; margin-top:8px;
   padding:8px 12px; background: var(--well); border-radius: var(--r-sm);
   container-type: inline-size; }
@@ -4083,14 +4140,16 @@ body.at-screening .at-chromebar { display:none; }
 
 /* A card's status, beside Edit on its screen: the app's menu button (see
    .at-menubtn) and its menu (see .at-pickmenu), hung from the button's
-   left edge, since the button sits at the start of its line. Edged in
-   where the card stands. See StatusMenu. */
+   right edge, since the button sits at the end of the card's top line —
+   so the menu opens back across the screen. Edged in where the card
+   stands. See StatusMenu; Popover keeps it on the screen wherever the
+   button goes next. */
 .at-statusmenu { position:relative; display:inline-flex; }
 .at-statusbtn.published { border-color: var(--jade); }
 .at-statusbtn.published { color: var(--jade); }
 .at-statusbtn.draft, .at-statusbtn.review, .at-statusbtn.changed { color: var(--brass); }
 .at-statusbtn.draft, .at-statusbtn.review, .at-statusbtn.changed { border-color: var(--brass); }
-.at-statuspick { left:0; right:auto; top:calc(100% + 6px); }
+.at-statuspick { left:auto; right:0; top:calc(100% + 6px); }
 /* At the start of a line or a table row: the badge's words, smaller, and
    on two lines rather than one long one. */
 .at-statuspill { display:inline-block; max-width:112px; padding:2px 7px; border-radius:8px;
@@ -4146,10 +4205,44 @@ body.at-screening .at-chromebar { display:none; }
  * something look disabled — which is true, and says so.
  */
 fieldset.at-cardlock { border:0; padding:0; margin:0; min-inline-size:0; }
-fieldset.at-cardlock:disabled :is(input, textarea, select):disabled { color: var(--text);
-  -webkit-text-fill-color: var(--text); opacity:1; cursor:default; }
-fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] { cursor:default; }
-fieldset.at-cardlock:disabled .at-seg.on:disabled { opacity:1; }
+/* What can be typed into once Edit is pressed is a step quieter while it is
+   read — the box's rule and ground lighter, its words a shade softer — so
+   reading and editing look different at a glance, and the words are still
+   read without effort. An empty box keeps no example in it: an example in
+   a box nobody can type into reads as an answer. Mixed towards the sheet,
+   so the same rule holds in the dark. */
+fieldset.at-cardlock:disabled {
+  --lock-line: color-mix(in srgb, var(--line) 50%, var(--surface));
+  --lock-well: color-mix(in srgb, var(--well) 45%, var(--surface));
+}
+fieldset.at-cardlock:disabled :is(input, textarea, select):disabled,
+fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] {
+  color: var(--text-soft); -webkit-text-fill-color: var(--text-soft); opacity:1; cursor:default;
+  border-color: var(--lock-line); background: var(--lock-well); }
+fieldset.at-cardlock:disabled :is(input, textarea)::placeholder { color: transparent;
+  -webkit-text-fill-color: transparent; }
+/* A tick, a choice of a few and an unset subtype show what was chosen, so
+   they stay, in the same quieter dress. */
+fieldset.at-cardlock:disabled :is(.at-ck, .at-seg, .at-choosebtn, .at-shutrow, .at-tickrow) {
+  border-color: var(--lock-line); background: var(--lock-well); color: var(--text-soft);
+  opacity:1; cursor:default; }
+fieldset.at-cardlock:disabled .at-ck.on { background: var(--lock-well); }
+fieldset.at-cardlock:disabled .at-ckbox { border-color: var(--lock-line); }
+/* The chosen one of a few still reads as chosen: the sheet's own ground
+   lifted out of the quieter track, with its words at full strength. */
+fieldset.at-cardlock:disabled .at-seg.on { background: var(--jade-bg); color: var(--ink);
+  box-shadow: inset 0 0 0 1.5px var(--accent); }
+fieldset.at-cardlock:disabled .at-choosebtn > .at-ic:last-child { display:none; }
+fieldset.at-cardlock:disabled input[type="checkbox"]:disabled { opacity:.55; }
+/* Every other button in a card or deck being read changes it — adds a
+   form, an answer, a deck, a recording; checks an ID; opens the on-screen
+   keys — and is not there until Edit is pressed. What only reads or plays
+   (folding a form, playing a recording, opening the ones there are) is a
+   Pressable, not a button, and stays. See Button's `reads`. */
+fieldset.at-cardlock:disabled button:not(:is(.at-ck, .at-seg, .at-choosebtn, .at-groupfold)) {
+  display:none; }
+/* A pill whose way out has gone is as wide on the right as on the left. */
+fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:16px; }
 
 /* A Section on a screen laid out like the card editor is headed the way
    the editor heads its own sections: a band out to the gutters with a rule
@@ -4158,8 +4251,46 @@ fieldset.at-cardlock:disabled .at-seg.on:disabled { opacity:1; }
    editor's blocks, and read as the same family this way. */
 .at-screen.cardform .at-section { margin:0 -16px; padding:28px 16px 32px;
   border-top:1px solid var(--line); }
+/* And the first of them has nothing above it to be ruled off from, as the
+   editor's first block has none. */
+.at-screen.cardform .at-screeninner > .at-section:first-child { border-top:0; }
 .at-screen.cardform .at-section > .at-sectiontop > .at-eyebrow { font-size:25px;
   font-weight:800; letter-spacing:-.015em; line-height:1.15; text-transform:none;
   color: var(--ink); }
 .at-screen.cardform .at-section .at-sectionlede { margin:4px 0 0; }
 .at-screen.cardform .at-section .at-sectionbody { margin-top:18px; }
+
+/* Progress, laid out the same way: one plain sheet, each part a band out
+   to the gutters with a rule above it, its name at the editor's heading
+   size and what it is for straight under it. Only the screen's own parts —
+   the screens that open from it bring their own layout. The first part
+   has nothing above it to be ruled off from, as the editor's first block
+   has none. */
+.at:has(> .at-wrap > .at-ruled) { background: var(--surface); }
+.at-ruled > .at-section { margin:0 -16px; padding:28px 16px 32px;
+  border-top:1px solid var(--line); }
+.at-ruled > .at-section:first-child { border-top:0; padding-top:20px; }
+.at-ruled > .at-section > .at-sectiontop > .at-sectionhead { font-size:25px;
+  font-weight:800; letter-spacing:-.015em; line-height:1.15; color: var(--ink); }
+.at-ruled > .at-section > .at-sectionlede { margin:4px 0 0; }
+.at-ruled > .at-section > .at-sectionbody { margin-top:18px; }
+
+/* ---- the home screen ----
+   The app's name heads it, large and centred, as the page's title; the
+   other tabs carry their own name in the same place. The content under it
+   sits on the page itself rather than in a card: one centred column, its
+   parts set apart by space alone. */
+.at-brand.at-brand-home { left:0; right:0; margin:0 auto; width:max-content; height:64px;
+  padding:0 12px; gap:12px; font-size:32px; color: var(--text); }
+.at-brand.at-brand-home .at-brandmark { width:48px; height:48px; }
+.at.on-home { padding-top:104px; }
+/* Progress and Cards have no heading over them, so no room is kept for one. */
+.at.untitled { padding-top:18px; }
+.at-tabtitle { position:absolute; top:calc(12px + var(--banner-h, 0px)); left:0; right:0;
+  margin:0; height:40px; display:flex; align-items:center; justify-content:center;
+  font-family: var(--ui); font-size:22px; font-weight:800; color: var(--text); pointer-events:none; }
+.at-home { text-align:center; padding:8px 0; }
+.at-home > :first-child { margin-top:0; }
+.at-home + .at-home { margin-top:28px; padding-top:28px; border-top:1px solid var(--line); }
+.at-home .at-row { max-width:420px; margin-inline:auto; }
+.at.kb-open .at-home { padding:0; }
