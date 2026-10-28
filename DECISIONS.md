@@ -7144,3 +7144,28 @@ to keep out of it.
 so anything looking for a space's sections inside its frame — the smoke
 harness did — has to look in the bar as well.
 
+---
+
+## Read, a card or deck hides every button that would change it
+
+**28 October 2026** · `src/index.css` (`fieldset.at-cardlock:disabled`), `src/card-editor.tsx` (`Locked`)
+
+A card or deck being read is its edit screen inside a disabled fieldset, so
+every control was there and dimmed: a page of buttons that did nothing. The
+owner asked for the ones that change something to go until Edit is pressed.
+
+It is one CSS rule rather than a condition at each button: inside a
+disabled `.at-cardlock`, every native `<button>` is hidden except the few
+that show a value — a tick, a choice of a few, an unset subtype, a fold.
+That works because the app already draws everything that only reads or
+plays (playing a recording, folding a form, Export) as a `Pressable`, a
+span, which a fieldset cannot disable — see Button's `reads`. So a new
+button that changes a card is hidden while it is read without anyone
+remembering to hide it; the cost is that a new button that only *shows*
+something has to be a `Pressable` (or join the exceptions) to be seen.
+
+Where hiding would hide a fact, the component says it instead, reading
+`Locked`: an answer's grammar is written out, recordings and pictures that
+exist open on screens that only play and show, and an empty list says
+"None." `Locked` is provided round the recording screens too, which are
+drawn outside the fieldset.

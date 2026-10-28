@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.502 — 28 October 2026
+## 0.503 — 28 October 2026
 
 **The bar at the foot of the window, tidied.**
 
@@ -22,6 +22,43 @@ and moves once per batch of work you would notice, not once per commit.
   parts, the note on what switching a language off does sits right under
   the Languages heading, and the Learning, Teaching and Admin buttons are
   a little wider.
+
+## 0.502 — 28 October 2026
+
+**A card or deck being read shows only what it says; changing it waits for
+Edit. A deck's lock is a button by its cards.**
+
+- On a card or a deck that is only being read, the boxes you type in once
+  you press Edit have a lighter outline and ground, and their words are a
+  shade softer. An empty box no longer shows its grey example (such as "For
+  example: the plant"), which read like an answer.
+- Ticks and choices of a few ("Keeps its capital letters", the practice
+  ticks, who says a line) take the same lighter look; the one chosen still
+  stands out.
+- Every button that would change something is hidden until you press Edit:
+  "Another deck", "Another course" and "Add custom tags"; the × on a deck,
+  course or tag already added; duplicating a form, adding an accepted
+  answer, the subtype's pencil, checking a card's ID, "Add a form",
+  "Record", "Add image", "Add another meaning of …" and the like; and the
+  on-screen keyboard button. They are all back in edit mode.
+- The grammar of an answer is written out in words where its button was,
+  and an unset subtype says "Not set".
+- Recordings and pictures that are already on a card can still be opened,
+  listened to and looked at while it is read, without the buttons to record,
+  upload or remove. A line or form with none says "None.", and so do custom
+  tags.
+- A deck's Lock section is gone. In its place is a Lock (or Unlock) button,
+  with a padlock, on the right of the Cards heading. It is dimmed until you
+  press Edit; pressed then, it explains what locking or unlocking does, and
+  the change is made when you save the deck, like everything else there.
+- On a locked deck, New card is dimmed, and pressing it says "This deck is
+  locked, so no cards can be added. Unlock it to add one."
+
+To check by hand: on a phone, open a card of each kind and a deck and look
+for anything that changes it before pressing Edit, then press Edit and
+check it all comes back; lock a deck, save, and try New card; unlock it
+again.
+
 
 ## 0.501 — 28 October 2026
 
