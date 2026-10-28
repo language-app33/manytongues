@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.503 — 28 October 2026
+
+**Fewer buttons at the top of a card while editing it.**
+
+- The way out is a cross in the top left, Cancel, as on a deck being
+  edited. With changes not yet saved, it asks whether to discard them
+  first; without, it goes straight back to reading the card (a card not
+  made yet closes).
+- Save is the one save button: Save and exit is gone, and so is the
+  separate Cancel on the right, which the cross replaces.
+- The card's status is shown only while reading the card, not while
+  editing it.
+
+To check by hand: open a card, tap Edit, change something and tap the
+cross; try again with no changes; start a new card and tap the cross.
+
 ## 0.502 — 28 October 2026
 
 **A card or deck being read shows only what it says; changing it waits for

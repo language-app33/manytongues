@@ -10422,6 +10422,8 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   const changed = snapshot !== savedAs;
   /* Cancel with changes on the card: asked first. */
   const [discarding, setDiscarding] = useState(false);
+  const quit = () => (stored && onRelock ? onRelock() : onClose());
+  const leave = () => (changed ? setDiscarding(true) : quit());
   /* `exit` is Save and exit: the card is saved and the editor closes.
      Save alone keeps it open on the card as saved. */
   const save = (next: "meaning" | "word" | null = null, exit = false) => {
@@ -10529,14 +10531,19 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
            editor is the only screen laid out that way, so it is the only
            one that asks for it. */
         className="cardform"
-        onBack={onClose}
+        /* Being edited, the way out is Cancel, as on a deck — a cross
+           where the back arrow was, asking first when there is something
+           to lose. A stored card goes back to being read; a new one
+           closes. */
+        onBack={locked ? onClose : leave}
+        backIcon={locked ? "back" : "close"}
+        backLabel={locked ? "Back" : "Cancel"}
         /* Icons only, on the title's own line, which gives way to them —
            the title is cut short rather than wrapped. Locked: the status
            and Edit; Export is by the "This card" heading, with the other
-           facts about the card. Open: Delete, the status, Cancel, and two
-           saves — Save keeps the card open to go on with it, and Save and
-           exit closes it, the one a finished card wants, so it is the
-           primary. Each says what it does on hover and out loud. */
+           facts about the card. Open: Delete and Save, which keeps the
+           card open to go on with it — the status is for a card being
+           read. Each says what it does on hover and out loud. */
         action={
           locked ? (
             <>
@@ -10550,28 +10557,13 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             {stored && onDelete ? (
               <IconButton icon="delete" label="Delete this card" title="Delete this card" danger onClick={onDelete} />
             ) : null}
-            {stored && status ? status(changed) : null}
-            {stored && onRelock ? (
-              <Button variant="ghost" size="sm" className="iconly" aria-label="Cancel" title="Cancel"
-                onClick={() => (changed ? setDiscarding(true) : onRelock())}>
-                <Icon name="close" />
-              </Button>
-            ) : null}
-            <Button size="sm" className="iconly"
+            <Button variant="primary" size="sm" className="iconly"
               aria-label={busy ? "Saving…" : "Save"}
               title={busy ? "Saving…" : "Save"}
               disabled={!canSave || !changed || busy}
               onClick={() => save()}
             >
               <Icon name="save" />
-            </Button>
-            <Button variant="primary" size="sm" className="iconly"
-              aria-label="Save and exit"
-              title="Save and exit"
-              disabled={!canSave || !changed || busy}
-              onClick={() => save(null, true)}
-            >
-              <Icon name="check" />
             </Button>
           </>
           )
@@ -10704,12 +10696,12 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
       {discarding && (
         <ConfirmModal
           title="Discard your changes?"
-          body={<p>The card goes back to how it was last saved.</p>}
+          body={<p>{stored ? "The card goes back to how it was last saved." : "The card is not made."}</p>}
           confirmLabel="Discard changes"
           onCancel={() => setDiscarding(false)}
           onConfirm={() => {
             setDiscarding(false);
-            if (onRelock) onRelock();
+            quit();
           }}
         />
       )}

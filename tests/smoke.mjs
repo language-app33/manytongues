@@ -913,6 +913,20 @@ const clickNamed = (re) => {
 };
 /** @param {Element | null | undefined} el */
 const click = (el) => el && el.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }));
+/* Out of the screen on top, as its back button does. A card being edited
+   has a cross there instead, Cancel, which goes back to reading it — so
+   out of one takes Cancel (and Discard, if asked) and then Back. */
+const backOut = () => {
+  const backs = () => [...document.querySelectorAll("button.at-back")];
+  const top = backs().pop();
+  if (!top) return;
+  const screen = top.closest(".at-screen");
+  click(top);
+  if (top.getAttribute("aria-label") !== "Cancel") return;
+  click(buttonNamed(/^Discard changes$/));
+  const again = screen && screen.isConnected ? screen.querySelector("button.at-back") : null;
+  if (again && again.getAttribute("aria-label") === "Back") click(again);
+};
 /* A space frame's buttons, its sections first. The sections used to head
    the frame; they are in the bar at the foot of the window now, outside
    it, so they are gathered from there and put back where they were. */
@@ -3875,7 +3889,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     await sleep(350);
     click(must(buttonNamed(on ? /^Mark as high priority$/ : /High priority — tap to clear/), `the priority button on ${id}`));
     await sleep(300);
-    click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+    backOut();
     await sleep(350);
   }
 };
@@ -4289,7 +4303,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     !!buttonNamed(/High priority — tap to clear/),
     (document.body.textContent || "").slice(-120).replace(/\s+/g, " "));
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(350);
   const priTiles = [...document.querySelectorAll(".at-cardgrid .at-minipri")];
   check("the list says which card it was", priTiles.length === 1,
@@ -4339,7 +4353,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await sleep(350);
   click(must(buttonNamed(/High priority — tap to clear/), "the button that clears it"));
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(350);
   check("clearing the mark takes it off the card list",
     document.querySelectorAll(".at-cardgrid .at-minipri").length === 0,
@@ -4376,7 +4390,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("a student's card screen does not offer exercises to try",
     document.querySelectorAll(".at-try").length === 0,
     `${document.querySelectorAll(".at-try").length} on the learner's card`);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(250);
 
   /* Into the teaching space, which this person now teaches in: from the
@@ -4540,20 +4554,21 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     JSON.stringify(after.log) === JSON.stringify(before.log),
     `${JSON.stringify(after.log)} vs ${JSON.stringify(before.log)}`);
 
-  /* ---- Save, and Save and exit ----
-     Save keeps the card open to go on with it; Save and exit closes it.
-     Both save this card, under its own id. */
+  /* ---- Save, and Cancel ----
+     Save keeps the card open to go on with it; the cross in the top left
+     leaves editing, asking first only when something is unsaved. Every
+     save is this card, under its own id. */
   const cardId = (phraseTile && phraseTile.getAttribute("data-card")) || "";
   click(cardEdit());
   await sleep(400);
   const editorOpen = () => !!document.querySelector(".at-screen.cardform");
-  check("Edit opens the card editor, with Save and Save and exit on its title line",
-    editorOpen() && !!buttonNamed(/^Save$/) && !!buttonNamed(/^Save and exit$/) &&
-      !!(/** @type {Element} */ (buttonNamed(/^Save and exit$/))).closest(".at-screenhead"),
+  check("Edit opens the card editor, with Save alone on its title line",
+    editorOpen() && !!buttonNamed(/^Save$/) && !buttonNamed(/^Save and exit$/) && !buttonNamed(/^Status/) &&
+      !!(/** @type {Element} */ (buttonNamed(/^Save$/))).closest(".at-screenhead"),
     editorOpen() ? [...document.querySelectorAll(".at-screen.cardform .at-screenhead button")].map(spokenName).join(" | ") : "(no editor)");
   /* Nothing changed yet, so there is nothing to save. */
-  const saveOff = () => /** @type {any} */ (buttonNamed(/^Save$/))?.disabled && /** @type {any} */ (buttonNamed(/^Save and exit$/))?.disabled;
-  check("both saves are off until something changes", !!saveOff(),
+  const saveOff = () => /** @type {any} */ (buttonNamed(/^Save$/))?.disabled;
+  check("Save is off until something changes", !!saveOff(),
     `Save ${(/** @type {any} */ (buttonNamed(/^Save$/)) || {}).disabled ? "off" : "on"}`);
   /* A change anywhere in the card turns them on: a word added to the
      first box with something written in it. */
@@ -4580,13 +4595,26 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     `Save ${(/** @type {any} */ (buttonNamed(/^Save$/)) || {}).disabled ? "off" : "on"}`);
   if (noteBox) typeOn(noteBox, `${noteBox.value}y`);
   await sleep(150);
-  clickNamed(/^Save and exit$/);
+  clickNamed(/^Cancel$/);
+  await sleep(300);
+  const asked = /Discard your changes\?/.test(document.body.textContent || "");
+  check("with a change unsaved, the cross asks whether to discard it", asked, asked ? "asked" : "(not asked)");
+  clickNamed(/^Cancel$/);
+  await sleep(200);
+  clickNamed(/^Save$/);
   await sleep(500);
   const both = savedCards.slice(savesBefore);
-  check("and Save and exit saves the same card again and closes it",
-    both.length === 2 && !!both[0].id && both[0].id === both[1].id && !editorOpen() &&
+  check("and a second Save saves the same card again",
+    both.length === 2 && !!both[0].id && both[0].id === both[1].id &&
       (!cardId || both[0].id === cardId),
-    `${both.map((c) => c.id).join(", ")} · ${editorOpen() ? "open" : "closed"}`);
+    both.map((c) => c.id).join(", "));
+  clickNamed(/^Cancel$/);
+  await sleep(400);
+  check("and with nothing unsaved the cross goes straight back to reading the card",
+    !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save$/),
+    [...document.querySelectorAll(".at-screenhead button")].map(spokenName).join(" | "));
+  clickNamed(/^Back$/);
+  await sleep(400);
   takeSaves = false;
 }
 
@@ -4916,7 +4944,7 @@ const openPronounTables = async () => {
     !!parts[0] && parts[0].getAttribute("aria-pressed") === "true",
     parts.map((b) => `${b.textContent}=${b.getAttribute("aria-pressed")}`).join(" "));
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 
   /* ---- somewhere to put them that does not exist yet ----
@@ -5093,7 +5121,7 @@ const openPronounTables = async () => {
   const screenTitle = () =>
     ((document.querySelector(".at-screen.over .at-screenhead h2") || {}).textContent || "").trim();
   const leaveScreen = async () => {
-    click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+    backOut();
     await sleep(350);
   };
   const newCard = async () => {
@@ -7338,7 +7366,7 @@ const openPronounTables = async () => {
         ? `"${cellNamed("Arabic for past · he").value}"` : "no such cell");
   }
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -7549,9 +7577,9 @@ const openPronounTables = async () => {
   check("and calling it a word again leaves the word where it was",
     !!own && own.value === "كتاب", own ? `"${own.value}"` : "no field");
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -7610,9 +7638,9 @@ const openPronounTables = async () => {
       !/A verb is its table/.test(document.body.textContent || ""),
     (thisCardBlock().textContent || "").replace(/\s+/g, " ").slice(-120));
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -7643,9 +7671,9 @@ const openPronounTables = async () => {
     offered.map((t) => t.slice(0, 12)).join(" | "));
   click(/** @type {any} */ (document.querySelector(".at-kindsheet")).closest(".at-modalback"));
   await sleep(200);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -7784,7 +7812,7 @@ const openPronounTables = async () => {
   check("and, with no meaning written yet, its button says this meaning",
     [...document.querySelectorAll("button")].some((b) => (b.textContent || "").trim() === "Add another Arabic word for this meaning"),
     "(looked for the button)");
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
   takeSaves = false;
 }
@@ -7865,9 +7893,9 @@ const openPronounTables = async () => {
       !!recFor() && !recFor().disabled,
       recFor() ? (recFor().getAttribute("aria-label") || "") : "(no button)");
   }
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -8008,9 +8036,9 @@ const openPronounTables = async () => {
       me ? `"${me.value}"` : "(no such box)");
   }
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -8091,7 +8119,7 @@ const openPronounTables = async () => {
 
   click(buttonNamed(/^Continue$/));
   await sleep(700);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -8135,7 +8163,7 @@ const openPronounTables = async () => {
   await sleep(700);
   click(buttonNamed(/^Continue$/));
   await sleep(700);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -8189,7 +8217,7 @@ const openPronounTables = async () => {
   await sleep(700);
   click(buttonNamed(/^Continue$/));
   await sleep(700);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -8254,7 +8282,7 @@ const openPronounTables = async () => {
 
   click(document.querySelector('[data-el="leave-session"]'));
   await sleep(500);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
