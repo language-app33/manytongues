@@ -8,6 +8,21 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.502 — 28 October 2026
+
+**The bar at the foot of the window, tidied.**
+
+- Each section in the bar now has its icon above its name, with the name
+  near the bottom edge, on every screen size and in every space. The bar
+  is a little taller and a little narrower.
+- The space and language button and the button with your initial are two
+  separate round buttons now, each as tall as the bar, rather than sharing
+  a pill.
+- The space and language menu has more room inside it and between its
+  parts, the note on what switching a language off does sits right under
+  the Languages heading, and the Learning, Teaching and Admin buttons are
+  a little wider.
+
 ## 0.501 — 28 October 2026
 
 **The sections and the corner menu move to a bar at the foot of the window.**
