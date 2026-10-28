@@ -8,6 +8,14 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.507 — 28 October 2026
+
+**In context is hidden in Teaching for now.**
+
+- The bar in the teaching space no longer offers In context; it shows
+  Courses, Decks and Cards. It is set aside rather than removed, and will
+  come back.
+
 ## 0.506 — 28 October 2026
 
 **Space and languages move into the menu behind your initial.**

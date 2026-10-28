@@ -4993,6 +4993,10 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
  *   card they pressed the button on comes back as a prop and is read once,
  *   here, at the first render.
  */
+/* Whether Teaching offers its In context section. Off for now; turning it
+   back on is this line. */
+const SHOW_IN_CONTEXT = false;
+
 export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose }: {
   account: User;
   languages: Record<LangId, Lang>;
@@ -7931,7 +7935,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         ["courses", "Courses", "school"],
         ["decks", "Decks", "folder"],
         ["cards", "Cards", "cards"],
-        ["context", "In context", "search"],
+        /* In context is hidden for now, on the owner's word, and comes
+           back later; what it shows is still built when it is asked for. */
+        ...(SHOW_IN_CONTEXT ? [["context", "In context", "search"] as [string, string, string]] : []),
       ]}
       tab={tab}
       onTab={setTab}
