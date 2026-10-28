@@ -231,10 +231,10 @@ test("an edited verb reaches the sentences it stands in", () => {
 
 test("a card with no language of its own is read in the language on screen", async () => {
   /* Verbs saved before cards said which language they were in, and a
-     Huế card, which is what puts a Huế question on screen. */
+     Vietnamese card, which is what puts a Vietnamese question on screen. */
   const items = collection({ verbs: 8, frames: 12, nouns: 12, names: 4 })
     .concat([verb(90, null), verb(91, null), verb(92, null)])
-    .concat([{ id: "vi1", lang: "vi-Hue", kind: "word", tags: [], created: 1, forms: [{ id: "vi1", ar: "nhà", en: "house", lat: "nha", lang: "vi-Hue", s: {} }] }]);
+    .concat([{ id: "vi1", lang: "vi", kind: "word", tags: [], created: 1, forms: [{ id: "vi1", ar: "nhà", en: "house", lat: "nha", lang: "vi", s: {} }] }]);
   /* Three copies set up once each, so the only thing that differs between
      them is what they were asked and in which language. */
   const [before, after, arabic] = await Promise.all([copy("lang-before"), copy("lang-after"), copy("lang-arabic")]);
@@ -242,14 +242,14 @@ test("a card with no language of its own is read in the language on screen", asy
      again once the question on screen has moved it. */
   before.trainer.installIndexes(items, settings);
   filled(before, items);
-  before.langs.setActiveLang("vi-Hue");
+  before.langs.setActiveLang("vi");
   const remembered = filled(before, items);
   /* Asked only once the language had moved. */
   after.trainer.installIndexes(items, settings);
-  after.langs.setActiveLang("vi-Hue");
+  after.langs.setActiveLang("vi");
   const afresh = filled(after, items);
   /* Only worth asking if the language makes a difference here: the old
-     verbs stand in these blanks in Arabic and not in Huế. */
+     verbs stand in these blanks in Arabic and not in Vietnamese. */
   arabic.trainer.installIndexes(items, settings);
   assert.notDeepEqual(afresh, filled(arabic, items), "the old verbs read differently in the two languages");
   assert.deepEqual(remembered, afresh);

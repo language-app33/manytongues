@@ -23,7 +23,7 @@
  */
 
 const AR = "ar-PS";
-const VI = "vi-Hue";
+const VI = "vi";
 
 /* A hash is what a recording is keyed by. Anything of the right shape will
    do: nothing here plays one. */
@@ -255,7 +255,7 @@ const scene = {
  * retired axis too — `register`, which no pack declares any more and which
  * a card that has one keeps.
  *
- * In Huế, because that is the pack with a lexical axis of its own, and a
+ * In Vietnamese, because that is the pack with a lexical axis of its own, and a
  * value stored under one has to reach the screen as well.
  */
 const legacy = {
@@ -298,7 +298,7 @@ export const CORPUS = [
 export const DECKS = [
   { id: "deck-1", title: "Lesson 1" },
   { id: "deck-2", title: "Lesson 2" },
-  { id: "deck-3", title: "Huế basics" },
+  { id: "deck-3", title: "Vietnamese basics" },
 ];
 
 /** And the collection they sit in, which is what the teacher's screen has:

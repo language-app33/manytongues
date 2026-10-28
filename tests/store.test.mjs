@@ -189,3 +189,18 @@ test("has says whether a key is stored, without reading it", async () => {
   await store.delete("clip:something");
   assert.equal(await store.has("clip:something"), false);
 });
+
+test("a renamed language id is rewritten in every stored document, once", async () => {
+  const { renameStoredLangs } = await import("../server/rename-langs.js");
+  const store = getStore("t-rename");
+  await store.set("course:c1", JSON.stringify({ id: "c1", language: "vi-Hue" }));
+  await store.set("mysystems:o", JSON.stringify({ numbers: { "vi-Hue": "n1", "ar-PS": "n2" } }));
+  await store.set("course:c2", JSON.stringify({ id: "c2", language: "ar-PS" }));
+  assert.equal(await renameStoredLangs(dir), 2);
+  assert.deepEqual(JSON.parse(must(await store.get("course:c1"), "c1")), { id: "c1", language: "vi" });
+  assert.deepEqual(JSON.parse(must(await store.get("mysystems:o"), "o")), { numbers: { vi: "n1", "ar-PS": "n2" } });
+  assert.deepEqual(JSON.parse(must(await store.get("course:c2"), "c2")), { id: "c2", language: "ar-PS" });
+  /* The marker says it is done, so a restart reads nothing. */
+  await store.set("course:c3", JSON.stringify({ id: "c3", language: "vi-Hue" }));
+  assert.equal(await renameStoredLangs(dir), 0);
+});

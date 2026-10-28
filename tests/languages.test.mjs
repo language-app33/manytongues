@@ -296,9 +296,9 @@ test("a pair is a number a language may count", () => {
   for (const [given, means] of [["pl", "plural"], ["p", "plural"], ["pl.", "plural"], ["plurals", "plural"], ["d", "dual"], ["s", "singular"], ["sg", "singular"]]) {
     assert.equal(normDimValue(GRAMMAR.number, given), means, given);
   }
-  /* And it is offered only where somebody counts in pairs: Huế declares
+  /* And it is offered only where somebody counts in pairs: Vietnamese declares
      no number at all, so nobody there is asked a question about a dual. */
-  assert.ok(!LANGUAGES["vi-Hue"].grammar.includes("number"));
+  assert.ok(!LANGUAGES["vi"].grammar.includes("number"));
   const ar = LANGUAGES["ar-PS"];
   assert.equal(labelFor({ number: "dual", gender: "" }, ar), "du.");
   assert.equal(labelFor({ number: "dual", gender: "feminine" }, ar), "du. f.");
@@ -477,9 +477,9 @@ test("a card that says what kind of word it is, is a word in any language", () =
    * The teacher answers what kind of word each card is anyway, and that
    * answer is a fact rather than a guess, so it is read first.
    */
-  const vi = LANGUAGES["vi-HUE"];
+  const vi = LANGUAGES["vi"];
   const card = (/** @type {string} */ ar, /** @type {Record<string, any>} */ over = {}) =>
-    ({ id: "x", lang: "vi-HUE", forms: [{ id: "x", ar, en: "thanks", lat: "" }], ...over });
+    ({ id: "x", lang: "vi", forms: [{ id: "x", ar, en: "thanks", lat: "" }], ...over });
   assert.equal(kindOf(card("cảm ơn", { category: "noun" }), vi), "word");
   assert.equal(kindOf(card("chó", { category: "noun" }), vi), "word");
   /* And the same in Arabic, where a compound the teacher called a noun is
@@ -498,8 +498,8 @@ test("a card that says what kind of word it is, is a word in any language", () =
 test("and so it is offered to fill the blank that means any word", () => {
   /* Which is the whole point of the rule above: fillsOf is handed the
      kind, and a card that reads as a word answers to `{{word}}`. */
-  const vi = LANGUAGES["vi-HUE"];
-  const thanks = { id: "x", lang: "vi-HUE", category: "noun", forms: [{ id: "x", ar: "cảm ơn", en: "thanks", lat: "" }] };
+  const vi = LANGUAGES["vi"];
+  const thanks = { id: "x", lang: "vi", category: "noun", forms: [{ id: "x", ar: "cảm ơn", en: "thanks", lat: "" }] };
   assert.deepEqual(fillsOf(thanks, kindOf(thanks, vi)).sort(), ["is-noun", "noun", "noun-is", "word"]);
 });
 
@@ -558,7 +558,7 @@ test("a language that does not declare context gets none of this", () => {
 });
 
 test("Vietnamese matches whole words and keeps the tone", () => {
-  const VI = LANGUAGES["vi-Hue"];
+  const VI = LANGUAGES["vi"];
   assert.equal(findWordSlot("má tôi", "má", VI), 0);
   /* ma and má are two words; treating them as one would repeat the mistake
      the answer checker exists to avoid. */
@@ -742,7 +742,7 @@ test("every pack resolves a usable type scale", () => {
      single Arabic pixel. */
   assert.equal(scaleOf(LANGUAGES["ar-PS"]), 1);
   assert.equal(leadingOf(LANGUAGES["ar-PS"]), 1);
-  assert.ok(scaleOf(LANGUAGES["vi-Hue"]) < 1, "Latin script should ask for less than Arabic");
+  assert.ok(scaleOf(LANGUAGES["vi"]) < 1, "Latin script should ask for less than Arabic");
 });
 
 test("a pack that says nothing about size renders at full size", () => {
@@ -763,7 +763,7 @@ test("the properties are strings, which is what a style object needs", () => {
   /* React appends no unit to a custom property, so a number would work —
      but the values are read straight into calc() and a string keeps that
      explicit rather than dependent on that behaviour. */
-  const v = scriptVars(LANGUAGES["vi-Hue"]);
+  const v = scriptVars(LANGUAGES["vi"]);
   assert.deepEqual(v, { "--sscale": "0.78", "--sleading": "0.85", "--lscale": "0.78" });
 });
 
@@ -775,7 +775,7 @@ test("the Latin beside the script is the same size whatever is being taught", ()
   const ls = Object.keys(LANGUAGES).map((id) => scriptVars(LANGUAGES[id])["--lscale"]);
   assert.equal(new Set(ls).size, 1, `Latin was sized differently per course: ${ls.join(", ")}`);
   assert.equal(scriptVars({})["--lscale"], ls[0], "a pack that says nothing still sizes Latin");
-  assert.equal(scriptVars(LANGUAGES["vi-Hue"])["--sscale"], ls[0],
+  assert.equal(scriptVars(LANGUAGES["vi"])["--sscale"], ls[0],
     "Vietnamese is Latin, so its own factor and Latin's have to agree");
 });
 
@@ -854,7 +854,7 @@ test("a language says which script it is written in, and a Latin-script one says
   assert.equal(inScript("book", LANGUAGES["ar-PS"]), false);
   /* Vietnamese cannot be told apart from English by character range, so it
      declares no script and the importer falls back to column order. */
-  assert.equal(inScript("sách", LANGUAGES["vi-Hue"]), false);
+  assert.equal(inScript("sách", LANGUAGES["vi"]), false);
 });
 
 test("a key too short to mean anything is no key", () => {
@@ -965,10 +965,10 @@ test("the verb and the pronouns are still found by name, and the rest by the reg
   assert.ok(specOf(ar, "number"), "and the faces a numeral takes");
   assert.equal(specOf(ar, "no-such-table"), null);
   assert.equal(specOf(null, "verb"), null);
-  const vi = LANGUAGES["vi-Hue"];
+  const vi = LANGUAGES["vi"];
   assert.deepEqual(Object.keys(tablesOf(vi)), ["verb", "number"]);
   assert.equal(specOf(vi, "agreement"), null);
-  assert.deepEqual(must(specOf(vi, "number"), "Huế number").persons.map((p) => p.id),
+  assert.deepEqual(must(specOf(vi, "number"), "Vietnamese number").persons.map((p) => p.id),
     ["company"]);
   /* Hebrew agrees in number and gender at once, so its plural is two cells. */
   assert.deepEqual(must(specOf(LANGUAGES["he-IL"], "agreement"), "Hebrew agreement").persons.map((p) => p.id),
@@ -1015,13 +1015,13 @@ test("what a kind of word lays out, and what it is asked about, is the category'
      masculine and a feminine side. Still within the pack's list. */
   assert.deepEqual(dimsFor(LANGUAGES["he-IL"], "noun").map((d) => d.field), ["number", "gender", "human"]);
   assert.deepEqual(dimsFor(LANGUAGES["he-IL"], "person").map((d) => d.field), ["number", "gender"]);
-  assert.deepEqual(dimsFor(LANGUAGES["vi-Hue"], "adjective"), []);
-  /* Huế names the same table the other two do and declares none of it, so
+  assert.deepEqual(dimsFor(LANGUAGES["vi"], "adjective"), []);
+  /* Vietnamese names the same table the other two do and declares none of it, so
      an adjective there is the word and whatever forms a teacher writes.
      That is right and it used to be silent — the screen came out
      identical to "Something else" — so the editor says so now, on exactly
      this condition: a kind that names a table its language has not got. */
-  const vi = LANGUAGES["vi-Hue"];
+  const vi = LANGUAGES["vi"];
   const named = (/** @type {any} */ l, /** @type {string} */ id) =>
     (must(categoriesOf(l).find((c) => c.id === id), id).table) || "";
   assert.equal(named(vi, "adjective"), "agreement", "the kind names a table");
@@ -1042,7 +1042,7 @@ test("which kinds of word agree out of a table, and which do not", () => {
   assert.equal(agreementOf(ar, "verb"), null);
   assert.equal(agreementOf(ar, "name"), null);
   assert.equal(agreementOf(ar, ""), null);
-  assert.equal(agreementOf(LANGUAGES["vi-Hue"], "adjective"), null, "nothing agrees in Huế");
+  assert.equal(agreementOf(LANGUAGES["vi"], "adjective"), null, "nothing agrees in Vietnamese");
 });
 
 test("a demonstrative agrees the way an adjective does, and is a subtype of its own", () => {
@@ -1053,7 +1053,7 @@ test("a demonstrative agrees the way an adjective does, and is a subtype of its 
   assert.deepEqual(dimsFor(ar, "demonstrative"), [], "its number and gender are its table");
   assert.equal(agreementOf(ar, "demonstrative"), agreementOf(ar, "adjective"));
   assert.ok(agreementOf(LANGUAGES["he-IL"], "demonstrative"), "Hebrew's זה and זאת agree too");
-  assert.equal(agreementOf(LANGUAGES["vi-Hue"], "demonstrative"), null, "nothing agrees in Huế");
+  assert.equal(agreementOf(LANGUAGES["vi"], "demonstrative"), null, "nothing agrees in Vietnamese");
   /* Its forms wait for the sentence to pick one, like an adjective's,
      unless the blank was linked to nothing — see blankAdmits. */
   const admits = blankAdmits(ar, () => [], () => true);
@@ -1073,7 +1073,7 @@ test("and which kinds of word a sentence can ask for a tense of", () => {
   assert.equal(tensedOf(ar, "noun"), null, "and so does a table of pronouns");
   assert.equal(tensedOf(ar, "name"), null, "and a name lays nothing out at all");
   assert.equal(tensedOf(ar, ""), null);
-  assert.ok(tensedOf(LANGUAGES["vi-Hue"], "verb"), "Huế marks four, in one column");
+  assert.ok(tensedOf(LANGUAGES["vi"], "verb"), "Vietnamese marks four, in one column");
 });
 
 test("a narrowed blank takes the verbs of those tenses and everything else as before", () => {
@@ -1123,8 +1123,8 @@ test("the Arabic subjunctive stands in a blank only where the sentence ticks it"
   const card = { category: "verb", ar: "أكل", subs: [subj] };
   assert.equal(blankAdmits(ar, () => ["subjunctive"], () => true)(card, card.subs[0], "verb"), true);
   assert.equal(blankAdmits(ar, () => [], () => true)(card, card.subs[0], "verb"), false);
-  /* Huế and Hebrew are as they were. */
-  assert.ok(!must(tensedOf(LANGUAGES["vi-Hue"], "verb"), "Huế verbs").tenses.some((t) => t.onlyWhenTicked));
+  /* Vietnamese and Hebrew are as they were. */
+  assert.ok(!must(tensedOf(LANGUAGES["vi"], "verb"), "Vietnamese verbs").tenses.some((t) => t.onlyWhenTicked));
   assert.ok(!must(tensedOf(LANGUAGES["he-IL"], "verb"), "Hebrew verbs").tenses.some((t) => t.id === "subjunctive"));
 });
 
@@ -1191,8 +1191,8 @@ test("an adjective's shapes say which they are: gender, plural and dual", () => 
   assert.equal(labelFor({ id: "p", ar: "كتابي", en: "my book", row: "attached", col: "me" }, ar), "");
   /* And a form that carries its own grammar is named by it, as before. */
   assert.equal(labelFor({ number: "plural", gender: "feminine" }, ar), "pl. f.");
-  /* Huế has no such table and nothing to say. */
-  assert.equal(labelFor(cell("feminine"), LANGUAGES["vi-Hue"]), "");
+  /* Vietnamese has no such table and nothing to say. */
+  assert.equal(labelFor(cell("feminine"), LANGUAGES["vi"]), "");
 });
 
 test("an agreeing card stands in a blank as its own word, unless the blank is linked to nothing", () => {
@@ -1214,7 +1214,7 @@ test("an agreeing card stands in a blank as its own word, unless the blank is li
   const lendsBook = lendsForm(ar, { category: "noun" });
   assert.equal(lendsBook({ ar: "كتابي", row: "attached", col: "me" }), true, "the pronouns pick nothing, so they lend");
   assert.equal(lendsForm(ar, { category: "" })({ row: "agreement" }), true, "a card that says nothing lends everything");
-  assert.equal(lendsForm(LANGUAGES["vi-Hue"], { category: "adjective" })({ row: "agreement" }), true, "nothing agrees in Huế");
+  assert.equal(lendsForm(LANGUAGES["vi"], { category: "adjective" })({ row: "agreement" }), true, "nothing agrees in Vietnamese");
   assert.equal(lendsForm(null, { category: "adjective" })({}), true);
 });
 
@@ -1223,7 +1223,7 @@ test("Pronoun is retired where verbs change with the person, and offered where t
     (/** @type {any} */ (LANGUAGES)[id].categories || []).find((/** @type {any} */ c) => c.id === "pronoun");
   assert.equal(!!(pronounIn("ar-PS") || {}).retired, true, "Arabic writes them on the Pronouns screen");
   assert.equal(!!(pronounIn("he-IL") || {}).retired, true, "and so does Hebrew");
-  assert.equal(!!(pronounIn("vi-Hue") || {}).retired, false, "Huế's verbs have no columns to pick");
+  assert.equal(!!(pronounIn("vi") || {}).retired, false, "Vietnamese's verbs have no columns to pick");
 });
 
 test("a blank that agrees with another takes a verb once per tense, and everything else as before", () => {
@@ -1325,8 +1325,8 @@ test("an exercise names grammar one way on every kind of card", () => {
   assert.equal(askLabel(shape("feminine"), big, ar), "feminine");
   assert.equal(askLabel(big, big, ar), "masculine");
   assert.equal(askLabel(shape("masc-plural"), big, he), "masculine plural");
-  /* Huế declares no grammar, and says nothing. */
-  const vi = LANGUAGES["vi-Hue"];
+  /* Vietnamese declares no grammar, and says nothing. */
+  const vi = LANGUAGES["vi"];
   assert.equal(askLabel({ id: "c", ar: "chó", en: "dog" }, { id: "c", ar: "chó", en: "dog", subs: [] }, vi), "");
 });
 
@@ -1375,11 +1375,11 @@ test("each pack offers only the grammar its language has", () => {
   assert.equal(labelFor({ number: "plural", gender: "masculine" }, LANGUAGES["he-IL"]), "pl. m.");
 });
 
-test("Huế names who a form is said to, on phrases and never on a noun", () => {
+test("Vietnamese names who a form is said to, on phrases and never on a noun", () => {
   /* A greeting with a form for someone younger, a peer and an elder was
      three unlabelled forms, and a learner asked for one was not told
-     which. The axis is Huế's, in its own address terms. */
-  const vi = LANGUAGES["vi-Hue"];
+     which. The axis is Vietnamese's, in its own address terms. */
+  const vi = LANGUAGES["vi"];
   const said = must(dimsOf(vi).find((d) => d.field === "register"), "the addressee axis");
   assert.deepEqual(said.options.map(([, label]) => label),
     ["to someone younger (em)", "to a peer (anh / chị)", "to an elder (bác)"]);
@@ -1444,8 +1444,8 @@ test("the gap in a phrase is the word: what is glued to it stays on the screen",
   assert.equal(gluedTo("مش", "بوليس", ar), null);
 });
 
-test("Huế is described in its own terms, not in Arabic's", () => {
-  const vi = LANGUAGES["vi-Hue"];
+test("Vietnamese is described in its own terms, not in Arabic's", () => {
+  const vi = LANGUAGES["vi"];
   const ar = LANGUAGES["ar-PS"];
   /* The subtypes are the same kinds, filling the same blanks. */
   assert.deepEqual(categoriesOf(vi).map((c) => c.id), categoriesOf(ar).map((c) => c.id));
@@ -1464,7 +1464,7 @@ test("Huế is described in its own terms, not in Arabic's", () => {
 
 test("a classifier is asked of a noun, and of a word not yet said to be anything", async () => {
   const { asksLexical } = await import("../src/languages.ts");
-  const vi = LANGUAGES["vi-Hue"];
+  const vi = LANGUAGES["vi"];
   assert.equal(asksLexical(vi, { category: "noun" }), true);
   assert.equal(asksLexical(vi, { category: "" }), true, "most new cards, and may well be a noun");
   for (const kind of ["verb", "adjective", "person", "place", "pronoun", "other"]) {
@@ -1476,4 +1476,18 @@ test("a classifier is asked of a noun, and of a word not yet said to be anything
   assert.equal(asksLexical(vi, { category: "", sentence: true, value: "cái" }), true);
   /* And a language with no such box has none to show. */
   assert.equal(asksLexical(LANGUAGES["ar-PS"], { category: "noun" }), false);
+});
+
+test("Vietnamese is plain Vietnamese, with all six tones, and its old id is carried over", async () => {
+  const { renameLangIds } = await import("../src/lang-ids.ts");
+  const vi = LANGUAGES["vi"];
+  assert.equal(vi.name, "Vietnamese");
+  assert.equal(vi.nativeName, "tiếng Việt");
+  assert.equal(LANGUAGES["vi-Hue"], undefined);
+  const tone = must((vi.derived || []).find((a) => a.quizzable), "the tone");
+  assert.deepEqual(must(tone.classes, "classes").map((c) => c.id), ["ngang", "huyen", "sac", "hoi", "nga", "nang"]);
+  const doc = { items: [{ lang: "vi-Hue", forms: [{ lang: "vi-Hue", ar: "nhà" }] }], settings: { byLang: { "vi-Hue": 1 } } };
+  assert.deepEqual(renameLangIds(doc), { items: [{ lang: "vi", forms: [{ lang: "vi", ar: "nhà" }] }], settings: { byLang: { vi: 1 } } });
+  const already = { items: [{ lang: "vi" }] };
+  assert.equal(renameLangIds(already), already);
 });

@@ -56,7 +56,7 @@ memorised"*, `README.md:626-657`). Today:
   (a part's alternate forms) and `spell(value, ctx)`, the composer.
 - Three packs have one: `AR_NUMBERS` (`src/languages.ts:1555-1621`),
   `HE_NUMBERS` (`:1638-1710`) and `VI_NUMBERS` (`:1731-1858`). Arabic
-  and Hebrew ask for 55 parts each, Huế Vietnamese for 14.
+  and Hebrew ask for 55 parts each, Vietnamese for 14.
 - The lexicon is cards: a card is a part by carrying `value`
   (`src/types.ts:784`), and `partCards` (`src/numbers.ts:109-122`) finds
   them. A card written for a *whole* number is the override: it beats
@@ -73,7 +73,7 @@ memorised"*, `README.md:626-657`). Today:
   (`src/languages.ts:351-391`) — with a digits answer mode that is exact
   or wrong (`:3238-3257`) and accepts Arabic-Indic and Persian digits.
 - The golden cases for all three languages are already in
-  `tests/numbers.test.mjs` (Arabic at `:161-190`, Hebrew `:192-231`, Huế
+  `tests/numbers.test.mjs` (Arabic at `:161-190`, Hebrew `:192-231`, Vietnamese
   `:233-264`).
 
 **Adaptation.** Decision 1 (lexicon is data, composition is code) is not a
@@ -86,11 +86,11 @@ digits answer mode and the crediting rule as they stand, and moves them
 under `src/numbers/` when the old module is retired.
 
 **Consequence for the phases.** Phase 5 in the brief is *"Hebrew
-composer"*. Hebrew and Huế Vietnamese already compose numbers. If Phase 4
+composer"*. Hebrew and Vietnamese already compose numbers. If Phase 4
 removes both old entry points before Phase 5, two languages lose numbers
 for a release or more. So **Phase 1 ports the three existing `spell`
 rule-sets onto the new composer contract** — Arabic gains agreement in
-Phase 0, Hebrew and Huế are straight ports with identical output, proved
+Phase 0, Hebrew and Vietnamese are straight ports with identical output, proved
 by lifting their existing test cases into golden tables — and Phase 5
 becomes *Hebrew agreement and times*, after which the shared helpers are
 extracted, as the brief intends.
@@ -793,7 +793,7 @@ and typechecked and never run. Fixtures may live in `tests/golden/`.
   against and a `reviewedBy`/`reviewedOn` line. Loaded with
   `readFileSync` + `JSON.parse`, the one JSON-reading idiom already in
   the repo (`tests/version.test.mjs:12`). The existing Arabic, Hebrew and
-  Huế cases in `tests/numbers.test.mjs` are lifted into
+  Vietnamese cases in `tests/numbers.test.mjs` are lifted into
   `tests/golden/<lang>.numbers.json` so the Phase 1 ports are proved
   identical.
 - **Property tests**, hand-rolled seeded LCG loops as in
@@ -920,19 +920,19 @@ has signed the tables.
 
 **Goal.** A number system and a time system can be saved by a teacher,
 reach a student, be backed up and restored, and be read totally at every
-boundary. Hebrew and Huế are ported so nothing regresses later.
+boundary. Hebrew and Vietnamese are ported so nothing regresses later.
 
 **Create.**
 - `src/numbers/schema.ts` — `readNumberSystem`, `readTimeSystem`, hand-
   written total narrowers (§1.2); `emptyNumberSystem(languageId)`.
-- `src/numbers/he-IL.ts`, `src/numbers/vi-Hue.ts` — straight ports of
+- `src/numbers/he-IL.ts`, `src/numbers/vi.ts` — straight ports of
   `HE_NUMBERS` and `VI_NUMBERS` onto `Composer`, identical output.
 - `src/numbers/index.ts` — `composerFor(langId)` and `timeComposerFor`,
   the neutral names an app file may import.
-- `tests/golden/he-IL.numbers.json`, `tests/golden/vi-Hue.numbers.json`
+- `tests/golden/he-IL.numbers.json`, `tests/golden/vi.numbers.json`
   — lifted from `tests/numbers.test.mjs`.
 - `tests/numbers-schema.test.mjs`, `tests/numbers-he-IL.test.mjs`,
-  `tests/numbers-vi-Hue.test.mjs`.
+  `tests/numbers-vi.test.mjs`.
 
 **Touch.**
 - `src/types.ts` — `Lang.numbers` typed as the new `Composer`, `Lang.times`
@@ -982,7 +982,7 @@ component cards, or only on the editor's first open?).
 
 **Exit.** A system saved on one device is read on another; the server
 tests for save, refuse, bundle, version, backup, restore and clear are
-green; Hebrew and Huế golden tables identical to the old cases.
+green; Hebrew and Vietnamese golden tables identical to the old cases.
 
 ### Phase 2 — the teacher editor, with the migration seeding it (3–4 days)
 
@@ -1133,7 +1133,7 @@ numbers* button and `settings.numbersReach` (`src/ArabicTrainer.tsx:3590-
 **Touch.**
 - `src/languages.ts` — `number` category retired the way `register` is
   (definition kept, `retired: true`, not offered); `COUNTED_TABLE` and
-  Huế's `counted` removed from the packs' `tables` (a card carrying a
+  Vietnamese's `counted` removed from the packs' `tables` (a card carrying a
   `counted` cell keeps it as an ordinary sub-form).
 - `server/api/courses.js` — `value` joins `RETIRED_CARD_FIELDS`
   (`:160-168`); the migration is now also run on `my-material` for any
@@ -1181,7 +1181,7 @@ unchanged across the extraction.
 `tests/golden/he-IL.times.json`, `tests/times-he-IL.test.mjs`.
 
 **Touch.** `src/numbers/ar-PS.ts`, `src/numbers/he-IL.ts` (refactor onto
-the helpers), `src/numbers/vi-Hue.ts` (only if a helper fits; Huế's
+the helpers), `src/numbers/vi.ts` (only if a helper fits; Vietnamese's
 in-company forms are not agreement), `DECISIONS.md` (D6).
 
 **Risks.** Extracting a helper that fits Arabic and not Hebrew is the
@@ -1189,7 +1189,7 @@ in-company forms are not agreement), `DECISIONS.md` (D6).
 rule is that a helper is extracted only where both golden suites exercise
 it.
 
-**Open questions.** Q12 (Hebrew native speaker). Q13 (is a Huế time
+**Open questions.** Q12 (Hebrew native speaker). Q13 (is a Vietnamese time
 system wanted, and if so what does *quarter past* look like there —
 outside this plan).
 
@@ -1220,7 +1220,7 @@ would not change the work.
 | Q10 | The levels in §5.4? | Phase 3 | As tabled |
 | Q11 | Derived cards deleted one release after Phase 4? | Phase 4 | One release |
 | Q12 | Who verifies Hebrew? | Phase 5 | — |
-| Q13 | A Huế time system at all? | Out of plan | No |
+| Q13 | A Vietnamese time system at all? | Out of plan | No |
 
 ---
 
@@ -1390,8 +1390,8 @@ Proposed opening and entries:
   per-teacher rule stands until there is one.
 - **Ordinals, fractions, dates, currency.** Out of scope for v1 by
   decision; each is a composer of its own over the same lexicon.
-- **Hebrew and Huế time systems.** Hebrew after Phase 5's golden tables;
-  Huế if anyone teaches it.
+- **Hebrew and Vietnamese time systems.** Hebrew after Phase 5's golden tables;
+  Vietnamese if anyone teaches it.
 - **Stitched audio within a number.** Playing *forty* then *seven* as one
   clip. Declined for v1 because the joins are where a dialect's sandhi
   lives and a stitched clip teaches the wrong sound.

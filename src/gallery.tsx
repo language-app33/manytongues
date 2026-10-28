@@ -868,7 +868,7 @@ export function ComponentGallery() {
           <LanguageRadio
             languages={{
               "ar-PS": { id: "ar-PS", name: "Arabic" },
-              "vi-Hue": { id: "vi-Hue", name: "Vietnamese (Huế)" },
+              "vi": { id: "vi", name: "Vietnamese" },
               "he-IL": { id: "he-IL", name: "Hebrew (Modern)" },
             }}
             value={lang}

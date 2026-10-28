@@ -182,7 +182,7 @@ const ALLOWED_SCRIPT = {
 /** @type {Record<string, string[]>} */
 const ALLOWED_VIETNAMESE = {
   /* The gallery's specimen of the language switch names the language. */
-  gallery: ["Huế"],
+  gallery: [],
 };
 
 for (const file of APP_FILES) {

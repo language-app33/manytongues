@@ -383,12 +383,12 @@ test("a course card arrives saying which language it is in, on every form", () =
      rules. The card knows; the forms are what an exercise is about, so they
      have to know too. */
   const item = cardToItem(
-    { id: "k1", ar: "cà phê", en: "coffee", lang: "vi-Hue", subs: [{ ar: "cà phê sữa", en: "milk coffee" }] },
+    { id: "k1", ar: "cà phê", en: "coffee", lang: "vi", subs: [{ ar: "cà phê sữa", en: "milk coffee" }] },
     "Lesson 1", "c1", "d1", () => ({}),
   );
-  assert.equal(item.lang, "vi-Hue");
-  assert.equal(item.forms[0].lang, "vi-Hue", "its own word");
-  assert.equal(item.forms[1].lang, "vi-Hue", "and every other form of it");
+  assert.equal(item.lang, "vi");
+  assert.equal(item.forms[0].lang, "vi", "its own word");
+  assert.equal(item.forms[1].lang, "vi", "and every other form of it");
 });
 
 test("a conversation reaches the learner as a scene, with its turns drillable", () => {
@@ -555,7 +555,7 @@ test("and a word is asked what kind of word it is, in the language's own list", 
 
 test("what a word is decides which table it is offered", () => {
   const ar = LANGUAGES["ar-PS"];
-  const viet = LANGUAGES["vi-Hue"];
+  const viet = LANGUAGES["vi"];
   /* A verb has its persons and tenses; a noun and a preposition take the
      pronouns on their end. */
   assert.equal(tableFor(ar, "verb"), "verb");
@@ -576,7 +576,7 @@ test("what a word is decides which table it is offered", () => {
   assert.equal(tableFor(ar, "pronoun"), "");
   assert.equal(tableFor(ar, ""), "");
   assert.equal(tableFor(ar, "nonsense"), "");
-  /* Huế attaches nothing and nothing agrees, so a noun and an adjective
+  /* Vietnamese attaches nothing and nothing agrees, so a noun and an adjective
      there have no table — which is what a category naming a table its
      pack has not got means. Its verbs still have theirs. */
   assert.equal(tableFor(viet, "noun"), "");
@@ -1044,7 +1044,7 @@ test("and nothing is said where saying it would not help", () => {
   const two = form({ id: "a-f0", ar: "كتب", en: "books", tag: "sg. m." });
   /* Tags that read alike tell nothing apart. */
   assert.deepEqual(tagsFor([one, two]), {});
-  /* Nor does a language that declares no grammar — Huế has none, and a
+  /* Nor does a language that declares no grammar — Vietnamese has none, and a
      tile with an empty tag on it would be a mark with nothing to say. */
   assert.deepEqual(tagsFor([{ ...one, tag: "" }, { ...two, tag: "" }]), {});
   /* One of the pair named and the other not is worth saying: "book · pl."
@@ -1932,7 +1932,7 @@ test("a saved card is told what it lays out, and a new one is asked", () => {
   assert.equal(storedFormsOf(/** @type {any} */ ({ id: "c", subs: [cellOf("agreement", "plural")] }), arLang), "agreement");
   assert.equal(storedFormsOf(/** @type {any} */ ({ id: "c", subs: [{ ar: "a", en: "b" }] }), arLang), "");
   /* And a table this language does not lay out is no table here. */
-  assert.equal(storedFormsOf(/** @type {any} */ ({ id: "c", subs: [cellOf("agreement", "plural")] }), LANGUAGES["vi-Hue"]), "");
+  assert.equal(storedFormsOf(/** @type {any} */ ({ id: "c", subs: [cellOf("agreement", "plural")] }), LANGUAGES["vi"]), "");
 });
 
 test("another meaning of a saved adjective may be any subtype until it is saved", () => {
@@ -2820,7 +2820,7 @@ test("a noun is laid out in boxes, with two sides for a person or an animal", ()
   /* Not a preposition, though it takes the same endings, and not a noun
      in a language that marks no number on one. */
   assert.equal(nounLayoutOf(arPS(), "preposition", "thing"), "");
-  assert.equal(nounLayoutOf(LANGUAGES["vi-Hue"], "noun", "thing"), "");
+  assert.equal(nounLayoutOf(LANGUAGES["vi"], "noun", "thing"), "");
   assert.deepEqual(nounBoxes(arPS(), "single").map((/** @type {any} */ b) => b.title), [
     "Singular", "Dual", "Plural", "Special plural after 3–10 (days, months)",
   ]);

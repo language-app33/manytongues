@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { renameLangIds } from "./lang-ids.ts";
 import type {
   Course, DayMoves, Deck, Doc, ExerciseSpec, ExerciseState, FlagKind, FlagVerdict, Form, Item,
   Lang, LangId, Millis, Question, SavedSession, Settings, User,
@@ -6746,7 +6747,7 @@ function resolveUnit(items: Item[], ex: Question | null | undefined) {
  *
  * What "belongs with" means is the language's answer, not the app's: the
  * pack names one derived property as the one that groups words, and the
- * app gathers everything sharing a value for it. In Huế that is the
+ * app gathers everything sharing a value for it. In Vietnamese that is the
  * spelling without its tone, so the group is the words you might mishear
  * for this one. In Arabic it is the consonantal skeleton, so the group is
  * the family built on the same root — a different relation entirely, and
@@ -6755,7 +6756,7 @@ function resolveUnit(items: Item[], ex: Question | null | undefined) {
  *
  * Where the pack also names a property to be quizzed, a word sharing that
  * value too is not worth showing: it would be the same word to the ear,
- * which is the case Huế cares about. Where it names none — Arabic — every
+ * which is the case Vietnamese cares about. Where it names none — Arabic — every
  * other member of the family qualifies. That second clause is the whole
  * change: this returned nothing at all for Arabic before, because it asked
  * for a quizzable property that Arabic has no reason to declare.
@@ -7441,7 +7442,7 @@ const RETIRED_SETTINGS = new Set([
 export function merge(parsedIn: Record<string, any> | null | undefined) {
   /* A stored or imported document never carries an account: the sync
      secret belongs to this device's sign-in, not to the data. */
-  const { account: _dropped, ...parsed } = parsedIn || {};
+  const { account: _dropped, ...parsed } = renameLangIds(parsedIn || {});
   const incoming = parsed.settings || {};
   const settings = { ...EMPTY.settings };
   for (const [k, v] of Object.entries(incoming)) {
@@ -10194,7 +10195,7 @@ function loadMaterial(handle?: string | null): HeldMaterial | null {
   if (!handle) return null;
   try {
     const raw = localStorage.getItem(MATERIAL_KEY);
-    const held = raw ? JSON.parse(raw) : null;
+    const held = raw ? renameLangIds(JSON.parse(raw)) : null;
     /* Whose it is matters: signing in as somebody else must not show them
        the last person's courses. */
     if (!held || held.handle !== handle) return null;
@@ -14400,7 +14401,7 @@ export default function ArabicTrainer() {
                         learner reported looking for it there.
 
                         And nothing at all where the language declares no
-                        grammar to say it with: Huế has none. */}
+                        grammar to say it with: Vietnamese has none. */}
                     {tagsAt.question && (
                       <p className="at-asktag" data-el="question-form-tag">
                         {formLabelText}
@@ -18375,7 +18376,7 @@ export function twinsOf({ unit, kin, promptField, told }: {
  *
  * Nothing is said where saying it would not help. Forms whose tags read
  * alike are not told apart by them; a language that declares no grammar —
- * Huế — has nothing to say at all; and a form standing on its own is not
+ * Vietnamese — has nothing to say at all; and a form standing on its own is not
  * ambiguous with anybody.
  *
  * A backstop now rather than the rule. Tagging only those tiles told a
@@ -19952,7 +19953,7 @@ const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", ad
    of the menu was about reaching them in one tap. Shown only to people with
    somewhere to go — a student who only studies sees nothing. */
 /* The two letters a language is known by, off the front of its id, which
-   is where its ISO code is: ar-PS is AR, vi-Hue is VI. Enough to say which
+   is where its ISO code is: ar-PS is AR, vi is VI. Enough to say which
    one is on when only one is, in the room a button has. */
 const langTag = (id: LangId) => String(id || "").split("-")[0].toUpperCase();
 

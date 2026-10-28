@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.493 — 28 October 2026
+
+**Vietnamese is just Vietnamese, with no one accent built in.**
+
+- The language is called Vietnamese everywhere the app names it, and
+  tiếng Việt in its own words, instead of Huế Vietnamese and tiếng Huế.
+- Tone practice now has all six tones. Hỏi and ngã, which used to be
+  practised as one tone because they sound alike in Huế, are two again,
+  as they are in the spelling. Typing a word is unchanged.
+- The teaching note on tones no longer describes Huế speech. It says
+  accents differ, cards carry the standard spelling, and the teacher's
+  recordings teach whichever accent the teacher has chosen.
+- Cards, courses, settings and numbers already made in Vietnamese carry
+  over by themselves, on this device and on the server. Nothing needs
+  redoing, and progress is kept.
+- A phone or tab still running the previous release, until it refreshes,
+  will not recognise Vietnamese material saved since this update.
+
+To check by hand: open a Vietnamese course and look at its name and the
+tone choices in a listening exercise; on a device that already had
+Vietnamese cards, check they are all still there after the update.
+
 ## 0.492 — 27 October 2026
 
 **ManyTongues has a logo: the dialect map.**

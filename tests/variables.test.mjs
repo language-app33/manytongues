@@ -120,7 +120,7 @@ test("what can fill a hole is a card that says so, in the same language", () => 
     { ...value("v2", "Victor"), lang: "ar-PS" },
     /* A Vietnamese name in an Arabic frame is not a variation on the
        sentence, it is a different sentence. */
-    { ...value("v3", "Sarah"), lang: "vi-HUE" },
+    { ...value("v3", "Sarah"), lang: "vi" },
     /* An ordinary card fills nothing, whatever it says. */
     { id: "w1", ar: "bayt", en: "house", lang: "ar-PS" },
     /* And a value with no word in it would fill the hole with nothing. */
@@ -360,7 +360,7 @@ test("a frame with {{word}} in it is filled from the whole vocabulary", () => {
     /* Not a word, so not a filler. */
     { id: "p1", ar: "sukkir il-baab", en: "close the door", lat: "", lang: "ar-PS" },
     /* Another language's word is a different sentence, not a variation. */
-    { id: "v1", ar: "nhà", en: "house", lat: "", lang: "vi-Hue" },
+    { id: "v1", ar: "nhà", en: "house", lat: "", lang: "vi" },
   ];
   /** @param {any} c */
   const kind = (c) => (String(c.ar || "").includes(" ") ? "phrase" : "word");

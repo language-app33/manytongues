@@ -1,6 +1,6 @@
 // @ts-check
 /*
- * Hebrew and Huế Vietnamese, ported onto the new composer contract.
+ * Hebrew and Vietnamese, ported onto the new composer contract.
  *
  * These two languages already built their numbers, and they have been in
  * front of learners since 0.152. So the question here is not "is this
@@ -21,7 +21,7 @@ import { readFileSync } from "node:fs";
 
 import { must } from "./helpers.mjs";
 import { renderHe } from "../src/numbers/he-IL.ts";
-import { renderVi } from "../src/numbers/vi-Hue.ts";
+import { renderVi } from "../src/numbers/vi.ts";
 import { composerFor, composerLanguages, timeComposerFor } from "../src/numbers/index.ts";
 import { NUMBER_CEILING } from "../src/numbers/types.ts";
 
@@ -29,11 +29,11 @@ const load = (/** @type {string} */ name) =>
   JSON.parse(readFileSync(new URL(`./golden/${name}`, import.meta.url), "utf8"));
 
 const HE = load("he-IL.numbers.json");
-const VI = load("vi-Hue.numbers.json");
+const VI = load("vi.numbers.json");
 
 const CASES = {
   "he-IL": { golden: HE, render: renderHe },
-  "vi-Hue": { golden: VI, render: renderVi },
+  "vi": { golden: VI, render: renderVi },
 };
 
 /* ---- the tables ---- */
@@ -51,9 +51,9 @@ for (const [langId, { golden, render }] of Object.entries(CASES)) {
 
 /* ---- what each language asks for ---- */
 
-test("Huế asks for a third of the boxes the Semitic pair do, and they ask for fewer than they did", () => {
+test("Vietnamese asks for a third of the boxes the Semitic pair do, and they ask for fewer than they did", () => {
   const he = must(composerFor("he-IL"), "he").requiredSlots();
-  const vi = must(composerFor("vi-Hue"), "vi").requiredSlots();
+  const vi = must(composerFor("vi"), "vi").requiredSlots();
   const ar = must(composerFor("ar-PS"), "ar").requiredSlots();
   assert.ok(vi.length * 2 < ar.length, `${vi.length} against ${ar.length}`);
   /* The same boxes, but for Palestinian three to nine hundred, which are
@@ -66,7 +66,7 @@ test("Huế asks for a third of the boxes the Semitic pair do, and they ask for 
      takes seventeen rows off the screen a teacher has to fill in, and the
      thousands a dialect fuses are written out as corrections instead. */
   assert.ok(ar.length < 55, `${ar.length} boxes is more than the old screen asked for`);
-  /* And the reason: Huế is regular, so its scale words are bare and it has
+  /* And the reason: Vietnamese is regular, so its scale words are bare and it has
      no hundreds or thousands to write out one at a time. */
   assert.deepEqual(
     vi.filter((s) => s.group === "scales").map((s) => s.slot),
@@ -75,7 +75,7 @@ test("Huế asks for a third of the boxes the Semitic pair do, and they ask for 
 });
 
 test("a language with nothing to agree with asks no counting question", () => {
-  const vi = must(composerFor("vi-Hue"), "vi").ranges();
+  const vi = must(composerFor("vi"), "vi").ranges();
   assert.equal(vi.some((r) => r.counts || r.counted), false);
   for (const id of ["ar-PS", "he-IL"]) {
     const stretches = must(composerFor(id), id).ranges().filter((r) => r.kind === "numbers");
@@ -83,7 +83,7 @@ test("a language with nothing to agree with asks no counting question", () => {
   }
 });
 
-test("Huế puts a noun after the number and changes neither", () => {
+test("Vietnamese puts a noun after the number and changes neither", () => {
   const noun = { id: "book", sg: "sách", pl: "sách", gender: /** @type {const} */ ("m"), en: "book" };
   const got = renderVi(5, VI.system, { noun });
   assert.equal(got.nounForm, "sg");
@@ -106,7 +106,7 @@ test("Hebrew counts in the feminine and keeps the masculine for a word beside it
 /* ---- the registry ---- */
 
 test("the registry answers by language and says nothing about any of them", () => {
-  assert.deepEqual(composerLanguages().sort(), ["ar-PS", "he-IL", "vi-Hue"]);
+  assert.deepEqual(composerLanguages().sort(), ["ar-PS", "he-IL", "vi"]);
   for (const id of composerLanguages()) {
     const composer = must(composerFor(id), id);
     assert.equal(composer.id, id, "a composer knows which language it is");
@@ -117,11 +117,11 @@ test("the registry answers by language and says nothing about any of them", () =
   assert.equal(composerFor("xx-XX"), null);
   assert.equal(composerFor(null), null);
   /* Telling the time is a separate answer: a language may build numbers
-     and have nobody yet who knows its clock, which is where Huế still
+     and have nobody yet who knows its clock, which is where Vietnamese still
      stands. */
   assert.ok(timeComposerFor("ar-PS"));
   assert.ok(timeComposerFor("he-IL"));
-  assert.equal(timeComposerFor("vi-Hue"), null);
+  assert.equal(timeComposerFor("vi"), null);
 });
 
 test("every composer is total: nothing throws and nothing is said off the end", () => {

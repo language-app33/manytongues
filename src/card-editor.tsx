@@ -2073,7 +2073,7 @@ function VerbTable({ lang, spec, of = "", ofLabel = "", inline = false, cells, m
     );
   });
   /* A box for the pronunciation only where the language asks for one to be
-     written. Huế calls it a note and never drills it, so a column of them
+     written. Vietnamese calls it a note and never drills it, so a column of them
      across a whole table would be twenty-four boxes nothing reads — the
      note belongs on the verb itself, which still has its own field below. */
   const saysHow = lang.translitDrilled !== false;
@@ -3723,7 +3723,7 @@ export interface NounBox {
  * Whether a card is laid out in boxes, and which way.
  *
  * Only a noun, and only in a language whose nouns are asked their number:
- * Huế marks none, and its nouns stay the word and whatever forms a teacher
+ * Vietnamese marks none, and its nouns stay the word and whatever forms a teacher
  * writes. A person or an animal has two sides; anything else, one.
  */
 export function nounLayoutOf(
@@ -4400,7 +4400,7 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
      neither: what fills its blanks is other cards. */
   const worded = shape === "word";
   /* The axes this language uses, straight from its declaration. Arabic gets
-     number and gender; Huế gets the addressee and no gender at all. */
+     number and gender; Vietnamese gets the addressee and no gender at all. */
   const drillsTranslit = (lang || {}).translitDrilled !== false;
   const [forms, setForms] = useState(() => oneValuePerCard(lang, initialForms(card, draft)));
   /* The card's cells, whichever tables they sit in. Kept beside `forms`
@@ -4425,7 +4425,7 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
    *
    * A category names a table, and a pack declares the tables it has: an
    * adjective agrees in the two Semitic languages and nothing agrees in
-   * Huế, so an adjective there is the word and whatever forms a teacher
+   * Vietnamese, so an adjective there is the word and whatever forms a teacher
    * writes. That is right, and it was silent — the screen came out
    * identical to "Something else", which is indistinguishable from the
    * app having lost the table. Said out loud below.
@@ -4480,7 +4480,7 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
    * two the cell carries everything the card's own word does — the script,
    * the pronunciation, the English and the recordings — and a block asking
    * for them again was asking the teacher to type the same word twice and
-   * then keep the two in step by hand. It is not shown. Huế cites the bare
+   * then keep the two in step by hand. It is not shown. Vietnamese cites the bare
    * verb, which is a word and not a cell, so there the block is the verb
    * and stays.
    *
@@ -6635,7 +6635,7 @@ function NameBlock({ word, of }: { word: WordDraft; of: "verb" | "sentence" }) {
   const { shownSpec, name, setName, needsName } = word;
   const verb = of === "verb";
   /* A verb only where the table stands in for the card's own word. Where a
-     language cites nothing — Huế cites the bare verb — the card has a word
+     language cites nothing — Vietnamese cites the bare verb — the card has a word
      of its own and is named by it. A sentence always: every one of them is
      a frame, which is the whole of what a sentence is. */
   if (verb && (!shownSpec || !citationOf(shownSpec))) return null;
@@ -7557,7 +7557,7 @@ function FormsSection({ lang, folded = false, children }: { lang: Lang; folded?:
           about the section written out once per panel. */}
       <div className="at-formhead">
         <span className="at-formnum">Forms</span>
-        {/* In the language's own terms: a plural means nothing in Huế. */}
+        {/* In the language's own terms: a plural means nothing in Vietnamese. */}
         <span className="at-formrole">{lang.formsNote}</span>
       </div>
       <FoldsForms.Provider value={{ drawn, folded }}>{children}</FoldsForms.Provider>

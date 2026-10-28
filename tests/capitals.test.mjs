@@ -10,7 +10,7 @@ import { fillText, lentBy, SPEAKER_COLUMNS, valueOf } from "../src/variables.ts"
 import { aboutPersons, LANGUAGES, verbOf } from "../src/languages.ts";
 import { personsOf } from "../src/verbs.ts";
 
-const word = (/** @type {string} */ en, /** @type {Record<string, any>} */ more = {}) => ({ id: "w", lang: "vi-Hue", forms: [{ ar: "x", lat: "", en }], ...more });
+const word = (/** @type {string} */ en, /** @type {Record<string, any>} */ more = {}) => ({ id: "w", lang: "vi", forms: [{ ar: "x", lat: "", en }], ...more });
 
 test("the tick is offered on words, and not on names, verbs and the like", () => {
   for (const kind of ["noun", "adjective", "other", "pronoun", ""]) assert.ok(subtypeTakesCapitals(kind), kind);

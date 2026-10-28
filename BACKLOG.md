@@ -28,7 +28,7 @@ correcting the words fixes their own screen and nothing here has to change,
 which is the point of the lexicon being data — but the table should stop
 being a set of hypotheses at some point, and `reviewedBy` is where it stops.
 
-## Telling the time in Huế Vietnamese
+## Telling the time in Vietnamese
 
 Numbers, yes; a clock, not yet. Nobody has written down how the language
 does it, and the composer registry answers `null` for it, which the app
@@ -73,8 +73,8 @@ table, because changing it changes what an existing learner sees.
 The list of numbers under *What a student will be asked* is one list for
 all three languages, chosen by eye to cover the shapes any of them can get
 wrong. It is Arabic-shaped, and it shows: the unit that changes after two
-tens is a Huế rule, and it is in there because somebody remembered, not
-because Huế asked for it. A composer already declares which boxes it needs
+tens is a Vietnamese rule, and it is in there because somebody remembered, not
+because Vietnamese asked for it. A composer already declares which boxes it needs
 and which ranges it can build; which numbers are worth showing is the same
 kind of answer and belongs beside them.
 

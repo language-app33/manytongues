@@ -284,7 +284,7 @@ const toEat = {
    over Teaching's language switch runs — see teachesTwo. Served then and
    not before, so every other walk counts the cards it always counted. */
 const viTeach = {
-  id: "k8a8a8a8a8a8a", owner: "t-1", ar: "nhà", en: "house", lat: "nha", note: "", lang: "vi-Hue",
+  id: "k8a8a8a8a8a8a", owner: "t-1", ar: "nhà", en: "house", lat: "nha", note: "", lang: "vi",
   forms: [], updated: 1,
 };
 let teachesTwo = false;
@@ -692,8 +692,8 @@ remoteDocs.set(realToken, {
          Arabic walk into a Vietnamese question. What it changes is the
          count of cards and the list of languages, which is the whole of
          what it is here for. */
-      { id: "vicard1", ar: "nhà", en: "house", lat: "nha", kind: "word", tags: ["Huế"],
-        lang: "vi-Hue", created: 1, updated: 5, s: climbed() },
+      { id: "vicard1", ar: "nhà", en: "house", lat: "nha", kind: "word", tags: ["Vietnamese"],
+        lang: "vi", created: 1, updated: 5, s: climbed() },
     ],
   },
 });

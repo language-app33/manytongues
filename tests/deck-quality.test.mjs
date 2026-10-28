@@ -16,7 +16,7 @@ import { ALT_SEP } from "../src/answers.ts";
 import { must } from "./helpers.mjs";
 
 const ar = LANGUAGES["ar-PS"];
-const vi = LANGUAGES["vi-Hue"];
+const vi = LANGUAGES["vi"];
 const he = LANGUAGES["he-IL"];
 
 /** @param {any} q @param {string} key */
@@ -54,13 +54,13 @@ test("names, and cards there only to fill blanks, are not asked to be in sentenc
 /* ---- a deck worked out whole ---- */
 
 test("a small deck, scored by hand", () => {
-  const coffee = { id: "w1", lang: "vi-Hue", category: "noun",
+  const coffee = { id: "w1", lang: "vi", category: "noun",
     forms: [{ id: "w1", ar: "cà phê", en: "coffee", lat: "", clips: ["h1"], images: ["i1"] }] };
-  const drink = { id: "s1", lang: "vi-Hue", uses: ["w1"],
+  const drink = { id: "s1", lang: "vi", uses: ["w1"],
     forms: [{ id: "s1", ar: "tôi uống cà phê", en: "I drink coffee", lat: "", clips: ["h2"] }] };
   const known = [coffee, drink,
-    { id: "k1", lang: "vi-Hue", category: "pronoun", forms: [{ ar: "tôi", en: "I" }] },
-    { id: "k2", lang: "vi-Hue", category: "verb", forms: [{ ar: "uống", en: "to drink" }] }];
+    { id: "k1", lang: "vi", category: "pronoun", forms: [{ ar: "tôi", en: "I" }] },
+    { id: "k2", lang: "vi", category: "verb", forms: [{ ar: "uống", en: "to drink" }] }];
   const q = deckQuality([coffee, drink], { lang: vi, pool: known, known });
   /* The word is in one sentence of the two it wants: half of 55. The one
      sentence is linked and knows all its words: 10. Recordings, pictures,
@@ -403,13 +403,13 @@ test("a card is flawed, unrecorded or unspelt when any of its versions is", () =
 
 test("sentences with two flaws are a fix of their own, and neither single fix claims them", () => {
   const vw = (/** @type {string} */ id, /** @type {string} */ w, extra = {}) =>
-    ({ id, lang: "vi-Hue", category: "noun", forms: [{ id, ar: w, en: id, clips: ["c"], images: ["i"], ...extra }] });
+    ({ id, lang: "vi", category: "noun", forms: [{ id, ar: w, en: id, clips: ["c"], images: ["i"], ...extra }] });
   const coffee = vw("w1", "cà phê");
   const vs = (/** @type {string} */ id, /** @type {string} */ w, /** @type {string[]} */ uses) =>
-    ({ id, lang: "vi-Hue", uses, forms: [{ id, ar: w, en: id, clips: ["c"] }] });
+    ({ id, lang: "vi", uses, forms: [{ id, ar: w, en: id, clips: ["c"] }] });
   const good = [vs("s1", "tôi uống cà phê", ["w1"]), vs("s2", "tôi thích cà phê", ["w1"])];
   const bad = [vs("b1", "tôi ăn phở", []), vs("b2", "tôi ăn cơm", [])];
-  const scene = { id: "sc", lang: "vi-Hue", speakers: ["A", "B"],
+  const scene = { id: "sc", lang: "vi", speakers: ["A", "B"],
     lines: [{ ar: "tôi uống cà phê", en: "I drink coffee", who: 0, uses: ["w1"], clips: ["c"] }] };
   const taught = [vw("k1", "tôi"), vw("k2", "uống"), vw("k3", "thích")];
   const deck = [coffee, ...good, ...bad, scene];

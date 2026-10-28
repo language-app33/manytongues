@@ -2,7 +2,7 @@
  * A verb's forms, as a table over the card's own sub-forms.
  *
  * A verb is not one thing to know. "To eat" in Palestinian Arabic is a
- * dozen words depending on who is eating and when; in Huế it is one word
+ * dozen words depending on who is eating and when; in Vietnamese it is one word
  * with a marker in front. What a learner needs is not the dictionary form
  * but the one that fits the sentence they are about to say.
  *
@@ -23,7 +23,7 @@
  * calls for, and which rows are open yet.
  *
  * Which rows and columns exist is the language's answer, never this
- * module's. Arabic declares nine persons and three tenses; Huế declares
+ * module's. Arabic declares nine persons and three tenses; Vietnamese declares
  * one person and four; a language that declares none has no verb tables
  * and every function here comes back empty. Nothing below knows what a
  * tense is — only that a table has two axes, that the rows are in the
@@ -394,7 +394,7 @@ export function foldJoined<T extends Record<string, any>>(
  * Arabic has no infinitive: *to eat* is listed under the he-past, which is
  * a cell of this very table. Where a language says so, the card's own word
  * and that cell are the same word, and only one of them is a thing to
- * learn. Where it says nothing — Huế cites the bare verb, which is a word
+ * learn. Where it says nothing — Vietnamese cites the bare verb, which is a word
  * and not a cell — there is nothing to reconcile.
  */
 export function citationOf(spec: VerbSpec | null | undefined): { row: string; col: string } | null {
@@ -883,7 +883,7 @@ export function slotRows(form: unknown, slot: string): string[] {
  * tense at all, and dropping it would answer a question nobody asked.
  *
  * A word that *is* laid out in tenses stands in a narrowed blank through
- * its table and nowhere else. Its own word is not one of the rows — Huế
+ * its table and nowhere else. Its own word is not one of the rows — Vietnamese
  * cites the bare verb, and Arabic cites a cell the table already lends — so
  * a blank asking for the past is filled with the past forms, and not with
  * everything that merely belongs to a verb.

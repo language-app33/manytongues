@@ -1,10 +1,10 @@
 {
-  "language": "vi-Hue",
+  "language": "vi",
   "composerVersion": 1,
   "reviewedBy": "the implementation this replaces",
   "reviewedOn": "2026-09-22",
   "note": [
-    "The table the Huế Vietnamese number composer is held to.",
+    "The table the Vietnamese number composer is held to.",
     "",
     "Generated from the implementation that has been shipping since 0.152,",
     "so every row is what a learner of this language has actually been",
@@ -19,7 +19,7 @@
   "system": {
     "id": "golden-vi",
     "owner": "golden",
-    "languageId": "vi-Hue",
+    "languageId": "vi",
     "composerVersion": 1,
     "audioPolicy": "components",
     "rev": 1,

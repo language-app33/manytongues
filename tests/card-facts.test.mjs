@@ -237,7 +237,7 @@ test("a language's pronouns are one entry, where the first of them stood, in the
   const door = { id: "w2", lang: "ar-PS", forms: [{ ar: "باب", en: "door", lat: "" }] };
   const hiya = pronoun("p-she", "she", "هي", "she");
   const ana = pronoun("p-i", "i", "أنا", "I");
-  const toi = pronoun("v-i", "i", "tôi", "I", "vi-Hue");
+  const toi = pronoun("v-i", "i", "tôi", "I", "vi");
   const listed = groupPronouns([book, hiya, door, ana, toi]);
   assert.equal(listed.length, 4, "two words, and one entry per language");
   assert.equal(listed[0], book);
@@ -248,7 +248,7 @@ test("a language's pronouns are one entry, where the first of them stood, in the
   assert.equal(ar.forms[0].ar, "أنا \u00b7 هي");
   assert.equal(ar.name, "Pronouns");
   assert.equal(listed[2], door);
-  assert.ok(isPronounGroup(listed[3]) && listed[3].lang === "vi-Hue");
+  assert.ok(isPronounGroup(listed[3]) && listed[3].lang === "vi");
   /* A deck's list names its entry after the deck, so the two never share one. */
   assert.equal(/** @type {any} */ (groupPronouns([ana], "deck-1")[0]).id, "pronouns:ar-PS@deck-1");
 });
@@ -351,14 +351,14 @@ test("a card's page leaves out the grammar its language never asks, where nobody
   const { LANGUAGES } = await import("../src/languages.ts");
   const fields = (/** @type {any} */ form, /** @type {any} */ lang) => dimsSaid(form, lang).map((d) => d.field);
   /* What every form is saved with, whatever its language: a number of
-     N/A and a thing. Huế asks neither, and its cards' pages said both. */
+     N/A and a thing. Vietnamese asks neither, and its cards' pages said both. */
   const saved = { ar: "sách", en: "book", number: "na", gender: "", human: "thing", register: "", classifier: "" };
-  assert.deepEqual(fields(saved, LANGUAGES["vi-Hue"]), []);
+  assert.deepEqual(fields(saved, LANGUAGES["vi"]), []);
   /* Arabic asks both, so there they are what the card says. */
   assert.deepEqual(fields(saved, LANGUAGES["ar-PS"]), ["number", "human"]);
   /* A value somebody chose is shown whatever the language, and so is an
      axis the language does use. */
-  assert.deepEqual(fields({ ...saved, number: "plural", register: "elder" }, LANGUAGES["vi-Hue"]), ["number", "register"]);
+  assert.deepEqual(fields({ ...saved, number: "plural", register: "elder" }, LANGUAGES["vi"]), ["number", "register"]);
   /* And without a language, everything held, as before. */
   assert.deepEqual(fields(saved, undefined), ["number", "human"]);
 });
