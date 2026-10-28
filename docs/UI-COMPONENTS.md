@@ -44,7 +44,8 @@ form rather than putting buttons in the flow.
 
 ### `SpaceFrame` — 2 uses
 The Teaching and Admin shells. Full-bleed screen, pending dialog, error line,
-busy line, tab strip, contents.
+busy line, the app's name, contents; its tab strip goes to the bar at the
+foot of the window (`Tabs` with `dock`).
 
 `tabs, tab, onTab, error, busy, label="Section", dialog, children`
 
@@ -268,10 +269,12 @@ scroll bar is the one in view.
 `className, children`, plus anything a `<div>` takes.
 
 Every menu that hangs off a button is one: the filter menus, a card's
-status, the corner menu, the space selector, a blank's values. Its class
+status, the corner menu, the space and language menu, a blank's values. Its class
 still says where it hangs and how it looks; `Popover` measures it once it
 is drawn and moves it back inside the window if it crosses either side,
-and cuts it to the room below it, scrolling, if it runs off the foot. A
+and cuts it to the room below it, scrolling, if it runs off the foot — or
+to the room above, for one that opens upward off the bar at the foot of
+the window. A
 new drop-down is a `Popover` — never a bare `<div>` with `position:
 absolute`, which is how the status menu came to open off the screen.
 

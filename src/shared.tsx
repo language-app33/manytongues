@@ -5,7 +5,7 @@
  * being parsed by every student on every launch.
  */
 
-import React, { useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
 import type { Card, Course, Deck, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
 import { formsOf, leadOf, wordOf } from "./cards.ts";
 import { createPortal } from "react-dom";
@@ -869,9 +869,18 @@ export function Segmented<T extends string | number | boolean | null>({
    The trainer, the teaching space and the admin space each had their
    own copy of this, and only one of them said which tab was current. */
 /**
+ * The main half of the bar that floats at the foot of the window, for a
+ * space's own sections to be shown in. The app owns the bar, because the
+ * other half — languages and spaces, and the corner menu — is the app's;
+ * the sections are each space's, so a space hands its tab strip over
+ * rather than the app knowing what the spaces are divided into.
+ */
+export const DockContext = createContext<HTMLElement | null>(null);
+
+/**
  * @param props  Each tab is [key, label, iconName].
  */
-export function Tabs({ tabs, value, onChange, label = "Section", dots = [] }: {
+export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock = false }: {
   tabs: [string, string, string?][];
   value?: string;
   onChange: (key: string) => void;
@@ -879,9 +888,14 @@ export function Tabs({ tabs, value, onChange, label = "Section", dots = [] }: {
   /** Tabs with something on them worth looking at — the card screen's
       unsaved changes, say — marked with a dot and said out loud. */
   dots?: string[];
+  /** A space's own sections, shown in the bar at the foot of the window
+      rather than at the top of the page. Where there is no bar — the
+      component gallery — they stay where they are. */
+  dock?: boolean;
 }) {
-  return (
-    <div className="at-nav2" role="tablist" aria-label={label}>
+  const slot = useContext(DockContext);
+  const strip = (
+    <div className={dock && slot ? "at-docktabs" : "at-nav2"} role="tablist" aria-label={label}>
       {tabs.map(([k, text, icon]) => (
         <button
           key={k}
@@ -899,6 +913,7 @@ export function Tabs({ tabs, value, onChange, label = "Section", dots = [] }: {
       ))}
     </div>
   );
+  return dock && slot ? createPortal(strip, slot) : strip;
 }
 
 /* --- Stat ---------------------------------------------------------
@@ -993,8 +1008,15 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
       {dialog}
       <div className="at-screenbody" ref={bodyRef}>
         <div className="at-screeninner">
+          {/* The app's name heads the space and scrolls away with it, as it
+              does in Learning. The space's sections are in the bar at the
+              foot of the window. */}
+          <div className="at-brand">
+            <img className="at-brandmark" src="/logo.svg" alt="" width={24} height={24} />
+            ManyTongues
+          </div>
           <Notice kind="error">{error}</Notice>
-          <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} />
+          <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} dock />
           {children}
         </div>
       </div>
@@ -3580,6 +3602,12 @@ export function Popover({ className = "", children, ...rest }: {
       if (dx) el.style.translate = `${Math.round(dx)}px 0`;
       if (r.bottom > tall - POPOVER_GUTTER) {
         el.style.maxHeight = `${Math.max(120, Math.floor(tall - POPOVER_GUTTER - r.top))}px`;
+        el.style.overflowY = "auto";
+      }
+      /* A menu that opens upward, off the bar at the foot of the window,
+         runs out of room at the top instead. */
+      if (r.top < POPOVER_GUTTER) {
+        el.style.maxHeight = `${Math.max(120, Math.floor(r.bottom - POPOVER_GUTTER))}px`;
         el.style.overflowY = "auto";
       }
     };

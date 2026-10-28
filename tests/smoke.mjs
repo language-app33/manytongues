@@ -913,6 +913,12 @@ const clickNamed = (re) => {
 };
 /** @param {Element | null | undefined} el */
 const click = (el) => el && el.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }));
+/* A space frame's buttons, its sections first. The sections used to head
+   the frame; they are in the bar at the foot of the window now, outside
+   it, so they are gathered from there and put back where they were. */
+/** @param {Element} frame */
+const frameButtons = (frame) =>
+  [...document.querySelectorAll(".at-dock [role=tab]"), ...frame.querySelectorAll("button")];
 /* The practice ticks are one list on the card's Exercises tab since
    0.482, a line per form and per table. Every tab stays drawn while
    another is shown, so a check reads them without going there; this
@@ -2642,8 +2648,11 @@ if (/Build a session/.test(document.body.textContent)) {
     return b ? String(b.getAttribute("aria-label")) : "nothing in the chrome bar";
   };
   check("somebody learning two languages gets a switch for them", !!swBtn(), swSaid());
+  /* This person teaches as well, so the one button is both the space and
+     the languages and wears a globe; what it says about the languages is
+     in the label a screen reader and a tooltip get. */
   check("and it says every language is on, without naming any of them",
-    ((swBtn() || {}).textContent || "").trim() === "All", ((swBtn() || {}).textContent || "").trim());
+    /Languages — all 2\b/.test(swSaid()), swSaid());
 
   click(swBtn());
   await sleep(200);
@@ -2661,7 +2670,7 @@ if (/Build a session/.test(document.body.textContent)) {
   click(viRow);
   await sleep(300);
   check("switching one off says which one is left, on the button itself",
-    ((swBtn() || {}).textContent || "").trim() === "AR", ((swBtn() || {}).textContent || "").trim());
+    /Languages — Palestinian Arabic only/.test(swSaid()), swSaid());
   check("and its cards go from the rest of Learning", cardCount() === both - 1,
     `${both} with both, ${cardCount()} with one`);
 
@@ -2681,8 +2690,8 @@ if (/Build a session/.test(document.body.textContent)) {
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);
   check("switching it back on brings its cards back",
-    cardCount() === both && ((swBtn() || {}).textContent || "").trim() === "All",
-    `${cardCount()} cards, button says ${((swBtn() || {}).textContent || "").trim()}`);
+    cardCount() === both && /Languages — all 2\b/.test(swSaid()),
+    `${cardCount()} cards, button says ${swSaid()}`);
   /* Anywhere outside it puts it away. */
   click(document.querySelector(".at-brand"));
   await sleep(200);
@@ -4370,11 +4379,14 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
   await sleep(250);
 
-  /* Into the teaching space, which this person now teaches in. */
+  /* Into the teaching space, which this person now teaches in: from the
+     space and language menu in the bar at the foot of the window. */
+  click(document.querySelector(".at-dock .at-langbtn"));
+  await sleep(200);
   const toTeaching = [...document.querySelectorAll(".at-spacebtn")]
-    .find((b) => /Teaching/i.test(b.getAttribute("aria-label") || ""));
+    .find((b) => /Teaching/i.test(b.textContent || ""));
   check("a teacher can reach the teaching space", !!toTeaching,
-    [...document.querySelectorAll(".at-spacebtn")].map((b) => b.getAttribute("aria-label")).join(","));
+    [...document.querySelectorAll(".at-spacebtn")].map((b) => b.textContent).join(",") || "no space menu");
   click(toTeaching);
   await sleep(700);
 
@@ -4385,9 +4397,9 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      learner's own nav and card list are still in the document behind it,
      so everything below is looked for inside the frame. */
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   check("the teaching space has a Cards tab of its own", teachTabs.length > 0,
-    [...frame.querySelectorAll('[role="tab"], .at-tab')].map((b) => b.textContent).join("|"));
+    [...document.querySelectorAll('.at-dock [role="tab"]')].map((b) => b.textContent).join("|"));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const teachTiles = [...frame.querySelectorAll(".at-minicard")];
@@ -4589,7 +4601,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
    exercise rather than whichever one a shuffled queue reaches. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -4665,7 +4677,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
    out has no mark on their side at all. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const bookTile = [...frame.querySelectorAll(".at-minicard")]
@@ -4835,7 +4847,7 @@ const openPronounTables = async () => {
    teacher commit to one before the second line is written. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -5006,7 +5018,7 @@ const openPronounTables = async () => {
      session builder had been drilling those same words inside those same
      turns all along. */
   const inFrame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const ctxTab = [...inFrame.querySelectorAll("button")].find((b) => /^In context$/.test(b.textContent || ""));
+  const ctxTab = frameButtons(inFrame).find((b) => /^In context$/.test(b.textContent || ""));
   click(ctxTab);
   await sleep(500);
 
@@ -5034,7 +5046,7 @@ const openPronounTables = async () => {
      made it read as a separate sort of thing to make — and meant this tab,
      with only the one New button, could not make one at all. The kind is
      the first field in the editor now. */
-  const toCards = [...inFrame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const toCards = frameButtons(inFrame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(toCards[toCards.length - 1]);
   await sleep(450);
   check("there is no second button for making a conversation",
@@ -7338,7 +7350,7 @@ const openPronounTables = async () => {
    has turns, and there would be nowhere to put them. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -7645,7 +7657,7 @@ const openPronounTables = async () => {
 {
   takeSaves = true;
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const btn = /** @type {any} */ ([...frame.querySelectorAll("button")]
+  const btn = /** @type {any} */ (frameButtons(frame)
     .find((b) => b.getAttribute("aria-label") === "Pronouns") || null);
   check("the Cards tab offers Pronouns beside Numbers", !!btn, btn ? "there" : "(no button)");
   click(btn);
@@ -8022,7 +8034,7 @@ const openPronounTables = async () => {
     await sleep(300);
   }
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -8091,7 +8103,7 @@ const openPronounTables = async () => {
    block above is. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const tile = [...frame.querySelectorAll(".at-minicard")]
@@ -8136,7 +8148,7 @@ const openPronounTables = async () => {
    behind the nudge until it is asked for. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const tile = [...frame.querySelectorAll(".at-minicard")]
@@ -8199,7 +8211,7 @@ const openPronounTables = async () => {
    grid on screen. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   /* The word itself, not the phrase that happens to contain it. */
@@ -8255,7 +8267,7 @@ const openPronounTables = async () => {
    queue reaches. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -8337,7 +8349,7 @@ const openPronounTables = async () => {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
   /* The last one in the document: the learner's nav is still behind this. */
   const tabNamed = (/** @type {RegExp} */ re) =>
-    [...frame.querySelectorAll("button")].filter((b) => re.test((b.textContent || "").trim())).pop();
+    frameButtons(frame).filter((b) => re.test((b.textContent || "").trim())).pop();
   const rows = () => [...frame.querySelectorAll(".at-toolbar")];
   const subRow = () => frame.querySelector(".at-toolbar-sub");
   /* The label a button carries, without the count riding inside it: a
@@ -10733,12 +10745,17 @@ const openPronounTables = async () => {
   r.render(React.createElement(App));
   await sleep(1500);
 
-  const spaceBtn = (/** @type {RegExp} */ re) =>
-    [...host.querySelectorAll(".at-spacebtn")].find((b) => re.test(b.getAttribute("aria-label") || ""));
+  /* The spaces are in the space and language menu, in the bar at the foot
+     of the window, so the menu is opened to reach them. */
+  const spaceBtn = async (/** @type {RegExp} */ re) => {
+    if (!host.querySelector(".at-spacebtn")) click(host.querySelector(".at-dock .at-langbtn"));
+    await sleep(200);
+    return [...host.querySelectorAll(".at-spacebtn")].find((b) => re.test(b.textContent || ""));
+  };
   /* A teacher opens into Teaching; asked for it all the same, in case this
      device has not yet heard that they teach. */
   if (!host.querySelector(".at-screen.bare")) {
-    click(spaceBtn(/Teaching/i));
+    click(await spaceBtn(/Teaching/i));
     await sleep(900);
   }
   const frame = () => host.querySelector(".at-screen.bare");
@@ -10748,12 +10765,15 @@ const openPronounTables = async () => {
     .map((t) => (t.textContent || "").replace(/\s+/g, " "));
   const hasHouse = () => listed().some((t) => /house/i.test(t));
   const learnOff = () => JSON.stringify((JSON.parse(localStorage.getItem("arabic-trainer:arabic-trainer-v3") || "{}").settings || {}).langsOff);
-  const cardsTab = [...((frame() || host).querySelectorAll("button"))].filter((b) => /^Cards$/.test(b.textContent || "")).pop();
+  const cardsTab = [...host.querySelectorAll(".at-dock [role=tab]"), ...((frame() || host).querySelectorAll("button"))]
+    .filter((b) => /^Cards$/.test(b.textContent || ""))[0];
   click(cardsTab);
   await sleep(500);
 
+  /* Two spaces and two languages: the one button wears a globe, and what it
+     says about the languages is in its label. */
   check("a teacher of two languages gets the language switch above Teaching",
-    !!swBtn() && ((swBtn() || {}).textContent || "").trim() === "All",
+    !!swBtn() && /Languages — all 2\b/.test(String(swBtn()?.getAttribute("aria-label"))),
     swBtn() ? String(swBtn()?.getAttribute("aria-label")) + " · " + (swBtn()?.textContent || "") : "no switch in the bar");
   check("and it lists the cards in both", hasHouse(), listed().length + " cards");
   click(swBtn());
@@ -10771,7 +10791,8 @@ const openPronounTables = async () => {
   check("switching Vietnamese off takes its card out of Teaching's list",
     !hasHouse() && listed().length === shown - 1, `${shown} before, ${listed().length} after`);
   check("and the button says Arabic is what is left",
-    ((swBtn() || {}).textContent || "").trim() === "AR", ((swBtn() || {}).textContent || "").trim());
+    /Languages — [^.]*Arabic only/.test(String(swBtn()?.getAttribute("aria-label"))),
+    String(swBtn()?.getAttribute("aria-label")));
   check("and Learning's own choice is not touched by it", learnOff() === learnWas, `${learnWas} before, ${learnOff()} after`);
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);
