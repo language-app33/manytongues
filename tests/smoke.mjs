@@ -1157,24 +1157,30 @@ if (/Build a session/.test(document.body.textContent)) {
     [...document.querySelectorAll(".at-choosebtn")].some((b) => b.getAttribute("aria-label") === "Mode. Not set. Choose one.") &&
       !sessionModeSaid(), sessionModeSaid() || "(none)");
   check("no deck or card is chosen for you either", !sessionPills().length, sessionPills().join("|"));
-  /* Length: two segmented controls, and on opening neither should have a
-     segment lit. */
-  const lit = [...document.querySelectorAll(".at-lengthgroup .on, .at-lengthgroup [aria-checked=true], .at-lengthgroup [aria-selected=true]")];
-  check("no length is chosen for you", lit.length === 0, lit.map((e) => e.textContent).join(","));
-
-  /* The one button is the card editor's kind: an icon in the top bar, on
-     the right. Being an icon, it cannot say why it is not lit, so each
-     section says what it still wants. */
-  const start = () => buttonState(/^(Start|Save and start)$/);
+  /* Length opens on 20 questions: unlike the mode, a length is taken as
+     offered more often than not. */
+  const lit = () => [...document.querySelectorAll(".at-lengthgroup .on, .at-lengthgroup [aria-checked=true], .at-lengthgroup [aria-selected=true]")]
+    .map((e) => (e.textContent || "").trim());
+  check("the length opens on 20 questions", lit().join(",") === "20", lit().join(","));
+  /* The one button is in the top bar, on the right, and says Start. Tapped
+     while something is missing, it starts nothing, and only the sections
+     still unfilled say what they want — nothing is said before the tap. */
+  const startBtn = () => buttonNamed(/^Start$/);
+  const off = () => startBtn()?.getAttribute("aria-disabled") === "true";
   const wants = () => [...document.querySelectorAll(".at-screen.cardform .at-formneed.unmet")].map((p) => p.textContent).join("|");
-  check("the way on is an icon in the top bar", start().there && !!buttonNamed(/^Start$/)?.closest(".at-screenhead"),
-    start().label || "no button");
-  check("and you cannot start until you choose", start().disabled, start().label);
-  check("each section says what it still wants",
-    wants() === "Choose a mode.|Choose at least one deck or card.|Choose a length.", wants());
+  check("the way on is a Start button in the top bar", !!startBtn()?.closest(".at-screenhead"),
+    startBtn() ? "elsewhere" : "no button");
+  check("and you cannot start until you choose", off());
+  check("but nothing is said to be missing before you try", !wants(), wants());
+  click(startBtn());
+  await sleep(80);
+  check("tapping it says what is missing, and only that",
+    wants() === "Choose a mode.|Choose at least one deck or card.", wants());
+  check("and starts nothing", !document.querySelector(".at-instruction"));
 
   check("a mode is chosen from the subtype's kind of sheet", await sessionMode(/Regular/));
   check("and reads as chosen", /Regular/.test(sessionModeSaid()), sessionModeSaid());
+  check("and its line goes", wants() === "Choose at least one deck or card.", wants());
 
   /* Introductions rather than Everything: the walks further down need the
      climbed cards untouched, and a hand-built session asks a card every
@@ -1182,11 +1188,11 @@ if (/Build a session/.test(document.body.textContent)) {
      of them is in is the one to practise here. */
   check("a deck is chosen from the sheet a card's decks are chosen in", await sessionDeck(/Introductions/));
   check("and stands as a pill", sessionPills().some((p) => /Introductions/.test(p)), sessionPills().join("|"));
-  check("so only the length is still wanted", start().disabled && wants() === "Choose a length.", wants());
+  check("so nothing is wanted any more", !off() && !wants(), wants());
 
   click([...document.querySelectorAll(".at-lengthgroup button")].find((b) => (b.textContent || "").trim() === "10"));
   await sleep(80);
-  check("choosing a length is all that was left", start().there && !start().disabled && !wants(), wants());
+  check("a length can still be changed", lit().join(",") === "10", lit().join(","));
 
   /* Keeping it: a box to tick, and the name asked only once it is. There
      is no Save of its own — it is kept as it starts. */
@@ -1199,7 +1205,6 @@ if (/Build a session/.test(document.body.textContent)) {
   await sleep(80);
   const nameBox = keepBox()?.querySelector("input.at-input");
   check("ticking it asks what to call it", !!nameBox);
-  check("and the button says it will be kept", !!buttonNamed(/^Save and start$/));
   if (nameBox) {
     /* Named, because a list of "Regular · 6 cards" tells nobody which was
        which. */
@@ -1214,7 +1219,7 @@ if (/Build a session/.test(document.body.textContent)) {
 
   /* The whole point of the walk: it still builds. Two new blocking
      conditions are two new ways to wedge the builder shut. */
-  clickNamed(/^(Start|Save and start)$/);
+  clickNamed(/^Start$/);
   await sleep(400);
   check("a hand-built session actually starts", !!document.querySelector(".at-instruction"),
     document.body.textContent.slice(0, 120));
@@ -1753,9 +1758,9 @@ if (/Build a session/.test(document.body.textContent)) {
       await sleep(60);
     }
     check("and its button saves rather than starts",
-      !!buttonNamed(/^Save changes$/) && !buttonNamed(/^Start$/),
+      !!buttonNamed(/^Save$/)?.closest(".at-screenhead") && !buttonNamed(/^Start$/),
       [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-120));
-    clickNamed(/^Save changes$/);
+    clickNamed(/^Save$/);
     await sleep(250);
     const listed = document.querySelector(".at-list")?.textContent || "";
     check("and the change is kept under the same session",

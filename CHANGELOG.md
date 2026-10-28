@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.499 — 27 October 2026
+## 0.500 — 28 October 2026
 
 **A deck is read and edited on one screen, the way a card is.**
 
@@ -43,6 +43,30 @@ and moves once per batch of work you would notice, not once per commit.
 To check by hand: on a phone, open a deck, press Edit, change its title,
 add a course and tick a part of the numbers, then Save; edit again and
 cancel after a change; make a new deck; open a locked deck and edit it.
+
+## 0.499 — 27 October 2026
+
+**Custom session: clearer button, quieter screen, 20 questions to start.**
+
+- The screen is called Custom session (Edit custom session when changing
+  a saved one).
+- The button in the top bar says Start beside its play icon. When editing
+  a saved session it says Save, with a save icon.
+- Nothing is marked as missing when the screen opens. Tapping Start before
+  it is ready starts nothing; it shows "Choose a mode." or "Choose at least
+  one deck or card." only under the sections still to fill in, and each
+  goes away once that section is filled.
+- Length now starts on 20 questions, and says "Pick how long you want the
+  session to be." Picking minutes instead says "The session ends after 5
+  minutes." (or however many). Ultimate still has no length and is not cut
+  to 20.
+- The numbers for questions and for minutes are now the same size.
+- Under Mode, one line: "The mode sets which exercise types are asked.
+  Cards you've already fully learnt are left out."
+
+To check by hand: on a phone, open Custom session and tap Start straight
+away; then compare the two rows of numbers under Length; then edit a saved
+session and look at the button.
 
 ## 0.498 — 27 October 2026
 

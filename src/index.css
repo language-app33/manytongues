@@ -454,7 +454,9 @@ button {
    heading — which is what lets five of them stay this size on one row of
    a phone. The type still grows with the track, as every segmented
    row's does, from a larger floor to a larger ceiling. */
-.at-lengthgroup .at-seg { font-size: clamp(16px, calc(var(--seg) * 0.3), 24px);
+/* Sized off a five-wide row whichever row it is in, so the four counts
+   and the five minutes are the same size of number. */
+.at-lengthgroup .at-seg { font-size: clamp(16px, calc((100cqi - 12px) / 5 * 0.3), 24px);
   min-height:52px; }
 .at-lengthor { font-family: var(--ui); font-size:12px; font-weight:800; letter-spacing:.1em;
   text-transform:uppercase; color: var(--faint); text-align:center; margin:6px 0 14px; }
