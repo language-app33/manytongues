@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.506 — 28 October 2026
+## 0.507 — 28 October 2026
 
 **Home has a proper title, and its content is no longer in a box.**
 
@@ -20,6 +20,18 @@ and moves once per batch of work you would notice, not once per commit.
   buttons sit straight on the page in one centred column, with space
   between them instead of a bordered card. With a prep set, its part and
   the everyday part are divided by a thin line.
+## 0.506 — 28 October 2026
+
+**Space and languages move into the menu behind your initial.**
+
+- Choosing the space (Learning, Teaching, Admin) and which languages are
+  in play now happens at the top of the menu behind your initial, "You",
+  so the bar at the foot of the window no longer has a Space item.
+- That menu no longer has its own Appearance switch: the look is chosen
+  in App preferences, where it already was.
+- Every item in the bar is now the same width, as wide as the widest; on
+  a narrow phone they shrink together. Their names are a touch smaller and
+  lighter, their icons a touch smaller, and the bar a little shorter.
 
 ## 0.505 — 28 October 2026
 

@@ -127,7 +127,7 @@ const PLACES: Record<string, [string, string]> = {
   AppPreferences: [LEARN, "App preferences"],
   SettingsScreen: [LEARN, "App preferences"],
   CornerMenu: [LEARN, "The menu behind your initial, in the bar at the foot of the window"],
-  PlaceSwitch: [LEARN, "Choosing the space and the languages, in the bar at the foot of the window"],
+  PlacePicker: [LEARN, "Choosing the space and the languages, in the menu behind your initial"],
   Guide: [LEARN, "How it works"],
   AfterAnswer: [LEARN, "A practice session · after answering"],
   AlsoBox: [LEARN, "A practice session · what else is worth knowing"],

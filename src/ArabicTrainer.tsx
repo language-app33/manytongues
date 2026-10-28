@@ -15473,25 +15473,6 @@ export default function ArabicTrainer() {
             <div className="at-dockbar">
             <div className="at-dockmain" ref={setDockSlot} />
             <div className="at-docksub">
-              <PlaceSwitch
-                space={space}
-                spaces={spaces}
-                /* Choosing a space is arriving at it, not resuming it: the
-                   card a trial was asked about is reopened on the way back
-                   from that one question and nowhere else. */
-                onSpace={(to: string) => {
-                  setTrialBack(null);
-                  setSpace(to);
-                }}
-                choices={choices}
-                off={space === "teach" ? teachLangsOff : langsOff}
-                onLangs={(next) => setSetting(space === "teach" ? "teachLangsOff" : "langsOff", next)}
-                note={
-                  space === "teach"
-                    ? "What you switch off here is out of Teaching — your courses, decks and cards in it — until you switch it back on. Your students see everything as before."
-                    : "What you switch off here is out of the whole of Learning — your cards, your progress and anything you practise — until you switch it back on."
-                }
-              />
               <CornerMenu
                 account={account}
                 /* The dot stands for the whole action, so it stays lit until
@@ -15508,8 +15489,24 @@ export default function ArabicTrainer() {
                    stand for every way this can go wrong. */
                 syncNote={syncNote}
                 onSyncNow={syncEverything}
-                theme={settings.theme || "auto"}
-                onTheme={(v) => setSetting("theme", v)}
+                place={{
+                  space,
+                  spaces,
+                  /* Choosing a space is arriving at it, not resuming it: the
+                     card a trial was asked about is reopened on the way back
+                     from that one question and nowhere else. */
+                  onSpace: (to: string) => {
+                    setTrialBack(null);
+                    setSpace(to);
+                  },
+                  choices,
+                  off: space === "teach" ? teachLangsOff : langsOff,
+                  onLangs: (next) => setSetting(space === "teach" ? "teachLangsOff" : "langsOff", next),
+                  note:
+                    space === "teach"
+                      ? "What you switch off here is out of Teaching — your courses, decks and cards in it — until you switch it back on. Your students see everything as before."
+                      : "What you switch off here is out of the whole of Learning — your cards, your progress and anything you practise — until you switch it back on.",
+                }}
                 onCourses={() => {
                   setTrialBack(null);
                   setSpace("learn");
@@ -19881,35 +19878,24 @@ const initialsOf = (name?: string | null) =>
 const SPACE_LABEL: Record<string, string> = { learn: "Learning", teach: "Teaching", admin: "Admin" };
 const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", admin: "tune" };
 
-/* The two letters a language is known by, off the front of its id, which
-   is where its ISO code is: ar-PS is AR, vi-Hue is VI. Enough to say which
-   one is on when only one is, in the room a button has. */
-const langTag = (id: LangId) => String(id || "").split("-")[0].toUpperCase();
 
 /*
- * Which space you are in, and which of its languages are in play: one
- * button in the bar at the foot of the window, one menu.
+ * Which space you are in, and which of its languages are in play: the top
+ * of the menu behind your initial.
  *
  * Each half is only there for somebody with a choice to make — more than
- * one space, or more than one language in this space — and the button
- * shows the half that is: the space's own icon when only the space can
- * change, the languages' mark when only they can, a globe when both can.
- * With neither there is nothing to ask, and no button.
- *
- * The mark is the whole of the languages' state rather than a decoration:
- * which one, when it is one; how many, when it is some; that there is
- * nothing to say, when it is all of them. The rest is in the label a screen
- * reader and a tooltip both get. What it decides holds everywhere in the
- * space: the cards you can list, what Progress counts, what is ready, and
- * what a session is dealt from.
+ * one space, or more than one language in this space. What the languages
+ * decide holds everywhere in the space: the cards you can list, what
+ * Progress counts, what is ready, and what a session is dealt from.
  *
  * You cannot switch the last language off. An app with no languages in it
  * is a blank screen with no way of telling why, and the row says so rather
  * than just refusing.
  */
-function PlaceSwitch({ space, spaces, onSpace, choices, off, onLangs, note }: {
+function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note }: {
   space: string;
   spaces: string[];
+  /** Choosing a space also puts the menu away, which is the caller's. */
   onSpace: (space: string) => void;
   choices: LangChoice[];
   off: LangId[];
@@ -19917,53 +19903,12 @@ function PlaceSwitch({ space, spaces, onSpace, choices, off, onLangs, note }: {
   /* What switching one off does, in the space it is switched in. */
   note: string;
 }) {
-  const [open, setOpen] = useState(false);
-  const mine: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
-
-  /*
-   * Anywhere outside puts it away, and "outside" is asked of the click
-   * rather than of who saw it.
-   *
-   * On the way down rather than on the way up, and reading the target
-   * rather than relying on the event reaching the window at all: the
-   * corner menu beside this one stops clicks inside itself from
-   * travelling, so a menu that waited for one to arrive stayed open behind
-   * it and the two sat over each other. Ticking a language keeps this
-   * open, which is what the check on `mine` is for — you are usually
-   * ticking more than one.
-   */
-  useEffect(() => {
-    if (!open) return;
-    const close = (e: MouseEvent) => {
-      const at = e.target;
-      if (mine.current && at instanceof Node && mine.current.contains(at)) return;
-      setOpen(false);
-    };
-    document.addEventListener("click", close, true);
-    return () => document.removeEventListener("click", close, true);
-  }, [open]);
-
   const spacesToo = !!spaces && spaces.length > 1;
   const langsToo = !!choices && choices.length > 1;
-  /* After the hooks, which have to run on every render. */
   if (!spacesToo && !langsToo) return null;
 
   const on = langsToo ? choices.filter((c) => !off.includes(c.id)) : [];
-  const all = on.length === (choices || []).length;
   const only = on.length === 1;
-  const mark = all ? "All" : only ? langTag(on[0].id) : String(on.length);
-  const said = all
-    ? `all ${choices.length}`
-    : only
-    ? `${on[0].name} only`
-    : `${on.length} of ${choices.length}`;
-  const label = [
-    spacesToo ? `Space — ${SPACE_LABEL[space]}` : "",
-    langsToo ? `Languages — ${said}` : "",
-  ]
-    .filter(Boolean)
-    .join(". ");
-
   const toggle = (id: LangId) => {
     const isOff = off.includes(id);
     if (!isOff && only) return; // the last one on stays on
@@ -19971,80 +19916,56 @@ function PlaceSwitch({ space, spaces, onSpace, choices, off, onLangs, note }: {
   };
 
   return (
-    <div className="at-langsw" ref={mine}>
-      <button
-        className={`at-langbtn at-dockitem${langsToo && !all ? " on" : ""}${open ? " open" : ""}`}
-        aria-expanded={open}
-        aria-label={`${label}. Choose.`}
-        title={label}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {spacesToo && langsToo ? (
-          <Icon name="language" size={26} />
-        ) : spacesToo ? (
-          <Icon name={SPACE_ICON[space]} size={26} />
-        ) : (
-          <span className="at-langmark">{mark}</span>
-        )}
-        {/* Named after what it changes, like the sections beside it. */}
-        <span className="at-docklabel">{spacesToo ? "Space" : "Languages"}</span>
-      </button>
-
-      {open && (
-        <Popover className="at-langmenu">
-          {spacesToo && (
-            <>
-              <p className="at-eyebrow">Space</p>
-              <div className="at-spacepick" role="radiogroup" aria-label="Space">
-                {spaces.map((sp) => (
-                  <button
-                    key={sp}
-                    role="radio"
-                    aria-checked={space === sp}
-                    className={`at-spacebtn${space === sp ? " on" : ""}`}
-                    onClick={() => {
-                      setOpen(false);
-                      onSpace(sp);
-                    }}
-                  >
-                    <Icon name={SPACE_ICON[sp]} size={18} />
-                    {SPACE_LABEL[sp]}
-                  </button>
-                ))}
-              </div>
-            </>
-          )}
-          {spacesToo && langsToo && <div className="at-crule" />}
-          {langsToo && (
-            <>
-              <p className="at-eyebrow">Languages</p>
-              <Help>{note}</Help>
-              <div className="at-cklist">
-                {choices.map((c) => {
-                  const chosen = !off.includes(c.id);
-                  return (
-                    <button
-                      key={c.id}
-                      className={`at-ck${chosen ? " on" : ""}`}
-                      role="checkbox"
-                      aria-checked={chosen}
-                      /* Not disabled: the last one on is pressable and simply
-                         holds. The line under each language is only its card
-                         count, whatever its state. */
-                      onClick={() => toggle(c.id)}
-                    >
-                      <span className="at-ckbox">{chosen ? "✓" : ""}</span>
-                      <span className="at-cktext">
-                        <b>{c.name}</b>
-                        <i>{plural(c.total, "card")}</i>
-                      </span>
-                    </button>
-                  );
-                })}
-              </div>
-            </>
-          )}
-        </Popover>
+    <div className="at-place">
+      {spacesToo && (
+        <>
+          <p className="at-eyebrow">Space</p>
+          <div className="at-spacepick" role="radiogroup" aria-label="Space">
+            {spaces.map((sp) => (
+              <button
+                key={sp}
+                role="radio"
+                aria-checked={space === sp}
+                className={`at-spacebtn${space === sp ? " on" : ""}`}
+                onClick={() => onSpace(sp)}
+              >
+                <Icon name={SPACE_ICON[sp]} size={18} />
+                {SPACE_LABEL[sp]}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+      {spacesToo && langsToo && <div className="at-crule" />}
+      {langsToo && (
+        <>
+          <p className="at-eyebrow">Languages</p>
+          <Help>{note}</Help>
+          <div className="at-cklist">
+            {choices.map((c) => {
+              const chosen = !off.includes(c.id);
+              return (
+                <button
+                  key={c.id}
+                  className={`at-ck${chosen ? " on" : ""}`}
+                  role="checkbox"
+                  aria-checked={chosen}
+                  /* Not disabled: the last one on is pressable and simply
+                     holds. The line under each language is only its card
+                     count, whatever its state. Ticking keeps the menu open:
+                     you are usually ticking more than one. */
+                  onClick={() => toggle(c.id)}
+                >
+                  <span className="at-ckbox">{chosen ? "✓" : ""}</span>
+                  <span className="at-cktext">
+                    <b>{c.name}</b>
+                    <i>{plural(c.total, "card")}</i>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
@@ -20193,15 +20114,16 @@ function AppVersion() {
   );
 }
 
-function CornerMenu({ account, syncState, syncNote, onSyncNow, theme, onTheme, onCourses, onAccount, onPrefs, onGuide }: {
+function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onAccount, onPrefs, onGuide }: {
   account: User | null;
   syncState?: string;
   /** What to say about it. Worked out by the app, which is the only thing
       that knows whether this was the connection or the passphrase. */
   syncNote?: string;
   onSyncNow: () => void;
-  theme?: string;
-  onTheme: (theme: string) => void;
+  /** Which space and which languages: at the top of the menu, for
+      somebody with a choice of either. */
+  place: React.ComponentProps<typeof PlacePicker>;
   /** The courses you are in, and joining another: Learning's Courses
       page, which has no section of its own in the bar. */
   onCourses: () => void;
@@ -20242,6 +20164,14 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, theme, onTheme, o
             </span>
           </div>
 
+          <PlacePicker
+            {...place}
+            onSpace={(sp: string) => {
+              setOpen(false);
+              place.onSpace(sp);
+            }}
+          />
+
           {/* The row states where sync has got to; the button is the only
               thing that starts one. It used to be the whole row, so
               reading the state meant risking the action. */}
@@ -20253,32 +20183,6 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, theme, onTheme, o
             <button className="at-cact" onClick={onSyncNow}>
               Sync now
             </button>
-          </div>
-
-          {/* Choosing between three looks, not doing a thing: the options
-              sit side by side and the current one is lit, rather than one
-              button cycling through them and leaving you to tap twice to
-              go back one. */}
-          <div className="at-cline as-field">
-            <span className="at-cico">
-              <Icon name="theme" size={18} />
-            </span>
-            <span className="at-clinetext">Appearance</span>
-          </div>
-          <div className="at-cseg">
-            <Segmented
-              label="Appearance"
-              /* The menu gives it a fixed width to fill; compact would sit
-                 short of the rows above and below it. */
-              size={null}
-              options={[
-                { value: "auto", label: "Device" },
-                { value: "light", label: "Light" },
-                { value: "dark", label: "Dark" },
-              ]}
-              value={theme || "auto"}
-              onChange={onTheme}
-            />
           </div>
 
           <div className="at-crule" />
