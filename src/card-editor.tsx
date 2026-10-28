@@ -4576,19 +4576,14 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
    * word stays the word, and the cells are forms of it rather than a
    * stand-in for it.
    *
-   * And the word's English becomes what the card is called, where nothing
-   * is called anything yet. A verb is listed as its name and has to have
-   * one, and the meaning just typed into a word about to become a verb —
-   * "to eat" — is that name in the overwhelming majority of cases. Never
-   * over a name somebody has written, and never from a card that has said
-   * nothing: what this cannot do is invent one.
+   * The name is not touched: it is asked first, before any word is
+   * written, and is the teacher's own answer.
    */
   const chooseCategory = (next: string) => {
     setCategory(next);
     const spec = specOf(lang, tableFor(lang, next));
     if (!citationOf(spec)) return;
     setCells((x) => seedCited(x, forms[0], spec, forms));
-    setName((was) => was.trim() || String((forms[0] || {}).en || "").trim());
   };
   /* Which blanks this card fills, where it is a value rather than
      something to learn: "Raphael" fills `name`, and every phrase with a
@@ -5768,12 +5763,12 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
   /* What the card is short of, where it is a verb the table stands in for:
      the two things such a card is held to, each said where it is asked for
      rather than both at the foot of the table. */
-  const needsName = standsIn && !name.trim();
+  const needsName = !name.trim();
   const needsForm = standsIn && !tableCells.some(
     (c) => String(c.ar || "").trim() && meant(c),
   );
   const canSave = (standsIn ? canSaveVerb(name, tableCells, trouble, meant) : canSaveWord(main, trouble))
-    && refOk && !strayHoles.length && !needsExamples && !examplesWrong;
+    && !needsName && refOk && !strayHoles.length && !needsExamples && !examplesWrong;
 
   /* Another form, named so that its own cells can point at it. No number
      override beyond the name: blankForm takes the language's declared
@@ -6474,7 +6469,7 @@ function SceneKindField({ talk, card }: { talk: SceneDraft; card: Card | null })
   );
 }
 
-function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen, onToggleDeck, onExport }: {
+function KindBlock({ card, lang, scene, shape, word, talk, decks, chosen, onToggleDeck, onExport }: {
   card: Card | null;
   lang: Lang;
   scene: boolean;
@@ -6485,7 +6480,6 @@ function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen
       the two it is — the wording is all that turns on the answer. Decided
       by the editor, which is where the kinds of card are told apart; null
       on a card named by its own word. See NameBlock. */
-  naming: "verb" | "sentence" | null;
   decks: Deck[];
   chosen: string[];
   onToggleDeck: (id: string, on: boolean) => void;
@@ -6528,6 +6522,11 @@ function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen
           answered question on this screen wears — the answer, read, with
           what would open it again on the end. What is on that end here is
           a padlock, because nothing opens it. */}
+      {/* ---- what it is called ----
+          First, before anything else is written: every card has a name,
+          whatever its kind, and it is its own answer rather than one taken
+          from another box — so nothing fills it in. */}
+      <NameBlock word={word} talk={talk} scene={!!scene} />
       <Field label="What type of card" lede="The type of card cannot be changed">
         <div className="at-shutrow">
           <Icon name="cards" />
@@ -6554,15 +6553,6 @@ function KindBlock({ card, lang, scene, shape, word, talk, naming, decks, chosen
           Asked only of a word: a conversation has turns where a word
           has forms, and there is nothing for a table to lay out. */}
       {scene ? <SceneKindField talk={talk} card={card} /> : <WordKind word={word} />}
-      {/* ---- and what it is called ----
-
-          Directly under the subtype, because it is the same sort of thing:
-          one fact about the whole card, settled once and then read. It
-          belongs to the card rather than to any of its words — which is
-          exactly why the card's own words cannot supply it — so it is asked
-          here with the other facts about the card, and not in a framed
-          section of its own halfway down the screen. */}
-      {naming && <NameBlock word={word} of={naming} />}
       {/* And what follows from the answer that is about the word rather
           than about its forms — see WordGrammar. Under the kind because it
           is asked on the strength of it: a noun is asked whether it is a
@@ -6641,67 +6631,25 @@ const storedHelp = (spec: VerbSpec | null): string => {
  * text box in it, standing between the card and its words, read as a stage
  * of the form rather than as the label it is.
  */
-function NameBlock({ word, of }: { word: WordDraft; of: "verb" | "sentence" }) {
-  const { shownSpec, name, setName, needsName } = word;
-  const verb = of === "verb";
-  /* A verb only where the table stands in for the card's own word. Where a
-     language cites nothing — Huế cites the bare verb — the card has a word
-     of its own and is named by it. A sentence always: every one of them is
-     a frame, which is the whole of what a sentence is. */
-  if (verb && (!shownSpec || !citationOf(shownSpec))) return null;
+function NameBlock({ word, talk, scene }: { word: WordDraft; talk: SceneDraft; scene: boolean }) {
+  /* A scene's name is its title, kept where it always was. */
+  const value = scene ? talk.title : word.name;
+  const set = scene ? talk.setTitle : word.setName;
   return (
-    /* ---- what to call it ----
-
-       A verb in a language with no infinitive has no one word of its
-       own: it is a table, and every box in it is a form. So a list had
-       to show one of those boxes — "past · he" — and a deck of verbs
-       read as a column of he-pasts, each naming one form rather than
-       the verb the card is about. A sentence is listed as itself,
-       braces and all: "{{name}} is heavy" names the shape of the card
-       rather than what it is for, and every frame in a deck reads as
-       the hole in it. Nothing is wrong with either card; neither
-       simply has a name of its own to be listed under.
-
-       **Which is why a verb is asked for one and a sentence is not.**
-       A sentence that goes unnamed is listed as the sentence, which is
-       its own words and says something; a verb that goes unnamed would
-       be listed as whichever box somebody happened to fill in first.
-       So the one that has nowhere to fall back to is the one it is
-       required of — see canSaveVerb, which is where that is settled.
-
-       Not the block 0.114 took away. That one asked for the script,
-       the pronunciation, the English and the recordings a second
-       time, and the two copies had to be kept in step by hand. This
-       asks for one thing the card cannot supply, and nothing is
-       drilled on it: it is a label, and the microcopy says so. */
     <Field
-      label="Name"
+      label={<>Name <span className="req">required</span></>}
       lede="How this card is listed and searched."
-      className="at-mt3"
     >
       <input
         className="at-input"
-        value={name}
-        placeholder={verb ? "to eat" : "saying where you live"}
-        onChange={(e) => setName(e.target.value)}
+        value={value}
+        placeholder={scene ? (talk.text ? "Our street" : "At the door") : "saying where you live"}
+        onChange={(e) => set(e.target.value)}
       />
       {/* Only while it is in the way, like every other line that unblocks
           Save on this screen: a demand standing there before anybody has
           typed reads as a telling-off for opening the screen. */}
-      {needsName && (
-        <p className="at-formneed unmet">
-          A verb is listed as its name, so it needs one — nothing else on
-          the card can stand for the whole of it.
-        </p>
-      )}
-      {!verb && (
-        <Help>
-          Without one it is listed as the sentence itself, blanks and all
-          — which names the shape of the card rather than what it is for.
-          Nobody is ever asked this: what is practised is the sentence
-          with its blanks filled in.
-        </Help>
-      )}
+      {!value.trim() && <p className="at-formneed unmet">Every card needs a name.</p>}
     </Field>
   );
 }
@@ -6916,22 +6864,13 @@ function TableBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
 /* The scene: what it is called, who is in it, and whose part the student
    takes. */
 function SceneBlock({ talk }: { talk: SceneDraft }) {
-  const { title, setTitle, speakers, setSpeakers, you, setYou, text } = talk;
+  const { speakers, setSpeakers, you, setYou, text } = talk;
   return (
     <>
     <div className="at-formblock main">
       <div className="at-formhead">
         <span className="at-formnum">{text ? "The text" : "The scene"}</span>
       </div>
-
-      <Field label="What it is called">
-        <input
-          className="at-input"
-          value={title}
-          placeholder={text ? "Our street" : "At the door"}
-          onChange={(e) => setTitle(e.target.value)}
-        />
-      </Field>
 
       {/* Nobody speaks a text, so there is nobody to name and no part to
           play. */}
@@ -9194,7 +9133,7 @@ export function writtenCard({ word, talk, shape, chosen }: {
   chosen: string[];
 }) {
   const scene = shape === "scene";
-  const { shownSpec, ownForms, tableCells, keptFrames = [], forms, note, standsIn, name, uses, fills, category, refName, spread, stripped, writtenExamples = [] } = word;
+  const { shownSpec, ownForms, tableCells, keptFrames = [], forms, note, name, uses, fills, category, refName, spread, stripped, writtenExamples = [] } = word;
   /* And the verb's own sentences back on the end, exactly as they were
      found: this screen does not write them, so the whole of what it owes
      them is not to lose them — see initialFrames. */
@@ -9215,9 +9154,9 @@ export function writtenCard({ word, talk, shape, chosen }: {
        every sentence passes through while it is being written, and the one
        the old reading could not hold. */
     sentence: shape === "sentence",
-    /* And what to call it, where its own words do not: the two cards that
-       are saved as something other than what they are about. */
-    name: standsIn || shape === "sentence" ? name.trim() : "",
+    /* And what to call it: every card has a name of its own. A scene's is
+       its title, saved with the scene. */
+    name: scene ? "" : name.trim(),
     /* And the examples its subjunctive is practised in, on a verb that
        has the row — each as read, with whose wish it is settled where
        its English asks, and who it was written for. See VerbExample. */
@@ -10226,15 +10165,6 @@ function CarryAsk({ cards, onAnswer, onCancel }: {
   );
 }
 
-/** A line of a card's words said in passing — a title — with each blank as
-    a gap rather than its braces: the braces are how a blank is stored,
-    never how it is shown. */
-const saidPlainly = (text: string): string => text.replace(/\{\{[^}]*\}\}/g, "…").trim();
-
-/** What a card is called on its own screen: what it is listed as. */
-const cardTitle = (card: Card | null): string =>
-  !card ? "Card" : String(card.name || "").trim() || saidPlainly(leadOf(card).en || leadOf(card).ar || "") || "Card";
-
 /* ------------------------------------------------------------------
    The card screen's tabs
 
@@ -10526,7 +10456,9 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         /* Named for what is being made, which is settled before this
            opens: a screen for writing a conversation should not be called
            "New card" and then be full of turns. */
-        title={stored ? cardTitle(card) : `New ${shapeLabel(shape).toLowerCase()}`}
+        /* What is being done, not which card: the name is the first
+           thing in "This card". */
+        title={locked ? "Card" : stored ? "Edit card" : "Create card"}
         /* One sheet, ruled into sections — see .at-screen.cardform. The
            editor is the only screen laid out that way, so it is the only
            one that asks for it. */
@@ -10599,17 +10531,6 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               shape={shape}
               word={word}
               talk={talk}
-              /* Whether the card's own words name it, decided here with the
-                 rest of what tells the kinds apart: a sentence never names
-                 itself, and a verb does not where the table stands in for
-                 its word. Everything else is listed under its own word. */
-              naming={
-                layout === "sentence"
-                  ? "sentence"
-                  : layout === "verb" && word.standsIn
-                    ? "verb"
-                    : null
-              }
               decks={decks || []}
               chosen={chosen}
               onToggleDeck={(id, on) =>

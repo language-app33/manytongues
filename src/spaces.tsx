@@ -3830,7 +3830,7 @@ function NewDeck({
   return (
     <>
     <Screen
-      title="New deck"
+      title="Create deck"
       onBack={() => (changed ? setDiscarding(true) : onClose())}
       backIcon="close"
       backLabel="Cancel"
@@ -3850,7 +3850,7 @@ function NewDeck({
         <div className="at-formhead">
           <span className="at-formnum">This deck</span>
         </div>
-        <Field label={<>Title <span className="req">required</span></>}>
+        <Field label={<>Deck name <span className="req">required</span></>}>
           <input
             className="at-input"
             placeholder="e.g. Week 3 · Verbs"
@@ -7413,7 +7413,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     };
     return (
       <Screen
-        title={d.title}
+        /* What is being done, not which deck: its name is the first
+           thing on the screen. */
+        title={editing ? "Edit deck" : "Deck"}
         /* Laid out like a card's screen — see .at-screen.cardform: one
            sheet ruled into sections, each headed at the editor's size with
            what it is for straight under the heading. */
@@ -7467,14 +7469,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 </span>
               </div>
               <fieldset className="at-cardlock" disabled={!editing}>
-                <Field label={<>Title{editing ? <> <span className="req">required</span></> : null}</>}>
+                <Field label={<>Deck name{editing ? <> <span className="req">required</span></> : null}</>}>
                   <input
                     className="at-input"
                     placeholder="e.g. Week 3 · Verbs"
                     value={shown.title}
                     onChange={(e) => edit({ title: e.target.value })}
                   />
-                  {editing && !shown.title.trim() && <Help>A deck needs a title.</Help>}
+                  {editing && !shown.title.trim() && <Help>A deck needs a name.</Help>}
                 </Field>
 
                 {/* Which courses carry it, as a card says which decks it

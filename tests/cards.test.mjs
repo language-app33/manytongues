@@ -2523,7 +2523,7 @@ test("a verb's own sentence does not block the save, and is not lost by it", () 
   assert.equal(back.en, "{{name}} eats {{object}}");
 });
 
-test("a sentence keeps what the teacher calls it, and a word is named by its own words", () => {
+test("every card keeps what the teacher calls it, a sentence and a word alike", () => {
   /*
    * A sentence is saved as a frame with a hole in it, so a list of them
    * reads as a list of holes: "{{name}} is heavy" names the shape of the
@@ -2532,9 +2532,8 @@ test("a sentence keeps what the teacher calls it, and a word is named by its own
    * not what the card is about — and the save has to carry it, which is
    * the half a screen cannot show.
    *
-   * And only where it is asked. Every other card is named by its own word,
-   * so a name typed while the card briefly was a sentence does not follow
-   * it out.
+   * Since 0.505 every card is asked for a name, first, so a word keeps
+   * its own as well.
    */
   const draft = {
     shownSpec: null,
@@ -2556,7 +2555,7 @@ test("a sentence keeps what the teacher calls it, and a word is named by its own
     "a sentence carries what it is called, trimmed");
   assert.equal(asSentence.sentence, true, "and is still saved as a sentence");
   const asWord = writtenCard({ word: draft, talk: {}, shape: "word", chosen: [] });
-  assert.equal(asWord.name, "", "and a word is named by its own words");
+  assert.equal(asWord.name, "introducing yourself", "and so does a word");
 });
 
 /* ---- what a document keeps on its way in ---- */
