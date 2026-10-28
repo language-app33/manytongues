@@ -15460,6 +15460,10 @@ export default function ArabicTrainer() {
         const choices = space === "learn" ? langChoices : space === "teach" ? teachChoices : [];
         return (
           <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
+            {/* One bar: the space's sections, then the space and languages,
+                then you. The holders inside it draw nothing, so every item
+                is a sibling in the one row and they share it evenly. */}
+            <div className="at-dockbar">
             <div className="at-dockmain" ref={setDockSlot} />
             <div className="at-docksub">
               <PlaceSwitch
@@ -15509,6 +15513,7 @@ export default function ArabicTrainer() {
                 onGuide={() => setScreen("guide")}
                 onPrefs={() => setScreen("prefs")}
               />
+            </div>
             </div>
           </nav>
         );
@@ -19961,19 +19966,21 @@ function PlaceSwitch({ space, spaces, onSpace, choices, off, onLangs, note }: {
   return (
     <div className="at-langsw" ref={mine}>
       <button
-        className={`at-langbtn${langsToo && !all ? " on" : ""}${open ? " open" : ""}`}
+        className={`at-langbtn at-dockitem${langsToo && !all ? " on" : ""}${open ? " open" : ""}`}
         aria-expanded={open}
         aria-label={`${label}. Choose.`}
         title={label}
         onClick={() => setOpen((v) => !v)}
       >
         {spacesToo && langsToo ? (
-          <Icon name="language" size={22} />
+          <Icon name="language" size={26} />
         ) : spacesToo ? (
-          <Icon name={SPACE_ICON[space]} size={22} />
+          <Icon name={SPACE_ICON[space]} size={26} />
         ) : (
           <span className="at-langmark">{mark}</span>
         )}
+        {/* Named after what it changes, like the sections beside it. */}
+        <span className="at-docklabel">{spacesToo ? "Space" : "Languages"}</span>
       </button>
 
       {open && (
@@ -20207,12 +20214,15 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, theme, onTheme, o
   return (
     <div className="at-corner" onClick={(e) => e.stopPropagation()}>
       <button
-        className="at-cornerbtn"
+        className="at-cornerbtn at-dockitem"
         onClick={() => setOpen((v) => !v)}
         aria-label="You and your settings"
       >
-        {initialsOf(account && account.displayName)}
-        <span className={`at-cdot ${syncState}`} />
+        <span className="at-cornerav">
+          {initialsOf(account && account.displayName)}
+          <span className={`at-cdot ${syncState}`} />
+        </span>
+        <span className="at-docklabel">You</span>
       </button>
 
       {open && (

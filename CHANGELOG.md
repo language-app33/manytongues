@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.505 — 28 October 2026
+
+**The bar at the foot of the window is one bar again, and easier to read.**
+
+- The sections, the space and language button, and the button with your
+  initial now sit together in one see-through bar, shared out evenly,
+  instead of a bar and two round buttons beside it.
+- Every item has its icon above its name, in larger type. The section you
+  are on is green, on a faint green ground; the others are white rather
+  than grey.
+- The space and language item is named after what it changes ("Space",
+  or "Languages" when only the languages can change), and your initial is
+  named "You".
+- On a narrow phone the names come down a size, rather than wrap, when a
+  space has more items than fit.
+
 ## 0.504 — 28 October 2026
 
 **Fewer buttons at the top of a card while editing it.**

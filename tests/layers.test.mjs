@@ -883,7 +883,7 @@ test("the bar the menus hang off is held inside the window", () => {
   assert.equal(dock.position, "fixed", `the bar is ${dock.position}: it would be placed by whatever it sits in`);
   assert.ok(dock.left !== undefined && dock.right !== undefined,
     "the bar sets no inset on one side, so its edge is wherever it lands");
-  assert.equal((declared[".at-docksub"] || {}).position, "relative",
+  assert.equal((declared[".at-dockbar"] || {}).position, "relative",
     "the menus have to be measured against the pill they open from");
   /* Nothing between the pill and its menus may be positioned, or that is
      what they are measured against instead — the button, near the middle
