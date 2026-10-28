@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.507 — 28 October 2026
+## 0.508 — 28 October 2026
 
 **Home has a proper title, and its content is no longer in a box.**
 
@@ -20,6 +20,14 @@ and moves once per batch of work you would notice, not once per commit.
   buttons sit straight on the page in one centred column, with space
   between them instead of a bordered card. With a prep set, its part and
   the everyday part are divided by a thin line.
+## 0.507 — 28 October 2026
+
+**In context is hidden in Teaching for now.**
+
+- The bar in the teaching space no longer offers In context; it shows
+  Courses, Decks and Cards. It is set aside rather than removed, and will
+  come back.
+
 ## 0.506 — 28 October 2026
 
 **Space and languages move into the menu behind your initial.**

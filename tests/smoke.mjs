@@ -5029,27 +5029,32 @@ const openPronounTables = async () => {
      turns all along. */
   const inFrame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
   const ctxTab = frameButtons(inFrame).find((b) => /^In context$/.test(b.textContent || ""));
-  click(ctxTab);
-  await sleep(500);
+  /* In context is hidden for now, on the owner's word. These checks come
+     back with it, when the tab is offered again. */
+  check("In context is not offered in the bar for now", !ctxTab, ctxTab ? "still there" : "hidden");
+  if (ctxTab) {
+    click(ctxTab);
+    await sleep(500);
 
-  const rows = [...inFrame.querySelectorAll(".at-findrow")].map((r) => (r.textContent || "").replace(/\s+/g, " "));
-  const turnRow = rows.find((t) => t.includes("وين الكتاب"));
-  check("a turn of a conversation is offered as somewhere a word turns up",
-    !!turnRow, rows.slice(0, 3).join(" // ") || "no rows at all");
-  check("and it reads as a turn, with the person who says it",
-    !!turnRow && /Layla says/.test(turnRow), turnRow || "(no row)");
-  /* The counterpart: the word is no longer listed as turning up nowhere.
-     Matched on the whole word rather than on the text of the panel — the
-     phrase card "الكتاب كبير" is two tokens, so it is word-shaped itself
-     and legitimately bare, and it has the word inside it. */
-  const barePanel = [...inFrame.querySelectorAll(".at-panel")]
-    .find((p) => /Words in no phrase/.test((p.querySelector(".at-eyebrow") || {}).textContent || ""));
-  const bareWords = barePanel
-    ? [...barePanel.querySelectorAll(".at-tag")].map((b) => (b.textContent || "").trim())
-    : [];
-  check("a word said in a conversation is not a word in no phrase",
-    !!barePanel && !bareWords.includes("كتاب"),
-    bareWords.join(" | ") || "(nothing bare)");
+    const rows = [...inFrame.querySelectorAll(".at-findrow")].map((r) => (r.textContent || "").replace(/\s+/g, " "));
+    const turnRow = rows.find((t) => t.includes("وين الكتاب"));
+    check("a turn of a conversation is offered as somewhere a word turns up",
+      !!turnRow, rows.slice(0, 3).join(" // ") || "no rows at all");
+    check("and it reads as a turn, with the person who says it",
+      !!turnRow && /Layla says/.test(turnRow), turnRow || "(no row)");
+    /* The counterpart: the word is no longer listed as turning up nowhere.
+       Matched on the whole word rather than on the text of the panel — the
+       phrase card "الكتاب كبير" is two tokens, so it is word-shaped itself
+       and legitimately bare, and it has the word inside it. */
+    const barePanel = [...inFrame.querySelectorAll(".at-panel")]
+      .find((p) => /Words in no phrase/.test((p.querySelector(".at-eyebrow") || {}).textContent || ""));
+    const bareWords = barePanel
+      ? [...barePanel.querySelectorAll(".at-tag")].map((b) => (b.textContent || "").trim())
+      : [];
+    check("a word said in a conversation is not a word in no phrase",
+      !!barePanel && !bareWords.includes("كتاب"),
+      bareWords.join(" | ") || "(nothing bare)");
+  }
 
   /* ---- one way to make a card, whatever kind of card it is ----
      A conversation had a button of its own in a deck's card list, which
