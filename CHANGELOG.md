@@ -8,6 +8,173 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.520 — 29 October 2026
+
+**Edit and Save float in the corner, and the card screen tells you why
+when it can't save.**
+
+- On a card or deck, Edit (while reading) and Save (while editing) are a
+  floating button in the bottom right. It shows its name when the screen
+  opens and while scrolling up, and only its icon while scrolling down.
+  While saving it says "Saving…". There is room at the bottom of these
+  screens so it never covers anything. Create card and Create deck have
+  the floating Save too.
+- The bar at the top of a card now holds only the status menu, and only
+  while the card is being read. A deck's top bar holds nothing on the
+  right.
+- Saving a new or edited card goes straight back to reading it. Adding
+  another meaning still opens the next card for editing.
+- Tapping a greyed-out Save says why: "No changes to save.", "Some
+  required fields are missing. They're marked with *.", or "Something
+  needs fixing before saving." Required fields carry a red asterisk:
+  the card name, the word and its English, a sentence and its English,
+  a scene's subtype and its first lines, a verb table ("Fill in at least
+  one form."), and a deck's name. "Every card needs a name." is gone.
+- Delete moved off the top bar to the bottom, under its own heading with
+  "…is permanent and cannot be undone." and a red button: Delete card (at
+  the foot of the Basic tab, while editing a saved card), Delete deck
+  (at the foot of a deck being edited) and Delete course. Each still asks
+  first.
+- Tapping a field or tick on a card or deck being read says "You are in
+  view-only mode. Switch to edit to make changes to the card." (or "the
+  deck"). Recordings, tabs, exercises, Export and the status menu work as
+  before.
+- The Basic, Advanced and Exercises tabs sit flush under the top bar and
+  no longer jump when the card scrolls.
+- Draft in the status menu has its own icon, an empty dashed circle,
+  instead of the pencil Edit uses.
+
+To check by hand: on a real phone, scroll a long card and watch the
+floating button; tap the grey Save on an empty card and on an unchanged
+one; delete a card from the bottom of its Basic tab.
+
+## 0.519 — 29 October 2026
+
+**The card screen says less until it has something to say.**
+
+- "Every card needs a name." no longer shows on a card just opened. Save
+  stays grey until the card can be saved; tapping the grey Save with the
+  name empty shows the line under the name. The dot on the tab waits for
+  that tap too, so a new card starts with no warnings.
+- The grey explanation under a Vietnamese word's pronunciation note is
+  gone; the box itself now reads "Pronunciation note (optional)". It is
+  still never asked in an exercise, and Arabic and Hebrew are unchanged.
+- Once a second accepted answer is added with +, a small line over the
+  extra boxes says what they are: "Other Vietnamese answers" (in the
+  course's language) or "Other English answers". A card with one answer
+  shows nothing new. On the Basic and the Advanced tab alike.
+
+To check by hand: on a phone, open New card and tap the grey Save; add
+and remove a second answer.
+
+## 0.518 — 29 October 2026
+
+**A card's parts are one segmented switch.**
+
+- At the top of a card's screen, Basic, Advanced (on an advanced card) and
+  Exercises are now one rounded track shared out equally, each with its
+  icon above its name. The part you are on is raised, with its icon in
+  green. The same whether the card is being read or edited.
+- The dot that says a part has a change not yet saved sits in the corner
+  of that part's segment.
+
+## 0.517 — 29 October 2026
+
+**The Basic tab is shorter: the Advanced box sits at the top of "This
+card".**
+
+- "Build an advanced card" is now the first thing under "This card",
+  above the card's name, with no heading or explanation of its own. The
+  separate Advanced section is gone. A saved sentence or scene, whose box
+  cannot be unticked, still says why under it.
+- The name's heading is now "Card name", without the "required" marker.
+  The line "How this card is listed and searched" stays, and an empty
+  name still says every card needs one.
+
+To check by hand: open New card on a phone and look at the top of the
+Basic tab.
+
+## 0.516 — 29 October 2026
+
+**A basic card is just the word: no grammar on it.**
+
+- The word on the Basic tab no longer has a Grammar button (number,
+  gender and the like), and a Vietnamese word no longer shows its
+  classifier box there. Both are on the Advanced tab, where they were
+  before.
+- A saved card that already says something about its grammar or its
+  classifier opens as an advanced card, so none of it is hidden.
+- Saving a card as basic drops any grammar written on the Advanced tab,
+  and the line under the Advanced box lists "the grammar" among what
+  would be dropped, while ticking the box again still keeps it.
+
+To check by hand: open a basic card and see the word has no Grammar
+button; open a card whose word was marked feminine, plural or similar and
+see it opens as advanced.
+
+## 0.515 — 29 October 2026
+
+**A card can be made quickly, as a basic card, or fully, as an advanced one.**
+
+- New card opens straight onto the card screen. It no longer asks
+  "word, sentence or scene?" first.
+- The first tab is now called Basic. It holds the card's name, a box
+  headed Advanced saying "Build an advanced card", the word or phrase
+  itself (its English, recordings and other accepted answers), and its
+  decks. Leave the box unticked, fill those in and save: that is a
+  quick card with one form.
+- Ticking the box hides the word from the Basic tab and opens the
+  Advanced tab (what was the Forms tab). The word already typed becomes
+  its first form. At the top are the type (word or phrase, sentence or
+  scene) and the subtype; at the bottom is everything that was on the
+  Settings tab, which is gone.
+- The type can be changed freely until the card is first saved, then it
+  is locked as before. Choosing sentence or scene on a new card says the
+  word from the Basic tab will be dropped on saving; choosing word or
+  phrase again before saving brings it back.
+- Unticking the box brings the word back to the Basic tab and says what
+  saving would drop from the Advanced tab. Nothing is lost until the
+  card is saved, and ticking the box again keeps it all.
+- A saved card opens as advanced when it has anything beyond one plain
+  form; sentences and scenes always do, and their box cannot be
+  unticked. Every new card starts as basic.
+
+To check by hand: make a quick card on a phone and save it; make a
+sentence through the Advanced tab; tick and untick the box on a card with
+two forms and read the warning.
+
+## 0.514 — 29 October 2026
+
+**Join codes work after a restore, and removed people really go.**
+
+- A course put back from a backup now answers to its join codes again.
+  Before, the codes shown in the teaching space could be turned away as
+  unknown in the learning space. Courses already restored are mended the
+  first time someone uses their code.
+- A join code pasted with capitals or stray spaces is accepted.
+- Deleting someone who came back on a course's roster from a backup, but
+  whose account no longer exists, now takes them off every course instead
+  of leaving them listed.
+- Deleting a course also retires its teacher code.
+
+To check by hand: copy a join code from a restored course's teaching
+space and join with it in the learning space; delete a person who was
+restored from a backup and confirm they are gone from the course.
+
+## 0.513 — 29 October 2026
+
+**The home screen no longer scrolls when everything already fits.**
+
+- Every screen was built a little taller than the phone, so the home
+  screen always scrolled by about a thumb's width even with room to spare.
+  It now fills the screen exactly and only scrolls when there is more on it
+  than fits.
+- On phones, the height used is the part actually on show, not the height
+  with the browser's bars hidden.
+
+To check by hand: open the home screen on a phone with only a few saved
+sessions and try to scroll it.
+
 ## 0.512 — 28 October 2026
 
 **Vietnamese is just Vietnamese, with no one accent built in.**

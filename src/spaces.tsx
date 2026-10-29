@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import * as API from "./courses-api.ts";
 import type { Card, Course, Deck, Flag, Form, Lang, LangId, User } from "./types.ts";
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
-import { CardEditor, NewCardKind } from "./card-editor.tsx";
+import { CardEditor, tapWouldChange } from "./card-editor.tsx";
 import type { CardShape } from "./card-editor.tsx";
 import { formsOf, leadOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
@@ -1215,9 +1215,6 @@ function CourseSettings({
     <Screen
       title={c.title}
       onBack={onClose}
-      action={
-        <Button variant="danger" size="sm" onClick={onDelete} icon="delete">Delete</Button>
-      }
       className="cardform"
     >
       {/* Headed and explained the way the card editor is: each part of the
@@ -1411,6 +1408,16 @@ function CourseSettings({
               </Button>
             </div>
           )}
+      </div>
+
+      {/* At the foot, away from everyday taps, as on a card and a deck.
+          It still asks first. */}
+      <div className="at-formblock at-mt5">
+        <div className="at-formhead">
+          <span className="at-formnum">Delete course</span>
+        </div>
+        <p className="at-dangerline">Deleting a course is permanent and cannot be undone.</p>
+        <Button variant="danger" icon="delete" onClick={onDelete}>Delete course</Button>
       </div>
     </Screen>
   );
@@ -3734,6 +3741,7 @@ function NewDeck({
   const [title, setTitle] = useState("");
   const [lang, setLang] = useState(initialLang || "");
   const [discarding, setDiscarding] = useState(false);
+  const snack = useSnackbar();
   const canSave = title.trim() && (!mustAsk || lang);
   const changed = !!title.trim() || (!!mustAsk && !!lang);
 
@@ -3744,23 +3752,26 @@ function NewDeck({
       onBack={() => (changed ? setDiscarding(true) : onClose())}
       backIcon="close"
       backLabel="Cancel"
-      action={
-        <Button variant="primary" size="sm" className="iconly"
-          aria-label={busy ? "Saving…" : "Save"}
-          title={busy ? "Saving…" : "Save"}
-          disabled={!canSave || busy}
-          onClick={() => onSave(title.trim(), lang)}
-        >
-          <Icon name="save" />
-        </Button>
-      }
+      /* Save floats in the bottom corner, as on every screen that is
+         written and saved — see ScreenFab. */
+      fab={{
+        icon: "save",
+        label: "Save",
+        off: !canSave,
+        busy: !!busy,
+        onClick: () => {
+          if (busy) return;
+          if (!canSave) snack("Some required fields are missing. They're marked with *.", "warn");
+          else onSave(title.trim(), lang);
+        },
+      }}
       className="cardform"
     >
       <div className="at-formblock">
         <div className="at-formhead">
           <span className="at-formnum">This deck</span>
         </div>
-        <Field label={<>Deck name <span className="req">required</span></>}>
+        <Field label={<>Deck name<span className="at-reqstar" aria-hidden="true" /></>}>
           <input
             className="at-input"
             placeholder="e.g. Week 3 · Verbs"
@@ -3780,11 +3791,7 @@ function NewDeck({
           />
         )}
 
-        {!canSave && (
-          <Help>
-            {!title.trim() ? "A deck needs a title." : "Choose the language it holds."}
-          </Help>
-        )}
+        {mustAsk && !lang && <Help>Choose the language it holds.</Help>}
         <Help className="at-mt3">Save the deck to add cards to it and share it with a course.</Help>
       </div>
     </Screen>
@@ -4576,7 +4583,7 @@ function statusChoices(card: Card): { value: string; label: string }[] {
    yet out, waiting for review, or out with changes on it not yet out. */
 const STATUS_ICON: Record<string, string> = {
   published: "verify",
-  draft: "edit",
+  draft: "draft",
   review: "view",
   changed: "refresh",
 };
@@ -5001,16 +5008,18 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     return c ? { card: c, decks: c.decks || [], locked: true } : null;
   });
   /*
-   * A card being started: everything settled about it so far, and nothing
-   * typed yet.
-   *
-   * New card asks which of the three kinds it is before the editor opens,
-   * because the three are not variations on one form — see NewCardKind.
-   * This is what the question is asked on top of: which decks it is going
-   * into, and which language it is in, both of which are known by the time
-   * the button is pressed or asked for first where they are not.
+   * A card being started: which decks it is going into, and which language
+   * it is in, both known by the time the button is pressed or asked for
+   * first where they are not. It opens straight onto the Basic tab as a
+   * word; a sentence or a scene is chosen on the Advanced tab — see
+   * opensAdvanced in card-editor.tsx.
    */
-  const [making, setMaking] = useState<{ decks: string[]; lang?: LangId } | null>(null);
+  const setMaking = (m: { decks: string[]; lang?: LangId } | null) => {
+    /* `opened` so a card already on screen is not reused: the editor is
+       keyed on it, and a new card starts from nothing. */
+    if (m) setEditing({ card: null, decks: m.decks, lang: m.lang, making: "word", opened: Date.now() });
+  };
+
   /* How many cards are waiting for a connection, so the space can say so
      rather than leaving a teacher to wonder where their work went. */
   const [kept, setKept] = useState(() => waitingToSend(CARD_OUTBOX));
@@ -6388,23 +6397,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   }
 
-  /* ---- and before it, the one question the editor cannot ask ----
-     Which of the three kinds is being made. It is asked here rather than
-     inside the editor because what the editor opens as follows from it:
-     a screen for writing a conversation should not be called "New card"
-     and then be full of turns. */
-  if (making) {
-    return (
-      <NewCardKind
-        onClose={() => setMaking(null)}
-        onPick={(shape) => {
-          setEditing({ card: null, decks: making.decks, lang: making.lang, making: shape });
-          setMaking(null);
-        }}
-      />
-    );
-  }
-
   /* ---- a card: read, edited or made ----
      The editor, drawn over whichever list it was opened from rather than
      in place of it, the way a card read used to be: Back lands on the list
@@ -6660,11 +6652,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               } else if (exit || !savedNow) {
                 setEditing(null);
               } else {
-                /* Save alone: the editor stays open, on the card as saved,
-                   so the next save is of this card — a new one included,
-                   which has an id from here on. Not drawn afresh: what is
-                   on the screen is what was just saved. */
-                setEditing((e) => (e ? { ...e, card: savedNow, decks: savedNow.decks || [], draft: undefined, making: undefined } : e));
+                /* Save: back to reading the card as saved — a new one
+                   included, which has an id from here on. Drawn afresh, so
+                   the screen is the card and nothing left over from the
+                   writing of it. */
+                setEditing((e) => (e ? { ...e, card: savedNow, decks: savedNow.decks || [], draft: undefined, making: undefined, locked: true, opened: Date.now() } : e));
               }
               /* Whether the card just saved turns up in phrases already
                  written. Counted against the list with the new card in
@@ -7344,23 +7336,23 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         backIcon={editing ? "close" : "back"}
         backLabel={editing ? "Cancel" : "Back"}
         /* Edit, as on a card being read; Save while editing, which goes
-           back to reading the deck. */
-        action={
-          editing ? (
-            <Button variant="primary" size="sm" className="iconly"
-              aria-label={busy ? "Saving…" : "Save"}
-              title={busy ? "Saving…" : "Save"}
-              disabled={!shown.title.trim() || !changed || busy}
-              onClick={() => deckDraft && saveDeck(d, deckDraft)}
-            >
-              <Icon name="save" />
-            </Button>
-          ) : (
-            <Button variant="primary" size="sm" className="iconly" aria-label="Edit" title="Edit"
-              onClick={() => setDeckDraft(draftOf(d))}>
-              <Icon name="edit" />
-            </Button>
-          )
+           back to reading the deck. Both float in the bottom corner — see
+           ScreenFab — and the bar over the deck holds nothing else. */
+        fab={
+          editing
+            ? {
+                icon: "save",
+                label: "Save",
+                off: !shown.title.trim() || !changed,
+                busy: !!busy,
+                onClick: () => {
+                  if (busy || !deckDraft) return;
+                  if (!changed) snack("No changes to save.");
+                  else if (!shown.title.trim()) snack("Some required fields are missing. They're marked with *.", "warn");
+                  else saveDeck(d, deckDraft);
+                },
+              }
+            : { icon: "edit", label: "Edit", onClick: () => setDeckDraft(draftOf(d)) }
         }
       >
             <Notice kind="error">{error}</Notice>
@@ -7382,15 +7374,15 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   {(langOfDeck(d) || {}).name} · {deckSize(d, held.length)}
                 </span>
               </div>
-              <fieldset className="at-cardlock" disabled={!editing}>
-                <Field label={<>Deck name{editing ? <> <span className="req">required</span></> : null}</>}>
+              <fieldset className="at-cardlock" disabled={!editing}
+                onPointerDown={!editing ? (e) => { if (tapWouldChange(e.target)) snack("You are in view-only mode. Switch to edit to make changes to the deck."); } : undefined}>
+                <Field label={<>Deck name<span className="at-reqstar" aria-hidden="true" /></>}>
                   <input
                     className="at-input"
                     placeholder="e.g. Week 3 · Verbs"
                     value={shown.title}
                     onChange={(e) => edit({ title: e.target.value })}
                   />
-                  {editing && !shown.title.trim() && <Help>A deck needs a name.</Help>}
                 </Field>
 
                 {/* Which courses carry it, as a card says which decks it
@@ -7570,9 +7562,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
             {/* At the foot while editing, away from Save, as the deck list
                 keeps it on the deck's own row. */}
             {editing && (
-              <div className="at-row at-mt5">
+              <div className="at-formblock at-mt5">
+                <div className="at-formhead">
+                  <span className="at-formnum">Delete deck</span>
+                </div>
+                <p className="at-dangerline">Deleting a deck is permanent and cannot be undone.</p>
                 <Button variant="danger" icon="delete" onClick={askDelete}>
-                  Delete this deck
+                  Delete deck
                 </Button>
               </div>
             )}

@@ -7169,3 +7169,24 @@ Where hiding would hide a fact, the component says it instead, reading
 exist open on screens that only play and show, and an empty list says
 "None." `Locked` is provided round the recording screens too, which are
 drawn outside the fieldset.
+
+---
+
+## Basic and advanced cards share one word draft
+
+**29 October 2026** · `src/basic-card.ts`, `src/card-editor.tsx` (`CardEditor`, `BasicBlock`, `KindBlock`)
+
+The card screen's first tab writes a quick card: a name, one form, decks.
+"Build an advanced card" opens the Advanced tab, where the type is now
+picked (it used to be asked before the screen opened, by `NewCardKind`,
+which nothing opens any more).
+
+The basic form is the word draft's own first form, drawn with the same
+`FormBlock` the Advanced tab uses, so ticking the box copies nothing. The
+sentence or scene is a second word draft (and the scene draft) beside it,
+so picking another type on a new card puts the word aside rather than
+overwriting it, and picking back restores it. Unticking leaves the
+Advanced tab's state in the draft, and only the save trims it: `basicCard`
+cuts what is written down to the first form, and `droppedByBasic` names
+what that cut would lose, for the line under the box. The cost is two word
+drafts per screen; only the shown one is saved.

@@ -54,6 +54,7 @@ import { ADJECTIVE_IS_SLOT, asMeaning, ADJECTIVE_SLOT, cardRef, DEMONSTRATIVE_RE
 import { agreeingBlanks, combosOf, mainFormOnly, EXAMPLES_CEILING, examplesOf, fillersFor, rowsLine, tensedBlanks, whyStarved } from "./card-facts.ts";
 import type { Value } from "./variables.ts";
 import { liftSubtypeTags } from "./subtype-tags.ts";
+import { basicCard, droppedByBasic, opensAdvanced } from "./basic-card.ts";
 import { subtypeTakesCapitals, tickCapitals } from "./capitals.ts";
 import { readSpan, spanTag } from "./numbers/spans.ts";
 import type { Span } from "./numbers/spans.ts";
@@ -67,6 +68,7 @@ import {
   splitAlternatives,
   joinAlternatives,
   CheckList,
+  useSnackbar,
   CLIP_KINDS,
   ClipList,
   clipsOf,
@@ -145,7 +147,7 @@ const blankLine = (taken: { id?: string }[] = []) => ({
    list is local state seeded from the stored string —
    deriving it on every render would drop an added field the moment it was
    added, because an empty answer joins to nothing. */
-function Alternatives({ value, onChange, render, of = "", addLabel = "Add another accepted answer" }: {
+function Alternatives({ value, onChange, render, of = "", addLabel = "Add another accepted answer", moreLabel = "" }: {
   value?: string;
   onChange: (value: string) => void;
   /* The third argument is what to call this box out loud, where the label
@@ -163,6 +165,8 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
    */
   of?: string;
   addLabel?: string;
+  /** Said once over the boxes after the first, where there are any. */
+  moreLabel?: string;
 }) {
   const [list, setList] = useState(() => splitAlternatives(value || ""));
   /*
@@ -197,7 +201,9 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
   return (
     <div className="at-alts">
       {list.map((v, i) => (
-        <div className="at-altrow" key={i}>
+        <React.Fragment key={i}>
+        {i === 1 && moreLabel && <p className="at-fieldlede at-altsmore">{moreLabel}</p>}
+        <div className="at-altrow">
           <div className="at-altfield">
             {render(v, (nv) => commit(list.map((x, j) => (j === i ? nv : x))), named(i))}
           </div>
@@ -216,6 +222,7 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
             />
           )}
         </div>
+        </React.Fragment>
       ))}
     </div>
   );
@@ -419,7 +426,10 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
   return (
     <div className="at-alts">
       {rows.map((row, i) => (
-        <div className="at-answerpair" key={i}>
+        <React.Fragment key={i}>
+        {/* Over the extra answers, once: what the boxes below the first are. */}
+        {i === 1 && <p className="at-fieldlede at-altsmore">Other {lang.name} answers</p>}
+        <div className="at-answerpair">
           <div className="at-altfield">
             {blanks ? (
               <BlankField
@@ -500,7 +510,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               className="at-input at-answersaid"
               value={row.lat}
               aria-label={named(lang.translitLabel, i)}
-              placeholder={lang.translitLabel.toLowerCase()}
+              placeholder={lang.translitDrilled === false ? `${lang.translitLabel} (optional)` : lang.translitLabel.toLowerCase()}
               onChange={(e) => edit(i, { lat: e.target.value })}
             />
           )}
@@ -566,6 +576,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
             </div>
           )}
         </div>
+        </React.Fragment>
       ))}
     </div>
   );
@@ -6431,7 +6442,7 @@ function SceneKindField({ talk, card }: { talk: SceneDraft; card: Card | null })
   if (said) {
     return (
       <div className="at-field at-mt3">
-        <label className="at-label">What subtype</label>
+        <label className="at-label">What subtype<Req /></label>
         <p className="at-fieldlede">{lede}</p>
         <div className="at-shutrow">
           <Icon name="tune" />
@@ -6450,7 +6461,7 @@ function SceneKindField({ talk, card }: { talk: SceneDraft; card: Card | null })
   }
   return (
     <div className="at-field at-mt3">
-      <label className="at-label">What subtype</label>
+      <label className="at-label">What subtype<Req /></label>
       <p className="at-fieldlede">{lede}</p>
       <div className="at-chooser">
         <button
@@ -6469,37 +6480,121 @@ function SceneKindField({ talk, card }: { talk: SceneDraft; card: Card | null })
   );
 }
 
-function KindBlock({ card, lang, scene, shape, word, talk, decks, chosen, onToggleDeck, onExport }: {
+function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, dropsWord }: {
   card: Card | null;
   lang: Lang;
   scene: boolean;
   shape: CardShape;
   word: WordDraft;
   talk: SceneDraft;
-  /** Whether this card is one whose own words do not name it, and which of
-      the two it is — the wording is all that turns on the answer. Decided
-      by the editor, which is where the kinds of card are told apart; null
-      on a card named by its own word. See NameBlock. */
+  /** Whether the type is settled: from the first save, as it always was. */
+  typeLocked: boolean;
+  onPick: (shape: CardShape) => void;
+  /** Whether the word written on the Basic tab is dropped by the type
+      chosen here, if the card is saved this way. */
+  dropsWord: boolean;
+}) {
+  const { aside, storedForms } = word;
+  return (
+    <div className="at-formblock">
+      <div className="at-formhead">
+        <span className="at-formnum">What it is</span>
+      </div>
+
+      {/* What kind of card it is. Asked here now rather than before the
+          screen opens: a quick card is a word, and only a teacher building
+          an advanced card is asked. Free until the first save, then a fact
+          with a padlock on it — a card is what a student's record of it
+          hangs on. */}
+      {typeLocked ? (
+        <Field label="What type of card" lede="The type of card cannot be changed">
+          <div className="at-shutrow">
+            <Icon name="cards" />
+            <span className="at-shutname">{shapeLabel(shape)}</span>
+            <span className="at-shutlock" aria-hidden="true">
+              <Icon name="lock" />
+            </span>
+          </div>
+        </Field>
+      ) : (
+        <div className="at-field">
+          <RadioGroup
+            label="What type of card"
+            name="card-type"
+            options={shapeChoices()}
+            value={shape}
+            onChange={onPick}
+          />
+          <p className="at-fieldlede">It cannot be changed once the card is saved.</p>
+          {/* Said while it can still be undone by choosing Word again. */}
+          {dropsWord && (
+            <p className="at-formneed unmet">
+              The word from the Basic tab is dropped when the card is saved this way. Choose{" "}
+              {shapeLabel("word")} to keep it.
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* ---- and what kind of word it is ----
+
+          Noun, verb, adjective, name — the language's own list. It is
+          the one thing about a card no amount of reading the script
+          will tell you. What follows from it is the table; nothing is
+          stored saying "verb", so the answer only decides what the
+          teacher is shown. A conversation's subtype is whether it is a
+          text. */}
+      {scene ? <SceneKindField talk={talk} card={card} /> : <WordKind word={word} />}
+      {/* And what follows from the answer that is about the word rather
+          than about its forms — see WordGrammar. */}
+      {shape === "word" && <WordGrammar lang={lang} word={word} />}
+      {/* A table put aside is not thrown away until the card is saved, and
+          saying so is the only warning there is. */}
+      {aside > 0 && (
+        <p className="at-formneed unmet">
+          {word.shownSpec ? "Its other table is" : "Its table is"} put aside —{" "}
+          {plural(aside, "box", "boxes")} filled in. Saving it this way drops them.
+        </p>
+      )}
+      {/* And where it cannot be asked, because the card already has
+          one: the table is the content, so offering the change would
+          be offering to throw it away. */}
+      {!scene && storedForms && storedHelp(specOf(lang, storedForms)) && (
+        <Help className="at-mt3">{storedHelp(specOf(lang, storedForms))}</Help>
+      )}
+    </div>
+  );
+}
+
+/*
+ * The Basic tab: the card's name, whether it is an advanced card, the word
+ * itself where it is not, and its decks.
+ *
+ * The word is the first form of the card, written in exactly the fields
+ * the Advanced tab writes it in — so ticking the box carries it over
+ * without anything to copy: it is the same form.
+ */
+function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onExport, onDelete }: {
+  lang: Lang;
+  scene: boolean;
+  word: WordDraft;
+  talk: SceneDraft;
+  advanced: boolean;
+  /** False on a saved sentence or scene, which has no basic version. */
+  canUntick: boolean;
+  onAdvanced: (on: boolean) => void;
+  /** What saving as a basic card would drop — see droppedByBasic. */
+  drops: string[];
   decks: Deck[];
   chosen: string[];
   onToggleDeck: (id: string, on: boolean) => void;
   /** Export the card, where it can be — on a saved card being read. */
   onExport?: () => void;
+  /** Delete the card — on a saved card being edited, at the foot. */
+  onDelete?: () => void;
 }) {
-  const { aside, storedForms } = word;
   return (
     <>
-    {/* What kind of card this is — the first thing about it, and no
-        longer a question here: it is answered before this screen opens
-        and cannot be answered again. See NewCardKind, and shapeChoices
-        for why it is settled once.
-
-        What a *word* lays out is a different question and is asked
-        underneath. The two were one control for a release — a verb was a
-        third answer beside Word and Conversation — and it stopped working
-        the moment there was a second table to offer: four answers on a
-        track that already ran off a phone at three, and a list mixing "a
-        different shape of card" with "a word with more said about it". */}
     <div className="at-formblock">
       <div className="at-formhead">
         <span className="at-formnum">This card</span>
@@ -6514,78 +6609,60 @@ function KindBlock({ card, lang, scene, shape, word, talk, decks, chosen, onTogg
           </span>
         ) : null}
       </div>
-
-      {/* What kind of card it is, as a fact on the screen rather than as a
-          line of grey beside the heading. It used to be the heading's own
-          gloss, with two paragraphs under it saying it could not be
-          changed; it is one answered question now, in the shape every
-          answered question on this screen wears — the answer, read, with
-          what would open it again on the end. What is on that end here is
-          a padlock, because nothing opens it. */}
-      {/* ---- what it is called ----
-          First, before anything else is written: every card has a name,
-          whatever its kind, and it is its own answer rather than one taken
-          from another box — so nothing fills it in. */}
-      <NameBlock word={word} talk={talk} scene={!!scene} />
-      <Field label="What type of card" lede="The type of card cannot be changed">
-        <div className="at-shutrow">
-          <Icon name="cards" />
-          <span className="at-shutname">{shapeLabel(shape)}</span>
-          <span className="at-shutlock" aria-hidden="true">
-            <Icon name="lock" />
-          </span>
-        </div>
-      </Field>
-
-      {/* ---- and what kind of word it is ----
-
-          Noun, verb, adjective, name — the language's own list. It is
-          the one thing about a card no amount of reading the script
-          will tell you, and until 0.137 it was guessed from whichever
-          table happened to have something in it.
-
-          What follows from it is the table: a verb is offered its
-          persons and tenses, a noun and a preposition the pronouns
-          that go on their end. Nothing is stored saying "verb" — the
-          table is still read off the rows its cells sit in — so the
-          answer only decides what the teacher is shown.
-
-          Asked only of a word: a conversation has turns where a word
-          has forms, and there is nothing for a table to lay out. */}
-      {scene ? <SceneKindField talk={talk} card={card} /> : <WordKind word={word} />}
-      {/* And what follows from the answer that is about the word rather
-          than about its forms — see WordGrammar. Under the kind because it
-          is asked on the strength of it: a noun is asked whether it is a
-          person or a thing and nothing else is. */}
-      {shape === "word" && <WordGrammar lang={lang} word={word} />}
-      {/* A table put aside is not thrown away until the card is saved, and
-          saying so is the only warning there is. Outside the question
-          above rather than inside it, because it is about what the card
-          holds rather than about the answer: what put the table aside was
-          answering that question, and what brings it back is answering it
-          again. */}
-      {aside > 0 && (
+      {/* ---- basic or advanced ----
+          The one question between a quick card and the whole editor, first
+          because the rest of the screen follows from it. Said in no more
+          than its own words; only where it cannot be unticked does it say
+          why. */}
+      <CheckList
+        options={[{
+          id: "advanced",
+          title: "Build an advanced card",
+          note: canUntick ? undefined : "A sentence or a scene is always an advanced card.",
+          disabled: !canUntick && advanced,
+        }]}
+        chosen={advanced ? ["advanced"] : []}
+        onToggle={(_, wasOn) => onAdvanced(!wasOn)}
+      />
+      {/* Said while it can still be undone by ticking the box again:
+          nothing is lost until the card is saved. */}
+      {!advanced && drops.length > 0 && (
         <p className="at-formneed unmet">
-          {word.shownSpec ? "Its other table is" : "Its table is"} put aside —{" "}
-          {plural(aside, "box", "boxes")} filled in. Saving it this way drops them.
+          Saving it as a basic card drops {joinList(drops)} from the Advanced tab. Tick the box
+          again to keep {drops.length === 1 && !/^\d/.test(drops[0]) ? "it" : "them"}.
         </p>
       )}
-      {/* And where it cannot be asked, because the card already has
-          one: the table is the content, so offering the change would
-          be offering to throw it away. */}
-      {!scene && storedForms && storedHelp(specOf(lang, storedForms)) && (
-        <Help className="at-mt3">{storedHelp(specOf(lang, storedForms))}</Help>
-      )}
-
+      {/* ---- what it is called ----
+          Every card has a name, whatever its kind. */}
+      <div className="at-mt5">
+        <NameBlock word={word} talk={talk} scene={scene} />
+      </div>
     </div>
 
-    {/* ---- and where it goes ----
+    {/* ---- the word itself ----
+        The card's own word, as the first form of the Advanced tab is
+        written — the same form, so nothing is copied either way. */}
+    {!advanced && (
+      <div className="at-formblock at-mt5">
+        <div className="at-formhead">
+          <span className="at-formnum">Word or phrase</span>
+        </div>
+        {/* No fold: on its own here, the word is always open to write. */}
+          <FormBlock
+            word={word}
+            lang={lang}
+            index={0}
+            form={word.forms[0] || {}}
+            title=""
+            role=""
+            canCopy={false}
+            dims={[]}
+            bare
+          />
+      </div>
+    )}
 
-        The other fact about the card rather than about its words, and the
-        one that decides whether anybody ever sees it — so it is a section
-        of its own, directly under what kind of card this is. It was a
-        control at the foot of that block, where it read as one more thing
-        about the kind rather than as the question it is. */}
+    {/* ---- and where it goes ---- */}
     <div className="at-formblock at-mt5">
       <div className="at-formhead">
         <span className="at-formnum">Decks</span>
@@ -6593,9 +6670,26 @@ function KindBlock({ card, lang, scene, shape, word, talk, decks, chosen, onTogg
       </div>
       <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} />
     </div>
+
+    {/* ---- and the way out of it altogether ----
+        At the foot, away from everyday taps, and only while editing a
+        saved card. It still asks first. */}
+    {onDelete && (
+      <div className="at-formblock at-mt5">
+        <div className="at-formhead">
+          <span className="at-formnum">Delete card</span>
+        </div>
+        <p className="at-dangerline">Deleting a card is permanent and cannot be undone.</p>
+        <Button variant="danger" icon="delete" onClick={onDelete}>Delete card</Button>
+      </div>
+    )}
     </>
   );
 }
+
+/* "a, b and c". */
+const joinList = (xs: string[]): string =>
+  xs.length < 2 ? xs.join("") : `${xs.slice(0, -1).join(", ")} and ${xs[xs.length - 1]}`;
 
 /* What a saved card's table makes it, in the words the table gives. A
    verb says nothing: the padlock on its subtype already says why it is
@@ -6631,13 +6725,17 @@ const storedHelp = (spec: VerbSpec | null): string => {
  * text box in it, standing between the card and its words, read as a stage
  * of the form rather than as the label it is.
  */
+/* The red asterisk on a field that must be filled in before Save works.
+   Drawn by the stylesheet, so the field's name reads the same as ever. */
+const Req = () => <span className="at-reqstar" aria-hidden="true" />;
+
 function NameBlock({ word, talk, scene }: { word: WordDraft; talk: SceneDraft; scene: boolean }) {
   /* A scene's name is its title, kept where it always was. */
   const value = scene ? talk.title : word.name;
   const set = scene ? talk.setTitle : word.setName;
   return (
     <Field
-      label={<>Name <span className="req">required</span></>}
+      label={<>Card name<Req /></>}
       lede="How this card is listed and searched."
     >
       <input
@@ -6649,7 +6747,6 @@ function NameBlock({ word, talk, scene }: { word: WordDraft; talk: SceneDraft; s
       {/* Only while it is in the way, like every other line that unblocks
           Save on this screen: a demand standing there before anybody has
           typed reads as a telling-off for opening the screen. */}
-      {!value.trim() && <p className="at-formneed unmet">Every card needs a name.</p>}
     </Field>
   );
 }
@@ -6819,6 +6916,12 @@ function TableBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
         plainly an empty box, and the rows are labelled in the order
         they are taught. */}
       <>
+        {word.standsIn && (
+          <>
+            <label className="at-label">Forms<Req /></label>
+            <p className="at-fieldlede">Fill in at least one form.</p>
+          </>
+        )}
         <VerbTable
           lang={lang}
           spec={shownSpec}
@@ -7012,6 +7115,8 @@ function TurnBlock({ talk, lang, allCards, selfId, index: i, line: l }: {
     <div className={`at-formblock${text ? "" : turnSide(l.who)}`}>
       <div className="at-formhead">
         <span className="at-formnum">{text ? `Sentence ${i + 1}` : `Line ${i + 1}`}</span>
+        {/* A text needs one sentence, a conversation two lines. */}
+        {i < (text ? 1 : 2) && <Req />}
         {!text && (
           <span className={`at-speaker s${(l.who || 0) % 4}`}>
             {speakers[l.who || 0] || `Speaker ${(l.who || 0) + 1}`}
@@ -7230,7 +7335,7 @@ export const baseName = (spec: VerbSpec | null): string =>
  * there is a single answer to record, and beside the word it is of once
  * there are two. Whoever draws the heading has to know the count.
  */
-function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, drillsTranslit, blanks, onRemoveBlank, onChange, more = false, children }: {
+function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, drillsTranslit, blanks, onRemoveBlank, onChange, more = false, required = false, children }: {
   lang: Lang;
   form: Record<string, any>;
   /** The axes each accepted answer is asked about — see answerDims. */
@@ -7255,6 +7360,8 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
       form's end — counts as the form having been written in, for whether
       it opens folded. See FoldsForms. */
   more?: boolean;
+  /** The card's own word: its script and English are marked required. */
+  required?: boolean;
   children?: Node;
 }) {
   const fields = answerFields();
@@ -7359,7 +7466,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
           was a heading doing the work of labels and still left the box
           itself blank; the box says what it is now, in the language, and
           the heading says which language. */}
-      <Field label={lang.scriptLabel}>
+      <Field label={<>{lang.scriptLabel}{required && <Req />}</>}>
         <ScriptAnswers
           lang={lang}
           dims={dims}
@@ -7386,19 +7493,13 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
           blanks={blanks}
           onRemoveBlank={onRemoveBlank}
         />
-        {!drillsTranslit && (
-          <Help>
-            {lang.name} is written in the Latin alphabet, so the{" "}
-            {lang.translitLabel.toLowerCase()} is never asked for — it is kept
-            beside the answer it belongs to, and read.
-          </Help>
-        )}
       </Field>
 
-      <Field label="English">
+      <Field label={<>English{required && <Req />}</>}>
         <Alternatives
           value={f.en}
           of={of}
+          moreLabel="Other English answers"
           onChange={(v) => onChange({ en: v })}
           render={(v, set, label) =>
             blanks ? (
@@ -7558,7 +7659,7 @@ function ReferenceField({ word, lang }: { word: WordDraft; lang: Lang }) {
   );
 }
 
-function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCopy = true, blanks, dims, onFill, children }: {
+function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCopy = true, blanks, dims, onFill, bare = false, children }: {
   word: WordDraft;
   lang: Lang;
   /** Where the form sits in the draft — or -1 for a noun's box nobody has
@@ -7601,6 +7702,9 @@ function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCop
   dims?: GrammarDim[];
   /** What the first thing typed into an empty box does with it. */
   onFill?: (next: Record<string, any>) => void;
+  /** The basic form: no classifier under it — grammar of every kind is on
+      the Advanced tab. */
+  bare?: boolean;
   children?: Node;
 }) {
   const { drillsTranslit, setForm, duplicateForm, removeForm, dropBlank, shownSpec, cells } = word;
@@ -7655,6 +7759,7 @@ function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCop
       blanks={blanks}
       onRemoveBlank={takeOff}
       more={pronouns}
+      required={i === 0 && !word.standsIn}
       onChange={(patch) => (i < 0 && onFill ? onFill({ ...f, ...patch }) : setForm(i, { ...f, ...patch }))}
     >
       {/* Whatever else belongs to this form — its table of attached
@@ -7663,7 +7768,7 @@ function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCop
       {children}
     </FormFields>
 
-    {i === 0 && <ReferenceField word={word} lang={lang} />}
+    {i === 0 && !bare && <ReferenceField word={word} lang={lang} />}
   </div>
     </>
   );
@@ -10190,10 +10295,10 @@ function byTab(written: ReturnType<typeof writtenCard>, clue: string, capitals: 
   const practice = (forms as Record<string, any>[]).map((f) => [f.ask, f.lend]);
   const { sceneKind, ...sceneRest } = scene || ({} as Record<string, any>);
   return {
-    overview: JSON.stringify([name, category, decks, sceneKind || null]),
-    content: JSON.stringify([bare, examples, uses, sentence, note, stripped, scene ? sceneRest : null]),
+    overview: JSON.stringify([name, decks, bare.slice(0, 1)]),
+    content: JSON.stringify([bare.slice(1), category, sceneKind || null, examples, uses, sentence, note, stripped, scene ? sceneRest : null, clue, capitals, fills, ref, spread]),
     exercises: JSON.stringify([practice, drill]),
-    settings: JSON.stringify([clue, capitals, fills, ref, spread]),
+    settings: "",
   };
 }
 
@@ -10206,16 +10311,35 @@ function byTab(written: ReturnType<typeof writtenCard>, clue: string, capitals: 
  * Locked inside, as the whole sheet was; `after` is drawn outside the lock,
  * for the exercises a teacher tries on a card they are only reading.
  */
-function TabPanel({ id, tab, locked, panel, after, children }: {
+/*
+ * Whether a tap while the card is read landed on something that would
+ * change it — a box, a tick, a control the lock holds still — as against
+ * something that works on a card being read: a recording to play, an
+ * exercise to try, a tab. Those are buttons the lock leaves alive.
+ */
+export function tapWouldChange(target: EventTarget | null): boolean {
+  const el = target as Element | null;
+  if (!el || typeof el.closest !== "function") return false;
+  if (!el.closest("fieldset.at-cardlock, fieldset.at-readlock")) return false;
+  /* A button the lock leaves alive — a recording, Export — does its job. */
+  const live = el.closest("button, a, [role=button]");
+  if (live && !live.matches(":disabled")) return false;
+  return !!el.closest("input, textarea, select, label, [contenteditable], button, .at-tickrow, .at-chooser, .at-field");
+}
+
+function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   id: CardTab;
   tab: CardTab;
   locked: boolean;
   panel: React.MutableRefObject<HTMLDivElement | null>;
   after?: Node;
+  /** A tap on something that would change the card, while it is read. */
+  onLockedTap?: () => void;
   children?: Node;
 }) {
   return (
-    <div ref={panel} role="tabpanel" aria-label={id} hidden={tab !== id}>
+    <div ref={panel} role="tabpanel" aria-label={id} hidden={tab !== id}
+      onPointerDown={locked && onLockedTap ? (e) => { if (tapWouldChange(e.target)) onLockedTap(); } : undefined}>
       <fieldset className="at-cardlock" disabled={locked}>
         <Locked.Provider value={locked}>{children}</Locked.Provider>
       </fieldset>
@@ -10276,12 +10400,37 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   /* And from here down there is one kind of card on this screen and it
      does not change. It is the card's own answer where there is a card,
      and the answer given before this opened where there is not. */
-  const shape = card ? shapeOf(card) : making;
+  /* What the card was saved as, or what it was started as. A saved card's
+     type is settled; a new one's is picked on the Advanced tab. */
+  const base = card ? shapeOf(card) : making;
+  const typeLocked = !!(card && card.id);
+  const [picked, setPicked] = useState<CardShape>(base);
+  /* Whether this is an advanced card — see opensAdvanced. A basic card is
+     always a word. */
+  const [advanced, setAdvanced] = useState(() => (card ? opensAdvanced(card) : base !== "word"));
+  const shape: CardShape = advanced ? picked : "word";
   const scene = shape === "scene";
-  const word = useWordDraft({ card, lang, allCards, draft, shape });
-  const talk = useSceneDraft({ card, allCards });
+  /* Two drafts: the word, and the sentence or scene. Choosing another type
+     on a new card puts the other aside rather than throwing it away, so
+     choosing back before saving brings it back; only what the card is
+     saved as is sent. */
+  const wordDraft = useWordDraft({ card: base === "word" ? card : null, lang, allCards, draft: base === "word" ? draft : null, shape: "word" });
+  const textDraft = useWordDraft({
+    card: base === "word" ? null : card,
+    lang,
+    allCards,
+    draft: base === "word" ? null : draft,
+    shape: picked === "scene" ? "scene" : "sentence",
+  });
+  const word = shape === "word" ? wordDraft : textDraft;
+  const talk = useSceneDraft({ card: base === "scene" ? card : null, allCards });
   const [chosen, setChosen] = useState(inDecks || []);
-  const canSave = scene ? talk.canSave : word.canSave;
+  /* A basic card is held to its name and its word, which is all it shows. */
+  const canSave = scene
+    ? talk.canSave
+    : advanced
+      ? word.canSave
+      : canSaveWord(word.main, slotTrouble(word.main)) && !word.needsName;
   /* Which of the seven editors this card gets: a conversation, a
      sentence, a noun laid out in its boxes, or a word — plainly, or with a
      table, and the table says which editor: one every form carries, one
@@ -10320,14 +10469,35 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
      which keep their capital already, and not a verb, whose *I* is kept by
      its column. Sent only where it is asked, so a card turned into a
      person drops the answer rather than carrying one nobody can see. */
-  const asksCapitals = shape === "word" && subtypeTakesCapitals(word.category) &&
+  const asksCapitals = advanced && shape === "word" && subtypeTakesCapitals(word.category) &&
     /* Nor the pronoun *I* the Pronouns screen wrote, which keeps its
        capital by its column, as a verb's *I* does. */
     !(card && SPEAKER_COLUMNS.has(String(card.person || "")));
   /* The question a change to a shared word asks, while it is being asked:
      what would be saved, and which cards it would be offered to. */
   const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null, exit: boolean } | null>(null);
-  const meanings = shape === "word";
+  const meanings = advanced && shape === "word";
+  /* The card as a save would write it — a basic card cut down to its word. */
+  const written = () => {
+    const w = writtenCard({ word, talk, shape, chosen });
+    return advanced ? w : basicCard(w, word.main);
+  };
+  /* The name follows the card from one type to another: it is the one
+     field every type has. */
+  const nameOf = (s: CardShape) => (s === "scene" ? talk.title : s === "word" ? wordDraft.name : textDraft.name);
+  const nameTo = (s: CardShape, v: string) =>
+    s === "scene" ? talk.setTitle(v) : s === "word" ? wordDraft.setName(v) : textDraft.setName(v);
+  const reshape = (next: CardShape, on: boolean) => {
+    const to = on ? next : "word";
+    if (to !== shape) nameTo(to, nameOf(shape));
+    setPicked(next);
+    setAdvanced(on);
+  };
+  /* Only what has something written in it is worth a warning. */
+  const asideWritten = picked === "sentence"
+    ? textDraft.forms.some(formWritten)
+    : picked === "scene" && (talk.written as Record<string, any>[]).some(formWritten);
+  const drops = advanced ? [] : droppedByBasic(wordDraft, clue, asideWritten ? picked : "word");
   /*
    * Whether anything has changed: the card as written now, against the card
    * as it was when the editor opened — or when it was last saved, since
@@ -10337,7 +10507,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
    * Measured through writtenCard, the same function that writes the save,
    * so what counts as a change is exactly what a save would send.
    */
-  const pieces = byTab(writtenCard({ word, talk, shape, chosen }), clue.trim(), asksCapitals ? capitals : null);
+  const pieces = byTab(written(), meanings ? clue.trim() : "", asksCapitals ? capitals : null);
   const snapshot = JSON.stringify(pieces);
   const [savedAs, setSavedAs] = useState(snapshot);
   /* What a Save sent, kept until the card comes back saved — the screen
@@ -10350,6 +10520,32 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     sending.current = null;
   }, [card]);
   const changed = snapshot !== savedAs;
+  /* Whether the grey Save has been tapped: until then a card that cannot
+     be saved yet says nothing about it — see `dots`. */
+  const [nameAsked, setNameAsked] = useState(false);
+  const snack = useSnackbar();
+  /* What is short, as against what is wrong: an empty field a red
+     asterisk marks, or a mistake that already has its own red line. */
+  const missing = (() => {
+    if (scene) return !talk.title.trim() || !talk.sceneKind || !canSaveScene(talk.title, talk.written, talk.text);
+    if (word.needsName) return true;
+    if (advanced && word.standsIn) return word.needsForm;
+    return !String(word.main.ar || "").trim() || !String(word.main.en || "").trim();
+  })();
+  /* A tap on a field of a card being read. */
+  const viewOnly = () => snack("You are in view-only mode. Switch to edit to make changes to the card.");
+  /* The floating Save: saves where it can, and otherwise says why not. */
+  const trySave = () => {
+    if (busy) return;
+    if (canSave && changed) {
+      save();
+      return;
+    }
+    setNameAsked(true);
+    if (!changed) snack("No changes to save.");
+    else if (missing) snack("Some required fields are missing. They're marked with *.", "warn");
+    else snack("Something needs fixing before saving.", "warn");
+  };
   /* Cancel with changes on the card: asked first. */
   const [discarding, setDiscarding] = useState(false);
   const quit = () => (stored && onRelock ? onRelock() : onClose());
@@ -10358,43 +10554,36 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
      Save alone keeps it open on the card as saved. */
   const save = (next: "meaning" | "word" | null = null, exit = false) => {
     sending.current = snapshot;
-    const written = writtenCard({ word, talk, shape, chosen });
+    const out = written();
     const extra = {
       clue: meanings ? clue.trim() : "",
       next: meanings ? next : null,
       capitals: asksCapitals ? capitals : undefined,
     };
-    const changes = stored && meanings ? wordChanges(card, written.forms as any) : [];
+    const changes = stored && shape === "word" ? wordChanges(card, out.forms as any) : [];
     const others = cardsSharingChange(allCards, { id: selfId, lang: lang.id }, changes);
     if (others.length) {
-      setCarrying({ written, cards: others, changes, next: extra.next, exit });
+      setCarrying({ written: out, cards: others, changes, next: extra.next, exit });
       return;
     }
-    onSave({ ...written, ...extra, carry: null, exit });
+    onSave({ ...out, ...extra, carry: null, exit });
   };
   /* Whether there is a connection, for the line above the first field. */
   const offline = useOffline();
 
-  /*
-   * The four tabs. Always opened on the first, which says what the card is
-   * — a new card included, whose subtype is chosen there.
-   *
-   * The second is named for what the card is made of, so a conversation's
-   * is its lines and a verb's its table: "Forms" over a conversation, or
-   * "Content" over anything, said nothing.
-   */
+  /* The tabs. Always opened on the first, which says what the card is. */
   const [tab, setTab] = useState<CardTab>("overview");
-  const contentName =
-    layout === "scene" ? (talk.text ? "Text" : "Lines")
-      : layout === "verb" ? "Table"
-        : layout === "sentence" ? "Sentence"
-          : "Forms";
-  const tabList: [string, string][] = [
-    ["overview", "Overview"],
-    ["content", contentName],
-    ["exercises", "Exercises"],
-    ...(scene ? [] : [["settings", "Settings"] as [string, string]]),
+  /* Basic, then Advanced while the box is ticked — see opensAdvanced. What
+     was on a Settings tab of its own is at the foot of Advanced. */
+  /* Each with its icon, over its name, in the one segmented track — see
+     .at-cardtabs. */
+  const tabList: [string, string, string][] = [
+    ["overview", "Basic", "cards"],
+    ...(advanced ? [["content", "Advanced", "tune"] as [string, string, string]] : []),
+    ["exercises", "Exercises", "school"],
   ];
+  /* Unticked while looking at the Advanced tab: back to Basic. */
+  const shownTab: CardTab = !advanced && (tab === "content" || tab === "settings") ? "overview" : tab;
   /*
    * A dot on a tab with something on it the teacher should know about while
    * looking at another: a change not yet saved, or a line saying what is in
@@ -10439,7 +10628,10 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     }
     return () => seen.disconnect();
   }, [locked]);
-  const blocked = unmet ? unmet.split(" ") : !locked && !canSave ? ["content"] : [];
+  /* And a card that cannot be saved yet says nothing about it until Save
+     has been tried: a dot on a card just opened would be a warning about
+     nothing the teacher has done. */
+  const blocked = unmet ? unmet.split(" ") : !locked && !canSave && nameAsked ? [advanced ? "content" : "overview"] : [];
   const dots = tabList
     .map(([k]) => k as CardTab)
     .filter((k) => pieces[k] !== savedPieces[k] || blocked.includes(k));
@@ -10470,35 +10662,14 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         onBack={locked ? onClose : leave}
         backIcon={locked ? "back" : "close"}
         backLabel={locked ? "Back" : "Cancel"}
-        /* Icons only, on the title's own line, which gives way to them —
-           the title is cut short rather than wrapped. Locked: the status
-           and Edit; Export is by the "This card" heading, with the other
-           facts about the card. Open: Delete and Save, which keeps the
-           card open to go on with it — the status is for a card being
-           read. Each says what it does on hover and out loud. */
-        action={
-          locked ? (
-            <>
-              {status ? status(false) : null}
-              <Button variant="primary" size="sm" className="iconly" aria-label="Edit" title="Edit" onClick={onUnlock}>
-                <Icon name="edit" />
-              </Button>
-            </>
-          ) : (
-          <>
-            {stored && onDelete ? (
-              <IconButton icon="delete" label="Delete this card" title="Delete this card" danger onClick={onDelete} />
-            ) : null}
-            <Button variant="primary" size="sm" className="iconly"
-              aria-label={busy ? "Saving…" : "Save"}
-              title={busy ? "Saving…" : "Save"}
-              disabled={!canSave || !changed || busy}
-              onClick={() => save()}
-            >
-              <Icon name="save" />
-            </Button>
-          </>
-          )
+        /* On the right of the title, only the status, and only while the
+           card is read: a status is a fact about the card as saved. Edit
+           and Save float in the bottom corner — see ScreenFab. */
+        action={locked && status ? status(false) : null}
+        fab={
+          locked
+            ? onUnlock ? { icon: "edit", label: "Edit", onClick: onUnlock } : null
+            : { icon: "save", label: "Save", off: !canSave || !changed, busy: !!busy, onClick: trySave }
         }
       >
           {about}
@@ -10517,26 +10688,29 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
           {/* Outside the lock: a card being read is moved round as freely
               as one being written. */}
           <div className="at-cardtabs">
-            <Tabs tabs={tabList} value={tab} onChange={(k) => setTab(k as CardTab)} label="Part of the card" dots={dots} />
+            <Tabs tabs={tabList} value={shownTab} onChange={(k) => setTab(k as CardTab)} label="Part of the card" dots={dots} />
           </div>
 
-          {/* ---- Overview ----
-              The facts about the card a teacher changes most: what kind
-              it is and which decks it is in. */}
-          <TabPanel id="overview" tab={tab} locked={locked} panel={panels.overview}>
-            <KindBlock
-              card={card}
+          {/* ---- Basic ----
+              The name, whether it is an advanced card, the word itself on
+              a basic one, and its decks. */}
+          <TabPanel id="overview" tab={shownTab} locked={locked} panel={panels.overview} onLockedTap={viewOnly}>
+            <BasicBlock
               lang={lang}
               scene={scene}
-              shape={shape}
               word={word}
               talk={talk}
+              advanced={advanced}
+              canUntick={!(typeLocked && base !== "word")}
+              onAdvanced={(on) => reshape(picked, on)}
+              drops={drops}
               decks={decks || []}
               chosen={chosen}
               onToggleDeck={(id, on) =>
                 setChosen((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
               }
               onExport={locked ? onExport : undefined}
+              onDelete={!locked && stored && onDelete ? onDelete : undefined}
             />
           </TabPanel>
 
@@ -10544,7 +10718,22 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               One editor, whichever kind of card this is. Told apart here
               and nowhere else: every block draws what it is handed, and
               which blocks that is, is each editor's list. */}
-          <TabPanel id="content" tab={tab} locked={locked} panel={panels.content}>
+          {advanced && (
+          <TabPanel id="content" tab={shownTab} locked={locked} panel={panels.content} onLockedTap={viewOnly}>
+            {/* The type and subtype first: everything below follows from
+                them. */}
+            <KindBlock
+              card={card}
+              lang={lang}
+              scene={scene}
+              shape={shape}
+              word={word}
+              talk={talk}
+              typeLocked={typeLocked}
+              onPick={(next) => reshape(next, true)}
+              dropsWord={!typeLocked && shape !== "word" && formWritten(wordDraft.forms[0] || {})}
+            />
+            <div className="at-mt5">
             {layout === "scene" ? (
               <SceneEditor talk={talk} lang={lang} allCards={allCards} selfId={selfId} />
             ) : layout === "sentence" ? (
@@ -10560,7 +10749,32 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             ) : (
               <WordEditor word={word} lang={lang} allCards={allCards} selfId={selfId} />
             )}
+            </div>
+            {/* ---- What most cards never need ----
+                The other meanings of its word and the clue that tells them
+                apart, how its English is capitalised, and how other cards'
+                blanks reach it. A scene has none of these. */}
+            {!scene && (
+              <>
+                {meanings && (
+                  <MeaningsBlock
+                    lang={lang}
+                    selfId={selfId}
+                    lead={word.forms[0] || {}}
+                    allCards={allCards}
+                    clue={clue}
+                    onClue={setClue}
+                    canAdd={canSave && !busy}
+                    onAnother={(which) => save(which)}
+                    onOpen={onOpenCard}
+                  />
+                )}
+                {asksCapitals && <CapitalsBlock on={capitals} onChange={setCapitals} />}
+                <BlanksBlock word={word} lang={lang} />
+              </>
+            )}
           </TabPanel>
+          )}
 
           {/* ---- Exercises ----
               What is practised, form by form, and then what that makes of
@@ -10568,10 +10782,10 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               trying one changes nothing on the card. */}
           <TabPanel
             id="exercises"
-            tab={tab}
+            tab={shownTab}
             locked={locked}
-           
             panel={panels.exercises}
+            onLockedTap={viewOnly}
             after={
               <>
                 {below}
@@ -10588,31 +10802,6 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               </>
             )}
           </TabPanel>
-
-          {/* ---- Settings ----
-              What most cards never need: the other meanings of its word
-              and the clue that tells them apart, how its English is
-              capitalised, and how other cards' blanks reach it. A scene
-              has none of these. */}
-          {!scene && (
-            <TabPanel id="settings" tab={tab} locked={locked} panel={panels.settings}>
-              {meanings && (
-                <MeaningsBlock
-                  lang={lang}
-                  selfId={selfId}
-                  lead={word.forms[0] || {}}
-                  allCards={allCards}
-                  clue={clue}
-                  onClue={setClue}
-                  canAdd={canSave && !busy}
-                  onAnother={(which) => save(which)}
-                  onOpen={onOpenCard}
-                />
-              )}
-              {asksCapitals && <CapitalsBlock on={capitals} onChange={setCapitals} />}
-              <BlanksBlock word={word} lang={lang} />
-            </TabPanel>
-          )}
       </Screen>
       {discarding && (
         <ConfirmModal
@@ -10640,7 +10829,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             setCarrying(null);
             onSave({
               ...written,
-              clue: clue.trim(),
+              clue: meanings ? clue.trim() : "",
               capitals: asksCapitals ? capitals : undefined,
               next,
               exit,
