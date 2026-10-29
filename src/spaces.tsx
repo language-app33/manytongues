@@ -5008,7 +5008,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
    * opensAdvanced in card-editor.tsx.
    */
   const setMaking = (m: { decks: string[]; lang?: LangId } | null) => {
-    if (m) setEditing({ card: null, decks: m.decks, lang: m.lang, making: "word" });
+    /* `opened` so a card already on screen is not reused: the editor is
+       keyed on it, and a new card starts from nothing. */
+    if (m) setEditing({ card: null, decks: m.decks, lang: m.lang, making: "word", opened: Date.now() });
   };
 
   /* How many cards are waiting for a connection, so the space can say so

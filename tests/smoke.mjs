@@ -4826,10 +4826,20 @@ const wordKindSaid = () => {
 const thisCardBlock = () => /** @type {any} */ ([...document.querySelectorAll(".at-formblock")]
   .find((b) => /^This card$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()))
   || null);
+/* And "What it is", at the head of the Advanced tab since 0.513: the type,
+   the subtype and what follows from it. */
+const kindBlock = () => /** @type {any} */ ([...document.querySelectorAll(".at-formblock")]
+  .find((b) => /^What it is$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()))
+  || null);
 /* The questions it asks, in the order it asks them. */
 const thisCardAsks = () => {
-  const block = thisCardBlock();
-  return block ? [...block.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : [];
+  /* Since 0.513 the name is on the Basic tab and the type and subtype head
+     the Advanced tab, under "What it is": read as one list, in that order. */
+  const kind = [...document.querySelectorAll(".at-formblock")]
+    .find((b) => /^What it is$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()));
+  return [thisCardBlock(), kind].filter(Boolean)
+    .flatMap((block) => [...block.querySelectorAll(".at-label, [role=radiogroup] > .at-label, legend")])
+    .map((l) => (l.textContent || "").trim());
 };
 const cardNameField = () => {
   const block = thisCardBlock();
@@ -4843,6 +4853,15 @@ const formRows = () => [...document.querySelectorAll(
    radio rows, looked for wherever they are drawn. */
 const openWordKind = async () => {
   if (formRows().length) return;
+  /* The subtype is on the Advanced tab since 0.513, there only while
+     "Build an advanced card" is ticked. */
+  const box = [...document.querySelectorAll(".at-formblock")]
+    .find((b) => /^Advanced$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()));
+  const tick = /** @type {any} */ (box ? box.querySelector("input") : null);
+  if (tick && !tick.checked && !tick.disabled) {
+    click(tick);
+    await sleep(250);
+  }
   click(wordKindPencil() || wordKindBtn());
   await sleep(250);
 };
@@ -5091,39 +5110,37 @@ const openPronounTables = async () => {
   click([...inFrame.querySelectorAll("button")].find((b) => /^New card$/.test((b.textContent || "").trim())));
   await sleep(450);
 
-  /* The three shapes a card comes in, asked before the editor opens.
-
-     It was the first field inside the editor until 0.187, which put a
-     teacher in a screen for making a card and then asked what sort of card
-     it was going to be. The three are not variations on one form — a
-     conversation has speakers and turns where a word has forms — so the
-     question comes first and what opens is a screen for making that one. */
-  const kindRows = () => [...document.querySelectorAll(
-    '[role="radiogroup"][aria-label="What kind of card is this?"] .at-tickrow')];
-  check("New card asks what kind of card it is, before the editor",
-    kindRows().length === 3 &&
-      /^Word or phrase/.test((kindRows()[0].textContent || "").trim()) &&
-      /^Sentence/.test((kindRows()[1].textContent || "").trim()) &&
-      /^Scene/.test((kindRows()[2].textContent || "").trim()),
-    kindRows().map((r) => (r.textContent || "").slice(0, 18)).join(" | ") || "(no kind picker)");
-  check("each of the three saying what it is",
-    kindRows().length === 3 && kindRows().every((r) => !!r.querySelector("i")),
-    kindRows().map((r) => ((r.querySelector("i") || {}).textContent || "—").slice(0, 30)).join(" | "));
-  check("and nothing chosen for the teacher, because nothing here can be worked out",
-    kindRows().every((r) => !(/** @type {any} */ (r.querySelector("input")).checked)),
-    kindRows().map((r) => /** @type {any} */ (r.querySelector("input")).checked).join(" "));
-  const startBtn = () => /** @type {any} */ (buttonNamed(/^Start the card$/) || null);
-  check("and there is no way on until one is picked",
-    !!startBtn() && startBtn().disabled,
-    startBtn() ? (startBtn().disabled ? "refused" : "offered") : "(no button)");
-
-  /* Picking one opens the editor for that one — named for it, and asking
-     nothing further about it. */
+  /* New card opens straight onto the card screen, as a basic card (0.513):
+     a name, a box headed Advanced, the word itself and its decks. What
+     kind of card it is — word, sentence or scene — is asked only of a
+     teacher building an advanced card, on the Advanced tab. */
+  const advancedBox = () => /** @type {any} */ ([...document.querySelectorAll(".at-formblock")]
+    .find((b) => /^Advanced$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim())) || null);
+  const advancedTick = () => /** @type {any} */ ((advancedBox() || document.createElement("div")).querySelector("input"));
+  const tabNames = () => [...document.querySelectorAll('.at-screen.over [role="tab"]')]
+    .map((t) => (t.textContent || "").trim());
+  check("New card opens straight onto a basic card, with no question first",
+    !document.querySelector('[role="radiogroup"][aria-label="What kind of card is this?"]') &&
+      !!advancedTick() && !advancedTick().checked && tabNames().join("|") === "Basic|Exercises",
+    `${tabNames().join("|")} · box ${advancedTick() ? (advancedTick().checked ? "ticked" : "unticked") : "missing"}`);
+  check("whose Basic tab holds the word itself",
+    [...document.querySelectorAll(".at-formblock .at-formnum")].some((n) => /^Word or phrase$/.test((n.textContent || "").trim())),
+    "(no word)");
+  const typeRows = () => [...document.querySelectorAll(
+    '[role="radiogroup"][aria-label="What type of card"] .at-tickrow')];
+  /* Ticking the box opens the Advanced tab, whose first question is the
+     type; picking one there makes the card that kind. */
   const pickCardKind = async (/** @type {RegExp} */ want) => {
-    const row = kindRows().find((r) => want.test((r.textContent || "").trim()));
-    click(row ? row.querySelector("input") : null);
+    if (advancedTick() && !advancedTick().checked) {
+      click(advancedTick());
+      await sleep(250);
+    }
+    const tab = [...document.querySelectorAll('.at-screen.over [role="tab"]')]
+      .find((t) => /^Advanced$/.test((t.textContent || "").trim()));
+    click(tab);
     await sleep(200);
-    click(startBtn());
+    const row = typeRows().find((r) => want.test((r.textContent || "").trim()));
+    click(row ? row.querySelector("input") : null);
     await sleep(450);
     await nameIt();
   };
@@ -5312,11 +5329,9 @@ const openPronounTables = async () => {
       formFolds().map((b) => b.getAttribute("aria-expanded")).join(" | ") || "(no folds)");
   }
   openFormsAsDrawn = true;
-  check("which says what kind of card it is and does not ask again",
-    !document.querySelector('[role="group"][aria-label="The kind of card"]') &&
-      /The type of card cannot be changed/.test(document.body.textContent || ""),
-    document.querySelector('[role="group"][aria-label="The kind of card"]')
-      ? "still asked" : "said, not asked");
+  check("which asks the type on the Advanced tab, free until the card is saved",
+    typeRows().length === 3 && /It cannot be changed once the card is saved/.test(document.body.textContent || ""),
+    `${typeRows().length} types`);
   /* And, underneath, what kind of word it is — which is a second question
      and not a third answer to the first. The list is the language's own,
      and what follows from the answer is which table the card is offered.
@@ -5377,7 +5392,8 @@ const openPronounTables = async () => {
     const named = () => [...document.querySelectorAll(".at-formblock .at-formnum")]
       .map((n) => (n.textContent || "").trim());
     check("and the decks are a section of their own, under the kind of card",
-      named().indexOf("Decks") === named().indexOf("This card") + 1 &&
+      named().indexOf("Decks") === named().indexOf("Advanced") + 1 &&
+        named().indexOf("Advanced") === named().indexOf("This card") + 1 &&
         !!addBtn() && !!addBtn().closest(".at-formblock") &&
         /^Decks$/.test(((addBtn().closest(".at-formblock").querySelector(".at-formnum") || {}).textContent || "").trim()),
       named().join(" | "));
@@ -7192,7 +7208,7 @@ const openPronounTables = async () => {
         `${cardAxis() ? "asked once" : "not asked"} · answers ${grammarBtn() ? "asked their grammar" : "asked nothing"}`);
       check("and it is one toggle in the block that says what kind it is",
         !!cardAxis() && !!cardAxis().closest(".at-formblock") &&
-          /This card/.test(((cardAxis().closest(".at-formblock").querySelector(".at-formnum")) || {}).textContent || "") &&
+          /What it is/.test(((cardAxis().closest(".at-formblock").querySelector(".at-formnum")) || {}).textContent || "") &&
           ["Thing", "Person", "Animal"].every((v) => axisPicks().includes(v)),
         axisPicks().join(" | ") || "(no toggle)");
       /* A box per number, already marked, each with its own pronouns. */
@@ -7625,7 +7641,7 @@ const openPronounTables = async () => {
     thisCardAsks().includes("What subtype"),
     thisCardAsks().join(" | ") || "(nothing asked)");
   const subtypeRow = () => {
-    const block = thisCardBlock();
+    const block = kindBlock();
     const field = block && [...block.querySelectorAll(".at-field")].find(
       (f) => /^What subtype$/.test(((f.querySelector(".at-label") || {}).textContent || "").trim()));
     return /** @type {any} */ (field ? field.querySelector(".at-shutrow") : null);
@@ -7639,7 +7655,7 @@ const openPronounTables = async () => {
   check("with a padlock rather than a pencil, and says why",
     !!subtypeRow() && !!subtypeRow().querySelector(".at-shutlock") && !wordKindPencil() &&
       /cannot be changed while the card carries its table/.test(
-        (thisCardBlock().textContent || "")),
+        (kindBlock().textContent || "")),
     subtypeRow() && subtypeRow().querySelector(".at-shutlock") ? "locked" : "no padlock");
   /* And no line explaining what a verb is — at the foot of the block or
      under its name. The padlock says it is settled; that is enough. */
@@ -7671,7 +7687,7 @@ const openPronounTables = async () => {
   check("a card saved as a Name still says Name",
     wordKindSaid() === "Name", wordKindSaid() || "(nothing said)");
   check("and says Person or Place is the way forward",
-    /choose Person or Place instead/.test((thisCardBlock() || {}).textContent || ""),
+    /choose Person or Place instead/.test((kindBlock() || {}).textContent || ""),
     "said");
   await openWordKind();
   const offered = formRows().map((r) => (r.textContent || "").trim());
@@ -7953,8 +7969,7 @@ const openPronounTables = async () => {
      a saved word with no table could be called a sentence and back again,
      which is the one pair that looked harmless. */
   {
-    const kind = [...document.querySelectorAll(".at-formblock")].find((b) =>
-      /^This card$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()));
+    const kind = kindBlock();
     check("a saved card is not offered another kind",
       !!kind && !kind.querySelector('[aria-label="The kind of card"]'),
       kind
