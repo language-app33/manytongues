@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.517 — 29 October 2026
+
+**The Basic tab is shorter: the Advanced box sits at the top of "This
+card".**
+
+- "Build an advanced card" is now the first thing under "This card",
+  above the card's name, with no heading or explanation of its own. The
+  separate Advanced section is gone. A saved sentence or scene, whose box
+  cannot be unticked, still says why under it.
+- The name's heading is now "Card name", without the "required" marker.
+  The line "How this card is listed and searched" stays, and an empty
+  name still says every card needs one.
+
+To check by hand: open New card on a phone and look at the top of the
+Basic tab.
+
 ## 0.516 — 29 October 2026
 
 **A basic card is just the word: no grammar on it.**
