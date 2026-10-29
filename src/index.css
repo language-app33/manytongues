@@ -210,9 +210,14 @@ button {
   }}
 .at {
   background: var(--bg); color: var(--text); font-family: var(--ui);
-  min-height: 100vh; padding: 66px 16px 108px; -webkit-font-smoothing: antialiased;
+  min-height: 100vh; min-height: 100dvh; box-sizing: border-box;
+  padding: 66px 16px 108px; -webkit-font-smoothing: antialiased;
   max-width: 100%; overflow-x: hidden;
 }
+/* The padding counts inside the screen's height, not on top of it: as a
+   content box the page was always a screen plus 174px tall, so a home
+   screen with room to spare still scrolled. dvh because 100vh on a phone is
+   the height with the browser bars hidden, taller than what is on show. */
 /* The 66px above is room for the fixed chrome — the wordmark, the space
    selector, the corner menu. During an exercise none of that is rendered
    (see inExercise), so the room stayed reserved for nothing and every
