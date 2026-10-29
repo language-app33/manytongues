@@ -920,7 +920,7 @@ const click = (el) => el && el.dispatchEvent(new w.MouseEvent("click", { bubbles
 const nameIt = async (v = "Test card") => {
   const screen = [...document.querySelectorAll(".at-screen.cardform")].pop();
   const field = screen && [...screen.querySelectorAll(".at-field")].find((f) =>
-    /^Name/.test(((f.querySelector(".at-label") || {}).textContent || "").trim()));
+    /^Card name$/.test(((f.querySelector(".at-label") || {}).textContent || "").trim()));
   const box = /** @type {HTMLInputElement | null} */ (field ? field.querySelector("input") : null);
   if (!box || box.value.trim()) return;
   must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(box, v);
@@ -4844,7 +4844,7 @@ const thisCardAsks = () => {
 const cardNameField = () => {
   const block = thisCardBlock();
   return /** @type {any} */ ((block && [...block.querySelectorAll(".at-field")]
-    .find((f) => /^Name\b/.test(((f.querySelector(".at-label") || {}).textContent || "").trim())))
+    .find((f) => /^Card name$/.test(((f.querySelector(".at-label") || {}).textContent || "").trim())))
     || null);
 };
 const formRows = () => [...document.querySelectorAll(
@@ -4855,8 +4855,8 @@ const openWordKind = async () => {
   if (formRows().length) return;
   /* The subtype is on the Advanced tab since 0.515, there only while
      "Build an advanced card" is ticked. */
-  const box = [...document.querySelectorAll(".at-formblock")]
-    .find((b) => /^Advanced$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()));
+  const box = [...document.querySelectorAll(".at-tickrow")]
+    .find((r) => /Build an advanced card/.test(r.textContent || ""));
   const tick = /** @type {any} */ (box ? box.querySelector("input") : null);
   if (tick && !tick.checked && !tick.disabled) {
     click(tick);
@@ -5111,11 +5111,12 @@ const openPronounTables = async () => {
   await sleep(450);
 
   /* New card opens straight onto the card screen, as a basic card (0.515):
-     a name, a box headed Advanced, the word itself and its decks. What
+     "Build an advanced card" over the card's name (0.517), the word itself
+     and its decks. What
      kind of card it is — word, sentence or scene — is asked only of a
      teacher building an advanced card, on the Advanced tab. */
-  const advancedBox = () => /** @type {any} */ ([...document.querySelectorAll(".at-formblock")]
-    .find((b) => /^Advanced$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim())) || null);
+  const advancedBox = () => /** @type {any} */ ([...document.querySelectorAll(".at-tickrow")]
+    .find((r) => /Build an advanced card/.test(r.textContent || "")) || null);
   const advancedTick = () => /** @type {any} */ ((advancedBox() || document.createElement("div")).querySelector("input"));
   const tabNames = () => [...document.querySelectorAll('.at-screen.over [role="tab"]')]
     .map((t) => (t.textContent || "").trim());
@@ -5123,6 +5124,12 @@ const openPronounTables = async () => {
     !document.querySelector('[role="radiogroup"][aria-label="What kind of card is this?"]') &&
       !!advancedTick() && !advancedTick().checked && tabNames().join("|") === "Basic|Exercises",
     `${tabNames().join("|")} · box ${advancedTick() ? (advancedTick().checked ? "ticked" : "unticked") : "missing"}`);
+  check("the box is the first thing in This card, above the card's name, and says nothing more",
+    !!advancedBox() && advancedBox().closest(".at-formblock") === thisCardBlock() &&
+      !!cardNameField() && !!(advancedBox().compareDocumentPosition(cardNameField()) & 4) &&
+      /^Build an advanced card$/.test((advancedBox().textContent || "").trim()) &&
+      !/required/i.test((cardNameField().querySelector(".at-label") || {}).textContent || ""),
+    advancedBox() ? (advancedBox().textContent || "").trim() : "(no box)");
   check("whose Basic tab holds the word itself",
     [...document.querySelectorAll(".at-formblock .at-formnum")].some((n) => /^Word or phrase$/.test((n.textContent || "").trim())),
     "(no word)");
@@ -5392,8 +5399,7 @@ const openPronounTables = async () => {
     const named = () => [...document.querySelectorAll(".at-formblock .at-formnum")]
       .map((n) => (n.textContent || "").trim());
     check("and the decks are a section of their own, under the kind of card",
-      named().indexOf("Decks") === named().indexOf("Advanced") + 1 &&
-        named().indexOf("Advanced") === named().indexOf("This card") + 1 &&
+      named().indexOf("Decks") === named().indexOf("This card") + 1 &&
         !!addBtn() && !!addBtn().closest(".at-formblock") &&
         /^Decks$/.test(((addBtn().closest(".at-formblock").querySelector(".at-formnum") || {}).textContent || "").trim()),
       named().join(" | "));
@@ -6220,12 +6226,14 @@ const openPronounTables = async () => {
     /* In "This card" with the other facts about the card, and not in a
        framed section of its own between the card and its words. */
     check("and it is asked first in This card, above the sentence itself",
-      !!sentenceName && /^Name/.test(thisCardAsks()[0] || "") &&
+      !!sentenceName && /^Card name$/.test(thisCardAsks()[0] || "") &&
         !blockNames().includes("What to call it"),
       `${thisCardAsks().join(" | ")} · ${blockNames().join(" | ")}`);
-    check("and says what it is for, and that it is required",
+    /* No "required" marker since 0.517: the line under an empty name says
+       every card needs one. */
+    check("and says what it is for",
       !!sentenceName && /listed and searched/.test(sentenceName.textContent || "") &&
-        /required/.test(sentenceName.textContent || ""),
+        !/required/.test(sentenceName.textContent || ""),
       sentenceName ? (sentenceName.textContent || "").replace(/\s+/g, " ").slice(0, 160) : "(no field)");
     /* The control itself, not the list behind it: the list is on screen
        only while it is open, so a card that is still asked and shut would
@@ -6942,7 +6950,7 @@ const openPronounTables = async () => {
        standing between the card and its table. */
     const heads = [...document.querySelectorAll(".at-formnum")].map((n) => (n.textContent || "").trim());
     check("and it is asked first in This card, before what subtype it is",
-      /^Name/.test(thisCardAsks()[0] || "") && thisCardAsks().indexOf("What subtype") > 0 &&
+      /^Card name$/.test(thisCardAsks()[0] || "") && thisCardAsks().indexOf("What subtype") > 0 &&
         !heads.includes("What to call it"),
       `${thisCardAsks().join(" | ")} · ${heads.join(" | ")}`);
     /* And it says what it is for, and nothing more: a verb's name carries

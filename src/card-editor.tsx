@@ -6597,26 +6597,16 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
           </span>
         ) : null}
       </div>
-      {/* ---- what it is called ----
-          First, before anything else is written: every card has a name,
-          whatever its kind. */}
-      <NameBlock word={word} talk={talk} scene={scene} />
-    </div>
-
-    {/* ---- Advanced ----
-        The one question between a quick card and the whole editor. */}
-    <div className="at-formblock at-mt5">
-      <div className="at-formhead">
-        <span className="at-formnum">Advanced</span>
-        <span className="at-formrole">More forms, a type and subtype, meanings and blanks.</span>
-      </div>
+      {/* ---- basic or advanced ----
+          The one question between a quick card and the whole editor, first
+          because the rest of the screen follows from it. Said in no more
+          than its own words; only where it cannot be unticked does it say
+          why. */}
       <CheckList
         options={[{
           id: "advanced",
           title: "Build an advanced card",
-          note: canUntick
-            ? "Opens the Advanced tab. Leave it off for a word or phrase with one form."
-            : "A sentence or a scene is always an advanced card.",
+          note: canUntick ? undefined : "A sentence or a scene is always an advanced card.",
           disabled: !canUntick && advanced,
         }]}
         chosen={advanced ? ["advanced"] : []}
@@ -6630,6 +6620,11 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
           again to keep {drops.length === 1 && !/^\d/.test(drops[0]) ? "it" : "them"}.
         </p>
       )}
+      {/* ---- what it is called ----
+          Every card has a name, whatever its kind. */}
+      <div className="at-mt5">
+        <NameBlock word={word} talk={talk} scene={scene} />
+      </div>
     </div>
 
     {/* ---- the word itself ----
@@ -6711,7 +6706,7 @@ function NameBlock({ word, talk, scene }: { word: WordDraft; talk: SceneDraft; s
   const set = scene ? talk.setTitle : word.setName;
   return (
     <Field
-      label={<>Name <span className="req">required</span></>}
+      label="Card name"
       lede="How this card is listed and searched."
     >
       <input
