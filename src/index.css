@@ -4311,3 +4311,38 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-home + .at-home { margin-top:28px; padding-top:28px; border-top:1px solid var(--line); }
 .at-home .at-row { max-width:420px; margin-inline:auto; }
 .at.kb-open .at-home { padding:0; }
+
+/* --- the floating button ---------------------------------------------
+   Edit on a card or deck being read, Save on one being written: in the
+   bottom right of the sheet (the 640px column on a wide window, the
+   window's corner on a phone), named while the screen is scrolled up and
+   its icon alone while scrolled down. The body keeps room for it at its
+   foot so it never sits over the last thing on the page. See ScreenFab. */
+.at-screen.hasfab .at-screenbody { padding-bottom: calc(104px + env(safe-area-inset-bottom)); }
+.at-fabrow { position:absolute; left:0; right:0; bottom: calc(16px + env(safe-area-inset-bottom));
+  max-width:640px; margin:0 auto; padding:0 16px; display:flex; justify-content:flex-end;
+  pointer-events:none; z-index:4; transition: bottom 160ms ease-out; }
+/* A message at the foot of the window lifts the button over it. */
+.at:has(.at-snack) .at-fabrow { bottom: calc(148px + env(safe-area-inset-bottom)); }
+.at-fab { pointer-events:auto; display:inline-flex; align-items:center; gap:8px;
+  height:56px; min-width:56px; padding:0 16px; border-radius:18px;
+  background: var(--jade); color: var(--onjade); border:0;
+  font-family: var(--ui); font-size:15px; font-weight:700; cursor:pointer;
+  box-shadow: 0 6px 18px rgba(0,0,0,.35); }
+.at-fab > svg { width:24px; height:24px; flex:none; }
+.at-fab .at-fablabel { white-space:nowrap; overflow:hidden; max-width:120px;
+  transition: max-width 160ms ease-out, opacity 120ms ease-out; }
+.at-fab:not(.named) .at-fablabel { max-width:0; opacity:0; }
+.at-fab:not(.named) { gap:0; padding:0; justify-content:center; width:56px; }
+.at-fab.off { background: var(--raised); color: var(--muted); box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+
+/* A field that must be filled in: a red asterisk after its name. */
+.at-reqstar::after { content:"*"; color: var(--rose); margin-left:3px; font-weight:700; }
+
+/* The danger zone at the foot of a card, deck or course: a heading, one
+   line on what it costs, and the red button. */
+.at-dangerline { margin:0 0 12px; color: var(--muted); font-size:14px; }
+
+/* The tabs start at the top of the sheet and stay there: no gap above
+   them that the sticking would take up on the first scroll. */
+.at-screen.cardform .at-screeninner > .at-cardtabs:first-child { margin-top:0; }

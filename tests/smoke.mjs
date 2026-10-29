@@ -1007,7 +1007,10 @@ const spokenName = (/** @type {Element} */ b) =>
 /* The open card's own Edit, on its title line — not the Edit on a tile in
    the list behind it, which is an icon named the same. */
 const cardEdit = () => /** @type {any} */ (
-  (cardOnScreen() || document).querySelector('.at-screenhead button[aria-label="Edit"]'));
+  (cardOnScreen() || document).querySelector('.at-fab[aria-label="Edit"]'));
+/* Whether a button is off: disabled, or — the floating Edit and Save,
+   which still take a tap so the screen can say why (0.520) — marked so. */
+const isOff = (/** @type {any} */ b) => !!b && (b.disabled || b.getAttribute("aria-disabled") === "true");
 /** @param {RegExp} re */
 const buttonNamed = (re) =>
   /* A fold, a play button or a link is pressed to read and keeps working
@@ -4562,40 +4565,51 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   click(cardEdit());
   await sleep(400);
   const editorOpen = () => !!document.querySelector(".at-screen.cardform");
-  check("Edit opens the card editor, with Save alone on its title line",
+  /* Since 0.520 Edit and Save float in the bottom corner, and the title
+     line holds nothing on the right while the card is written. */
+  check("Edit opens the card editor, with Save floating in the corner and nothing on its title line",
     editorOpen() && !!buttonNamed(/^Save$/) && !buttonNamed(/^Save and exit$/) && !buttonNamed(/^Status/) &&
-      !!(/** @type {Element} */ (buttonNamed(/^Save$/))).closest(".at-screenhead"),
-    editorOpen() ? [...document.querySelectorAll(".at-screen.cardform .at-screenhead button")].map(spokenName).join(" | ") : "(no editor)");
+      (/** @type {Element} */ (buttonNamed(/^Save$/))).classList.contains("at-fab") &&
+      !document.querySelector(".at-screen.cardform .at-screenaction button"),
+    editorOpen() ? [...document.querySelectorAll(".at-screen.cardform button.at-fab, .at-screen.cardform .at-screenaction button")].map(spokenName).join(" | ") : "(no editor)");
   /* Nothing changed yet, so there is nothing to save. */
-  const saveOff = () => /** @type {any} */ (buttonNamed(/^Save$/))?.disabled;
+  const saveOff = () => isOff(buttonNamed(/^Save$/));
   check("Save is off until something changes", !!saveOff(),
-    `Save ${(/** @type {any} */ (buttonNamed(/^Save$/)) || {}).disabled ? "off" : "on"}`);
+    `Save ${isOff(buttonNamed(/^Save$/)) ? "off" : "on"}`);
+  /* And a tap on it says so, rather than nothing happening. */
+  clickNamed(/^Save$/);
+  await sleep(150);
+  const snackSays = () => ((document.querySelector(".at-snack") || {}).textContent || "").trim();
+  check("and tapping it says there is nothing to save", /No changes to save/.test(snackSays()), snackSays() || "(nothing said)");
   /* A change anywhere in the card turns them on: a word added to the
      first box with something written in it. */
-  const noteBox = /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (
+  const noteBox = () => /** @type {HTMLInputElement | HTMLTextAreaElement | null} */ (
     [...document.querySelectorAll(".at-screen.cardform input:not([type]), .at-screen.cardform input[type=text], .at-screen.cardform textarea")]
-      .find((b) => !!(/** @type {any} */ (b)).value) || null);
-  /** @param {HTMLInputElement | HTMLTextAreaElement} box @param {string} v */
+      .find((b) => !!(/** @type {any} */ (b)).value && !(/** @type {any} */ (b)).closest("fieldset[disabled]")) || null);
+  /** @param {HTMLInputElement | HTMLTextAreaElement | null} box @param {string} v */
   const typeOn = (box, v) => {
+    if (!box) return;
     const proto = box.tagName === "TEXTAREA" ? w.HTMLTextAreaElement.prototype : w.HTMLInputElement.prototype;
     must(Object.getOwnPropertyDescriptor(proto, "value"), "the value descriptor").set?.call(box, v);
     box.dispatchEvent(new w.Event("input", { bubbles: true }));
   };
   /* A card from before every card had a name is asked for one first. */
   await nameIt();
-  if (noteBox) typeOn(noteBox, `${noteBox.value} x`);
+  const firstBox = noteBox();
+  typeOn(firstBox, `${firstBox ? firstBox.value : ""} x`);
   await sleep(150);
-  check("and come on once something has", !!noteBox && !saveOff(), noteBox ? "typed in a box" : "(no box to type in)");
+  check("and come on once something has", !!firstBox && !saveOff(), firstBox ? "typed in a box" : "(no box to type in)");
   takeSaves = true;
   const savesBefore = savedCards.length;
   clickNamed(/^Save$/);
   await sleep(500);
-  check("Save saves the card and keeps it open",
-    savedCards.length === savesBefore + 1 && editorOpen(),
-    `${savedCards.length - savesBefore} saved · ${editorOpen() ? "open" : "closed"}`);
-  check("and once saved, they are off again until the next change", !!saveOff(),
-    `Save ${(/** @type {any} */ (buttonNamed(/^Save$/)) || {}).disabled ? "off" : "on"}`);
-  if (noteBox) typeOn(noteBox, `${noteBox.value}y`);
+  /* Saving goes back to reading the card as saved (0.520). */
+  check("Save saves the card and goes back to reading it",
+    savedCards.length === savesBefore + 1 && !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save$/),
+    `${savedCards.length - savesBefore} saved · ${buttonNamed(/^Edit$/) ? "reading" : "still editing"}`);
+  click(cardEdit());
+  await sleep(400);
+  typeOn(noteBox(), `${(noteBox() || { value: "" }).value}y`);
   await sleep(150);
   clickNamed(/^Cancel$/);
   await sleep(300);
@@ -4610,11 +4624,9 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     both.length === 2 && !!both[0].id && both[0].id === both[1].id &&
       (!cardId || both[0].id === cardId),
     both.map((c) => c.id).join(", "));
-  clickNamed(/^Cancel$/);
-  await sleep(400);
-  check("and with nothing unsaved the cross goes straight back to reading the card",
+  check("and with it saved the card is read again, Edit in the corner",
     !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save$/),
-    [...document.querySelectorAll(".at-screenhead button")].map(spokenName).join(" | "));
+    [...document.querySelectorAll(".at-fab")].map(spokenName).join(" | "));
   clickNamed(/^Back$/);
   await sleep(400);
   takeSaves = false;
@@ -5128,7 +5140,7 @@ const openPronounTables = async () => {
     !!advancedBox() && advancedBox().closest(".at-formblock") === thisCardBlock() &&
       !!cardNameField() && !!(advancedBox().compareDocumentPosition(cardNameField()) & 4) &&
       /^Build an advanced card$/.test((advancedBox().textContent || "").trim()) &&
-      !/required/i.test((cardNameField().querySelector(".at-label") || {}).textContent || ""),
+      !cardNameField().querySelector(".at-label .req"),
     advancedBox() ? (advancedBox().textContent || "").trim() : "(no box)");
   check("whose Basic tab holds the word itself",
     [...document.querySelectorAll(".at-formblock .at-formnum")].some((n) => /^Word or phrase$/.test((n.textContent || "").trim())),
@@ -5273,9 +5285,9 @@ const openPronounTables = async () => {
       !!fem && fem.classList.contains("main") && !!masc && !masc.classList.contains("main") &&
         (input("Arabic for feminine singular") || {}).value === "قطة" &&
         (input("Arabic for masculine singular") || {}).value === "" &&
-        !!buttonNamed(/^Save$/) && !/** @type {any} */ (buttonNamed(/^Save$/)).disabled,
+        !!buttonNamed(/^Save$/) && !isOff(buttonNamed(/^Save$/)),
       `feminine ${fem && fem.classList.contains("main") ? "is" : "is not"} the word · ` +
-        `save ${buttonNamed(/^Save$/) && !/** @type {any} */ (buttonNamed(/^Save$/)).disabled ? "on" : "off"}`);
+        `save ${buttonNamed(/^Save$/) && !isOff(buttonNamed(/^Save$/)) ? "on" : "off"}`);
   }
 
   /* A person's boxes, a side for each gender, all start folded under their
@@ -5618,8 +5630,8 @@ const openPronounTables = async () => {
     typeInto(fieldNamed(/^English$/), "sun");
     await sleep(200);
     check("and a card with its words is saved without one",
-      !!saveBtn() && !saveBtn().disabled && !idBox().value,
-      `save is ${saveBtn() && saveBtn().disabled ? "refused" : "offered"} with the ID box empty`);
+      !!saveBtn() && !isOff(saveBtn()) && !idBox().value,
+      `save is ${saveBtn() && isOff(saveBtn()) ? "refused" : "offered"} with the ID box empty`);
 
     /* And with a word written, the form can be recorded. The button is
        beside the answer's grammar, under the word it records, rather than
@@ -5722,7 +5734,7 @@ const openPronounTables = async () => {
      It is refused now, and both ways out are named, because the two
      things it can mean are opposite and only the teacher knows which. */
   check("a blank typed into a word is refused rather than quietly allowed",
-    !!saveBtn() && saveBtn().disabled &&
+    !!saveBtn() && isOff(saveBtn()) &&
       /only a sentence can have one/.test(document.body.textContent || ""),
     ([...document.querySelectorAll(".at-formneed.unmet")].map((p) => (p.textContent || "").replace(/\s+/g, " ").trim())
       .find((t) => /only a sentence/.test(t))) || "(nothing said)");
@@ -5748,16 +5760,16 @@ const openPronounTables = async () => {
   typeInto(fieldNamed(/^English$/), "My name is {{friend}}");
   await sleep(300);
   check("a card with a hole in one field only cannot be saved",
-    !!saveBtn() && saveBtn().disabled,
-    `save is ${saveBtn() && saveBtn().disabled ? "refused" : "offered"}`);
+    !!saveBtn() && isOff(saveBtn()),
+    `save is ${saveBtn() && isOff(saveBtn()) ? "refused" : "offered"}`);
   check("and the editor says which field is short of it",
     /is missing\s+friend\b/.test(document.body.textContent || ""),
     ([...document.querySelectorAll(".at-formneed.unmet")].map((p) => (p.textContent || "").replace(/\s+/g, " ").trim())[0]) || "(nothing said)");
   typeInto(fieldNamed(/^Arabic$/i), "ismi {{friend}}");
   await sleep(200);
   check("and it can be saved once every field leaves the same hole",
-    !!saveBtn() && !saveBtn().disabled,
-    `save is ${saveBtn() && saveBtn().disabled ? "still refused" : "offered"}`);
+    !!saveBtn() && !isOff(saveBtn()),
+    `save is ${saveBtn() && isOff(saveBtn()) ? "still refused" : "offered"}`);
 
   /* ---- which way a field with blanks in it reads ----
 
@@ -6078,8 +6090,8 @@ const openPronounTables = async () => {
         readField(enNow()) === "My name is" && readField(arNow()) === "ismi",
         `English "${readField(enNow())}", script "${readField(arNow())}"`);
       check("and the card is left whole rather than half a blank short",
-        !!saveBtn() && !saveBtn().disabled && !pillsIn(enNow()).length && !pillsIn(arNow()).length,
-        `save is ${saveBtn() && saveBtn().disabled ? "refused" : "offered"}, ` +
+        !!saveBtn() && !isOff(saveBtn()) && !pillsIn(enNow()).length && !pillsIn(arNow()).length,
+        `save is ${saveBtn() && isOff(saveBtn()) ? "refused" : "offered"}, ` +
           `${pillsIn(enNow()).length + pillsIn(arNow()).length} pills left`);
 
       /* ---- one pronoun, then how it reads ----
@@ -6202,8 +6214,8 @@ const openPronounTables = async () => {
       JSON.stringify(chips()) === JSON.stringify(["friend"]),
       chips().join(", ") || "(none)");
     check("so the fields agree, and the card saves",
-      !!saveBtn() && !saveBtn().disabled && !/is missing \{\{/.test(document.body.textContent || ""),
-      `save is ${saveBtn() && saveBtn().disabled ? "refused" : "offered"}`);
+      !!saveBtn() && !isOff(saveBtn()) && !/is missing \{\{/.test(document.body.textContent || ""),
+      `save is ${saveBtn() && isOff(saveBtn()) ? "refused" : "offered"}`);
 
     /* ---- and a sentence is a kind of card in its own right ----
 
@@ -6260,8 +6272,8 @@ const openPronounTables = async () => {
       JSON.stringify(chips()) === JSON.stringify(["friend", "noun"]),
       chips().join(", ") || "(none)");
     check("and the sentence saves, because every field leaves the same two",
-      !!saveBtn() && !saveBtn().disabled && !/is missing \{\{/.test(document.body.textContent || ""),
-      `save is ${saveBtn() && saveBtn().disabled ? "refused" : "offered"}`);
+      !!saveBtn() && !isOff(saveBtn()) && !/is missing \{\{/.test(document.body.textContent || ""),
+      `save is ${saveBtn() && isOff(saveBtn()) ? "refused" : "offered"}`);
     /* And it is filled by the words that say they are nouns, with nothing
        written on any of them to say so — which is the whole bargain: a
        teacher writes the sentence, and the vocabulary joins in. Asked for
@@ -6965,8 +6977,8 @@ const openPronounTables = async () => {
       !/the dictionary form/i.test(document.body.textContent || ""),
       /the dictionary form/i.test(document.body.textContent || "") ? "still labelled" : "the table is plain");
     check("and the card can be saved on the strength of it",
-      !!saveBtn() && !saveBtn().disabled,
-      `save is ${saveBtn() && saveBtn().disabled ? "refused" : "offered"}`);
+      !!saveBtn() && !isOff(saveBtn()),
+      `save is ${saveBtn() && isOff(saveBtn()) ? "refused" : "offered"}`);
 
     /*
      * ---- no box of the table is the card ----
@@ -6984,8 +6996,8 @@ const openPronounTables = async () => {
     typeInto(cellNamed("English for present · he"), "he eats");
     await sleep(250);
     check("a verb with the box a dictionary lists left empty still saves",
-      !!saveBtn() && !saveBtn().disabled,
-      `save is ${saveBtn() && saveBtn().disabled ? "refused" : "offered"}`);
+      !!saveBtn() && !isOff(saveBtn()),
+      `save is ${saveBtn() && isOff(saveBtn()) ? "refused" : "offered"}`);
     check("and nothing on the screen asks for that box",
       !/past · he/.test(([...document.querySelectorAll(".at-formneed.unmet")]
         .map((n) => n.textContent || "").join(" ")) || ""),
@@ -6999,20 +7011,21 @@ const openPronounTables = async () => {
     typeInto(nameBox(), "");
     await sleep(250);
     check("a verb with no name is refused, because a name is what it is listed as",
-      !!saveBtn() && saveBtn().disabled,
-      `save is ${saveBtn() && saveBtn().disabled ? "refused" : "still offered"}`);
+      !!saveBtn() && isOff(saveBtn()),
+      `save is ${saveBtn() && isOff(saveBtn()) ? "refused" : "still offered"}`);
     /* Said only once Save has been tapped (0.519): a line standing there
        before anybody tried reads as a telling-off. */
     check("and nothing says so until Save is tapped",
       !!cardNameField() && !cardNameField().querySelector(".at-formneed.unmet"),
       "said already");
-    click(saveBtn().closest(".at-savewrap"));
+    /* Since 0.520 a tap on the grey Save says so in a message at the foot,
+       and the name wears the red asterisk every required field does. */
+    click(saveBtn());
     await sleep(200);
-    check("and the line that says so is beside the name, not under the table",
-      !!cardNameField() && /needs a name/.test(
-        (cardNameField().querySelector(".at-formneed.unmet") || {}).textContent || ""),
-      ([...document.querySelectorAll(".at-formneed.unmet")]
-        .map((n) => (n.textContent || "").replace(/\s+/g, " ").trim())[0]) || "(nothing said)");
+    const said = ((document.querySelector(".at-snack") || {}).textContent || "").trim();
+    check("and tapping Save says required fields are missing, the name marked required",
+      /Some required fields are missing/.test(said) && !!cardNameField() && !!cardNameField().querySelector(".at-reqstar"),
+      said || "(nothing said)");
     typeInto(nameBox(), "to eat");
     await sleep(250);
 
@@ -7022,8 +7035,8 @@ const openPronounTables = async () => {
     typeInto(cellNamed("English for present · he"), "");
     await sleep(250);
     check("a verb with nothing written in its table is refused",
-      !!saveBtn() && saveBtn().disabled,
-      `save is ${saveBtn() && saveBtn().disabled ? "refused" : "still offered"}`);
+      !!saveBtn() && isOff(saveBtn()),
+      `save is ${saveBtn() && isOff(saveBtn()) ? "refused" : "still offered"}`);
     const unmetLines = () => [...document.querySelectorAll(".at-formneed.unmet")]
       .map((n) => (n.textContent || "").replace(/\s+/g, " ").trim());
     check("and what it asks for is any one form, not a named box",
@@ -7058,8 +7071,8 @@ const openPronounTables = async () => {
     typeInto(cellNamed("Arabic for subjunctive · I"), "آكل");
     await sleep(250);
     check("a subjunctive form with no example to be asked in is refused",
-      !!saveBtn() && saveBtn().disabled && unmetLines().some((t) => /at least one example/.test(t)),
-      `${saveBtn() && saveBtn().disabled ? "refused" : "offered"} · ${unmetLines().join(" · ")}`);
+      !!saveBtn() && isOff(saveBtn()) && unmetLines().some((t) => /at least one example/.test(t)),
+      `${saveBtn() && isOff(saveBtn()) ? "refused" : "offered"} · ${unmetLines().join(" · ")}`);
     /* The example's boxes are plain boxes, written in as a sentence is
        said: no chip for a gap, and none for the English. Until 0.469 they
        were a sentence card's, with the gap and three ways of reading the
@@ -7082,13 +7095,13 @@ const openPronounTables = async () => {
     typeInto(cellNamed("English for example 1"), "I must eat");
     await sleep(250);
     check("an example whose English names somebody its form is not is refused, and says so",
-      !!saveBtn() && saveBtn().disabled && unmetLines().some((t) => /The English says “I”, but تاكل is/.test(t)),
-      `${saveBtn() && saveBtn().disabled ? "refused" : "offered"} · ${unmetLines().join(" · ")}`);
+      !!saveBtn() && isOff(saveBtn()) && unmetLines().some((t) => /The English says “I”, but تاكل is/.test(t)),
+      `${saveBtn() && isOff(saveBtn()) ? "refused" : "offered"} · ${unmetLines().join(" · ")}`);
     typeInto(cellNamed("English for example 1"), "she must eat");
     await sleep(250);
     check("one said for her saves the verb on its subjunctive alone",
-      !!saveBtn() && !saveBtn().disabled,
-      `${saveBtn() && saveBtn().disabled ? "refused" : "offered"} · ${unmetLines().join(" · ")}`);
+      !!saveBtn() && !isOff(saveBtn()),
+      `${saveBtn() && isOff(saveBtn()) ? "refused" : "offered"} · ${unmetLines().join(" · ")}`);
     const previewText = () => ((document.querySelector('[data-el="editor-verb-example-preview"]') || {}).textContent || "").replace(/\s+/g, " ");
     check("and under it is what another person will read it as",
       /لازم آكل — I must eat/.test(previewText()) && !/She must eat/.test(previewText()),
@@ -7099,8 +7112,8 @@ const openPronounTables = async () => {
     typeInto(cellNamed("English for example 1"), "I want her to eat");
     await sleep(250);
     check("and somebody else's wish is read out of the sentence too",
-      /بدي آكل — I want to eat/.test(previewText()) && !!saveBtn() && !saveBtn().disabled,
-      `${previewText() || "(no preview)"} · ${saveBtn() && saveBtn().disabled ? "refused" : "offered"}`);
+      /بدي آكل — I want to eat/.test(previewText()) && !!saveBtn() && !isOff(saveBtn()),
+      `${previewText() || "(no preview)"} · ${saveBtn() && isOff(saveBtn()) ? "refused" : "offered"}`);
     const addExample = () => /** @type {any} */ ([...document.querySelectorAll("button")]
       .find((b) => /^Add an example$/.test((b.textContent || "").trim())) || null);
     click(addExample());
@@ -8675,10 +8688,10 @@ const openPronounTables = async () => {
       labels.join(" | ") === "Deck name | Courses | Deck quality" &&
         /** @type {any} */ ((thisDeck && thisDeck.querySelector("input")) || {}).value === "Lesson 1",
       labels.join(" | ") || "(no This deck)");
-    check("and Export sits by its “This deck” heading, with Edit alone on the title line",
+    check("and Export sits by its “This deck” heading, with Edit floating in the corner and nothing on the title line",
       !!deckSheet && !!deckSheet.querySelector('.at-formhead [aria-label="Export this deck"]') &&
-        named(deckSheet.querySelector(".at-screenaction")).length === 1 &&
-        !!deckSheet.querySelector('.at-screenaction [aria-label="Edit"]'),
+        named(deckSheet.querySelector(".at-screenaction")).length === 0 &&
+        !!deckSheet.querySelector('.at-fab[aria-label="Edit"]'),
       deckSheet ? [...deckSheet.querySelectorAll(".at-screenaction button")].map((b) => b.getAttribute("aria-label")).join(" | ") || "(nothing on the title line)" : "(no deck screen)");
     check("and read, its title cannot be typed into",
       !!thisDeck && !!thisDeck.querySelector("fieldset:disabled input"),
@@ -8734,7 +8747,7 @@ const openPronounTables = async () => {
      by name, from a screen of their own. */
   check("read, an open deck offers no way to change its built-in cards",
     !buttonNamed(/^Choose built-in cards$/), "the button is there before Edit");
-  click(document.querySelector('.at-screenaction [aria-label="Edit"]'));
+  click(document.querySelector('.at-fab[aria-label="Edit"]'));
   await sleep(250);
   check("Edit swaps the back arrow for a cross that cancels",
     !!document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'),
@@ -8759,7 +8772,7 @@ const openPronounTables = async () => {
   check("and choosing them sends nothing until the deck is saved",
     savedParts.length === partsBefore && /Numbers 0 to 9/.test(document.body.textContent || ""),
     JSON.stringify(savedParts.slice(partsBefore)));
-  click(document.querySelector('.at-screenaction [aria-label="Save"]'));
+  click(document.querySelector('.at-fab[aria-label="Save"]'));
   await sleep(600);
   const sent = savedParts[savedParts.length - 1];
   check("and saving tells the server which parts the deck holds",
@@ -8776,7 +8789,7 @@ const openPronounTables = async () => {
   check("a deck being read has a dimmed Lock button by its Cards heading",
     !!lockBtn() && /^Lock$/.test((lockBtn()?.textContent || "").trim()) && !!lockBtn()?.disabled,
     lockBtn() ? `${(lockBtn()?.textContent || "").trim()} · ${lockBtn()?.disabled ? "dimmed" : "live"}` : "(no button by Cards)");
-  click(document.querySelector('.at-screenaction [aria-label="Edit"]'));
+  click(document.querySelector('.at-fab[aria-label="Edit"]'));
   await sleep(250);
   click(lockBtn());
   await sleep(200);
@@ -8789,7 +8802,7 @@ const openPronounTables = async () => {
   check("and agreeing turns it to Unlock, sending nothing yet",
     /^Unlock$/.test((lockBtn()?.textContent || "").trim()) && lockedDecks.length === 0,
     `${(lockBtn()?.textContent || "").trim()} · ${JSON.stringify(lockedDecks)}`);
-  click(document.querySelector('.at-screenaction [aria-label="Save"]'));
+  click(document.querySelector('.at-fab[aria-label="Save"]'));
   await sleep(600);
   check("and Save locks the deck",
     lockedDecks.length === 1 && lockedDecks[0].deckId === "d1" && lockedDecks[0].locked === true,
@@ -9264,7 +9277,7 @@ const openPronounTables = async () => {
 
   /* Saved, so going back asks nothing. */
   check("once saved, there is nothing left to save",
-    !!buttonIn(/^Save$/) && /** @type {any} */ (buttonIn(/^Save$/)).disabled);
+    !!buttonIn(/^Save$/) && isOff(buttonIn(/^Save$/)));
   await goBack();
   check("once saved, going back asks nothing", !!screenNamed("Number system") && !/Save your changes/.test(document.body.textContent || ""));
   check("and the main screen does not say anything is unsaved",
@@ -9358,7 +9371,7 @@ const openPronounTables = async () => {
   await sleep(250);
   check("a number written out from Check a number lands on the corrections, where its Save is",
     !!screenNamed("Correct how a number is said") && /tamanye/.test(up().textContent || "") &&
-      !!buttonIn(/^Save$/) && !(/** @type {any} */ (buttonIn(/^Save$/)).disabled),
+      !!buttonIn(/^Save$/) && !isOff(buttonIn(/^Save$/)),
     ((up().getAttribute && up().getAttribute("aria-label")) || "(no screen)"));
   await goBack();
   click([...document.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "Don't save"));
@@ -9381,7 +9394,7 @@ const openPronounTables = async () => {
   await sleep(250);
   check("a save on the way out that does not go through stays on the part, and says so",
     !!screenNamed("Numbers 0 to 9") && /not saved/.test(up().textContent || "") &&
-      !(/** @type {any} */ (buttonIn(/^Save$/) || { disabled: true })).disabled,
+      !!buttonIn(/^Save$/) && !isOff(buttonIn(/^Save$/)),
     (up().textContent || "").slice(0, 160).replace(/\s+/g, " "));
   refuseSave = false;
   click(buttonIn(/^Save$/));

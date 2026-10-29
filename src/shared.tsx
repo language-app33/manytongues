@@ -92,6 +92,9 @@ export function confirmStrength({ permanent, affectsOthers, name }: {
    ------------------------------------------------------------------ */
 
 const ICONS: Record<string, string> = {
+  /* An empty ring of dashes: not out yet — the draft beside Published's
+     tick. */
+  draft: "M20.92 13.17A9 9 0 0 1 19.14 17.48L17.55 16.26A7 7 0 0 0 18.94 12.91zM17.48 19.14A9 9 0 0 1 13.17 20.92L12.91 18.94A7 7 0 0 0 16.26 17.55zM10.83 20.92A9 9 0 0 1 6.52 19.14L7.74 17.55A7 7 0 0 0 11.09 18.94zM4.86 17.48A9 9 0 0 1 3.08 13.17L5.06 12.91A7 7 0 0 0 6.45 16.26zM3.08 10.83A9 9 0 0 1 4.86 6.52L6.45 7.74A7 7 0 0 0 5.06 11.09zM6.52 4.86A9 9 0 0 1 10.83 3.08L11.09 5.06A7 7 0 0 0 7.74 6.45zM13.17 3.08A9 9 0 0 1 17.48 4.86L16.26 6.45A7 7 0 0 0 12.91 5.06zM19.14 6.52A9 9 0 0 1 20.92 10.83L18.94 11.09A7 7 0 0 0 17.55 7.74z",
   add: "M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z",
   search:
     "M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z",
@@ -3694,7 +3697,19 @@ export function useScrollTop(key: unknown) {
  *   which says it is a step to the side of what is underneath rather than
  *   somewhere new.
  */
-export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", backIcon = "back", rise, className = "" }: {
+/**
+ * The button floating in a screen's bottom right corner — Edit on a card
+ * or deck being read, Save on one being written. Named while the screen
+ * opens and while it is scrolled up; its icon alone while scrolled down,
+ * out of the way of what is being read.
+ *
+ * `off` draws it grey and still takes the tap, so the screen can say why
+ * nothing happened: a grey button that says nothing leaves a teacher
+ * guessing.
+ */
+export type ScreenFab = { icon: string; label: string; onClick: () => void; off?: boolean; busy?: boolean };
+
+export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", backIcon = "back", rise, className = "", fab }: {
   title?: Node;
   onBack?: () => void;
   action?: Node;
@@ -3715,6 +3730,7 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
       being edited — rather than going back. */
   backIcon?: string;
   className?: string;
+  fab?: ScreenFab | null;
 }) {
   const self: React.MutableRefObject<{ el: Element | null, close?: () => void }> = useRef({ el: null });
   /* The screen's own element, so the stack can be checked against the
@@ -3735,6 +3751,20 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
   }, [title]);
+  /* Whether the floating button wears its name: yes at the top and while
+     scrolling up, no while scrolling down. A few pixels either way are
+     ignored, so a finger resting on the glass does not flicker it. */
+  const [fabNamed, setFabNamed] = useState(true);
+  const lastTop = useRef(0);
+  const onBodyScroll = () => {
+    const el = bodyRef.current;
+    if (!el) return;
+    const top = el.scrollTop;
+    if (top <= 4) setFabNamed(true);
+    else if (top > lastTop.current + 6) setFabNamed(false);
+    else if (top < lastTop.current - 6) setFabNamed(true);
+    if (Math.abs(top - lastTop.current) > 6 || top <= 4) lastTop.current = top;
+  };
 
   useEffect(() => {
     const me = self.current;
@@ -3779,7 +3809,7 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
      and no z-index of its own, so it is not a stacking context — mounting
      inside it escapes the space's layer while staying in the theme. */
   const view = (
-    <div className={`at-screen over${rise ? " rise" : ""}${className ? " " + className : ""}`} ref={elRef} role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined}>
+    <div className={`at-screen over${rise ? " rise" : ""}${fab ? " hasfab" : ""}${className ? " " + className : ""}`} ref={elRef} role="dialog" aria-modal="true" aria-label={typeof title === "string" ? title : undefined}>
       <div className={`at-screenhead${actionBelow ? " below" : ""}`}>
         {onBack ? (
           <button className="at-back" onClick={onBack} aria-label={backLabel} title={backIcon === "back" ? undefined : backLabel}>
@@ -3793,12 +3823,26 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
             are at opposite ends and neither is hit by accident. */}
         <span className="at-screenaction">{action}</span>
       </div>
-      <div className="at-screenbody" ref={bodyRef}>
+      <div className="at-screenbody" ref={bodyRef} onScroll={fab ? onBodyScroll : undefined}>
         <div className="at-screeninner">
           {children}
           {footer ? <div className="at-screenfoot">{footer}</div> : null}
         </div>
       </div>
+      {fab ? (
+        <div className="at-fabrow">
+          <button
+            type="button"
+            className={`at-fab${fabNamed ? " named" : ""}${fab.off || fab.busy ? " off" : ""}`}
+            aria-label={fab.busy ? "Saving…" : fab.label}
+            aria-disabled={fab.off || fab.busy ? "true" : undefined}
+            onClick={() => { if (!fab.busy) fab.onClick(); }}
+          >
+            <Icon name={fab.icon} />
+            <span className="at-fablabel">{fab.busy ? "Saving…" : fab.label}</span>
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 

@@ -8,6 +8,46 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.520 — 29 October 2026
+
+**Edit and Save float in the corner, and the card screen tells you why
+when it can't save.**
+
+- On a card or deck, Edit (while reading) and Save (while editing) are a
+  floating button in the bottom right. It shows its name when the screen
+  opens and while scrolling up, and only its icon while scrolling down.
+  While saving it says "Saving…". There is room at the bottom of these
+  screens so it never covers anything. Create card and Create deck have
+  the floating Save too.
+- The bar at the top of a card now holds only the status menu, and only
+  while the card is being read. A deck's top bar holds nothing on the
+  right.
+- Saving a new or edited card goes straight back to reading it. Adding
+  another meaning still opens the next card for editing.
+- Tapping a greyed-out Save says why: "No changes to save.", "Some
+  required fields are missing. They're marked with *.", or "Something
+  needs fixing before saving." Required fields carry a red asterisk:
+  the card name, the word and its English, a sentence and its English,
+  a scene's subtype and its first lines, a verb table ("Fill in at least
+  one form."), and a deck's name. "Every card needs a name." is gone.
+- Delete moved off the top bar to the bottom, under its own heading with
+  "…is permanent and cannot be undone." and a red button: Delete card (at
+  the foot of the Basic tab, while editing a saved card), Delete deck
+  (at the foot of a deck being edited) and Delete course. Each still asks
+  first.
+- Tapping a field or tick on a card or deck being read says "You are in
+  view-only mode. Switch to edit to make changes to the card." (or "the
+  deck"). Recordings, tabs, exercises, Export and the status menu work as
+  before.
+- The Basic, Advanced and Exercises tabs sit flush under the top bar and
+  no longer jump when the card scrolls.
+- Draft in the status menu has its own icon, an empty dashed circle,
+  instead of the pencil Edit uses.
+
+To check by hand: on a real phone, scroll a long card and watch the
+floating button; tap the grey Save on an empty card and on an unchanged
+one; delete a card from the bottom of its Basic tab.
+
 ## 0.519 — 29 October 2026
 
 **The card screen says less until it has something to say.**

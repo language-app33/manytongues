@@ -68,6 +68,7 @@ import {
   splitAlternatives,
   joinAlternatives,
   CheckList,
+  useSnackbar,
   CLIP_KINDS,
   ClipList,
   clipsOf,
@@ -6441,7 +6442,7 @@ function SceneKindField({ talk, card }: { talk: SceneDraft; card: Card | null })
   if (said) {
     return (
       <div className="at-field at-mt3">
-        <label className="at-label">What subtype</label>
+        <label className="at-label">What subtype<Req /></label>
         <p className="at-fieldlede">{lede}</p>
         <div className="at-shutrow">
           <Icon name="tune" />
@@ -6460,7 +6461,7 @@ function SceneKindField({ talk, card }: { talk: SceneDraft; card: Card | null })
   }
   return (
     <div className="at-field at-mt3">
-      <label className="at-label">What subtype</label>
+      <label className="at-label">What subtype<Req /></label>
       <p className="at-fieldlede">{lede}</p>
       <div className="at-chooser">
         <button
@@ -6573,7 +6574,7 @@ function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, d
  * the Advanced tab writes it in — so ticking the box carries it over
  * without anything to copy: it is the same form.
  */
-function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onExport, nameAsked }: {
+function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onExport, onDelete }: {
   lang: Lang;
   scene: boolean;
   word: WordDraft;
@@ -6589,9 +6590,8 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   onToggleDeck: (id: string, on: boolean) => void;
   /** Export the card, where it can be — on a saved card being read. */
   onExport?: () => void;
-  /** Whether Save has been tapped with no name: only then is the name
-      said to be missing. */
-  nameAsked: boolean;
+  /** Delete the card — on a saved card being edited, at the foot. */
+  onDelete?: () => void;
 }) {
   return (
     <>
@@ -6635,7 +6635,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
       {/* ---- what it is called ----
           Every card has a name, whatever its kind. */}
       <div className="at-mt5">
-        <NameBlock word={word} talk={talk} scene={scene} asked={nameAsked} />
+        <NameBlock word={word} talk={talk} scene={scene} />
       </div>
     </div>
 
@@ -6670,6 +6670,19 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
       </div>
       <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} />
     </div>
+
+    {/* ---- and the way out of it altogether ----
+        At the foot, away from everyday taps, and only while editing a
+        saved card. It still asks first. */}
+    {onDelete && (
+      <div className="at-formblock at-mt5">
+        <div className="at-formhead">
+          <span className="at-formnum">Delete card</span>
+        </div>
+        <p className="at-dangerline">Deleting a card is permanent and cannot be undone.</p>
+        <Button variant="danger" icon="delete" onClick={onDelete}>Delete card</Button>
+      </div>
+    )}
     </>
   );
 }
@@ -6712,13 +6725,17 @@ const storedHelp = (spec: VerbSpec | null): string => {
  * text box in it, standing between the card and its words, read as a stage
  * of the form rather than as the label it is.
  */
-function NameBlock({ word, talk, scene, asked }: { word: WordDraft; talk: SceneDraft; scene: boolean; asked: boolean }) {
+/* The red asterisk on a field that must be filled in before Save works.
+   Drawn by the stylesheet, so the field's name reads the same as ever. */
+const Req = () => <span className="at-reqstar" aria-hidden="true" />;
+
+function NameBlock({ word, talk, scene }: { word: WordDraft; talk: SceneDraft; scene: boolean }) {
   /* A scene's name is its title, kept where it always was. */
   const value = scene ? talk.title : word.name;
   const set = scene ? talk.setTitle : word.setName;
   return (
     <Field
-      label="Card name"
+      label={<>Card name<Req /></>}
       lede="How this card is listed and searched."
     >
       <input
@@ -6730,7 +6747,6 @@ function NameBlock({ word, talk, scene, asked }: { word: WordDraft; talk: SceneD
       {/* Only while it is in the way, like every other line that unblocks
           Save on this screen: a demand standing there before anybody has
           typed reads as a telling-off for opening the screen. */}
-      {asked && !value.trim() && <p className="at-formneed unmet">Every card needs a name.</p>}
     </Field>
   );
 }
@@ -6900,6 +6916,12 @@ function TableBlock({ word, lang }: { word: WordDraft; lang: Lang }) {
         plainly an empty box, and the rows are labelled in the order
         they are taught. */}
       <>
+        {word.standsIn && (
+          <>
+            <label className="at-label">Forms<Req /></label>
+            <p className="at-fieldlede">Fill in at least one form.</p>
+          </>
+        )}
         <VerbTable
           lang={lang}
           spec={shownSpec}
@@ -7093,6 +7115,8 @@ function TurnBlock({ talk, lang, allCards, selfId, index: i, line: l }: {
     <div className={`at-formblock${text ? "" : turnSide(l.who)}`}>
       <div className="at-formhead">
         <span className="at-formnum">{text ? `Sentence ${i + 1}` : `Line ${i + 1}`}</span>
+        {/* A text needs one sentence, a conversation two lines. */}
+        {i < (text ? 1 : 2) && <Req />}
         {!text && (
           <span className={`at-speaker s${(l.who || 0) % 4}`}>
             {speakers[l.who || 0] || `Speaker ${(l.who || 0) + 1}`}
@@ -7311,7 +7335,7 @@ export const baseName = (spec: VerbSpec | null): string =>
  * there is a single answer to record, and beside the word it is of once
  * there are two. Whoever draws the heading has to know the count.
  */
-function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, drillsTranslit, blanks, onRemoveBlank, onChange, more = false, children }: {
+function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, drillsTranslit, blanks, onRemoveBlank, onChange, more = false, required = false, children }: {
   lang: Lang;
   form: Record<string, any>;
   /** The axes each accepted answer is asked about — see answerDims. */
@@ -7336,6 +7360,8 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
       form's end — counts as the form having been written in, for whether
       it opens folded. See FoldsForms. */
   more?: boolean;
+  /** The card's own word: its script and English are marked required. */
+  required?: boolean;
   children?: Node;
 }) {
   const fields = answerFields();
@@ -7440,7 +7466,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
           was a heading doing the work of labels and still left the box
           itself blank; the box says what it is now, in the language, and
           the heading says which language. */}
-      <Field label={lang.scriptLabel}>
+      <Field label={<>{lang.scriptLabel}{required && <Req />}</>}>
         <ScriptAnswers
           lang={lang}
           dims={dims}
@@ -7469,7 +7495,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
         />
       </Field>
 
-      <Field label="English">
+      <Field label={<>English{required && <Req />}</>}>
         <Alternatives
           value={f.en}
           of={of}
@@ -7733,6 +7759,7 @@ function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCop
       blanks={blanks}
       onRemoveBlank={takeOff}
       more={pronouns}
+      required={i === 0 && !word.standsIn}
       onChange={(patch) => (i < 0 && onFill ? onFill({ ...f, ...patch }) : setForm(i, { ...f, ...patch }))}
     >
       {/* Whatever else belongs to this form — its table of attached
@@ -10284,16 +10311,35 @@ function byTab(written: ReturnType<typeof writtenCard>, clue: string, capitals: 
  * Locked inside, as the whole sheet was; `after` is drawn outside the lock,
  * for the exercises a teacher tries on a card they are only reading.
  */
-function TabPanel({ id, tab, locked, panel, after, children }: {
+/*
+ * Whether a tap while the card is read landed on something that would
+ * change it — a box, a tick, a control the lock holds still — as against
+ * something that works on a card being read: a recording to play, an
+ * exercise to try, a tab. Those are buttons the lock leaves alive.
+ */
+export function tapWouldChange(target: EventTarget | null): boolean {
+  const el = target as Element | null;
+  if (!el || typeof el.closest !== "function") return false;
+  if (!el.closest("fieldset.at-cardlock, fieldset.at-readlock")) return false;
+  /* A button the lock leaves alive — a recording, Export — does its job. */
+  const live = el.closest("button, a, [role=button]");
+  if (live && !live.matches(":disabled")) return false;
+  return !!el.closest("input, textarea, select, label, [contenteditable], button, .at-tickrow, .at-chooser, .at-field");
+}
+
+function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   id: CardTab;
   tab: CardTab;
   locked: boolean;
   panel: React.MutableRefObject<HTMLDivElement | null>;
   after?: Node;
+  /** A tap on something that would change the card, while it is read. */
+  onLockedTap?: () => void;
   children?: Node;
 }) {
   return (
-    <div ref={panel} role="tabpanel" aria-label={id} hidden={tab !== id}>
+    <div ref={panel} role="tabpanel" aria-label={id} hidden={tab !== id}
+      onPointerDown={locked && onLockedTap ? (e) => { if (tapWouldChange(e.target)) onLockedTap(); } : undefined}>
       <fieldset className="at-cardlock" disabled={locked}>
         <Locked.Provider value={locked}>{children}</Locked.Provider>
       </fieldset>
@@ -10474,10 +10520,32 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     sending.current = null;
   }, [card]);
   const changed = snapshot !== savedAs;
-  /* Whether Save has been tapped while the card had no name — see
-     NameBlock. A line saying so before anybody has tried to save reads as
-     a telling-off for opening the screen. */
+  /* Whether the grey Save has been tapped: until then a card that cannot
+     be saved yet says nothing about it — see `dots`. */
   const [nameAsked, setNameAsked] = useState(false);
+  const snack = useSnackbar();
+  /* What is short, as against what is wrong: an empty field a red
+     asterisk marks, or a mistake that already has its own red line. */
+  const missing = (() => {
+    if (scene) return !talk.title.trim() || !talk.sceneKind || !canSaveScene(talk.title, talk.written, talk.text);
+    if (word.needsName) return true;
+    if (advanced && word.standsIn) return word.needsForm;
+    return !String(word.main.ar || "").trim() || !String(word.main.en || "").trim();
+  })();
+  /* A tap on a field of a card being read. */
+  const viewOnly = () => snack("You are in view-only mode. Switch to edit to make changes to the card.");
+  /* The floating Save: saves where it can, and otherwise says why not. */
+  const trySave = () => {
+    if (busy) return;
+    if (canSave && changed) {
+      save();
+      return;
+    }
+    setNameAsked(true);
+    if (!changed) snack("No changes to save.");
+    else if (missing) snack("Some required fields are missing. They're marked with *.", "warn");
+    else snack("Something needs fixing before saving.", "warn");
+  };
   /* Cancel with changes on the card: asked first. */
   const [discarding, setDiscarding] = useState(false);
   const quit = () => (stored && onRelock ? onRelock() : onClose());
@@ -10594,41 +10662,14 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         onBack={locked ? onClose : leave}
         backIcon={locked ? "back" : "close"}
         backLabel={locked ? "Back" : "Cancel"}
-        /* Icons only, on the title's own line, which gives way to them —
-           the title is cut short rather than wrapped. Locked: the status
-           and Edit; Export is by the "This card" heading, with the other
-           facts about the card. Open: Delete and Save, which keeps the
-           card open to go on with it — the status is for a card being
-           read. Each says what it does on hover and out loud. */
-        action={
-          locked ? (
-            <>
-              {status ? status(false) : null}
-              <Button variant="primary" size="sm" className="iconly" aria-label="Edit" title="Edit" onClick={onUnlock}>
-                <Icon name="edit" />
-              </Button>
-            </>
-          ) : (
-          <>
-            {stored && onDelete ? (
-              <IconButton icon="delete" label="Delete this card" title="Delete this card" danger onClick={onDelete} />
-            ) : null}
-            {/* Grey while the card cannot be saved, and still answers a
-                tap: one with no name says so under the name. The button
-                lets the tap through to this wrapper while it is off. */}
-            <span className="at-savewrap" onClick={() => { if (!canSave && !busy) setNameAsked(true); }}>
-            <Button variant="primary" size="sm" className="iconly"
-              aria-label={busy ? "Saving…" : "Save"}
-              title={busy ? "Saving…" : "Save"}
-              disabled={!canSave || !changed || busy}
-              style={!canSave || !changed || busy ? { pointerEvents: "none" } : undefined}
-              onClick={() => save()}
-            >
-              <Icon name="save" />
-            </Button>
-            </span>
-          </>
-          )
+        /* On the right of the title, only the status, and only while the
+           card is read: a status is a fact about the card as saved. Edit
+           and Save float in the bottom corner — see ScreenFab. */
+        action={locked && status ? status(false) : null}
+        fab={
+          locked
+            ? onUnlock ? { icon: "edit", label: "Edit", onClick: onUnlock } : null
+            : { icon: "save", label: "Save", off: !canSave || !changed, busy: !!busy, onClick: trySave }
         }
       >
           {about}
@@ -10653,7 +10694,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
           {/* ---- Basic ----
               The name, whether it is an advanced card, the word itself on
               a basic one, and its decks. */}
-          <TabPanel id="overview" tab={shownTab} locked={locked} panel={panels.overview}>
+          <TabPanel id="overview" tab={shownTab} locked={locked} panel={panels.overview} onLockedTap={viewOnly}>
             <BasicBlock
               lang={lang}
               scene={scene}
@@ -10669,7 +10710,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
                 setChosen((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
               }
               onExport={locked ? onExport : undefined}
-              nameAsked={nameAsked}
+              onDelete={!locked && stored && onDelete ? onDelete : undefined}
             />
           </TabPanel>
 
@@ -10678,7 +10719,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               and nowhere else: every block draws what it is handed, and
               which blocks that is, is each editor's list. */}
           {advanced && (
-          <TabPanel id="content" tab={shownTab} locked={locked} panel={panels.content}>
+          <TabPanel id="content" tab={shownTab} locked={locked} panel={panels.content} onLockedTap={viewOnly}>
             {/* The type and subtype first: everything below follows from
                 them. */}
             <KindBlock
@@ -10744,6 +10785,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             tab={shownTab}
             locked={locked}
             panel={panels.exercises}
+            onLockedTap={viewOnly}
             after={
               <>
                 {below}
