@@ -6229,9 +6229,11 @@ const openPronounTables = async () => {
       !!sentenceName && /^Card name$/.test(thisCardAsks()[0] || "") &&
         !blockNames().includes("What to call it"),
       `${thisCardAsks().join(" | ")} · ${blockNames().join(" | ")}`);
-    check("and says what it is for, and that it is required",
+    /* No "required" marker since 0.517: the line under an empty name says
+       every card needs one. */
+    check("and says what it is for",
       !!sentenceName && /listed and searched/.test(sentenceName.textContent || "") &&
-        /required/.test(sentenceName.textContent || ""),
+        !/required/.test(sentenceName.textContent || ""),
       sentenceName ? (sentenceName.textContent || "").replace(/\s+/g, " ").slice(0, 160) : "(no field)");
     /* The control itself, not the list behind it: the list is on screen
        only while it is open, so a card that is still asked and shut would
