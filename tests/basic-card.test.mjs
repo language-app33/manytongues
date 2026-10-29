@@ -1,5 +1,5 @@
 /*
- * Basic and advanced cards (0.513): which saved cards open with "Build an
+ * Basic and advanced cards (0.515): which saved cards open with "Build an
  * advanced card" ticked, what a basic card is saved as, and what the line
  * under the box says unticking it would drop.
  */

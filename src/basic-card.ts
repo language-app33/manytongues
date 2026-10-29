@@ -5,7 +5,7 @@
  * scene: a name, the word and its English, and its decks, all on the card
  * screen's first tab. Everything else — the type, the subtype, more forms,
  * blanks, other meanings — is on the Advanced tab, which is there only
- * while "Build an advanced card" is ticked. The owner's design, 0.513.
+ * while "Build an advanced card" is ticked. The owner's design, 0.515.
  *
  * Kept apart from the card editor so the rules can be tested on their own.
  */

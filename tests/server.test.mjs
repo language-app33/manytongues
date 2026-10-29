@@ -4617,3 +4617,41 @@ test("the server says how big recordings and pictures are, and leaves out the on
   assert.deepEqual(Object.keys(r.json.images), [image]);
   assert.ok(r.json.clips[clip] >= clipData.length, "a recording's size is smaller than what was stored");
 });
+
+/*
+ * A backup holds courses but not the records their join codes are looked
+ * up by, and it holds rosters as they were — naming people who may since
+ * have gone.
+ */
+test("a restored course's codes open it, and a person it names can be removed", async () => {
+  const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Salma" } });
+  const key = made.json.key;
+  await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
+
+  const id = "crestored01";
+  const course = {
+    id, title: "Restored", description: "", language: "ar-PS",
+    teachers: [], students: ["gone-person"], decks: [],
+    code: "amber-cedar-0a0b", teacherCode: "opal-rowan-0c0d", created: 1,
+  };
+  const put = await api("/api/courses?action=admin-restore-chunk", {
+    method: "POST", key, body: { records: { [`course:${id}`]: course, "index:courses": [id] } },
+  });
+  assert.equal(put.status, 200, put.text);
+
+  /* Pasted with a capital and a stray space, as a copy can arrive. */
+  const learner = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Ziad" } });
+  const joined = await api("/api/courses?action=join-course", {
+    method: "POST", key: learner.json.key, body: { code: " Amber-cedar-0a0b " },
+  });
+  assert.equal(joined.status, 200, joined.text);
+  assert.equal(joined.json.role, "student");
+
+  const gone = await api("/api/courses?action=admin-delete-user", {
+    method: "POST", key, body: { handle: "gone-person" },
+  });
+  assert.equal(gone.status, 200, gone.text);
+  const mine = await api("/api/courses?action=my-courses", { key: learner.json.key });
+  const after = mine.json.courses.find((/** @type {any} */ c) => c.id === id);
+  assert.deepEqual(after.students, [learner.json.user.handle], "the person is off the roster");
+});

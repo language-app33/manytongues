@@ -4826,14 +4826,14 @@ const wordKindSaid = () => {
 const thisCardBlock = () => /** @type {any} */ ([...document.querySelectorAll(".at-formblock")]
   .find((b) => /^This card$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()))
   || null);
-/* And "What it is", at the head of the Advanced tab since 0.513: the type,
+/* And "What it is", at the head of the Advanced tab since 0.515: the type,
    the subtype and what follows from it. */
 const kindBlock = () => /** @type {any} */ ([...document.querySelectorAll(".at-formblock")]
   .find((b) => /^What it is$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()))
   || null);
 /* The questions it asks, in the order it asks them. */
 const thisCardAsks = () => {
-  /* Since 0.513 the name is on the Basic tab and the type and subtype head
+  /* Since 0.515 the name is on the Basic tab and the type and subtype head
      the Advanced tab, under "What it is": read as one list, in that order. */
   const kind = [...document.querySelectorAll(".at-formblock")]
     .find((b) => /^What it is$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()));
@@ -4853,7 +4853,7 @@ const formRows = () => [...document.querySelectorAll(
    radio rows, looked for wherever they are drawn. */
 const openWordKind = async () => {
   if (formRows().length) return;
-  /* The subtype is on the Advanced tab since 0.513, there only while
+  /* The subtype is on the Advanced tab since 0.515, there only while
      "Build an advanced card" is ticked. */
   const box = [...document.querySelectorAll(".at-formblock")]
     .find((b) => /^Advanced$/.test(((b.querySelector(".at-formnum") || {}).textContent || "").trim()));
@@ -5110,7 +5110,7 @@ const openPronounTables = async () => {
   click([...inFrame.querySelectorAll("button")].find((b) => /^New card$/.test((b.textContent || "").trim())));
   await sleep(450);
 
-  /* New card opens straight onto the card screen, as a basic card (0.513):
+  /* New card opens straight onto the card screen, as a basic card (0.515):
      a name, a box headed Advanced, the word itself and its decks. What
      kind of card it is — word, sentence or scene — is asked only of a
      teacher building an advanced card, on the Advanced tab. */

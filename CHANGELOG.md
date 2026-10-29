@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.513 — 29 October 2026
+## 0.515 — 29 October 2026
 
 **A card can be made quickly, as a basic card, or fully, as an advanced one.**
 
@@ -38,6 +38,38 @@ and moves once per batch of work you would notice, not once per commit.
 To check by hand: make a quick card on a phone and save it; make a
 sentence through the Advanced tab; tick and untick the box on a card with
 two forms and read the warning.
+
+## 0.514 — 29 October 2026
+
+**Join codes work after a restore, and removed people really go.**
+
+- A course put back from a backup now answers to its join codes again.
+  Before, the codes shown in the teaching space could be turned away as
+  unknown in the learning space. Courses already restored are mended the
+  first time someone uses their code.
+- A join code pasted with capitals or stray spaces is accepted.
+- Deleting someone who came back on a course's roster from a backup, but
+  whose account no longer exists, now takes them off every course instead
+  of leaving them listed.
+- Deleting a course also retires its teacher code.
+
+To check by hand: copy a join code from a restored course's teaching
+space and join with it in the learning space; delete a person who was
+restored from a backup and confirm they are gone from the course.
+
+## 0.513 — 29 October 2026
+
+**The home screen no longer scrolls when everything already fits.**
+
+- Every screen was built a little taller than the phone, so the home
+  screen always scrolled by about a thumb's width even with room to spare.
+  It now fills the screen exactly and only scrolls when there is more on it
+  than fits.
+- On phones, the height used is the part actually on show, not the height
+  with the browser's bars hidden.
+
+To check by hand: open the home screen on a phone with only a few saved
+sessions and try to scroll it.
 
 ## 0.512 — 28 October 2026
 
