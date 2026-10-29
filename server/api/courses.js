@@ -852,12 +852,59 @@ async function systemKeysOf(store, handle) {
 }
 
 /**
+ * Takes a person off every course they teach or study. Says whether they
+ * were on any.
+ * @param {Store} store
+ * @param {string} handle
+ */
+async function dropFromRosters(store, handle) {
+  let found = false;
+  for (const id of await readIndex(store, "courses")) {
+    await updateJson(store, K.course(id), (/** @type {Course | null} */ c) => {
+      if (!c || !(c.teachers.includes(handle) || c.students.includes(handle))) return null;
+      found = true;
+      return {
+        ...c,
+        teachers: c.teachers.filter((x) => x !== handle),
+        students: c.students.filter((x) => x !== handle),
+      };
+    });
+  }
+  return found;
+}
+
+/**
+ * The course a join code opens. The code's own record is the quick way,
+ * but a course restored from a backup came back without one (a backup
+ * holds courses, not their codes), so a miss looks through the courses
+ * and writes the record it should have found.
+ * @param {Store} store
+ * @param {string} given
+ */
+async function courseForCode(store, given) {
+  if (!given) return null;
+  const id = await readJson(store, K.code(given));
+  if (id) return id;
+  const ids = await readIndex(store, "courses");
+  for (const c of await readManyJson(store, ids.map((x) => K.course(x)))) {
+    if (c && (c.code === given || c.teacherCode === given)) {
+      await writeJson(store, K.code(given), c.id);
+      return c.id;
+    }
+  }
+  return null;
+}
+
+/**
  * @param {Store} store
  * @param {string} handle
  */
 async function wipeAccount(store, handle) {
   const user = await readUser(store, handle);
-  if (!user) return false;
+  /* A course restored from a backup brings its roster back as it was, and
+     that can name somebody whose account has since gone. There is nothing
+     of theirs left to remove but their place on the rosters. */
+  if (!user) return dropFromRosters(store, handle);
 
   /* The person's cards go, so they come out of everyone's decks too —
      locked or not, the same as deleting a card does. Left in, another
@@ -899,16 +946,7 @@ async function wipeAccount(store, handle) {
   await store.delete(K.mySystems(handle)).catch(() => {});
   await store.delete(K.tagLift(handle)).catch(() => {});
 
-  for (const id of await readIndex(store, "courses")) {
-    await updateJson(store, K.course(id), (/** @type {Course | null} */ c) => {
-      if (!c || !(c.teachers.includes(handle) || c.students.includes(handle))) return null;
-      return {
-        ...c,
-        teachers: c.teachers.filter((x) => x !== handle),
-        students: c.students.filter((x) => x !== handle),
-      };
-    });
-  }
+  await dropFromRosters(store, handle);
 
   if (user.keyHash) await store.delete(K.keyOf(user.keyHash)).catch(() => {});
   await store.delete(K.user(handle)).catch(() => {});
@@ -3059,8 +3097,10 @@ export default async (req) => {
     }
 
     if (action === "join-course") {
-      const given = String(body.code || "").trim();
-      const id = await readJson(store, K.code(given));
+      /* Codes are made lower-case; a copy can pick up capitals or stray
+         spaces on its way from one screen to another. */
+      const given = String(body.code || "").replace(/\s+/g, "").toLowerCase();
+      const id = await courseForCode(store, given);
       if (!id) return json({ error: "bad-code" }, 404);
       const course = await readCourse(store, id);
       if (!course) return json({ error: "not-found" }, 404);
@@ -4108,6 +4148,14 @@ export default async (req) => {
           if (!payload || payload.length > 4 * 1024 * 1024) continue;
           await store.set(k, payload);
           written += 1;
+          /* A course's join codes are records of their own that a backup
+             does not carry; without them the codes the teacher sees open
+             nothing. */
+          if (k.startsWith("course:") && v && typeof v === "object") {
+            for (const c of [v.code, v.teacherCode]) {
+              if (typeof c === "string" && c) await writeJson(store, K.code(c), v.id);
+            }
+          }
         }
         return json({ ok: true, written });
       }
@@ -4341,6 +4389,7 @@ export default async (req) => {
           );
         }
         if (course.code) await store.delete(K.code(course.code)).catch(() => {});
+        if (course.teacherCode) await store.delete(K.code(course.teacherCode)).catch(() => {});
         await store.delete(K.course(course.id)).catch(() => {});
         const ids = await readIndex(store, "courses");
         await writeJson(store, K.index("courses"), ids.filter((x) => x !== course.id));
