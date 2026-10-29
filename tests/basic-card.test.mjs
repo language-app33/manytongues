@@ -55,7 +55,7 @@ test("unticking says what saving would drop, and nothing when there is nothing",
 test("grammar is not on a basic card: a card that says some opens as advanced, and a basic save drops it", async () => {
   const { hasGrammar, withoutGrammar } = await import("../src/basic-card.ts");
   const { GRAMMAR } = await import("../src/languages.ts");
-  const dim = Object.values(GRAMMAR).find((d) => !d.required);
+  const dim = /** @type {any} */ (Object.values(GRAMMAR).find((d) => !d.required));
   const said = dim.options.map(([v]) => v).find(Boolean);
   const plainForm = { ar: "nhà", en: "house", lat: "" };
   assert.equal(hasGrammar(plainForm), false);
