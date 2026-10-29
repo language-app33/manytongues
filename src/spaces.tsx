@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import * as API from "./courses-api.ts";
 import type { Card, Course, Deck, Flag, Form, Lang, LangId, User } from "./types.ts";
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
-import { CardEditor, NewCardKind } from "./card-editor.tsx";
+import { CardEditor } from "./card-editor.tsx";
 import type { CardShape } from "./card-editor.tsx";
 import { formsOf, leadOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
@@ -5001,16 +5001,16 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     return c ? { card: c, decks: c.decks || [], locked: true } : null;
   });
   /*
-   * A card being started: everything settled about it so far, and nothing
-   * typed yet.
-   *
-   * New card asks which of the three kinds it is before the editor opens,
-   * because the three are not variations on one form — see NewCardKind.
-   * This is what the question is asked on top of: which decks it is going
-   * into, and which language it is in, both of which are known by the time
-   * the button is pressed or asked for first where they are not.
+   * A card being started: which decks it is going into, and which language
+   * it is in, both known by the time the button is pressed or asked for
+   * first where they are not. It opens straight onto the Basic tab as a
+   * word; a sentence or a scene is chosen on the Advanced tab — see
+   * opensAdvanced in card-editor.tsx.
    */
-  const [making, setMaking] = useState<{ decks: string[]; lang?: LangId } | null>(null);
+  const setMaking = (m: { decks: string[]; lang?: LangId } | null) => {
+    if (m) setEditing({ card: null, decks: m.decks, lang: m.lang, making: "word" });
+  };
+
   /* How many cards are waiting for a connection, so the space can say so
      rather than leaving a teacher to wonder where their work went. */
   const [kept, setKept] = useState(() => waitingToSend(CARD_OUTBOX));
@@ -6384,23 +6384,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
             `${title} created`
           )
         }
-      />
-    );
-  }
-
-  /* ---- and before it, the one question the editor cannot ask ----
-     Which of the three kinds is being made. It is asked here rather than
-     inside the editor because what the editor opens as follows from it:
-     a screen for writing a conversation should not be called "New card"
-     and then be full of turns. */
-  if (making) {
-    return (
-      <NewCardKind
-        onClose={() => setMaking(null)}
-        onPick={(shape) => {
-          setEditing({ card: null, decks: making.decks, lang: making.lang, making: shape });
-          setMaking(null);
-        }}
       />
     );
   }

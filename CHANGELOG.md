@@ -8,6 +8,37 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.513 — 29 October 2026
+
+**A card can be made quickly, as a basic card, or fully, as an advanced one.**
+
+- New card opens straight onto the card screen. It no longer asks
+  "word, sentence or scene?" first.
+- The first tab is now called Basic. It holds the card's name, a box
+  headed Advanced saying "Build an advanced card", the word or phrase
+  itself (its English, recordings and other accepted answers), and its
+  decks. Leave the box unticked, fill those in and save: that is a
+  quick card with one form.
+- Ticking the box hides the word from the Basic tab and opens the
+  Advanced tab (what was the Forms tab). The word already typed becomes
+  its first form. At the top are the type (word or phrase, sentence or
+  scene) and the subtype; at the bottom is everything that was on the
+  Settings tab, which is gone.
+- The type can be changed freely until the card is first saved, then it
+  is locked as before. Choosing sentence or scene on a new card says the
+  word from the Basic tab will be dropped on saving; choosing word or
+  phrase again before saving brings it back.
+- Unticking the box brings the word back to the Basic tab and says what
+  saving would drop from the Advanced tab. Nothing is lost until the
+  card is saved, and ticking the box again keeps it all.
+- A saved card opens as advanced when it has anything beyond one plain
+  form; sentences and scenes always do, and their box cannot be
+  unticked. Every new card starts as basic.
+
+To check by hand: make a quick card on a phone and save it; make a
+sentence through the Advanced tab; tick and untick the box on a card with
+two forms and read the warning.
+
 ## 0.512 — 28 October 2026
 
 **Vietnamese is just Vietnamese, with no one accent built in.**
