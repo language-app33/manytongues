@@ -1075,11 +1075,23 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-screen.cardform .at-cardtabs { position:sticky; top:0; z-index:3;
   margin:0 -16px; padding:12px 16px; background: var(--surface);
   border-bottom:1px solid var(--line); }
+/* One segmented track: the parts share it equally, each an icon over its
+   name, the current one raised out of the well on the sheet's lighter
+   ground with its icon in the accent colour. */
 .at-screen.cardform .at-cardtabs .at-nav2 { margin:0; flex-wrap:nowrap;
-  overflow-x:auto; scrollbar-width:none; }
-/* A size down from the space's own tabs, so all four fit across a phone. */
-.at-screen.cardform .at-cardtabs .at-nav2 { gap:4px; }
-.at-screen.cardform .at-cardtabs .at-tab2 { flex:0 0 auto; font-size:12px; padding:8px 11px; }
+  display:grid; grid-auto-flow:column; grid-auto-columns: minmax(0, 1fr); gap:4px;
+  padding:4px; border-radius:16px; background: var(--bg); border:1px solid var(--line); }
+.at-screen.cardform .at-cardtabs .at-tab2 { position:relative; min-width:0; height:52px;
+  flex-direction:column; justify-content:center; gap:3px; padding:0 6px;
+  border:1px solid transparent; border-radius:12px; background:none;
+  color: var(--muted); font-size:11px; letter-spacing:.05em; }
+.at-screen.cardform .at-cardtabs .at-tab2 > svg { width:20px; height:20px; flex:none; }
+.at-screen.cardform .at-cardtabs .at-tab2.on { background: var(--raised); color: var(--text);
+  border-color: var(--tab-stroke); box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+.at-screen.cardform .at-cardtabs .at-tab2.on > svg { color: var(--accent); }
+/* The dot for a change on another part rides on the corner of its segment
+   rather than taking a line of its own. */
+.at-screen.cardform .at-cardtabs .at-tabdot { position:absolute; top:7px; right:9px; }
 /* A change not yet saved on that tab, or a line on it saying what is in
    the way of saving. Brass, the colour of a thing waiting on the teacher. */
 .at-tabdot { width:8px; height:8px; border-radius:50%; background: var(--brass);

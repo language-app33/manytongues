@@ -8,6 +8,17 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.517 — 29 October 2026
+
+**A card's parts are one segmented switch.**
+
+- At the top of a card's screen, Basic, Advanced (on an advanced card) and
+  Exercises are now one rounded track shared out equally, each with its
+  icon above its name. The part you are on is raised, with its icon in
+  green. The same whether the card is being read or edited.
+- The dot that says a part has a change not yet saved sits in the corner
+  of that part's segment.
+
 ## 0.516 — 29 October 2026
 
 **A basic card is just the word: no grammar on it.**
