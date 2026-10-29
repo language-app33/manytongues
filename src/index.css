@@ -1781,6 +1781,10 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* A row that names a choice rather than being one: no hover, no pointer,
    because the thing you tap is the picker underneath it. */
 .at-cline.as-field { cursor:default; }
+/* Courses, Settings and How it works: the menu's main doors, a size up. */
+.at-cline.at-cbig { padding-top:15px; padding-bottom:15px; }
+.at-cline.at-cbig .at-cico { width:24px; }
+.at-cline.at-cbig .at-clinetext { font-size:15px; }
 .at-cline.as-field:hover .at-clinetext { color: var(--text-soft); font-weight:600; }
 .at-cseg { padding:2px 10px 8px 34px; }
 .at-crule { height:2px; background: var(--line); margin:8px 4px; border-radius:2px; }

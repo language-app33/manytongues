@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.521 — 29 October 2026
+
+**The You menu is simpler, and settings are on one screen.**
+
+- Choosing a space in the You menu no longer closes it: the space changes
+  behind the menu and you stay where you were.
+- Account settings and App preferences are now one Settings screen, with
+  the preferences first. It always opens at the top.
+- The version number and the check for a newer one have moved from the
+  menu into Settings, just above Sign out.
+- Sync status and Sync now sit at the bottom of the You menu.
+- Courses, Settings and How it works are bigger and easier to tap.
+
 ## 0.520 — 29 October 2026
 
 **Edit and Save float in the corner, and the card screen tells you why

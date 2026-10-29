@@ -125,7 +125,7 @@ const PLACES: Record<string, [string, string]> = {
   CloseAccount: [LEARN, "Account settings · Closing your account"],
   ClaimAdmin: [LEARN, "Account settings · Becoming the administrator"],
   AppPreferences: [LEARN, "App preferences"],
-  SettingsScreen: [LEARN, "App preferences"],
+  SettingsScreen: [LEARN, "Settings"],
   CornerMenu: [LEARN, "The menu behind your initial, in the bar at the foot of the window"],
   PlacePicker: [LEARN, "Choosing the space and the languages, in the menu behind your initial"],
   Guide: [LEARN, "How it works"],

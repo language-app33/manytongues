@@ -10347,7 +10347,7 @@ export default function ArabicTrainer() {
      rather than a ref, so the tab strips that portal into it render again
      once it exists. */
   const [dockSlot, setDockSlot] = useState<HTMLElement | null>(null);
-  const [screen, setScreen] = useState<string | null>(null); // null | "account" | "prefs"
+  const [screen, setScreen] = useState<string | null>(null); // null | "settings" | "guide"
   /* Remembered, because it decides whether the Teaching option exists at all.
      Deriving it only from a fresh network call meant a slow or failed request
      took the space selector away, with no way back but signing out. */
@@ -13881,7 +13881,7 @@ export default function ArabicTrainer() {
                   <span>
                     {`${plural(missingClips, "recording")} isn't on this device, so questions that
                       play ${missingClips === 1 ? "it" : "them"} are being held back. `}
-                    <button className="at-linkbtn" onClick={() => setScreen("account")}>
+                    <button className="at-linkbtn" onClick={() => setScreen("settings")}>
                       Download when you&apos;re back online
                     </button>
                   </span>
@@ -15513,9 +15513,8 @@ export default function ArabicTrainer() {
                   setTab("courses");
                   setSession(null);
                 }}
-                onAccount={() => setScreen("account")}
+                onSettings={() => setScreen("settings")}
                 onGuide={() => setScreen("guide")}
-                onPrefs={() => setScreen("prefs")}
               />
             </div>
             </div>
@@ -19668,7 +19667,7 @@ const GUIDE = [
          saying plainly which is which, because the difference is what
          somebody would plan a journey around. */
       "Practising works with no connection at all: your answers, your schedule and anything you report about a card are kept on the device and go up when you are back online.",
-      "What does need a connection: setting up, joining a course, new material from your teacher, and recordings you haven't played yet. Account settings can download a whole course's recordings before you travel.",
+      "What does need a connection: setting up, joining a course, new material from your teacher, and recordings you haven't played yet. Settings can download a whole course's recordings before you travel.",
     ],
   },
 ];
@@ -19896,7 +19895,7 @@ const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", ad
 function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note }: {
   space: string;
   spaces: string[];
-  /** Choosing a space also puts the menu away, which is the caller's. */
+  /** Choosing a space keeps the menu open; the app changes behind it. */
   onSpace: (space: string) => void;
   choices: LangChoice[];
   off: LangId[];
@@ -20113,7 +20112,7 @@ function AppVersion() {
   );
 }
 
-function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onAccount, onPrefs, onGuide }: {
+function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide }: {
   account: User | null;
   syncState?: string;
   /** What to say about it. Worked out by the app, which is the only thing
@@ -20126,8 +20125,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
   /** The courses you are in, and joining another: Learning's Courses
       page, which has no section of its own in the bar. */
   onCourses: () => void;
-  onAccount: () => void;
-  onPrefs: () => void;
+  onSettings: () => void;
   onGuide: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -20165,12 +20163,47 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
 
           <PlacePicker
             {...place}
-            onSpace={(sp: string) => {
-              setOpen(false);
-              place.onSpace(sp);
-            }}
           />
 
+
+          <button
+            className="at-cline at-cbig"
+            onClick={() => {
+              setOpen(false);
+              onCourses();
+            }}
+          >
+            <span className="at-cico">
+              <Icon name="folder" size={22} />
+            </span>
+            <span className="at-clinetext">Courses</span>
+          </button>
+          <button
+            className="at-cline at-cbig"
+            onClick={() => {
+              setOpen(false);
+              onSettings();
+            }}
+          >
+            <span className="at-cico">
+              <Icon name="tune" size={22} />
+            </span>
+            <span className="at-clinetext">Settings</span>
+          </button>
+          <button
+            className="at-cline at-cbig"
+            onClick={() => {
+              setOpen(false);
+              onGuide();
+            }}
+          >
+            <span className="at-cico">
+              <Icon name="help" size={22} />
+            </span>
+            <span className="at-clinetext">How it works</span>
+          </button>
+
+          <div className="at-crule" />
           {/* The row states where sync has got to; the button is the only
               thing that starts one. It used to be the whole row, so
               reading the state meant risking the action. */}
@@ -20183,59 +20216,6 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
               Sync now
             </button>
           </div>
-
-
-          <button
-            className="at-cline"
-            onClick={() => {
-              setOpen(false);
-              onCourses();
-            }}
-          >
-            <span className="at-cico">
-              <Icon name="folder" size={18} />
-            </span>
-            <span className="at-clinetext">Courses</span>
-          </button>
-          <button
-            className="at-cline"
-            onClick={() => {
-              setOpen(false);
-              onAccount();
-            }}
-          >
-            <span className="at-cico">
-              <Icon name="person" size={18} />
-            </span>
-            <span className="at-clinetext">Account settings</span>
-          </button>
-          <button
-            className="at-cline"
-            onClick={() => {
-              setOpen(false);
-              onPrefs();
-            }}
-          >
-            <span className="at-cico">
-              <Icon name="tune" size={18} />
-            </span>
-            <span className="at-clinetext">App preferences</span>
-          </button>
-          <button
-            className="at-cline"
-            onClick={() => {
-              setOpen(false);
-              onGuide();
-            }}
-          >
-            <span className="at-cico">
-              <Icon name="help" size={18} />
-            </span>
-            <span className="at-clinetext">How it works</span>
-          </button>
-
-          <div className="at-crule" />
-          <AppVersion />
         </Popover>
       )}
     </div>
@@ -20260,16 +20240,17 @@ function SettingsScreen({ kind, onClose, ...rest }: {
   kind?: string;
   onClose: () => void;
 } & React.ComponentProps<typeof AccountSettings> & React.ComponentProps<typeof AppPreferences>) {
-  const title =
-    kind === "account" ? "Account settings" : kind === "guide" ? "How it works" : "App preferences";
+  const title = kind === "guide" ? "How it works" : "Settings";
   return (
     <Screen title={title} onBack={onClose} className={kind === "guide" ? "" : "cardform"}>
-      {kind === "account" ? (
-        <AccountSettings {...rest} />
-      ) : kind === "guide" ? (
+      {kind === "guide" ? (
         <Guide />
       ) : (
-        <AppPreferences {...rest} />
+        <>
+          {/* One screen: how the app behaves first, then you. */}
+          <AppPreferences {...rest} />
+          <AccountSettings {...rest} />
+        </>
       )}
     </Screen>
   );
@@ -20505,6 +20486,14 @@ function AccountSettings({
         imagesOnDevice={imagesOnDevice}
         onDownloaded={onDownloaded}
       />
+
+      {/* Which version this is, and the check for a newer one. */}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Version</span>
+        </div>
+        <AppVersion />
+      </div>
 
       {/* Signing out is ordinary housekeeping, not a danger: it leaves
           everything on the server exactly as it is. */}

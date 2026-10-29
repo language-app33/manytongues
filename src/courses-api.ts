@@ -368,8 +368,8 @@ export function explain(err: unknown): string {
       "bad-image": "That picture couldn't be stored. Use a PNG, JPEG, WebP or GIF.",
       "not-in-course": "You aren't in that course.",
       "no-access": "You don't have access to that.",
-      "not-yourself": "Use the danger zone in Account settings to close your own account.",
-      "use-delete-account": "Delete your own account from Account settings instead.",
+      "not-yourself": "Use the danger zone in Settings to close your own account.",
+      "use-delete-account": "Delete your own account from Settings instead.",
       "not-found": "That no longer exists.",
       "signup-code-required": "This site needs an invitation code to make an account.",
       "storage-unconfigured":
