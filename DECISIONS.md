@@ -4401,7 +4401,7 @@ pronoun or number modules written since was among them. It reads the
 directory now, ignores comments (an explanation that أنا is *I* is not a
 rule), and looks for Vietnamese as well as Arabic and Hebrew. Two strings
 it had allowed went: the card sheet's placeholder comes from the pack, and
-the first screen's wordmark is the app's name, Taleb33, rather than an
+the first screen's wordmark is the app's own name rather than an
 Arabic word every learner met whatever they were learning. Sentence-ending
 punctuation is read off Unicode's classes rather than a list naming one
 script's question mark.
@@ -7049,3 +7049,123 @@ no `has`. A recording found once is remembered for the life of the process,
 since recordings never change once written; clearing data forgets what it
 deletes. A damaged recording that is present still counts as present —
 catching that would mean reading every file, and is not attempted.
+
+---
+
+## Layers lock the page; menus measure themselves; a too-long label wraps
+
+**27 October 2026** · `src/shared.tsx` (`usePageLock`, `Popover`, `Button`), `src/index.css`
+
+Three overflows a teacher found on one card screen, each fixed where it was
+shared rather than where it was seen.
+
+*The page under a layer.* A `Screen` is laid over the page, not swapped for
+it, and nothing stopped the page scrolling. The scroll bar in view was the
+cards list's, under the card. Three layers saved and restored the body's
+overflow on their own and `Screen` did nothing; now every layer holds
+`usePageLock`, a count that puts `at-pagelocked` on `<html>`. The count is
+the point: a confirmation over a screen closing first used to hand back the
+other one's saved value.
+
+*Menus.* Each drop-down's side was written in its own CSS from where its
+button sat, and the status button moved from the start of a line to the
+end of one without its menu being told. `Popover` measures after layout and
+translates the menu back inside the window, capping its height if it runs
+off the foot. The CSS still places it — measuring is the backstop, not the
+layout — so the status menu's side was corrected too.
+
+*Labels in a row.* `.at-row` never wraps a label: the row steps its type
+down, then drops a whole button to the next line. A label wider than the
+whole row at the smallest type had nowhere to go and ran off the screen.
+It now wraps, in that case only: the button's `min-width` is `auto` with a
+`max-width` of 100% (the automatic minimum is clamped by the max, where an
+explicit `min-content` beats it), and its words sit in `.at-btnlabel`,
+which asks for its one-line width and wraps below it. Everywhere outside a
+row the box is `display: contents`, so it changes nothing. The cost: a
+raw `<button className="at-btn">` has no such box, so it does not get this.
+
+---
+
+## A deck is read and edited on one screen, as a card is
+
+**27 October 2026** · `src/spaces.tsx` (the open deck in `TeachSpace`, `NewDeck`, `DeckDraft`)
+
+Deck settings was its own screen, reached from a pencil on each deck, and
+the deck's own screen could not change anything about the deck. A card had
+already gone the other way (0.474): one screen, read until Edit is pressed,
+the edit's own controls held still in a disabled fieldset while it is read.
+The owner asked for the deck to work exactly the same, so the settings
+screen is gone and its title, lock and courses live under "This deck".
+
+What an edit holds is a draft (`DeckDraft`) and nothing reaches the server
+until Save — including the deck's built-in cards, which used to save from
+their own sheet. Save writes the lock last when it goes on and first when
+it comes off, so pronoun cards going in or out of the deck in the same save
+are not refused by it.
+
+Two things were left outside the edit on purpose. The card list works the
+same read or edited, saving as it always did: each card has its own screen
+and its own Edit, so holding the list behind the deck's would add a step and
+protect nothing; a locked deck still takes no cards in or out. And Deck
+quality is read in both, outside the fieldset, because its buttons only show
+more of it.
+
+Unlike a card, the deck's way out while editing is a cross in place of the
+back arrow rather than a Cancel beside Save, and Delete is at the foot of
+the screen rather than on the title line: the owner's choice, to keep the
+title line to the one action. A new deck opens the same screen already
+being edited, asking only what a deck needs to exist; courses and cards
+come once it is saved, when it opens as itself.
+
+---
+
+## A space's sections are handed to the app's bar, not drawn by it
+
+**28 October 2026** · `src/shared.tsx` (`DockContext`, `Tabs`), `src/ArabicTrainer.tsx`
+
+The sections and the corner menu share one bar at the foot of the window.
+The other half of that bar — space, languages, you — is the app's, but
+the sections are each space's: Teaching and Admin keep their tab state
+inside themselves, and the app does not know what they are divided into.
+
+So the app owns an empty slot in the bar and offers it through
+`DockContext`, and a `Tabs` marked `dock` portals itself into it. Each
+space goes on rendering its own tabs exactly as before; only where they
+land has changed. The slot is held in state, not a ref, so strips that
+rendered before it existed render again once it does, and the bar is never
+taken down — hidden during an exercise — so the slot stays the same
+element.
+
+**Why not lift the tabs into the app.** It would mean the app knowing
+every space's sections and their state, which is what SpaceFrame exists
+to keep out of it.
+
+**What it costs.** A tab strip is no longer inside the page it belongs to,
+so anything looking for a space's sections inside its frame — the smoke
+harness did — has to look in the bar as well.
+
+---
+
+## Read, a card or deck hides every button that would change it
+
+**28 October 2026** · `src/index.css` (`fieldset.at-cardlock:disabled`), `src/card-editor.tsx` (`Locked`)
+
+A card or deck being read is its edit screen inside a disabled fieldset, so
+every control was there and dimmed: a page of buttons that did nothing. The
+owner asked for the ones that change something to go until Edit is pressed.
+
+It is one CSS rule rather than a condition at each button: inside a
+disabled `.at-cardlock`, every native `<button>` is hidden except the few
+that show a value — a tick, a choice of a few, an unset subtype, a fold.
+That works because the app already draws everything that only reads or
+plays (playing a recording, folding a form, Export) as a `Pressable`, a
+span, which a fieldset cannot disable — see Button's `reads`. So a new
+button that changes a card is hidden while it is read without anyone
+remembering to hide it; the cost is that a new button that only *shows*
+something has to be a `Pressable` (or join the exceptions) to be seen.
+
+Where hiding would hide a fact, the component says it instead, reading
+`Locked`: an answer's grammar is written out, recordings and pictures that
+exist open on screens that only play and show, and an empty list says
+"None." `Locked` is provided round the recording screens too, which are
+drawn outside the fieldset.

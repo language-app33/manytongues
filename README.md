@@ -1,8 +1,8 @@
 # ManyTongues
 
 A spaced-repetition app for learning languages, built as a progressive web
-app. It started as an Arabic trainer and now also supports Vietnamese (Huế
-dialect); adding another language is a matter of describing it in one file.
+app. It started as an Arabic trainer and now also supports Vietnamese;
+adding another language is a matter of describing it in one file.
 
 Teachers publish decks of cards to a course; students join with a code and
 the material appears on their devices, along with any recordings. A card is
@@ -377,7 +377,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   open, *Mature* is three weeks out everywhere.
 - **One tense of a verb is ever new at a time.** Where a language lays its
   verbs out in a table — Arabic in nine persons (one *I* unless a word
-  has two: `keepsApart` in `src/verbs.ts`) and three tenses, Huế in
+  has two: `keepsApart` in `src/verbs.ts`) and three tenses, Vietnamese in
   one person and four markers — each cell of it is a sub-form, drilled and
   scheduled in its own right by the exercises every other form gets. (Where
   the language offers the practices of a tense, as Arabic and Hebrew do, it
@@ -395,7 +395,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   it stands in for it in the editor as well: the block asking for the
   card's own word is not shown, the cell is what the card is saved as, and
   a word first called a verb moves into that cell rather than being asked
-  for twice. Where a language cites nothing — Huế cites the bare verb,
+  for twice. Where a language cites nothing — Vietnamese cites the bare verb,
   which is a word and not a cell — the block is the verb and stays.
 
   **No cell of the table is required, and none of them is what the card is
@@ -417,7 +417,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   holds up one form, so a verb was thirty unrelated words: nothing showed
   a tense laid out by person, or put the forms that look alike side by
   side. Where a language's verb table lists them in `practices` — Arabic
-  and Hebrew, not Huế, whose verb has one form for everybody — each cell
+  and Hebrew, not Vietnamese, whose verb has one form for everybody — each cell
   of a tense with something to tell apart climbs five more questions, all
   in the ordinary exercise table and marked `verbDrill`:
 
@@ -451,7 +451,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   they are answered. Nothing is coloured: the table is the pattern. See
   `src/verb-drills.ts`, and `drillFits` for when a cell can be asked one.
 - **A tense is learnt as one thing.** Where a language offers the
-  practices of a tense — Arabic and Hebrew; Huế's verb is one form for
+  practices of a tense — Arabic and Hebrew; Vietnamese's verb is one form for
   everybody and is asked as above — every tense the teacher has filled in is
   a **skill**, the way a stretch of the number line is: one schedule, one
   ladder, no words of its own, and a person drawn for every question
@@ -1160,7 +1160,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   and its numerals agree with what they count — one face for counting, two
   for the gender of a word beside them, two more for standing directly in
   front of a noun. Hebrew puts the ten before the unit and one joining
-  word in the whole number. Huế is regular enough to need fourteen boxes
+  word in the whole number. Vietnamese is regular enough to need fourteen boxes
   against the Semitic pair's thirty-eight, and puts its irregularity in
   the face a word wears inside a bigger number.
 
@@ -1290,7 +1290,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   stretch with a noun beside it (`countingOf`), and it joins the stretch's
   questions once one of the teacher's noun cards can be counted across all
   of it — never holding the stretch's other questions back
-  (`RangeCheck.counting`). A language with nothing to agree, like Huế,
+  (`RangeCheck.counting`). A language with nothing to agree, like Vietnamese,
   counts nothing (`counts` on the range). It was three parts of its own
   until 0.336; a deck that held one holds the stretch it went into
   (`partsNow`), what a learner had earned on one is handed to that stretch
@@ -1471,7 +1471,7 @@ Environment variables:
 
 ### Version numbers
 
-Two numbers appear at the foot of the top-right menu, and they answer
+Two numbers appear at the foot of the menu behind your initial, and they answer
 different questions.
 
 The **release** — `0.1`, `0.2`, `0.3` — is what you are on. It lives in

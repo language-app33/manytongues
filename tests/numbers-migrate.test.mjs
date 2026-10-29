@@ -24,7 +24,7 @@ import assert from "node:assert/strict";
 import { must } from "./helpers.mjs";
 import { arComposer } from "../src/numbers/ar-PS.ts";
 import { heComposer } from "../src/numbers/he-IL.ts";
-import { viComposer } from "../src/numbers/vi-Hue.ts";
+import { viComposer } from "../src/numbers/vi.ts";
 import { migrateCards, oldCardOf, slotForValue } from "../src/numbers/migrate.ts";
 import { emptyNumberSystem } from "../src/numbers/schema.ts";
 import { renderAr } from "../src/numbers/ar-PS.ts";
@@ -147,14 +147,14 @@ test("Hebrew is turned round, because its old cards were the other way up", () =
   assert.equal(thin.system.lexemes["unit.4"].forms.m, "arba'a");
 });
 
-test("Huế's two cells are one face, because they were always one idea", () => {
+test("Vietnamese's two cells are one face, because they were always one idea", () => {
   const got = migrateCards(
     [
-      { ...card("k5", 5, "năm", { "after-ten": "lăm" }), lang: "vi-Hue" },
-      { ...card("k0", 0, "không", { "empty-place": "lẻ" }), lang: "vi-Hue" },
+      { ...card("k5", 5, "năm", { "after-ten": "lăm" }), lang: "vi" },
+      { ...card("k0", 0, "không", { "empty-place": "lẻ" }), lang: "vi" },
     ],
     viComposer,
-    base("vi-Hue"),
+    base("vi"),
   );
   assert.equal(got.system.lexemes["unit.5"].forms.company, "lăm");
   assert.equal(got.system.lexemes["unit.0"].forms.company, "lẻ");

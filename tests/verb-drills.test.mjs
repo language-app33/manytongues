@@ -59,7 +59,7 @@ const { drillFits, whoChoices, whoIsRight, rowMarks, shiftCue, tenseOf, drillTab
 
 const AR = LANGUAGES["ar-PS"];
 const HE = LANGUAGES["he-IL"];
-const VI = LANGUAGES["vi-Hue"];
+const VI = LANGUAGES["vi"];
 const settings = { language: "ar-PS" };
 const PRACTICES = ["vpattern", "vread", "vwho", "vwhorec", "vrow", "vshift"];
 
@@ -89,10 +89,10 @@ const words = (/** @type {number} */ n) =>
     forms: [{ id: `w${i + 1}`, ar: `كلمة${i + 1}`, en: `word ${i + 1}`, lat: `kilma${i + 1}`, lang: "ar-PS", s: {} }],
   }));
 
-test("Arabic and Hebrew offer every practice on their verb tables; Huế offers none", () => {
+test("Arabic and Hebrew offer every practice on their verb tables; Vietnamese offers none", () => {
   assert.deepEqual([...(must(verbOf(AR), "Arabic's verbs").practices || [])].sort(), [...PRACTICES].sort());
   assert.deepEqual([...(must(verbOf(HE), "Hebrew's verbs").practices || [])].sort(), [...PRACTICES].sort());
-  assert.equal((must(verbOf(VI), "Huế's verbs").practices || []).length, 0);
+  assert.equal((must(verbOf(VI), "Vietnamese's verbs").practices || []).length, 0);
   for (const t of PRACTICES) {
     assert.ok(TYPES.includes(t), `${t} is scheduled`);
     assert.ok(EX[t].verbDrill, `${t} is a verb practice`);

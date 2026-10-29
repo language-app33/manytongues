@@ -34,7 +34,7 @@ import type { Range as SkillRange } from "./numbers/types.ts";
 export type { SkillRange };
 
 /**
- * A language's id — "ar-PS", "vi-Hue". The key into LANGUAGES, and what is
+ * A language's id — "ar-PS", "vi". The key into LANGUAGES, and what is
  * stored on a card, a course and a report.
  *
  * Not the language pack itself. The two are easy to confuse and the
@@ -176,7 +176,7 @@ export interface ExerciseSpec {
    The two axes a verb's forms are laid out on. Which of them exist, what
    they are called and what order they are taught in is the language pack's
    answer and never the app's: Arabic declares nine persons and three
-   tenses, Huế one person and four, and a language whose verbs do not vary
+   tenses, Vietnamese one person and four, and a language whose verbs do not vary
    declares no table at all. Nothing outside the pack knows what a tense
    is — only that a table has rows and columns and that a cell is one thing
    to learn. See src/verbs.ts. */
@@ -335,7 +335,7 @@ export interface VerbSpec {
    * Naming it says they are one. The card's word keeps its face and its
    * dictionary meaning, and the cell is what is practised.
    *
-   * Absent where the language has a form of its own for the purpose: Huế
+   * Absent where the language has a form of its own for the purpose: Vietnamese
    * cites the bare verb, which is a card's word and not a cell, and
    * English would cite an infinitive. There is nothing to reconcile in
    * either, and nothing changes for them.
@@ -345,7 +345,7 @@ export interface VerbSpec {
    * The verb practices this language offers on the table, by exercise
    * type: the tense on its own, read through, sorted into its persons,
    * and one person changed into another. Absent offers none, which is what
-   * a language whose verbs barely change is right to say — see Huế.
+   * a language whose verbs barely change is right to say — see Vietnamese.
    */
   practices?: string[];
 }
@@ -609,7 +609,7 @@ export interface Lang {
    * is called — [stored value, what to show]. GRAMMAR's own list is every
    * value any language stores, which is what a card is checked against;
    * this is the part of it that means something here. Arabic has no
-   * neuter, so a teacher writing Arabic is not offered one; Huế names its
+   * neuter, so a teacher writing Arabic is not offered one; Vietnamese names its
    * addressees in its own words. An axis not listed offers GRAMMAR's.
    */
   grammarOptions?: Record<string, [string, string][]>;
@@ -627,7 +627,7 @@ export interface Lang {
   longSentence?: number;
   /**
    * The line under a card's Forms heading, saying what a form is in this
-   * language: a plural or a feminine in Arabic, who it is said to in Huế.
+   * language: a plural or a feminine in Arabic, who it is said to in Vietnamese.
    * It was one line for every language, and told a Vietnamese teacher about
    * plurals and feminines their language does not have.
    */
@@ -678,7 +678,7 @@ export interface Lang {
    * `verb` is the persons and tenses, where verbs vary; `attached` the
    * pronouns on the end of a word; `agreement` an adjective's feminine and
    * plural; `counted` a number's feminine. A pack declares the ones it
-   * has and none of the rest — a noun in Huế is a noun with nothing laid
+   * has and none of the rest — a noun in Vietnamese is a noun with nothing laid
    * out under it. Two of them used to be named fields here, and a third
    * table would have been a third field, a third accessor and a third
    * branch wherever the two were told apart.

@@ -100,7 +100,7 @@ test("a sentence's English reads its verb blank through the three words", () => 
 
 test("the subjunctive is the row practised in examples, and only in Arabic", () => {
   assert.equal(examplesRowOf(spec), "subjunctive");
-  assert.equal(examplesRowOf(tensedOf(LANGUAGES["vi-Hue"], "verb")), "");
+  assert.equal(examplesRowOf(tensedOf(LANGUAGES["vi"], "verb")), "");
   assert.equal(examplesRowOf(tensedOf(LANGUAGES["he-IL"], "verb")), "");
   assert.ok(inExamplesRow(spec, subj("she", "تاكل", "")));
   assert.ok(!inExamplesRow(spec, { row: "present", col: "she" }));

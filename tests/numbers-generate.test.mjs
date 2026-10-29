@@ -520,5 +520,5 @@ test("Arabic writes its figures digit for digit, with its own thousands mark", a
   assert.equal(write(1000), "١٬٠٠٠");
   assert.equal(write(2000000), "٢٬٠٠٠٬٠٠٠");
   assert.equal(write(-1), "");
-  assert.equal(LANGUAGES["vi-Hue"].numerals, undefined);
+  assert.equal(LANGUAGES["vi"].numerals, undefined);
 });

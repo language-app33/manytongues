@@ -284,7 +284,7 @@ const toEat = {
    over Teaching's language switch runs — see teachesTwo. Served then and
    not before, so every other walk counts the cards it always counted. */
 const viTeach = {
-  id: "k8a8a8a8a8a8a", owner: "t-1", ar: "nhà", en: "house", lat: "nha", note: "", lang: "vi-Hue",
+  id: "k8a8a8a8a8a8a", owner: "t-1", ar: "nhà", en: "house", lat: "nha", note: "", lang: "vi",
   forms: [], updated: 1,
 };
 let teachesTwo = false;
@@ -309,6 +309,9 @@ let materialDecks = [];
 /* What the deck screen's Numbers and pronouns asked the server to keep. */
 /** @type {any[]} */
 const savedParts = [];
+/* What the deck screen's Lock asked the server to do. */
+/** @type {any[]} */
+const lockedDecks = [];
 /* The accounts the first screen asked to have made, so a walk of it can
    check what was sent rather than only what the screen then showed. */
 /** @type {any[]} */
@@ -444,6 +447,11 @@ const fakeFetch = async (input, opts = {}) => {
       });
     }
     /* Which parts of the numbers a deck holds, as the screen saved them. */
+    if (action === "lock-deck") {
+      const body = JSON.parse(opts.body || "{}");
+      lockedDecks.push(body);
+      return json({ ok: true });
+    }
     if (action === "set-deck-parts") {
       const body = JSON.parse(opts.body || "{}");
       savedParts.push(body);
@@ -692,8 +700,8 @@ remoteDocs.set(realToken, {
          Arabic walk into a Vietnamese question. What it changes is the
          count of cards and the list of languages, which is the whole of
          what it is here for. */
-      { id: "vicard1", ar: "nhà", en: "house", lat: "nha", kind: "word", tags: ["Huế"],
-        lang: "vi-Hue", created: 1, updated: 5, s: climbed() },
+      { id: "vicard1", ar: "nhà", en: "house", lat: "nha", kind: "word", tags: ["Vietnamese"],
+        lang: "vi", created: 1, updated: 5, s: climbed() },
     ],
   },
 });
@@ -792,7 +800,7 @@ process.on("unhandledRejection", died);
 
 /* The home screen opens on the climb — the ring and the band beside it —
    rather than on a count of what is due. */
-const homeCard = () => document.querySelector(".at-card[data-ready]");
+const homeCard = () => document.querySelector(".at-home[data-ready]");
 check("app rendered the home screen", !!homeCard() && !!document.querySelector(".at-climb"), text.slice(0, 80).replace(/\s+/g, " "));
 check("and it says how far along the collection is, drawn and in words",
   /\d+ of \d+ cards? learnt/.test(text.replace(/\s+/g, " ")) &&
@@ -905,6 +913,40 @@ const clickNamed = (re) => {
 };
 /** @param {Element | null | undefined} el */
 const click = (el) => el && el.dispatchEvent(new w.MouseEvent("click", { bubbles: true, cancelable: true }));
+/* Every card has a name, asked first in "This card" and needed before it
+   saves. A test about something else gives the card on screen one, where
+   it has none yet, so that Save is refused only for what the test is
+   about. */
+const nameIt = async (v = "Test card") => {
+  const screen = [...document.querySelectorAll(".at-screen.cardform")].pop();
+  const field = screen && [...screen.querySelectorAll(".at-field")].find((f) =>
+    /^Name/.test(((f.querySelector(".at-label") || {}).textContent || "").trim()));
+  const box = /** @type {HTMLInputElement | null} */ (field ? field.querySelector("input") : null);
+  if (!box || box.value.trim()) return;
+  must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(box, v);
+  box.dispatchEvent(new w.Event("input", { bubbles: true }));
+  await sleep(120);
+};
+/* Out of the screen on top, as its back button does. A card being edited
+   has a cross there instead, Cancel, which goes back to reading it — so
+   out of one takes Cancel (and Discard, if asked) and then Back. */
+const backOut = () => {
+  const backs = () => [...document.querySelectorAll("button.at-back")];
+  const top = backs().pop();
+  if (!top) return;
+  const screen = top.closest(".at-screen");
+  click(top);
+  if (top.getAttribute("aria-label") !== "Cancel") return;
+  click(buttonNamed(/^Discard changes$/));
+  const again = screen && screen.isConnected ? screen.querySelector("button.at-back") : null;
+  if (again && again.getAttribute("aria-label") === "Back") click(again);
+};
+/* A space frame's buttons, its sections first. The sections used to head
+   the frame; they are in the bar at the foot of the window now, outside
+   it, so they are gathered from there and put back where they were. */
+/** @param {Element} frame */
+const frameButtons = (frame) =>
+  [...document.querySelectorAll(".at-dock [role=tab]"), ...frame.querySelectorAll("button")];
 /* The practice ticks are one list on the card's Exercises tab since
    0.482, a line per form and per table. Every tab stays drawn while
    another is shown, so a check reads them without going there; this
@@ -1104,64 +1146,107 @@ const buttonState = (re) => {
   return { there: !!b, disabled: !!b && b.disabled, label: (b && b.textContent) || "" };
 };
 
+/* The Build a session screen's pickers, which are the card editor's: the
+   mode is chosen as a card's subtype is, from a sheet of radios, and the
+   decks as a card's decks are, from a sheet of rows. */
+const sessionMode = async (/** @type {RegExp} */ want) => {
+  click([...document.querySelectorAll("button")].find((b) =>
+    /^(Mode\. Not set\. Choose one\.|Change the mode)$/.test(b.getAttribute("aria-label") || "")));
+  await sleep(80);
+  const row = [...document.querySelectorAll('[role="radiogroup"][aria-label="Mode"] .at-tickrow')]
+    .find((r) => want.test(r.textContent || ""));
+  click(row ? row.querySelector("input") : null);
+  await sleep(80);
+  return !!row;
+};
+const sessionDeck = async (/** @type {RegExp} */ want) => {
+  clickNamed(/^(Choose decks|Another deck)$/);
+  await sleep(80);
+  const sheet = document.querySelector('[role="dialog"][aria-label="Decks"]');
+  const row = sheet ? [...sheet.querySelectorAll(".at-deckpick")].find((b) => want.test(b.textContent || "")) : null;
+  click(row);
+  await sleep(60);
+  click(sheet ? sheet.querySelector('[aria-label="Close"]') : null);
+  await sleep(60);
+  return !!row;
+};
+/* What the screen shows as chosen: the mode's shut row, and the pills. */
+const sessionModeSaid = () =>
+  ((document.querySelector(".at-screen.cardform .at-shutrow .at-shutname") || {}).textContent || "").trim();
+const sessionPills = () => [...document.querySelectorAll(".at-screen.cardform .at-deckpill")].map((p) => (p.textContent || "").trim());
+
 check("the manual session builder opens", clickNamed(/Build a session|Choose what to practice|Pick cards/) || true);
 await sleep(300);
-if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
+if (/Build a session/.test(document.body.textContent)) {
   check("session builder rendered in a Screen with its footer", !!document.querySelector(".at-screenfoot, .at-screenhead"));
+
+  /* One screen, laid out as the card editor is: Mode, Cards, Length and
+     keeping it, each a section with the editor's heading and the line
+     under it. */
+  const heads = [...document.querySelectorAll(".at-screen.cardform .at-formblock > .at-formhead > .at-formnum")]
+    .map((h) => h.textContent);
+  check("the builder is one screen, sectioned like the card editor",
+    heads.join("|") === "Mode|Cards|Length|Save for later" &&
+      document.querySelectorAll(".at-formblock > .at-formhead > .at-formrole").length === 4,
+    heads.join("|"));
+  check("and nothing on it is a step to go through", !buttonNamed(/^Next$/));
 
   /* Nothing is chosen for you. Every step of this used to open with an
      answer already lit — Ultimate on the first screen, twenty questions on
      the last — which reads as a decision made rather than one to make, and
      Ultimate is the longest session on offer to hand somebody by default. */
-  const modeCards = [...document.querySelectorAll(".at-modecard")];
-  check("the modes are all offered, none of them chosen", modeCards.length > 1 && !modeCards.some((b) => b.classList.contains("on")),
-    `${modeCards.length} modes, ${modeCards.filter((b) => b.classList.contains("on")).map((b) => (b.textContent || "").slice(0, 12)).join(",") || "none"} lit`);
-
-  const next = () => buttonState(/^(Next|Choose a mode|Choose at least one card)$/);
-  check("and you cannot go on until you choose one", next().there && next().disabled, next().label || "no button");
-  check("the button says what is missing rather than sitting dead", next().there && /Choose a mode/.test(next().label),
-    next().label);
-
-  click(modeCards.find((b) => /Regular/.test(b.textContent || "")));
+  check("the mode is asked as a card's subtype is, and not answered for you",
+    [...document.querySelectorAll(".at-choosebtn")].some((b) => b.getAttribute("aria-label") === "Mode. Not set. Choose one.") &&
+      !sessionModeSaid(), sessionModeSaid() || "(none)");
+  check("no deck or card is chosen for you either", !sessionPills().length, sessionPills().join("|"));
+  /* Length opens on 20 questions: unlike the mode, a length is taken as
+     offered more often than not. */
+  const lit = () => [...document.querySelectorAll(".at-lengthgroup .on, .at-lengthgroup [aria-checked=true], .at-lengthgroup [aria-selected=true]")]
+    .map((e) => (e.textContent || "").trim());
+  check("the length opens on 20 questions", lit().join(",") === "20", lit().join(","));
+  /* The one button is in the top bar, on the right, and says Start. Tapped
+     while something is missing, it starts nothing, and only the sections
+     still unfilled say what they want — nothing is said before the tap. */
+  const startBtn = () => buttonNamed(/^Start$/);
+  const off = () => startBtn()?.getAttribute("aria-disabled") === "true";
+  const wants = () => [...document.querySelectorAll(".at-screen.cardform .at-formneed.unmet")].map((p) => p.textContent).join("|");
+  check("the way on is a Start button in the top bar", !!startBtn()?.closest(".at-screenhead"),
+    startBtn() ? "elsewhere" : "no button");
+  check("and you cannot start until you choose", off());
+  check("but nothing is said to be missing before you try", !wants(), wants());
+  click(startBtn());
   await sleep(80);
-  check("choosing one lets you go on", next().there && !next().disabled && /^Next$/.test(next().label),
-    next().label);
+  check("tapping it says what is missing, and only that",
+    wants() === "Choose a mode.|Choose at least one deck or card.", wants());
+  check("and starts nothing", !document.querySelector(".at-instruction"));
 
-  /* Cards, which had no default and still should not. */
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(120);
-  check("no card is chosen for you either", !document.querySelector(".at-tagpick.on, .at-minicard.on"));
+  check("a mode is chosen from the subtype's kind of sheet", await sessionMode(/Regular/));
+  check("and reads as chosen", /Regular/.test(sessionModeSaid()), sessionModeSaid());
+  check("and its line goes", wants() === "Choose at least one deck or card.", wants());
+
   /* Introductions rather than Everything: the walks further down need the
      climbed cards untouched, and a hand-built session asks a card every
      exercise it has open whether it is due or not — so the one deck none
      of them is in is the one to practise here. */
-  const everything = [...document.querySelectorAll(".at-tagpickmain")].find((b) => /Introductions/.test(b.textContent));
-  click(everything);
-  await sleep(80);
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(120);
-
-  /* Length: two segmented controls, and on opening neither should have a
-     segment lit. */
-  const lit = [...document.querySelectorAll(".at-lengthgroup .on, .at-lengthgroup [aria-checked=true], .at-lengthgroup [aria-selected=true]")];
-  check("no length is chosen for you", lit.length === 0, lit.map((e) => e.textContent).join(","));
-  const start = () => buttonState(/^(Start|Choose a length)$/);
-  check("and it says so instead of starting a session you did not describe",
-    start().there && start().disabled && /Choose a length/.test(start().label),
-    start().label || "no button");
+  check("a deck is chosen from the sheet a card's decks are chosen in", await sessionDeck(/Introductions/));
+  check("and stands as a pill", sessionPills().some((p) => /Introductions/.test(p)), sessionPills().join("|"));
+  check("so nothing is wanted any more", !off() && !wants(), wants());
 
   click([...document.querySelectorAll(".at-lengthgroup button")].find((b) => (b.textContent || "").trim() === "10"));
   await sleep(80);
-  check("choosing a length is all that was left", start().there && !start().disabled && /^Start$/.test(start().label),
-    start().label);
+  check("a length can still be changed", lit().join(",") === "10", lit().join(","));
 
-  /* Keeping it, which is the other half of what the last step is for.
-     Several minutes of picking used to be spent again the next morning. */
-  const keepBox = [...document.querySelectorAll(".at-formblock")]
-    .find((d) => /Keep this session/.test(d.textContent || ""));
-  check("the last step offers to keep the session", !!keepBox,
-    (document.querySelector(".at-screenbody") || { textContent: "" }).textContent.slice(-90));
-  const nameBox = keepBox && keepBox.querySelector("input");
+  /* Keeping it: a box to tick, and the name asked only once it is. There
+     is no Save of its own — it is kept as it starts. */
+  const keepBox = () => [...document.querySelectorAll(".at-formblock")]
+    .find((d) => /^Save for later$/.test(((d.querySelector(".at-formnum") || {}).textContent || "").trim()));
+  check("the screen offers to keep the session, without asking its name yet",
+    !!keepBox() && !keepBox()?.querySelector("input.at-input"),
+    (keepBox() || { textContent: "(no block)" }).textContent?.slice(0, 90));
+  click(keepBox()?.querySelector('input[type="checkbox"]'));
+  await sleep(80);
+  const nameBox = keepBox()?.querySelector("input.at-input");
+  check("ticking it asks what to call it", !!nameBox);
   if (nameBox) {
     /* Named, because a list of "Regular · 6 cards" tells nobody which was
        which. */
@@ -1172,17 +1257,11 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
     must(setInput, "the input's value setter").call(nameBox, "Thursday's verbs");
     nameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
     await sleep(60);
-    clickNamed(/^Save$/);
-    await sleep(150);
-    check("saving it says so, rather than looking like nothing happened",
-      !!buttonNamed(/^Saved$/), buttonState(/^Saved?$/).label || "no button");
-    check("and Start is still the way on — keeping one is not practising it",
-      start().there && !start().disabled, start().label);
   }
 
   /* The whole point of the walk: it still builds. Two new blocking
      conditions are two new ways to wedge the builder shut. */
-  clickNamed(/^(Start|Choose a length)$/);
+  clickNamed(/^Start$/);
   await sleep(400);
   check("a hand-built session actually starts", !!document.querySelector(".at-instruction"),
     document.body.textContent.slice(0, 120));
@@ -1709,26 +1788,21 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
     click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Edit Thursday's verbs"));
     await sleep(250);
     check("a kept session opens on the Build screen to be changed",
-      !!document.querySelector(".at-modecard.on"),
-      (document.body.textContent || "").slice(0, 120));
-    clickNamed(/^Next$/);
-    await sleep(120);
-    check("with its cards already picked", !!document.querySelector(".at-tagpick.on"),
-      (document.body.textContent || "").slice(0, 120));
-    clickNamed(/^Next$/);
-    await sleep(120);
+      /Regular/.test(sessionModeSaid()), sessionModeSaid() || (document.body.textContent || "").slice(0, 120));
+    check("with its deck already picked, as a deck", sessionPills().some((p) => /Introductions/.test(p)),
+      sessionPills().join("|"));
     const renameBox = [...document.querySelectorAll(".at-formblock")]
-      .find((d) => /Name/.test(d.textContent || ""))?.querySelector("input");
+      .find((d) => d.querySelector(".at-formnum")?.textContent === "Name")?.querySelector("input");
     if (renameBox) {
       must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value")?.set, "the input's value setter")
         .call(renameBox, "Friday's verbs");
       renameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
       await sleep(60);
     }
-    check("and its last step saves rather than starts",
-      !!buttonNamed(/^Save changes$/) && !buttonNamed(/^Start$/),
+    check("and its button saves rather than starts",
+      !!buttonNamed(/^Save$/)?.closest(".at-screenhead") && !buttonNamed(/^Start$/),
       [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-120));
-    clickNamed(/^Save changes$/);
+    clickNamed(/^Save$/);
     await sleep(250);
     const listed = document.querySelector(".at-list")?.textContent || "";
     check("and the change is kept under the same session",
@@ -1772,20 +1846,10 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
     (ver && ver.textContent) || "");
   check("it says when, so two deploys in a day are distinguishable",
     !!verWhen && /\d/.test(verWhen.textContent || ""), (verWhen && verWhen.textContent) || "");
-  /* Three looks, side by side, one lit — rather than one button that
-     cycled and made you tap twice to go back one. */
-  const appearance = document.querySelector(".at-cseg .at-segmented");
-  const looks = appearance ? [...appearance.querySelectorAll("button")] : [];
-  check("Appearance is one picker with its options side by side",
-    looks.length === 3, `${looks.length} options`);
-  /* One control, not three buttons: the options are inside the track,
-     which is the element carrying the picker's own name. */
-  check("and they are inside the track rather than beside it",
-    looks.every((b) => b.parentElement === appearance && b.classList.contains("at-seg")),
-    looks.map((b) => b.className).join(" | "));
-  check("and exactly one of them is lit",
-    looks.filter((b) => b.getAttribute("aria-pressed") === "true").length === 1,
-    looks.map((b) => `${b.textContent}:${b.getAttribute("aria-pressed")}`).join(" "));
+  /* The look is chosen in App preferences, and only there. */
+  check("the menu no longer carries a second Appearance picker",
+    !document.querySelector(".at-cmenu .at-segmented"),
+    document.querySelector(".at-cmenu .at-segmented") ? "still there" : "gone");
 
   const verBtn = ver && ver.querySelector(".at-cverbtn");
   check("nothing to reload when it is the deployed one",
@@ -2596,18 +2660,13 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
   const cardCount = () =>
     Number(((document.querySelector("button.at-rung") || {}).textContent || "").trim().match(/^\d+/));
   const both = cardCount();
-  const swBtn = () => document.querySelector(".at-langbtn");
-  const swSaid = () => {
-    const b = swBtn();
-    return b ? String(b.getAttribute("aria-label")) : "nothing in the chrome bar";
-  };
-  check("somebody learning two languages gets a switch for them", !!swBtn(), swSaid());
-  check("and it says every language is on, without naming any of them",
-    ((swBtn() || {}).textContent || "").trim() === "All", ((swBtn() || {}).textContent || "").trim());
+  /* The languages are at the top of the menu behind your initial. */
+  const swBtn = () => document.querySelector(".at-cornerbtn");
+  const rows = () => [...document.querySelectorAll(".at-cmenu .at-ck")];
+  const swSaid = () => rows().map((r) => `${(r.querySelector("b") || {}).textContent}:${r.getAttribute("aria-checked")}`).join(", ");
 
   click(swBtn());
   await sleep(200);
-  const rows = () => [...document.querySelectorAll(".at-langmenu .at-ck")];
   check("pressing it opens the languages being learnt", rows().length === 2,
     rows().map((r) => (r.textContent || "").replace(/\s+/g, " ")).join(" · ") || "nothing opened");
   check("with every one of them ticked to start with",
@@ -2620,8 +2679,8 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
     rows().map((r) => (r.textContent || "").replace(/\s+/g, " ")).join(" · "));
   click(viRow);
   await sleep(300);
-  check("switching one off says which one is left, on the button itself",
-    ((swBtn() || {}).textContent || "").trim() === "AR", ((swBtn() || {}).textContent || "").trim());
+  check("switching one off leaves only the other ticked",
+    /Arabic:true/.test(swSaid()) && /Vietnamese:false/.test(swSaid()), swSaid());
   check("and its cards go from the rest of Learning", cardCount() === both - 1,
     `${both} with both, ${cardCount()} with one`);
 
@@ -2633,22 +2692,23 @@ if (/of 3|of 4|Build a session/.test(document.body.textContent)) {
   check("the last language on cannot be switched off",
     !!arRow && arRow.getAttribute("aria-checked") === "true" && cardCount() === both - 1,
     `${arRow ? arRow.getAttribute("aria-checked") : "no row"}, ${cardCount()} cards`);
-  check("and the row still says only how many cards it has",
-    /^\s*✓?\s*Palestinian Arabic\s*\d+ cards?\s*$/.test((arRow || {}).textContent || ""),
+  check("and the row says only the language's name",
+    /^\s*✓?\s*Palestinian Arabic\s*$/.test((arRow || {}).textContent || ""),
     ((arRow || {}).textContent || "").replace(/\s+/g, " "));
 
   /* And back on again, which is the state everything else expects. */
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);
   check("switching it back on brings its cards back",
-    cardCount() === both && ((swBtn() || {}).textContent || "").trim() === "All",
-    `${cardCount()} cards, button says ${((swBtn() || {}).textContent || "").trim()}`);
+    cardCount() === both && !/:false/.test(swSaid()),
+    `${cardCount()} cards, button says ${swSaid()}`);
   /* Anywhere outside it puts it away. */
-  click(document.querySelector(".at-brand"));
+  /* Progress has no heading now, so the press lands on the page itself. */
+  click(document.querySelector(".at-brand, .at-tabtitle") || document.querySelector(".at"));
   await sleep(200);
   check("and pressing away from it closes it",
-    !document.querySelector(".at-langmenu"),
-    document.querySelector(".at-langmenu") ? "still open" : "put away");
+    !document.querySelector(".at-cmenu"),
+    document.querySelector(".at-cmenu") ? "still open" : "put away");
 
   click(buttonNamed(/^Home$/));
   await sleep(300);
@@ -3444,17 +3504,8 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   await sleep(300);
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
-  click([...document.querySelectorAll(".at-modecard")].find((b) => /Regular/.test(b.textContent || "")));
-  await sleep(60);
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(150);
-  const deck = [...document.querySelectorAll(".at-tagpickmain")].find((b) => /Scenes/.test(b.textContent || ""));
-  check("the scene's own deck is there to practise from", !!deck,
-    [...document.querySelectorAll(".at-tagpickmain")].map((b) => (b.textContent || "").slice(0, 12)).join("|"));
-  click(deck);
-  await sleep(80);
-  clickNamed(/^(Next|Choose at least one card)$/);
-  await sleep(150);
+  await sessionMode(/Regular/);
+  check("the scene's own deck is there to practise from", await sessionDeck(/Scenes/), sessionPills().join("|"));
   click([...document.querySelectorAll(".at-lengthgroup button")].find((b) => (b.textContent || "").trim() === "10"));
   await sleep(60);
   clickNamed(/^(Start|Choose a length)$/);
@@ -3722,14 +3773,8 @@ check("no console errors during the session", errors.length === 0, errors.slice(
 
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
-  click([...document.querySelectorAll(".at-modecard")].find((b) => /Regular/.test(b.textContent || "")));
-  await sleep(60);
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(150);
-  click([...document.querySelectorAll(".at-tagpickmain")].find((b) => /Introductions/.test(b.textContent || "")));
-  await sleep(80);
-  clickNamed(/^(Next|Choose at least one card)$/);
-  await sleep(150);
+  await sessionMode(/Regular/);
+  await sessionDeck(/Introductions/);
   const groups = [...document.querySelectorAll(".at-lengthgroup")];
   const minutesGroup = groups.find((g) => /Minutes/.test(g.textContent || ""));
   click(minutesGroup && [...minutesGroup.querySelectorAll("button")].find((b) => (b.textContent || "").trim() === "2"));
@@ -3841,7 +3886,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     await sleep(350);
     click(must(buttonNamed(on ? /^Mark as high priority$/ : /High priority — tap to clear/), `the priority button on ${id}`));
     await sleep(300);
-    click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+    backOut();
     await sleep(350);
   }
 };
@@ -3857,15 +3902,8 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await sleep(300);
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
-  click([...document.querySelectorAll(".at-modecard")].find((b) => /Ultimate/.test(b.textContent || "")));
-  await sleep(80);
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(150);
-  const lesson = [...document.querySelectorAll(".at-tagpickmain")].find((b) => /Lesson 1/.test(b.textContent || ""));
-  click(lesson);
-  await sleep(80);
-  clickNamed(/^(Next|Choose at least one card|Start|Choose a length)$/);
-  await sleep(200);
+  await sessionMode(/Ultimate/);
+  await sessionDeck(/Lesson 1/);
   clickNamed(/^(Start|Choose a length)$/);
   await sleep(500);
 
@@ -4162,18 +4200,9 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await sleep(300);
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
-  click([...document.querySelectorAll(".at-modecard")].find((b) => /Ultimate/.test(b.textContent || "")));
-  await sleep(80);
-  clickNamed(/^(Next|Choose a mode|Choose at least one card)$/);
-  await sleep(150);
-  const intro = [...document.querySelectorAll(".at-tagpickmain")]
-    .find((b) => /Introductions/.test(b.textContent || ""));
-  check("the deck the frame is in can be practised on its own", !!intro,
-    [...document.querySelectorAll(".at-tagpickmain")].map((b) => (b.textContent || "").slice(0, 20)).join(" | "));
-  click(intro);
-  await sleep(80);
-  clickNamed(/^(Next|Choose at least one card|Start|Choose a length)$/);
-  await sleep(200);
+  await sessionMode(/Ultimate/);
+  check("the deck the frame is in can be practised on its own", await sessionDeck(/Introductions/),
+    sessionPills().join(" | "));
   clickNamed(/^(Start|Choose a length)$/);
   await sleep(500);
 
@@ -4271,7 +4300,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     !!buttonNamed(/High priority — tap to clear/),
     (document.body.textContent || "").slice(-120).replace(/\s+/g, " "));
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(350);
   const priTiles = [...document.querySelectorAll(".at-cardgrid .at-minipri")];
   check("the list says which card it was", priTiles.length === 1,
@@ -4321,7 +4350,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await sleep(350);
   click(must(buttonNamed(/High priority — tap to clear/), "the button that clears it"));
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(350);
   check("clearing the mark takes it off the card list",
     document.querySelectorAll(".at-cardgrid .at-minipri").length === 0,
@@ -4358,14 +4387,17 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("a student's card screen does not offer exercises to try",
     document.querySelectorAll(".at-try").length === 0,
     `${document.querySelectorAll(".at-try").length} on the learner's card`);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(250);
 
-  /* Into the teaching space, which this person now teaches in. */
+  /* Into the teaching space, which this person now teaches in: from the
+     space and language menu in the bar at the foot of the window. */
+  click(document.querySelector(".at-dock .at-cornerbtn"));
+  await sleep(200);
   const toTeaching = [...document.querySelectorAll(".at-spacebtn")]
-    .find((b) => /Teaching/i.test(b.getAttribute("aria-label") || ""));
+    .find((b) => /Teaching/i.test(b.textContent || ""));
   check("a teacher can reach the teaching space", !!toTeaching,
-    [...document.querySelectorAll(".at-spacebtn")].map((b) => b.getAttribute("aria-label")).join(","));
+    [...document.querySelectorAll(".at-spacebtn")].map((b) => b.textContent).join(",") || "no space menu");
   click(toTeaching);
   await sleep(700);
 
@@ -4376,9 +4408,9 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      learner's own nav and card list are still in the document behind it,
      so everything below is looked for inside the frame. */
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   check("the teaching space has a Cards tab of its own", teachTabs.length > 0,
-    [...frame.querySelectorAll('[role="tab"], .at-tab')].map((b) => b.textContent).join("|"));
+    [...document.querySelectorAll('.at-dock [role="tab"]')].map((b) => b.textContent).join("|"));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const teachTiles = [...frame.querySelectorAll(".at-minicard")];
@@ -4404,7 +4436,8 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   const statusBtn = /** @type {HTMLButtonElement | null} */ ([...document.querySelectorAll(".at-statusmenu .at-statusbtn")].pop() || null);
   check("a teacher's card says where it stands with students, beside Edit",
     !!statusBtn && /Published/.test(spokenName(statusBtn)) && statusBtn.classList.contains("at-btn") &&
-      statusBtn.classList.contains("sm") && !document.querySelector(".at-statusmenu select"),
+      statusBtn.classList.contains("sm") && !document.querySelector(".at-statusmenu select") &&
+      /Published/.test(statusBtn.textContent || "") && !statusBtn.classList.contains("iconly"),
     statusBtn ? `${statusBtn.className}: ${spokenName(statusBtn)}` : "(no status button)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
@@ -4417,10 +4450,12 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      with Export by the "This card" heading rather than among them. */
   const cardHead = statusBtn && statusBtn.closest(".at-screenhead");
   const headButtons = cardHead ? [...cardHead.querySelectorAll(".at-screenaction button")] : [];
-  check("and its buttons are icons on the card's title line, each with a name",
+  /* Icons, each named — but the status, which says itself in words. */
+  check("and its buttons are icons on the card's title line, each with a name, the status in words",
     !!cardHead && !cardHead.classList.contains("below") &&
       !!cardHead.querySelector(".at-screenaction .at-statusmenu") &&
-      headButtons.length > 0 && headButtons.every((b) => !(b.textContent || "").trim() && !!b.getAttribute("aria-label")) &&
+      headButtons.length > 0 && headButtons.every((b) => !!b.getAttribute("aria-label") &&
+        (b.classList.contains("at-statusbtn") || !(b.textContent || "").trim())) &&
       !headButtons.some((b) => /Export/.test(b.getAttribute("aria-label") || "")),
     headButtons.map((b) => b.getAttribute("aria-label") || (b.textContent || "").trim()).join(" | ") || "(no header)");
   const exportBtn = /** @type {any} */ ((teachRead || document).querySelector('[aria-label="Export this card"]'));
@@ -4519,20 +4554,21 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     JSON.stringify(after.log) === JSON.stringify(before.log),
     `${JSON.stringify(after.log)} vs ${JSON.stringify(before.log)}`);
 
-  /* ---- Save, and Save and exit ----
-     Save keeps the card open to go on with it; Save and exit closes it.
-     Both save this card, under its own id. */
+  /* ---- Save, and Cancel ----
+     Save keeps the card open to go on with it; the cross in the top left
+     leaves editing, asking first only when something is unsaved. Every
+     save is this card, under its own id. */
   const cardId = (phraseTile && phraseTile.getAttribute("data-card")) || "";
   click(cardEdit());
   await sleep(400);
   const editorOpen = () => !!document.querySelector(".at-screen.cardform");
-  check("Edit opens the card editor, with Save and Save and exit on its title line",
-    editorOpen() && !!buttonNamed(/^Save$/) && !!buttonNamed(/^Save and exit$/) &&
-      !!(/** @type {Element} */ (buttonNamed(/^Save and exit$/))).closest(".at-screenhead"),
+  check("Edit opens the card editor, with Save alone on its title line",
+    editorOpen() && !!buttonNamed(/^Save$/) && !buttonNamed(/^Save and exit$/) && !buttonNamed(/^Status/) &&
+      !!(/** @type {Element} */ (buttonNamed(/^Save$/))).closest(".at-screenhead"),
     editorOpen() ? [...document.querySelectorAll(".at-screen.cardform .at-screenhead button")].map(spokenName).join(" | ") : "(no editor)");
   /* Nothing changed yet, so there is nothing to save. */
-  const saveOff = () => /** @type {any} */ (buttonNamed(/^Save$/))?.disabled && /** @type {any} */ (buttonNamed(/^Save and exit$/))?.disabled;
-  check("both saves are off until something changes", !!saveOff(),
+  const saveOff = () => /** @type {any} */ (buttonNamed(/^Save$/))?.disabled;
+  check("Save is off until something changes", !!saveOff(),
     `Save ${(/** @type {any} */ (buttonNamed(/^Save$/)) || {}).disabled ? "off" : "on"}`);
   /* A change anywhere in the card turns them on: a word added to the
      first box with something written in it. */
@@ -4545,6 +4581,8 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     must(Object.getOwnPropertyDescriptor(proto, "value"), "the value descriptor").set?.call(box, v);
     box.dispatchEvent(new w.Event("input", { bubbles: true }));
   };
+  /* A card from before every card had a name is asked for one first. */
+  await nameIt();
   if (noteBox) typeOn(noteBox, `${noteBox.value} x`);
   await sleep(150);
   check("and come on once something has", !!noteBox && !saveOff(), noteBox ? "typed in a box" : "(no box to type in)");
@@ -4559,13 +4597,26 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     `Save ${(/** @type {any} */ (buttonNamed(/^Save$/)) || {}).disabled ? "off" : "on"}`);
   if (noteBox) typeOn(noteBox, `${noteBox.value}y`);
   await sleep(150);
-  clickNamed(/^Save and exit$/);
+  clickNamed(/^Cancel$/);
+  await sleep(300);
+  const asked = /Discard your changes\?/.test(document.body.textContent || "");
+  check("with a change unsaved, the cross asks whether to discard it", asked, asked ? "asked" : "(not asked)");
+  clickNamed(/^Cancel$/);
+  await sleep(200);
+  clickNamed(/^Save$/);
   await sleep(500);
   const both = savedCards.slice(savesBefore);
-  check("and Save and exit saves the same card again and closes it",
-    both.length === 2 && !!both[0].id && both[0].id === both[1].id && !editorOpen() &&
+  check("and a second Save saves the same card again",
+    both.length === 2 && !!both[0].id && both[0].id === both[1].id &&
       (!cardId || both[0].id === cardId),
-    `${both.map((c) => c.id).join(", ")} · ${editorOpen() ? "open" : "closed"}`);
+    both.map((c) => c.id).join(", "));
+  clickNamed(/^Cancel$/);
+  await sleep(400);
+  check("and with nothing unsaved the cross goes straight back to reading the card",
+    !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save$/),
+    [...document.querySelectorAll(".at-screenhead button")].map(spokenName).join(" | "));
+  clickNamed(/^Back$/);
+  await sleep(400);
   takeSaves = false;
 }
 
@@ -4580,7 +4631,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
    exercise rather than whichever one a shuffled queue reaches. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -4656,7 +4707,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
    out has no mark on their side at all. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const bookTile = [...frame.querySelectorAll(".at-minicard")]
@@ -4783,7 +4834,7 @@ const thisCardAsks = () => {
 const cardNameField = () => {
   const block = thisCardBlock();
   return /** @type {any} */ ((block && [...block.querySelectorAll(".at-field")]
-    .find((f) => /^Name$/.test(((f.querySelector(".at-label") || {}).textContent || "").trim())))
+    .find((f) => /^Name\b/.test(((f.querySelector(".at-label") || {}).textContent || "").trim())))
     || null);
 };
 const formRows = () => [...document.querySelectorAll(
@@ -4826,7 +4877,7 @@ const openPronounTables = async () => {
    teacher commit to one before the second line is written. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -4858,6 +4909,7 @@ const openPronounTables = async () => {
   click(cardEdit());
   await sleep(450);
 
+
   /* The bug, in one assertion: which editor came up. */
   const heading = (
     [...document.querySelectorAll(".at-screenhead h2")].pop() || {}
@@ -4868,8 +4920,8 @@ const openPronounTables = async () => {
     `${heading || "(no title)"} · ${document.querySelectorAll(".at-formblock").length} blocks`);
   /* And it is an editor for a card, which this one happens to be a
      conversation. A screen called "Edit conversation" said the opposite. */
-  check("it is still the card editor, named for the card, saying which kind of card this is",
-    /At the door/.test(heading.trim()) &&
+  check("it is still the card editor, headed Edit card, saying which kind of card this is",
+    heading.trim() === "Edit card" &&
       /This card/.test(document.body.textContent || "") &&
       !document.querySelector(".at-screen.cardform fieldset.at-cardlock[disabled]"),
     heading.trim() || "(no title)");
@@ -4895,7 +4947,7 @@ const openPronounTables = async () => {
     !!parts[0] && parts[0].getAttribute("aria-pressed") === "true",
     parts.map((b) => `${b.textContent}=${b.getAttribute("aria-pressed")}`).join(" "));
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 
   /* ---- somewhere to put them that does not exist yet ----
@@ -4997,35 +5049,40 @@ const openPronounTables = async () => {
      session builder had been drilling those same words inside those same
      turns all along. */
   const inFrame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const ctxTab = [...inFrame.querySelectorAll("button")].find((b) => /^In context$/.test(b.textContent || ""));
-  click(ctxTab);
-  await sleep(500);
+  const ctxTab = frameButtons(inFrame).find((b) => /^In context$/.test(b.textContent || ""));
+  /* In context is hidden for now, on the owner's word. These checks come
+     back with it, when the tab is offered again. */
+  check("In context is not offered in the bar for now", !ctxTab, ctxTab ? "still there" : "hidden");
+  if (ctxTab) {
+    click(ctxTab);
+    await sleep(500);
 
-  const rows = [...inFrame.querySelectorAll(".at-findrow")].map((r) => (r.textContent || "").replace(/\s+/g, " "));
-  const turnRow = rows.find((t) => t.includes("وين الكتاب"));
-  check("a turn of a conversation is offered as somewhere a word turns up",
-    !!turnRow, rows.slice(0, 3).join(" // ") || "no rows at all");
-  check("and it reads as a turn, with the person who says it",
-    !!turnRow && /Layla says/.test(turnRow), turnRow || "(no row)");
-  /* The counterpart: the word is no longer listed as turning up nowhere.
-     Matched on the whole word rather than on the text of the panel — the
-     phrase card "الكتاب كبير" is two tokens, so it is word-shaped itself
-     and legitimately bare, and it has the word inside it. */
-  const barePanel = [...inFrame.querySelectorAll(".at-panel")]
-    .find((p) => /Words in no phrase/.test((p.querySelector(".at-eyebrow") || {}).textContent || ""));
-  const bareWords = barePanel
-    ? [...barePanel.querySelectorAll(".at-tag")].map((b) => (b.textContent || "").trim())
-    : [];
-  check("a word said in a conversation is not a word in no phrase",
-    !!barePanel && !bareWords.includes("كتاب"),
-    bareWords.join(" | ") || "(nothing bare)");
+    const rows = [...inFrame.querySelectorAll(".at-findrow")].map((r) => (r.textContent || "").replace(/\s+/g, " "));
+    const turnRow = rows.find((t) => t.includes("وين الكتاب"));
+    check("a turn of a conversation is offered as somewhere a word turns up",
+      !!turnRow, rows.slice(0, 3).join(" // ") || "no rows at all");
+    check("and it reads as a turn, with the person who says it",
+      !!turnRow && /Layla says/.test(turnRow), turnRow || "(no row)");
+    /* The counterpart: the word is no longer listed as turning up nowhere.
+       Matched on the whole word rather than on the text of the panel — the
+       phrase card "الكتاب كبير" is two tokens, so it is word-shaped itself
+       and legitimately bare, and it has the word inside it. */
+    const barePanel = [...inFrame.querySelectorAll(".at-panel")]
+      .find((p) => /Words in no phrase/.test((p.querySelector(".at-eyebrow") || {}).textContent || ""));
+    const bareWords = barePanel
+      ? [...barePanel.querySelectorAll(".at-tag")].map((b) => (b.textContent || "").trim())
+      : [];
+    check("a word said in a conversation is not a word in no phrase",
+      !!barePanel && !bareWords.includes("كتاب"),
+      bareWords.join(" | ") || "(nothing bare)");
+  }
 
   /* ---- one way to make a card, whatever kind of card it is ----
      A conversation had a button of its own in a deck's card list, which
      made it read as a separate sort of thing to make — and meant this tab,
      with only the one New button, could not make one at all. The kind is
      the first field in the editor now. */
-  const toCards = [...inFrame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const toCards = frameButtons(inFrame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(toCards[toCards.length - 1]);
   await sleep(450);
   check("there is no second button for making a conversation",
@@ -5068,11 +5125,12 @@ const openPronounTables = async () => {
     await sleep(200);
     click(startBtn());
     await sleep(450);
+    await nameIt();
   };
   const screenTitle = () =>
     ((document.querySelector(".at-screen.over .at-screenhead h2") || {}).textContent || "").trim();
   const leaveScreen = async () => {
-    click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+    backOut();
     await sleep(350);
   };
   const newCard = async () => {
@@ -5091,7 +5149,7 @@ const openPronounTables = async () => {
       [...document.querySelectorAll('[role="group"][aria-label="Who says line 1"]')].length === 1,
     talkText.slice(0, 100) || "(no editor open)");
   check("and the screen is named for what is being made",
-    screenTitle() === "New scene", screenTitle() || "(no title)");
+    screenTitle() === "Create card", screenTitle() || "(no title)");
 
   /* A scene is a conversation or a text, asked the way a word's subtype
      is, and nothing is chosen for the teacher. */
@@ -5226,8 +5284,8 @@ const openPronounTables = async () => {
   openFormsAsDrawn = false;
   await newCard();
   await pickCardKind(/^Word or phrase/);
-  check("and picking the ordinary kind opens a screen for that one, named for it",
-    screenTitle() === "New word or phrase", screenTitle() || "(no editor)");
+  check("and picking the ordinary kind opens a screen headed Create card",
+    screenTitle() === "Create card", screenTitle() || "(no editor)");
   /* A form with nothing written in it is folded under its name, the way a
      form's attached pronouns are, and says so under the name. */
   {
@@ -5660,7 +5718,7 @@ const openPronounTables = async () => {
   await newCard();
   await pickCardKind(/^Sentence/);
   check("a sentence is made by saying so before the editor, not by typing braces",
-    screenTitle() === "New sentence" &&
+    screenTitle() === "Create card" &&
       !/only a sentence can have one/.test(document.body.textContent || ""),
     screenTitle() || "(no editor)");
   typeInto(fieldNamed(/^Arabic$/i), "ismi");
@@ -6145,14 +6203,13 @@ const openPronounTables = async () => {
       !!sentenceName, thisCardAsks().join(" | "));
     /* In "This card" with the other facts about the card, and not in a
        framed section of its own between the card and its words. */
-    check("and it is asked in This card, above the sentence itself",
-      !!sentenceName && thisCardAsks().includes("Name") &&
+    check("and it is asked first in This card, above the sentence itself",
+      !!sentenceName && /^Name/.test(thisCardAsks()[0] || "") &&
         !blockNames().includes("What to call it"),
       `${thisCardAsks().join(" | ")} · ${blockNames().join(" | ")}`);
-    check("and says what a blank one falls back to, and that nothing is asked about it",
+    check("and says what it is for, and that it is required",
       !!sentenceName && /listed and searched/.test(sentenceName.textContent || "") &&
-        /blanks and all/.test(sentenceName.textContent || "") &&
-        /Nobody is ever asked this/.test(sentenceName.textContent || ""),
+        /required/.test(sentenceName.textContent || ""),
       sentenceName ? (sentenceName.textContent || "").replace(/\s+/g, " ").slice(0, 160) : "(no field)");
     /* The control itself, not the list behind it: the list is on screen
        only while it is open, so a card that is still asked and shut would
@@ -6859,16 +6916,17 @@ const openPronounTables = async () => {
       thisCardAsks().join(" | "));
     const nameBox = () => /** @type {any} */ (
       (cardNameField() || { querySelector: () => null }).querySelector("input"));
-    check("and it starts as the meaning the word already had",
-      !!nameBox() && nameBox().value === "to eat",
-      nameBox() ? `"${nameBox().value}"` : "no such box");
+    /* A verb's name is its infinitive, which its English is checked
+       against. Nothing fills it in: it is asked before any word is. */
+    typeInto(nameBox(), "to eat");
+    await sleep(200);
     /* In "This card" and directly under what subtype it is: both are one
        fact about the whole card, settled once and then read, and neither
        belongs to any one of its forms. Not a framed section of its own
        standing between the card and its table. */
     const heads = [...document.querySelectorAll(".at-formnum")].map((n) => (n.textContent || "").trim());
-    check("and it is asked in This card, directly under what subtype it is",
-      thisCardAsks().indexOf("Name") === thisCardAsks().indexOf("What subtype") + 1 &&
+    check("and it is asked first in This card, before what subtype it is",
+      /^Name/.test(thisCardAsks()[0] || "") && thisCardAsks().indexOf("What subtype") > 0 &&
         !heads.includes("What to call it"),
       `${thisCardAsks().join(" | ")} · ${heads.join(" | ")}`);
     /* And it says what it is for, and nothing more: a verb's name carries
@@ -6920,7 +6978,7 @@ const openPronounTables = async () => {
       !!saveBtn() && saveBtn().disabled,
       `save is ${saveBtn() && saveBtn().disabled ? "refused" : "still offered"}`);
     check("and the line that says so is beside the name, not under the table",
-      !!cardNameField() && /listed as its name/.test(
+      !!cardNameField() && /needs a name/.test(
         (cardNameField().querySelector(".at-formneed.unmet") || {}).textContent || ""),
       ([...document.querySelectorAll(".at-formneed.unmet")]
         .map((n) => (n.textContent || "").replace(/\s+/g, " ").trim())[0]) || "(nothing said)");
@@ -7317,7 +7375,7 @@ const openPronounTables = async () => {
         ? `"${cellNamed("Arabic for past · he").value}"` : "no such cell");
   }
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -7329,7 +7387,7 @@ const openPronounTables = async () => {
    has turns, and there would be nowhere to put them. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -7340,6 +7398,7 @@ const openPronounTables = async () => {
   openFormsAsDrawn = false;
   click(cardEdit());
   await sleep(450);
+  await nameIt();
   check("a form with anything written in it opens already open, its word under its name",
     formFolds().length > 0 && formFolds()[0].getAttribute("aria-expanded") === "true" &&
       /كتاب/.test(formFolds()[0].textContent || ""),
@@ -7528,9 +7587,9 @@ const openPronounTables = async () => {
   check("and calling it a word again leaves the word where it was",
     !!own && own.value === "كتاب", own ? `"${own.value}"` : "no field");
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -7589,9 +7648,9 @@ const openPronounTables = async () => {
       !/A verb is its table/.test(document.body.textContent || ""),
     (thisCardBlock().textContent || "").replace(/\s+/g, " ").slice(-120));
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -7622,9 +7681,9 @@ const openPronounTables = async () => {
     offered.map((t) => t.slice(0, 12)).join(" | "));
   click(/** @type {any} */ (document.querySelector(".at-kindsheet")).closest(".at-modalback"));
   await sleep(200);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -7636,7 +7695,7 @@ const openPronounTables = async () => {
 {
   takeSaves = true;
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const btn = /** @type {any} */ ([...frame.querySelectorAll("button")]
+  const btn = /** @type {any} */ (frameButtons(frame)
     .find((b) => b.getAttribute("aria-label") === "Pronouns") || null);
   check("the Cards tab offers Pronouns beside Numbers", !!btn, btn ? "there" : "(no button)");
   click(btn);
@@ -7737,6 +7796,7 @@ const openPronounTables = async () => {
   await sleep(450);
   click(cardEdit());
   await sleep(450);
+  await nameIt();
   const text = () => document.body.textContent || "";
   check("the editor has a Meanings section with a clue",
     /Meanings/.test(text()) && !!document.querySelector('input[aria-label="Clue"]'),
@@ -7746,6 +7806,8 @@ const openPronounTables = async () => {
     buttonText.includes("Add another meaning of كتاب") && buttonText.includes("Add another Arabic word for “book”"),
     buttonText.filter((t) => /^Add another/.test(t)).join(" | ") || "(no buttons)");
   const before = savedCards.length;
+  /* A card from before every card had a name is given one first. */
+  await nameIt("book");
   const another = /** @type {any} */ ([...document.querySelectorAll("button")].find((b) => /^Add another meaning of كتاب$/.test((b.textContent || "").trim())) || null);
   click(another);
   await sleep(600);
@@ -7756,14 +7818,14 @@ const openPronounTables = async () => {
   const values = inputs.map((i) => /** @type {any} */ (i).value);
   const meanings = values.filter((v) => /^(book|notebook|books)/.test(v));
   check("then opens a new card with the word and its forms in it and every meaning empty",
-    /^New /.test(heading) && values.includes("كتاب") && values.includes("كتب") && meanings.length === 0,
+    heading === "Create card" && values.includes("كتاب") && values.includes("كتب") && meanings.length === 0,
     `${heading} · ${values.filter(Boolean).join(" | ")}`);
   check("which names the original as sharing its word",
     /Same word:\s*book/.test(text()), (text().match(/Same word:[^.]{0,30}/) || ["(no line)"])[0]);
   check("and, with no meaning written yet, its button says this meaning",
     [...document.querySelectorAll("button")].some((b) => (b.textContent || "").trim() === "Add another Arabic word for this meaning"),
     "(looked for the button)");
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
   takeSaves = false;
 }
@@ -7782,6 +7844,7 @@ const openPronounTables = async () => {
   await sleep(450);
   click(cardEdit());
   await sleep(450);
+  await nameIt();
   const box = (/** @type {string} */ label) =>
     /** @type {any} */ ([...document.querySelectorAll("input")]
       .find((i) => (i.getAttribute("aria-label") || "") === label) || null);
@@ -7844,9 +7907,9 @@ const openPronounTables = async () => {
       !!recFor() && !recFor().disabled,
       recFor() ? (recFor().getAttribute("aria-label") || "") : "(no button)");
   }
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -7864,6 +7927,7 @@ const openPronounTables = async () => {
   await sleep(450);
   click(cardEdit());
   await sleep(450);
+  await nameIt();
 
   const box = (/** @type {string} */ label) =>
     /** @type {any} */ ([...document.querySelectorAll("input")]
@@ -7987,9 +8051,9 @@ const openPronounTables = async () => {
       me ? `"${me.value}"` : "(no such box)");
   }
 
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -8013,7 +8077,7 @@ const openPronounTables = async () => {
     await sleep(300);
   }
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -8070,7 +8134,7 @@ const openPronounTables = async () => {
 
   click(buttonNamed(/^Continue$/));
   await sleep(700);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -8082,7 +8146,7 @@ const openPronounTables = async () => {
    block above is. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const tile = [...frame.querySelectorAll(".at-minicard")]
@@ -8114,7 +8178,7 @@ const openPronounTables = async () => {
   await sleep(700);
   click(buttonNamed(/^Continue$/));
   await sleep(700);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -8127,7 +8191,7 @@ const openPronounTables = async () => {
    behind the nudge until it is asked for. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   const tile = [...frame.querySelectorAll(".at-minicard")]
@@ -8168,7 +8232,7 @@ const openPronounTables = async () => {
   await sleep(700);
   click(buttonNamed(/^Continue$/));
   await sleep(700);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -8190,7 +8254,7 @@ const openPronounTables = async () => {
    grid on screen. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
   /* The word itself, not the phrase that happens to contain it. */
@@ -8233,7 +8297,7 @@ const openPronounTables = async () => {
 
   click(document.querySelector('[data-el="leave-session"]'));
   await sleep(500);
-  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  backOut();
   await sleep(300);
 }
 
@@ -8246,7 +8310,7 @@ const openPronounTables = async () => {
    queue reaches. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = [...frame.querySelectorAll("button")].filter((b) => /^Cards$/.test(b.textContent || ""));
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
   click(teachTabs[teachTabs.length - 1]);
   await sleep(500);
 
@@ -8328,7 +8392,7 @@ const openPronounTables = async () => {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
   /* The last one in the document: the learner's nav is still behind this. */
   const tabNamed = (/** @type {RegExp} */ re) =>
-    [...frame.querySelectorAll("button")].filter((b) => re.test((b.textContent || "").trim())).pop();
+    frameButtons(frame).filter((b) => re.test((b.textContent || "").trim())).pop();
   const rows = () => [...frame.querySelectorAll(".at-toolbar")];
   const subRow = () => frame.querySelector(".at-toolbar-sub");
   /* The label a button carries, without the count riding inside it: a
@@ -8563,6 +8627,33 @@ const openPronounTables = async () => {
   check("and the same filter, still in force",
     !!document.querySelector(".at-menubtn.on"),
     [...document.querySelectorAll(".at-menubtn")].map((b) => (b.textContent || "").trim()).join(" | "));
+  /* Laid out like a card's screen: its sections headed at the editor's
+     size, Deck quality part of "This deck", Export by that heading, and
+     Edit alone on the title line, as on a card being read. */
+  {
+    const deckSheet = [...document.querySelectorAll(".at-screen.cardform")]
+      .find((el) => ((el.querySelector(".at-screenhead h2") || {}).textContent || "").trim() === "Deck");
+    const deckHeads = deckSheet
+      ? [...deckSheet.querySelectorAll(".at-formnum, .at-section > .at-sectiontop > .at-eyebrow")].map((h) => (h.textContent || "").trim())
+      : [];
+    check("an open deck is headed like a card's screen, This deck to Cards",
+      deckHeads.join(" | ") === "This deck | Built-in cards | Cards",
+      deckHeads.join(" | ") || "(not laid out like the card editor)");
+    const thisDeck = deckSheet && deckSheet.querySelector(".at-formblock");
+    const labels = thisDeck ? [...thisDeck.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : [];
+    check("and This deck holds its name, courses and quality",
+      labels.join(" | ") === "Deck name | Courses | Deck quality" &&
+        /** @type {any} */ ((thisDeck && thisDeck.querySelector("input")) || {}).value === "Lesson 1",
+      labels.join(" | ") || "(no This deck)");
+    check("and Export sits by its “This deck” heading, with Edit alone on the title line",
+      !!deckSheet && !!deckSheet.querySelector('.at-formhead [aria-label="Export this deck"]') &&
+        named(deckSheet.querySelector(".at-screenaction")).length === 1 &&
+        !!deckSheet.querySelector('.at-screenaction [aria-label="Edit"]'),
+      deckSheet ? [...deckSheet.querySelectorAll(".at-screenaction button")].map((b) => b.getAttribute("aria-label")).join(" | ") || "(nothing on the title line)" : "(no deck screen)");
+    check("and read, its title cannot be typed into",
+      !!thisDeck && !!thisDeck.querySelector("fieldset:disabled input"),
+      thisDeck ? "the title box is live" : "(no This deck)");
+  }
 
   /* Four views, in turn: small tiles, bigger tiles — fewer to a row, each
      with its words set larger, the grid carrying the scale so one variable
@@ -8611,9 +8702,16 @@ const openPronounTables = async () => {
   /* ---- and what a deck holds besides cards ----
      Numbers are one document per language, so a deck takes them in parts,
      by name, from a screen of their own. */
-  const addExtras = buttonNamed(/^Add numbers or pronouns$/);
-  check("an open deck offers to add numbers or pronouns", !!addExtras,
-    (document.body.textContent || "").includes("Numbers and pronouns") ? "(section, no button)" : "(no section)");
+  check("read, an open deck offers no way to change its built-in cards",
+    !buttonNamed(/^Choose built-in cards$/), "the button is there before Edit");
+  click(document.querySelector('.at-screenaction [aria-label="Edit"]'));
+  await sleep(250);
+  check("Edit swaps the back arrow for a cross that cancels",
+    !!document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'),
+    [...document.querySelectorAll(".at-screenhead .at-back")].map((b) => b.getAttribute("aria-label")).join(" | "));
+  const addExtras = buttonNamed(/^Choose built-in cards$/);
+  check("and edited, an open deck offers to choose its built-in cards", !!addExtras,
+    (document.body.textContent || "").includes("Built-in cards") ? "(section, no button)" : "(no section)");
   click(addExtras);
   await sleep(300);
   const partRow = (/** @type {RegExp} */ re) =>
@@ -8625,12 +8723,47 @@ const openPronounTables = async () => {
   const box = partRow(/Numbers 0 to 9/);
   click(box && (box.querySelector("input") || box));
   await sleep(150);
-  click(buttonNamed(/^Save$/));
+  const partsBefore = savedParts.length;
+  click(document.querySelector('.at-screenaction [aria-label="Done"]'));
+  await sleep(250);
+  check("and choosing them sends nothing until the deck is saved",
+    savedParts.length === partsBefore && /Numbers 0 to 9/.test(document.body.textContent || ""),
+    JSON.stringify(savedParts.slice(partsBefore)));
+  click(document.querySelector('.at-screenaction [aria-label="Save"]'));
   await sleep(600);
   const sent = savedParts[savedParts.length - 1];
   check("and saving tells the server which parts the deck holds",
     !!sent && sent.deckId === "d1" && JSON.stringify(sent.parts) === JSON.stringify(["numbers:0-9"]),
     JSON.stringify(savedParts));
+
+  /* ---- and locking it ----
+     A button by the Cards heading, dimmed while the deck is read; pressed
+     while editing, it asks, and what it asks is saved with the deck. */
+  await sleep(300);
+  const lockBtn = () => [...document.querySelectorAll(".at-section")]
+    .filter((sec) => /^Cards$/.test((sec.querySelector(".at-sectiontop .at-eyebrow") || {}).textContent || ""))
+    .map((sec) => /** @type {HTMLButtonElement | null} */ (sec.querySelector(".at-sectiontop button")))[0] || null;
+  check("a deck being read has a dimmed Lock button by its Cards heading",
+    !!lockBtn() && /^Lock$/.test((lockBtn()?.textContent || "").trim()) && !!lockBtn()?.disabled,
+    lockBtn() ? `${(lockBtn()?.textContent || "").trim()} · ${lockBtn()?.disabled ? "dimmed" : "live"}` : "(no button by Cards)");
+  click(document.querySelector('.at-screenaction [aria-label="Edit"]'));
+  await sleep(250);
+  click(lockBtn());
+  await sleep(200);
+  const lockModal = document.querySelector(".at-modal");
+  check("and edited, pressing it explains what locking does before it does it",
+    !!lockModal && /Lock this deck\?/.test(lockModal.textContent || "") && /No cards can be added/.test(lockModal.textContent || ""),
+    lockModal ? (lockModal.textContent || "").slice(0, 80) : "(no question)");
+  click(lockModal && [...lockModal.querySelectorAll("button")].find((b) => /^Lock$/.test((b.textContent || "").trim())));
+  await sleep(200);
+  check("and agreeing turns it to Unlock, sending nothing yet",
+    /^Unlock$/.test((lockBtn()?.textContent || "").trim()) && lockedDecks.length === 0,
+    `${(lockBtn()?.textContent || "").trim()} · ${JSON.stringify(lockedDecks)}`);
+  click(document.querySelector('.at-screenaction [aria-label="Save"]'));
+  await sleep(600);
+  check("and Save locks the deck",
+    lockedDecks.length === 1 && lockedDecks[0].deckId === "d1" && lockedDecks[0].locked === true,
+    JSON.stringify(lockedDecks));
 }
 
 /* ---- a deck whose cards accept two spellings ----
@@ -9606,8 +9739,14 @@ const openPronounTables = async () => {
   click(rowNamed(/^App preferences$/));
   await sleep(350);
   const prefsText = ((screenTitled("App preferences") || host6).textContent || "");
-  check("the preferences screen offers the language being learnt, the theme and the sounds",
-    /Language/.test(prefsText) && /Theme/.test(prefsText) && /Sounds/.test(prefsText),
+  check("the preferences screen offers the theme and the sounds",
+    /Theme/.test(prefsText) && /Sounds/.test(prefsText),
+    prefsText.slice(0, 220).replace(/\s+/g, " "));
+  /* And no longer a language to learn: the switch in the top bar is where
+     that is decided, and a second control here changed nothing visible —
+     see AppPreferences. */
+  check("and no Learning language choice, which the top bar's switch replaced",
+    !/Learning/.test(prefsText) && !prefsText.includes("Language"),
     prefsText.slice(0, 220).replace(/\s+/g, " "));
 
   /* And the account screen names who is signed in, which is the one fact
@@ -10650,28 +10789,34 @@ const openPronounTables = async () => {
   r.render(React.createElement(App));
   await sleep(1500);
 
-  const spaceBtn = (/** @type {RegExp} */ re) =>
-    [...host.querySelectorAll(".at-spacebtn")].find((b) => re.test(b.getAttribute("aria-label") || ""));
+  /* The spaces are in the space and language menu, in the bar at the foot
+     of the window, so the menu is opened to reach them. */
+  const spaceBtn = async (/** @type {RegExp} */ re) => {
+    if (!host.querySelector(".at-spacebtn")) click(host.querySelector(".at-dock .at-cornerbtn"));
+    await sleep(200);
+    return [...host.querySelectorAll(".at-spacebtn")].find((b) => re.test(b.textContent || ""));
+  };
   /* A teacher opens into Teaching; asked for it all the same, in case this
      device has not yet heard that they teach. */
   if (!host.querySelector(".at-screen.bare")) {
-    click(spaceBtn(/Teaching/i));
+    click(await spaceBtn(/Teaching/i));
     await sleep(900);
   }
   const frame = () => host.querySelector(".at-screen.bare");
-  const swBtn = () => host.querySelector(".at-langbtn");
-  const rows = () => [...host.querySelectorAll(".at-langmenu .at-ck")];
+  const swBtn = () => host.querySelector(".at-cornerbtn");
+  const rows = () => [...host.querySelectorAll(".at-cmenu .at-ck")];
   const listed = () => [...((frame() || host).querySelectorAll(".at-minicard"))]
     .map((t) => (t.textContent || "").replace(/\s+/g, " "));
   const hasHouse = () => listed().some((t) => /house/i.test(t));
   const learnOff = () => JSON.stringify((JSON.parse(localStorage.getItem("arabic-trainer:arabic-trainer-v3") || "{}").settings || {}).langsOff);
-  const cardsTab = [...((frame() || host).querySelectorAll("button"))].filter((b) => /^Cards$/.test(b.textContent || "")).pop();
+  const cardsTab = [...host.querySelectorAll(".at-dock [role=tab]"), ...((frame() || host).querySelectorAll("button"))]
+    .filter((b) => /^Cards$/.test(b.textContent || ""))[0];
   click(cardsTab);
   await sleep(500);
 
-  check("a teacher of two languages gets the language switch above Teaching",
-    !!swBtn() && ((swBtn() || {}).textContent || "").trim() === "All",
-    swBtn() ? String(swBtn()?.getAttribute("aria-label")) + " · " + (swBtn()?.textContent || "") : "no switch in the bar");
+  /* The languages are at the top of the menu behind your initial. */
+  check("a teacher of two languages has the menu that holds the language switch",
+    !!swBtn(), "no menu button in the bar");
   check("and it lists the cards in both", hasHouse(), listed().length + " cards");
   click(swBtn());
   await sleep(200);
@@ -10679,16 +10824,18 @@ const openPronounTables = async () => {
     rows().length === 2 && rows().some((r) => /Vietnamese/.test(r.textContent || "")),
     rows().map((r) => (r.textContent || "").replace(/\s+/g, " ")).join(" · ") || "nothing opened");
   check("and says what switching one off does here",
-    /out of Teaching/.test((host.querySelector(".at-langmenu") || {}).textContent || ""),
-    ((host.querySelector(".at-langmenu") || {}).textContent || "").slice(0, 80));
+    /doesn't change anything for your students/.test((host.querySelector(".at-cmenu") || {}).textContent || ""),
+    ((host.querySelector(".at-cmenu") || {}).textContent || "").slice(0, 80));
   const shown = listed().length;
   const learnWas = learnOff();
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);
   check("switching Vietnamese off takes its card out of Teaching's list",
     !hasHouse() && listed().length === shown - 1, `${shown} before, ${listed().length} after`);
-  check("and the button says Arabic is what is left",
-    ((swBtn() || {}).textContent || "").trim() === "AR", ((swBtn() || {}).textContent || "").trim());
+  check("and Arabic is what is left ticked",
+    rows().filter((r) => r.getAttribute("aria-checked") === "true").map((r) => r.textContent || "").join("|").includes("Arabic")
+      && rows().filter((r) => r.getAttribute("aria-checked") === "true").length === 1,
+    rows().map((r) => `${r.textContent}:${r.getAttribute("aria-checked")}`).join(", "));
   check("and Learning's own choice is not touched by it", learnOff() === learnWas, `${learnWas} before, ${learnOff()} after`);
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);

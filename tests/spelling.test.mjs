@@ -16,7 +16,7 @@ import { LANGUAGES } from "../src/languages.ts";
 import { must } from "./helpers.mjs";
 
 const ar = LANGUAGES["ar-PS"];
-const vi = LANGUAGES["vi-Hue"];
+const vi = LANGUAGES["vi"];
 const he = LANGUAGES["he-IL"];
 
 /** One side of a marking, as a string with the marked stretches in [ ]. */
@@ -100,7 +100,7 @@ test("the closest of several accepted spellings is the one marked against", () =
   assert.equal(mark(ar, "سفر", ["كتاب", "سفر"]).wrong, false);
 });
 
-test("a tone is not a letter in Huế, and a horn is", () => {
+test("a tone is not a letter in Vietnamese, and a horn is", () => {
   /* Each of these is the marking's own answer, read back through the fold
      the marking uses — which is the whole reason the fold is the pack's
      and not this module's. A word typed without its tones is accepted, so

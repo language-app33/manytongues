@@ -31,12 +31,12 @@ import {
 import { offersFor } from "../src/offers.ts";
 import { EX, LANGUAGES, arTokenIsWord, checkAnswer, levelOf } from "../src/languages.ts";
 
-const vi = LANGUAGES["vi-Hue"];
+const vi = LANGUAGES["vi"];
 
 /** @param {string[]} said @param {Record<string, any>} [over] @returns {any} */
 const text = (said, over = {}) => ({
-  id: "T", lang: "vi-Hue", kind: "dialog", sceneKind: "text", tags: [], created: 1,
-  forms: [{ id: "T", ar: "", en: "", lat: "", lang: "vi-Hue", s: {} }],
+  id: "T", lang: "vi", kind: "dialog", sceneKind: "text", tags: [], created: 1,
+  forms: [{ id: "T", ar: "", en: "", lat: "", lang: "vi", s: {} }],
   lines: said.map((ar, i) => ({ id: `t${i}`, who: 0, ar, en: "", lat: "", recs: [], s: {} })),
   ...over,
 });
@@ -184,7 +184,7 @@ await build({
 });
 const { installIndexes, resolveQuestion } = await import(path.join(out, "trainer.js"));
 
-const settings = { language: "vi-Hue", strict: false, types: {}, kinds: {} };
+const settings = { language: "vi", strict: false, types: {}, kinds: {} };
 
 test("the scene is asked for the hidden word, and keeps its own schedule", () => {
   const card = talk(["Tôi đi học.", "Mai ở nhà."]);
@@ -207,7 +207,7 @@ test("the word moves on with the asking, but not under an answer", () => {
   /* Answered once: the same question, read again for its answer screen,
      is still about the same word. */
   const answered = talk(["Tôi đi học.", "Mai ở nhà."], {
-    forms: [{ id: "T", ar: "", en: "", lat: "", lang: "vi-Hue", s: { gap2pick: { right: 1, wrong: 0, near: 0, skips: 0 } } }],
+    forms: [{ id: "T", ar: "", en: "", lat: "", lang: "vi", s: { gap2pick: { right: 1, wrong: 0, near: 0, skips: 0 } } }],
   });
   installIndexes([answered], settings);
   assert.equal(must(resolveQuestion([answered], q, false, []), "same question").unit.ar, "Tôi");
@@ -239,8 +239,8 @@ test("a sentence of a text is asked for its own words, and keeps its own schedul
 test("a short word the learner holds a card for is asked in the scene", () => {
   const card = talk(["Tôi đi học."]);
   const word = {
-    id: "W", lang: "vi-Hue", kind: "word", tags: [], created: 1,
-    forms: [{ id: "W", ar: "đi", en: "to go", lat: "", lang: "vi-Hue", s: {} }],
+    id: "W", lang: "vi", kind: "word", tags: [], created: 1,
+    forms: [{ id: "W", ar: "đi", en: "to go", lat: "", lang: "vi", s: {} }],
   };
   installIndexes([card], settings);
   assert.equal(gapsFor(card, 1), "học", "without the card, the short word is passed over");

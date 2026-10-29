@@ -27,7 +27,7 @@
  * kept, for the day it is wanted back.
  *
  * Only on a table whose language lists the tense practices — Arabic's and
- * Hebrew's verbs. Huế's verb is one form for everybody and is asked as it
+ * Hebrew's verbs. Vietnamese's verb is one form for everybody and is asked as it
  * always was; so are the pronouns on the end of a word, and an adjective's
  * forms.
  *

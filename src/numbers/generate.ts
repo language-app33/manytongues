@@ -1215,7 +1215,7 @@ const HOMES: WeakMap<Composer, Map<string, string>> = new WeakMap();
  * name, which is not a word of anything — and reading which boxes each
  * number's tokens came from. An empty system would not do: a composer
  * stops reaching for words at the first one missing. So each language gets the
- * split its own rules make — Huế builds 11 to 99 out of the words for one
+ * split its own rules make — Vietnamese builds 11 to 99 out of the words for one
  * to ten and the forms they take in company, so its 11 to 99 has nothing
  * of its own — and a composer that changes how it builds a number moves
  * its boxes with it.

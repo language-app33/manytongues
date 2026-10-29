@@ -977,7 +977,7 @@ function PartScreen({
 }) {
   const range = check.range;
   const own = slots.filter((s) => homes.get(s.slot) === range.id);
-  /* Built from the parts before it alone — Huế's 11 to 99. */
+  /* Built from the parts before it alone — Vietnamese's 11 to 99. */
   const before = checks.filter((c) => c.range.kind === "numbers");
   const earlier = before.slice(0, Math.max(0, before.findIndex((c) => c.range.id === range.id)));
 

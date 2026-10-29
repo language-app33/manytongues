@@ -1,14 +1,14 @@
 # Changelog
 
 What changed in each release, in plain language. The number shown at the
-foot of the top-right menu is the one to look up here.
+foot of the menu behind your initial is the one to look up here.
 
 Releases count: 0.1, 0.2, 0.3 … 0.9, 0.10, 0.11. The second digit is a
 counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.493 — 29 October 2026
+## 0.513 — 29 October 2026
 
 **The home screen no longer scrolls when everything already fits.**
 
@@ -21,6 +21,417 @@ and moves once per batch of work you would notice, not once per commit.
 
 To check by hand: open the home screen on a phone with only a few saved
 sessions and try to scroll it.
+
+## 0.512 — 28 October 2026
+
+**Vietnamese is just Vietnamese, with no one accent built in.**
+
+- The language is called Vietnamese everywhere the app names it, and
+  tiếng Việt in its own words, instead of Huế Vietnamese and tiếng Huế.
+- Tone practice now has all six tones. Hỏi and ngã, which used to be
+  practised as one tone because they sound alike in Huế, are two again,
+  as they are in the spelling. Typing a word is unchanged.
+- The teaching note on tones no longer describes Huế speech. It says
+  accents differ, cards carry the standard spelling, and the teacher's
+  recordings teach whichever accent the teacher has chosen.
+- Cards, courses, settings and numbers already made in Vietnamese carry
+  over by themselves, on this device and on the server. Nothing needs
+  redoing, and progress is kept.
+- A phone or tab still running the previous release, until it refreshes,
+  will not recognise Vietnamese material saved since this update.
+
+To check by hand: open a Vietnamese course and look at its name and the
+tone choices in a listening exercise; on a device that already had
+Vietnamese cards, check they are all still there after the update.
+
+## 0.511 — 28 October 2026
+
+**A course's screen is laid out like a deck's, and its decks are chosen the
+same way a deck's courses are.**
+
+- In Teaching, a course opens on one sheet headed "Course", in the same
+  style as a deck's or a card's screen: This course (its name and
+  language), then Join code, then People (teachers and students), then
+  Decks.
+- The course's decks are shown as their names, each with a cross to take
+  it out; "Another deck" opens the list of your decks, with a search, to
+  add one. A change is saved as you tap it — there is no Edit or Save on
+  this screen — and a deck's name opens the deck.
+- The separate "Manage decks" screen, with its ticks and its own Save, is
+  gone.
+
+## 0.510 — 28 October 2026
+
+**Progress and Cards lose their headings; the You menu is shorter.**
+
+- Progress and Cards no longer have a title at the top: the section lit
+  in the bar says where you are.
+- On Progress, Prep mode is now at the bottom, after your decks.
+- In the menu behind your initial, the languages are listed by name
+  alone, without how many cards each has, so the list is shorter. The
+  note under Languages now says what the choice does in plain words — in
+  Learning, "Select the languages you see in your cards, progress, and
+  anything you practice"; in Teaching, "Select the languages you see in
+  your courses, decks, and cards. This doesn't change anything for your
+  students."
+- The menu's dividers are gone, except the one above the version.
+
+## 0.509 — 28 October 2026
+
+**Every card has a name, and the top of a card or deck says what you are doing.**
+
+- The top bar of a card says Card while you read it, Edit card while you
+  edit it and Create card while you make one. A deck's says Deck, Edit
+  deck or Create deck. The name is no longer in the top bar.
+- Every card has a name, whatever its kind: it is the first thing in
+  "This card", and a card cannot be saved without one. Nothing fills it
+  in for you, because it is asked before anything else is written. A
+  scene's name is what used to be its title.
+- Cards made before this keep being listed by their words until they are
+  next edited, when they are asked for a name before they can be saved.
+- A deck's Title is now called Deck name.
+- A card's status button, beside Edit, says the status in words
+  (Published, Draft…) and opens like the other menus, rather than being
+  a coloured icon on its own.
+
+To check by hand: open a card and a deck, read them and edit them, and
+look at the top bar; make a new card of each kind and see Save stay off
+until it has a name; edit an old word card and give it one.
+
+## 0.508 — 28 October 2026
+
+**Home has a proper title, and its content is no longer in a box.**
+
+- The ManyTongues name and logo head the home screen, twice the size and
+  centred, instead of sitting small in the top-left corner.
+- The other tabs are headed with their own name — Progress, Cards,
+  Courses — centred in the same place.
+- The progress ring, the line about what is waiting and the session
+  buttons sit straight on the page in one centred column, with space
+  between them instead of a bordered card. With a prep set, its part and
+  the everyday part are divided by a thin line.
+## 0.507 — 28 October 2026
+
+**In context is hidden in Teaching for now.**
+
+- The bar in the teaching space no longer offers In context; it shows
+  Courses, Decks and Cards. It is set aside rather than removed, and will
+  come back.
+
+## 0.506 — 28 October 2026
+
+**Space and languages move into the menu behind your initial.**
+
+- Choosing the space (Learning, Teaching, Admin) and which languages are
+  in play now happens at the top of the menu behind your initial, "You",
+  so the bar at the foot of the window no longer has a Space item.
+- That menu no longer has its own Appearance switch: the look is chosen
+  in App preferences, where it already was.
+- Every item in the bar is now the same width, as wide as the widest; on
+  a narrow phone they shrink together. Their names are a touch smaller and
+  lighter, their icons a touch smaller, and the bar a little shorter.
+
+## 0.505 — 28 October 2026
+
+**The bar at the foot of the window is one bar again, and easier to read.**
+
+- The sections, the space and language button, and the button with your
+  initial now sit together in one see-through bar, shared out evenly,
+  instead of a bar and two round buttons beside it.
+- Every item has its icon above its name, in larger type. The section you
+  are on is green, on a faint green ground; the others are white rather
+  than grey.
+- The space and language item is named after what it changes ("Space",
+  or "Languages" when only the languages can change), and your initial is
+  named "You".
+- On a narrow phone the names come down a size, rather than wrap, when a
+  space has more items than fit.
+
+## 0.504 — 28 October 2026
+
+**Fewer buttons at the top of a card while editing it.**
+
+- The way out is a cross in the top left, Cancel, as on a deck being
+  edited. With changes not yet saved, it asks whether to discard them
+  first; without, it goes straight back to reading the card (a card not
+  made yet closes).
+- Save is the one save button: Save and exit is gone, and so is the
+  separate Cancel on the right, which the cross replaces.
+- The card's status is shown only while reading the card, not while
+  editing it.
+
+To check by hand: open a card, tap Edit, change something and tap the
+cross; try again with no changes; start a new card and tap the cross.
+
+## 0.503 — 28 October 2026
+
+**The bar at the foot of the window, tidied.**
+
+- Each section in the bar now has its icon above its name, with the name
+  near the bottom edge, on every screen size and in every space. The bar
+  is a little taller and a little narrower.
+- The space and language button and the button with your initial are two
+  separate round buttons now, each as tall as the bar, rather than sharing
+  a pill.
+- The space and language menu has more room inside it and between its
+  parts, the note on what switching a language off does sits right under
+  the Languages heading, and the Learning, Teaching and Admin buttons are
+  a little wider.
+
+## 0.502 — 28 October 2026
+
+**A card or deck being read shows only what it says; changing it waits for
+Edit. A deck's lock is a button by its cards.**
+
+- On a card or a deck that is only being read, the boxes you type in once
+  you press Edit have a lighter outline and ground, and their words are a
+  shade softer. An empty box no longer shows its grey example (such as "For
+  example: the plant"), which read like an answer.
+- Ticks and choices of a few ("Keeps its capital letters", the practice
+  ticks, who says a line) take the same lighter look; the one chosen still
+  stands out.
+- Every button that would change something is hidden until you press Edit:
+  "Another deck", "Another course" and "Add custom tags"; the × on a deck,
+  course or tag already added; duplicating a form, adding an accepted
+  answer, the subtype's pencil, checking a card's ID, "Add a form",
+  "Record", "Add image", "Add another meaning of …" and the like; and the
+  on-screen keyboard button. They are all back in edit mode.
+- The grammar of an answer is written out in words where its button was,
+  and an unset subtype says "Not set".
+- Recordings and pictures that are already on a card can still be opened,
+  listened to and looked at while it is read, without the buttons to record,
+  upload or remove. A line or form with none says "None.", and so do custom
+  tags.
+- A deck's Lock section is gone. In its place is a Lock (or Unlock) button,
+  with a padlock, on the right of the Cards heading. It is dimmed until you
+  press Edit; pressed then, it explains what locking or unlocking does, and
+  the change is made when you save the deck, like everything else there.
+- On a locked deck, New card is dimmed, and pressing it says "This deck is
+  locked, so no cards can be added. Unlock it to add one."
+
+To check by hand: on a phone, open a card of each kind and a deck and look
+for anything that changes it before pressing Edit, then press Edit and
+check it all comes back; lock a deck, save, and try New card; unlock it
+again.
+
+
+## 0.501 — 28 October 2026
+
+**The sections and the corner menu move to a bar at the foot of the window.**
+
+- The tabs no longer sit loose under the app's name, scrolling away with
+  the page and wrapping onto a second line on a phone. In their place is a
+  bar that floats near the bottom of every page, in reach of a thumb: Home,
+  Progress and Cards in Learning, and each space's own sections in
+  Teaching and Admin. It stays put as the page scrolls under it, and goes
+  away during an exercise, as the tabs did.
+- A smaller bar beside it holds what used to be in the top-right corner.
+  The round button with your initial opens the same menu as before —
+  sync, appearance, account settings, app preferences, how it works and
+  the version — and it now opens upward, off the bar.
+- Choosing a space and choosing which languages are in play are one
+  button and one menu now, instead of two controls. The button shows what
+  you can actually change: the space's icon if only the space can change,
+  the languages' mark ("All", "AR"…) if only they can, a globe if both
+  can. Somebody with one space and one language has nothing to choose, so
+  the button is not there and the initial stands on its own.
+- **Courses is in the corner menu** rather than a tab of its own. It is
+  where you join a course or look one up, not a place you work in every
+  day; one more tap away is the cost.
+- The app's name stays at the top of the page, and scrolls away with it.
+- While cards are ticked for a change to all of them, the tray of actions
+  along the foot of the window takes the bar's place until the ticking is
+  done.
+- On a narrow phone the section names come down a size so they stay on
+  one line; on a wider screen they carry their icons as well.
+## 0.500 — 28 October 2026
+
+**A deck is read and edited on one screen, the way a card is.**
+
+- Opening a deck under Teaching › Decks shows it as it is saved, with an
+  Edit button at the top right. Its title, courses and lock are shown in
+  the same boxes and ticks you edit them with, held still until you press
+  Edit. Deck settings is no longer a separate screen, and the pencil on
+  each deck in the Decks list, and in a course's list of decks, is gone:
+  open the deck and press Edit.
+- While editing, the back arrow becomes a cross that cancels; if anything
+  has changed it asks "Discard your changes?" first. Save, at the top
+  right, writes everything at once and goes back to reading the deck.
+- "This deck" now says which courses the deck is in, as tags like the
+  decks on a card, or "Not in a course yet — nobody can see it". While
+  editing, "Another course" adds one and the × on a tag takes it out.
+- Deck quality is part of "This deck", after the lock, and what used to be
+  "In context" (how many words appear in a phrase, and the pairings) sits
+  under the score rather than under a heading of its own.
+- "Numbers and pronouns" is now "Built-in cards", "Cards that come with
+  the language, such as numbers and pronouns." They are chosen while
+  editing, with "Choose built-in cards", and saved with the deck rather
+  than on their own.
+- Delete this deck is at the foot of the screen while editing; it is
+  still on each deck in the Decks list too. A locked deck still cannot be
+  deleted.
+- The card list works the same whether the deck is being edited or not,
+  and a locked deck still takes no cards in or out.
+- New deck opens the same screen, already being edited, asking for the
+  title (and the language, where there is a choice). Saved, it opens as
+  the deck itself, where its courses and cards are added.
+
+To check by hand: on a phone, open a deck, press Edit, change its title,
+add a course and tick a part of the numbers, then Save; edit again and
+cancel after a change; make a new deck; open a locked deck and edit it.
+
+## 0.499 — 27 October 2026
+
+**Custom session: clearer button, quieter screen, 20 questions to start.**
+
+- The screen is called Custom session (Edit custom session when changing
+  a saved one).
+- The button in the top bar says Start beside its play icon. When editing
+  a saved session it says Save, with a save icon.
+- Nothing is marked as missing when the screen opens. Tapping Start before
+  it is ready starts nothing; it shows "Choose a mode." or "Choose at least
+  one deck or card." only under the sections still to fill in, and each
+  goes away once that section is filled.
+- Length now starts on 20 questions, and says "Pick how long you want the
+  session to be." Picking minutes instead says "The session ends after 5
+  minutes." (or however many). Ultimate still has no length and is not cut
+  to 20.
+- The numbers for questions and for minutes are now the same size.
+- Under Mode, one line: "The mode sets which exercise types are asked.
+  Cards you've already fully learnt are left out."
+
+To check by hand: on a phone, open Custom session and tap Start straight
+away; then compare the two rows of numbers under Length; then edit a saved
+session and look at the button.
+
+## 0.498 — 27 October 2026
+
+**Build a session uses the card screen's pickers, and keeps a session with a tick.**
+
+- The mode is chosen the way a card's subtype is: a button that opens the
+  list of modes in a sheet, and once one is chosen, its name with a pencil
+  to change it.
+- Decks are chosen the way a card's decks are: a button that opens the
+  list of decks, and the chosen ones shown as pills, each with a cross to
+  take it out. Single cards are chosen the same way, from a second list
+  with a search box at the top, and also show as pills. A session can mix
+  both.
+- The Everything row is gone. Choosing every deck does the same, and a
+  card that is in no deck can still be chosen on its own.
+- Keeping a session is now a tick box, "Save this session to reuse", under
+  a section called Save for later. The name box only appears once it is
+  ticked, and the session is saved when it starts. There is no separate
+  Save button to remember any more. Left without a name, it is called
+  after its mode and size, as before.
+- The Start button is now an icon in the top bar, on the right, like the
+  card screen's saves. Its name changes to "Save and start" when the box
+  is ticked, and to "Save changes" when editing a saved session. Because
+  an icon can't say what is missing, each section says what it still
+  needs ("Choose a mode.") until it has it.
+
+To check by hand: on a phone, build a session from one deck and two single
+cards found by search, tick the box, name it and start it; then find it
+under Saved sessions, edit it, and check the deck and cards come back as
+they were chosen.
+
+## 0.497 — 27 October 2026
+
+**A deck's screen in Teaching is laid out like a card's.**
+
+- Opening a deck under Teaching › Decks now shows the same white sheet,
+  ruled into sections, with the same large headings as a card's screen.
+- It opens on "This deck", with the language and how many cards it holds
+  under the heading, and Export as an icon beside it — where a card keeps
+  its Export by "This card". The worded Export button on the title line is
+  gone.
+- Numbers and pronouns, Deck quality, In context, and a new Cards heading
+  over the list each have a line under the heading saying what they are
+  for. Deck quality's explanation of its score now comes before the score
+  rather than after it.
+- How to use the list ("Tap a card to see it. Tap Select to …") sits under
+  the Cards heading, next to the cards, instead of at the top of the screen.
+- On a locked deck, the line saying it is locked stays under "This deck".
+
+To check by hand: on a phone, open a deck under Teaching › Decks and then a
+card, and compare the two; open a locked deck too.
+
+## 0.496 — 27 October 2026
+
+**Screens, menus and buttons stay inside the window.**
+
+- With a card open, the scroll bar belongs to the card. The page under it
+  — often a long list of cards — no longer scrolls behind it, so a card
+  that fits on the screen no longer shows a long scroll bar, and the wheel
+  no longer moves anything out of sight. The same holds under every
+  full-screen view, question and sheet in the app.
+- A card's status menu opens back across the screen from its button,
+  instead of off the right-hand side of a phone. Every menu that drops
+  from a button — the filters, the corner menu, the space selector, a
+  blank's values — now checks it fits once it opens, and moves back into
+  the window, or scrolls, if it does not.
+- A button whose words are longer than the screen is wide — "Add another
+  meaning of …" and "Add another Vietnamese word for …" on a card with a
+  long name — now takes a second line inside the button instead of
+  running off the side. This applies to every row of buttons, and to the
+  buttons along the foot of a screen.
+
+To check by hand: on a phone, open a card from a long list and scroll;
+open its status menu; open its Settings tab on a card with a long name.
+
+## 0.495 — 27 October 2026
+
+**Progress is laid out like the card editor.**
+
+- Each part of Progress now has the card editor's large heading, with
+  what it is for straight underneath, and a thin line between one part
+  and the next. The screen is on the same plain sheet as the editor.
+- The lines at the top saying what moved today and this week have a
+  heading of their own, Lately, instead of sitting above everything
+  without one.
+- Nothing on the screen does anything different; the screen is a little
+  longer, so there is slightly more to scroll on a phone.
+
+To check by hand: open Learning > Progress in light and dark, and compare
+it with a card open in the editor.
+
+## 0.494 — 27 October 2026
+
+**App preferences no longer has a Language section.**
+
+- The "Learning" language choice is gone from App preferences, with the
+  Language heading over it. Every card carries its own language, so it
+  changed nothing about what was practised: with one language the app sets
+  it from the course, and with several the language switch in the top bar
+  decides what is practised. All it did was decide which language that
+  switch listed first.
+- The app still keeps a language of its own for the rare thing that
+  carries none, and takes it from the courses, as before. A language
+  picked here in the past no longer holds it: when all of someone's
+  courses are in one language, the app follows them.
+
+To check by hand: open App preferences and see Appearance and Feedback
+only; with courses in two languages, the top bar's switch still chooses
+what is practised.
+
+## 0.493 — 27 October 2026
+
+**Build a session is one screen.**
+
+- Building a session, and changing one you saved, used to take three
+  steps: the mode, then the cards, then the length. All of it is now on a
+  single screen, in sections headed Mode, Cards, Length and Keep this
+  session, laid out the way the card screen is, with the same headings
+  and the same line under each saying what it is for.
+- Everything chosen stays in view, so changing a saved session's length
+  no longer means walking through its mode and cards first.
+- The button at the foot says what is still missing (choose a mode,
+  choose a card, choose a length) until there is nothing left, then
+  starts the session, or saves the changes to a saved one.
+- Ultimate, which has no length to choose, says so under Length.
+
+To check by hand: open Build a session on a phone, choose a mode, some
+cards and a length, and start it; then edit a saved session and save a
+change.
 
 ## 0.492 — 27 October 2026
 

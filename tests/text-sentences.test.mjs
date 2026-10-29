@@ -257,7 +257,7 @@ test("a question with nothing to choose between gives way to a backup", () => {
 
 test("a sentence is long by its own language's count", () => {
   const ar = LANGUAGES["ar-PS"];
-  const vi = LANGUAGES["vi-Hue"];
+  const vi = LANGUAGES["vi"];
   assert.equal(longSentenceOf(ar), LONG_SENTENCE);
   assert.ok(longSentenceOf(vi) > LONG_SENTENCE, "a language that writes each syllable apart counts more words");
   assert.equal(wordCount("أنا ساكن بالبيت — مع {{name}}.", ar), 5, "a dash is not a word, and a blank is one");
