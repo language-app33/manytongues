@@ -10507,10 +10507,12 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   const [tab, setTab] = useState<CardTab>("overview");
   /* Basic, then Advanced while the box is ticked — see opensAdvanced. What
      was on a Settings tab of its own is at the foot of Advanced. */
-  const tabList: [string, string][] = [
-    ["overview", "Basic"],
-    ...(advanced ? [["content", "Advanced"] as [string, string]] : []),
-    ["exercises", "Exercises"],
+  /* Each with its icon, over its name, in the one segmented track — see
+     .at-cardtabs. */
+  const tabList: [string, string, string][] = [
+    ["overview", "Basic", "cards"],
+    ...(advanced ? [["content", "Advanced", "tune"] as [string, string, string]] : []),
+    ["exercises", "Exercises", "school"],
   ];
   /* Unticked while looking at the Advanced tab: back to Basic. */
   const shownTab: CardTab = !advanced && (tab === "content" || tab === "settings") ? "overview" : tab;
