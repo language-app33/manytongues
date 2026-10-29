@@ -6649,6 +6649,8 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
             title=""
             role=""
             canCopy={false}
+            dims={[]}
+            bare
           />
       </div>
     )}
@@ -7630,7 +7632,7 @@ function ReferenceField({ word, lang }: { word: WordDraft; lang: Lang }) {
   );
 }
 
-function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCopy = true, blanks, dims, onFill, children }: {
+function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCopy = true, blanks, dims, onFill, bare = false, children }: {
   word: WordDraft;
   lang: Lang;
   /** Where the form sits in the draft — or -1 for a noun's box nobody has
@@ -7673,6 +7675,9 @@ function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCop
   dims?: GrammarDim[];
   /** What the first thing typed into an empty box does with it. */
   onFill?: (next: Record<string, any>) => void;
+  /** The basic form: no classifier under it — grammar of every kind is on
+      the Advanced tab. */
+  bare?: boolean;
   children?: Node;
 }) {
   const { drillsTranslit, setForm, duplicateForm, removeForm, dropBlank, shownSpec, cells } = word;
@@ -7735,7 +7740,7 @@ function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCop
       {children}
     </FormFields>
 
-    {i === 0 && <ReferenceField word={word} lang={lang} />}
+    {i === 0 && !bare && <ReferenceField word={word} lang={lang} />}
   </div>
     </>
   );

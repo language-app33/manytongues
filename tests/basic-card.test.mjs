@@ -51,3 +51,23 @@ test("unticking says what saving would drop, and nothing when there is nothing",
     "the sentence", "1 other form", "the subtype", "the blanks it fills", "the clue for its other meanings",
   ]);
 });
+
+test("grammar is not on a basic card: a card that says some opens as advanced, and a basic save drops it", async () => {
+  const { hasGrammar, withoutGrammar } = await import("../src/basic-card.ts");
+  const { GRAMMAR } = await import("../src/languages.ts");
+  const dim = Object.values(GRAMMAR).find((d) => !d.required);
+  const said = dim.options.map(([v]) => v).find(Boolean);
+  const plainForm = { ar: "nhà", en: "house", lat: "" };
+  assert.equal(hasGrammar(plainForm), false);
+  const told = { ...plainForm, answers: [{ text: "nhà", [dim.field]: said }] };
+  assert.equal(hasGrammar(told), true);
+  assert.equal(opensAdvanced(word({ forms: [told] })), true);
+  assert.equal(hasGrammar(withoutGrammar(told)), false);
+  assert.equal(withoutGrammar(told).answers[0].text, "nhà");
+  /* Required ones at their default say nothing. */
+  for (const d of Object.values(GRAMMAR).filter((d) => d.required)) {
+    assert.equal(hasGrammar({ ...plainForm, [d.field]: d.default || d.options[0][0] }), false, d.field);
+  }
+  assert.ok(droppedByBasic(/** @type {any} */ ({ forms: [told] }), "", "word").includes("the grammar"));
+  assert.equal(hasGrammar(basicCard(/** @type {any} */ ({ forms: [told] }), told).forms[0]), false);
+});

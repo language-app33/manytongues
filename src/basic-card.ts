@@ -13,6 +13,7 @@ import type { Card } from "./types.ts";
 import { formsOf } from "./cards.ts";
 import { isDialog } from "./dialogs.ts";
 import { isSentence } from "./variables.ts";
+import { GRAMMAR, LANGUAGES } from "./languages.ts";
 
 type Shape = "word" | "sentence" | "scene";
 
@@ -23,6 +24,40 @@ const written = (f: Record<string, any>): boolean =>
   some(f.ar) || some(f.lat) || some(f.en) || some(f.clips) || some(f.slowClips) || some(f.images) ||
   (Array.isArray(f.answers) && f.answers.some((a: any) => a && (some(a.text) || some(a.lat))));
 
+/* The grammar a form or an answer can carry, and the classifier a
+   language may keep beside the word: none of it is on the basic form. */
+const grammarFields = (): { field: string; unset: string[] }[] => [
+  ...Object.values(GRAMMAR).map((d) => ({
+    field: d.field,
+    /* A required one always holds something; its default is "not said". */
+    unset: ["", ...(d.required ? [d.default || (d.options[0] || [""])[0]] : [])],
+  })),
+  ...Object.values(LANGUAGES)
+    .filter((l) => l.lexical)
+    .map((l) => ({ field: (l.lexical as { key: string }).key, unset: [""] })),
+];
+
+/* Whether a form, or any of its accepted answers, says anything about its
+   grammar — so a card that does opens as advanced. */
+export function hasGrammar(form: Record<string, any> | null | undefined): boolean {
+  if (!form) return false;
+  const says = (o: Record<string, any>) =>
+    grammarFields().some(({ field, unset }) => o[field] != null && !unset.includes(String(o[field]).trim()));
+  return says(form) || (Array.isArray(form.answers) && form.answers.some((a: any) => a && says(a)));
+}
+
+/* The form with its grammar taken off, on it and on every answer. */
+export function withoutGrammar<F extends Record<string, any>>(form: F): F {
+  const strip = (o: Record<string, any>) => {
+    const out = { ...o };
+    for (const { field } of grammarFields()) delete out[field];
+    return out;
+  };
+  const out = strip(form);
+  if (Array.isArray(form.answers)) out.answers = form.answers.map((a: any) => (a && typeof a === "object" ? strip(a) : a));
+  return out as F;
+}
+
 /*
  * Whether a saved card opens with the box ticked: wherever it carries
  * anything the basic form would not show, so nothing on it is ever out of
@@ -32,7 +67,7 @@ export function opensAdvanced(card: Card | null | undefined): boolean {
   if (!card) return false;
   if (isDialog(card as any) || isSentence(card)) return true;
   const c = card as Record<string, any>;
-  return formsOf(card).length > 1 || some(c.category) || some(c.examples) || some(c.fills) ||
+  return formsOf(card).length > 1 || hasGrammar(formsOf(card)[0]) || some(c.category) || some(c.examples) || some(c.fills) ||
     some(c.ref) || some(c.uses) || some(c.clue);
 }
 
@@ -45,7 +80,7 @@ export function opensAdvanced(card: Card | null | undefined): boolean {
 export function basicCard<T extends { forms: unknown[] }>(card: T, main: Record<string, any>): T {
   return {
     ...card,
-    forms: [main],
+    forms: [withoutGrammar(main)],
     category: "",
     sentence: false,
     examples: [],
@@ -71,6 +106,7 @@ export function droppedByBasic(
   if (picked === "scene") out.push("the scene");
   const more = word.forms.slice(1).filter(written).length;
   if (more) out.push(more === 1 ? "1 other form" : `${more} other forms`);
+  if (hasGrammar(word.forms[0])) out.push("the grammar");
   if ((word.tableCells || []).some((c) => some(c.ar) || some(c.en))) out.push("the table");
   if (some(word.category)) out.push("the subtype");
   if (some(word.writtenExamples)) out.push("the examples");

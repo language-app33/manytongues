@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.516 — 29 October 2026
+
+**A basic card is just the word: no grammar on it.**
+
+- The word on the Basic tab no longer has a Grammar button (number,
+  gender and the like), and a Vietnamese word no longer shows its
+  classifier box there. Both are on the Advanced tab, where they were
+  before.
+- A saved card that already says something about its grammar or its
+  classifier opens as an advanced card, so none of it is hidden.
+- Saving a card as basic drops any grammar written on the Advanced tab,
+  and the line under the Advanced box lists "the grammar" among what
+  would be dropped, while ticking the box again still keeps it.
+
+To check by hand: open a basic card and see the word has no Grammar
+button; open a card whose word was marked feminine, plural or similar and
+see it opens as advanced.
+
 ## 0.515 — 29 October 2026
 
 **A card can be made quickly, as a basic card, or fully, as an advanced one.**
