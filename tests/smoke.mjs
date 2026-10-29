@@ -7001,6 +7001,13 @@ const openPronounTables = async () => {
     check("a verb with no name is refused, because a name is what it is listed as",
       !!saveBtn() && saveBtn().disabled,
       `save is ${saveBtn() && saveBtn().disabled ? "refused" : "still offered"}`);
+    /* Said only once Save has been tapped (0.518): a line standing there
+       before anybody tried reads as a telling-off. */
+    check("and nothing says so until Save is tapped",
+      !!cardNameField() && !cardNameField().querySelector(".at-formneed.unmet"),
+      "said already");
+    click(saveBtn().closest(".at-savewrap"));
+    await sleep(200);
     check("and the line that says so is beside the name, not under the table",
       !!cardNameField() && /needs a name/.test(
         (cardNameField().querySelector(".at-formneed.unmet") || {}).textContent || ""),

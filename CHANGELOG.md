@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.518 — 29 October 2026
+
+**The card screen says less until it has something to say.**
+
+- "Every card needs a name." no longer shows on a card just opened. Save
+  stays grey until the card can be saved; tapping the grey Save with the
+  name empty shows the line under the name. The dot on the tab waits for
+  that tap too, so a new card starts with no warnings.
+- The grey explanation under a Vietnamese word's pronunciation note is
+  gone; the box itself now reads "Pronunciation note (optional)". It is
+  still never asked in an exercise, and Arabic and Hebrew are unchanged.
+- Once a second accepted answer is added with +, a small line over the
+  extra boxes says what they are: "Other Vietnamese answers" (in the
+  course's language) or "Other English answers". A card with one answer
+  shows nothing new. On the Basic and the Advanced tab alike.
+
+To check by hand: on a phone, open New card and tap the grey Save; add
+and remove a second answer.
+
 ## 0.517 — 29 October 2026
 
 **The Basic tab is shorter: the Advanced box sits at the top of "This

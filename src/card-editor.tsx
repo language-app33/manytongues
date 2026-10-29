@@ -146,7 +146,7 @@ const blankLine = (taken: { id?: string }[] = []) => ({
    list is local state seeded from the stored string —
    deriving it on every render would drop an added field the moment it was
    added, because an empty answer joins to nothing. */
-function Alternatives({ value, onChange, render, of = "", addLabel = "Add another accepted answer" }: {
+function Alternatives({ value, onChange, render, of = "", addLabel = "Add another accepted answer", moreLabel = "" }: {
   value?: string;
   onChange: (value: string) => void;
   /* The third argument is what to call this box out loud, where the label
@@ -164,6 +164,8 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
    */
   of?: string;
   addLabel?: string;
+  /** Said once over the boxes after the first, where there are any. */
+  moreLabel?: string;
 }) {
   const [list, setList] = useState(() => splitAlternatives(value || ""));
   /*
@@ -198,7 +200,9 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
   return (
     <div className="at-alts">
       {list.map((v, i) => (
-        <div className="at-altrow" key={i}>
+        <React.Fragment key={i}>
+        {i === 1 && moreLabel && <p className="at-fieldlede at-altsmore">{moreLabel}</p>}
+        <div className="at-altrow">
           <div className="at-altfield">
             {render(v, (nv) => commit(list.map((x, j) => (j === i ? nv : x))), named(i))}
           </div>
@@ -217,6 +221,7 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
             />
           )}
         </div>
+        </React.Fragment>
       ))}
     </div>
   );
@@ -420,7 +425,10 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
   return (
     <div className="at-alts">
       {rows.map((row, i) => (
-        <div className="at-answerpair" key={i}>
+        <React.Fragment key={i}>
+        {/* Over the extra answers, once: what the boxes below the first are. */}
+        {i === 1 && <p className="at-fieldlede at-altsmore">Other {lang.name} answers</p>}
+        <div className="at-answerpair">
           <div className="at-altfield">
             {blanks ? (
               <BlankField
@@ -501,7 +509,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               className="at-input at-answersaid"
               value={row.lat}
               aria-label={named(lang.translitLabel, i)}
-              placeholder={lang.translitLabel.toLowerCase()}
+              placeholder={lang.translitDrilled === false ? `${lang.translitLabel} (optional)` : lang.translitLabel.toLowerCase()}
               onChange={(e) => edit(i, { lat: e.target.value })}
             />
           )}
@@ -567,6 +575,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
             </div>
           )}
         </div>
+        </React.Fragment>
       ))}
     </div>
   );
@@ -6564,7 +6573,7 @@ function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, d
  * the Advanced tab writes it in — so ticking the box carries it over
  * without anything to copy: it is the same form.
  */
-function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onExport }: {
+function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onExport, nameAsked }: {
   lang: Lang;
   scene: boolean;
   word: WordDraft;
@@ -6580,6 +6589,9 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   onToggleDeck: (id: string, on: boolean) => void;
   /** Export the card, where it can be — on a saved card being read. */
   onExport?: () => void;
+  /** Whether Save has been tapped with no name: only then is the name
+      said to be missing. */
+  nameAsked: boolean;
 }) {
   return (
     <>
@@ -6623,7 +6635,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
       {/* ---- what it is called ----
           Every card has a name, whatever its kind. */}
       <div className="at-mt5">
-        <NameBlock word={word} talk={talk} scene={scene} />
+        <NameBlock word={word} talk={talk} scene={scene} asked={nameAsked} />
       </div>
     </div>
 
@@ -6700,7 +6712,7 @@ const storedHelp = (spec: VerbSpec | null): string => {
  * text box in it, standing between the card and its words, read as a stage
  * of the form rather than as the label it is.
  */
-function NameBlock({ word, talk, scene }: { word: WordDraft; talk: SceneDraft; scene: boolean }) {
+function NameBlock({ word, talk, scene, asked }: { word: WordDraft; talk: SceneDraft; scene: boolean; asked: boolean }) {
   /* A scene's name is its title, kept where it always was. */
   const value = scene ? talk.title : word.name;
   const set = scene ? talk.setTitle : word.setName;
@@ -6718,7 +6730,7 @@ function NameBlock({ word, talk, scene }: { word: WordDraft; talk: SceneDraft; s
       {/* Only while it is in the way, like every other line that unblocks
           Save on this screen: a demand standing there before anybody has
           typed reads as a telling-off for opening the screen. */}
-      {!value.trim() && <p className="at-formneed unmet">Every card needs a name.</p>}
+      {asked && !value.trim() && <p className="at-formneed unmet">Every card needs a name.</p>}
     </Field>
   );
 }
@@ -7455,19 +7467,13 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
           blanks={blanks}
           onRemoveBlank={onRemoveBlank}
         />
-        {!drillsTranslit && (
-          <Help>
-            {lang.name} is written in the Latin alphabet, so the{" "}
-            {lang.translitLabel.toLowerCase()} is never asked for — it is kept
-            beside the answer it belongs to, and read.
-          </Help>
-        )}
       </Field>
 
       <Field label="English">
         <Alternatives
           value={f.en}
           of={of}
+          moreLabel="Other English answers"
           onChange={(v) => onChange({ en: v })}
           render={(v, set, label) =>
             blanks ? (
@@ -10468,6 +10474,10 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     sending.current = null;
   }, [card]);
   const changed = snapshot !== savedAs;
+  /* Whether Save has been tapped while the card had no name — see
+     NameBlock. A line saying so before anybody has tried to save reads as
+     a telling-off for opening the screen. */
+  const [nameAsked, setNameAsked] = useState(false);
   /* Cancel with changes on the card: asked first. */
   const [discarding, setDiscarding] = useState(false);
   const quit = () => (stored && onRelock ? onRelock() : onClose());
@@ -10548,7 +10558,10 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     }
     return () => seen.disconnect();
   }, [locked]);
-  const blocked = unmet ? unmet.split(" ") : !locked && !canSave ? [advanced ? "content" : "overview"] : [];
+  /* And a card that cannot be saved yet says nothing about it until Save
+     has been tried: a dot on a card just opened would be a warning about
+     nothing the teacher has done. */
+  const blocked = unmet ? unmet.split(" ") : !locked && !canSave && nameAsked ? [advanced ? "content" : "overview"] : [];
   const dots = tabList
     .map(([k]) => k as CardTab)
     .filter((k) => pieces[k] !== savedPieces[k] || blocked.includes(k));
@@ -10598,14 +10611,20 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             {stored && onDelete ? (
               <IconButton icon="delete" label="Delete this card" title="Delete this card" danger onClick={onDelete} />
             ) : null}
+            {/* Grey while the card cannot be saved, and still answers a
+                tap: one with no name says so under the name. The button
+                lets the tap through to this wrapper while it is off. */}
+            <span className="at-savewrap" onClick={() => { if (!canSave && !busy) setNameAsked(true); }}>
             <Button variant="primary" size="sm" className="iconly"
               aria-label={busy ? "Saving…" : "Save"}
               title={busy ? "Saving…" : "Save"}
               disabled={!canSave || !changed || busy}
+              style={!canSave || !changed || busy ? { pointerEvents: "none" } : undefined}
               onClick={() => save()}
             >
               <Icon name="save" />
             </Button>
+            </span>
           </>
           )
         }
@@ -10648,6 +10667,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
                 setChosen((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
               }
               onExport={locked ? onExport : undefined}
+              nameAsked={nameAsked}
             />
           </TabPanel>
 
