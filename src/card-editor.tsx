@@ -10689,7 +10689,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   const changed = snapshot !== savedAs;
   /* Whether the grey Save has been tapped: until then a card that cannot
      be saved yet says nothing about it — see `dots`. */
-  const [nameAsked, setNameAsked] = useState(false);
+  const [, setNameAsked] = useState(false);
   const snack = useSnackbar();
   /* What is short, as against what is wrong: an empty field a red
      asterisk marks, or a mistake that already has its own red line. */
@@ -10765,14 +10765,13 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
    * why, it is the card's own words that are short, which are on the
    * second tab.
    */
-  const savedPieces = useMemo(() => JSON.parse(savedAs) as Record<CardTab, string>, [savedAs]);
   const panels = {
     overview: useRef<HTMLDivElement | null>(null),
     content: useRef<HTMLDivElement | null>(null),
     exercises: useRef<HTMLDivElement | null>(null),
     settings: useRef<HTMLDivElement | null>(null),
   };
-  const [unmet, setUnmet] = useState("");
+  const [, setUnmet] = useState("");
   /* Read again whenever anything on a tab is redrawn, which is when one of
      those lines can come or go. Nothing is in the way of a card being read. */
   const watched = useRef(panels);

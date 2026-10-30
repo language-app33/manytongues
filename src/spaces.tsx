@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import * as API from "./courses-api.ts";
 import type { Card, Course, Deck, Flag, Form, Lang, LangId, User } from "./types.ts";
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
-import { CardEditor, tapWouldChange } from "./card-editor.tsx";
+import { CardEditor } from "./card-editor.tsx";
 import type { CardShape } from "./card-editor.tsx";
 import { formsOf, leadOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
@@ -5054,10 +5054,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      step, for the same reason. */
   const [pronouning, setPronouning] = useState<LangId | null>(null);
   const [pronounLang, setPronounLang] = useState<LangId | null>(null);
-  /* The open deck's numbers and pronouns, being chosen: null when the
-     screen is shut, and otherwise what is ticked on it so far — the parts
-     of the numbers by range id, and the pronoun cards by card id. */
-  const [deckExtras, setDeckExtras] = useState<{ parts: string[]; pronouns: string[] } | null>(null);
   /* The open deck, being edited: null while it is only read. */
   const [deckDraft, setDeckDraft] = useState<DeckDraft | null>(null);
   const [discardingDeck, setDiscardingDeck] = useState(false);
@@ -5638,7 +5634,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       }
       const said = cardWords(c, langOfCard(c));
       const titles = (c.decks || [])
-        .map((id) => (decks.find((d) => d.id === id) || { title: "" }).title)
+        .map((id: string) => (decks.find((d) => d.id === id) || { title: "" }).title)
         .filter(Boolean);
       return {
         word: said.word,
@@ -7577,7 +7573,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         onBack={
           editing
             ? () => (changed ? setDiscardingDeck(true) : setDeckDraft(null))
-            : () => { setOpenDeck(null); setCardAction(null); setTagAction(null); setDeckExtras(null); setManaging(false); setAdding(null); }
+            : () => { setOpenDeck(null); setCardAction(null); setTagAction(null); setManaging(false); setAdding(null); }
         }
         backIcon={editing ? "close" : "back"}
         backLabel={editing ? "Cancel" : "Back"}

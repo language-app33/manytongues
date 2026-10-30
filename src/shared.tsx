@@ -4014,9 +4014,10 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
      id; renaming the thing you are looking at scrolls you up, which is
      rare and cheap next to arriving halfway down every time. */
   const bodyRef: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
+  const placeKey = scrollKey === undefined ? title : scrollKey;
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
-  }, [scrollKey === undefined ? title : scrollKey]);
+  }, [placeKey]);
   /* Whether the floating button wears its name: yes at the top and while
      scrolling up, no while scrolling down. A few pixels either way are
      ignored, so a finger resting on the glass does not flicker it. */
