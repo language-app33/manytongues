@@ -4497,8 +4497,10 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
    line — wrapping, still at the right, when there are more than fit. */
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed { flex-wrap:wrap; }
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answersaid {
-  flex:1 1 40% !important; width:auto !important; min-width:0 !important; }
+  flex:1 1 0 !important; width:auto !important; min-width:35% !important;
+  align-self:flex-start; height: var(--formbox, 43px) !important; }
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
-  flex:0 1 auto !important; max-width:60%; min-width:0; margin-inline-start:auto; }
+  flex:0 1 auto !important; max-width:calc(65% - 8px); min-width:0; margin-inline-start:auto;
+  align-self:flex-start !important; }
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline > .at-playrow {
   flex-wrap:wrap; justify-content:flex-end; }
