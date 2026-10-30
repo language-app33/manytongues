@@ -4491,3 +4491,14 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
 .at-fullimageimg { max-width:100%; max-height:100%; object-fit:contain; border-radius: var(--r-sm); }
 .at-fullimagex { position:absolute; top:16px; right:16px; color:#fff; width:40px; height:40px;
   display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background: rgba(255,255,255,.15); }
+
+/* Read, an answer's second line: how it is said on the left, taking what
+   room the recordings leave, and the recordings on the right of the same
+   line — wrapping, still at the right, when there are more than fit. */
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed { flex-wrap:wrap; }
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answersaid {
+  flex:1 1 40% !important; width:auto !important; min-width:0 !important; }
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
+  flex:0 1 auto !important; max-width:60%; min-width:0; margin-inline-start:auto; }
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline > .at-playrow {
+  flex-wrap:wrap; justify-content:flex-end; }
