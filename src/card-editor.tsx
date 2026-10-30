@@ -10487,7 +10487,7 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
     root.querySelectorAll(".at-readempty").forEach((el) => el.classList.remove("at-readempty"));
     if (!locked) return;
     root.querySelectorAll<HTMLElement>("input:not([type=checkbox]):not([type=radio]), textarea, .at-blanktext").forEach((el) => {
-      const text = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement ? el.value : el.textContent || "";
+      const text = "value" in el ? String((el as HTMLInputElement).value || "") : el.textContent || "";
       if (String(text).trim()) return;
       const holder = el.closest(".at-altstack, .at-answersaid, .at-field") || el;
       holder.classList.add("at-readempty");
