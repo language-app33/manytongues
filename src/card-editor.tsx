@@ -91,7 +91,6 @@ import {
   ChoiceSwitch,
   Popover,
   DeckSwitch,
-  Nudge,
   Locked,
   Pressable,
   AudioPrompt,
@@ -6756,17 +6755,27 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
         <span className="at-formnum">Decks</span>
         <span className="at-formrole">Manage what decks this card belongs to.</span>
       </div>
-      {chosen.length ? (
-        <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} />
-      ) : (
-        <Nudge
-          icon="folder"
-          tone="attention"
-          action={!locked ? <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} /> : undefined}
-        >
-          Not in a deck yet, so no students can see it. Add it to a deck to share it.
-        </Nudge>
-      )}
+      {/* In no deck, the list stands in the Nudge panel's dress; built by
+          hand rather than with Nudge so the list keeps its place in the
+          tree — swapped for another, it would close the picker the moment
+          the first deck was chosen. */}
+      <div className={chosen.length ? "at-deckhold" : "at-nudge attention"}>
+        {!chosen.length && (
+          <span className="at-nudgeico" aria-hidden="true">
+            <Icon name="folder" size={22} />
+          </span>
+        )}
+        <div className={chosen.length ? "at-deckhold" : "at-nudgebody"}>
+          {!chosen.length && (
+            <p className="at-nudgetext">Not in a deck yet, so no students can see it. Add it to a deck to share it.</p>
+          )}
+          {chosen.length || !locked ? (
+            <div className={chosen.length ? "at-deckhold" : "at-nudgeact"}>
+              <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} />
+            </div>
+          ) : null}
+        </div>
+      </div>
     </div>
 
     {/* ---- and the way out of it altogether ----

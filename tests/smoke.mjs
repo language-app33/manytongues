@@ -5161,7 +5161,7 @@ const openPronounTables = async () => {
       !cardNameField().querySelector(".at-label .req"),
     advancedBox() ? (advancedBox().textContent || "").trim() : "(no box)");
   check("whose Basic tab holds the word itself",
-    [...document.querySelectorAll(".at-formblock .at-formnum")].some((n) => /^Word or phrase$/.test((n.textContent || "").trim())),
+    [...document.querySelectorAll(".at-formblock .at-formnum")].some((n) => /^Content$/.test((n.textContent || "").trim())),
     "(no word)");
   const typeRows = () => [...document.querySelectorAll(
     '[role="radiogroup"][aria-label="What type of card"] .at-tickrow')];
