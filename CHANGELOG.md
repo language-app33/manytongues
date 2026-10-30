@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.525 — 30 October 2026
+
+**English is optional on a card that can be heard or seen.**
+
+- On a teacher's card, the Basic tab's section is called Content rather
+  than "Word or phrase". The card type keeps its name.
+- Arabic, Transliteration, Add-ons, English and "Accepted answer 2" are
+  headed like "Card name" above them, rather than in large type.
+- English is no longer required once the word has a recording or a
+  picture; its asterisk goes and the card saves without it. Such a card
+  is practised only in the exercises that need no meaning, such as
+  listening and matching recordings. Without either, English is still
+  required.
+- To check by hand: a card saved with a recording and no English, its
+  tile, and that it turns up in listening exercises.
+
 ## 0.524 — 30 October 2026
 
 **A teacher's card: a plainer Basic tab, with every part headed.**

@@ -4330,7 +4330,13 @@ export function askParts(
 export const canSaveWord = (
   main: { ar?: string; en?: string },
   trouble: unknown,
-): boolean => !!(String(main.ar || "").trim() && String(main.en || "").trim() && !trouble);
+): boolean => !!(String(main.ar || "").trim() && (String(main.en || "").trim() || soundOrPicture(main)) && !trouble);
+
+/* Whether the word has a recording or a picture — any of its accepted
+   answers, either speed. With one, English is optional: the card can be
+   heard or seen, and is asked only what needs no meaning. */
+export const soundOrPicture = (main: Record<string, any> | null | undefined): boolean =>
+  !!main && ((Array.isArray(main.images) && main.images.length > 0) || /"(?:slowClips|clips)":\["/.test(JSON.stringify(main)));
 
 /*
  * Whether a verb whose table stands in for its own word can be saved.
@@ -6654,7 +6660,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
     {!advanced && (
       <div className="at-formblock at-mt5">
         <div className="at-formhead">
-          <span className="at-formnum">Word or phrase</span>
+          <span className="at-formnum">Content</span>
         </div>
         {/* No fold: on its own here, the word is always open to write. */}
           <FormBlock
@@ -7511,7 +7517,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
         />
       </Field>
 
-      <Field label={<>English{required && <Req />}</>}>
+      <Field label={<>English{required && !soundOrPicture(f) && <Req />}</>}>
         <Alternatives
           value={f.en}
           of={of}
@@ -10575,7 +10581,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     if (scene) return !talk.title.trim() || !talk.sceneKind || !canSaveScene(talk.title, talk.written, talk.text);
     if (word.needsName) return true;
     if (advanced && word.standsIn) return word.needsForm;
-    return !String(word.main.ar || "").trim() || !String(word.main.en || "").trim();
+    return !String(word.main.ar || "").trim() || (!String(word.main.en || "").trim() && !soundOrPicture(word.main));
   })();
   /* A tap on a field of a card being read. */
   const viewOnly = () => snack("You are in view-only mode. Switch to edit to make changes to the card.");
