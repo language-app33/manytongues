@@ -363,7 +363,12 @@ function GrammarToggles({ dims, values, onPick, bare }: {
  * most cards accept one answer and want the language's default, and four
  * pickers under every row would bury the words the card is actually about.
  */
-function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, ownRecorders, blanks, onRemoveBlank, pictures }: {
+function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, ownRecorders, blanks, onRemoveBlank, pictures, headed = false, required = false }: {
+  /** The basic form, alone on its tab: each answer's three parts headed
+      — the script, how it is said, and what goes with it — and each
+      answer after the first headed with its number. */
+  headed?: boolean;
+  required?: boolean;
   lang: Lang;
   /**
    * Which form of the card these boxes belong to, where saying so is the
@@ -428,8 +433,10 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
       {rows.map((row, i) => (
         <React.Fragment key={i}>
         {/* Over the extra answers, once: what the boxes below the first are. */}
-        {i === 1 && <p className="at-fieldlede at-altsmore">Other {lang.name} answers</p>}
-        <div className="at-answerpair">
+        {!headed && i === 1 && <p className="at-fieldlede at-altsmore">Other {lang.name} answers</p>}
+        {headed && i > 0 && <h3 className="at-answerhead at-answernum">Accepted answer {i + 1}</h3>}
+        <div className={`at-answerpair${headed ? " headed" : ""}`}>
+          {headed && <h4 className="at-answerhead">{lang.scriptLabel}{required && i === 0 && <Req />}</h4>}
           <div className="at-altfield">
             {blanks ? (
               <BlankField
@@ -483,6 +490,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               />
             )}
           </div>
+          {headed && lang.translitLabel && <h4 className="at-answerhead">{lang.translitLabel}</h4>}
           {blanks ? (
             <div className="at-answersaid">
               <BlankField
@@ -524,6 +532,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               the card had, beside the word and its meaning. It is not: it
               is one of the accepted answers, said out loud, and a card
               that accepts two had one set of clips over the pair. */}
+          {headed && <h4 className="at-answerhead">Add-ons</h4>}
           <div className="at-answerabout">
             {dims.length > 0 && locked && grammarOf(row) && (
               <span className="at-answergram">{grammarOf(row)}</span>
@@ -7335,7 +7344,10 @@ export const baseName = (spec: VerbSpec | null): string =>
  * there is a single answer to record, and beside the word it is of once
  * there are two. Whoever draws the heading has to know the count.
  */
-function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, drillsTranslit, blanks, onRemoveBlank, onChange, more = false, required = false, children }: {
+function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, drillsTranslit, blanks, onRemoveBlank, onChange, more = false, required = false, plain = false, children }: {
+  /** The one form on the Basic tab: no heading row over it, and each
+      answer's parts headed instead — see ScriptAnswers' `headed`. */
+  plain?: boolean;
   lang: Lang;
   form: Record<string, any>;
   /** The axes each accepted answer is asked about — see answerDims. */
@@ -7422,7 +7434,8 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
        the screen announcing each form as though it were a subject of its
        own. Inside and a size down, they are what they are: the panels are
        the forms, and the section heading above them says so once. */}
-    <div className={`at-part${blanks ? "" : " evenfields"}`}>
+    <div className={`at-part${blanks ? "" : " evenfields"}${plain ? " plain" : ""}`}>
+      {!plain && (
       <div className="at-formhead">
         {folds ? (
           /* The name is the heading that opens it, the way a form's
@@ -7453,6 +7466,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
             them shortens instead of collapsing into a column. */}
         {acts ? <span className="at-formacts">{acts}</span> : null}
       </div>
+      )}
       {open && (
       <>
       {/* An accepted answer, how it is said and how it sounds are written
@@ -7466,8 +7480,10 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
           was a heading doing the work of labels and still left the box
           itself blank; the box says what it is now, in the language, and
           the heading says which language. */}
-      <Field label={<>{lang.scriptLabel}{required && <Req />}</>}>
+      <Field label={plain ? undefined : <>{lang.scriptLabel}{required && <Req />}</>}>
         <ScriptAnswers
+          headed={plain}
+          required={required}
           lang={lang}
           dims={dims}
           rows={rows}
@@ -7727,7 +7743,7 @@ function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCop
   const takeOff = (name: string) => dropBlank(i, name);
   return (
     <>
-  <div className={`at-formblock at-formtile${i === 0 ? " main" : ""}`}>
+  <div className={`at-formblock at-formtile${i === 0 ? " main" : ""}${bare ? " plain" : ""}`}>
     <FormFields
       lang={lang}
       form={f}
@@ -7760,6 +7776,7 @@ function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCop
       onRemoveBlank={takeOff}
       more={pronouns}
       required={i === 0 && !word.standsIn}
+      plain={bare}
       onChange={(patch) => (i < 0 && onFill ? onFill({ ...f, ...patch }) : setForm(i, { ...f, ...patch }))}
     >
       {/* Whatever else belongs to this form — its table of attached

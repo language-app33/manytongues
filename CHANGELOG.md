@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.524 — 30 October 2026
+
+**A teacher's card: a plainer Basic tab, with every part headed.**
+
+- The selected tab on a card no longer has a drop shadow.
+- The Basic tab's form has no frame and no divider at its top: it is the
+  only form there, so its fields sit straight on the screen.
+- Each accepted answer is headed in three parts: the language's script
+  (Arabic, for example), Transliteration where the language has one, and
+  Add-ons for its grammar, recordings and images. Answers after the first
+  start with "Accepted answer 2", "Accepted answer 3", under a thin line.
+- These headings and English use the size of the section headings in
+  Settings.
+- To check by hand: a card with one answer and with two, read and edited;
+  a language with no transliteration; a sentence with blanks.
+
 ## 0.523 — 30 October 2026
 
 **A deck's cards are managed on a page of their own, and locking decks is

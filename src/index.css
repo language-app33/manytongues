@@ -1087,7 +1087,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   color: var(--muted); font-size:11px; letter-spacing:.05em; }
 .at-screen.cardform .at-cardtabs .at-tab2 > svg { width:20px; height:20px; flex:none; }
 .at-screen.cardform .at-cardtabs .at-tab2.on { background: var(--raised); color: var(--text);
-  border-color: var(--tab-stroke); box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+  border-color: var(--tab-stroke); box-shadow:none; }
 .at-screen.cardform .at-cardtabs .at-tab2.on > svg { color: var(--accent); }
 /* The dot for a change on another part rides on the corner of its segment
    rather than taking a line of its own. */
@@ -4374,3 +4374,17 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    width of the list, under its toolbar. */
 .at-managefor { margin:0 0 var(--s3); font-weight:700; color: var(--text-soft); }
 .at-blockbtn { width:100%; justify-content:center; }
+
+/* The Basic tab's one form: no frame and no heading row, since it is the
+   only form there; its parts are headed instead, at the size the Settings
+   screen heads its sections. */
+.at-formblock.at-formtile.plain, .at-formblock.at-formtile.plain > .at-part.plain {
+  border:0 !important; padding:0 !important; background:none !important; box-shadow:none; }
+.at-part.plain > .at-formhead { display:none; }
+.at-answerhead, .at-part.plain > .at-field > .at-label {
+  margin:22px 0 10px; font-family: var(--ui); font-size:25px; font-weight:800;
+  letter-spacing:-.015em; line-height:1.15; text-transform:none; color: var(--ink); }
+.at-answerpair.headed { gap:0 6px; }
+.at-answerpair.headed > .at-answerhead { grid-column:1 / -1; }
+.at-answerpair.headed > .at-answerhead:first-child { margin-top:0; }
+.at-answernum { margin-top:28px; padding-top:24px; border-top:1px solid var(--line); }
