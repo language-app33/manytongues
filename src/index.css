@@ -4497,10 +4497,13 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
    line — wrapping, still at the right, when there are more than fit. */
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed { flex-wrap:wrap; }
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answersaid {
-  flex:1 1 0 !important; width:auto !important; min-width:35% !important;
-  align-self:flex-start; height: var(--formbox, 43px) !important; }
+  flex:0 1 auto !important; width:auto !important; min-width:0 !important;
+  align-self:flex-start; min-height: var(--formbox, 43px); display:flex; align-items:center; }
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
-  flex:0 1 auto !important; max-width:calc(65% - 8px); min-width:0; margin-inline-start:auto;
+  flex:1 1 auto !important; max-width:none; min-width:0; margin-inline-start:auto;
   align-self:flex-start !important; }
 .at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline > .at-playrow {
   flex-wrap:wrap; justify-content:flex-end; }
+
+.at-readsaid { font-size:21px; font-style:italic; font-weight:500; color: var(--muted); line-height:1.3; overflow-wrap:anywhere; }
+.at-screen.over .at-part.evenfields .at-answerpair > .at-answersaid.at-readsaid { height:auto !important; padding-block:8px; }

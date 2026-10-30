@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.539 — 30 October 2026
+
+**The transliteration on a card being read is as wide as its words.**
+
+- Read, the transliteration or pronunciation note is plain text taking
+  only the room it needs; the recordings fill the rest of its line at the
+  right, wrapping underneath when there isn't room. A long note takes the
+  line it needs, with the recordings below it at the right.
+- Checked in a browser with a two-letter and a long note.
+
 ## 0.538 — 30 October 2026
 
 **Recordings really do share the transliteration's line now.**

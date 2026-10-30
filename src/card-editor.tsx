@@ -528,7 +528,11 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               />
             )}
           </div>}
-          {headed && locked && !String(row.lat || "").trim() ? null : blanks ? (
+          {headed && locked && !String(row.lat || "").trim() ? null : headed && locked && !blanks ? (
+            /* Read, plain words — as wide as they are, so the recordings
+               beside them take whatever is left of the line. */
+            <span className="at-answersaid at-readsaid">{row.lat}</span>
+          ) : blanks ? (
             <div className="at-answersaid">
               <BlankField
                 wiring={blanks}
