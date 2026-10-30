@@ -91,9 +91,10 @@ import {
   ChoiceSwitch,
   Popover,
   DeckSwitch,
+  Nudge,
   Locked,
   Pressable,
-  useClipPlayer,
+  AudioPrompt,
   AskedMeanings,
   AskedScript,
   Tabs,
@@ -584,9 +585,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               </Button>
             )}
             {/* Read, each recording is played where it is. */}
-            {ownRecorders && locked && headed && clipsOf(row).map((c, k) => (
-              <ReadPlay key={c.id} hash={c.id} label={`Play recording ${k + 1}${rows.length > 1 ? ` of answer ${i + 1}` : ""}`} />
-            ))}
+            {ownRecorders && locked && headed && <AudioPrompt compact recs={clipsOf(row)} />}
             {ownRecorders && !(locked && headed) && (
               <Button
                 variant="ghost"
@@ -638,24 +637,6 @@ const translitHint = (lang: Lang): string => {
 /* And English's: one of the language's own sample meanings. */
 const englishHint = (lang: Lang): string =>
   `e.g. ${((lang.sample || [])[0] || { en: "book" }).en || "book"}`;
-
-/* A recording on a card being read: played in place, paused again. */
-const loadClip = async (h: string) => (await API.getClip(h)).data;
-function ReadPlay({ hash, label }: { hash: string; label: string }) {
-  const player = useClipPlayer(loadClip);
-  const snack = useSnackbar();
-  useEffect(() => {
-    if (player.state !== "missing") return;
-    snack("This recording couldn't be found.", "warn");
-    player.reset();
-  }, [player.state]);
-  const playing = player.state === "playing";
-  return (
-    <Button reads size="sm" className="iconly at-readplay" icon={playing ? "pause" : "play"}
-      aria-label={playing ? "Pause" : label} title={playing ? "Pause" : label}
-      disabled={player.state === "loading"} onClick={() => player.play(hash)} />
-  );
-}
 
 /* An image of a card being read, over everything, as large as the window
    allows. A tap anywhere or Escape puts it away. */
@@ -6690,6 +6671,8 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   /** Delete the card — on a saved card being edited, at the foot. */
   onDelete?: () => void;
 }) {
+  /* Read, the panel for a card in no deck says so and offers nothing. */
+  const locked = useContext(Locked);
   return (
     <>
     <div className="at-formblock">
@@ -6765,7 +6748,17 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
         <span className="at-formnum">Decks</span>
         <span className="at-formrole">Manage what decks this card belongs to.</span>
       </div>
-      <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} />
+      {chosen.length ? (
+        <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} />
+      ) : (
+        <Nudge
+          icon="folder"
+          tone="attention"
+          action={!locked ? <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} /> : undefined}
+        >
+          Not in a deck yet, so no students can see it. Add it to a deck to share it.
+        </Nudge>
+      )}
     </div>
 
     {/* ---- and the way out of it altogether ----

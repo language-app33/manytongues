@@ -8,6 +8,21 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.535 — 30 October 2026
+
+**A card being read plays its recordings the way a practice question does,
+and says when it is in no deck.**
+
+- Read, an answer's recordings use the same player as the exercises, at
+  a button's size at the end of the transliteration line: Regular, and
+  Slow with its own icon, where there is a slow recording.
+- A card in no deck shows the attention panel under Decks: "Not in a deck
+  yet, so no students can see it." Read, it is the message alone; while
+  editing, the way to add it to a deck is inside the panel.
+- To check by hand: a card with a regular and a slow recording, read; the
+  exercises' player still looks as before; a card in no deck, read and
+  edited.
+
 ## 0.534 — 30 October 2026
 
 **Play buttons on a card being read are proper buttons, at the end of the

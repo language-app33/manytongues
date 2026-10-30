@@ -4479,8 +4479,11 @@ fieldset.at-cardlock:disabled .at-alts > .at-altstack ~ .at-altstack::before { f
 fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answersaid { flex:1 1 auto; min-width:0; }
 fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
   margin-inline-start:auto; display:flex; gap:6px; align-self:center; }
-.at-btn.at-readplay { width: var(--formbox, 43px); height: var(--formbox, 43px) !important;
-  min-height:0; padding:0; justify-content:center; flex:none; }
+/* The practice player, at a button's size, at the end of the line. */
+.at-playrow.compact { gap:6px; justify-content:flex-end; align-items:center; }
+.at-playrow.compact .at-playbig { min-width:0; height: var(--formbox, 43px); padding:0 12px; gap:6px;
+  font-size:13px; flex:none; }
+.at-playrow.compact .at-playbig .at-ic { width:18px; height:18px; }
 .at-fullimage { position:fixed; inset:0; z-index:1000; background: rgba(0,0,0,.88);
   display:flex; align-items:center; justify-content:center; padding:16px; cursor:zoom-out; }
 .at-fullimageimg { max-width:100%; max-height:100%; object-fit:contain; border-radius: var(--r-sm); }
