@@ -602,6 +602,8 @@ export interface Lang {
   leading?: number;
   sample: LangSample[];
   translitLabel: string;
+  /** An example for the empty box, where the label alone is no help. */
+  translitExample?: string;
   /** Which axes of GRAMMAR this language uses. */
   grammar: string[];
   /**

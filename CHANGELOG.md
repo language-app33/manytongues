@@ -8,6 +8,21 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.526 — 30 October 2026
+
+**A teacher's card: recordings with their answer, the picture on its own.**
+
+- The tabs on a card have no line under them and no dots on them.
+- Vietnamese's pronunciation note shows an example in the empty box
+  ("e.g. rising tone; ư like the u in ‘put’") instead of "(optional)".
+- Tapping a field on a card or deck that is only being read no longer
+  shows "You are in view-only mode".
+- On the Basic tab, each accepted answer holds its script, its
+  transliteration or pronunciation note, and its Recordings. The image is
+  for the whole card, so it has its own Image heading after English.
+- To check by hand: a card with two answers, each with its own
+  recordings; the image once at the end; a Vietnamese card.
+
 ## 0.525 — 30 October 2026
 
 **English is optional on a card that can be heard or seen.**

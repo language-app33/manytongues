@@ -506,7 +506,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
                     className="at-input"
                     value={row.lat}
                     label={named(lang.translitLabel, i)}
-                    placeholder={lang.translitLabel.toLowerCase()}
+                    placeholder={lang.translitExample || lang.translitLabel.toLowerCase()}
                     onChange={(v) => edit(i, { lat: v })}
                     onRemove={onRemoveBlank}
                   />
@@ -518,7 +518,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               className="at-input at-answersaid"
               value={row.lat}
               aria-label={named(lang.translitLabel, i)}
-              placeholder={lang.translitDrilled === false ? `${lang.translitLabel} (optional)` : lang.translitLabel.toLowerCase()}
+              placeholder={lang.translitExample || lang.translitLabel.toLowerCase()}
               onChange={(e) => edit(i, { lat: e.target.value })}
             />
           )}
@@ -532,7 +532,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               the card had, beside the word and its meaning. It is not: it
               is one of the accepted answers, said out loud, and a card
               that accepts two had one set of clips over the pair. */}
-          {headed && <h4 className="at-answerhead">Add-ons</h4>}
+          {headed && <h4 className="at-answerhead">Recordings</h4>}
           <div className="at-answerabout">
             {dims.length > 0 && locked && grammarOf(row) && (
               <span className="at-answergram">{grammarOf(row)}</span>
@@ -572,7 +572,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
                 {soundOf(clipsOf(row).length)}
               </Button>
             )}
-            {i === 0 && pictures}
+            {i === 0 && !headed && pictures}
           </div>
           {dims.length > 0 && open === i && (
             <div className="at-answergrammar">
@@ -7549,6 +7549,25 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
         />
       </Field>
 
+      {/* The card's picture, for the whole card rather than for one of its
+          answers — so under Content, after them, as a part of its own. */}
+      {plain && (
+        <Field label="Image">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="image"
+            iconSize={17}
+            className="at-answerrec"
+            reads={locked && images.length > 0}
+            aria-label={`Images — ${images.length ? `${images.length} added` : "none yet"}`}
+            onClick={() => setSeeing(true)}
+          >
+            {picturesOf(images.length)}
+          </Button>
+        </Field>
+      )}
+
       {/* No Recordings field here. It stood level with the English, which
           said a recording was a third thing the card had beside the word
           and its meaning — and gave a card with two accepted answers one
@@ -10584,7 +10603,8 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     return !String(word.main.ar || "").trim() || (!String(word.main.en || "").trim() && !soundOrPicture(word.main));
   })();
   /* A tap on a field of a card being read. */
-  const viewOnly = () => snack("You are in view-only mode. Switch to edit to make changes to the card.");
+  /* Read fields are plain words now, so a tap on one needs no answer. */
+  const viewOnly = () => {};
   /* The floating Save: saves where it can, and otherwise says why not. */
   const trySave = () => {
     if (busy) return;
@@ -10679,13 +10699,6 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     }
     return () => seen.disconnect();
   }, [locked]);
-  /* And a card that cannot be saved yet says nothing about it until Save
-     has been tried: a dot on a card just opened would be a warning about
-     nothing the teacher has done. */
-  const blocked = unmet ? unmet.split(" ") : !locked && !canSave && nameAsked ? [advanced ? "content" : "overview"] : [];
-  const dots = tabList
-    .map(([k]) => k as CardTab)
-    .filter((k) => pieces[k] !== savedPieces[k] || blocked.includes(k));
   return (
     /* "over" puts this above the mode selector and the corner menu, so
        editing a card is the only thing on screen. */
@@ -10740,7 +10753,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
           {/* Outside the lock: a card being read is moved round as freely
               as one being written. */}
           <div className="at-cardtabs">
-            <Tabs tabs={tabList} value={shownTab} onChange={(k) => setTab(k as CardTab)} label="Part of the card" dots={dots} />
+            <Tabs tabs={tabList} value={shownTab} onChange={(k) => setTab(k as CardTab)} label="Part of the card" />
           </div>
 
           {/* ---- Basic ----

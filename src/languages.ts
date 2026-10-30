@@ -3945,6 +3945,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
       { ar: "một", en: "one", lat: "" },
     ],
     translitLabel: "Pronunciation note",
+    translitExample: "e.g. rising tone; ư like the u in ‘put’",
     /* Nothing declines. What does vary is who is being spoken to: a
        greeting or a thanks has a form for someone younger, a peer and an
        elder, held as forms of one card — and named, so a learner asked for

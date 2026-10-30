@@ -7621,7 +7621,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 </span>
               </div>
               <fieldset className="at-cardlock" disabled={!editing}
-                onPointerDown={!editing ? (e) => { if (tapWouldChange(e.target)) snack("You are in view-only mode. Switch to edit to make changes to the deck."); } : undefined}>
+>
                 <Field label={<>Deck name<span className="at-reqstar" aria-hidden="true" /></>}>
                   <input
                     className="at-input"

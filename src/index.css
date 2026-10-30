@@ -1073,8 +1073,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    is never a scroll back up; it is the sheet's own colour, with the rule
    the sections use under it. */
 .at-screen.cardform .at-cardtabs { position:sticky; top:0; z-index:3;
-  margin:0 -16px; padding:12px 16px; background: var(--surface);
-  border-bottom:1px solid var(--line); }
+  margin:0 -16px; padding:12px 16px; background: var(--surface); }
 /* One segmented track: the parts share it equally, each an icon over its
    name, the current one raised out of the well on the sheet's lighter
    ground with its icon in the accent colour. */
