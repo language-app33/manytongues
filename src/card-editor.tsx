@@ -436,7 +436,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
         {!headed && i === 1 && <p className="at-fieldlede at-altsmore">Other {lang.name} answers</p>}
         {headed && i > 0 && <h3 className="at-answerhead at-answernum">Accepted answer {i + 1}</h3>}
         <div className={`at-answerpair${headed ? " headed" : ""}`}>
-          {headed && <h4 className="at-answerhead">{lang.scriptLabel}{required && i === 0 && <Req />}</h4>}
+          {headed && i === 0 && <h4 className="at-answerhead">{lang.scriptLabel}{required && <Req />}</h4>}
           <div className="at-altfield">
             {blanks ? (
               <BlankField
@@ -490,8 +490,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               />
             )}
           </div>
-          {headed && lang.translitLabel && <h4 className="at-answerhead">{lang.translitLabel}</h4>}
-          {blanks ? (
+          {headed && locked && !String(row.lat || "").trim() ? null : blanks ? (
             <div className="at-answersaid">
               <BlankField
                 wiring={blanks}
@@ -532,8 +531,9 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               the card had, beside the word and its meaning. It is not: it
               is one of the accepted answers, said out loud, and a card
               that accepts two had one set of clips over the pair. */}
-          {headed && <h4 className="at-answerhead">Recordings</h4>}
-          <div className="at-answerabout">
+          {/* Headed, the recordings sit beside the transliteration they
+              go with, in the buttons' column. */}
+          <div className={`at-answerabout${headed ? " inline" : ""}`}>
             {dims.length > 0 && locked && grammarOf(row) && (
               <span className="at-answergram">{grammarOf(row)}</span>
             )}
@@ -7517,7 +7517,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
         />
       </Field>
 
-      <Field label={<>English{required && !soundOrPicture(f) && <Req />}</>}>
+      <Field className={plain ? "at-softrule" : ""} label={<>English{required && !soundOrPicture(f) && <Req />}</>}>
         <Alternatives
           value={f.en}
           of={of}
@@ -7552,7 +7552,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
       {/* The card's picture, for the whole card rather than for one of its
           answers — so under Content, after them, as a part of its own. */}
       {plain && (
-        <Field label="Image">
+        <Field className="at-softrule" label="Image">
           <Button
             variant="ghost"
             size="sm"

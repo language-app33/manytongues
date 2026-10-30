@@ -4385,4 +4385,19 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-answerpair.headed { gap:0 6px; }
 .at-answerpair.headed > .at-answerhead { grid-column:1 / -1; }
 .at-answerpair.headed > .at-answerhead:first-child { margin-top:0; }
-.at-answernum { margin-top:28px; padding-top:24px; border-top:1px solid var(--line); }
+/* Inside Content, a lighter line than the one between sections: dashed,
+   and short of the edges — between answers, and above English and Image. */
+.at-answernum, .at-part.plain > .at-field.at-softrule {
+  margin-top:20px; padding-top:18px; margin-inline:12px; border-top:1px dashed var(--line); }
+.at-part.plain > .at-field.at-softrule { margin-inline:12px 0; }
+.at-part.plain > .at-field.at-softrule > .at-label { margin-top:0; }
+.at-answerpair.headed > .at-answerhead:first-child + * { margin-top:0; }
+/* An answer, compact: its script, then how it is said with its recordings
+   beside it in the buttons' column. */
+.at-answerpair.headed { row-gap:6px; }
+.at-answerpair.headed > .at-answerabout.inline { grid-column:2; align-self:center; }
+/* Read: the script at its size, how it is said quieter under it. */
+fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid,
+fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid .at-input {
+  font-size:14px !important; font-style:italic; font-weight:500;
+  color: var(--muted) !important; -webkit-text-fill-color: var(--muted) !important; }

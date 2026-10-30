@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.527 — 30 October 2026
+
+**Accepted answers on a card are compact, one heading each.**
+
+- On the Basic tab, each accepted answer has one heading — Arabic for the
+  first, "Accepted answer 2" and on after it — with its script, then its
+  transliteration and the record button beside it on one line.
+- Between answers, and above English and Image, a dashed line short of
+  the edges, lighter than the solid line between sections.
+- Read, the script stands at its size and the transliteration is quieter
+  under it, in grey italics; an empty one is left out.
+- To check by hand: one and two answers, read and edited, on a phone.
+
 ## 0.526 — 30 October 2026
 
 **A teacher's card: recordings with their answer, the picture on its own.**
