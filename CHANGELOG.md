@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.529 — 30 October 2026
+
+**A card's boxes are one height, and Content's separators are quieter.**
+
+- The + and − beside an answer's heading are ordinary icon buttons, the
+  height of a box, at the right of the heading's line.
+- Every one-line box on a card is the same height: the card's name, the
+  script, its transliteration or pronunciation note, and English.
+- Inside Content, answers, English and Image are separated by a short
+  faint stub in the middle of the gap rather than a line across; the
+  full-width line is only between sections.
+- To check by hand: script text still fits its box; phone width.
+
 ## 0.528 — 30 October 2026
 
 **Accepted answers: + and − on their headings, everything on one edge.**

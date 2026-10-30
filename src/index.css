@@ -2638,7 +2638,9 @@ textarea.at-input { font-size:15px; font-weight:500; line-height:1.7; resize:ver
 .at-screen.over .at-part.evenfields .at-answerpair > .at-answersaid,
 .at-screen.over .at-part.evenfields .at-altrow > .at-altfield > .at-input,
 .at-screen.over .at-cellrow .at-cellfields > .at-input,
-.at-screen.over .at-cellrow .at-cellfields > .at-inputwrap > .at-input {
+.at-screen.over .at-cellrow .at-cellfields > .at-inputwrap > .at-input,
+.at-screen.over.cardform input.at-input:not([type=checkbox]):not([type=radio]),
+.at-screen.over.cardform .at-alts > .at-altfield > .at-input {
   height: var(--formbox, 43px); box-sizing:border-box; padding-block:0; line-height:normal; }
 /* Which side the button takes is the script's business, not the page's: it
    belongs at the end of the line, which is the left in Arabic. Marked with
@@ -4387,19 +4389,24 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-answerpair.headed > .at-answerhead:first-child { margin-top:0; }
 /* Inside Content, a lighter line than the one between sections: dashed,
    and short of the edges — between answers, and above English and Image. */
+/* Inside Content, a pause rather than a boundary: a short faint stub
+   centred in the gap. The full-width line is for between sections. */
 .at-answernum, .at-part.plain > .at-field.at-softrule {
-  position:relative; margin-top:20px; padding-top:18px; }
+  position:relative; margin-top:30px; padding-top:0; }
 .at-answernum::before, .at-part.plain > .at-field.at-softrule::before {
-  content:""; position:absolute; left:12px; right:12px; top:0; border-top:1px dashed var(--line); }
+  content:""; position:absolute; left:50%; width:48px; transform:translateX(-50%); top:-16px;
+  border-top:2px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius:2px; }
 /* A heading with what acts on its list at the right of its line. */
 .at-answerheadrow { display:flex; align-items:center; justify-content:space-between; gap:8px;
   margin:18px 0 8px; grid-column:1 / -1; }
 .at-answerheadrow > .at-answerhead { margin:0 !important; }
 .at-answerpair.headed > .at-answerheadrow:first-child,
 .at-alts > .at-answerheadrow:first-child { margin-top:0; }
-.at-answerheadrow.at-answernum { margin-top:20px; padding-top:18px; }
+.at-answerheadrow.at-answernum { margin-top:30px; padding-top:0; }
+/* The + and −: an ordinary icon-only button, square, a box's height. */
+.at-answerheadrow > .at-icon { flex:none; width:44px; height: var(--formbox, 43px); min-height:0; padding:0; }
 .at-answerpair.headed > .at-altfield { grid-column:1 / -1; }
-.at-alts > .at-altfield + .at-answerheadrow { margin-top:20px; }
+.at-alts > .at-altfield + .at-answerheadrow { margin-top:30px; }
 .at-part.plain > .at-field.at-softrule > .at-label { margin-top:0; }
 .at-answerpair.headed > .at-answerhead:first-child + * { margin-top:0; }
 /* An answer, compact: its script, then how it is said with its recordings
