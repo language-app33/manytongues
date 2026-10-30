@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.536 — 30 October 2026
+
+**Every recording on a card being read, in line with its words.**
+
+- Read, every recording of an answer has its own button — Regular ones
+  first, then Slow — centred on the transliteration or pronunciation line
+  at its right; any that don't fit carry on to the next line, still at
+  the right.
+- While editing, a further answer in the language has its − at the very
+  right and its box filling the rest of the line, as English's do.
+- Exercises still offer one Regular and one Slow.
+
 ## 0.535 — 30 October 2026
 
 **A card being read plays its recordings the way a practice question does,

@@ -2635,6 +2635,7 @@ textarea.at-input { font-size:15px; font-weight:500; line-height:1.7; resize:ver
    height that no longer has room for it. */
 .at-screen.over { --formbox: 43px; }
 .at-screen.over .at-part.evenfields .at-answerpair > .at-altfield > .at-inputwrap > .at-input,
+.at-screen.over .at-part.evenfields .at-answerpair > div > .at-altfield > .at-inputwrap > .at-input,
 .at-screen.over .at-part.evenfields .at-answerpair > .at-answersaid,
 .at-screen.over .at-part.evenfields .at-altrow > .at-altfield > .at-input,
 .at-screen.over .at-cellrow .at-cellfields > .at-input,
@@ -4405,7 +4406,8 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-answerheadrow.at-answernum { margin-top:30px; padding-top:0; }
 /* The + and −: an ordinary icon-only button, square, a box's height. */
 .at-answerheadrow > .at-icon { flex:none; width:44px; height: var(--formbox, 43px); min-height:0; padding:0; }
-.at-answerpair.headed > .at-altfield { grid-column:1 / -1; }
+.at-answerpair > .at-scriptcell { grid-column:1; min-width:0; }
+.at-answerpair.headed > .at-scriptcell, .at-answerpair.headed > .at-scriptrow { grid-column:1 / -1; min-width:0; }
 .at-alts > .at-altfield + .at-answerheadrow { margin-top:30px; }
 .at-part.plain > .at-field.at-softrule > .at-label { margin-top:0; }
 .at-answerpair.headed > .at-answerhead:first-child + * { margin-top:0; }
@@ -4430,7 +4432,6 @@ fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid .at-input {
 
 /* The script's further answers, stacked under the first as English's are:
    the box with its − beside it, then how it is said with its recordings. */
-.at-answerpair.headed.extra > .at-altfield { grid-column:1; }
 .at-answerpair.headed > .at-icon { flex:none; width:44px; height: var(--formbox, 43px); min-height:0; padding:0; }
 .at-alts > .at-answerpair.headed + .at-answerpair.headed { margin-top:14px; }
 
@@ -4447,9 +4448,10 @@ fieldset.at-cardlock:disabled .at-field { margin-bottom:16px; }
 fieldset.at-cardlock:disabled .at-answerheadrow { margin:0 0 4px; min-height:0; }
 fieldset.at-cardlock:disabled .at-answerheadnote { display:none; }
 /* An answer: its script, then how it is said with its recordings inline. */
-fieldset.at-cardlock:disabled .at-answerpair.headed { display:flex; flex-wrap:wrap; align-items:baseline; gap:0 8px; }
+fieldset.at-cardlock:disabled .at-answerpair.headed { display:flex; flex-wrap:wrap; align-items:center; gap:0 8px; }
 fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerheadrow,
-fieldset.at-cardlock:disabled .at-answerpair.headed > .at-altfield { flex:0 0 100%; }
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-scriptcell,
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-scriptrow { flex:0 0 100%; }
 fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answersaid { flex:0 1 auto; width:auto; }
 fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline { align-self:baseline; }
 fieldset.at-cardlock:disabled .at-alts > .at-answerpair.headed + .at-answerpair.headed { margin-top:6px; }
@@ -4478,9 +4480,9 @@ fieldset.at-cardlock:disabled .at-alts > .at-altstack ~ .at-altstack::before { f
    the line that says how it is said. */
 fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answersaid { flex:1 1 auto; min-width:0; }
 fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
-  margin-inline-start:auto; display:flex; gap:6px; align-self:center; }
+  margin-inline-start:auto; display:flex; justify-content:flex-end; flex:1 1 auto; min-width:0; gap:6px; align-self:center; }
 /* The practice player, at a button's size, at the end of the line. */
-.at-playrow.compact { gap:6px; justify-content:flex-end; align-items:center; }
+.at-playrow.compact { gap:6px; flex-wrap:wrap; justify-content:flex-end; align-items:center; }
 .at-playrow.compact .at-playbig { min-width:0; height: var(--formbox, 43px); padding:0 12px; gap:6px;
   font-size:13px; flex:none; }
 .at-playrow.compact .at-playbig .at-ic { width:18px; height:18px; }

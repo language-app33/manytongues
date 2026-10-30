@@ -1551,6 +1551,12 @@ export function AudioPrompt({ recs, autoPlay, lead = "regular", after, load, com
   if (iSlow >= 0) takes.push({ i: iSlow, slow: true });
   /* A card with nothing but slow recordings would otherwise show none. */
   if (!takes.length && list.length) takes.push({ i: 0, slow: false });
+  /* A card being read shows every take, regular ones first. */
+  if (compact) {
+    takes.length = 0;
+    list.forEach((r, i) => takes.push({ i, slow: r.speed === "slow" }));
+    takes.sort((a, b) => Number(a.slow) - Number(b.slow) || a.i - b.i);
+  }
   /* The one the card's progress asks for, if the card has it: a lead that
      is not there is not a lead, and the other one is then the whole
      offering rather than a quiet second choice. */
@@ -1666,6 +1672,9 @@ export function AudioPrompt({ recs, autoPlay, lead = "regular", after, load, com
         return (
           <Pressable
             key={list[i].id}
+            aria-label={compact && takes.filter((x) => x.slow === slow).length > 1
+              ? `${slow ? "Slow" : "Regular"}, take ${takes.filter((x) => x.slow === slow).findIndex((x) => x.i === i) + 1}`
+              : undefined}
             className={`at-playbig${takes.length > 1 ? " twin" : ""}${
               takes.length > 1 && slow !== leadSlow ? " quiet" : ""
             }`}

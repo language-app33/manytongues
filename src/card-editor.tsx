@@ -468,6 +468,9 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               <IconButton icon="add" label="Add another accepted answer" onClick={() => commit(rows.concat([{ text: "", lat: "" }]))} />
             </div>
           )}
+          {/* A further answer's box and its −, one row the width of the
+              list, as English's are. */}
+          <div className={headed && i > 0 ? "at-altrow at-altstack at-scriptrow" : "at-scriptcell"}>
           <div className="at-altfield">
             {blanks ? (
               <BlankField
@@ -502,12 +505,13 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               />
             )}
           </div>
-          {/* The buttons take a column of their own so that the answer and
-              its pronunciation, stacked in the column beside them, line up
-              with each other rather than one running past the other. */}
           {headed && i > 0 && (
             <IconButton icon="remove" label="Remove this answer" onClick={() => commit(rows.filter((_, j) => j !== i))} />
           )}
+          </div>
+          {/* The buttons take a column of their own so that the answer and
+              its pronunciation, stacked in the column beside them, line up
+              with each other rather than one running past the other. */}
           {!headed && <div className="at-answeracts">
             {rows.length > 1 && (
               <IconButton
