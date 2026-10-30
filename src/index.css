@@ -4427,3 +4427,9 @@ fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid .at-input {
 .at-answerheadnote { font-size:13px; font-weight:500; color: var(--muted); }
 .at-alts > .at-altstack + .at-altstack { margin-top:8px; }
 .at-altstack > .at-icon { flex:none; width:44px; height: var(--formbox, 43px); min-height:0; padding:0; }
+
+/* The script's further answers, stacked under the first as English's are:
+   the box with its − beside it, then how it is said with its recordings. */
+.at-answerpair.headed.extra > .at-altfield { grid-column:1; }
+.at-answerpair.headed > .at-icon { flex:none; width:44px; height: var(--formbox, 43px); min-height:0; padding:0; }
+.at-alts > .at-answerpair.headed + .at-answerpair.headed { margin-top:14px; }

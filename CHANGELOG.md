@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.531 — 30 October 2026
+
+**The target language's accepted answers stack, as English's do.**
+
+- On the Basic tab, a further answer in the language being taught goes
+  straight under the one before — its box with a − beside it, then its
+  transliteration or pronunciation note with its recordings — with no
+  heading or line between them. With more than one, "Multiple accepted
+  answers" is said under the language's heading, level with the +.
+- To check by hand: removing a middle answer takes its transliteration
+  and recordings with it; phone width.
+
 ## 0.530 — 30 October 2026
 
 **English's accepted answers sit together, and empty boxes give examples.**

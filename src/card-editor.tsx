@@ -456,16 +456,13 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
         <React.Fragment key={i}>
         {/* Over the extra answers, once: what the boxes below the first are. */}
         {!headed && i === 1 && <p className="at-fieldlede at-altsmore">Other {lang.name} answers</p>}
-        {headed && i > 0 && (
-          <div className="at-answerheadrow at-answernum">
-            <h4 className="at-answerhead">Another accepted answer</h4>
-            <IconButton icon="remove" label="Remove this answer" onClick={() => commit(rows.filter((_, j) => j !== i))} />
-          </div>
-        )}
-        <div className={`at-answerpair${headed ? " headed" : ""}`}>
+        <div className={`at-answerpair${headed ? " headed" : ""}${headed && i > 0 ? " extra" : ""}`}>
           {headed && i === 0 && (
             <div className="at-answerheadrow">
-              <h4 className="at-answerhead">{lang.scriptLabel}{required && <Req />}</h4>
+              <span className="at-answerheadtext">
+                <h4 className="at-answerhead">{lang.scriptLabel}{required && <Req />}</h4>
+                {rows.length > 1 && <span className="at-answerheadnote">Multiple accepted answers</span>}
+              </span>
               <IconButton icon="add" label="Add another accepted answer" onClick={() => commit(rows.concat([{ text: "", lat: "" }]))} />
             </div>
           )}
@@ -506,6 +503,9 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
           {/* The buttons take a column of their own so that the answer and
               its pronunciation, stacked in the column beside them, line up
               with each other rather than one running past the other. */}
+          {headed && i > 0 && (
+            <IconButton icon="remove" label="Remove this answer" onClick={() => commit(rows.filter((_, j) => j !== i))} />
+          )}
           {!headed && <div className="at-answeracts">
             {rows.length > 1 && (
               <IconButton
