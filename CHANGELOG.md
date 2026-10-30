@@ -8,6 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.532 — 30 October 2026
+
+**A card being read looks like a dictionary entry, not a form.**
+
+- Read, the Basic tab leaves out anything empty — no more "None" rows —
+  and its lines are the height of their words, with no room kept for the
+  buttons that only show while editing.
+- Each answer's script stands large, with its transliteration or
+  pronunciation note in grey italics under it and its recordings as small
+  play chips beside that; further answers follow straight underneath.
+- English's accepted meanings read on one line, between dots.
+- Images show as small thumbnails, which open them; with none, there is
+  no Image heading.
+- Editing is unchanged.
+- To check by hand: a full and a sparse card read; switching between
+  reading and editing; a phone.
+
 ## 0.531 — 30 October 2026
 
 **The target language's accepted answers stack, as English's do.**

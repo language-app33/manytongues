@@ -4433,3 +4433,34 @@ fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid .at-input {
 .at-answerpair.headed.extra > .at-altfield { grid-column:1; }
 .at-answerpair.headed > .at-icon { flex:none; width:44px; height: var(--formbox, 43px); min-height:0; padding:0; }
 .at-alts > .at-answerpair.headed + .at-answerpair.headed { margin-top:14px; }
+
+/* ---- A card being read: a dictionary entry, not a form held still ----
+   Empty things are left out, rows are the height of their words, and the
+   space the hidden buttons kept is given back. */
+fieldset.at-cardlock:disabled .at-readempty { display:none !important; }
+.at-screen.over.cardform fieldset.at-cardlock:disabled input.at-input,
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-input {
+  height:auto !important; min-height:0 !important; padding:0 !important; field-sizing:content; }
+fieldset.at-cardlock:disabled .at-label,
+fieldset.at-cardlock:disabled .at-answerhead { margin-bottom:4px; }
+fieldset.at-cardlock:disabled .at-field { margin-bottom:16px; }
+fieldset.at-cardlock:disabled .at-answerheadrow { margin:0 0 4px; min-height:0; }
+fieldset.at-cardlock:disabled .at-answerheadnote { display:none; }
+/* An answer: its script, then how it is said with its recordings inline. */
+fieldset.at-cardlock:disabled .at-answerpair.headed { display:flex; flex-wrap:wrap; align-items:baseline; gap:0 8px; }
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerheadrow,
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-altfield { flex:0 0 100%; }
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answersaid { flex:0 1 auto; width:auto; }
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline { align-self:baseline; }
+fieldset.at-cardlock:disabled .at-alts > .at-answerpair.headed + .at-answerpair.headed { margin-top:6px; }
+fieldset.at-cardlock:disabled .at-answerrec { height:auto !important; font-size:12px; padding:2px 8px; }
+/* English: its meanings on one line, between dots. */
+fieldset.at-cardlock:disabled .at-alts:has(> .at-altstack) { display:flex; flex-wrap:wrap; align-items:baseline; }
+fieldset.at-cardlock:disabled .at-alts > .at-altstack { margin:0 !important; width:auto; }
+fieldset.at-cardlock:disabled .at-alts > .at-altstack > .at-altfield { width:auto; }
+fieldset.at-cardlock:disabled .at-alts > .at-altstack:not(.at-readempty) ~ .at-altstack:not(.at-readempty)::before {
+  content:"·"; margin:0 8px; color: var(--faint); font-weight:700; }
+fieldset.at-cardlock:disabled .at-alts > .at-answerheadrow { flex:0 0 100%; }
+/* The picture, small, as what it is. */
+.at-readthumbs { display:flex; flex-wrap:wrap; gap:8px; background:none; border:0; padding:0; cursor:pointer; }
+.at-readthumb { width:72px; height:72px; object-fit:cover; border-radius: var(--r-sm); border:1px solid var(--line); }

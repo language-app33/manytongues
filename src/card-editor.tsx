@@ -7596,7 +7596,14 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
 
       {/* The card's picture, for the whole card rather than for one of its
           answers — so under Content, after them, as a part of its own. */}
-      {plain && (
+      {plain && locked && images.length > 0 && (
+        <Field className="at-softrule" label="Image">
+          <Pressable className="at-readthumbs" aria-label={`Images — ${images.length} added`} onClick={() => setSeeing(true)}>
+            {images.map((h) => <StoredImage key={h} hash={h} alt="" className="at-readthumb" />)}
+          </Pressable>
+        </Field>
+      )}
+      {plain && !locked && (
         <Field className="at-softrule" label="Image">
           <Button
             variant="ghost"
@@ -10424,21 +10431,20 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   onLockedTap?: () => void;
   children?: Node;
 }) {
-  /* Read, a field is its words under its label, and an empty one says
-     "None" — in the example's place, which is put back for editing. */
+  /* Read, a field is its words under its label, and an empty one is left
+     out — the nearest thing it stands in (a field, an English answer, a
+     transliteration) is marked and hidden, and unmarked for editing. */
   const box = useRef<HTMLFieldSetElement | null>(null);
   useEffect(() => {
     const root = box.current;
     if (!root) return;
+    root.querySelectorAll(".at-readempty").forEach((el) => el.classList.remove("at-readempty"));
+    if (!locked) return;
     root.querySelectorAll<HTMLElement>("input:not([type=checkbox]):not([type=radio]), textarea, .at-blanktext").forEach((el) => {
-      const attr = el.classList.contains("at-blanktext") ? "data-placeholder" : "placeholder";
-      if (locked) {
-        if (!el.hasAttribute("data-example")) el.setAttribute("data-example", el.getAttribute(attr) || "");
-        el.setAttribute(attr, "None");
-      } else if (el.hasAttribute("data-example")) {
-        el.setAttribute(attr, el.getAttribute("data-example") || "");
-        el.removeAttribute("data-example");
-      }
+      const text = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement ? el.value : el.textContent || "";
+      if (String(text).trim()) return;
+      const holder = el.closest(".at-altstack, .at-answersaid, .at-field") || el;
+      holder.classList.add("at-readempty");
     });
   });
   return (
