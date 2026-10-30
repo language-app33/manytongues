@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.522 — 30 October 2026
+
+**Courses opens as its own screen, the You menu is tidier, and empty
+spots in Teaching invite you to fill them.**
+
+- In Learning, Courses opens as a full screen with a back arrow, like
+  Settings and How it works, and the arrow takes you back to where you
+  were. Courses is in the You menu only in Learning; Teaching and Admin
+  keep it in their bar.
+- Choosing a space is now at the very bottom of the You menu, under the
+  sync line, without a heading.
+- In Settings, the version reads like the recordings figures above it:
+  the version number large, the build and date as a quieter line under it.
+- A new "nothing yet" panel replaces the plain grey lines in Teaching: a
+  course with no decks, a deck in no course, and a deck with no built-in
+  cards. Where students are missing out it is in the warm accent colour;
+  where empty is fine it is calm. While editing, the way to fill it sits
+  inside the panel.
+- To check by hand: adding the first deck to an empty course closes the
+  picker after that one deck, as the panel gives way to the list.
+
 ## 0.521 — 29 October 2026
 
 **The You menu is simpler, and settings are on one screen.**

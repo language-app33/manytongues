@@ -703,6 +703,32 @@ export function Empty({ title, children, action }: { title?: Node; children?: No
   );
 }
 
+/* --- Nudge ---------------------------------------------------------
+   "Nothing here yet", said inside an open deck or course where the
+   section would otherwise be one grey line. An icon, one warm sentence,
+   and room for the way to fill it — passed only while it can be acted
+   on, so a screen being read shows the message alone. `tone` says how
+   much it matters: "attention" where students are missing out because
+   of it, "calm" where empty is a fine way to be. */
+export function Nudge({ icon, tone = "calm", children, action }: {
+  icon: string;
+  tone?: "calm" | "attention";
+  children: Node;
+  action?: Node;
+}) {
+  return (
+    <div className={`at-nudge ${tone}`}>
+      <span className="at-nudgeico" aria-hidden="true">
+        <Icon name={icon} size={22} />
+      </span>
+      <div className="at-nudgebody">
+        <p className="at-nudgetext">{children}</p>
+        {action ? <div className="at-nudgeact">{action}</div> : null}
+      </div>
+    </div>
+  );
+}
+
 /* --- StickyFoot ---------------------------------------------------
    The foot of an exercise screen: the row of buttons that carries the
    question forward, and above it an optional line of plain text — the

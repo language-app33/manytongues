@@ -124,6 +124,7 @@ import {
   LanguageRadio,
   Lede,
   Notice,
+  Nudge,
   Screen,
   Section,
   Segmented,
@@ -7389,8 +7390,32 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     is in: the names, each with its way out, and the way to
                     add another on the end of the row. */}
                 <Field label="Courses" lede="Students in these courses see this deck.">
-                  {!editing && !shown.courses.length ? (
-                    <Help>Not in a course yet — nobody can see it.</Help>
+                  {!shown.courses.length ? (
+                    <Nudge
+                      icon="school"
+                      tone="attention"
+                      action={editing ? (
+                        <DeckSwitch
+                          decks={courses.map((c) => ({ id: c.id, title: c.title }))}
+                          chosen={shown.courses}
+                          onToggle={(id, on) =>
+                            edit({ courses: on ? shown.courses.filter((x) => x !== id) : shown.courses.concat([id]) })
+                          }
+                          title="Courses"
+                          size={null}
+                          words={{
+                            first: "Add this deck to a course",
+                            another: "Another course",
+                            drop: (t) => `Take this deck out of ${t}`,
+                            lede: "Choose the courses whose students see this deck.",
+                            note: "",
+                            none: "You aren't teaching a course yet.",
+                          }}
+                        />
+                      ) : undefined}
+                    >
+                      Not in a course yet, so no students can see it. Add it to a course to share it.
+                    </Nudge>
                   ) : (
                     <DeckSwitch
                       decks={courses.map((c) => ({ id: c.id, title: c.title }))}
@@ -7435,18 +7460,33 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 their own — see extrasScreen. */}
             {hasExtras && (
               <Section title="Built-in cards" lede="Cards that come with the language, such as numbers and pronouns.">
-                <Help>
-                  {(() => {
-                    const all = numberPartsOf(langId);
-                    const named = shown.parts
-                      .map((id) => (all.find((r) => r.id === id) || { label: "" }).label)
-                      .filter(Boolean);
-                    const pron = shown.pronouns.length;
-                    const said = named.concat(pron ? [plural(pron, "pronoun")] : []);
-                    return said.length ? said.join(" · ") : "None in this deck yet.";
-                  })()}
-                </Help>
-                {editing && !shown.locked && (
+                {(() => {
+                  const all = numberPartsOf(langId);
+                  const named = shown.parts
+                    .map((id) => (all.find((r) => r.id === id) || { label: "" }).label)
+                    .filter(Boolean);
+                  const pron = shown.pronouns.length;
+                  const said = named.concat(pron ? [plural(pron, "pronoun")] : []);
+                  if (said.length) return <Help>{said.join(" · ")}</Help>;
+                  return (
+                    <Nudge
+                      icon="hash"
+                      action={editing && !shown.locked ? (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          icon="add"
+                          onClick={() => setDeckExtras({ parts: shown.parts, pronouns: shown.pronouns })}
+                        >
+                          Choose built-in cards
+                        </Button>
+                      ) : undefined}
+                    >
+                      None yet. Numbers and pronouns come ready-made with the language, so they're an easy way to fill out a deck.
+                    </Nudge>
+                  );
+                })()}
+                {editing && !shown.locked && (shown.parts.length > 0 || shown.pronouns.length > 0) && (
                   <div className="at-row at-mt3">
                     <Button
                       variant="ghost"
@@ -7749,37 +7789,76 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 <span className="at-formrole">
                   {mine.length
                     ? "Students in this course see these decks. Tap one to open it."
-                    : "This course has no decks yet, so students see nothing."}
+                    : "Students in this course see the decks you add here."}
                 </span>
               </div>
-              <DeckSwitch
-                decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
-                chosen={mine.map((d) => d.id)}
-                onOpen={(id) => setOpenDeck(id)}
-                onToggle={(id, on) => {
-                  const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
-                  run(
-                    async () => {
-                      if (on) await API.detachDeck(id, c.id);
-                      else await API.attachDeck(id, c.id);
-                      await refresh();
-                    },
-                    on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
-                  );
-                }}
-                find={{
-                  placeholder: "Search decks",
-                  match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
-                }}
-                words={{
-                  first: "Add a deck to this course",
-                  another: "Another deck",
-                  drop: (t) => `Take ${t} out of this course`,
-                  lede: `Choose the decks ${c.title} teaches. Students see them at their next check.`,
-                  note: "",
-                  none: "You have no decks yet. Make one under Decks, then add it to this course.",
-                }}
-              />
+              {mine.length ? (
+                <DeckSwitch
+                  decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
+                  chosen={mine.map((d) => d.id)}
+                  onOpen={(id) => setOpenDeck(id)}
+                  onToggle={(id, on) => {
+                    const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
+                    run(
+                      async () => {
+                        if (on) await API.detachDeck(id, c.id);
+                        else await API.attachDeck(id, c.id);
+                        await refresh();
+                      },
+                      on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
+                    );
+                  }}
+                  find={{
+                    placeholder: "Search decks",
+                    match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
+                  }}
+                  words={{
+                    first: "Add a deck to this course",
+                    another: "Another deck",
+                    drop: (t) => `Take ${t} out of this course`,
+                    lede: `Choose the decks ${c.title} teaches. Students see them at their next check.`,
+                    note: "",
+                    none: "You have no decks yet. Make one under Decks, then add it to this course.",
+                  }}
+                />
+              ) : (
+                <Nudge
+                  icon="folder"
+                  tone="attention"
+                  action={
+                    <DeckSwitch
+                      decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
+                      chosen={mine.map((d) => d.id)}
+                      onOpen={(id) => setOpenDeck(id)}
+                      onToggle={(id, on) => {
+                        const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
+                        run(
+                          async () => {
+                            if (on) await API.detachDeck(id, c.id);
+                            else await API.attachDeck(id, c.id);
+                            await refresh();
+                          },
+                          on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
+                        );
+                      }}
+                      find={{
+                        placeholder: "Search decks",
+                        match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
+                      }}
+                      words={{
+                        first: "Add a deck to this course",
+                        another: "Another deck",
+                        drop: (t) => `Take ${t} out of this course`,
+                        lede: `Choose the decks ${c.title} teaches. Students see them at their next check.`,
+                        note: "",
+                        none: "You have no decks yet. Make one under Decks, then add it to this course.",
+                      }}
+                    />
+                  }
+                >
+                  Nothing here yet. Add a deck to give your students something to practise.
+                </Nudge>
+              )}
             </div>
       </Screen>
     );

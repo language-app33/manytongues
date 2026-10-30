@@ -10307,6 +10307,13 @@ export default function ArabicTrainer() {
   const [ready, setReady] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [tab, setTab] = useState("home");
+  /* Courses is a screen over Learning, opened from the menu or the empty
+     home: its back arrow returns to the tab it was opened from. */
+  const [coursesBack, setCoursesBack] = useState("home");
+  const openCourses = () => {
+    if (tab !== "courses") setCoursesBack(tab);
+    setTab("courses");
+  };
 
   /* The deck filter. Nothing sets it any more — the control that used
      to toggle it was removed, and this was left reading as though it
@@ -13922,7 +13929,7 @@ export default function ArabicTrainer() {
                    strip above does not go anywhere. */
                 action={
                   coursesKnown && myCourses.length === 0 ? (
-                    <Button variant="primary" onClick={() => setTab("courses")} icon="school">
+                    <Button variant="primary" onClick={openCourses} icon="school">
                       Join a course
                     </Button>
                   ) : null
@@ -15254,6 +15261,7 @@ export default function ArabicTrainer() {
         )}
 
         {tab === "courses" && (
+          <Screen title="Courses" onBack={() => setTab(coursesBack)}>
           <React.Suspense fallback={<ChunkFallback />}>
           <StudentCourses
             courses={myCourses}
@@ -15275,6 +15283,7 @@ export default function ArabicTrainer() {
             }}
           />
           </React.Suspense>
+          </Screen>
         )}
 
         {space === "teach" && account && (
@@ -15453,7 +15462,6 @@ export default function ArabicTrainer() {
           ManyTongues
         </div>
       )}
-      {!inExercise && space === "learn" && tab === "courses" && <h1 className="at-tabtitle">Courses</h1>}
 
       {/* The bar at the foot of the window. Always mounted, so the slot the
           sections portal into stays the same element; hidden rather than
@@ -15497,6 +15505,7 @@ export default function ArabicTrainer() {
                      from that one question and nowhere else. */
                   onSpace: (to: string) => {
                     setTrialBack(null);
+                    if (tab === "courses") setTab(coursesBack);
                     setSpace(to);
                   },
                   choices,
@@ -15507,12 +15516,16 @@ export default function ArabicTrainer() {
                       ? "Select the languages you see in your courses, decks, and cards. This doesn't change anything for your students."
                       : "Select the languages you see in your cards, progress, and anything you practice.",
                 }}
-                onCourses={() => {
-                  setTrialBack(null);
-                  setSpace("learn");
-                  setTab("courses");
-                  setSession(null);
-                }}
+                /* Only Learning: Teaching and Admin have Courses in their bar. */
+                onCourses={
+                  space === "learn"
+                    ? () => {
+                        setTrialBack(null);
+                        setSession(null);
+                        openCourses();
+                      }
+                    : undefined
+                }
                 onSettings={() => setScreen("settings")}
                 onGuide={() => setScreen("guide")}
               />
@@ -19892,7 +19905,7 @@ const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", ad
  * is a blank screen with no way of telling why, and the row says so rather
  * than just refusing.
  */
-function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note }: {
+function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part }: {
   space: string;
   spaces: string[];
   /** Choosing a space keeps the menu open; the app changes behind it. */
@@ -19902,9 +19915,11 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note }: {
   onLangs: (off: LangId[]) => void;
   /* What switching one off does, in the space it is switched in. */
   note: string;
+  /** The menu shows the languages at its top and the spaces at its foot. */
+  part?: "spaces" | "langs";
 }) {
-  const spacesToo = !!spaces && spaces.length > 1;
-  const langsToo = !!choices && choices.length > 1;
+  const spacesToo = part !== "langs" && !!spaces && spaces.length > 1;
+  const langsToo = part !== "spaces" && !!choices && choices.length > 1;
   if (!spacesToo && !langsToo) return null;
 
   const on = langsToo ? choices.filter((c) => !off.includes(c.id)) : [];
@@ -19919,7 +19934,6 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note }: {
     <div className="at-place">
       {spacesToo && (
         <>
-          <p className="at-eyebrow">Space</p>
           <div className="at-spacepick" role="radiogroup" aria-label="Space">
             {spaces.map((sp) => (
               <button
@@ -20124,7 +20138,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
   place: React.ComponentProps<typeof PlacePicker>;
   /** The courses you are in, and joining another: Learning's Courses
       page, which has no section of its own in the bar. */
-  onCourses: () => void;
+  onCourses?: () => void;
   onSettings: () => void;
   onGuide: () => void;
 }) {
@@ -20161,23 +20175,23 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
             </span>
           </div>
 
-          <PlacePicker
-            {...place}
-          />
+          <PlacePicker {...place} part="langs" />
 
 
-          <button
-            className="at-cline at-cbig"
-            onClick={() => {
-              setOpen(false);
-              onCourses();
-            }}
-          >
-            <span className="at-cico">
-              <Icon name="folder" size={22} />
-            </span>
-            <span className="at-clinetext">Courses</span>
-          </button>
+          {onCourses && (
+            <button
+              className="at-cline at-cbig"
+              onClick={() => {
+                setOpen(false);
+                onCourses();
+              }}
+            >
+              <span className="at-cico">
+                <Icon name="folder" size={22} />
+              </span>
+              <span className="at-clinetext">Courses</span>
+            </button>
+          )}
           <button
             className="at-cline at-cbig"
             onClick={() => {
@@ -20216,6 +20230,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
               Sync now
             </button>
           </div>
+          <PlacePicker {...place} part="spaces" />
         </Popover>
       )}
     </div>
