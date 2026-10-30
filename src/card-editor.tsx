@@ -93,6 +93,8 @@ import {
   DeckSwitch,
   Locked,
   Pressable,
+  PlayButton,
+  useClipPlayer,
   AskedMeanings,
   AskedScript,
   Tabs,
@@ -582,7 +584,11 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
                 <Icon name={open === i ? "chevronUp" : "chevronDown"} />
               </Button>
             )}
-            {ownRecorders && (
+            {/* Read, each recording is played where it is. */}
+            {ownRecorders && locked && headed && clipsOf(row).map((c, k) => (
+              <ReadPlay key={c.id} hash={c.id} label={`Play recording ${k + 1}${rows.length > 1 ? ` of answer ${i + 1}` : ""}`} />
+            ))}
+            {ownRecorders && !(locked && headed) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -633,6 +639,29 @@ const translitHint = (lang: Lang): string => {
 /* And English's: one of the language's own sample meanings. */
 const englishHint = (lang: Lang): string =>
   `e.g. ${((lang.sample || [])[0] || { en: "book" }).en || "book"}`;
+
+/* A recording on a card being read: played in place, paused again. */
+const loadClip = async (h: string) => (await API.getClip(h)).data;
+function ReadPlay({ hash, label }: { hash: string; label: string }) {
+  const player = useClipPlayer(loadClip);
+  return <PlayButton state={player.state as any} label={label} className="at-readplay" onClick={() => player.play(hash)} />;
+}
+
+/* An image of a card being read, over everything, as large as the window
+   allows. A tap anywhere or Escape puts it away. */
+function FullImage({ hash, onClose }: { hash: string; onClose: () => void }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [onClose]);
+  return (
+    <div className="at-fullimage" role="dialog" aria-label="Image" onClick={onClose}>
+      <StoredImage hash={hash} alt="" className="at-fullimageimg" />
+      <span className="at-fullimagex" aria-hidden="true"><Icon name="close" /></span>
+    </div>
+  );
+}
 
 /* What the button beside an answer reads, and what a screen reader is told
    it is. Written once because the two must agree: the count is the whole
@@ -6797,7 +6826,7 @@ function NameBlock({ word, talk, scene }: { word: WordDraft; talk: SceneDraft; s
       lede="How this card is listed and searched."
     >
       <input
-        className="at-input"
+        className="at-input at-namefield"
         value={value}
         placeholder={scene ? (talk.text ? "Our street" : "At the door") : "saying where you live"}
         onChange={(e) => set(e.target.value)}
@@ -7446,6 +7475,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
      so kept on the form rather than on one of its answers. */
   const [seeing, setSeeing] = useState(false);
   const images: string[] = Array.isArray(f.images) ? f.images : [];
+  const [viewing, setViewing] = useState("");
   /* The same rule as Alternatives above, and for the same reason: these
      rows were read off the form once, and a blank written into the card
      from outside would otherwise change the card and not the screen. What
@@ -7598,9 +7628,14 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
           answers — so under Content, after them, as a part of its own. */}
       {plain && locked && images.length > 0 && (
         <Field className="at-softrule" label="Image">
-          <Pressable className="at-readthumbs" aria-label={`Images — ${images.length} added`} onClick={() => setSeeing(true)}>
-            {images.map((h) => <StoredImage key={h} hash={h} alt="" className="at-readthumb" />)}
-          </Pressable>
+          <div className="at-readthumbs">
+            {images.map((h, k) => (
+              <Pressable key={h} aria-label={`Open image ${k + 1}`} onClick={() => setViewing(h)}>
+                <StoredImage hash={h} alt="" className="at-readthumb" />
+              </Pressable>
+            ))}
+          </div>
+          {viewing && <FullImage hash={viewing} onClose={() => setViewing("")} />}
         </Field>
       )}
       {plain && !locked && (

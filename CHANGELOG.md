@@ -8,6 +8,21 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.533 — 30 October 2026
+
+**A card being read: bigger words, recordings that play in place, images
+full screen.**
+
+- Read, the card's name, each answer in the language and English are one
+  larger size; the transliteration or pronunciation note is a step
+  smaller, in italics.
+- An answer's recordings are play buttons beside its transliteration and
+  play right there; recording is still done while editing.
+- Image thumbnails are twice the size and open full screen; a tap or
+  Escape closes them.
+- To check by hand: Vietnamese, Arabic and Hebrew cards read; playing
+  recordings; opening an image on a phone.
+
 ## 0.532 — 30 October 2026
 
 **A card being read looks like a dictionary entry, not a form.**

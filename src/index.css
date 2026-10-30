@@ -4417,7 +4417,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 /* Read: the script at its size, how it is said quieter under it. */
 fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid,
 fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid .at-input {
-  font-size:14px !important; font-style:italic; font-weight:500;
+  font-size:21px !important; font-style:italic; font-weight:500;
   color: var(--muted) !important; -webkit-text-fill-color: var(--muted) !important; }
 
 /* English on the Basic tab: its boxes one under another, and where there
@@ -4463,4 +4463,20 @@ fieldset.at-cardlock:disabled .at-alts > .at-altstack:not(.at-readempty) ~ .at-a
 fieldset.at-cardlock:disabled .at-alts > .at-answerheadrow { flex:0 0 100%; }
 /* The picture, small, as what it is. */
 .at-readthumbs { display:flex; flex-wrap:wrap; gap:8px; background:none; border:0; padding:0; cursor:pointer; }
-.at-readthumb { width:72px; height:72px; object-fit:cover; border-radius: var(--r-sm); border:1px solid var(--line); }
+.at-readthumb { width:144px; height:144px; object-fit:cover; border-radius: var(--r-sm); border:1px solid var(--line); }
+
+/* Read, the words at one size: the card's name, each answer and English;
+   how an answer is said a step smaller, in italics (above). */
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-namefield,
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed .at-altfield .at-input,
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed .at-altfield .at-blanktext,
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-alts > .at-altstack .at-input {
+  font-size:26px !important; font-weight:700 !important; line-height:1.3;
+  color: var(--text) !important; -webkit-text-fill-color: var(--text) !important; }
+fieldset.at-cardlock:disabled .at-alts > .at-altstack ~ .at-altstack::before { font-size:26px; }
+.at-readplay { width:36px; height:36px; }
+.at-fullimage { position:fixed; inset:0; z-index:1000; background: rgba(0,0,0,.88);
+  display:flex; align-items:center; justify-content:center; padding:16px; cursor:zoom-out; }
+.at-fullimageimg { max-width:100%; max-height:100%; object-fit:contain; border-radius: var(--r-sm); }
+.at-fullimagex { position:absolute; top:16px; right:16px; color:#fff; width:40px; height:40px;
+  display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background: rgba(255,255,255,.15); }
