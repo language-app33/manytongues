@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.534 — 30 October 2026
+
+**Play buttons on a card being read are proper buttons, at the end of the
+line.**
+
+- Read, each recording of an answer is the app's usual square icon
+  button — play, and pause while it plays — at the right end of that
+  answer's transliteration or pronunciation line. A recording that can't
+  be found says so.
+
 ## 0.533 — 30 October 2026
 
 **A card being read: bigger words, recordings that play in place, images

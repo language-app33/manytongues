@@ -93,7 +93,6 @@ import {
   DeckSwitch,
   Locked,
   Pressable,
-  PlayButton,
   useClipPlayer,
   AskedMeanings,
   AskedScript,
@@ -644,7 +643,18 @@ const englishHint = (lang: Lang): string =>
 const loadClip = async (h: string) => (await API.getClip(h)).data;
 function ReadPlay({ hash, label }: { hash: string; label: string }) {
   const player = useClipPlayer(loadClip);
-  return <PlayButton state={player.state as any} label={label} className="at-readplay" onClick={() => player.play(hash)} />;
+  const snack = useSnackbar();
+  useEffect(() => {
+    if (player.state !== "missing") return;
+    snack("This recording couldn't be found.", "warn");
+    player.reset();
+  }, [player.state]);
+  const playing = player.state === "playing";
+  return (
+    <Button reads size="sm" className="iconly at-readplay" icon={playing ? "pause" : "play"}
+      aria-label={playing ? "Pause" : label} title={playing ? "Pause" : label}
+      disabled={player.state === "loading"} onClick={() => player.play(hash)} />
+  );
 }
 
 /* An image of a card being read, over everything, as large as the window
