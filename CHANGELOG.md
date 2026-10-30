@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.530 — 30 October 2026
+
+**English's accepted answers sit together, and empty boxes give examples.**
+
+- On the Basic tab, a second English answer goes straight under the
+  first rather than under a heading of its own; each extra one has its −
+  beside it. With more than one, "Multiple accepted answers" is said
+  under the English heading, both level with the +.
+- The English box shows an example ("e.g. book"), and the transliteration
+  or pronunciation note box says what goes there with an example:
+  "transliteration (e.g. kitāb)", "pronunciation note (e.g. rising tone;
+  ư like the u in ‘put’)".
+
 ## 0.529 — 30 October 2026
 
 **A card's boxes are one height, and Content's separators are quieter.**

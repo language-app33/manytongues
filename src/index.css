@@ -4419,3 +4419,11 @@ fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid,
 fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid .at-input {
   font-size:14px !important; font-style:italic; font-weight:500;
   color: var(--muted) !important; -webkit-text-fill-color: var(--muted) !important; }
+
+/* English on the Basic tab: its boxes one under another, and where there
+   is more than one, a note beside the heading saying so — both on the
+   line with the +, the heading drawn up to meet it. */
+.at-answerheadtext { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.at-answerheadnote { font-size:13px; font-weight:500; color: var(--muted); }
+.at-alts > .at-altstack + .at-altstack { margin-top:8px; }
+.at-altstack > .at-icon { flex:none; width:44px; height: var(--formbox, 43px); min-height:0; padding:0; }

@@ -206,22 +206,22 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
     <div className="at-alts">
       {headed && (
         <div className="at-answerheadrow">
-          <h4 className="at-answerhead">{headed}</h4>
+          <span className="at-answerheadtext">
+            <h4 className="at-answerhead">{headed}</h4>
+            {list.length > 1 && <span className="at-answerheadnote">Multiple accepted answers</span>}
+          </span>
           <IconButton icon="add" label={of ? `${addLabel} for ${of}` : addLabel} onClick={() => commit(list.concat([""]))} />
         </div>
       )}
       {headed ? list.map((v, i) => (
-        <React.Fragment key={i}>
-        {i > 0 && (
-          <div className="at-answerheadrow at-answernum">
-            <h4 className="at-answerhead">Another accepted answer</h4>
-            <IconButton icon="remove" label="Remove this answer" onClick={() => commit(list.filter((_, j) => j !== i))} />
+        <div className="at-altrow at-altstack" key={i}>
+          <div className="at-altfield">
+            {render(v, (nv) => commit(list.map((x, j) => (j === i ? nv : x))), named(i))}
           </div>
-        )}
-        <div className="at-altfield">
-          {render(v, (nv) => commit(list.map((x, j) => (j === i ? nv : x))), named(i))}
+          {i > 0 && (
+            <IconButton icon="remove" label="Remove this answer" onClick={() => commit(list.filter((_, j) => j !== i))} />
+          )}
         </div>
-        </React.Fragment>
       )) : list.map((v, i) => (
         <React.Fragment key={i}>
         {i === 1 && moreLabel && <p className="at-fieldlede at-altsmore">{moreLabel}</p>}
@@ -537,7 +537,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
                     className="at-input"
                     value={row.lat}
                     label={named(lang.translitLabel, i)}
-                    placeholder={lang.translitExample || lang.translitLabel.toLowerCase()}
+                    placeholder={translitHint(lang)}
                     onChange={(v) => edit(i, { lat: v })}
                     onRemove={onRemoveBlank}
                   />
@@ -549,7 +549,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               className="at-input at-answersaid"
               value={row.lat}
               aria-label={named(lang.translitLabel, i)}
-              placeholder={lang.translitExample || lang.translitLabel.toLowerCase()}
+              placeholder={translitHint(lang)}
               onChange={(e) => edit(i, { lat: e.target.value })}
             />
           )}
@@ -622,6 +622,17 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
     </div>
   );
 }
+
+/* The empty transliteration box's example: its name, then one of the
+   language's own, so a teacher sees what kind of thing goes there. */
+const translitHint = (lang: Lang): string => {
+  const ex = lang.translitExample || ((lang.sample || []).find((x: any) => x.lat) || { lat: "" }).lat;
+  const name = lang.translitLabel.toLowerCase();
+  return ex ? `${name} (e.g. ${ex})` : name;
+};
+/* And English's: one of the language's own sample meanings. */
+const englishHint = (lang: Lang): string =>
+  `e.g. ${((lang.sample || [])[0] || { en: "book" }).en || "book"}`;
 
 /* What the button beside an answer reads, and what a screen reader is told
    it is. Written once because the two must agree: the count is the whole
@@ -7574,6 +7585,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
               <input
                 className="at-input"
                 aria-label={label}
+                placeholder={englishHint(lang)}
                 value={v}
                 onChange={(e) => set(e.target.value)}
               />
