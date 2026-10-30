@@ -8,6 +8,34 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.523 — 30 October 2026
+
+**A deck's cards are managed on a page of their own, and locking decks is
+set aside for now.**
+
+- Opening a deck shows its cards to read, search, sort and filter. Which
+  cards it holds is changed on a new Manage cards page, laid out like
+  Teaching > Cards: New card, Import and the view switch, the search, then
+  Select, Sort and Filter. Add existing cards opens a picker of your cards
+  in the deck's language, with the built-in numbers and pronouns at the
+  top; nothing changes until Done. Each card has a Remove button, and
+  removing can be undone from the message that follows.
+- Built-in cards are now among a deck's cards, marked Built-in: one entry
+  per range of numbers, and one for the pronouns. They are added and
+  removed on Manage cards and saved straight away, not with the deck.
+- A deck with no cards, and Teaching > Cards with none, show a panel
+  inviting you to add some instead of the search, Sort and Filter.
+- Locking a deck is gone for now: there is no Lock or Unlock, and decks
+  that were locked can be changed like any other. Whether a deck was
+  locked is still remembered.
+- Edit and Save no longer jump back to the top of a card or deck.
+- A card or deck being read shows its fields as plain words under their
+  labels, like a course's name and language; an empty field says "None".
+- In Settings, Check is a full-size button under the version, and turns
+  into a filled Reload button when a newer version is waiting.
+- To check by hand: Import on Manage cards brings cards in as the file
+  says rather than straight into the deck.
+
 ## 0.522 — 30 October 2026
 
 **Courses opens as its own screen, the You menu is tidier, and empty

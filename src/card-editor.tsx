@@ -10337,10 +10337,27 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   onLockedTap?: () => void;
   children?: Node;
 }) {
+  /* Read, a field is its words under its label, and an empty one says
+     "None" — in the example's place, which is put back for editing. */
+  const box = useRef<HTMLFieldSetElement | null>(null);
+  useEffect(() => {
+    const root = box.current;
+    if (!root) return;
+    root.querySelectorAll<HTMLElement>("input:not([type=checkbox]):not([type=radio]), textarea, .at-blanktext").forEach((el) => {
+      const attr = el.classList.contains("at-blanktext") ? "data-placeholder" : "placeholder";
+      if (locked) {
+        if (!el.hasAttribute("data-example")) el.setAttribute("data-example", el.getAttribute(attr) || "");
+        el.setAttribute(attr, "None");
+      } else if (el.hasAttribute("data-example")) {
+        el.setAttribute(attr, el.getAttribute("data-example") || "");
+        el.removeAttribute("data-example");
+      }
+    });
+  });
   return (
     <div ref={panel} role="tabpanel" aria-label={id} hidden={tab !== id}
       onPointerDown={locked && onLockedTap ? (e) => { if (tapWouldChange(e.target)) onLockedTap(); } : undefined}>
-      <fieldset className="at-cardlock" disabled={locked}>
+      <fieldset ref={box} className="at-cardlock" disabled={locked}>
         <Locked.Provider value={locked}>{children}</Locked.Provider>
       </fieldset>
       {after}
@@ -10453,6 +10470,17 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   /* A card that exists, as against one being made — which a copy made
      for another meaning is, though it arrives with words in it. */
   const stored = !!(card && card.id);
+  /* Where the screen is, for Screen's scroll: the card, but a new card
+     keeps its place when it is first saved and gains an id. Opening
+     another card is somewhere new. */
+  const scrollAt = useRef({ key: (card && card.id) || "new", id: (card && card.id) || "" });
+  {
+    const id = (card && card.id) || "";
+    if (id !== scrollAt.current.id) {
+      if (scrollAt.current.id) scrollAt.current.key = id || "new";
+      scrollAt.current.id = id;
+    }
+  }
   /* Which meaning this card is, for the questions another card shares —
      see MeaningsBlock. Only on a word: a sentence and a conversation
      carry their own context. */
@@ -10651,6 +10679,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         /* What is being done, not which card: the name is the first
            thing in "This card". */
         title={locked ? "Card" : stored ? "Edit card" : "Create card"}
+        scrollKey={scrollAt.current.key}
         /* One sheet, ruled into sections — see .at-screen.cardform. The
            editor is the only screen laid out that way, so it is the only
            one that asks for it. */

@@ -20114,13 +20114,13 @@ function AppVersion() {
           carrying both would make you pick between them, and the pick is
           never yours to make. */}
       {stale ? (
-        <button className="at-cverbtn" onClick={reload} disabled={reloading}>
+        <Button variant="primary" icon="refresh" onClick={reload} disabled={reloading}>
           {reloading ? "Reloading…" : "Reload"}
-        </button>
+        </Button>
       ) : (
-        <button className="at-cverbtn" onClick={() => check(true)} disabled={busy}>
+        <Button icon="refresh" onClick={() => check(true)} disabled={busy}>
           {busy ? "Checking…" : "Check"}
-        </button>
+        </Button>
       )}
     </div>
   );

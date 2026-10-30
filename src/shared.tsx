@@ -2014,6 +2014,7 @@ export function ItemList<T>({
   onSelectedChange,
   bulkActions,
   empty,
+  emptyPanel,
   busy,
 }: {
   /** "course";
@@ -2072,10 +2073,15 @@ export function ItemList<T>({
   onSelectedChange?: (chosen: Set<string>) => void;
   bulkActions?: { label: string; danger?: boolean; icon?: string; onClick: (ids: string[]) => void; }[];
   empty?: Node;
+  /** Drawn instead of the list's own controls when there is nothing in it
+      at all — a Nudge, holding the way to make the first one. New and the
+      Sort and Filter row stand aside for it. */
+  emptyPanel?: Node;
   busy?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [selecting, setSelecting] = useState(false);
+  const bare = !!emptyPanel && !items.length;
   /* How many tiles are on the page. A long list is shown a page at a time:
      every tile rendered at once is what made a big course slow to open. */
   const [limit, setLimit] = useState(PAGE_SIZE);
@@ -2234,7 +2240,7 @@ export function ItemList<T>({
       style={trayH ? ({ "--bulk-h": `${trayH}px` } as React.CSSProperties) : undefined}
     >
       <div className="at-toolbar at-toolbar-top">
-        {(onNew || newOff) && (
+        {(onNew || newOff) && !bare && (
           <button className={`at-btn primary${newOff ? " off" : ""}`} aria-disabled={newOff ? true : undefined}
             onClick={newOff || onNew}>
             <Icon name="add" />
@@ -2271,7 +2277,7 @@ export function ItemList<T>({
       {/* Select, and the menus that order and narrow the list — one row,
           under the one that searches it. Select is not a filter and comes
           first; the menus are in the order they are given. */}
-      {(canSelect || live.length > 0) && (
+      {(canSelect || live.length > 0) && !bare && (
         <div className="at-toolbar at-toolbar-sub">
           {canSelect && (
             <button
@@ -2409,7 +2415,8 @@ export function ItemList<T>({
         </div>
       )}
 
-      {!shown.length && !busy && (
+      {bare && !busy && emptyPanel}
+      {!shown.length && !busy && !bare && (
         <p className="at-hint">
           {query ? `No ${plural || `${noun}s`} match "${query}".` : empty}
         </p>
@@ -3447,16 +3454,23 @@ export function TopBanner({ kind = "warn", actions, children }: {
 
 const SNACK_DWELL_MS = 4000;
 
-export function Snackbar({ message, kind = "info", onDismiss }: {
+export function Snackbar({ message, kind = "info", onDismiss, undo }: {
   message?: Node;
   kind?: string;
   onDismiss?: () => void;
+  /** A way back from what the message reports — Remove's Undo. */
+  undo?: () => void;
 }) {
   const host = useAppHost();
 
   const view = (
     <div className={`at-snack ${kind}`} role="status" aria-live="polite">
       <span className="msg">{message}</span>
+      {undo && (
+        <button className="at-snackundo" onClick={() => { undo(); if (onDismiss) onDismiss(); }}>
+          Undo
+        </button>
+      )}
       {onDismiss && (
         <button className="at-snackx" onClick={onDismiss} aria-label="Dismiss">
           <Icon name="close" size={16} />
@@ -3477,7 +3491,7 @@ export function Snackbar({ message, kind = "info", onDismiss }: {
  * from anywhere.
  */
 export function useSnackbarState({ dwell = SNACK_DWELL_MS }: { dwell?: number } = {}) {
-  const [snack, setSnack] = useState<{ id: number; message: string; kind: string } | null>(null);
+  const [snack, setSnack] = useState<{ id: number; message: string; kind: string; undo?: () => void } | null>(null);
   const timer: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = useRef(null);
   /* Numbered so that a second message remounts the pill rather than
      swapping the text inside the old one: without it the entrance is played
@@ -3491,13 +3505,13 @@ export function useSnackbarState({ dwell = SNACK_DWELL_MS }: { dwell?: number } 
   }, []);
 
   const show = useCallback(
-    (message: unknown, kind = "info") => {
+    (message: unknown, kind = "info", undo?: () => void) => {
       const text = String(message == null ? "" : message).trim();
       /* An empty message would show an empty pill, which reads as a bug. */
       if (!text) return;
       if (timer.current) clearTimeout(timer.current);
       seq.current += 1;
-      setSnack({ id: seq.current, message: text, kind });
+      setSnack({ id: seq.current, message: text, kind, undo });
       timer.current = setTimeout(() => {
         timer.current = null;
         setSnack(null);
@@ -3517,7 +3531,7 @@ export function useSnackbarState({ dwell = SNACK_DWELL_MS }: { dwell?: number } 
     dismiss,
     current: snack,
     node: snack ? (
-      <Snackbar key={snack.id} message={snack.message} kind={snack.kind} onDismiss={dismiss} />
+      <Snackbar key={snack.id} message={snack.message} kind={snack.kind} undo={snack.undo} onDismiss={dismiss} />
     ) : null,
   };
 }
@@ -3533,11 +3547,11 @@ export function useSnackbarState({ dwell = SNACK_DWELL_MS }: { dwell?: number } 
  * renders these components with nothing hosting them, and a notification
  * that goes nowhere is not worth taking a screen down for.
  */
-const noSnackbar: (message: string, kind?: string) => void = () => {};
+const noSnackbar: (message: string, kind?: string, undo?: () => void) => void = () => {};
 const SnackbarContext = React.createContext(noSnackbar);
 
 export function SnackbarProvider({ show, children }: {
-  show?: (message: string, kind?: string) => void;
+  show?: (message: string, kind?: string, undo?: () => void) => void;
   children?: Node;
 }) {
   return <SnackbarContext.Provider value={show || noSnackbar}>{children}</SnackbarContext.Provider>;
@@ -3735,8 +3749,13 @@ export function useScrollTop(key: unknown) {
  */
 export type ScreenFab = { icon: string; label: string; onClick: () => void; off?: boolean; busy?: boolean };
 
-export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", backIcon = "back", rise, className = "", fab }: {
+export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", backIcon = "back", rise, className = "", fab, scrollKey }: {
   title?: Node;
+  /** What, changing, means somewhere new and starts at the top. The title
+      by default; a screen whose title changes as it goes from reading to
+      editing and back passes something steadier, so Edit and Save leave
+      you where you were. */
+  scrollKey?: unknown;
   onBack?: () => void;
   action?: Node;
   /** Put the action on a line of its own under the title, where there is
@@ -3776,7 +3795,7 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
   const bodyRef: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
-  }, [title]);
+  }, [scrollKey === undefined ? title : scrollKey]);
   /* Whether the floating button wears its name: yes at the top and while
      scrolling up, no while scrolling down. A few pixels either way are
      ignored, so a finger resting on the glass does not flicker it. */
