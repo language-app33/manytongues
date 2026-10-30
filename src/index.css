@@ -4388,14 +4388,25 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 /* Inside Content, a lighter line than the one between sections: dashed,
    and short of the edges — between answers, and above English and Image. */
 .at-answernum, .at-part.plain > .at-field.at-softrule {
-  margin-top:20px; padding-top:18px; margin-inline:12px; border-top:1px dashed var(--line); }
-.at-part.plain > .at-field.at-softrule { margin-inline:12px 0; }
+  position:relative; margin-top:20px; padding-top:18px; }
+.at-answernum::before, .at-part.plain > .at-field.at-softrule::before {
+  content:""; position:absolute; left:12px; right:12px; top:0; border-top:1px dashed var(--line); }
+/* A heading with what acts on its list at the right of its line. */
+.at-answerheadrow { display:flex; align-items:center; justify-content:space-between; gap:8px;
+  margin:18px 0 8px; grid-column:1 / -1; }
+.at-answerheadrow > .at-answerhead { margin:0 !important; }
+.at-answerpair.headed > .at-answerheadrow:first-child,
+.at-alts > .at-answerheadrow:first-child { margin-top:0; }
+.at-answerheadrow.at-answernum { margin-top:20px; padding-top:18px; }
+.at-answerpair.headed > .at-altfield { grid-column:1 / -1; }
+.at-alts > .at-altfield + .at-answerheadrow { margin-top:20px; }
 .at-part.plain > .at-field.at-softrule > .at-label { margin-top:0; }
 .at-answerpair.headed > .at-answerhead:first-child + * { margin-top:0; }
 /* An answer, compact: its script, then how it is said with its recordings
    beside it in the buttons' column. */
 .at-answerpair.headed { row-gap:6px; }
-.at-answerpair.headed > .at-answerabout.inline { grid-column:2; align-self:center; }
+.at-answerpair.headed > .at-answerabout.inline { grid-column:2; align-self:stretch; }
+.at-answerpair.headed > .at-answerabout.inline > .at-answerrec { height:100%; }
 /* Read: the script at its size, how it is said quieter under it. */
 fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid,
 fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid .at-input {

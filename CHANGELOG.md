@@ -8,6 +8,20 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.528 — 30 October 2026
+
+**Accepted answers: + and − on their headings, everything on one edge.**
+
+- Each answer after the first is headed "Another accepted answer".
+- The + that adds an answer is at the right of the language's heading,
+  and of English's; each further answer has its − at the right of its own
+  heading. The boxes take the full width. Neither shows while reading.
+- The record button is as tall as the box beside it.
+- English and Image line up with the answers above them; only the dashed
+  line between them is drawn short of the edges.
+- To check by hand: adding and removing answers and English meanings,
+  reading, and a phone-width screen.
+
 ## 0.527 — 30 October 2026
 
 **Accepted answers on a card are compact, one heading each.**

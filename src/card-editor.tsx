@@ -147,7 +147,11 @@ const blankLine = (taken: { id?: string }[] = []) => ({
    list is local state seeded from the stored string —
    deriving it on every render would drop an added field the moment it was
    added, because an empty answer joins to nothing. */
-function Alternatives({ value, onChange, render, of = "", addLabel = "Add another accepted answer", moreLabel = "" }: {
+function Alternatives({ value, onChange, render, of = "", addLabel = "Add another accepted answer", moreLabel = "", headed = null }: {
+  /** The Basic tab: this heading over the boxes with the + on its line,
+      and each box after the first headed "Another accepted answer" with
+      its − on that line. */
+  headed?: Node;
   value?: string;
   onChange: (value: string) => void;
   /* The third argument is what to call this box out loud, where the label
@@ -200,7 +204,25 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
     of ? `English${list.length > 1 ? ` of accepted answer ${i + 1}` : ""} for ${of}` : undefined;
   return (
     <div className="at-alts">
-      {list.map((v, i) => (
+      {headed && (
+        <div className="at-answerheadrow">
+          <h4 className="at-answerhead">{headed}</h4>
+          <IconButton icon="add" label={of ? `${addLabel} for ${of}` : addLabel} onClick={() => commit(list.concat([""]))} />
+        </div>
+      )}
+      {headed ? list.map((v, i) => (
+        <React.Fragment key={i}>
+        {i > 0 && (
+          <div className="at-answerheadrow at-answernum">
+            <h4 className="at-answerhead">Another accepted answer</h4>
+            <IconButton icon="remove" label="Remove this answer" onClick={() => commit(list.filter((_, j) => j !== i))} />
+          </div>
+        )}
+        <div className="at-altfield">
+          {render(v, (nv) => commit(list.map((x, j) => (j === i ? nv : x))), named(i))}
+        </div>
+        </React.Fragment>
+      )) : list.map((v, i) => (
         <React.Fragment key={i}>
         {i === 1 && moreLabel && <p className="at-fieldlede at-altsmore">{moreLabel}</p>}
         <div className="at-altrow">
@@ -434,9 +456,19 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
         <React.Fragment key={i}>
         {/* Over the extra answers, once: what the boxes below the first are. */}
         {!headed && i === 1 && <p className="at-fieldlede at-altsmore">Other {lang.name} answers</p>}
-        {headed && i > 0 && <h3 className="at-answerhead at-answernum">Accepted answer {i + 1}</h3>}
+        {headed && i > 0 && (
+          <div className="at-answerheadrow at-answernum">
+            <h4 className="at-answerhead">Another accepted answer</h4>
+            <IconButton icon="remove" label="Remove this answer" onClick={() => commit(rows.filter((_, j) => j !== i))} />
+          </div>
+        )}
         <div className={`at-answerpair${headed ? " headed" : ""}`}>
-          {headed && i === 0 && <h4 className="at-answerhead">{lang.scriptLabel}{required && <Req />}</h4>}
+          {headed && i === 0 && (
+            <div className="at-answerheadrow">
+              <h4 className="at-answerhead">{lang.scriptLabel}{required && <Req />}</h4>
+              <IconButton icon="add" label="Add another accepted answer" onClick={() => commit(rows.concat([{ text: "", lat: "" }]))} />
+            </div>
+          )}
           <div className="at-altfield">
             {blanks ? (
               <BlankField
@@ -474,7 +506,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
           {/* The buttons take a column of their own so that the answer and
               its pronunciation, stacked in the column beside them, line up
               with each other rather than one running past the other. */}
-          <div className="at-answeracts">
+          {!headed && <div className="at-answeracts">
             {rows.length > 1 && (
               <IconButton
                 icon="remove"
@@ -489,7 +521,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
                 onClick={() => commit(rows.concat([{ text: "", lat: "" }]))}
               />
             )}
-          </div>
+          </div>}
           {headed && locked && !String(row.lat || "").trim() ? null : blanks ? (
             <div className="at-answersaid">
               <BlankField
@@ -7517,8 +7549,9 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
         />
       </Field>
 
-      <Field className={plain ? "at-softrule" : ""} label={<>English{required && !soundOrPicture(f) && <Req />}</>}>
+      <Field className={plain ? "at-softrule" : ""} label={plain ? undefined : <>English{required && !soundOrPicture(f) && <Req />}</>}>
         <Alternatives
+          headed={plain ? <>English{required && !soundOrPicture(f) && <Req />}</> : null}
           value={f.en}
           of={of}
           moreLabel="Other English answers"
