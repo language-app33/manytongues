@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.540 — 31 October 2026
+
+**Everything since 0.521 checked, and two bugs it found fixed.**
+
+- A card in no deck: choosing its first deck no longer closes the list of
+  decks, so several can be picked in one go.
+- A card being read no longer fails to open outside a full browser (as in
+  the app's own checks).
+- The app's checks now describe it as it is since 0.521: the version and
+  sync in their new places, one Settings screen, the deck screen with
+  Manage cards, and locks set aside. All of them pass.
+
 ## 0.539 — 30 October 2026
 
 **The transliteration on a card being read is as wide as its words.**
