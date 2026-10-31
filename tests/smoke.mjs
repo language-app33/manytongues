@@ -8681,9 +8681,11 @@ const openPronounTables = async () => {
       .map((t) => (t.textContent || "").slice(0, 14)).join(" | ") || "no decks");
   click(deckTile);
   await sleep(500);
+  /* Read-only since 0.523: the deck's cards are sorted and filtered here,
+     and selected only on Manage cards. */
   check("an open deck carries the same two rows",
     [...document.querySelectorAll(".at-toolbar")].length >= 2 &&
-      named(document.querySelector(".at-toolbar-sub")).join(" | ") === "Select | Sort | Filter",
+      named(document.querySelector(".at-toolbar-sub")).join(" | ") === "Sort | Filter",
     named(document.querySelector(".at-toolbar-sub")).join(" | ") || "(no second row)");
   check("and the same filter, still in force",
     !!document.querySelector(".at-menubtn.on"),
@@ -8698,7 +8700,7 @@ const openPronounTables = async () => {
       ? [...deckSheet.querySelectorAll(".at-formnum, .at-section > .at-sectiontop > .at-eyebrow")].map((h) => (h.textContent || "").trim())
       : [];
     check("an open deck is headed like a card's screen, This deck to Cards",
-      deckHeads.join(" | ") === "This deck | Built-in cards | Cards",
+      deckHeads.join(" | ") === "This deck | Cards",
       deckHeads.join(" | ") || "(not laid out like the card editor)");
     const thisDeck = deckSheet && deckSheet.querySelector(".at-formblock");
     const labels = thisDeck ? [...thisDeck.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : [];
@@ -8770,14 +8772,20 @@ const openPronounTables = async () => {
   check("Edit swaps the back arrow for a cross that cancels",
     !!document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'),
     [...document.querySelectorAll(".at-screenhead .at-back")].map((b) => b.getAttribute("aria-label")).join(" | "));
-  const addExtras = buttonNamed(/^Choose built-in cards$/);
-  check("and edited, an open deck offers to choose its built-in cards", !!addExtras,
-    (document.body.textContent || "").includes("Built-in cards") ? "(section, no button)" : "(no section)");
-  click(addExtras);
+  /* Since 0.523 the built-in cards are among the deck's cards, added on
+     Manage cards with the rest and saved there and then. */
+  click(document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'));
+  await sleep(250);
+  click(buttonNamed(/^Manage this deck's cards$/));
+  await sleep(300);
+  check("Manage this deck's cards opens a page of its own",
+    [...document.querySelectorAll(".at-screenhead h2")].some((h) => /^Manage cards$/.test((h.textContent || "").trim())),
+    [...document.querySelectorAll(".at-screenhead h2")].map((h) => h.textContent).join(" | "));
+  click(buttonNamed(/^Add existing cards$/));
   await sleep(300);
   const partRow = (/** @type {RegExp} */ re) =>
     [...document.querySelectorAll(".at-tickrow, label")].find((r) => re.test(r.textContent || ""));
-  check("and lists the parts of the numbers, with counting inside them rather than parts of its own",
+  check("and adding lists the parts of the numbers, with counting inside them rather than parts of its own",
     !!partRow(/Numbers 0 to 9/) && !!partRow(/Numbers 10 to 19/) && !partRow(/Counting things/) &&
       !!partRow(/Telling the hour/),
     [...document.querySelectorAll(".at-tickrow, label")].map((r) => (r.textContent || "").slice(0, 24)).join(" | ") || "(no list)");
@@ -8785,46 +8793,19 @@ const openPronounTables = async () => {
   click(box && (box.querySelector("input") || box));
   await sleep(150);
   const partsBefore = savedParts.length;
-  click(document.querySelector('.at-screenaction [aria-label="Done"]'));
-  await sleep(250);
-  check("and choosing them sends nothing until the deck is saved",
-    savedParts.length === partsBefore && /Numbers 0 to 9/.test(document.body.textContent || ""),
+  check("and ticking sends nothing until Done", savedParts.length === partsBefore,
     JSON.stringify(savedParts.slice(partsBefore)));
-  click(document.querySelector('.at-fab[aria-label="Save"]'));
+  click(document.querySelector('.at-screenaction [aria-label="Done"]'));
   await sleep(600);
   const sent = savedParts[savedParts.length - 1];
-  check("and saving tells the server which parts the deck holds",
+  check("and Done tells the server which parts the deck holds",
     !!sent && sent.deckId === "d1" && JSON.stringify(sent.parts) === JSON.stringify(["numbers:0-9"]),
     JSON.stringify(savedParts));
 
-  /* ---- and locking it ----
-     A button by the Cards heading, dimmed while the deck is read; pressed
-     while editing, it asks, and what it asks is saved with the deck. */
-  await sleep(300);
-  const lockBtn = () => [...document.querySelectorAll(".at-section")]
-    .filter((sec) => /^Cards$/.test((sec.querySelector(".at-sectiontop .at-eyebrow") || {}).textContent || ""))
-    .map((sec) => /** @type {HTMLButtonElement | null} */ (sec.querySelector(".at-sectiontop button")))[0] || null;
-  check("a deck being read has a dimmed Lock button by its Cards heading",
-    !!lockBtn() && /^Lock$/.test((lockBtn()?.textContent || "").trim()) && !!lockBtn()?.disabled,
-    lockBtn() ? `${(lockBtn()?.textContent || "").trim()} · ${lockBtn()?.disabled ? "dimmed" : "live"}` : "(no button by Cards)");
-  click(document.querySelector('.at-fab[aria-label="Edit"]'));
-  await sleep(250);
-  click(lockBtn());
-  await sleep(200);
-  const lockModal = document.querySelector(".at-modal");
-  check("and edited, pressing it explains what locking does before it does it",
-    !!lockModal && /Lock this deck\?/.test(lockModal.textContent || "") && /No cards can be added/.test(lockModal.textContent || ""),
-    lockModal ? (lockModal.textContent || "").slice(0, 80) : "(no question)");
-  click(lockModal && [...lockModal.querySelectorAll("button")].find((b) => /^Lock$/.test((b.textContent || "").trim())));
-  await sleep(200);
-  check("and agreeing turns it to Unlock, sending nothing yet",
-    /^Unlock$/.test((lockBtn()?.textContent || "").trim()) && lockedDecks.length === 0,
-    `${(lockBtn()?.textContent || "").trim()} · ${JSON.stringify(lockedDecks)}`);
-  click(document.querySelector('.at-fab[aria-label="Save"]'));
-  await sleep(600);
-  check("and Save locks the deck",
-    lockedDecks.length === 1 && lockedDecks[0].deckId === "d1" && lockedDecks[0].locked === true,
-    JSON.stringify(lockedDecks));
+  /* Locking is set aside for now (0.523): no button for it anywhere. */
+  check("a deck offers no Lock button while locks are set aside",
+    ![...document.querySelectorAll("button")].some((b) => /^(Lock|Unlock)$/.test((b.textContent || "").trim())),
+    "a Lock button is still there");
 }
 
 /* ---- a deck whose cards accept two spellings ----
