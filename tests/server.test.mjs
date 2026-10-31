@@ -1046,13 +1046,13 @@ test("a deck keeps the parts of the numbers it holds, and its students are told"
   const emptied = await api("/api/courses?action=my-material", { key: student.json.key });
   assert.equal(must((emptied.json.decks || []).find((/** @type {any} */ d) => d.id === deckId), "the deck").parts, undefined);
 
-  /* Locked is locked: which parts it holds is what it holds. */
+  /* Locks are set aside for now (0.523): a deck marked locked still takes
+     a change to its parts. */
   await api("/api/courses?action=lock-deck", { method: "POST", key, body: { deckId, locked: true } });
-  const refused = await api("/api/courses?action=set-deck-parts", {
+  const allowed = await api("/api/courses?action=set-deck-parts", {
     method: "POST", key, body: { deckId, parts: ["numbers:0-10"] },
   });
-  assert.equal(refused.status, 409);
-  assert.equal(refused.json.error, "deck-locked");
+  assert.equal(allowed.status, 200, allowed.text);
 
   /* And somebody else's deck is not theirs to change. */
   const other = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Sami" } });
@@ -4409,7 +4409,7 @@ test("a sentence card waits for review, and only its teachers can review it or r
  * a script. A card's words still change; which decks it is in does not,
  * for a locked one — and the answer names the deck so the teacher is told.
  */
-test("a locked deck gains and loses no cards, and cannot be deleted until unlocked", async () => {
+test("a deck marked locked keeps the mark but refuses nothing while locks are set aside", async () => {
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rana" } });
   const key = made.json.key;
   const deckOf = async (/** @type {string} */ title) =>
@@ -4424,66 +4424,36 @@ test("a locked deck gains and loses no cards, and cannot be deleted until unlock
   assert.equal(inside.status, 200, inside.text);
   const card = inside.json.card;
 
+  /* The mark is still stored, and still only the owner's to set. */
   const lock = await api("/api/courses?action=lock-deck", { method: "POST", key, body: { deckId: locked, locked: true } });
   assert.equal(lock.status, 200, lock.text);
-
-  /* Nobody else may lock it. */
   const other = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Omar" } });
   const theirs = await api("/api/courses?action=lock-deck", {
     method: "POST", key: other.json.key, body: { deckId: open, locked: true },
   });
   assert.equal(theirs.status, 403);
+  const decks = async () => (await api("/api/courses?action=my-decks", { key })).json.decks;
+  assert.equal((await decks()).find((/** @type {any} */ d) => d.id === locked).locked, true);
 
-  /* Taken out of it: refused, and said so. Put into another: fine. And the
-     words change all the same. */
+  /* Taken out of it: done, and nothing said about locks. */
   const moved = await api("/api/courses?action=save-card", {
-    method: "POST", key, body: { card: { ...card, forms: [{ ...lead(card), en: "home" }] }, decks: [open] },
+    method: "POST", key, body: { card, decks: [open] },
   });
   assert.equal(moved.status, 200, moved.text);
-  assert.deepEqual(moved.json.card.decks.sort(), [locked, open].sort());
-  assert.deepEqual(moved.json.locked.map((/** @type {any} */ d) => d.title), ["Fixed"]);
-  assert.equal(lead(moved.json.card).en, "home");
+  assert.deepEqual(moved.json.card.decks, [open]);
+  assert.equal(moved.json.locked, undefined);
 
-  /* A new card into it: the card is made, in no locked deck. */
+  /* A new card into it: in it. */
   const fresh = await api("/api/courses?action=save-card", {
     method: "POST", key, body: { card: carded({ ar: "باب", en: "door", lat: "bab" }), decks: [locked] },
   });
-  assert.equal(fresh.status, 200, fresh.text);
-  assert.deepEqual(fresh.json.card.decks, []);
-  assert.equal(fresh.json.locked.length, 1);
+  assert.deepEqual(fresh.json.card.decks, [locked]);
 
-  /* An ordinary save says nothing about locks. */
-  const plain = await api("/api/courses?action=save-card", {
-    method: "POST", key, body: { card: moved.json.card, decks: [locked, open] },
-  });
-  assert.equal(plain.json.locked, undefined);
-
-  const decks = async () => (await api("/api/courses?action=my-decks", { key })).json.decks;
-  const fixed = (await decks()).find((/** @type {any} */ d) => d.id === locked);
-  assert.equal(fixed.locked, true);
-  assert.deepEqual(fixed.cardIds, [card.id]);
-
-  /* The deck itself stays until it is unlocked. */
-  const gone = await api("/api/courses?action=delete-deck", { method: "POST", key, body: { deckId: locked } });
-  assert.equal(gone.status, 409);
-  assert.equal(gone.json.error, "deck-locked");
-
-  /* Deleting a card is still allowed, and takes it out of the locked deck. */
-  const cut = await api("/api/courses?action=delete-cards", { method: "POST", key, body: { cardIds: [card.id] } });
-  assert.equal(cut.status, 200, cut.text);
-  assert.deepEqual((await decks()).find((/** @type {any} */ d) => d.id === locked).cardIds, []);
-
-  /* Unlocked, everything is as before. */
-  await api("/api/courses?action=lock-deck", { method: "POST", key, body: { deckId: locked, locked: false } });
-  const after = (await decks()).find((/** @type {any} */ d) => d.id === locked);
-  assert.equal(after.locked, undefined);
-  const back = await api("/api/courses?action=save-card", {
-    method: "POST", key, body: { card: fresh.json.card, decks: [locked] },
-  });
-  assert.deepEqual(back.json.card.decks, [locked]);
+  /* And it can be deleted as it is. */
   const bye = await api("/api/courses?action=delete-deck", { method: "POST", key, body: { deckId: locked } });
   assert.equal(bye.status, 200, bye.text);
 });
+
 
 /*
  * A teacher's export: a deck goes with its cards, a card goes with its

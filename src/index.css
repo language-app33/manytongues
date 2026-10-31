@@ -1073,8 +1073,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    is never a scroll back up; it is the sheet's own colour, with the rule
    the sections use under it. */
 .at-screen.cardform .at-cardtabs { position:sticky; top:0; z-index:3;
-  margin:0 -16px; padding:12px 16px; background: var(--surface);
-  border-bottom:1px solid var(--line); }
+  margin:0 -16px; padding:12px 16px; background: var(--surface); }
 /* One segmented track: the parts share it equally, each an icon over its
    name, the current one raised out of the well on the sheet's lighter
    ground with its icon in the accent colour. */
@@ -1087,7 +1086,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   color: var(--muted); font-size:11px; letter-spacing:.05em; }
 .at-screen.cardform .at-cardtabs .at-tab2 > svg { width:20px; height:20px; flex:none; }
 .at-screen.cardform .at-cardtabs .at-tab2.on { background: var(--raised); color: var(--text);
-  border-color: var(--tab-stroke); box-shadow: 0 2px 6px rgba(0,0,0,.35); }
+  border-color: var(--tab-stroke); box-shadow:none; }
 .at-screen.cardform .at-cardtabs .at-tab2.on > svg { color: var(--accent); }
 /* The dot for a change on another part rides on the corner of its segment
    rather than taking a line of its own. */
@@ -1781,6 +1780,10 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* A row that names a choice rather than being one: no hover, no pointer,
    because the thing you tap is the picker underneath it. */
 .at-cline.as-field { cursor:default; }
+/* Courses, Settings and How it works: the menu's main doors, a size up. */
+.at-cline.at-cbig { padding-top:15px; padding-bottom:15px; }
+.at-cline.at-cbig .at-cico { width:24px; }
+.at-cline.at-cbig .at-clinetext { font-size:15px; }
 .at-cline.as-field:hover .at-clinetext { color: var(--text-soft); font-weight:600; }
 .at-cseg { padding:2px 10px 8px 34px; }
 .at-crule { height:2px; background: var(--line); margin:8px 4px; border-radius:2px; }
@@ -1788,28 +1791,23 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    it is a fact to look up, not somewhere to go — until the server turns out
    to be serving a newer build, when it becomes the one thing in the menu
    worth acting on. */
-.at-cver { display:flex; align-items:center; gap:10px; padding:8px 10px 4px; }
+/* The release and its build above, the check on a row of its own under
+   them, as the other buttons on the Settings screen stand. */
+.at-cver { display:flex; flex-direction:column; align-items:flex-start; gap:12px; padding:0; }
+.at-cvertext { width:100%; }
 .at-cvertext { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
 /* The release leads, in the app's own type, because it is the bit you
    read. The build beneath it is a string to compare against GitHub
    character by character, which is what the monospace is for. */
-.at-cver b { font-size:12px; font-weight:800; letter-spacing:.02em; color: var(--text-soft); }
-.at-cver i { font-family: var(--mono, ui-monospace, SFMono-Regular, Menlo, monospace);
-  font-style:normal; font-size:10px; font-weight:600; color: var(--muted);
+/* In Settings, read like the device figures above it: the release as
+   the figure, the build and date as the hint under it. */
+.at-cver b { font-family: var(--ui); font-size: var(--fs-md); font-weight:700; color: var(--text);
+  font-variant-numeric: tabular-nums; }
+.at-cver i { font-family: var(--ui);
+  font-style:normal; font-size:14px; font-weight:500; color: var(--muted); line-height:1.6;
   white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .at-cver.stale b, .at-cver.stale i { color: var(--brass); }
 .at-cvernew { font-weight:800; }
-.at-cverbtn { border:2px solid var(--brass); background:none; color: var(--brass); cursor:pointer;
-  border-radius:999px; padding:5px 11px; font-family: var(--ui); font-size:10px; font-weight:800;
-  letter-spacing:.06em; text-transform:uppercase; white-space:nowrap; flex:none; }
-.at-cverbtn:hover { background: var(--brass); color: var(--onbrass); }
-/* Check is a thing you may do; Reload is a thing you should. Only the
-   second is worth brass — a permanent brass pill down there would pull the
-   eye every time the menu opened, which is the job of the stale state and
-   nothing else. */
-.at-cver:not(.stale) .at-cverbtn { border-color: var(--line); color: var(--muted); }
-.at-cver:not(.stale) .at-cverbtn:hover { background: var(--raised); color: var(--text); }
-.at-cverbtn:disabled { opacity:.55; cursor: default; }
 .at-screen { position:fixed; inset:0; top: var(--banner-h, 0px); z-index: var(--z-screen); background: var(--bg);
   display:flex; flex-direction:column; }
 /* A screen opened to do one small thing and come straight back comes up
@@ -2025,6 +2023,9 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 /* Takes the slack, so the dismiss button sits hard right rather than
    trailing the text across a half-empty pill. */
 .at-snack .msg { flex:1; min-width:0; overflow-wrap:anywhere; }
+.at-snackundo { border:0; background:none; cursor:pointer; padding:4px 8px; border-radius:8px;
+  font: inherit; font-weight:800; color: var(--brass); }
+.at-snackundo:hover { background: var(--raised); }
 .at-snack.good { border-left-color: var(--jade); }
 .at-snack.warn { border-left-color: var(--rose); }
 .at-snack.info { border-left-color: var(--brass); }
@@ -2634,10 +2635,13 @@ textarea.at-input { font-size:15px; font-weight:500; line-height:1.7; resize:ver
    height that no longer has room for it. */
 .at-screen.over { --formbox: 43px; }
 .at-screen.over .at-part.evenfields .at-answerpair > .at-altfield > .at-inputwrap > .at-input,
+.at-screen.over .at-part.evenfields .at-answerpair > div > .at-altfield > .at-inputwrap > .at-input,
 .at-screen.over .at-part.evenfields .at-answerpair > .at-answersaid,
 .at-screen.over .at-part.evenfields .at-altrow > .at-altfield > .at-input,
 .at-screen.over .at-cellrow .at-cellfields > .at-input,
-.at-screen.over .at-cellrow .at-cellfields > .at-inputwrap > .at-input {
+.at-screen.over .at-cellrow .at-cellfields > .at-inputwrap > .at-input,
+.at-screen.over.cardform input.at-input:not([type=checkbox]):not([type=radio]),
+.at-screen.over.cardform .at-alts > .at-altfield > .at-input {
   height: var(--formbox, 43px); box-sizing:border-box; padding-block:0; line-height:normal; }
 /* Which side the button takes is the script's business, not the page's: it
    belongs at the end of the line, which is the left in Arabic. Marked with
@@ -3192,6 +3196,18 @@ button.at-stat { transition: border-color 140ms ease; }
 .at-linkbtn:hover { color: var(--text); }
 .at-notice.plain { border:0; background:none; padding:0; }
 /* --- Empty: nothing here yet --- */
+/* Nudge: an empty section that invites filling. Calm sits on the well;
+   attention borrows the brass, faintly, for what students are missing. */
+.at-nudge { display:flex; align-items:flex-start; gap:12px; padding:14px 16px;
+  border-radius: var(--r); border:2px solid var(--line); background: var(--well); }
+.at-nudge.attention { border-color: color-mix(in srgb, var(--brass) 45%, transparent);
+  background: color-mix(in srgb, var(--brass) 10%, var(--surface)); }
+.at-nudgeico { flex:0 0 auto; width:40px; height:40px; border-radius:50%; display:inline-flex;
+  align-items:center; justify-content:center; background: var(--surface); color: var(--muted); }
+.at-nudge.attention .at-nudgeico { background: var(--brass); color: var(--onbrass); }
+.at-nudgebody { flex:1; min-width:0; align-self:center; }
+.at-nudgetext { margin:0; font-size:14px; font-weight:600; line-height:1.5; color: var(--text); }
+.at-nudgeact { margin-top:10px; }
 .at-empty2 { text-align:center; padding: var(--s6) var(--s4); border:2px dashed var(--line); border-radius: var(--r); background: var(--well); }
 .at-empty2 .at-eyebrow { margin:0 0 var(--s2); }
 .at-empty2 .at-hint { margin:0 auto; max-width: 46ch; }
@@ -4236,8 +4252,17 @@ fieldset.at-cardlock:disabled :is(input, textarea, select):disabled,
 fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] {
   color: var(--text-soft); -webkit-text-fill-color: var(--text-soft); opacity:1; cursor:default;
   border-color: var(--lock-line); background: var(--lock-well); }
-fieldset.at-cardlock:disabled :is(input, textarea)::placeholder { color: transparent;
-  -webkit-text-fill-color: transparent; }
+/* Read, a field is plain words under its label, as a course's name and
+   language are (.at-fieldvalue): no box, no ground. Empty, it says "None",
+   faintly — see TabPanel. */
+fieldset.at-cardlock:disabled :is(input:not([type=checkbox]):not([type=radio]), textarea, select):disabled,
+fieldset.at-cardlock:disabled .at-blanktext[contenteditable="false"] {
+  border-color: transparent !important; background: transparent !important; box-shadow:none;
+  padding-left:0; padding-right:0; min-height:0; height:auto; resize:none;
+  font-size:15px; font-weight:600; color: var(--text); -webkit-text-fill-color: var(--text); }
+fieldset.at-cardlock:disabled select:disabled { appearance:none; -webkit-appearance:none; background-image:none; }
+fieldset.at-cardlock:disabled :is(input, textarea)::placeholder { color: var(--faint);
+  -webkit-text-fill-color: var(--faint); font-weight:500; }
 /* A tick, a choice of a few and an unset subtype show what was chosen, so
    they stay, in the same quieter dress. */
 fieldset.at-cardlock:disabled :is(.at-ck, .at-seg, .at-choosebtn, .at-shutrow, .at-tickrow) {
@@ -4346,3 +4371,139 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 /* The tabs start at the top of the sheet and stay there: no gap above
    them that the sticking would take up on the first scroll. */
 .at-screen.cardform .at-screeninner > .at-cardtabs:first-child { margin-top:0; }
+
+/* Manage cards: whose cards, under the title; and Add existing cards the
+   width of the list, under its toolbar. */
+.at-managefor { margin:0 0 var(--s3); font-weight:700; color: var(--text-soft); }
+.at-blockbtn { width:100%; justify-content:center; }
+
+/* The Basic tab's one form: no frame and no heading row, since it is the
+   only form there; its parts are headed instead, as field names are (Card name). */
+.at-formblock.at-formtile.plain, .at-formblock.at-formtile.plain > .at-part.plain {
+  border:0 !important; padding:0 !important; background:none !important; box-shadow:none; }
+.at-part.plain > .at-formhead { display:none; }
+.at-answerhead, .at-part.plain > .at-field > .at-label {
+  display:block; margin:18px 0 8px; font-family: var(--ui); font-size:15px; font-weight:800;
+  letter-spacing:.07em; line-height:1.3; text-transform:uppercase; color: var(--muted); }
+.at-answerpair.headed { gap:0 6px; }
+.at-answerpair.headed > .at-answerhead { grid-column:1 / -1; }
+.at-answerpair.headed > .at-answerhead:first-child { margin-top:0; }
+/* Inside Content, a lighter line than the one between sections: dashed,
+   and short of the edges — between answers, and above English and Image. */
+/* Inside Content, a pause rather than a boundary: a short faint stub
+   centred in the gap. The full-width line is for between sections. */
+.at-answernum, .at-part.plain > .at-field.at-softrule {
+  position:relative; margin-top:30px; padding-top:0; }
+.at-answernum::before, .at-part.plain > .at-field.at-softrule::before {
+  content:""; position:absolute; left:50%; width:48px; transform:translateX(-50%); top:-16px;
+  border-top:2px solid color-mix(in srgb, var(--line) 70%, transparent); border-radius:2px; }
+/* A heading with what acts on its list at the right of its line. */
+.at-answerheadrow { display:flex; align-items:center; justify-content:space-between; gap:8px;
+  margin:18px 0 8px; grid-column:1 / -1; }
+.at-answerheadrow > .at-answerhead { margin:0 !important; }
+.at-answerpair.headed > .at-answerheadrow:first-child,
+.at-alts > .at-answerheadrow:first-child { margin-top:0; }
+.at-answerheadrow.at-answernum { margin-top:30px; padding-top:0; }
+/* The + and −: an ordinary icon-only button, square, a box's height. */
+.at-answerheadrow > .at-icon { flex:none; width:44px; height: var(--formbox, 43px); min-height:0; padding:0; }
+.at-answerpair > .at-scriptcell { grid-column:1; min-width:0; }
+.at-answerpair.headed > .at-scriptcell, .at-answerpair.headed > .at-scriptrow { grid-column:1 / -1; min-width:0; }
+.at-alts > .at-altfield + .at-answerheadrow { margin-top:30px; }
+.at-part.plain > .at-field.at-softrule > .at-label { margin-top:0; }
+.at-answerpair.headed > .at-answerhead:first-child + * { margin-top:0; }
+/* An answer, compact: its script, then how it is said with its recordings
+   beside it in the buttons' column. */
+.at-answerpair.headed { row-gap:6px; }
+.at-answerpair.headed > .at-answerabout.inline { grid-column:2; align-self:stretch; }
+.at-answerpair.headed > .at-answerabout.inline > .at-answerrec { height:100%; }
+/* Read: the script at its size, how it is said quieter under it. */
+fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid,
+fieldset.at-cardlock:disabled .at-answerpair.headed .at-answersaid .at-input {
+  font-size:21px !important; font-style:italic; font-weight:500;
+  color: var(--muted) !important; -webkit-text-fill-color: var(--muted) !important; }
+
+/* English on the Basic tab: its boxes one under another, and where there
+   is more than one, a note beside the heading saying so — both on the
+   line with the +, the heading drawn up to meet it. */
+.at-answerheadtext { display:flex; flex-direction:column; gap:2px; min-width:0; }
+.at-answerheadnote { font-size:13px; font-weight:500; color: var(--muted); }
+.at-alts > .at-altstack + .at-altstack { margin-top:8px; }
+.at-altstack > .at-icon { flex:none; width:44px; height: var(--formbox, 43px); min-height:0; padding:0; }
+
+/* The script's further answers, stacked under the first as English's are:
+   the box with its − beside it, then how it is said with its recordings. */
+.at-answerpair.headed > .at-icon { flex:none; width:44px; height: var(--formbox, 43px); min-height:0; padding:0; }
+.at-alts > .at-answerpair.headed + .at-answerpair.headed { margin-top:14px; }
+
+/* ---- A card being read: a dictionary entry, not a form held still ----
+   Empty things are left out, rows are the height of their words, and the
+   space the hidden buttons kept is given back. */
+fieldset.at-cardlock:disabled .at-readempty { display:none !important; }
+.at-screen.over.cardform fieldset.at-cardlock:disabled input.at-input,
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-input {
+  height:auto !important; min-height:0 !important; padding:0 !important; field-sizing:content; }
+fieldset.at-cardlock:disabled .at-label,
+fieldset.at-cardlock:disabled .at-answerhead { margin-bottom:4px; }
+fieldset.at-cardlock:disabled .at-field { margin-bottom:16px; }
+fieldset.at-cardlock:disabled .at-answerheadrow { margin:0 0 4px; min-height:0; }
+fieldset.at-cardlock:disabled .at-answerheadnote { display:none; }
+/* An answer: its script, then how it is said with its recordings inline. */
+fieldset.at-cardlock:disabled .at-answerpair.headed { display:flex; flex-wrap:wrap; align-items:center; gap:0 8px; }
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerheadrow,
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-scriptcell,
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-scriptrow { flex:0 0 100%; }
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answersaid { flex:0 1 auto; width:auto; }
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline { align-self:baseline; }
+fieldset.at-cardlock:disabled .at-alts > .at-answerpair.headed + .at-answerpair.headed { margin-top:6px; }
+fieldset.at-cardlock:disabled .at-answerrec { height:auto !important; font-size:12px; padding:2px 8px; }
+/* English: its meanings on one line, between dots. */
+fieldset.at-cardlock:disabled .at-alts:has(> .at-altstack) { display:flex; flex-wrap:wrap; align-items:baseline; }
+fieldset.at-cardlock:disabled .at-alts > .at-altstack { margin:0 !important; width:auto; }
+fieldset.at-cardlock:disabled .at-alts > .at-altstack > .at-altfield { width:auto; }
+fieldset.at-cardlock:disabled .at-alts > .at-altstack:not(.at-readempty) ~ .at-altstack:not(.at-readempty)::before {
+  content:"·"; margin:0 8px; color: var(--faint); font-weight:700; }
+fieldset.at-cardlock:disabled .at-alts > .at-answerheadrow { flex:0 0 100%; }
+/* The picture, small, as what it is. */
+.at-readthumbs { display:flex; flex-wrap:wrap; gap:8px; background:none; border:0; padding:0; cursor:pointer; }
+.at-readthumb { width:144px; height:144px; object-fit:cover; border-radius: var(--r-sm); border:1px solid var(--line); }
+
+/* Read, the words at one size: the card's name, each answer and English;
+   how an answer is said a step smaller, in italics (above). */
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-namefield,
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed .at-altfield .at-input,
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed .at-altfield .at-blanktext,
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-alts > .at-altstack .at-input {
+  font-size:26px !important; font-weight:700 !important; line-height:1.3;
+  color: var(--text) !important; -webkit-text-fill-color: var(--text) !important; }
+fieldset.at-cardlock:disabled .at-alts > .at-altstack ~ .at-altstack::before { font-size:26px; }
+/* Read, an answer's recordings are ordinary icon buttons at the end of
+   the line that says how it is said. */
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answersaid { flex:1 1 auto; min-width:0; }
+fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
+  margin-inline-start:auto; display:flex; justify-content:flex-end; flex:1 1 auto; min-width:0; gap:6px; align-self:center; }
+/* The practice player, at a button's size, at the end of the line. */
+.at-playrow.compact { gap:6px; flex-wrap:wrap; justify-content:flex-end; align-items:center; }
+.at-playrow.compact .at-playbig { min-width:0; height: var(--formbox, 43px); padding:0 12px; gap:6px;
+  font-size:13px; flex:none; }
+.at-playrow.compact .at-playbig .at-ic { width:18px; height:18px; }
+.at-fullimage { position:fixed; inset:0; z-index:1000; background: rgba(0,0,0,.88);
+  display:flex; align-items:center; justify-content:center; padding:16px; cursor:zoom-out; }
+.at-fullimageimg { max-width:100%; max-height:100%; object-fit:contain; border-radius: var(--r-sm); }
+.at-fullimagex { position:absolute; top:16px; right:16px; color:#fff; width:40px; height:40px;
+  display:inline-flex; align-items:center; justify-content:center; border-radius:50%; background: rgba(255,255,255,.15); }
+
+/* Read, an answer's second line: how it is said on the left, taking what
+   room the recordings leave, and the recordings on the right of the same
+   line — wrapping, still at the right, when there are more than fit. */
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed { flex-wrap:wrap; }
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answersaid {
+  flex:0 1 auto !important; width:auto !important; min-width:0 !important;
+  align-self:flex-start; min-height: var(--formbox, 43px); display:flex; align-items:center; }
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
+  flex:1 1 auto !important; max-width:none; min-width:0; margin-inline-start:auto;
+  align-self:flex-start !important; }
+.at-screen.over.cardform fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline > .at-playrow {
+  flex-wrap:wrap; justify-content:flex-end; }
+
+.at-readsaid { font-size:21px; font-style:italic; font-weight:500; color: var(--muted); line-height:1.3; overflow-wrap:anywhere; }
+.at-screen.over .at-part.evenfields .at-answerpair > .at-answersaid.at-readsaid { height:auto !important; padding-block:8px; }

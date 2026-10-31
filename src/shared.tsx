@@ -703,6 +703,32 @@ export function Empty({ title, children, action }: { title?: Node; children?: No
   );
 }
 
+/* --- Nudge ---------------------------------------------------------
+   "Nothing here yet", said inside an open deck or course where the
+   section would otherwise be one grey line. An icon, one warm sentence,
+   and room for the way to fill it — passed only while it can be acted
+   on, so a screen being read shows the message alone. `tone` says how
+   much it matters: "attention" where students are missing out because
+   of it, "calm" where empty is a fine way to be. */
+export function Nudge({ icon, tone = "calm", children, action }: {
+  icon: string;
+  tone?: "calm" | "attention";
+  children: Node;
+  action?: Node;
+}) {
+  return (
+    <div className={`at-nudge ${tone}`}>
+      <span className="at-nudgeico" aria-hidden="true">
+        <Icon name={icon} size={22} />
+      </span>
+      <div className="at-nudgebody">
+        <p className="at-nudgetext">{children}</p>
+        {action ? <div className="at-nudgeact">{action}</div> : null}
+      </div>
+    </div>
+  );
+}
+
 /* --- StickyFoot ---------------------------------------------------
    The foot of an exercise screen: the row of buttons that carries the
    question forward, and above it an optional line of plain text — the
@@ -1470,6 +1496,227 @@ export function useClipPlayer(load?: (hash: string) => Promise<string | null>) {
   return { state, play, playing: state === "playing", reset: () => setState("idle") };
 }
 
+const NO_PROMPT_RECS: any[] = [];
+const defaultClipSrc = async (id: string) => (await API.getClip(id)).data;
+
+/* A recording to listen to, at one speed or both — the player a practice
+   question opens with, and a teacher's card being read. */
+export function AudioPrompt({ recs, autoPlay, lead = "regular", after, load, compact = false }: {
+  /** Where a recording's playable address comes from: this device's copy
+      in a session, the server's on a teacher's card. */
+  load?: (id: string) => Promise<string | null>;
+  /** A card being read: the same Regular and Slow, at a button's size,
+      for the end of a line rather than a row of their own. */
+  compact?: boolean;
+  recs?: any[];
+  autoPlay?: boolean;
+  lead?: "regular" | "slow";
+  /**
+   * Recordings to play straight after the one that was started.
+   *
+   * The one place two clips are ever joined: a time may be its hour and
+   * its minutes said one after the other, because a teacher records the
+   * words and not the nine hundred times a clock can show. Played in
+   * order rather than stitched — the join is where a dialect lives, and a
+   * stitched clip teaches the wrong sound.
+   */
+  after?: string[];
+}) {
+  const [idx, setIdx] = useState(0);
+  const [state, setState] = useState("idle");
+  const audioRef: React.MutableRefObject<HTMLAudioElement | null> = useRef(null);
+  const urlRef = useRef("");
+  /* Whether a clip is finishing so the next can start. Held apart from
+     the state because the browser reports the gap between two clips as a
+     pause, and a pause between them is not the player stopping. */
+  const chaining = useRef(false);
+  const list = recs || NO_PROMPT_RECS;
+  /* Which recordings this is showing, as one string, so the reset below
+     fires when any of them changes and not only the first. */
+  const signature = list.map((r) => r.id).concat(after || []).join("|");
+
+  /*
+   * At most one of each speed, and the ordinary one first.
+   *
+   * A card may hold several takes at either speed — a teacher recording
+   * twice to get it right leaves both — and a question is not the place to
+   * choose between them: what a learner wants here is this word, and this
+   * word said slowly, not a numbered rank of the takes that exist. The rest
+   * are still on the card, and the teacher's screen still lists them all.
+   */
+  const iReg = list.findIndex((r) => r.speed !== "slow");
+  const iSlow = list.findIndex((r) => r.speed === "slow");
+  const takes: { i: number, slow: boolean }[] = [];
+  if (iReg >= 0) takes.push({ i: iReg, slow: false });
+  if (iSlow >= 0) takes.push({ i: iSlow, slow: true });
+  /* A card with nothing but slow recordings would otherwise show none. */
+  if (!takes.length && list.length) takes.push({ i: 0, slow: false });
+  /* A card being read shows every take, regular ones first. */
+  if (compact) {
+    takes.length = 0;
+    list.forEach((r, i) => takes.push({ i, slow: r.speed === "slow" }));
+    takes.sort((a, b) => Number(a.slow) - Number(b.slow) || a.i - b.i);
+  }
+  /* The one the card's progress asks for, if the card has it: a lead that
+     is not there is not a lead, and the other one is then the whole
+     offering rather than a quiet second choice. */
+  const leadSlow = lead === "slow" && iSlow >= 0;
+  /* The one being led with goes first. The pair is built ordinary-then-slow
+     because that is the order they are recorded in; what is read left to
+     right is which of them this question is about. */
+  if (leadSlow) takes.reverse();
+  const opens = takes.length ? takes[0].i : 0;
+
+  const releaseUrl = () => {
+    if (urlRef.current && urlRef.current.startsWith("blob:")) URL.revokeObjectURL(urlRef.current);
+    urlRef.current = "";
+  };
+
+  /* Stop where it is. The button has said Pause since the icons went in and
+     did not: pressing it called play again, which loaded the clip afresh
+     and started it over — the one thing "pause" cannot mean. */
+  const pause = () => {
+    if (audioRef.current) audioRef.current.pause();
+    setState("idle");
+  };
+
+  const play = useCallback(
+    async (i: number) => {
+      const rec = list[i];
+      if (!rec) return;
+      setState("loading");
+      const url = await (load || defaultClipSrc)(rec.id);
+      if (!url) {
+        setState("missing");
+        return;
+      }
+      if (!audioRef.current) audioRef.current = new Audio();
+      const el = audioRef.current;
+      releaseUrl();
+      urlRef.current = url;
+      el.src = url;
+      /* One clip, or a clip and then the rest of them. */
+      const queue = (after || []).slice();
+      el.onended = async () => {
+        const next = queue.shift();
+        if (!next) {
+          chaining.current = false;
+          setState("idle");
+          return;
+        }
+        chaining.current = true;
+        const nextUrl = await (load || defaultClipSrc)(next);
+        if (!nextUrl) {
+          chaining.current = false;
+          setState("idle");
+          return;
+        }
+        releaseUrl();
+        urlRef.current = nextUrl;
+        el.src = nextUrl;
+        try {
+          await el.play();
+        } catch (e) {
+          chaining.current = false;
+          setState("idle");
+        }
+      };
+      /* Paused by anything else — the other button taking the element, a
+         headset, the phone's own controls — reads the same as pausing here.
+         Only ever a step down from playing, so it cannot undo the state a
+         moment before the clip starts. */
+      el.onpause = () => {
+        if (chaining.current) return;
+        setState((v) => (v === "playing" ? "idle" : v));
+      };
+      /* A clip that cannot be decoded used to leave the button on "playing"
+         for good; now it reads as missing, which is what it is. */
+      el.onerror = () => setState("missing");
+      try {
+        await el.play();
+        setState("playing");
+      } catch (e) {
+        // Browsers block autoplay until you've interacted with the page.
+        setState("idle");
+      }
+    },
+  /* The signature is the identity of the list, and the reason it
+     exists: `list` is rebuilt on every render, so depending on it
+     would rebuild the player between every keystroke. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+    [signature]
+  );
+
+  useEffect(() => {
+    setIdx(opens);
+    setState("idle");
+    /* The ordinary speed is what plays by itself: the slow one is a thing
+       to reach for, not the question as it is asked. */
+    if (autoPlay) play(opens);
+    return () => {
+      if (audioRef.current) audioRef.current.pause();
+      releaseUrl();
+    };
+  /* Same again: a new clip list with the same contents must not
+     restart playback. autoPlay and play are read on purpose from the
+     render that changed the signature. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [signature]);
+
+  if (!list.length) return compact ? null : <Notice kind="warn">No recording for this form.</Notice>;
+
+  return (
+    <div className={`at-playrow${takes.length > 1 ? " twin" : ""}${compact ? " compact" : ""}`}>
+      {takes.map(({ i, slow }) => {
+        const mine = idx === i;
+        return (
+          <Pressable
+            key={list[i].id}
+            aria-label={compact && takes.filter((x) => x.slow === slow).length > 1
+              ? `${slow ? "Slow" : "Regular"}, take ${takes.filter((x) => x.slow === slow).findIndex((x) => x.i === i) + 1}`
+              : undefined}
+            className={`at-playbig${takes.length > 1 ? " twin" : ""}${
+              takes.length > 1 && slow !== leadSlow ? " quiet" : ""
+            }`}
+            onClick={() => {
+              /* Pressing the one that is playing stops it; pressing the
+                 other switches to it. */
+              if (mine && state === "playing") {
+                pause();
+                return;
+              }
+              setIdx(i);
+              play(i);
+            }}
+          >
+            {/* The icon is the target on a phone, so it is sized like one
+                rather than like a glyph sitting in the label's line — and
+                it is what tells the two apart at a glance, the label being
+                the thing you read second. */}
+            <span className="dot">
+              <Icon
+                name={mine && state === "playing" ? "pause" : slow ? "slow" : "play"}
+                /* Smaller on the one taking the narrower third of the row,
+                   so what it holds is in proportion to the room it has. */
+                size={compact ? 18 : takes.length > 1 && slow !== leadSlow ? 26 : 36}
+              />
+            </span>
+            {mine && state === "loading"
+              ? "Loading"
+              : mine && state === "missing"
+              ? "Not on this device"
+              : slow
+              ? "Slow"
+              : takes.length > 1
+              ? "Regular"
+              : "Play"}
+          </Pressable>
+        );
+      })}
+    </div>
+  );
+}
+
 /* The button that goes with it, so play/pause looks the same wherever
    a recording appears. */
 export function PlayButton({ state, onClick, className = "", label = "Play" }: {
@@ -1988,6 +2235,7 @@ export function ItemList<T>({
   onSelectedChange,
   bulkActions,
   empty,
+  emptyPanel,
   busy,
 }: {
   /** "course";
@@ -2046,10 +2294,15 @@ export function ItemList<T>({
   onSelectedChange?: (chosen: Set<string>) => void;
   bulkActions?: { label: string; danger?: boolean; icon?: string; onClick: (ids: string[]) => void; }[];
   empty?: Node;
+  /** Drawn instead of the list's own controls when there is nothing in it
+      at all — a Nudge, holding the way to make the first one. New and the
+      Sort and Filter row stand aside for it. */
+  emptyPanel?: Node;
   busy?: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [selecting, setSelecting] = useState(false);
+  const bare = !!emptyPanel && !items.length;
   /* How many tiles are on the page. A long list is shown a page at a time:
      every tile rendered at once is what made a big course slow to open. */
   const [limit, setLimit] = useState(PAGE_SIZE);
@@ -2208,7 +2461,7 @@ export function ItemList<T>({
       style={trayH ? ({ "--bulk-h": `${trayH}px` } as React.CSSProperties) : undefined}
     >
       <div className="at-toolbar at-toolbar-top">
-        {(onNew || newOff) && (
+        {(onNew || newOff) && !bare && (
           <button className={`at-btn primary${newOff ? " off" : ""}`} aria-disabled={newOff ? true : undefined}
             onClick={newOff || onNew}>
             <Icon name="add" />
@@ -2245,7 +2498,7 @@ export function ItemList<T>({
       {/* Select, and the menus that order and narrow the list — one row,
           under the one that searches it. Select is not a filter and comes
           first; the menus are in the order they are given. */}
-      {(canSelect || live.length > 0) && (
+      {(canSelect || live.length > 0) && !bare && (
         <div className="at-toolbar at-toolbar-sub">
           {canSelect && (
             <button
@@ -2383,7 +2636,8 @@ export function ItemList<T>({
         </div>
       )}
 
-      {!shown.length && !busy && (
+      {bare && !busy && emptyPanel}
+      {!shown.length && !busy && !bare && (
         <p className="at-hint">
           {query ? `No ${plural || `${noun}s`} match "${query}".` : empty}
         </p>
@@ -3421,16 +3675,23 @@ export function TopBanner({ kind = "warn", actions, children }: {
 
 const SNACK_DWELL_MS = 4000;
 
-export function Snackbar({ message, kind = "info", onDismiss }: {
+export function Snackbar({ message, kind = "info", onDismiss, undo }: {
   message?: Node;
   kind?: string;
   onDismiss?: () => void;
+  /** A way back from what the message reports — Remove's Undo. */
+  undo?: () => void;
 }) {
   const host = useAppHost();
 
   const view = (
     <div className={`at-snack ${kind}`} role="status" aria-live="polite">
       <span className="msg">{message}</span>
+      {undo && (
+        <button className="at-snackundo" onClick={() => { undo(); if (onDismiss) onDismiss(); }}>
+          Undo
+        </button>
+      )}
       {onDismiss && (
         <button className="at-snackx" onClick={onDismiss} aria-label="Dismiss">
           <Icon name="close" size={16} />
@@ -3451,7 +3712,7 @@ export function Snackbar({ message, kind = "info", onDismiss }: {
  * from anywhere.
  */
 export function useSnackbarState({ dwell = SNACK_DWELL_MS }: { dwell?: number } = {}) {
-  const [snack, setSnack] = useState<{ id: number; message: string; kind: string } | null>(null);
+  const [snack, setSnack] = useState<{ id: number; message: string; kind: string; undo?: () => void } | null>(null);
   const timer: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = useRef(null);
   /* Numbered so that a second message remounts the pill rather than
      swapping the text inside the old one: without it the entrance is played
@@ -3465,13 +3726,13 @@ export function useSnackbarState({ dwell = SNACK_DWELL_MS }: { dwell?: number } 
   }, []);
 
   const show = useCallback(
-    (message: unknown, kind = "info") => {
+    (message: unknown, kind = "info", undo?: () => void) => {
       const text = String(message == null ? "" : message).trim();
       /* An empty message would show an empty pill, which reads as a bug. */
       if (!text) return;
       if (timer.current) clearTimeout(timer.current);
       seq.current += 1;
-      setSnack({ id: seq.current, message: text, kind });
+      setSnack({ id: seq.current, message: text, kind, undo });
       timer.current = setTimeout(() => {
         timer.current = null;
         setSnack(null);
@@ -3491,7 +3752,7 @@ export function useSnackbarState({ dwell = SNACK_DWELL_MS }: { dwell?: number } 
     dismiss,
     current: snack,
     node: snack ? (
-      <Snackbar key={snack.id} message={snack.message} kind={snack.kind} onDismiss={dismiss} />
+      <Snackbar key={snack.id} message={snack.message} kind={snack.kind} undo={snack.undo} onDismiss={dismiss} />
     ) : null,
   };
 }
@@ -3507,11 +3768,11 @@ export function useSnackbarState({ dwell = SNACK_DWELL_MS }: { dwell?: number } 
  * renders these components with nothing hosting them, and a notification
  * that goes nowhere is not worth taking a screen down for.
  */
-const noSnackbar: (message: string, kind?: string) => void = () => {};
+const noSnackbar: (message: string, kind?: string, undo?: () => void) => void = () => {};
 const SnackbarContext = React.createContext(noSnackbar);
 
 export function SnackbarProvider({ show, children }: {
-  show?: (message: string, kind?: string) => void;
+  show?: (message: string, kind?: string, undo?: () => void) => void;
   children?: Node;
 }) {
   return <SnackbarContext.Provider value={show || noSnackbar}>{children}</SnackbarContext.Provider>;
@@ -3709,8 +3970,13 @@ export function useScrollTop(key: unknown) {
  */
 export type ScreenFab = { icon: string; label: string; onClick: () => void; off?: boolean; busy?: boolean };
 
-export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", backIcon = "back", rise, className = "", fab }: {
+export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", backIcon = "back", rise, className = "", fab, scrollKey }: {
   title?: Node;
+  /** What, changing, means somewhere new and starts at the top. The title
+      by default; a screen whose title changes as it goes from reading to
+      editing and back passes something steadier, so Edit and Save leave
+      you where you were. */
+  scrollKey?: unknown;
   onBack?: () => void;
   action?: Node;
   /** Put the action on a line of its own under the title, where there is
@@ -3748,9 +4014,10 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
      id; renaming the thing you are looking at scrolls you up, which is
      rare and cheap next to arriving halfway down every time. */
   const bodyRef: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
+  const placeKey = scrollKey === undefined ? title : scrollKey;
   useEffect(() => {
     if (bodyRef.current) bodyRef.current.scrollTop = 0;
-  }, [title]);
+  }, [placeKey]);
   /* Whether the floating button wears its name: yes at the top and while
      scrolling up, no while scrolling down. A few pixels either way are
      ignored, so a finger resting on the glass does not flicker it. */

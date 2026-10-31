@@ -8,6 +8,289 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.540 — 31 October 2026
+
+**Everything since 0.521 checked, and two bugs it found fixed.**
+
+- A card in no deck: choosing its first deck no longer closes the list of
+  decks, so several can be picked in one go.
+- A card being read no longer fails to open outside a full browser (as in
+  the app's own checks).
+- The app's checks now describe it as it is since 0.521: the version and
+  sync in their new places, one Settings screen, the deck screen with
+  Manage cards, and locks set aside. All of them pass.
+
+## 0.539 — 30 October 2026
+
+**The transliteration on a card being read is as wide as its words.**
+
+- Read, the transliteration or pronunciation note is plain text taking
+  only the room it needs; the recordings fill the rest of its line at the
+  right, wrapping underneath when there isn't room. A long note takes the
+  line it needs, with the recordings below it at the right.
+- Checked in a browser with a two-letter and a long note.
+
+## 0.538 — 30 October 2026
+
+**Recordings really do share the transliteration's line now.**
+
+- On a card being read, the transliteration or pronunciation note and the
+  first recordings sit on one line, level with each other; recordings
+  that don't fit wrap underneath, at the right. 0.537 still pushed them
+  all below, because the line's two halves asked for more than its width.
+- Checked by opening the card screen in a browser.
+
+## 0.537 — 30 October 2026
+
+**Recordings share the transliteration's line on a card being read.**
+
+- The first recordings now sit on the transliteration or pronunciation
+  line, at its right; only those that don't fit carry on to the next
+  line, still at the right. (0.536 put them all on the line below.)
+
+## 0.536 — 30 October 2026
+
+**Every recording on a card being read, in line with its words.**
+
+- Read, every recording of an answer has its own button — Regular ones
+  first, then Slow — centred on the transliteration or pronunciation line
+  at its right; any that don't fit carry on to the next line, still at
+  the right.
+- While editing, a further answer in the language has its − at the very
+  right and its box filling the rest of the line, as English's do.
+- Exercises still offer one Regular and one Slow.
+
+## 0.535 — 30 October 2026
+
+**A card being read plays its recordings the way a practice question does,
+and says when it is in no deck.**
+
+- Read, an answer's recordings use the same player as the exercises, at
+  a button's size at the end of the transliteration line: Regular, and
+  Slow with its own icon, where there is a slow recording.
+- A card in no deck shows the attention panel under Decks: "Not in a deck
+  yet, so no students can see it." Read, it is the message alone; while
+  editing, the way to add it to a deck is inside the panel.
+- To check by hand: a card with a regular and a slow recording, read; the
+  exercises' player still looks as before; a card in no deck, read and
+  edited.
+
+## 0.534 — 30 October 2026
+
+**Play buttons on a card being read are proper buttons, at the end of the
+line.**
+
+- Read, each recording of an answer is the app's usual square icon
+  button — play, and pause while it plays — at the right end of that
+  answer's transliteration or pronunciation line. A recording that can't
+  be found says so.
+
+## 0.533 — 30 October 2026
+
+**A card being read: bigger words, recordings that play in place, images
+full screen.**
+
+- Read, the card's name, each answer in the language and English are one
+  larger size; the transliteration or pronunciation note is a step
+  smaller, in italics.
+- An answer's recordings are play buttons beside its transliteration and
+  play right there; recording is still done while editing.
+- Image thumbnails are twice the size and open full screen; a tap or
+  Escape closes them.
+- To check by hand: Vietnamese, Arabic and Hebrew cards read; playing
+  recordings; opening an image on a phone.
+
+## 0.532 — 30 October 2026
+
+**A card being read looks like a dictionary entry, not a form.**
+
+- Read, the Basic tab leaves out anything empty — no more "None" rows —
+  and its lines are the height of their words, with no room kept for the
+  buttons that only show while editing.
+- Each answer's script stands large, with its transliteration or
+  pronunciation note in grey italics under it and its recordings as small
+  play chips beside that; further answers follow straight underneath.
+- English's accepted meanings read on one line, between dots.
+- Images show as small thumbnails, which open them; with none, there is
+  no Image heading.
+- Editing is unchanged.
+- To check by hand: a full and a sparse card read; switching between
+  reading and editing; a phone.
+
+## 0.531 — 30 October 2026
+
+**The target language's accepted answers stack, as English's do.**
+
+- On the Basic tab, a further answer in the language being taught goes
+  straight under the one before — its box with a − beside it, then its
+  transliteration or pronunciation note with its recordings — with no
+  heading or line between them. With more than one, "Multiple accepted
+  answers" is said under the language's heading, level with the +.
+- To check by hand: removing a middle answer takes its transliteration
+  and recordings with it; phone width.
+
+## 0.530 — 30 October 2026
+
+**English's accepted answers sit together, and empty boxes give examples.**
+
+- On the Basic tab, a second English answer goes straight under the
+  first rather than under a heading of its own; each extra one has its −
+  beside it. With more than one, "Multiple accepted answers" is said
+  under the English heading, both level with the +.
+- The English box shows an example ("e.g. book"), and the transliteration
+  or pronunciation note box says what goes there with an example:
+  "transliteration (e.g. kitāb)", "pronunciation note (e.g. rising tone;
+  ư like the u in ‘put’)".
+
+## 0.529 — 30 October 2026
+
+**A card's boxes are one height, and Content's separators are quieter.**
+
+- The + and − beside an answer's heading are ordinary icon buttons, the
+  height of a box, at the right of the heading's line.
+- Every one-line box on a card is the same height: the card's name, the
+  script, its transliteration or pronunciation note, and English.
+- Inside Content, answers, English and Image are separated by a short
+  faint stub in the middle of the gap rather than a line across; the
+  full-width line is only between sections.
+- To check by hand: script text still fits its box; phone width.
+
+## 0.528 — 30 October 2026
+
+**Accepted answers: + and − on their headings, everything on one edge.**
+
+- Each answer after the first is headed "Another accepted answer".
+- The + that adds an answer is at the right of the language's heading,
+  and of English's; each further answer has its − at the right of its own
+  heading. The boxes take the full width. Neither shows while reading.
+- The record button is as tall as the box beside it.
+- English and Image line up with the answers above them; only the dashed
+  line between them is drawn short of the edges.
+- To check by hand: adding and removing answers and English meanings,
+  reading, and a phone-width screen.
+
+## 0.527 — 30 October 2026
+
+**Accepted answers on a card are compact, one heading each.**
+
+- On the Basic tab, each accepted answer has one heading — Arabic for the
+  first, "Accepted answer 2" and on after it — with its script, then its
+  transliteration and the record button beside it on one line.
+- Between answers, and above English and Image, a dashed line short of
+  the edges, lighter than the solid line between sections.
+- Read, the script stands at its size and the transliteration is quieter
+  under it, in grey italics; an empty one is left out.
+- To check by hand: one and two answers, read and edited, on a phone.
+
+## 0.526 — 30 October 2026
+
+**A teacher's card: recordings with their answer, the picture on its own.**
+
+- The tabs on a card have no line under them and no dots on them.
+- Vietnamese's pronunciation note shows an example in the empty box
+  ("e.g. rising tone; ư like the u in ‘put’") instead of "(optional)".
+- Tapping a field on a card or deck that is only being read no longer
+  shows "You are in view-only mode".
+- On the Basic tab, each accepted answer holds its script, its
+  transliteration or pronunciation note, and its Recordings. The image is
+  for the whole card, so it has its own Image heading after English.
+- To check by hand: a card with two answers, each with its own
+  recordings; the image once at the end; a Vietnamese card.
+
+## 0.525 — 30 October 2026
+
+**English is optional on a card that can be heard or seen.**
+
+- On a teacher's card, the Basic tab's section is called Content rather
+  than "Word or phrase". The card type keeps its name.
+- Arabic, Transliteration, Add-ons, English and "Accepted answer 2" are
+  headed like "Card name" above them, rather than in large type.
+- English is no longer required once the word has a recording or a
+  picture; its asterisk goes and the card saves without it. Such a card
+  is practised only in the exercises that need no meaning, such as
+  listening and matching recordings. Without either, English is still
+  required.
+- To check by hand: a card saved with a recording and no English, its
+  tile, and that it turns up in listening exercises.
+
+## 0.524 — 30 October 2026
+
+**A teacher's card: a plainer Basic tab, with every part headed.**
+
+- The selected tab on a card no longer has a drop shadow.
+- The Basic tab's form has no frame and no divider at its top: it is the
+  only form there, so its fields sit straight on the screen.
+- Each accepted answer is headed in three parts: the language's script
+  (Arabic, for example), Transliteration where the language has one, and
+  Add-ons for its grammar, recordings and images. Answers after the first
+  start with "Accepted answer 2", "Accepted answer 3", under a thin line.
+- These headings and English use the size of the section headings in
+  Settings.
+- To check by hand: a card with one answer and with two, read and edited;
+  a language with no transliteration; a sentence with blanks.
+
+## 0.523 — 30 October 2026
+
+**A deck's cards are managed on a page of their own, and locking decks is
+set aside for now.**
+
+- Opening a deck shows its cards to read, search, sort and filter. Which
+  cards it holds is changed on a new Manage cards page, laid out like
+  Teaching > Cards: New card, Import and the view switch, the search, then
+  Select, Sort and Filter. Add existing cards opens a picker of your cards
+  in the deck's language, with the built-in numbers and pronouns at the
+  top; nothing changes until Done. Each card has a Remove button, and
+  removing can be undone from the message that follows.
+- Built-in cards are now among a deck's cards, marked Built-in: one entry
+  per range of numbers, and one for the pronouns. They are added and
+  removed on Manage cards and saved straight away, not with the deck.
+- A deck with no cards, and Teaching > Cards with none, show a panel
+  inviting you to add some instead of the search, Sort and Filter.
+- Locking a deck is gone for now: there is no Lock or Unlock, and decks
+  that were locked can be changed like any other. Whether a deck was
+  locked is still remembered.
+- Edit and Save no longer jump back to the top of a card or deck.
+- A card or deck being read shows its fields as plain words under their
+  labels, like a course's name and language; an empty field says "None".
+- In Settings, Check is a full-size button under the version, and turns
+  into a filled Reload button when a newer version is waiting.
+- To check by hand: Import on Manage cards brings cards in as the file
+  says rather than straight into the deck.
+
+## 0.522 — 30 October 2026
+
+**Courses opens as its own screen, the You menu is tidier, and empty
+spots in Teaching invite you to fill them.**
+
+- In Learning, Courses opens as a full screen with a back arrow, like
+  Settings and How it works, and the arrow takes you back to where you
+  were. Courses is in the You menu only in Learning; Teaching and Admin
+  keep it in their bar.
+- Choosing a space is now at the very bottom of the You menu, under the
+  sync line, without a heading.
+- In Settings, the version reads like the recordings figures above it:
+  the version number large, the build and date as a quieter line under it.
+- A new "nothing yet" panel replaces the plain grey lines in Teaching: a
+  course with no decks, a deck in no course, and a deck with no built-in
+  cards. Where students are missing out it is in the warm accent colour;
+  where empty is fine it is calm. While editing, the way to fill it sits
+  inside the panel.
+- To check by hand: adding the first deck to an empty course closes the
+  picker after that one deck, as the panel gives way to the list.
+
+## 0.521 — 29 October 2026
+
+**The You menu is simpler, and settings are on one screen.**
+
+- Choosing a space in the You menu no longer closes it: the space changes
+  behind the menu and you stay where you were.
+- Account settings and App preferences are now one Settings screen, with
+  the preferences first. It always opens at the top.
+- The version number and the check for a newer one have moved from the
+  menu into Settings, just above Sign out.
+- Sync status and Sync now sit at the bottom of the You menu.
+- Courses, Settings and How it works are bigger and easier to tap.
+
 ## 0.520 — 29 October 2026
 
 **Edit and Save float in the corner, and the card screen tells you why

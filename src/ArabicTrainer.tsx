@@ -9,6 +9,7 @@ import {
   APP_COMMIT,
   APP_RELEASE,
   APP_BUILD,
+  AudioPrompt as SharedAudioPrompt,
   Button,
   CardReadout,
   CardTile,
@@ -8903,205 +8904,10 @@ function chainOf(unit: Form): string[] {
   return seq.slice(1).map((group) => (group || [])[0]).filter(Boolean);
 }
 
-function AudioPrompt({ recs, autoPlay, lead = "regular", after }: {
-  recs?: any[];
-  autoPlay?: boolean;
-  lead?: "regular" | "slow";
-  /**
-   * Recordings to play straight after the one that was started.
-   *
-   * The one place two clips are ever joined: a time may be its hour and
-   * its minutes said one after the other, because a teacher records the
-   * words and not the nine hundred times a clock can show. Played in
-   * order rather than stitched — the join is where a dialect lives, and a
-   * stitched clip teaches the wrong sound.
-   */
-  after?: string[];
-}) {
-  const [idx, setIdx] = useState(0);
-  const [state, setState] = useState("idle");
-  const audioRef: React.MutableRefObject<HTMLAudioElement | null> = useRef(null);
-  const urlRef = useRef("");
-  /* Whether a clip is finishing so the next can start. Held apart from
-     the state because the browser reports the gap between two clips as a
-     pause, and a pause between them is not the player stopping. */
-  const chaining = useRef(false);
-  const list = recs || NO_RECS;
-  /* Which recordings this is showing, as one string, so the reset below
-     fires when any of them changes and not only the first. */
-  const signature = list.map((r) => r.id).concat(after || []).join("|");
-
-  /*
-   * At most one of each speed, and the ordinary one first.
-   *
-   * A card may hold several takes at either speed — a teacher recording
-   * twice to get it right leaves both — and a question is not the place to
-   * choose between them: what a learner wants here is this word, and this
-   * word said slowly, not a numbered rank of the takes that exist. The rest
-   * are still on the card, and the teacher's screen still lists them all.
-   */
-  const iReg = list.findIndex((r) => r.speed !== "slow");
-  const iSlow = list.findIndex((r) => r.speed === "slow");
-  const takes: { i: number, slow: boolean }[] = [];
-  if (iReg >= 0) takes.push({ i: iReg, slow: false });
-  if (iSlow >= 0) takes.push({ i: iSlow, slow: true });
-  /* A card with nothing but slow recordings would otherwise show none. */
-  if (!takes.length && list.length) takes.push({ i: 0, slow: false });
-  /* The one the card's progress asks for, if the card has it: a lead that
-     is not there is not a lead, and the other one is then the whole
-     offering rather than a quiet second choice. */
-  const leadSlow = lead === "slow" && iSlow >= 0;
-  /* The one being led with goes first. The pair is built ordinary-then-slow
-     because that is the order they are recorded in; what is read left to
-     right is which of them this question is about. */
-  if (leadSlow) takes.reverse();
-  const opens = takes.length ? takes[0].i : 0;
-
-  const releaseUrl = () => {
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-    urlRef.current = "";
-  };
-
-  /* Stop where it is. The button has said Pause since the icons went in and
-     did not: pressing it called play again, which loaded the clip afresh
-     and started it over — the one thing "pause" cannot mean. */
-  const pause = () => {
-    if (audioRef.current) audioRef.current.pause();
-    setState("idle");
-  };
-
-  const play = useCallback(
-    async (i: number) => {
-      const rec = list[i];
-      if (!rec) return;
-      setState("loading");
-      const url = await clipUrl(rec.id);
-      if (!url) {
-        setState("missing");
-        return;
-      }
-      if (!audioRef.current) audioRef.current = new Audio();
-      const el = audioRef.current;
-      releaseUrl();
-      urlRef.current = url;
-      el.src = url;
-      /* One clip, or a clip and then the rest of them. */
-      const queue = (after || []).slice();
-      el.onended = async () => {
-        const next = queue.shift();
-        if (!next) {
-          chaining.current = false;
-          setState("idle");
-          return;
-        }
-        chaining.current = true;
-        const nextUrl = await clipUrl(next);
-        if (!nextUrl) {
-          chaining.current = false;
-          setState("idle");
-          return;
-        }
-        releaseUrl();
-        urlRef.current = nextUrl;
-        el.src = nextUrl;
-        try {
-          await el.play();
-        } catch (e) {
-          chaining.current = false;
-          setState("idle");
-        }
-      };
-      /* Paused by anything else — the other button taking the element, a
-         headset, the phone's own controls — reads the same as pausing here.
-         Only ever a step down from playing, so it cannot undo the state a
-         moment before the clip starts. */
-      el.onpause = () => {
-        if (chaining.current) return;
-        setState((v) => (v === "playing" ? "idle" : v));
-      };
-      /* A clip that cannot be decoded used to leave the button on "playing"
-         for good; now it reads as missing, which is what it is. */
-      el.onerror = () => setState("missing");
-      try {
-        await el.play();
-        setState("playing");
-      } catch (e) {
-        // Browsers block autoplay until you've interacted with the page.
-        setState("idle");
-      }
-    },
-  /* The signature is the identity of the list, and the reason it
-     exists: `list` is rebuilt on every render, so depending on it
-     would rebuild the player between every keystroke. */
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-    [signature]
-  );
-
-  useEffect(() => {
-    setIdx(opens);
-    setState("idle");
-    /* The ordinary speed is what plays by itself: the slow one is a thing
-       to reach for, not the question as it is asked. */
-    if (autoPlay) play(opens);
-    return () => {
-      if (audioRef.current) audioRef.current.pause();
-      releaseUrl();
-    };
-  /* Same again: a new clip list with the same contents must not
-     restart playback. autoPlay and play are read on purpose from the
-     render that changed the signature. */
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature]);
-
-  if (!list.length) return <Notice kind="warn">No recording for this form.</Notice>;
-
-  return (
-    <div className={`at-playrow${takes.length > 1 ? " twin" : ""}`}>
-      {takes.map(({ i, slow }) => {
-        const mine = idx === i;
-        return (
-          <button
-            key={list[i].id}
-            className={`at-playbig${takes.length > 1 ? " twin" : ""}${
-              takes.length > 1 && slow !== leadSlow ? " quiet" : ""
-            }`}
-            onClick={() => {
-              /* Pressing the one that is playing stops it; pressing the
-                 other switches to it. */
-              if (mine && state === "playing") {
-                pause();
-                return;
-              }
-              setIdx(i);
-              play(i);
-            }}
-          >
-            {/* The icon is the target on a phone, so it is sized like one
-                rather than like a glyph sitting in the label's line — and
-                it is what tells the two apart at a glance, the label being
-                the thing you read second. */}
-            <span className="dot">
-              <Icon
-                name={mine && state === "playing" ? "pause" : slow ? "slow" : "play"}
-                /* Smaller on the one taking the narrower third of the row,
-                   so what it holds is in proportion to the room it has. */
-                size={takes.length > 1 && slow !== leadSlow ? 26 : 36}
-              />
-            </span>
-            {mine && state === "loading"
-              ? "Loading"
-              : mine && state === "missing"
-              ? "Not on this device"
-              : slow
-              ? "Slow"
-              : takes.length > 1
-              ? "Regular"
-              : "Play"}
-          </button>
-        );
-      })}
-    </div>
-  );
+/* The player itself is shared — see AudioPrompt in shared.tsx — and reads
+   this device's copies of the recordings. */
+function AudioPrompt(props: Omit<React.ComponentProps<typeof SharedAudioPrompt>, "load">) {
+  return <SharedAudioPrompt load={clipUrl} {...props} />;
 }
 
 function Field({ value, field, kind, lang, name }: {
@@ -10307,6 +10113,13 @@ export default function ArabicTrainer() {
   const [ready, setReady] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [tab, setTab] = useState("home");
+  /* Courses is a screen over Learning, opened from the menu or the empty
+     home: its back arrow returns to the tab it was opened from. */
+  const [coursesBack, setCoursesBack] = useState("home");
+  const openCourses = () => {
+    if (tab !== "courses") setCoursesBack(tab);
+    setTab("courses");
+  };
 
   /* The deck filter. Nothing sets it any more — the control that used
      to toggle it was removed, and this was left reading as though it
@@ -10347,7 +10160,7 @@ export default function ArabicTrainer() {
      rather than a ref, so the tab strips that portal into it render again
      once it exists. */
   const [dockSlot, setDockSlot] = useState<HTMLElement | null>(null);
-  const [screen, setScreen] = useState<string | null>(null); // null | "account" | "prefs"
+  const [screen, setScreen] = useState<string | null>(null); // null | "settings" | "guide"
   /* Remembered, because it decides whether the Teaching option exists at all.
      Deriving it only from a fresh network call meant a slow or failed request
      took the space selector away, with no way back but signing out. */
@@ -13881,7 +13694,7 @@ export default function ArabicTrainer() {
                   <span>
                     {`${plural(missingClips, "recording")} isn't on this device, so questions that
                       play ${missingClips === 1 ? "it" : "them"} are being held back. `}
-                    <button className="at-linkbtn" onClick={() => setScreen("account")}>
+                    <button className="at-linkbtn" onClick={() => setScreen("settings")}>
                       Download when you&apos;re back online
                     </button>
                   </span>
@@ -13922,7 +13735,7 @@ export default function ArabicTrainer() {
                    strip above does not go anywhere. */
                 action={
                   coursesKnown && myCourses.length === 0 ? (
-                    <Button variant="primary" onClick={() => setTab("courses")} icon="school">
+                    <Button variant="primary" onClick={openCourses} icon="school">
                       Join a course
                     </Button>
                   ) : null
@@ -15254,6 +15067,7 @@ export default function ArabicTrainer() {
         )}
 
         {tab === "courses" && (
+          <Screen title="Courses" onBack={() => setTab(coursesBack)}>
           <React.Suspense fallback={<ChunkFallback />}>
           <StudentCourses
             courses={myCourses}
@@ -15275,6 +15089,7 @@ export default function ArabicTrainer() {
             }}
           />
           </React.Suspense>
+          </Screen>
         )}
 
         {space === "teach" && account && (
@@ -15453,7 +15268,6 @@ export default function ArabicTrainer() {
           ManyTongues
         </div>
       )}
-      {!inExercise && space === "learn" && tab === "courses" && <h1 className="at-tabtitle">Courses</h1>}
 
       {/* The bar at the foot of the window. Always mounted, so the slot the
           sections portal into stays the same element; hidden rather than
@@ -15497,6 +15311,7 @@ export default function ArabicTrainer() {
                      from that one question and nowhere else. */
                   onSpace: (to: string) => {
                     setTrialBack(null);
+                    if (tab === "courses") setTab(coursesBack);
                     setSpace(to);
                   },
                   choices,
@@ -15507,15 +15322,18 @@ export default function ArabicTrainer() {
                       ? "Select the languages you see in your courses, decks, and cards. This doesn't change anything for your students."
                       : "Select the languages you see in your cards, progress, and anything you practice.",
                 }}
-                onCourses={() => {
-                  setTrialBack(null);
-                  setSpace("learn");
-                  setTab("courses");
-                  setSession(null);
-                }}
-                onAccount={() => setScreen("account")}
+                /* Only Learning: Teaching and Admin have Courses in their bar. */
+                onCourses={
+                  space === "learn"
+                    ? () => {
+                        setTrialBack(null);
+                        setSession(null);
+                        openCourses();
+                      }
+                    : undefined
+                }
+                onSettings={() => setScreen("settings")}
                 onGuide={() => setScreen("guide")}
-                onPrefs={() => setScreen("prefs")}
               />
             </div>
             </div>
@@ -19668,7 +19486,7 @@ const GUIDE = [
          saying plainly which is which, because the difference is what
          somebody would plan a journey around. */
       "Practising works with no connection at all: your answers, your schedule and anything you report about a card are kept on the device and go up when you are back online.",
-      "What does need a connection: setting up, joining a course, new material from your teacher, and recordings you haven't played yet. Account settings can download a whole course's recordings before you travel.",
+      "What does need a connection: setting up, joining a course, new material from your teacher, and recordings you haven't played yet. Settings can download a whole course's recordings before you travel.",
     ],
   },
 ];
@@ -19893,19 +19711,21 @@ const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", ad
  * is a blank screen with no way of telling why, and the row says so rather
  * than just refusing.
  */
-function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note }: {
+function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part }: {
   space: string;
   spaces: string[];
-  /** Choosing a space also puts the menu away, which is the caller's. */
+  /** Choosing a space keeps the menu open; the app changes behind it. */
   onSpace: (space: string) => void;
   choices: LangChoice[];
   off: LangId[];
   onLangs: (off: LangId[]) => void;
   /* What switching one off does, in the space it is switched in. */
   note: string;
+  /** The menu shows the languages at its top and the spaces at its foot. */
+  part?: "spaces" | "langs";
 }) {
-  const spacesToo = !!spaces && spaces.length > 1;
-  const langsToo = !!choices && choices.length > 1;
+  const spacesToo = part !== "langs" && !!spaces && spaces.length > 1;
+  const langsToo = part !== "spaces" && !!choices && choices.length > 1;
   if (!spacesToo && !langsToo) return null;
 
   const on = langsToo ? choices.filter((c) => !off.includes(c.id)) : [];
@@ -19920,7 +19740,6 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note }: {
     <div className="at-place">
       {spacesToo && (
         <>
-          <p className="at-eyebrow">Space</p>
           <div className="at-spacepick" role="radiogroup" aria-label="Space">
             {spaces.map((sp) => (
               <button
@@ -20101,19 +19920,19 @@ function AppVersion() {
           carrying both would make you pick between them, and the pick is
           never yours to make. */}
       {stale ? (
-        <button className="at-cverbtn" onClick={reload} disabled={reloading}>
+        <Button variant="primary" icon="refresh" onClick={reload} disabled={reloading}>
           {reloading ? "Reloading…" : "Reload"}
-        </button>
+        </Button>
       ) : (
-        <button className="at-cverbtn" onClick={() => check(true)} disabled={busy}>
+        <Button icon="refresh" onClick={() => check(true)} disabled={busy}>
           {busy ? "Checking…" : "Check"}
-        </button>
+        </Button>
       )}
     </div>
   );
 }
 
-function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onAccount, onPrefs, onGuide }: {
+function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide }: {
   account: User | null;
   syncState?: string;
   /** What to say about it. Worked out by the app, which is the only thing
@@ -20125,9 +19944,8 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
   place: React.ComponentProps<typeof PlacePicker>;
   /** The courses you are in, and joining another: Learning's Courses
       page, which has no section of its own in the bar. */
-  onCourses: () => void;
-  onAccount: () => void;
-  onPrefs: () => void;
+  onCourses?: () => void;
+  onSettings: () => void;
   onGuide: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -20163,14 +19981,49 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
             </span>
           </div>
 
-          <PlacePicker
-            {...place}
-            onSpace={(sp: string) => {
-              setOpen(false);
-              place.onSpace(sp);
-            }}
-          />
+          <PlacePicker {...place} part="langs" />
 
+
+          {onCourses && (
+            <button
+              className="at-cline at-cbig"
+              onClick={() => {
+                setOpen(false);
+                onCourses();
+              }}
+            >
+              <span className="at-cico">
+                <Icon name="folder" size={22} />
+              </span>
+              <span className="at-clinetext">Courses</span>
+            </button>
+          )}
+          <button
+            className="at-cline at-cbig"
+            onClick={() => {
+              setOpen(false);
+              onSettings();
+            }}
+          >
+            <span className="at-cico">
+              <Icon name="tune" size={22} />
+            </span>
+            <span className="at-clinetext">Settings</span>
+          </button>
+          <button
+            className="at-cline at-cbig"
+            onClick={() => {
+              setOpen(false);
+              onGuide();
+            }}
+          >
+            <span className="at-cico">
+              <Icon name="help" size={22} />
+            </span>
+            <span className="at-clinetext">How it works</span>
+          </button>
+
+          <div className="at-crule" />
           {/* The row states where sync has got to; the button is the only
               thing that starts one. It used to be the whole row, so
               reading the state meant risking the action. */}
@@ -20183,59 +20036,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
               Sync now
             </button>
           </div>
-
-
-          <button
-            className="at-cline"
-            onClick={() => {
-              setOpen(false);
-              onCourses();
-            }}
-          >
-            <span className="at-cico">
-              <Icon name="folder" size={18} />
-            </span>
-            <span className="at-clinetext">Courses</span>
-          </button>
-          <button
-            className="at-cline"
-            onClick={() => {
-              setOpen(false);
-              onAccount();
-            }}
-          >
-            <span className="at-cico">
-              <Icon name="person" size={18} />
-            </span>
-            <span className="at-clinetext">Account settings</span>
-          </button>
-          <button
-            className="at-cline"
-            onClick={() => {
-              setOpen(false);
-              onPrefs();
-            }}
-          >
-            <span className="at-cico">
-              <Icon name="tune" size={18} />
-            </span>
-            <span className="at-clinetext">App preferences</span>
-          </button>
-          <button
-            className="at-cline"
-            onClick={() => {
-              setOpen(false);
-              onGuide();
-            }}
-          >
-            <span className="at-cico">
-              <Icon name="help" size={18} />
-            </span>
-            <span className="at-clinetext">How it works</span>
-          </button>
-
-          <div className="at-crule" />
-          <AppVersion />
+          <PlacePicker {...place} part="spaces" />
         </Popover>
       )}
     </div>
@@ -20260,16 +20061,17 @@ function SettingsScreen({ kind, onClose, ...rest }: {
   kind?: string;
   onClose: () => void;
 } & React.ComponentProps<typeof AccountSettings> & React.ComponentProps<typeof AppPreferences>) {
-  const title =
-    kind === "account" ? "Account settings" : kind === "guide" ? "How it works" : "App preferences";
+  const title = kind === "guide" ? "How it works" : "Settings";
   return (
     <Screen title={title} onBack={onClose} className={kind === "guide" ? "" : "cardform"}>
-      {kind === "account" ? (
-        <AccountSettings {...rest} />
-      ) : kind === "guide" ? (
+      {kind === "guide" ? (
         <Guide />
       ) : (
-        <AppPreferences {...rest} />
+        <>
+          {/* One screen: how the app behaves first, then you. */}
+          <AppPreferences {...rest} />
+          <AccountSettings {...rest} />
+        </>
       )}
     </Screen>
   );
@@ -20505,6 +20307,14 @@ function AccountSettings({
         imagesOnDevice={imagesOnDevice}
         onDownloaded={onDownloaded}
       />
+
+      {/* Which version this is, and the check for a newer one. */}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">Version</span>
+        </div>
+        <AppVersion />
+      </div>
 
       {/* Signing out is ordinary housekeeping, not a danger: it leaves
           everything on the server exactly as it is. */}

@@ -30,6 +30,10 @@ import { migrateCards } from "../../src/numbers/migrate.ts";
 import { liftSubtypeTagsIn } from "../../src/subtype-tags.ts";
 import { tickCapitals } from "../../src/capitals.ts";
 
+/* Locking a deck is set aside for now: a locked deck's flag is kept, but
+   nothing is refused because of it. Turn back on to bring locks back. */
+const DECK_LOCKS = false;
+
 /*
  * Courses, decks and the people who use them.
  *
@@ -2459,7 +2463,7 @@ export default async (req) => {
            was and named in the answer, so a save queued offline before the
            lock still lands its words and the teacher is told which deck
            did not take the change. */
-        if (want !== has && d.locked) {
+        if (want !== has && d.locked && DECK_LOCKS) {
           if (has) final.push(did);
           refusedLocked.push({ id: d.id, title: d.title });
           continue;
@@ -2937,7 +2941,7 @@ export default async (req) => {
       if (!deck) return json({ error: "no-deck" }, 404);
       if (!(await canEditDeck(store, deck, mine, me.admin)))
         return json({ error: "not-yours" }, 403);
-      if (deck.locked) return json({ error: "deck-locked" }, 409);
+      if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
       const asked = Array.isArray(body.parts) ? body.parts : [];
       const parts = [
         ...new Set(
@@ -2965,7 +2969,7 @@ export default async (req) => {
       if (!deck) return json({ error: "no-deck" }, 404);
       if (!(await canEditDeck(store, deck, mine, me.admin)))
         return json({ error: "not-yours" }, 403);
-      if (deck.locked) return json({ error: "deck-locked" }, 409);
+      if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
 
       await dropFromCourses(store, deck.id);
       await store.delete(K.deck(deck.id)).catch(() => {});

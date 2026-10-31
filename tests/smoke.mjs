@@ -1835,11 +1835,24 @@ if (/Build a session/.test(document.body.textContent)) {
     click(document.querySelector(".at-cornerbtn"));
     await sleep(150);
   };
+  /* The version moved from the menu into Settings, above Sign out
+     (0.521): reached through the menu's Settings, and left by its back. */
+  const openVersion = async () => {
+    if (!document.querySelector(".at-cmenu")) await openMenu();
+    click([...document.querySelectorAll(".at-cmenu .at-cline")].find((b) => /Settings/.test(b.textContent || "")));
+    await sleep(150);
+  };
+  const closeVersion = async () => {
+    const back = [...document.querySelectorAll(".at-screen .at-back")].pop();
+    if (back) click(back);
+    await sleep(80);
+  };
+  const verBtnOf = (/** @type {Element | null} */ v) => v && v.querySelector(".at-btn");
 
-  await openMenu();
+  await openVersion();
   const ver = document.querySelector(".at-cver");
-  check("the corner menu carries a version", !!ver,
-    ver ? "" : document.querySelector(".at-cmenu") ? "menu open, no version line" : "the menu did not open");
+  check("Settings carries a version", !!ver,
+    ver ? "" : document.querySelector(".at-screen") ? "Settings open, no version line" : "Settings did not open");
   const verHead = ver && ver.querySelector("b");
   const verWhen = ver && ver.querySelector("i");
   check("the headline is the release, not a hash",
@@ -1854,7 +1867,7 @@ if (/Build a session/.test(document.body.textContent)) {
     !document.querySelector(".at-cmenu .at-segmented"),
     document.querySelector(".at-cmenu .at-segmented") ? "still there" : "gone");
 
-  const verBtn = ver && ver.querySelector(".at-cverbtn");
+  const verBtn = verBtnOf(ver);
   check("nothing to reload when it is the deployed one",
     !!ver && !ver.classList.contains("stale") && !!verBtn && /^Check$/.test(verBtn.textContent.trim()),
     verBtn ? verBtn.textContent : "no button");
@@ -1867,8 +1880,7 @@ if (/Build a session/.test(document.body.textContent)) {
     await sleep(80);
     check("Check asks the server again", versionHits > before, `${before} → ${versionHits}`);
     const after = document.querySelector(".at-cver");
-    check("and the menu is still open, so the answer can be read",
-      !!after && !!document.querySelector(".at-cmenu"));
+    check("and Settings is still open, so the answer can be read", !!after);
     check("nothing changes when nothing has changed",
       !!after && !after.classList.contains("stale"), (after && after.className) || "");
     /* Nothing on the line moved, so without a word the button reads as
@@ -1883,6 +1895,8 @@ if (/Build a session/.test(document.body.textContent)) {
      reading the state meant risking the action — and the state is the
      part you open the menu for. */
   {
+    await closeVersion();
+    await openMenu();
     const row = [...document.querySelectorAll(".at-cline")].find((r) => r.querySelector(".at-cact"));
     check("the sync row is a label, not a button", !!row && row.tagName !== "BUTTON",
       row ? row.tagName : "no sync row");
@@ -1902,34 +1916,30 @@ if (/Build a session/.test(document.body.textContent)) {
   /* A deploy that landed while the menu was open: found by pressing the
      button, not by reopening the menu. */
   {
+    await openVersion();
     deployedVersion = { release: "0.2", commit: "9999999", builtAt: "2026-09-05T15:00:00.000Z" };
-    click(document.querySelector(".at-cverbtn"));
+    click(verBtnOf(document.querySelector(".at-cver")));
     await sleep(80);
     const found = document.querySelector(".at-cver");
-    const btn = found && found.querySelector(".at-cverbtn");
+    const btn = verBtnOf(found);
     check("Check finds a deploy that landed while the menu was open",
       !!found && found.classList.contains("stale") && /9999999/.test(found.textContent),
       (found && found.textContent) || "");
     check("and the button becomes the one that fixes it",
       !!btn && /^Reload$/.test(btn.textContent.trim()), btn ? btn.textContent : "no button");
     deployedVersion = { release: "0.1", commit: "abc1234", builtAt: "2026-09-05T13:00:00.000Z" };
-    click(document.querySelector(".at-cornerbtn"));
-    await sleep(50);
-    await openMenu();
-    await sleep(60);
+    await closeVersion();
   }
 
   /* A deploy lands while this bundle is the one in hand. */
-  click(document.querySelector(".at-cornerbtn"));
-  await sleep(50);
   deployedVersion = { release: "0.2", commit: "def5678", builtAt: "2026-09-05T14:00:00.000Z" };
-  await openMenu();
+  await openVersion();
   await sleep(60);
   const stale = document.querySelector(".at-cver");
   check("a newer deploy is reported rather than passed over",
     !!stale && stale.classList.contains("stale") && /def5678/.test(stale.textContent),
     (stale && stale.textContent) || "");
-  check("and it offers the one thing that fixes it", !!stale && !!stale.querySelector(".at-cverbtn"));
+  check("and it offers the one thing that fixes it", !!stale && /Reload/.test((verBtnOf(stale) || { textContent: "" }).textContent || ""));
   /* Updating used to take a press and two refreshes. The worker skips
      waiting and claims the page, so a deployed one takes charge as soon as
      it has installed — but nothing told the page, so the tab went on
@@ -1975,27 +1985,25 @@ if (/Build a session/.test(document.body.textContent)) {
   /* Same build, differently labelled. Only the commit decides: a release
      string that disagreed would otherwise send everyone to Reload for
      nothing. */
-  click(document.querySelector(".at-cornerbtn"));
-  await sleep(50);
+  await closeVersion();
   deployedVersion = { release: "0.9", commit: "abc1234", builtAt: "2026-09-05T13:00:00.000Z" };
-  await openMenu();
+  await openVersion();
   await sleep(60);
   const relabelled = document.querySelector(".at-cver");
-  const relabelledBtn = relabelled && relabelled.querySelector(".at-cverbtn");
+  const relabelledBtn = verBtnOf(relabelled);
   check("a relabelled release on the same build is not a new deploy",
     !!relabelled && !relabelled.classList.contains("stale") &&
       !!relabelledBtn && /^Check$/.test(relabelledBtn.textContent.trim()),
     (relabelled && relabelled.textContent) || "");
 
   /* Offline is not a failed deploy, and must not be shown as one. */
-  click(document.querySelector(".at-cornerbtn"));
-  await sleep(50);
+  await closeVersion();
   const realFetch = w.fetch;
   w.fetch = globalThis.fetch = async (input, opts) => {
     if (String(input).includes("/api/version")) throw new Error("offline");
     return realFetch(input, opts);
   };
-  await openMenu();
+  await openVersion();
   await sleep(60);
   const offline = document.querySelector(".at-cver");
   check("unreachable is not reported as out of date",
@@ -2019,9 +2027,17 @@ if (/Build a session/.test(document.body.textContent)) {
   await sleep(60);
   /* The menu is already open from the check above — asked rather than
      assumed, so this reads the same whether or not that changes. */
+  {
+    const back = [...document.querySelectorAll(".at-screen .at-back")].pop();
+    if (back) { click(back); await sleep(80); }
+  }
   if (!document.querySelector(".at-cmenu")) await openMenu();
   await sleep(60);
-  const line = document.querySelector(".at-clinetext");
+  /* The sync row is at the foot of the menu now, under Courses and the
+     rest (0.521), so it is found by its button rather than as the first
+     line. */
+  const syncRow = [...document.querySelectorAll(".at-cmenu .at-cline")].find((r) => r.querySelector(".at-cact"));
+  const line = syncRow && syncRow.querySelector(".at-clinetext");
   check("offline, the sync line says so and says the work is safe",
     !!line && /offline/i.test(line.textContent) && /this device/i.test(line.textContent),
     (line && line.textContent) || "no sync line in the menu");
@@ -3271,7 +3287,9 @@ check("no console errors during the session", errors.length === 0, errors.slice(
     check("a space's tabs put its own panel back",
       /useEffect\(\(\) => \{\s*if \(bodyRef\.current\) bodyRef\.current\.scrollTop = 0;\s*\}, \[tab\]\)/.test(shared));
     check("and a screen replacing another starts at its own top",
-      /useEffect\(\(\) => \{\s*if \(bodyRef\.current\) bodyRef\.current\.scrollTop = 0;\s*\}, \[title\]\)/.test(shared));
+      /* Keyed on the title, or on a steadier key where Edit and Save
+         change the title but not the place (0.523). */
+      /const placeKey = scrollKey === undefined \? title : scrollKey;\s*useEffect\(\(\) => \{\s*if \(bodyRef\.current\) bodyRef\.current\.scrollTop = 0;\s*\}, \[placeKey\]\)/.test(shared));
   }
 
   /* The sound setting used to be a boolean and is now a level, and a
@@ -5143,7 +5161,7 @@ const openPronounTables = async () => {
       !cardNameField().querySelector(".at-label .req"),
     advancedBox() ? (advancedBox().textContent || "").trim() : "(no box)");
   check("whose Basic tab holds the word itself",
-    [...document.querySelectorAll(".at-formblock .at-formnum")].some((n) => /^Word or phrase$/.test((n.textContent || "").trim())),
+    [...document.querySelectorAll(".at-formblock .at-formnum")].some((n) => /^Content$/.test((n.textContent || "").trim())),
     "(no word)");
   const typeRows = () => [...document.querySelectorAll(
     '[role="radiogroup"][aria-label="What type of card"] .at-tickrow')];
@@ -8663,9 +8681,11 @@ const openPronounTables = async () => {
       .map((t) => (t.textContent || "").slice(0, 14)).join(" | ") || "no decks");
   click(deckTile);
   await sleep(500);
+  /* Read-only since 0.523: the deck's cards are sorted and filtered here,
+     and selected only on Manage cards. */
   check("an open deck carries the same two rows",
     [...document.querySelectorAll(".at-toolbar")].length >= 2 &&
-      named(document.querySelector(".at-toolbar-sub")).join(" | ") === "Select | Sort | Filter",
+      named(document.querySelector(".at-toolbar-sub")).join(" | ") === "Sort | Filter",
     named(document.querySelector(".at-toolbar-sub")).join(" | ") || "(no second row)");
   check("and the same filter, still in force",
     !!document.querySelector(".at-menubtn.on"),
@@ -8680,7 +8700,7 @@ const openPronounTables = async () => {
       ? [...deckSheet.querySelectorAll(".at-formnum, .at-section > .at-sectiontop > .at-eyebrow")].map((h) => (h.textContent || "").trim())
       : [];
     check("an open deck is headed like a card's screen, This deck to Cards",
-      deckHeads.join(" | ") === "This deck | Built-in cards | Cards",
+      deckHeads.join(" | ") === "This deck | Cards",
       deckHeads.join(" | ") || "(not laid out like the card editor)");
     const thisDeck = deckSheet && deckSheet.querySelector(".at-formblock");
     const labels = thisDeck ? [...thisDeck.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : [];
@@ -8752,14 +8772,20 @@ const openPronounTables = async () => {
   check("Edit swaps the back arrow for a cross that cancels",
     !!document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'),
     [...document.querySelectorAll(".at-screenhead .at-back")].map((b) => b.getAttribute("aria-label")).join(" | "));
-  const addExtras = buttonNamed(/^Choose built-in cards$/);
-  check("and edited, an open deck offers to choose its built-in cards", !!addExtras,
-    (document.body.textContent || "").includes("Built-in cards") ? "(section, no button)" : "(no section)");
-  click(addExtras);
+  /* Since 0.523 the built-in cards are among the deck's cards, added on
+     Manage cards with the rest and saved there and then. */
+  click(document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'));
+  await sleep(250);
+  click(buttonNamed(/^Manage this deck's cards$/));
+  await sleep(300);
+  check("Manage this deck's cards opens a page of its own",
+    [...document.querySelectorAll(".at-screenhead h2")].some((h) => /^Manage cards$/.test((h.textContent || "").trim())),
+    [...document.querySelectorAll(".at-screenhead h2")].map((h) => h.textContent).join(" | "));
+  click(buttonNamed(/^Add existing cards$/));
   await sleep(300);
   const partRow = (/** @type {RegExp} */ re) =>
     [...document.querySelectorAll(".at-tickrow, label")].find((r) => re.test(r.textContent || ""));
-  check("and lists the parts of the numbers, with counting inside them rather than parts of its own",
+  check("and adding lists the parts of the numbers, with counting inside them rather than parts of its own",
     !!partRow(/Numbers 0 to 9/) && !!partRow(/Numbers 10 to 19/) && !partRow(/Counting things/) &&
       !!partRow(/Telling the hour/),
     [...document.querySelectorAll(".at-tickrow, label")].map((r) => (r.textContent || "").slice(0, 24)).join(" | ") || "(no list)");
@@ -8767,46 +8793,19 @@ const openPronounTables = async () => {
   click(box && (box.querySelector("input") || box));
   await sleep(150);
   const partsBefore = savedParts.length;
-  click(document.querySelector('.at-screenaction [aria-label="Done"]'));
-  await sleep(250);
-  check("and choosing them sends nothing until the deck is saved",
-    savedParts.length === partsBefore && /Numbers 0 to 9/.test(document.body.textContent || ""),
+  check("and ticking sends nothing until Done", savedParts.length === partsBefore,
     JSON.stringify(savedParts.slice(partsBefore)));
-  click(document.querySelector('.at-fab[aria-label="Save"]'));
+  click(document.querySelector('.at-screenaction [aria-label="Done"]'));
   await sleep(600);
   const sent = savedParts[savedParts.length - 1];
-  check("and saving tells the server which parts the deck holds",
+  check("and Done tells the server which parts the deck holds",
     !!sent && sent.deckId === "d1" && JSON.stringify(sent.parts) === JSON.stringify(["numbers:0-9"]),
     JSON.stringify(savedParts));
 
-  /* ---- and locking it ----
-     A button by the Cards heading, dimmed while the deck is read; pressed
-     while editing, it asks, and what it asks is saved with the deck. */
-  await sleep(300);
-  const lockBtn = () => [...document.querySelectorAll(".at-section")]
-    .filter((sec) => /^Cards$/.test((sec.querySelector(".at-sectiontop .at-eyebrow") || {}).textContent || ""))
-    .map((sec) => /** @type {HTMLButtonElement | null} */ (sec.querySelector(".at-sectiontop button")))[0] || null;
-  check("a deck being read has a dimmed Lock button by its Cards heading",
-    !!lockBtn() && /^Lock$/.test((lockBtn()?.textContent || "").trim()) && !!lockBtn()?.disabled,
-    lockBtn() ? `${(lockBtn()?.textContent || "").trim()} · ${lockBtn()?.disabled ? "dimmed" : "live"}` : "(no button by Cards)");
-  click(document.querySelector('.at-fab[aria-label="Edit"]'));
-  await sleep(250);
-  click(lockBtn());
-  await sleep(200);
-  const lockModal = document.querySelector(".at-modal");
-  check("and edited, pressing it explains what locking does before it does it",
-    !!lockModal && /Lock this deck\?/.test(lockModal.textContent || "") && /No cards can be added/.test(lockModal.textContent || ""),
-    lockModal ? (lockModal.textContent || "").slice(0, 80) : "(no question)");
-  click(lockModal && [...lockModal.querySelectorAll("button")].find((b) => /^Lock$/.test((b.textContent || "").trim())));
-  await sleep(200);
-  check("and agreeing turns it to Unlock, sending nothing yet",
-    /^Unlock$/.test((lockBtn()?.textContent || "").trim()) && lockedDecks.length === 0,
-    `${(lockBtn()?.textContent || "").trim()} · ${JSON.stringify(lockedDecks)}`);
-  click(document.querySelector('.at-fab[aria-label="Save"]'));
-  await sleep(600);
-  check("and Save locks the deck",
-    lockedDecks.length === 1 && lockedDecks[0].deckId === "d1" && lockedDecks[0].locked === true,
-    JSON.stringify(lockedDecks));
+  /* Locking is set aside for now (0.523): no button for it anywhere. */
+  check("a deck offers no Lock button while locks are set aside",
+    ![...document.querySelectorAll("button")].some((b) => /^(Lock|Unlock)$/.test((b.textContent || "").trim())),
+    "a Lock button is still there");
 }
 
 /* ---- a deck whose cards accept two spellings ----
@@ -9753,8 +9752,8 @@ const openPronounTables = async () => {
   };
 
   for (const [name, wanted] of /** @type {[RegExp, string][]} */ ([
-    [/^Account settings$/, "Account settings"],
-    [/^App preferences$/, "App preferences"],
+    /* One Settings since 0.521: the preferences, then the account. */
+    [/^Settings$/, "Settings"],
     [/^How it works$/, "How it works"],
   ])) {
     await openCorner();
@@ -9779,9 +9778,9 @@ const openPronounTables = async () => {
   /* The two things a learner actually changes in there, which is the
      whole reason the screen exists. */
   await openCorner();
-  click(rowNamed(/^App preferences$/));
+  click(rowNamed(/^Settings$/));
   await sleep(350);
-  const prefsText = ((screenTitled("App preferences") || host6).textContent || "");
+  const prefsText = ((screenTitled("Settings") || host6).textContent || "");
   check("the preferences screen offers the theme and the sounds",
     /Theme/.test(prefsText) && /Sounds/.test(prefsText),
     prefsText.slice(0, 220).replace(/\s+/g, " "));
@@ -9792,18 +9791,9 @@ const openPronounTables = async () => {
     !/Learning/.test(prefsText) && !prefsText.includes("Language"),
     prefsText.slice(0, 220).replace(/\s+/g, " "));
 
-  /* And the account screen names who is signed in, which is the one fact
-     it exists to carry. */
-  const prefsScreen = screenTitled("App preferences");
-  const backFromPrefs = prefsScreen
-    && ([...prefsScreen.querySelectorAll("button")].find((b) => /^Back$/.test((b.textContent || "").trim()))
-      || prefsScreen.querySelector(".at-back"));
-  click(backFromPrefs);
-  await sleep(250);
-  await openCorner();
-  click(rowNamed(/^Account settings$/));
-  await sleep(350);
-  const accountText = ((screenTitled("Account settings") || host6).textContent || "");
+  /* And the same screen names who is signed in, further down, which is
+     the one fact the account part exists to carry. */
+  const accountText = prefsText;
   check("the account screen says who is signed in",
     accountText.includes(account.displayName) || accountText.includes(account.handle),
     accountText.slice(0, 200).replace(/\s+/g, " "));

@@ -93,6 +93,7 @@ import {
   DeckSwitch,
   Locked,
   Pressable,
+  AudioPrompt,
   AskedMeanings,
   AskedScript,
   Tabs,
@@ -147,7 +148,11 @@ const blankLine = (taken: { id?: string }[] = []) => ({
    list is local state seeded from the stored string —
    deriving it on every render would drop an added field the moment it was
    added, because an empty answer joins to nothing. */
-function Alternatives({ value, onChange, render, of = "", addLabel = "Add another accepted answer", moreLabel = "" }: {
+function Alternatives({ value, onChange, render, of = "", addLabel = "Add another accepted answer", moreLabel = "", headed = null }: {
+  /** The Basic tab: this heading over the boxes with the + on its line,
+      and each box after the first headed "Another accepted answer" with
+      its − on that line. */
+  headed?: Node;
   value?: string;
   onChange: (value: string) => void;
   /* The third argument is what to call this box out loud, where the label
@@ -200,7 +205,25 @@ function Alternatives({ value, onChange, render, of = "", addLabel = "Add anothe
     of ? `English${list.length > 1 ? ` of accepted answer ${i + 1}` : ""} for ${of}` : undefined;
   return (
     <div className="at-alts">
-      {list.map((v, i) => (
+      {headed && (
+        <div className="at-answerheadrow">
+          <span className="at-answerheadtext">
+            <h4 className="at-answerhead">{headed}</h4>
+            {list.length > 1 && <span className="at-answerheadnote">Multiple accepted answers</span>}
+          </span>
+          <IconButton icon="add" label={of ? `${addLabel} for ${of}` : addLabel} onClick={() => commit(list.concat([""]))} />
+        </div>
+      )}
+      {headed ? list.map((v, i) => (
+        <div className="at-altrow at-altstack" key={i}>
+          <div className="at-altfield">
+            {render(v, (nv) => commit(list.map((x, j) => (j === i ? nv : x))), named(i))}
+          </div>
+          {i > 0 && (
+            <IconButton icon="remove" label="Remove this answer" onClick={() => commit(list.filter((_, j) => j !== i))} />
+          )}
+        </div>
+      )) : list.map((v, i) => (
         <React.Fragment key={i}>
         {i === 1 && moreLabel && <p className="at-fieldlede at-altsmore">{moreLabel}</p>}
         <div className="at-altrow">
@@ -363,7 +386,12 @@ function GrammarToggles({ dims, values, onPick, bare }: {
  * most cards accept one answer and want the language's default, and four
  * pickers under every row would bury the words the card is actually about.
  */
-function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, ownRecorders, blanks, onRemoveBlank, pictures }: {
+function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, ownRecorders, blanks, onRemoveBlank, pictures, headed = false, required = false }: {
+  /** The basic form, alone on its tab: each answer's three parts headed
+      — the script, how it is said, and what goes with it — and each
+      answer after the first headed with its number. */
+  headed?: boolean;
+  required?: boolean;
   lang: Lang;
   /**
    * Which form of the card these boxes belong to, where saying so is the
@@ -428,8 +456,20 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
       {rows.map((row, i) => (
         <React.Fragment key={i}>
         {/* Over the extra answers, once: what the boxes below the first are. */}
-        {i === 1 && <p className="at-fieldlede at-altsmore">Other {lang.name} answers</p>}
-        <div className="at-answerpair">
+        {!headed && i === 1 && <p className="at-fieldlede at-altsmore">Other {lang.name} answers</p>}
+        <div className={`at-answerpair${headed ? " headed" : ""}${headed && i > 0 ? " extra" : ""}`}>
+          {headed && i === 0 && (
+            <div className="at-answerheadrow">
+              <span className="at-answerheadtext">
+                <h4 className="at-answerhead">{lang.scriptLabel}{required && <Req />}</h4>
+                {rows.length > 1 && <span className="at-answerheadnote">Multiple accepted answers</span>}
+              </span>
+              <IconButton icon="add" label="Add another accepted answer" onClick={() => commit(rows.concat([{ text: "", lat: "" }]))} />
+            </div>
+          )}
+          {/* A further answer's box and its −, one row the width of the
+              list, as English's are. */}
+          <div className={headed && i > 0 ? "at-altrow at-altstack at-scriptrow" : "at-scriptcell"}>
           <div className="at-altfield">
             {blanks ? (
               <BlankField
@@ -464,10 +504,14 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               />
             )}
           </div>
+          {headed && i > 0 && (
+            <IconButton icon="remove" label="Remove this answer" onClick={() => commit(rows.filter((_, j) => j !== i))} />
+          )}
+          </div>
           {/* The buttons take a column of their own so that the answer and
               its pronunciation, stacked in the column beside them, line up
               with each other rather than one running past the other. */}
-          <div className="at-answeracts">
+          {!headed && <div className="at-answeracts">
             {rows.length > 1 && (
               <IconButton
                 icon="remove"
@@ -482,8 +526,12 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
                 onClick={() => commit(rows.concat([{ text: "", lat: "" }]))}
               />
             )}
-          </div>
-          {blanks ? (
+          </div>}
+          {headed && locked && !String(row.lat || "").trim() ? null : headed && locked && !blanks ? (
+            /* Read, plain words — as wide as they are, so the recordings
+               beside them take whatever is left of the line. */
+            <span className="at-answersaid at-readsaid">{row.lat}</span>
+          ) : blanks ? (
             <div className="at-answersaid">
               <BlankField
                 wiring={blanks}
@@ -498,7 +546,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
                     className="at-input"
                     value={row.lat}
                     label={named(lang.translitLabel, i)}
-                    placeholder={lang.translitLabel.toLowerCase()}
+                    placeholder={translitHint(lang)}
                     onChange={(v) => edit(i, { lat: v })}
                     onRemove={onRemoveBlank}
                   />
@@ -510,7 +558,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               className="at-input at-answersaid"
               value={row.lat}
               aria-label={named(lang.translitLabel, i)}
-              placeholder={lang.translitDrilled === false ? `${lang.translitLabel} (optional)` : lang.translitLabel.toLowerCase()}
+              placeholder={translitHint(lang)}
               onChange={(e) => edit(i, { lat: e.target.value })}
             />
           )}
@@ -524,7 +572,9 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
               the card had, beside the word and its meaning. It is not: it
               is one of the accepted answers, said out loud, and a card
               that accepts two had one set of clips over the pair. */}
-          <div className="at-answerabout">
+          {/* Headed, the recordings sit beside the transliteration they
+              go with, in the buttons' column. */}
+          <div className={`at-answerabout${headed ? " inline" : ""}`}>
             {dims.length > 0 && locked && grammarOf(row) && (
               <span className="at-answergram">{grammarOf(row)}</span>
             )}
@@ -541,7 +591,9 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
                 <Icon name={open === i ? "chevronUp" : "chevronDown"} />
               </Button>
             )}
-            {ownRecorders && (
+            {/* Read, each recording is played where it is. */}
+            {ownRecorders && locked && headed && <AudioPrompt compact recs={clipsOf(row)} />}
+            {ownRecorders && !(locked && headed) && (
               <Button
                 variant="ghost"
                 size="sm"
@@ -563,7 +615,7 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
                 {soundOf(clipsOf(row).length)}
               </Button>
             )}
-            {i === 0 && pictures}
+            {i === 0 && !headed && pictures}
           </div>
           {dims.length > 0 && open === i && (
             <div className="at-answergrammar">
@@ -578,6 +630,33 @@ function ScriptAnswers({ lang, dims, rows, of = "", onEdit, onCommit, onRecord, 
         </div>
         </React.Fragment>
       ))}
+    </div>
+  );
+}
+
+/* The empty transliteration box's example: its name, then one of the
+   language's own, so a teacher sees what kind of thing goes there. */
+const translitHint = (lang: Lang): string => {
+  const ex = lang.translitExample || ((lang.sample || []).find((x: any) => x.lat) || { lat: "" }).lat;
+  const name = lang.translitLabel.toLowerCase();
+  return ex ? `${name} (e.g. ${ex})` : name;
+};
+/* And English's: one of the language's own sample meanings. */
+const englishHint = (lang: Lang): string =>
+  `e.g. ${((lang.sample || [])[0] || { en: "book" }).en || "book"}`;
+
+/* An image of a card being read, over everything, as large as the window
+   allows. A tap anywhere or Escape puts it away. */
+function FullImage({ hash, onClose }: { hash: string; onClose: () => void }) {
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [onClose]);
+  return (
+    <div className="at-fullimage" role="dialog" aria-label="Image" onClick={onClose}>
+      <StoredImage hash={hash} alt="" className="at-fullimageimg" />
+      <span className="at-fullimagex" aria-hidden="true"><Icon name="close" /></span>
     </div>
   );
 }
@@ -4321,7 +4400,13 @@ export function askParts(
 export const canSaveWord = (
   main: { ar?: string; en?: string },
   trouble: unknown,
-): boolean => !!(String(main.ar || "").trim() && String(main.en || "").trim() && !trouble);
+): boolean => !!(String(main.ar || "").trim() && (String(main.en || "").trim() || soundOrPicture(main)) && !trouble);
+
+/* Whether the word has a recording or a picture — any of its accepted
+   answers, either speed. With one, English is optional: the card can be
+   heard or seen, and is asked only what needs no meaning. */
+export const soundOrPicture = (main: Record<string, any> | null | undefined): boolean =>
+  !!main && ((Array.isArray(main.images) && main.images.length > 0) || /"(?:slowClips|clips)":\["/.test(JSON.stringify(main)));
 
 /*
  * Whether a verb whose table stands in for its own word can be saved.
@@ -6593,6 +6678,8 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   /** Delete the card — on a saved card being edited, at the foot. */
   onDelete?: () => void;
 }) {
+  /* Read, the panel for a card in no deck says so and offers nothing. */
+  const locked = useContext(Locked);
   return (
     <>
     <div className="at-formblock">
@@ -6645,7 +6732,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
     {!advanced && (
       <div className="at-formblock at-mt5">
         <div className="at-formhead">
-          <span className="at-formnum">Word or phrase</span>
+          <span className="at-formnum">Content</span>
         </div>
         {/* No fold: on its own here, the word is always open to write. */}
           <FormBlock
@@ -6668,7 +6755,27 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
         <span className="at-formnum">Decks</span>
         <span className="at-formrole">Manage what decks this card belongs to.</span>
       </div>
-      <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} />
+      {/* In no deck, the list stands in the Nudge panel's dress; built by
+          hand rather than with Nudge so the list keeps its place in the
+          tree — swapped for another, it would close the picker the moment
+          the first deck was chosen. */}
+      <div className={chosen.length ? "at-deckhold" : "at-nudge attention"}>
+        {!chosen.length && (
+          <span className="at-nudgeico" aria-hidden="true">
+            <Icon name="folder" size={22} />
+          </span>
+        )}
+        <div className={chosen.length ? "at-deckhold" : "at-nudgebody"}>
+          {!chosen.length && (
+            <p className="at-nudgetext">Not in a deck yet, so no students can see it. Add it to a deck to share it.</p>
+          )}
+          {chosen.length || !locked ? (
+            <div className={chosen.length ? "at-deckhold" : "at-nudgeact"}>
+              <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} />
+            </div>
+          ) : null}
+        </div>
+      </div>
     </div>
 
     {/* ---- and the way out of it altogether ----
@@ -6739,7 +6846,7 @@ function NameBlock({ word, talk, scene }: { word: WordDraft; talk: SceneDraft; s
       lede="How this card is listed and searched."
     >
       <input
-        className="at-input"
+        className="at-input at-namefield"
         value={value}
         placeholder={scene ? (talk.text ? "Our street" : "At the door") : "saying where you live"}
         onChange={(e) => set(e.target.value)}
@@ -7335,7 +7442,10 @@ export const baseName = (spec: VerbSpec | null): string =>
  * there is a single answer to record, and beside the word it is of once
  * there are two. Whoever draws the heading has to know the count.
  */
-function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, drillsTranslit, blanks, onRemoveBlank, onChange, more = false, required = false, children }: {
+function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, drillsTranslit, blanks, onRemoveBlank, onChange, more = false, required = false, plain = false, children }: {
+  /** The one form on the Basic tab: no heading row over it, and each
+      answer's parts headed instead — see ScriptAnswers' `headed`. */
+  plain?: boolean;
   lang: Lang;
   form: Record<string, any>;
   /** The axes each accepted answer is asked about — see answerDims. */
@@ -7385,6 +7495,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
      so kept on the form rather than on one of its answers. */
   const [seeing, setSeeing] = useState(false);
   const images: string[] = Array.isArray(f.images) ? f.images : [];
+  const [viewing, setViewing] = useState("");
   /* The same rule as Alternatives above, and for the same reason: these
      rows were read off the form once, and a blank written into the card
      from outside would otherwise change the card and not the screen. What
@@ -7422,7 +7533,8 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
        the screen announcing each form as though it were a subject of its
        own. Inside and a size down, they are what they are: the panels are
        the forms, and the section heading above them says so once. */}
-    <div className={`at-part${blanks ? "" : " evenfields"}`}>
+    <div className={`at-part${blanks ? "" : " evenfields"}${plain ? " plain" : ""}`}>
+      {!plain && (
       <div className="at-formhead">
         {folds ? (
           /* The name is the heading that opens it, the way a form's
@@ -7453,6 +7565,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
             them shortens instead of collapsing into a column. */}
         {acts ? <span className="at-formacts">{acts}</span> : null}
       </div>
+      )}
       {open && (
       <>
       {/* An accepted answer, how it is said and how it sounds are written
@@ -7466,8 +7579,10 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
           was a heading doing the work of labels and still left the box
           itself blank; the box says what it is now, in the language, and
           the heading says which language. */}
-      <Field label={<>{lang.scriptLabel}{required && <Req />}</>}>
+      <Field label={plain ? undefined : <>{lang.scriptLabel}{required && <Req />}</>}>
         <ScriptAnswers
+          headed={plain}
+          required={required}
           lang={lang}
           dims={dims}
           rows={rows}
@@ -7495,8 +7610,9 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
         />
       </Field>
 
-      <Field label={<>English{required && <Req />}</>}>
+      <Field className={plain ? "at-softrule" : ""} label={plain ? undefined : <>English{required && !soundOrPicture(f) && <Req />}</>}>
         <Alternatives
+          headed={plain ? <>English{required && !soundOrPicture(f) && <Req />}</> : null}
           value={f.en}
           of={of}
           moreLabel="Other English answers"
@@ -7519,6 +7635,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
               <input
                 className="at-input"
                 aria-label={label}
+                placeholder={englishHint(lang)}
                 value={v}
                 onChange={(e) => set(e.target.value)}
               />
@@ -7526,6 +7643,37 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
           }
         />
       </Field>
+
+      {/* The card's picture, for the whole card rather than for one of its
+          answers — so under Content, after them, as a part of its own. */}
+      {plain && locked && images.length > 0 && (
+        <Field className="at-softrule" label="Image">
+          <div className="at-readthumbs">
+            {images.map((h, k) => (
+              <Pressable key={h} aria-label={`Open image ${k + 1}`} onClick={() => setViewing(h)}>
+                <StoredImage hash={h} alt="" className="at-readthumb" />
+              </Pressable>
+            ))}
+          </div>
+          {viewing && <FullImage hash={viewing} onClose={() => setViewing("")} />}
+        </Field>
+      )}
+      {plain && !locked && (
+        <Field className="at-softrule" label="Image">
+          <Button
+            variant="ghost"
+            size="sm"
+            icon="image"
+            iconSize={17}
+            className="at-answerrec"
+            reads={locked && images.length > 0}
+            aria-label={`Images — ${images.length ? `${images.length} added` : "none yet"}`}
+            onClick={() => setSeeing(true)}
+          >
+            {picturesOf(images.length)}
+          </Button>
+        </Field>
+      )}
 
       {/* No Recordings field here. It stood level with the English, which
           said a recording was a third thing the card had beside the word
@@ -7727,7 +7875,7 @@ function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCop
   const takeOff = (name: string) => dropBlank(i, name);
   return (
     <>
-  <div className={`at-formblock at-formtile${i === 0 ? " main" : ""}`}>
+  <div className={`at-formblock at-formtile${i === 0 ? " main" : ""}${bare ? " plain" : ""}`}>
     <FormFields
       lang={lang}
       form={f}
@@ -7760,6 +7908,7 @@ function FormBlock({ word, lang, index: i, form: f, title, role, of = "", canCop
       onRemoveBlank={takeOff}
       more={pronouns}
       required={i === 0 && !word.standsIn}
+      plain={bare}
       onChange={(patch) => (i < 0 && onFill ? onFill({ ...f, ...patch }) : setForm(i, { ...f, ...patch }))}
     >
       {/* Whatever else belongs to this form — its table of attached
@@ -10337,10 +10486,26 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   onLockedTap?: () => void;
   children?: Node;
 }) {
+  /* Read, a field is its words under its label, and an empty one is left
+     out — the nearest thing it stands in (a field, an English answer, a
+     transliteration) is marked and hidden, and unmarked for editing. */
+  const box = useRef<HTMLFieldSetElement | null>(null);
+  useEffect(() => {
+    const root = box.current;
+    if (!root) return;
+    root.querySelectorAll(".at-readempty").forEach((el) => el.classList.remove("at-readempty"));
+    if (!locked) return;
+    root.querySelectorAll<HTMLElement>("input:not([type=checkbox]):not([type=radio]), textarea, .at-blanktext").forEach((el) => {
+      const text = "value" in el ? String((el as HTMLInputElement).value || "") : el.textContent || "";
+      if (String(text).trim()) return;
+      const holder = el.closest(".at-altstack, .at-answersaid, .at-field") || el;
+      holder.classList.add("at-readempty");
+    });
+  });
   return (
     <div ref={panel} role="tabpanel" aria-label={id} hidden={tab !== id}
       onPointerDown={locked && onLockedTap ? (e) => { if (tapWouldChange(e.target)) onLockedTap(); } : undefined}>
-      <fieldset className="at-cardlock" disabled={locked}>
+      <fieldset ref={box} className="at-cardlock" disabled={locked}>
         <Locked.Provider value={locked}>{children}</Locked.Provider>
       </fieldset>
       {after}
@@ -10453,6 +10618,17 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   /* A card that exists, as against one being made — which a copy made
      for another meaning is, though it arrives with words in it. */
   const stored = !!(card && card.id);
+  /* Where the screen is, for Screen's scroll: the card, but a new card
+     keeps its place when it is first saved and gains an id. Opening
+     another card is somewhere new. */
+  const scrollAt = useRef({ key: (card && card.id) || "new", id: (card && card.id) || "" });
+  {
+    const id = (card && card.id) || "";
+    if (id !== scrollAt.current.id) {
+      if (scrollAt.current.id) scrollAt.current.key = id || "new";
+      scrollAt.current.id = id;
+    }
+  }
   /* Which meaning this card is, for the questions another card shares —
      see MeaningsBlock. Only on a word: a sentence and a conversation
      carry their own context. */
@@ -10522,7 +10698,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   const changed = snapshot !== savedAs;
   /* Whether the grey Save has been tapped: until then a card that cannot
      be saved yet says nothing about it — see `dots`. */
-  const [nameAsked, setNameAsked] = useState(false);
+  const [, setNameAsked] = useState(false);
   const snack = useSnackbar();
   /* What is short, as against what is wrong: an empty field a red
      asterisk marks, or a mistake that already has its own red line. */
@@ -10530,10 +10706,11 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     if (scene) return !talk.title.trim() || !talk.sceneKind || !canSaveScene(talk.title, talk.written, talk.text);
     if (word.needsName) return true;
     if (advanced && word.standsIn) return word.needsForm;
-    return !String(word.main.ar || "").trim() || !String(word.main.en || "").trim();
+    return !String(word.main.ar || "").trim() || (!String(word.main.en || "").trim() && !soundOrPicture(word.main));
   })();
   /* A tap on a field of a card being read. */
-  const viewOnly = () => snack("You are in view-only mode. Switch to edit to make changes to the card.");
+  /* Read fields are plain words now, so a tap on one needs no answer. */
+  const viewOnly = () => {};
   /* The floating Save: saves where it can, and otherwise says why not. */
   const trySave = () => {
     if (busy) return;
@@ -10597,14 +10774,13 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
    * why, it is the card's own words that are short, which are on the
    * second tab.
    */
-  const savedPieces = useMemo(() => JSON.parse(savedAs) as Record<CardTab, string>, [savedAs]);
   const panels = {
     overview: useRef<HTMLDivElement | null>(null),
     content: useRef<HTMLDivElement | null>(null),
     exercises: useRef<HTMLDivElement | null>(null),
     settings: useRef<HTMLDivElement | null>(null),
   };
-  const [unmet, setUnmet] = useState("");
+  const [, setUnmet] = useState("");
   /* Read again whenever anything on a tab is redrawn, which is when one of
      those lines can come or go. Nothing is in the way of a card being read. */
   const watched = useRef(panels);
@@ -10628,13 +10804,6 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     }
     return () => seen.disconnect();
   }, [locked]);
-  /* And a card that cannot be saved yet says nothing about it until Save
-     has been tried: a dot on a card just opened would be a warning about
-     nothing the teacher has done. */
-  const blocked = unmet ? unmet.split(" ") : !locked && !canSave && nameAsked ? [advanced ? "content" : "overview"] : [];
-  const dots = tabList
-    .map(([k]) => k as CardTab)
-    .filter((k) => pieces[k] !== savedPieces[k] || blocked.includes(k));
   return (
     /* "over" puts this above the mode selector and the corner menu, so
        editing a card is the only thing on screen. */
@@ -10651,6 +10820,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         /* What is being done, not which card: the name is the first
            thing in "This card". */
         title={locked ? "Card" : stored ? "Edit card" : "Create card"}
+        scrollKey={scrollAt.current.key}
         /* One sheet, ruled into sections — see .at-screen.cardform. The
            editor is the only screen laid out that way, so it is the only
            one that asks for it. */
@@ -10688,7 +10858,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
           {/* Outside the lock: a card being read is moved round as freely
               as one being written. */}
           <div className="at-cardtabs">
-            <Tabs tabs={tabList} value={shownTab} onChange={(k) => setTab(k as CardTab)} label="Part of the card" dots={dots} />
+            <Tabs tabs={tabList} value={shownTab} onChange={(k) => setTab(k as CardTab)} label="Part of the card" />
           </div>
 
           {/* ---- Basic ----
