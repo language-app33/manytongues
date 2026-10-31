@@ -9752,8 +9752,8 @@ const openPronounTables = async () => {
   };
 
   for (const [name, wanted] of /** @type {[RegExp, string][]} */ ([
-    [/^Account settings$/, "Account settings"],
-    [/^App preferences$/, "App preferences"],
+    /* One Settings since 0.521: the preferences, then the account. */
+    [/^Settings$/, "Settings"],
     [/^How it works$/, "How it works"],
   ])) {
     await openCorner();
@@ -9778,9 +9778,9 @@ const openPronounTables = async () => {
   /* The two things a learner actually changes in there, which is the
      whole reason the screen exists. */
   await openCorner();
-  click(rowNamed(/^App preferences$/));
+  click(rowNamed(/^Settings$/));
   await sleep(350);
-  const prefsText = ((screenTitled("App preferences") || host6).textContent || "");
+  const prefsText = ((screenTitled("Settings") || host6).textContent || "");
   check("the preferences screen offers the theme and the sounds",
     /Theme/.test(prefsText) && /Sounds/.test(prefsText),
     prefsText.slice(0, 220).replace(/\s+/g, " "));
@@ -9791,18 +9791,9 @@ const openPronounTables = async () => {
     !/Learning/.test(prefsText) && !prefsText.includes("Language"),
     prefsText.slice(0, 220).replace(/\s+/g, " "));
 
-  /* And the account screen names who is signed in, which is the one fact
-     it exists to carry. */
-  const prefsScreen = screenTitled("App preferences");
-  const backFromPrefs = prefsScreen
-    && ([...prefsScreen.querySelectorAll("button")].find((b) => /^Back$/.test((b.textContent || "").trim()))
-      || prefsScreen.querySelector(".at-back"));
-  click(backFromPrefs);
-  await sleep(250);
-  await openCorner();
-  click(rowNamed(/^Account settings$/));
-  await sleep(350);
-  const accountText = ((screenTitled("Account settings") || host6).textContent || "");
+  /* And the same screen names who is signed in, further down, which is
+     the one fact the account part exists to carry. */
+  const accountText = prefsText;
   check("the account screen says who is signed in",
     accountText.includes(account.displayName) || accountText.includes(account.handle),
     accountText.slice(0, 200).replace(/\s+/g, " "));
