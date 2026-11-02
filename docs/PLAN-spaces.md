@@ -1,11 +1,11 @@
 # Plan: spaces
 
-**Status: settled except question 94, not started.** Written before
-anything is built, from the owner's answers to questions 1–93 and a
-reading of the repository, then audited a second time for gaps an
-implementer would hit. Question 94 (A6) is open, and it touches stage 2.
-Anything new that comes up while building goes back to the owner, in the
-way `CLAUDE.md` describes, before it is decided.
+**Status: settled, not started.** Written before anything is built,
+from the owner's answers to questions 1–94 and a reading of the
+repository, then audited a second time for gaps an implementer would hit.
+No questions are open. Anything new that comes up while building goes
+back to the owner, in the way `CLAUDE.md` describes, before it is
+decided.
 
 Part A is for the owner, in plain terms. Part B holds the build notes for
 whoever implements it. It is long because the owner asked for a plan
@@ -104,13 +104,17 @@ The number after each decision is the question it was settled in.
   and edit all of the space's material (6a), except teachers' numbers and
   clock (79a). They work on that material in Teaching, which they see
   whether or not they teach a course. They can't see anyone's My space
-  (48a). Whether they can delete decks and cards someone else made is
-  question 94.
+  (48a). They can delete decks and cards someone else made, as a
+  co-teacher already can, after a warning (94a).
 - **Teachers and students** work as today: memberships of a course. Only
   teachers and space admins make material in the space (33a).
 
 **Material**
 
+- **Deleting someone else's material (94a).** Whoever deletes a deck or
+  card they didn't make (a space admin, or a co-teacher as today) is first
+  warned: "{Name} made this deck. Deleting it removes it from every course
+  it's in, for every student. This can't be undone."
 - **Teachers own the cards they make (6a).** When a teacher leaves, is
   suspended or deletes their account, their material stays under their
   name, and the space admin can hand it to another teacher (31a, 85a).
@@ -252,19 +256,9 @@ Stages 5 and 6 can follow.
 - A deleted account's record (name, dates, courses) is kept. If someone
   asks for even that to be removed, you remove it by hand.
 
-## A6. Open question
+## A6. Open questions
 
-94. A space admin can see and edit everything in their space (6a). Deleting
-    was kept for you (4b), but that answer was about people and courses.
-    Today, teachers can already delete a deck in a course they teach, even
-    one a colleague made. Can a space admin delete decks and cards that
-    someone else made?
-    a. Yes, the same as editing them. A space admin can then do anything a
-       co-teacher can.
-    b. No. They can edit them, but only the person who made them, or you,
-       can delete them.
-    *Recommend a:* otherwise a space admin has less say over a deck than a
-    teacher of the same course, which would be hard to explain.
+None. The last one, 94, was answered "a, with a warning".
 
 ---
 
@@ -643,10 +637,9 @@ changes like this (85a, 86a):
 - **`rename-deck`, `lock-deck`, `set-deck-parts`, `detach-deck`,
   `deck-cards`**: org check plus the new `canEditDeck`.
 - **`delete-deck`, `delete-card(s)`**: org check plus the new
-  `canEditDeck`/`mayEditCard`, **except** that what a space admin may
-  delete depends on question 94. Under 94a nothing more is needed. Under
-  94b, add: a space admin who isn't the owner, and isn't a teacher of a
-  course holding it, is refused (`not-yours`).
+  `canEditDeck`/`mayEditCard`. A space admin may delete anything in their
+  space that isn't personal, the same as a co-teacher (94a). The warning is
+  the client's job (B7, stage 4). The server doesn't need a flag for it.
 - **New `set-deck-practise`** `{ deckId, practise }`: owner of a personal
   deck only.
 - **New `set-deck-numbers`** `{ deckId, from }` (stage 1, 46c): anyone who
@@ -1026,6 +1019,21 @@ comment above it says so. Add the same kinds to the backup manifest
     has "Hand their material to…". App admins also see "Remove this
     record".
 - **Reports.** The Flags tab goes to space admins too (7a).
+- **Deleting someone else's material (94a).** Wherever a deck or card can
+  be deleted (the "Delete deck" `IconButton`s in Teaching's deck list and
+  in Admin's Decks tab, and a card's delete in Teaching), when the deck's
+  or card's `owner` isn't the person deleting:
+  - The existing confirmation becomes a `ConfirmModal` whose body reads
+    "{owner's name} made this deck. Deleting it removes it from every
+    course it's in, for every student. This can't be undone." (or "this
+    card" for a card). The owner's name comes from `ownerName`, falling
+    back to the `gone:` name.
+  - For a deck, both places already ask for the deck's name to be typed
+    (`confirmWord: d.title`). Keep that, and only add the sentence above
+    to the body.
+  - For a card, add the sentence to whatever confirmation the card's
+    delete shows today, and don't add typing.
+  - Deleting your own material stays as it is today.
 - **`AccountPanel`** (`src/ArabicTrainer.tsx`):
   - Add "Leave this space" (`ConfirmModal` with the 52a warning: "You won't
     be able to sign in until your space's admin reactivates you."). Don't
