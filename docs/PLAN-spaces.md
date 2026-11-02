@@ -1,9 +1,11 @@
 # Plan: spaces
 
-**Status: settled, not started.** Written before anything is built, from
-the owner's answers to questions 1–93 and a reading of the repository. No
-questions are open. Anything new that comes up while building goes back
-to the owner, in the way `CLAUDE.md` describes, before it is decided.
+**Status: settled except question 94, not started.** Written before
+anything is built, from the owner's answers to questions 1–93 and a
+reading of the repository, then audited a second time for gaps an
+implementer would hit. Question 94 (A6) is open, and it touches stage 2.
+Anything new that comes up while building goes back to the owner, in the
+way `CLAUDE.md` describes, before it is decided.
 
 Part A is for the owner, in plain terms. Part B holds the build notes for
 whoever implements it. It is long because the owner asked for a plan
@@ -100,7 +102,10 @@ The number after each decision is the question it was settled in.
   67a); hand a former teacher's material to another teacher (31a); share
   and replace the invite link (37a); read learners' reports (7a); and see
   and edit all of the space's material (6a), except teachers' numbers and
-  clock (79a). They can't see anyone's My space (48a).
+  clock (79a). They work on that material in Teaching, which they see
+  whether or not they teach a course. They can't see anyone's My space
+  (48a). Whether they can delete decks and cards someone else made is
+  question 94.
 - **Teachers and students** work as today: memberships of a course. Only
   teachers and space admins make material in the space (33a).
 
@@ -132,7 +137,10 @@ The number after each decision is the question it was settled in.
 - **Teachers** reach it as a "My space" shelf inside Teaching, next to the
   space's own material.
 - **Learners** reach it through "My space" in the You menu, next to
-  Learning. It opens the same screens as Teaching, limited to My space.
+  Learning. It opens the same screens as Teaching, limited to My space. A
+  new deck there can be in the languages of the courses the learner
+  studies, or any language if they study none. That's the same rule
+  Teaching already uses for a teacher's courses.
 - Each My space deck has **"Practise this myself"**, on for new decks. It's
   a tick box on the deck's own screen, where a space deck shows its
   courses. In the shelf's list, a deck that's ticked off shows "Not
@@ -188,7 +196,8 @@ into a space.
   gains a "My space" shelf.
 - **A space admin** sees an Admin screen like today's, showing only their
   space: courses, people (with "Former members"), decks, reports, and the
-  invite link. The backup and clear controls are not there.
+  invite link. The backup and clear controls are not there. They also see
+  Teaching, with all of the space's decks and cards.
 - **You** see today's Admin screen plus a **Spaces** section. There you
   create, edit, archive, reopen, delete and export spaces, choose space
   admins, and see each space's storage use. You can open any space's
@@ -243,6 +252,20 @@ Stages 5 and 6 can follow.
 - A deleted account's record (name, dates, courses) is kept. If someone
   asks for even that to be removed, you remove it by hand.
 
+## A6. Open question
+
+94. A space admin can see and edit everything in their space (6a). Deleting
+    was kept for you (4b), but that answer was about people and courses.
+    Today, teachers can already delete a deck in a course they teach, even
+    one a colleague made. Can a space admin delete decks and cards that
+    someone else made?
+    a. Yes, the same as editing them. A space admin can then do anything a
+       co-teacher can.
+    b. No. They can edit them, but only the person who made them, or you,
+       can delete them.
+    *Recommend a:* otherwise a space admin has less say over a deck than a
+    teacher of the same course, which would be hard to explain.
+
 ---
 
 # Part B — Build notes (technical, for the implementer)
@@ -270,6 +293,58 @@ Stages 5 and 6 can follow.
   rules for owner-facing language.
 - Do the stages in order. If something isn't covered here, ask the owner;
   don't guess.
+
+**Practical notes, learnt the hard way while writing this plan:**
+
+- A fresh checkout has no `node_modules`. Run `npm ci` first, or the lint
+  step fails with "Cannot find package '@eslint/js'".
+- `npm run check` takes about **20 minutes**, almost all of it one
+  simulation (`tests/pace.test.mjs`). Run it in the background and don't
+  start a second copy. While working, run single files:
+  `node --test tests/spaces.test.mjs`, `npm run lint`, `npm run typecheck`,
+  `node tests/smoke.mjs`.
+- **Read-modify-write on the server always goes through `updateJson`**
+  (it retries on a conflicting write, and creates with `onlyIfNew` when the
+  key is missing). `writeJson` has no condition and `indexAdd` isn't atomic
+  (read, then write), so don't use either for anything two requests could
+  write at once. That includes the new `index:orgs` and `former:<org>`
+  lists. Returning `null` from the `updateJson` callback means "no change".
+- **Types.** `src/types.ts` holds the shapes the client and the server
+  share (the server's JSDoc imports them). Add the new optional fields to
+  `User`, `Course`, `Deck`, `Card` and `Flag` (B2), add `Org` and
+  `FormerMember` interfaces, and extend `AdminOverview` with the org data
+  the Admin screens read. `npm run typecheck` checks the server's
+  JavaScript too.
+- **Error answers lose their details today.** `call()` in
+  `src/courses-api.ts` throws `new Error(data.error)`, so any extra field
+  in an error answer (such as `space: { name, slug }`) is lost. Change it
+  to attach the parsed body:
+  `throw Object.assign(new Error(data.error || \`http-${res.status}\`), { data })`.
+  Then read `err.data.space` where the wrong-address message needs it.
+  Keep the message exactly as it is, because callers and `explain()`
+  compare it.
+- **Every new error code gets a sentence in `explain()`**
+  (`src/courses-api.ts`), in the app's plain voice: `other-space`,
+  `suspended`, `space-closed`, `no-space`, `personal-deck`,
+  `personal-card`, `not-reportable`, `slug-taken`, `slug-invalid`,
+  `not-in-space`.
+- **The smoke harness** (`tests/smoke.mjs`) runs the real app in jsdom
+  against a stubbed server: one `if (action === "…")` branch per action,
+  around the `whoami` and `my-material` branches, ending in
+  `unknown-action`. Each stage that makes the app call a new action, or
+  read a new field, adds it to the stub. For example, `whoami` must answer
+  with `org` from stage 3 on, or the You menu has no name to show. Add a
+  walk for each new screen, in the style of the existing ones.
+- **Component list.** After adding or moving a use of a shared component,
+  run `npm run components` and commit the regenerated
+  `src/component-uses.js`. `tests/component-uses.test.mjs` fails if it is
+  stale.
+- **Icons** come from the fixed set in `src/shared.tsx` (`ICONS`): draft,
+  add, search, close, delete, edit, tune, sort, check, back, save, folder,
+  cards, person, group, key, download, upload, verify, play, slow, pause,
+  view, select, school, copy, refresh, mic, remove, image, camera, star,
+  flag, menu, help, theme, language, lock, unlock, hash. Don't add one.
+  This plan names which to use.
 
 ## B1. Naming in code: `org`, not `space`
 
@@ -360,8 +435,11 @@ read `.org` directly; always go through `orgOf`.
 Make sure `org:main` exists on first use, inside `courses.js`:
 `{ id: "main", slug: "main", formerSlugs: [], name: "Main", logo: "", colour: "", admins: [], inviteCode: <makeCode()>, created: Date.now() }`,
 plus `slug:main`, the `K.code` record for the invite code, and the
-`index:orgs` entry. Write it with `onlyIfNew` so two requests can't race.
-"Main" can never be archived or deleted (87a).
+`index:orgs` entry. Create it with
+`updateJson(store, K.org("main"), (cur) => cur ? null : { … })`, which
+creates only when the key is missing, so two requests can't race. Run the
+check once per process: a module-level promise, the way `CLIPS_HERE`
+caches. "Main" can never be archived or deleted (87a).
 
 **Former members record** (25a, 30c, 83a, 84a). One list per org at
 `former:<org>`, newest last:
@@ -449,19 +527,31 @@ Put `actingOrg`, `sameOrg`, `orgOf`, `isOrgAdmin` and a
   remove `SIGNUP_CODE` from the README's environment table.
 - **`makeHandle`**: also treat a handle as taken when `K.gone(handle)`
   exists, so a deleted person's handle is never given to someone else.
+  `makeHandle` is synchronous, so wrap it in an async `freshHandle(store,
+  displayName)` that retries while `K.gone` exists, and use that in
+  `signup`, `admin-create-user` and `admin-create-org`.
 - **`signin` / `whoami`**: refuse suspended users (`suspended`) and
-  archived spaces (`space-closed`). If `body.org` is given and differs
-  from the user's, answer
+  archived spaces (`space-closed`). The app signs in with `whoami`, a GET
+  (`API.whoAmI(key)`), so the address's space arrives as a **query
+  parameter**, `?org=<id>`. Add an optional `org` argument to
+  `whoAmI` that it passes in `params`. If it's given and differs from the
+  user's, answer
   `{ error: "other-space", space: { name, slug } }` without signing in.
-  The answer gains `org: { id, slug, name, logo, colour }`,
-  `orgAdmin: boolean` and `keySaved`.
+  App admins are never refused this way (35a). The answer's `user` object
+  gains `org: { id, slug, name, logo, colour }`, `orgAdmin: boolean` and
+  `keySaved`. Put them **on `user`**, because the app saves `r.user` as the
+  account (`saveAccount({ ...r.user, key })`), and that is how the rest of
+  the app will read them.
 - **`delete-account`** stays (68b) but changes what it removes. See
   `wipeAccount` below.
 - **New `leave-space`**: suspends the caller with `why: "left"` (52a).
 - **`claim-admin`**: unchanged.
-- **`report-flag`**: stamp `org` from the deck or card. A card that's
-  personal and not in any course isn't reportable. Answer `not-reportable`,
-  and the client hides the button for such cards.
+- **`report-flag`**: stamp `org` from the card (`orgOf(card)`; for a card
+  that no longer exists, from the deck, then the reporter). A personal
+  card isn't reportable: answer `not-reportable`. The client hides the
+  button for personal cards. For a course card met through My space, it
+  sends `courseId: ""` and `deckId: ""`, never `my-space` or the personal
+  deck's id.
 
 **`wipeAccount`** (used by `delete-account` and `admin-delete-user`)
 changes like this (85a, 86a):
@@ -507,15 +597,30 @@ changes like this (85a, 86a):
   `org`.
 - **`my-material`** also gains the person's practised My space decks
   (59b). Build them as a **pseudo-course**
-  `{ id: "my-space", title: "My space", personal: true, decks: [...ids], teachers: [], students: [mine] }`.
-  It is added to `courseRows` only for this answer and never stored. This
-  lets `StudentCourses` and the rest of Learning treat it as a course with
-  almost no change. Include its decks, and the cards in them (the person's
-  own cards *and* the course cards they added, 66b), in the bundle and in
-  `materialVersion`. A course card in a personal deck is sent only while
-  that card is still in a course the person studies. Otherwise it's left
-  out (66b: it "drops out if the space withdraws it"). The client must not
-  offer "leave" or show codes for a course with `personal: true`.
+  `{ id: "my-space", title: "My space", personal: true, language: "", decks: [...ids], teachers: [], students: [mine] }`.
+  It's never stored. Follow these steps:
+  1. Work out `teaches` from the real courses **first**, exactly as now.
+  2. Append the pseudo-course to `courseRows` **last**, only when the
+     person has at least one personal deck with `practise: true`.
+  3. In the `deckToCourse` loop, its decks map to it. Personal decks are
+     never in a real course, so "first course wins" never applies.
+  4. The deck loop then gives each personal deck `courseId: "my-space"` and
+     `courseTitle: "My space"`. `link` is undefined (personal decks have no
+     `courses`), so `addedAt` is `null`, which is fine.
+  5. `teacherHandles` (whose blank-fillers and numbers can reach this
+     person) must include `mine` and each personal deck's `numbersFrom`.
+     The pseudo-course's empty `teachers` would otherwise leave the owner's
+     own fillers out.
+  6. Include its decks, and the cards in them (the person's own cards
+     *and* the course cards they added, 66b), in the bundle and in
+     `materialVersion`. As for every deck, only published cards are sent
+     (`isPublished`/`studentView`). A course card in a personal deck is
+     sent only while that card is also in a deck of a course the person
+     studies. Otherwise it's left out (66b: it "drops out if the space
+     withdraws it").
+
+  On the client, a course with `personal: true` shows no leave control and
+  no codes, and is listed after the real courses in `StudentCourses`.
 
 **Decks**
 
@@ -535,30 +640,51 @@ changes like this (85a, 86a):
   non-personal deck in the space (6a).
 - **`attach-deck`**: refuse personal decks (`personal-deck`). A personal
   deck reaches a course only by being copied (see `copy-to-space` below).
-- **`rename-deck`, `lock-deck`, `delete-deck`, `set-deck-parts`,
-  `detach-deck`, `deck-cards`**: org check plus the new `canEditDeck`.
+- **`rename-deck`, `lock-deck`, `set-deck-parts`, `detach-deck`,
+  `deck-cards`**: org check plus the new `canEditDeck`.
+- **`delete-deck`, `delete-card(s)`**: org check plus the new
+  `canEditDeck`/`mayEditCard`, **except** that what a space admin may
+  delete depends on question 94. Under 94a nothing more is needed. Under
+  94b, add: a space admin who isn't the owner, and isn't a teacher of a
+  course holding it, is refused (`not-yours`).
 - **New `set-deck-practise`** `{ deckId, practise }`: owner of a personal
   deck only.
 - **New `set-deck-numbers`** `{ deckId, from }` (stage 1, 46c): anyone who
-  can edit the deck. `from` must be a handle in the deck's space with a
-  number or time system in the deck's language. For a personal deck,
-  `from` may be the owner or any teacher in the space (73b).
+  can edit the deck. `from` must be one of the handles `number-sources`
+  offers for that deck. Bump the deck's `version`, as `set-deck-parts`
+  does, so students' devices fetch again.
+- **New `number-sources`** `?deck=<id>` (stage 1): the people whose
+  numbers this deck may use, as
+  `[{ handle, displayName, numbers: boolean, times: boolean }]`. The deck's
+  language is `deck.lang`, or the language of the first course holding
+  it, the same fallback `partsWaiting` uses. Read each candidate's
+  `systemIndex(handle)` and keep those with a numbers system in that
+  language.
+  - **The candidates in stage 1** (no spaces yet): the deck's owner plus
+    every teacher of any course.
+  - **From stage 2:** filtered to the deck's space.
+  - **For a personal deck (73b):** the owner plus every teacher in the
+    space.
+  - **Ordering:** the owner first, then the rest by display name.
 
 **Cards**
 
-- **`save-card`**: stamp `org` on new cards. A card saved into only
-  personal decks is `personal: true`. A personal card can't be saved into
-  a space deck (refuse `personal-card`; copy instead). A space card *can*
-  be added to a personal deck, but only one the person can see through a
-  course they study (66b). That adds the card's id to the deck. It doesn't
-  change the card's owner or `personal`, and needs no edit right on the
-  card.
+- **`save-card`**: stamp `org` on new cards. **Whether a card is personal
+  is decided once, when it's created,** from `body.personal`. The client
+  sends `personal: true` whenever the card is made on the My space side,
+  whether or not it goes into a deck (cards can exist in no deck). After
+  that it never changes. A personal card can be saved into personal decks
+  only (refuse `personal-card` for a space deck; copy the deck instead). A
+  space card *can* be added to one of the person's personal decks when the
+  person can see it: it's in a deck of a course they study, or they could
+  edit it (`mayEditCard`). That only adds the card's id to the deck. It
+  doesn't change the card's owner or `personal`, and needs no edit right
+  on the card (66b).
 - **`mayEditCard`**: org check. A personal card can be edited by its owner
   only. Otherwise the same as the new `canEditDeck`.
 - **`my-cards`**: filter by `org`. Return personal cards separately, as
   for decks.
-- **`card-status`, `review-card`, `delete-card(s)`**: org check plus
-  `mayEditCard`.
+- **`card-status`, `review-card`**: org check plus `mayEditCard`.
 - **New `copy-to-space`** `{ deckId }`: owner of a personal deck who is a
   teacher in the space, a space admin or App admin (15a, 33a). It makes a
   new space deck (not personal) and new copies of every card in it that
@@ -610,8 +736,15 @@ changes like this (85a, 86a):
   ids come from the system's id; see `handOn` and `handOnSplit`) keep
   their progress. A deck with no source sends nothing, and its
   `partsWaiting` says so.
-- `partsWaiting` (which number parts reach nobody yet) must read the
-  deck's chosen source, not every teacher's.
+- `partsWaiting` (which number parts reach nobody yet; it's defined
+  inside the request handler, next to `systemIndex`, and `my-decks` calls
+  it) builds a list called `whose` for each deck:
+  its owner, plus every teacher and deck owner of every course holding it.
+  Replace that list with `[d.numbersFrom || d.owner]`. Leave the rest of
+  the function (`opens`, `rangeChecks`) as it is. A clock is used only
+  with the number system it was written for (`clock.numberSystemId ===
+  sys.id`), so the chosen person's numbers and clock always travel
+  together.
 - A deleted teacher's systems stay (see `wipeAccount`). `systemIndex` reads
   `mysystems:<handle>`, which is kept, so this works without a user
   document.
@@ -625,7 +758,8 @@ changes like this (85a, 86a):
 **Reports**
 
 - **`my-reports`**: today App admin only (since 0.412). Becomes App admin
-  (all, or filtered to `x-org`) or space admin (their space only, 7a).
+  or space admin, always for the acting space only (7a). An App admin reads
+  another space's reports by opening that space's address.
 - **`dismiss-reports`, `admin-delete-flags`**: same gate.
 
 **Media**
@@ -646,7 +780,7 @@ changes like this (85a, 86a):
 
 | action | App admin | space admin (own space) |
 |---|---|---|
-| `admin-overview` | yes (all spaces, or `x-org`) | yes, filtered to their space, personal records excluded |
+| `admin-overview` | yes, for the acting space (open a space's address to see it; the Spaces tab is the cross-space view) | yes, filtered to their space, personal records excluded |
 | `admin-create-user` | yes | yes; the new user's `org` is theirs; never `admin`; the course must be in their space |
 | `admin-reissue-key` | yes | yes for people in their space, **except** space admins and App admins (70a) |
 | `admin-rename-course`, `admin-course-language`, `admin-new-code`, `admin-card` | yes | yes, in their space |
@@ -670,18 +804,26 @@ comment above it says so. Add the same kinds to the backup manifest
 ## B5. New actions
 
 - **`org-info`** (no sign-in needed) `?slug=`: answers
-  `{ ok, org: { id, slug, name, logo, colour, closed } }` for a current
+  `{ ok, org: { id, slug, name, logoData, colour, closed } }` for a current
   slug, `{ ok, moved: newSlug }` for a former one (8b), and
-  `{ error: "no-space" }` otherwise. It never reveals people or material.
-  It is the only new action that can be called without a key, so put it
-  before the `currentUser` check, next to `signup`.
+  `{ error: "no-space" }` otherwise.
+  - **`logoData`** is the logo's data URL itself, read from
+    `K.image(logo)`, or `""`. The existing `image` action needs a key, and
+    this page is shown to people who aren't signed in yet.
+  - It never reveals people or material.
+  - It is the only new action that can be called without a key, so put it
+    before the `currentUser` check, next to `signup`.
+  - Add `org-info` and `whoami` to `tests/smoke.mjs`'s stub.
 - **`key-saved`**: sets `keySaved: true` on the caller (19b).
 - **`leave-space`**: see Accounts above.
 - **`admin-create-org`** `{ name, slug, logo, colour, adminName }`: makes
   the org, the `slug:` record and an invite code. In the same request it
   creates the first space admin's account in the new space (65a), the way
   `admin-create-user` does (with `keySaved: false`), and returns that
-  account's key once.
+  account's key once. It refuses a reserved or malformed slug
+  (`slug-invalid`) and one whose `K.slug` exists (`slug-taken`).
+  **Built in stage 2, server only,** so the stage-2 tests can make a
+  second space through the real API. Its screen comes in stage 3.
 - **`admin-update-org`** `{ id, name?, slug?, logo?, colour? }`: changing
   `slug` pushes the old one onto `formerSlugs` and keeps its `slug:`
   record pointing at this org (8b).
@@ -717,7 +859,13 @@ comment above it says so. Add the same kinds to the backup manifest
   app with no server change. Check that a deep path like
   `/lingua-academy/` (trailing slash) still loads its assets.
 - **Read the address once at start-up** (`src/main.tsx` or the top of
-  `ArabicTrainer`): `slug = location.pathname.split("/")[1] || ""`.
+  `ArabicTrainer`): `slug = location.pathname.split("/")[1] || ""`. When
+  there's a slug, call `org-info` straight away, whether or not anyone is
+  signed in, and keep the answer as the **address space**
+  (`{ id, slug, name, logoData, colour }`). Keep its `id` in
+  `src/courses-api.ts` with a new `setAddressOrg(id)`, next to `setKey`.
+  `call()` then sends it as the `x-org` header on every request. The
+  server ignores it for everyone but App admins, so it can always be sent.
 - **Not signed in:** call `org-info`.
   - **A current slug** shows `Onboarding` (`src/spaces.tsx`) with the
     space's logo and name in place of the ManyTongues logo and title, and
@@ -744,18 +892,51 @@ comment above it says so. Add the same kinds to the backup manifest
     (`replaceState` to the own slug, dropping `?join=`).
   - **Otherwise**, call
     `history.replaceState(null, "", "/" + account.org.slug)`.
-  - **App admins** stay at the address they opened (35a). Every
-    `courses-api.ts` call then sends `x-org` with the id of that address's
-    space (add it in `call()`, next to `x-key`). On the plain home page,
-    an App admin acts in "Main".
-- **Wrong address while not signed in (53b):** `Onboarding` sends
-  `body.org` with `signin` and `signup`. On `other-space` it shows the
-  message: "This key belongs to the space {name}." with two buttons,
-  "Go to {name}" (link to `/<slug>`) and "Make a new account here" (goes
-  to the "new" step). It uses `Notice` and `Button`.
-- **Suspended or closed:** on `suspended`, `Onboarding` shows "This
-  account is suspended. Ask your space's admin." On `space-closed`, it
-  shows "This space is closed." In both cases the device is signed out.
+  - **App admins** stay at the address they opened (35a), and the
+    `x-org` header makes the server act in that space. On the plain home
+    page there's no address space, so an App admin acts in "Main".
+  - Do this redirect inside the launch effect's `.then`, after the
+    account has been saved, and in `Onboarding`'s `onDone` after signing
+    in or up.
+- **Where the app checks who's signed in**, so you know what to change:
+  - `Onboarding`'s `signIn()` in `src/spaces.tsx` calls
+    `API.whoAmI(key)` when someone types their key.
+  - An effect in `src/ArabicTrainer.tsx` (its comment begins "Confirm who
+    we are on each start") calls `API.whoAmI(account.key)` on every
+    launch, and **swallows every error** so the app keeps working offline.
+- **Wrong address while not signed in (53b):** `Onboarding` passes the
+  address space's id to `whoAmI` (as `?org=`) and to `signUp` (in the
+  body). On `other-space` it reads `err.data.space` (see the `call()`
+  change in B0) and shows "This key belongs to the space {name}." with
+  two buttons: "Go to {name}" (link to `/<slug>`) and "Make a new account
+  here" (goes to the "new" step). It uses `Notice` and `Button`.
+- **Suspended or closed:**
+  - In `signIn()`: on `suspended`, `Onboarding` shows "This account is
+    suspended. Ask your space's admin." On `space-closed`, it shows "This
+    space is closed."
+  - In the launch effect: on exactly those two errors (`err.message ===
+    "suspended"` or `"space-closed"`), sign the device out through the
+    same path as the log-out button (`API.clearAccount()` and the
+    `onLogOut` resets in `src/ArabicTrainer.tsx`), then show the message
+    on `Onboarding`. **Every other error keeps being swallowed**, or an
+    offline learner would be signed out.
+- **The space's colour** is applied only on `Onboarding` (and its
+  wrong-address messages), as the CSS variable the app already uses for
+  highlights: set `style={{ "--accent": colour }}` on `Onboarding`'s
+  outer `ob` element. Before using a colour, check its contrast:
+  - Write a pure helper, `contrastRatio(hexA, hexB)`, using the WCAG
+    relative-luminance formula, in a small new file under `src/` with a
+    unit test in `tests/`.
+  - Use the colour only if it reaches at least **3:1** against both the
+    light and the dark page backgrounds (read their values from
+    `src/index.css`). Otherwise leave `--accent` alone.
+  - Show the same verdict beside the colour field in the Spaces tab: "This
+    colour is too faint to use; the app's own will be shown."
+- **The logo** shows as an `<img src={logoData}>` where `Onboarding` now
+  shows `/logo.svg` (the `ob-logo` image), and at the top of the You menu.
+  Signed-in people get it from `whoami` (`user.org.logo` is the image
+  hash; show it with `StoredImage` from `src/card-editor.tsx`, exported
+  for this, which fetches a stored picture by hash).
 - **Stored account:** the account stays in `localStorage["arabic-account"]`
   (`loadAccount`/`saveAccount` in `src/courses-api.ts`). It now also
   carries `org`. All spaces share the one origin, so one device holds one
@@ -780,7 +961,8 @@ comment above it says so. Add the same kinds to the backup manifest
   first set keep their progress.
 
 **Stage 2 — spaces underneath.**
-- No screen changes. Server only (B2–B4), plus `x-org` in `call()`.
+- No screen changes. Server only (B2–B4), plus `x-org` in `call()`, plus
+  `admin-create-org` (server only, B5), so a test can make a second space.
 - Tests: a new `tests/spaces.test.mjs` built like `tests/server.test.mjs`
   (a real server on a temp `DATA_DIR`). Write a second org's records
   straight into the store, then for **every** action in the
@@ -793,14 +975,20 @@ comment above it says so. Add the same kinds to the backup manifest
 
 **Stage 3 — creating spaces and addresses.**
 - **Spaces tab.** Admin gets a **Spaces** tab
-  (`["orgs", "Spaces", <an existing icon>]` in `AdminSpace`'s `tabs`), for
-  App admins only.
+  (`["orgs", "Spaces", "hash"]` in `AdminSpace`'s `tabs`, after "People"),
+  for App admins only.
   - The list is an `ItemList` of spaces: name, address, people count, and
     "Closed" when archived.
-  - A space opens into a `Section` with `Field`s for name, address, logo
-    (the card editor's picture picker, reused), colour (an
-    `<input type="color">` inside a `Field`, as plain as the app's other
-    inputs), and space admins (the existing people-list pattern).
+  - A space opens into a `Section` with `Field`s for name, address, logo,
+    colour and space admins:
+    - **Logo:** reuse the card editor's picture screen, `ImageScreen` in
+      `src/card-editor.tsx` (it shrinks the picture with `shrinkImage`,
+      hashes it and uploads it with `API.putImage`), and keep only the
+      first picture. Export it if it isn't exported.
+    - **Colour:** an `<input type="color">` inside a `Field`, as plain as
+      the app's other inputs, with the contrast verdict from B6.
+    - **Space admins:** the existing people-list pattern, choosing from
+      current people in that space.
   - Archive and reopen sit behind a `ConfirmModal`. Delete sits behind the
     typed-name `ConfirmModal`.
   - "New space" asks for the name, address and the first space admin's
@@ -814,9 +1002,17 @@ comment above it says so. Add the same kinds to the backup manifest
   `Onboarding`.
 
 **Stage 4 — space admins and accounts.**
-- **Who sees Admin.** `AdminSpace` shows for App admins and space admins
-  (`account.admin || account.orgAdmin`). For space admins, hide the "App"
-  tab (backup, restore, clear), the Spaces tab, and the delete actions.
+- **Who sees Admin and Teaching.** Two places in `src/ArabicTrainer.tsx`
+  decide this today:
+  - The mode list built for the bar
+    (`["learn"].concat(teaches || (account && account.admin) ? ["teach"] : []).concat(account && account.admin ? ["admin"] : [])`).
+    It becomes: Teaching when `teaches || admin || orgAdmin`, and Admin
+    when `admin || orgAdmin`.
+  - The render guard `space === "admin" && account && account.admin`. It
+    becomes `(account.admin || account.orgAdmin)`.
+  - For space admins, `AdminSpace` hides the "App" tab (backup, restore,
+    clear), the Spaces tab, and the delete-person and delete-course
+    actions.
 - **People tab.**
   - The space's invite link sits at the top: a read-only field with Copy
     and "Replace link" (`ConfirmModal`: "The old link will stop
@@ -832,7 +1028,9 @@ comment above it says so. Add the same kinds to the backup manifest
 - **Reports.** The Flags tab goes to space admins too (7a).
 - **`AccountPanel`** (`src/ArabicTrainer.tsx`):
   - Add "Leave this space" (`ConfirmModal` with the 52a warning: "You won't
-    be able to sign in until your space's admin reactivates you.").
+    be able to sign in until your space's admin reactivates you."). Don't
+    show it to App admins: leaving would lock you out of your own app.
+    The server refuses `leave-space` from an App admin too.
   - Keep "Delete account" (`CloseAccount`, typed-handle confirmation),
     with its text saying what goes and what stays (A2).
   - The sign-in key's text changes from "your administrator can issue a
@@ -854,9 +1052,23 @@ comment above it says so. Add the same kinds to the backup manifest
   person's personal decks and cards, and "New deck" there makes a personal
   deck.
 - **Learners:** the You menu's mode picker (`PlacePicker`) gains
-  "My space" for people who don't teach (58a). It opens `TeachSpace` with
-  a `personalOnly` prop: no Courses tab, only the "My space" side of
-  Decks and Cards. Learners don't see the `Segmented`.
+  "My space" for people who see no Teaching (58a). How to add it:
+  - Add a mode `"mine"` to the mode list in `src/ArabicTrainer.tsx`, only
+    when Teaching isn't in it.
+  - Give it a label and icon: `SPACE_LABEL.mine = "My space"` and
+    `SPACE_ICON.mine = "person"`.
+  - Render
+    `{space === "mine" && account && (<TeachSpace … personalOnly />)}`
+    beside the existing `space === "teach"` block, with the same props.
+  - Language choices: where the bar picks `langChoices` for Learning and
+    `teachChoices` for Teaching (`const choices = space === "learn" ? …`),
+    treat `"mine"` like `"teach"`.
+- **`TeachSpace` with `personalOnly`:** no Courses tab, only the "My
+  space" side of Decks and Cards, and no `Segmented`. For new decks it
+  offers the languages of the courses the person studies, or every
+  language when there are none. Today that list comes from the courses
+  they teach (`teachingLangs` → `knownLangs` → `taught` → `choicesOn`).
+  With `personalOnly`, feed it the studied courses' languages instead.
 - **A personal deck's screen:**
   - In place of the "Courses" `Field`, a `Field` labelled "Practise this
     myself" with a single checkbox (the existing `CheckList` with one
@@ -910,6 +1122,23 @@ comment above it says so. Add the same kinds to the backup manifest
   App admin only, or space admin too (table in B4).
 - **Deleting a space** touches every kind of record. Test it on a space
   with recordings that another space also uses, and check those survive.
+- **The launch check must stay forgiving.** The "Confirm who we are on each
+  start" effect swallows errors so the app works offline. Only
+  `suspended` and `space-closed` may sign a device out. Add a smoke walk
+  where `whoami` is offline (the stub throws), and check the learner stays
+  signed in.
+- **An App admin acting in another space** sees that space's material, not
+  their own My space (their personal decks are in "Main"). That's
+  intended. Don't "fix" it by skipping the org filter for App admins.
+- **Older records have no `org`.** Every test that matters should run
+  twice, once with records written without `org` (as today's data is) and
+  once with `org: "main"`, to prove `orgOf` is used everywhere.
+- **Definition of done for each stage:** `npm run check` is green; new
+  behaviour has tests (server behaviour in `tests/spaces.test.mjs` or a
+  new file beside it, screens in `tests/smoke.mjs`); `CHANGELOG.md`,
+  `DECISIONS.md` and `README.md` say what changed; the release is bumped;
+  it's pushed to `beta`; and the owner has been told, in plain terms, what
+  to try by hand (B9).
 
 ## B9. What to tell the owner at each hand-over
 
