@@ -225,13 +225,15 @@ the next stage starts.
    with its first space admin; rename its address; archive, reopen and
    delete it. Also the space's own sign-in page with its logo and colour,
    the address always showing your space, the "wrong address" messages,
-   and sign-up only by invite or course code. **By hand, when it ships:**
+   and sign-up only by invite or course code. From this stage, deleting an
+   account also erases its practice history. **By hand, when it ships:**
    remove the `SIGNUP_CODE` setting from the server's environment if it's
    set.
 4. **Space admins and accounts.** Their Admin screen, the invite link,
    suspending and reactivating, "Former members", handing over a former
-   teacher's material, leaving a space, deleting your own account with its
-   record and practice history, reports going to the space admin, the key
+   teacher's material, leaving a space, deleting your own account while
+   keeping what you made for the space and leaving a record, reports going
+   to the space admin, the key
    reminder, and the new lost-key wording.
 5. **My space.** The shelf in Teaching, "My space" for learners, "Practise
    this myself", the My space group in Learning, adding course cards to My
@@ -264,6 +266,30 @@ None. The last one, 94, was answered "a, with a warning".
 
 # Part B — Build notes (technical, for the implementer)
 
+**How to use Part B.** B1–B6 describe the whole design **by subject**
+(data, server rules, each action, addresses), so related rules sit
+together. **B10 says which of those items belong to which stage.**
+Build one stage at a time, from B10's checklist, and don't start an item
+that B10 puts in a later stage, even when B4 describes it next to one you
+are doing. B11 is the instruction the owner gives at the start of each
+stage.
+
+**Words used in Part B**
+
+| word | meaning |
+|---|---|
+| space | what people see on screen: a walled-off organisation with its own address |
+| org | the same thing in code (B1); `org:<id>` is its document |
+| Main | the first org, id `"main"`; everything that exists today is in it |
+| App admin | an account with today's `admin: true` flag (the owner); can act in any org |
+| space admin | an account listed in its org's `admins`; never has `admin: true` |
+| acting org | the org a request works in: the caller's own, or for an App admin the one named by the `x-org` header (B3) |
+| address space | the org named by the first part of the page address, e.g. `/lingua-academy` |
+| personal | a deck or card in someone's My space (`personal: true`); private to its owner |
+| pseudo-course | the "My space" course built on the fly in `my-material`, id `"my-space"`, never stored |
+| suspended | an account that can't sign in until reactivated; listed under Former members |
+| Former members | the `former:<org>` list of people who left, were removed or were deleted |
+
 ## B0. Ground rules
 
 - Read `CLAUDE.md` and the parts of `README.md` and `DECISIONS.md` your
@@ -285,8 +311,9 @@ None. The last one, 94, was answered "a, with a warning".
 - **Wording.** Text people see says "space" (or the space's name), never
   "school", "organisation" or "tenant". It also follows the CLAUDE.md
   rules for owner-facing language.
-- Do the stages in order. If something isn't covered here, ask the owner;
-  don't guess.
+- Do the stages in order, one per release, from the checklists in B10.
+  If something isn't covered here, or the code disagrees with this plan,
+  ask the owner; don't guess.
 
 **Practical notes, learnt the hard way while writing this plan:**
 
@@ -774,7 +801,7 @@ changes like this (85a, 86a):
 | action | App admin | space admin (own space) |
 |---|---|---|
 | `admin-overview` | yes, for the acting space (open a space's address to see it; the Spaces tab is the cross-space view) | yes, filtered to their space, personal records excluded |
-| `admin-create-user` | yes | yes; the new user's `org` is theirs; never `admin`; the course must be in their space |
+| `admin-create-user` | yes; the new user's `org` is the acting org (stage 2) | yes; the new user's `org` is theirs; never `admin`; the course must be in their space (stage 4) |
 | `admin-reissue-key` | yes | yes for people in their space, **except** space admins and App admins (70a) |
 | `admin-rename-course`, `admin-course-language`, `admin-new-code`, `admin-card` | yes | yes, in their space |
 | `admin-delete-flags` | yes | yes, their space's flags |
@@ -945,23 +972,35 @@ comment above it says so. Add the same kinds to the backup manifest
 - On a deck's screen in Teaching (the "This deck" block in
   `src/spaces.tsx`, under the Courses field), when the deck holds number
   parts, add a `Field` labelled "Numbers from". It holds a `RadioGroup` of
-  the teachers in the space who have numbers in the deck's language. The
-  owner comes first and is chosen by default when they have numbers. With
-  no candidates, show the existing `partsWaiting` nudge.
+  the people `number-sources` returns for the deck (in stage 1: the owner
+  and every teacher who has numbers in the deck's language; from stage 2,
+  only those in the deck's space). The owner comes first and is chosen by
+  default when they have numbers. With no candidates, show the existing
+  `partsWaiting` nudge.
 - Tests: a course with two teachers who both have numbers gives each
   number once, from the chosen teacher. Changing the choice moves the
   deck's students onto the other set, and items they already had from the
   first set keep their progress.
 
 **Stage 2 — spaces underneath.**
-- No screen changes. Server only (B2–B4), plus `x-org` in `call()`, plus
+- No screen or browser changes at all (the `x-org` header and addresses
+  come in stage 3). Server only, as listed in B10, including
   `admin-create-org` (server only, B5), so a test can make a second space.
 - Tests: a new `tests/spaces.test.mjs` built like `tests/server.test.mjs`
-  (a real server on a temp `DATA_DIR`). Write a second org's records
-  straight into the store, then for **every** action in the
-  `action === "…"` list, assert that a user of one org can't read or
-  change the other's course, deck, card, system or flag. Assert that every
-  list leaves the other org out, and that an App admin with `x-org` can.
+  (a real server on a temp `DATA_DIR`, `ADMIN_KEY` set, an account made
+  App admin with `claim-admin`). Build the second space through the API:
+  1. The App admin calls `admin-create-org` for space B (this also makes
+     B's first admin account and returns its key).
+  2. Sending `x-org: <B's id>`, the App admin calls `create-course` and
+     `admin-create-user` (a teacher and a student, put on that course).
+     New users are stamped with the acting org.
+  3. B's teacher creates a deck and cards, and attaches the deck.
+  4. Do the same in Main.
+
+  Then, for **every** action in the `action === "…"` list, assert that a
+  user of one org can't read or change the other's course, deck, card,
+  system or flag. Assert that every list leaves the other org out, and
+  that an App admin with `x-org` can.
 - Add one test that fails if a new `action === "…"` appears in
   `courses.js` without being listed in the test's table. That stops a
   later action from being added without its org check.
@@ -1155,3 +1194,183 @@ anything still to decide, in plain terms (CLAUDE.md). For stage 2 the
 answer is "nothing visible; here is how we know nothing leaks". For stage
 3, remind the owner to remove `SIGNUP_CODE` from the server's environment
 if it's set.
+
+## B10. Stage checklists
+
+Build only the items for the stage you were given. Each item points to
+where Part B describes it. "Server" items live in `server/api/courses.js`
+unless named otherwise. Every stage also adds its new fields to
+`src/types.ts`, its new calls to `src/courses-api.ts`, its new error codes
+to `explain()`, and its new actions to the smoke stub (B0).
+
+### Stage 1 — numbers by choice
+
+Server:
+- `deck.numbersFrom` (B2); `set-deck-numbers` and `number-sources`, with
+  stage-1 candidates (B4, Decks).
+- `my-material`: add each deck's `numbersFrom` to `teacherHandles`, and
+  stamp every deck it sends with `numbersSystemId` and `timeSystemId` (the
+  chosen source's ids for the deck's language, or `null` when the source
+  has none) (B4, Numbers).
+- `partsWaiting`: `whose` becomes `[d.numbersFrom || d.owner]` (B4,
+  Numbers).
+
+Client:
+- `src/shared.tsx`, where systems are filed into decks: move the choice of
+  `holding` decks into a small pure exported function (for example
+  `decksForSystem(decks, systemId)`) so it can be unit-tested, and filter
+  by `d.numbersSystemId === systemId`. **Compatibility:** when a deck has
+  no `numbersSystemId` field at all (an answer from a server older than
+  this release, which can happen for a moment during a deploy), keep
+  today's behaviour for that deck. `null` means "no numbers for this
+  deck".
+- The "Numbers from" field (B7, stage 1).
+
+Tests: the server cases in B7 stage 1; a unit test of `decksForSystem`
+(two systems in one language, two decks naming different ones: each
+system lands only in its deck; a deck without the field gets both).
+
+### Stage 2 — spaces underneath
+
+Server:
+- Keys `K.org`, `K.slug`, `index:orgs`; making sure `org:main` exists
+  (B2).
+- `orgOf`, `sameOrg`, `actingOrg` (honouring `x-org` for App admins only),
+  `isOrgAdmin`, `refuseOther` (B3).
+- Stamp `org` on every new user, course, deck, card and flag: the acting
+  org (B2 table). `signup` (still the old sign-up for now) stamps Main.
+- The org check and list filter on **every existing action** (B3, B4),
+  limited to what exists today. No personal records, no suspension, no
+  space-admin powers yet. In this stage `canEditDeck` is:
+  same org and (owner, App admin, or teacher of a course holding it).
+- `number-sources` filtered by org.
+- `admin-overview` filtered to the acting org. Every other `admin-*`
+  action checks that its target is in the acting org.
+- `admin-create-org`, server only (B5). It uses `makeHandle` for now.
+- Backups: add `org` and `slug` to `admin-restore-chunk`'s allowed prefixes
+  and to the backup manifest. `admin-clear` keeps or recreates Main (B4,
+  Admin actions).
+
+Client: none.
+
+Tests: B7 stage 2, plus the "older records have no `org`" pass (B8).
+
+### Stage 3 — creating spaces, and addresses
+
+Server:
+- `org-info` (B5).
+- `admin-update-org` (with address forwarding), `admin-org-admins` (stores
+  the list; the powers arrive in stage 4), `admin-archive-org`,
+  `admin-reopen-org`, and the `space-closed` refusal (B3, B5).
+- An invite code for every org, Main included (B2).
+- `signup` needs an invite or course code (`codeTarget`), checks
+  `body.org`, refuses archived spaces, and loses `SIGNUP_CODE` (B4,
+  Accounts).
+- `whoami`/`signin`: the `?org=` check, refusing `space-closed`, and
+  `user.org` in the answer (B4, Accounts). `orgAdmin` and `keySaved` come
+  in stage 4.
+- `join-course`: the `other-space` answer (B4, Courses).
+- `forgetSyncDoc` in `server/api/sync.js`, called from `wipeAccount`
+  (B4, `wipeAccount`, the practice history item only). From now on, every
+  account deletion erases its practice history.
+- `admin-delete-org` (B5). It calls today's `wipeAccount` for each
+  account, then deletes everything else in the org, with the shared-media
+  rule (B4, Media).
+
+Client:
+- `call()` keeps error details (B0). `setAddressOrg` and the `x-org`
+  header (B6).
+- Everything in B6: reading the address, `org-info`, `Onboarding` with
+  the space's logo, name and checked colour, invite links, the three
+  wrong-address cases, `space-closed` in sign-in and in the launch effect
+  (`suspended` can be handled the same way now, ready for stage 4), and
+  the redirect to the account's own address.
+- The contrast helper and its unit test (B6).
+- The Spaces tab and the You menu's logo and name (B7, stage 3). Remove the
+  sign-up code field.
+
+Tests: server (`org-info` for current, former and unknown addresses;
+address rules and `slug-taken`; archived refusal; delete-org removing
+everything of B while Main and a recording both spaces use survive;
+the practice document gone after an account deletion); smoke (`Onboarding`
+at `/<slug>` shows the space; wrong-address messages; a signed-in learner
+whose `whoami` fails offline stays signed in); the contrast unit test.
+
+Tell the owner: remove `SIGNUP_CODE` from the server's environment if set.
+
+### Stage 4 — space admins and accounts
+
+Server:
+- The admin gate table, space-admin rows (B4, Admin actions), and the
+  space admin's powers in `create-course`, `assign-*`, `remove-member`,
+  `canEditDeck` and `mayEditCard` (6a, 94a), `my-decks` (all of the
+  space's decks), and reports (`my-reports`, `dismiss-reports`,
+  `admin-delete-flags`).
+- `whoami` adds `orgAdmin` and `keySaved` on `user`.
+- Suspension: `user.suspended`, the refusal everywhere,
+  `admin-suspend-user`, `admin-reactivate-user`, `leave-space` (refused
+  for App admins), with the 70a exceptions (B2, B3, B5).
+- `former:<org>` and `gone:<handle>` records, `freshHandle`, and the rest
+  of the `wipeAccount` change: keep space material and systems, delete
+  personal material (there is none until stage 5, but write it now), and
+  write the records (B2, B4).
+- `admin-hand-over`, `admin-new-invite`, `admin-remove-former` (B4, B5).
+- `key-saved`, and `keySaved: false` on new accounts (B2, B5).
+- Backups: add `former` and `gone` to the restore prefixes and the
+  manifest.
+
+Client: everything in B7 stage 4.
+
+Tests: each server rule above, especially the B8 `wipeAccount` cases and
+the 70a exceptions; smoke walks for a space admin's Admin screen
+(invite link, suspend, Former members, hand over), the deletion warning
+on someone else's deck, the key reminder, and "Leave this space".
+
+### Stage 5 — My space
+
+Server:
+- `deck.personal`, `deck.practise`, `card.personal` (B2), and the
+  personal rule in B3.
+- `create-deck` (personal decks, and the tightening of who may create a
+  space deck), `save-card` (personal decided at creation; borrowing course
+  cards), `canEditDeck`/`mayEditCard` (personal = owner only),
+  `my-decks`/`my-cards` (separate `personal` lists), `set-deck-practise`,
+  `attach-deck` refusing personal decks, `copy-to-space` (B4, Decks and
+  Cards).
+- `my-material`'s pseudo-course, steps 1–6 (B4, Courses).
+- Blank-fillers and `number-sources` for personal decks (B4, Numbers).
+- `report-flag` refusing personal cards (B4, Accounts).
+- `admin-overview`, the export plan (`exportable`) and `my-reports` never
+  include someone else's personal records.
+
+Client: everything in B7 stage 5, and reports sent from My space carry
+empty `courseId`/`deckId` (B4, `report-flag`).
+
+Tests: a learner makes a personal deck and card, publishes, and receives
+them through `my-material`; nobody else (teacher, space admin, App admin)
+can read them; a borrowed course card drops out when withdrawn;
+`copy-to-space` makes separate copies; smoke walks for "My space" as a
+learner and the shelf as a teacher.
+
+### Stage 6 — your extras
+
+Server: `admin-export-org-manifest`/`-chunk` without personal records,
+and `admin-org-usage` (B5, B4 Media).
+
+Client: B7 stage 6.
+
+Tests: an export of B holds B's courses, decks, cards and media and
+nothing of Main's or anyone's My space; usage counts match.
+
+## B11. Starting a stage
+
+The owner starts each stage with an instruction like this:
+
+> Implement **stage N** of `docs/PLAN-spaces.md` in this repository.
+> Read `CLAUDE.md` first, then the whole plan: Part A says what and why,
+> Part B says how. Build only the items B10 lists for stage N, and don't
+> start anything B10 puts in a later stage. Use only the app's existing
+> components (B0). If the code disagrees with the plan, or something you
+> need isn't covered, stop and ask me in the way `CLAUDE.md` describes,
+> rather than guessing. When the stage is done (the definition of done is
+> in B8), tell me in plain terms what changed and what to try by hand.
