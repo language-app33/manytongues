@@ -1495,6 +1495,30 @@ comes from. The app compares its own commit against `/api/version` and
 offers a Reload when a service worker is still serving an older copy, so a
 release number alone is never taken as proof of a deploy.
 
+## Spaces
+
+A **space** is a walled-off part of the app for one organisation, with its
+own people, courses, decks and cards; nothing in one can be seen or
+touched from another. In code it is an **org**, because "space" already
+names Learning, Teaching and Admin there. Everything that existed before
+spaces is in the first one, **Main**. The plan, the decisions behind it
+and the stages still to come are in `docs/PLAN-spaces.md`.
+
+How the wall is kept, in `server/api/courses.js` (since 0.542):
+
+- Every person, course, deck, card and report carries `org`. One written
+  before spaces has none and is Main's: `orgOf` is the only reader of it,
+  so no migration was written.
+- A request acts in the caller's own org, or, for an App admin, in the
+  one its `x-org` header names. That org is held for the request in
+  `orgScope`, and while it is set the record readers (`readCourse`,
+  `readDeck`, `readCard`, `readUser`) answer null for another org's record.
+  So something in another space reads exactly like something that doesn't
+  exist, whichever action asked. Lists read straight off an index are
+  filtered with `inScope` where they are read.
+- `tests/spaces.test.mjs` tries every action across two real spaces, and
+  fails if a new action is added without being placed in its table.
+
 ## How it fits together
 
 ```

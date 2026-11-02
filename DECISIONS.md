@@ -7217,3 +7217,30 @@ longer filed into a deck is simply not dealt.
 
 Part of the spaces plan (`docs/PLAN-spaces.md`, stage 1).
 
+---
+
+## The space a request acts in is held for the whole request
+
+**2 November 2026** · `orgScope`, `inScope` and the record readers in
+`server/api/courses.js`
+
+The plan (`docs/PLAN-spaces.md`, B3) asked for an org check in every
+action and a changed signature for `canEditDeck`. There are some sixty
+actions, and every one written by hand is one more place to forget. So
+the org is worked out once, after the caller is known, and kept in an
+`AsyncLocalStorage` for the rest of the request — per request rather than
+per process, because requests interleave. While it is set, `readCourse`,
+`readDeck`, `readCard` and `readUser` answer null for another org's record,
+`everyCourse` and `canEditDeck` see only this org, and the lists read
+straight off an index are filtered with `inScope`. Another space's record
+looks like no record at all, and every action already knows what to do
+with that.
+
+Cost: a raw `readJson` of a course, deck, card or user bypasses the wall,
+so new code reads through the four readers or filters with `inScope`.
+`tests/spaces.test.mjs` is what catches a slip, and it fails until a new
+action is placed in its table. Two slips it caught on the first run:
+`admin-delete-user` took a stranger off every roster through
+`wipeAccount`, and the export let an administrator take any card. Both are
+now limited to the acting org.
+

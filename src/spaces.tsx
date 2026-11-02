@@ -634,6 +634,16 @@ export const BACKUP_PARTS: {
   unit: string;
 }[] = [
   {
+    key: "spaces",
+    title: "Spaces",
+    what: "Each space's name, address, look and admins, and every address it has had.",
+    kinds: ["org", "slug"],
+    prefixes: ["org:", "slug:"],
+    index: "orgs",
+    count: "orgs",
+    unit: "space",
+  },
+  {
     key: "people",
     title: "People",
     what: "Accounts and their names, with the fingerprint of each sign-in key — never the keys themselves.",

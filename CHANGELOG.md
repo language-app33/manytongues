@@ -8,6 +8,20 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.542 — 2 November 2026
+
+**Spaces, underneath. Nothing changes on screen.**
+
+- Everything in the app now belongs to a space: the first one, called
+  Main, holds everything there is today. The server refuses anything that
+  crosses from one space to another, and checks of every kind of request
+  prove it.
+- Nobody will notice a difference yet. Creating spaces, and their
+  addresses, come next.
+- Two gaps found while checking, both only reachable by the app admin, are
+  closed: deleting a person from another space, and exporting another
+  space's cards.
+
 ## 0.541 — 2 November 2026
 
 **A deck's numbers come from one teacher, chosen on the deck.**
