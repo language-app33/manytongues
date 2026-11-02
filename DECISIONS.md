@@ -7190,3 +7190,30 @@ Advanced tab's state in the draft, and only the save trims it: `basicCard`
 cuts what is written down to the first form, and `droppedByBasic` names
 what that cut would lose, for the line under the box. The cost is two word
 drafts per screen; only the shown one is saved.
+
+---
+
+## A deck's numbers come from one person
+
+**2 November 2026** · `number-sources`, `set-deck-numbers` and `partsWaiting`
+in `server/api/courses.js`, `src/number-decks.ts`
+
+A deck holds number *parts* (0 to 10, telling the hour), and the words come
+from a teacher's number system. The device was sent every system of every
+teacher connected to the learner's courses and filed each into every deck of
+its language, so a course with two teachers who had numbers gave each number
+twice. A deck now names one source, `numbersFrom`, defaulting to its owner;
+the server stamps each deck it sends with that person's system and clock ids,
+and the device files a system only into the decks that name it
+(`decksForSystem`).
+
+Weighed: keeping "everyone's" and de-duplicating on the device. Rejected
+because two teachers' recordings of the same number are different answers,
+and only a person can say which one a class should hear. A deck answered by
+an older server carries no `numbersSystemId` and is filed as before, so a
+deploy caught half way doesn't empty anyone's numbers. Progress already made
+on a system is kept: items are keyed by the system's id, and a system no
+longer filed into a deck is simply not dealt.
+
+Part of the spaces plan (`docs/PLAN-spaces.md`, stage 1).
+

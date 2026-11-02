@@ -191,6 +191,14 @@ export const lockDeck = (deckId: string, locked: boolean) => call("lock-deck", {
 export const setDeckParts = (deckId: string, parts: string[]) =>
   call("set-deck-parts", { body: { deckId, parts } });
 export const myCards = () => call("my-cards");
+/** Who a deck may take its numbers from, owner first (0.541). */
+export const numberSources = (deckId: string): Promise<{
+  ok: true;
+  sources: { handle: string; displayName: string; numbers: boolean; times: boolean }[];
+  chosen: string;
+}> => call("number-sources", { params: { deck: deckId } });
+export const setDeckNumbers = (deckId: string, from: string) =>
+  call("set-deck-numbers", { body: { deckId, from } });
 /* The server calls this field "decks"; sending anything else means the
    card saves but never lands in a deck. */
 /**

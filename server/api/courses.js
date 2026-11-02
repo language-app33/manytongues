@@ -1341,13 +1341,10 @@ export default async (req) => {
       for (const d of withParts) {
         const holding = courses.filter((c) => (c.decks || []).includes(d.id));
         const lang = d.lang || (holding[0] && holding[0].language) || "";
-        const whose = [
-          ...new Set(
-            [d.owner]
-              .concat(holding.flatMap((c) => (c.teachers || []).concat((c.decks || []).map((x) => ownerOf.get(x) || ""))))
-              .filter(Boolean),
-          ),
-        ];
+        /* The one person whose numbers the deck uses (0.541): its own
+           choice, or its owner. Every teacher's used to count, which sent
+           students each number once per teacher. */
+        const whose = [d.numbersFrom || d.owner].filter(Boolean);
         /** @type {Set<string>} */
         const open = new Set();
         for (const ids of await Promise.all(whose.map((h) => opens(h, lang)))) for (const id of ids) open.add(id);
@@ -2961,6 +2958,59 @@ export default async (req) => {
       return json({ ok: true, parts, partsWaiting: waiting || [] });
     }
 
+    /*
+     * Whose numbers a deck uses (0.541).
+     *
+     * A deck holding number parts is filled from one person's numbers and
+     * clock: its own choice, or its owner's. number-sources lists who may be
+     * chosen — the owner and every teacher with a number system in the
+     * deck's language — and set-deck-numbers records the choice.
+     */
+    async function numberSources(/** @type {Deck} */ deck) {
+      const courses = await everyCourse(store);
+      const holding = courses.filter((c) => (c.decks || []).includes(deck.id));
+      const lang = deck.lang || (holding[0] && holding[0].language) || "";
+      const handles = [...new Set([deck.owner].concat(courses.flatMap((c) => c.teachers || [])).filter(Boolean))];
+      const out = [];
+      for (const h of handles) {
+        const index = await systemIndex(h);
+        if (!index.numbers[lang]) continue;
+        const u = await readUser(store, h);
+        out.push({ handle: h, displayName: (u && u.displayName) || h, numbers: true, times: !!index.times[lang] });
+      }
+      const owner = out.filter((x) => x.handle === deck.owner);
+      const rest = out.filter((x) => x.handle !== deck.owner).sort((a, b) => a.displayName.localeCompare(b.displayName));
+      return owner.concat(rest);
+    }
+
+    if (action === "number-sources") {
+      const deck = await readDeck(store, url.searchParams.get("deck") || "");
+      if (!deck) return json({ error: "no-deck" }, 404);
+      if (!(await canEditDeck(store, deck, mine, me.admin))) return json({ error: "not-yours" }, 403);
+      return json({ ok: true, sources: await numberSources(deck), chosen: deck.numbersFrom || deck.owner });
+    }
+
+    if (action === "set-deck-numbers") {
+      const deck = await readDeck(store, String(body.deckId || ""));
+      if (!deck) return json({ error: "no-deck" }, 404);
+      if (!(await canEditDeck(store, deck, mine, me.admin))) return json({ error: "not-yours" }, 403);
+      const from = String(body.from || "");
+      if (!(await numberSources(deck)).some((x) => x.handle === from)) return json({ error: "bad-source" }, 400);
+      const next = await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
+        if (!fresh) return null;
+        const { numbersFrom: _was, ...rest } = /** @type {any} */ (fresh);
+        return {
+          ...rest,
+          ...(from === fresh.owner ? null : { numbersFrom: from }),
+          version: (fresh.version || 1) + 1,
+          updated: Date.now(),
+        };
+      });
+      await taught();
+      const waiting = next ? (await partsWaiting([next], await everyCourse(store))).get(next.id) : null;
+      return json({ ok: true, numbersFrom: from, partsWaiting: waiting || [] });
+    }
+
     /* The deck goes; the cards it held stay in the library. A locked deck
        is unlocked first: deleting it is the largest change there is to
        which cards it holds. */
@@ -3355,6 +3405,9 @@ export default async (req) => {
           deckRows
             .map((/** @type {any} */ d) => d.owner)
             .concat(courseRows.flatMap((/** @type {any} */ c) => c.teachers || []))
+            /* And whoever a deck takes its numbers from (0.541), who may
+               teach none of these courses. */
+            .concat(deckRows.map((/** @type {any} */ d) => d.numbersFrom || ""))
             .filter(Boolean)
         ),
       ];
@@ -3433,8 +3486,16 @@ export default async (req) => {
         const course = deckToCourse.get(d.id);
         const link = (d.courses || []).find((/** @type {{ courseId: string }} */ c) => c.courseId === course.id);
         const cardIds = await deckCardIds(d);
+        /* Which number system and clock fill this deck's number parts: the
+           chosen person's, in the deck's language (0.541). null when that
+           person has none, so the device files nothing rather than
+           everything. */
+        const numLang = d.lang || course.language || "";
+        const numIndex = await systemIndex(d.numbersFrom || d.owner);
         decks.push({
           ...d,
+          numbersSystemId: numIndex.numbers[numLang] || null,
+          timeSystemId: numIndex.times[numLang] || null,
           cardIds,
           cardCount: cardIds.length,
           ownerName: nameOf[d.owner],

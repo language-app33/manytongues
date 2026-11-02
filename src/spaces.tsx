@@ -112,6 +112,7 @@ import {
   ClipList,
   clipHashes,
   ConfirmModal,
+  RadioGroup,
   Field,
   FilterBar,
   formHasAudio,
@@ -7680,6 +7681,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
               </fieldset>
 
+              {(d.parts || []).length ? <NumbersFrom deckId={d.id} /> : null}
+
               {/* The whole deck, whatever the list below is showing: what a
                   deck covers is a fact about the deck, not about the cards
                   a filter has left on screen. How much of it is practised
@@ -8660,5 +8663,55 @@ export function StudentCourses({
         </div>
       }
     />
+  );
+}
+
+/*
+ * Whose numbers a deck's number parts use (0.541).
+ *
+ * Saved as soon as it is chosen, like a deck's parts: it is not part of the
+ * deck's Edit, because it changes what students hear rather than what the
+ * deck is called. Shown only on a deck that holds number parts.
+ */
+function NumbersFrom({ deckId }: { deckId: string }) {
+  const [sources, setSources] = useState<{ handle: string; displayName: string }[] | null>(null);
+  const [chosen, setChosen] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    API.numberSources(deckId).then(
+      (r) => {
+        if (!live) return;
+        setSources(r.sources);
+        setChosen(r.chosen);
+      },
+      (e) => live && setError(API.explain(e)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [deckId]);
+  if (error) return <Notice kind="error">{error}</Notice>;
+  if (!sources || !sources.length) return null;
+  return (
+    <Field label="Numbers from" lede="Whose numbers and recordings this deck's students practise.">
+      <RadioGroup
+        name={`numbers-from-${deckId}`}
+        label="Numbers from"
+        quiet
+        value={chosen}
+        options={sources.map((x) => ({ value: x.handle, label: x.displayName }))}
+        onChange={async (h) => {
+          const was = chosen;
+          setChosen(h);
+          try {
+            await API.setDeckNumbers(deckId, h);
+          } catch (e) {
+            setChosen(was);
+            setError(API.explain(e));
+          }
+        }}
+      />
+    </Field>
   );
 }

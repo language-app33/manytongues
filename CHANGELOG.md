@@ -8,6 +8,20 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.541 — 2 November 2026
+
+**A deck's numbers come from one teacher, chosen on the deck.**
+
+- A course with two teachers who both had numbers gave its students every
+  number twice, once in each teacher's words and voice. Now each number
+  comes once.
+- A deck that holds numbers has a new choice on its screen, **Numbers
+  from**: the deck owner's own numbers, or any other teacher's who has
+  numbers in that language. It starts on the owner's. Changing it takes
+  effect for students the next time their app checks in.
+- A teacher with no numbers of their own can make a numbers deck from a
+  colleague's numbers instead of writing their own.
+
 ## 0.540 — 31 October 2026
 
 **Everything since 0.521 checked, and two bugs it found fixed.**

@@ -1269,6 +1269,13 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   word already cleared is given its reading as done and starts on writing
   — `creditNumbers` again.
 
+  **A deck's numbers come from one person** (since 0.541): its own
+  choice, `numbersFrom`, set on the deck's screen under "Numbers from",
+  or its owner. The server stamps each deck it sends a learner with that
+  person's system and clock ids, and the device files a system only into
+  the decks that name it (`decksForSystem` in `src/number-decks.ts`), so
+  two teachers with numbers no longer give a course every number twice.
+
   **A deck holds the parts it teaches.** A system is one document per
   language and not cards, so a deck cannot list it among its cards: it
   names the ranges it teaches (`parts` on the deck, set through

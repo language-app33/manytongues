@@ -1214,6 +1214,15 @@ export interface Deck {
    * fileIntoDecks in numbers/generate.ts.
    */
   parts?: string[];
+  /** Whose numbers and clock fill `parts`; absent means the owner (0.541). */
+  numbersFrom?: string;
+  /**
+   * Sent with a learner's decks: the number system and clock `parts` are
+   * filled from, or null for none. Absent on an answer from an older
+   * server, where every system is filed as before.
+   */
+  numbersSystemId?: string | null;
+  timeSystemId?: string | null;
   /**
    * Which of `parts` its students get nothing from yet, because the words
    * those parts are built of are not all written. Worked out by the
