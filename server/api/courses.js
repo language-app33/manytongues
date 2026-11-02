@@ -466,6 +466,12 @@ const K = {
   /** An address, to the org it belongs to. Kept for ever (8b). */
   /** @param {string} name */
   slug: (name) => `slug:${name}`,
+  /** An org's Former members list (0.544). */
+  /** @param {string} org */
+  former: (org) => `former:${org}`,
+  /** A deleted account's name, kept for what it made (0.544). */
+  /** @param {string} handle */
+  gone: (handle) => `gone:${handle}`,
 };
 
 /*
@@ -945,64 +951,126 @@ async function courseForCode(store, given) {
 }
 
 /**
+ * Former members (0.544; docs/PLAN-spaces.md, B2): one list per org of the
+ * people who left, were removed or were deleted, newest last. A record is
+ * replaced, not doubled, when the same person's story moves on (suspended,
+ * then deleted).
+ * @param {Store} store
+ * @param {string} org
+ * @param {Record<string, any>} rec
+ */
+async function noteFormer(store, org, rec) {
+  await updateJson(store, K.former(org), (/** @type {any} */ cur) =>
+    (cur || []).filter((/** @type {any} */ r) => r.handle !== rec.handle).concat([rec])
+  );
+}
+
+/**
+ * The courses someone is on, with their roles and titles — what a record
+ * keeps and what reactivating puts back. This org's courses only.
  * @param {Store} store
  * @param {string} handle
  */
-async function wipeAccount(store, handle) {
+async function coursesOf(store, handle) {
+  return (await everyCourse(store))
+    .filter((c) => isTeacher(c, handle) || isStudent(c, handle))
+    .map((c) => ({
+      id: c.id,
+      title: c.title,
+      roles: /** @type {string[]} */ ([]).concat(isTeacher(c, handle) ? ["teacher"] : [], isStudent(c, handle) ? ["student"] : []),
+    }));
+}
+
+/**
+ * Deleting an account (0.544; 85a, 86a, 83a, 84a).
+ *
+ * What the person made for their space stays, under their name — decks,
+ * cards, numbers and clock — so courses keep working and a space admin can
+ * hand it on. Their own private material (My space: personal decks and
+ * cards) goes, and so does their practice history. Their place on every
+ * roster goes, and a Former members record says who they were.
+ *
+ * Every list here is changed by taking out what is named, never rewritten
+ * from what this request can see: since 0.542 a request sees one org, and
+ * a list rewritten from that would lose every other org's entries.
+ * @param {Store} store
+ * @param {string} handle
+ * @param {{ why?: string, by?: string }} [how]
+ */
+async function wipeAccount(store, handle, how = {}) {
   const user = await readUser(store, handle);
   /* A course restored from a backup brings its roster back as it was, and
      that can name somebody whose account has since gone. There is nothing
      of theirs left to remove but their place on the rosters. */
   if (!user) return dropFromRosters(store, handle);
+  const org = orgOf(user);
+  const courses = user.suspended && Array.isArray(user.suspended.courses) && user.suspended.courses.length
+    ? user.suspended.courses
+    : await coursesOf(store, handle);
 
-  /* The person's cards go, so they come out of everyone's decks too —
-     locked or not, the same as deleting a card does. Left in, another
-     teacher's deck would point at cards that no longer exist. */
-  const ownIds = new Set((await readJson(store, K.ownCards(handle))) || []);
-  const deckIds = await readIndex(store, "decks");
-  const keptDecks = [];
-  for (const id of deckIds) {
-    const d = await readDeck(store, id);
-    if (!d) continue;
-    if (d.owner !== handle) {
-      keptDecks.push(id);
-      if (ownIds.size && (d.cardIds || []).some((/** @type {string} */ x) => ownIds.has(x))) {
-        await updateJson(store, K.deck(id), (fresh) => {
-          if (!fresh) return null;
-          const next = (fresh.cardIds || []).filter((/** @type {string} */ x) => !ownIds.has(x));
-          return {
-            ...fresh,
-            cardIds: next,
-            cardCount: next.length,
-            version: (fresh.version || 1) + 1,
-            updated: Date.now(),
-          };
-        });
-      }
-      continue;
+  /* Their personal cards, taken out of whatever decks hold them, then gone. */
+  const listed = (await readJson(store, K.myCards(handle))) || [];
+  const cards = (await readManyJson(store, listed.map((/** @type {string} */ id) => K.card(id)))).filter(Boolean);
+  const personalCards = new Set(cards.filter((c) => c.personal).map((c) => c.id));
+  for (const c of cards.filter((x) => x.personal)) {
+    for (const did of c.inDecks || []) {
+      await updateJson(store, K.deck(did), (/** @type {any} */ fresh) => {
+        if (!fresh || !(fresh.cardIds || []).includes(c.id)) return null;
+        const next = fresh.cardIds.filter((/** @type {string} */ x) => x !== c.id);
+        return { ...fresh, cardIds: next, cardCount: next.length, version: (fresh.version || 1) + 1, updated: Date.now() };
+      });
     }
-    await dropFromCourses(store, id);
-    await store.delete(K.deck(id)).catch(() => {});
+    await store.delete(K.card(c.id)).catch(() => {});
   }
-  await writeJson(store, K.index("decks"), keptDecks);
-
-  for (const id of (await readJson(store, K.ownCards(handle))) || []) {
-    await store.delete(K.card(id)).catch(() => {});
+  if (personalCards.size) {
+    await updateJson(store, K.myCards(handle), (/** @type {any} */ cur) =>
+      (cur || []).filter((/** @type {string} */ x) => !personalCards.has(x))
+    );
   }
-  await store.delete(K.ownCards(handle)).catch(() => {});
 
-  for (const key of await systemKeysOf(store, handle)) await store.delete(key).catch(() => {});
-  await store.delete(K.mySystems(handle)).catch(() => {});
-  await store.delete(K.tagLift(handle)).catch(() => {});
+  /* Their personal decks. A deck borrowing course cards (66b) goes alone:
+     those cards are the space's. */
+  const deckIds = await readIndex(store, "decks");
+  const decks = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(
+    (d) => d && d.owner === handle && d.personal
+  );
+  for (const d of decks) await store.delete(K.deck(d.id)).catch(() => {});
+  if (decks.length) {
+    const goneDecks = new Set(decks.map((d) => d.id));
+    await updateJson(store, K.index("decks"), (/** @type {any} */ cur) =>
+      (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x))
+    );
+  }
 
   await dropFromRosters(store, handle);
+  await updateJson(store, K.org(org), (/** @type {any} */ o) =>
+    o && (o.admins || []).includes(handle) ? { ...o, admins: o.admins.filter((/** @type {string} */ x) => x !== handle) } : null
+  );
 
   if (user.keyHash) await store.delete(K.keyOf(user.keyHash)).catch(() => {});
   /* And the practice history, which the key's digest finds (86a). */
   if (user.keyHash) await forgetSyncDoc(user.keyHash).catch(() => {});
   await store.delete(K.user(handle)).catch(() => {});
-  const users = await readIndex(store, "users");
-  await writeJson(store, K.index("users"), users.filter((x) => x !== handle));
+  await updateJson(store, K.index("users"), (/** @type {any} */ cur) =>
+    (cur || []).filter((/** @type {string} */ x) => x !== handle)
+  );
+
+  /* Their name, kept for the material that stays, and so the handle is
+     never given to somebody else. */
+  await writeJson(store, K.gone(handle), { displayName: user.displayName, org, at: Date.now() });
+  await updateJson(store, K.index("gone"), (/** @type {any} */ cur) =>
+    (cur || []).includes(handle) ? null : (cur || []).concat([handle])
+  );
+  const who = how.by || handle;
+  await noteFormer(store, org, {
+    handle,
+    displayName: user.displayName,
+    joined: user.created || 0,
+    left: Date.now(),
+    courses,
+    why: who === handle ? "deleted-self" : "deleted-by-admin",
+    by: who,
+  });
   return true;
 }
 
@@ -1143,7 +1211,7 @@ async function handle(req) {
       const at = String(body.org || "");
       if (at && at !== orgId) return json({ error: "other-space", space: orgCard(org) }, 409);
 
-      const handle = makeHandle(displayName, handles);
+      const handle = makeHandle(displayName, handles.concat(await readIndex(store, "gone")));
       const key = makeKey();
       const user = {
         handle,
@@ -1152,6 +1220,7 @@ async function handle(req) {
         org: orgId,
         created: Date.now(),
         lastSeen: Date.now(),
+        keySaved: false,
       };
       await writeJson(store, K.user(handle), { ...user, keyHash: sha(key) });
       await writeJson(store, K.keyOf(sha(key)), handle);
@@ -1171,6 +1240,7 @@ async function handle(req) {
       await ensureMain(store);
       const me = await currentUser(req, store);
       if (!me) return json({ error: "bad-key" }, 401);
+      if (me.suspended) return json({ error: "suspended" }, 403);
       const org = await readJson(store, K.org(orgOf(me)));
       if (org && org.archived && !me.admin) return json({ error: "space-closed" }, 403);
       /* Signing in at another space's address (53b): say whose the key is,
@@ -1181,13 +1251,22 @@ async function handle(req) {
       }
       await touch(store, me, "lastSeen");
       const { keyHash, ...safe } = me;
-      return json({ ok: true, user: { ...safe, org: org ? orgCard(org) : { id: MAIN, slug: MAIN, name: "Main", logo: "", colour: "" } } });
+      return json({
+        ok: true,
+        user: {
+          ...safe,
+          org: org ? orgCard(org) : { id: MAIN, slug: MAIN, name: "Main", logo: "", colour: "" },
+          orgAdmin: !!org && (org.admins || []).includes(me.handle),
+        },
+      });
     }
 
     const me = await currentUser(req, store);
     if (!me) return json({ error: "bad-key" }, 401);
     const mine = me.handle;
     const iAmAdmin = !!me.admin;
+    /* A suspended account can do nothing until reactivated (64a). */
+    if (me.suspended) return json({ error: "suspended" }, 403);
 
     /* A closed space's people can't do anything until it reopens (62a). */
     if (!me.admin) {
@@ -1208,6 +1287,21 @@ async function handle(req) {
     if (scope) {
       scope.org = acting;
       scope.self = mine;
+    }
+    /* Who runs the space this request acts in (0.544): its space admins,
+       acting in their own space, and App admins anywhere. A space admin is
+       never an App admin: everything that was the App admin's alone stays
+       so unless it is named for space admins below. */
+    const actingOrgDoc = await readJson(store, K.org(acting));
+    const iRunThis = !!actingOrgDoc && orgOf(me) === acting && (actingOrgDoc.admins || []).includes(mine);
+    const iManage = iAmAdmin || iRunThis;
+    /** Names for handles whose accounts were deleted (0.544): what they made keeps their name. */
+    async function nameTheGone(/** @type {Record<string, string>} */ nameOf, /** @type {string[]} */ handles) {
+      for (const h of [...new Set(handles)]) {
+        if (!h || (nameOf[h] && nameOf[h] !== h)) continue;
+        const g = await readJson(store, K.gone(h));
+        if (g && g.displayName) nameOf[h] = g.displayName;
+      }
     }
     /** Rows read straight off an index, with another org's blanked (kept in place, so ids still line up). */
     const here = (/** @type {any[]} */ rows) => rows.map((r) => (r && inScope(r) ? r : null));
@@ -1689,7 +1783,7 @@ async function handle(req) {
           result.missing.push(id);
           continue;
         }
-        if (card.owner !== mine && !iAmAdmin) {
+        if (card.owner !== mine && !iManage) {
           result.refused.push(id);
           continue;
         }
@@ -1781,7 +1875,9 @@ async function handle(req) {
       const teaching = new Set(
         courseRows.filter((c) => c && isTeacher(c, mine)).flatMap((c) => c.decks || [])
       );
-      const editable = deckRows.filter((d) => d && (d.owner === mine || teaching.has(d.id)));
+      /* A space admin looks after every deck in the space (6a), except
+         anyone's My space. */
+      const editable = deckRows.filter((d) => d && (d.owner === mine || teaching.has(d.id) || (iManage && !d.personal)));
 
       /** @type {Record<string, string[]>} */
       const holding = {};
@@ -1825,13 +1921,13 @@ async function handle(req) {
         if (!existing) return json({ error: "no-card" }, 404);
         wasFilling = fillsOf(existing).length > 0;
         current = await decksHolding(existing);
-        if (existing.owner !== mine && !me.admin) {
+        if (existing.owner !== mine && !iManage) {
           /* A card in a deck I teach is mine to correct — a deck it is
              actually in, not one the request happens to name. */
           let allowed = false;
           for (const did of current) {
             const d = await readDeck(store, did);
-            if (await canEditDeck(store, d, mine, me.admin)) {
+            if (await canEditDeck(store, d, mine, iManage)) {
               allowed = true;
               break;
             }
@@ -2652,7 +2748,7 @@ async function handle(req) {
         if (!d) continue;
         const has = current.includes(did);
         const want = wanted.has(did);
-        if (want !== has && !(await canEditDeck(store, d, mine, me.admin))) {
+        if (want !== has && !(await canEditDeck(store, d, mine, iManage))) {
           /* Not this person's deck to change: leave it as it was. */
           if (has) final.push(did);
           continue;
@@ -2825,9 +2921,9 @@ async function handle(req) {
     /** @param {Card} card */
     async function mayEditCard(card) {
       if (!card) return false;
-      if (card.owner === mine || iAmAdmin) return true;
+      if (card.owner === mine || iManage) return true;
       for (const did of await decksHolding(card)) {
-        if (await canEditDeck(store, await readDeck(store, did), mine, iAmAdmin)) return true;
+        if (await canEditDeck(store, await readDeck(store, did), mine, iManage)) return true;
       }
       return false;
     }
@@ -2979,7 +3075,7 @@ async function handle(req) {
      * an older build still on a teacher's device simply shows none.
      */
     if (action === "my-reports") {
-      if (!iAmAdmin) return json({ ok: true, flags: [], cards: [] });
+      if (!iManage) return json({ ok: true, flags: [], cards: [] });
       const flagIds = await readIndex(store, "flags");
       const rows = here(await readManyJson(store, flagIds.map((x) => K.flag(x)))).filter(Boolean);
       /** @type {Map<string, any>} */
@@ -2995,7 +3091,7 @@ async function handle(req) {
         if (!allowed.has(cid)) {
           let may = card ? await mayEditCard(card) : false;
           if (!may && !card && f.deckId) {
-            may = await canEditDeck(store, await readDeck(store, String(f.deckId)), mine, me.admin);
+            may = await canEditDeck(store, await readDeck(store, String(f.deckId)), mine, iManage);
           }
           allowed.set(cid, may);
         }
@@ -3013,7 +3109,7 @@ async function handle(req) {
        administrator's dismissal counts — see my-reports. The Flags list
        loses it too: there is one report, and it has been answered. */
     if (action === "dismiss-reports") {
-      if (!iAmAdmin) return json({ ok: true, deleted: 0 });
+      if (!iManage) return json({ ok: true, deleted: 0 });
       const wanted = new Set((Array.isArray(body.flagIds) ? body.flagIds : []).map(String).slice(0, 100));
       if (!wanted.size) return json({ ok: true, deleted: 0 });
       const ids = await readIndex(store, "flags");
@@ -3026,7 +3122,7 @@ async function handle(req) {
         const card = await loadCard(cardIdOf(f.cardId));
         const may = card
           ? await mayEditCard(card)
-          : !!f.deckId && (await canEditDeck(store, await readDeck(store, String(f.deckId)), mine, me.admin));
+          : !!f.deckId && (await canEditDeck(store, await readDeck(store, String(f.deckId)), mine, iManage));
         if (!may) continue;
         await store.delete(K.flag(fid)).catch(() => {});
         gone.push(fid);
@@ -3072,7 +3168,7 @@ async function handle(req) {
       /* With the courses that hold each one read off those courses, which
          is what the course screen, Manage decks and a deck's settings all
          show — see linksOf. */
-      const shown = rows.filter((d) => d.owner === mine || teaching.has(d.id));
+      const shown = rows.filter((d) => d.owner === mine || teaching.has(d.id) || (iManage && !d.personal));
       /* And which of its number parts reach nobody yet — see partsWaiting. */
       const waiting = await partsWaiting(shown, courses);
       const decks = shown.map((d) => ({
@@ -3088,7 +3184,7 @@ async function handle(req) {
     if (action === "rename-deck") {
       const deck = await readDeck(store, String(body.deckId || ""));
       if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin)))
+      if (!(await canEditDeck(store, deck, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       const title = String(body.title || "").trim().slice(0, 60);
       if (!title) return json({ error: "title-required" }, 400);
@@ -3111,7 +3207,7 @@ async function handle(req) {
     if (action === "lock-deck") {
       const deck = await readDeck(store, String(body.deckId || ""));
       if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin)))
+      if (!(await canEditDeck(store, deck, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       const locked = !!body.locked;
       await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
@@ -3137,7 +3233,7 @@ async function handle(req) {
     if (action === "set-deck-parts") {
       const deck = await readDeck(store, String(body.deckId || ""));
       if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin)))
+      if (!(await canEditDeck(store, deck, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
       const asked = Array.isArray(body.parts) ? body.parts : [];
@@ -3187,14 +3283,14 @@ async function handle(req) {
     if (action === "number-sources") {
       const deck = await readDeck(store, url.searchParams.get("deck") || "");
       if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin))) return json({ error: "not-yours" }, 403);
+      if (!(await canEditDeck(store, deck, mine, iManage))) return json({ error: "not-yours" }, 403);
       return json({ ok: true, sources: await numberSources(deck), chosen: deck.numbersFrom || deck.owner });
     }
 
     if (action === "set-deck-numbers") {
       const deck = await readDeck(store, String(body.deckId || ""));
       if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin))) return json({ error: "not-yours" }, 403);
+      if (!(await canEditDeck(store, deck, mine, iManage))) return json({ error: "not-yours" }, 403);
       const from = String(body.from || "");
       if (!(await numberSources(deck)).some((x) => x.handle === from)) return json({ error: "bad-source" }, 400);
       const next = await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
@@ -3218,7 +3314,7 @@ async function handle(req) {
     if (action === "delete-deck") {
       const deck = await readDeck(store, String(body.deckId || ""));
       if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin)))
+      if (!(await canEditDeck(store, deck, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
 
@@ -3246,9 +3342,9 @@ async function handle(req) {
       const deck = await readDeck(store, String(body.deckId || ""));
       const course = await readCourse(store, String(body.courseId || ""));
       if (!deck || !course) return json({ error: "not-found" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin)))
+      if (!(await canEditDeck(store, deck, mine, iManage)))
         return json({ error: "not-yours" }, 403);
-      if (!isTeacher(course, mine) && !me.admin) return json({ error: "not-teaching" }, 403);
+      if (!isTeacher(course, mine) && !iManage) return json({ error: "not-teaching" }, 403);
 
       const adding = action === "attach-deck";
       /* Whether the course held it before this, which decides whether the
@@ -3286,7 +3382,7 @@ async function handle(req) {
     /* ================= courses ================= */
 
     if (action === "create-course") {
-      if (!me.admin) return json({ error: "admin-only" }, 403);
+      if (!iManage) return json({ error: "admin-only" }, 403);
       const title = String(body.title || "").trim().slice(0, 80);
       if (!title) return json({ error: "title-required" }, 400);
       const id = `c${randomBytes(6).toString("hex")}`;
@@ -3324,7 +3420,7 @@ async function handle(req) {
        has to be enrolled as a student to get them. Assigning one no longer
        removes the other. */
     if (action === "assign-teacher" || action === "assign-student" || action === "remove-member") {
-      if (!me.admin) return json({ error: "admin-only" }, 403);
+      if (!iManage) return json({ error: "admin-only" }, 403);
       const course = await readCourse(store, String(body.courseId || ""));
       const handle = String(body.handle || "");
       const target = await readUser(store, handle);
@@ -3689,6 +3785,7 @@ async function handle(req) {
       /** @type {Record<string, string>} */
       const nameOf = {};
       ownerHandles.forEach((h, i) => (nameOf[h] = owners[i] ? owners[i].displayName : h));
+      await nameTheGone(nameOf, ownerHandles);
 
       const decks = [];
       for (const d of deckRows) {
@@ -3890,7 +3987,7 @@ async function handle(req) {
     if (action === "course-decks") {
       const course = await readCourse(store, url.searchParams.get("course") || "");
       if (!course) return json({ error: "not-found" }, 404);
-      if (!inCourse(course, mine) && !me.admin) return json({ error: "not-in-course" }, 403);
+      if (!inCourse(course, mine) && !iManage) return json({ error: "not-in-course" }, 403);
 
       const rows = (await readManyJson(store, course.decks.map((id) => K.deck(id)))).filter(
         Boolean
@@ -3900,6 +3997,7 @@ async function handle(req) {
       /** @type {Record<string, string>} */
       const nameOf = {};
       ownerHandles.forEach((h, i) => (nameOf[h] = owners[i] ? owners[i].displayName : h));
+      await nameTheGone(nameOf, ownerHandles);
       const decks = rows.map((d) => {
         const link = d.courses.find((/** @type {{ courseId: string }} */ c) => c.courseId === course.id);
         return {
@@ -3925,7 +4023,7 @@ async function handle(req) {
          what sends it to them in the first place. */
       const allowed =
         deck.owner === mine ||
-        me.admin ||
+        iManage ||
         (await everyCourse(store)).some((c) => (c.decks || []).includes(deck.id) && inCourse(c, mine));
       if (!allowed) return json({ error: "no-access" }, 403);
 
@@ -3958,7 +4056,7 @@ async function handle(req) {
       const deckRows = (await readManyJson(store, (await readIndex(store, "decks")).map((id) => K.deck(id))))
         .filter((d) => d && inScope(d));
       /* An administrator may take anything, as a backup would. */
-      const admin = !!(me && me.admin);
+      const admin = iManage;
       const decks = deckRows.filter((d) => admin || d.owner === mine || teaching.has(d.id));
       const cards = new Set(own.concat(decks.flatMap((d) => d.cardIds || [])));
       return { decks: new Map(decks.map((d) => [d.id, d])), cards, admin };
@@ -4134,10 +4232,53 @@ async function handle(req) {
       return json({ ok: true, hash, data });
     }
 
+    /* ================= one's own account in a space (0.544) ================= */
+
+    /* "I've saved my key somewhere safe" (19b). */
+    if (action === "key-saved") {
+      await writeJson(store, K.user(mine), { ...me, keySaved: true });
+      return json({ ok: true });
+    }
+
+    /* Leaving the space (25a, 52a): suspended, with a record, until a space
+       admin or the App admin reactivates. Never an App admin. */
+    if (action === "leave-space") {
+      if (iAmAdmin) return json({ error: "admin-stays" }, 400);
+      await suspend(me, "left", mine);
+      return json({ ok: true });
+    }
+
+    /**
+     * Suspend an account: off every roster, the courses kept to put back,
+     * and a Former members record.
+     * @param {any} user @param {"left" | "removed"} why @param {string} by
+     */
+    async function suspend(user, why, by) {
+      const courses = await coursesOf(store, user.handle);
+      await dropFromRosters(store, user.handle);
+      await writeJson(store, K.user(user.handle), { ...user, suspended: { at: Date.now(), by, why, courses } });
+      await noteFormer(store, orgOf(user), {
+        handle: user.handle,
+        displayName: user.displayName,
+        joined: user.created || 0,
+        left: Date.now(),
+        courses,
+        why,
+        by,
+      });
+    }
+
     /* ================= admin ================= */
 
     if (action.startsWith("admin-")) {
-      if (!me.admin) return json({ error: "admin-only" }, 403);
+      /* A space admin may use these, in their own space (0.544; B4); every
+         other admin- action is the App admin's alone. */
+      const SPACE_ADMIN_MAY = new Set([
+        "admin-overview", "admin-create-user", "admin-reissue-key", "admin-rename-course",
+        "admin-course-language", "admin-new-code", "admin-card", "admin-delete-flags",
+        "admin-suspend-user", "admin-reactivate-user", "admin-new-invite", "admin-hand-over",
+      ]);
+      if (!iAmAdmin && !(iRunThis && SPACE_ADMIN_MAY.has(action))) return json({ error: "admin-only" }, 403);
 
       if (action === "admin-overview") {
         const userIds = await readIndex(store, "users");
@@ -4173,6 +4314,7 @@ async function handle(req) {
         /** @type {Record<string, string>} */
       const nameOf = {};
         for (const u of userRows) if (u) nameOf[u.handle] = u.displayName;
+        await nameTheGone(nameOf, deckRows.filter(Boolean).map((d) => d.owner));
         /* Which courses hold a deck, said by the courses — see linksOf —
            and which of its number parts reach nobody yet. */
         const waiting = await partsWaiting(deckRows.filter(Boolean), courses);
@@ -4247,7 +4389,11 @@ async function handle(req) {
             };
           })
           .sort((a, b) => (b.at || 0) - (a.at || 0));
-        return json({ ok: true, users, courses, decks, flags });
+        /* And who has left the space (30c). */
+        const former = (await readJson(store, K.former(acting))) || [];
+        /* And the space's invitation, for its admins to share (37a). */
+        const invite = actingOrgDoc ? { code: actingOrgDoc.inviteCode, slug: actingOrgDoc.slug, name: actingOrgDoc.name, admins: actingOrgDoc.admins || [] } : null;
+        return json({ ok: true, users, courses, decks, flags, former, invite });
       }
 
       /* A lost key: the handle survives, so memberships and progress do too. */
@@ -4345,6 +4491,9 @@ async function handle(req) {
         batch("mysystems", handles.map(K.mySystems), 60);
         batch("flag", flagIds.map(K.flag), 60);
         batch("org", orgIds.map(K.org), 60);
+        batch("former", orgIds.map(K.former), 60);
+        const goneHandles = await readIndex(store, "gone");
+        batch("gone", goneHandles.map(K.gone), 100);
         batch("slug", slugNames.map(K.slug), 100);
         batch("clip", clipHashes.map(K.clip), 3);
         batch("image", imageHashes.map(K.image), 2);
@@ -4366,7 +4515,7 @@ async function handle(req) {
               keys: keyHashes.length,
               orgs: orgIds.length,
             },
-            indexes: { users: handles, courses: courseIds, decks: deckIds, flags: flagIds, orgs: orgIds },
+            indexes: { users: handles, courses: courseIds, decks: deckIds, flags: flagIds, orgs: orgIds, gone: goneHandles },
             chunks: chunks.map((c) => ({ id: c.id, kind: c.kind, keys: c.keys.length })),
             /* Repeated so a chunk can be fetched without the client having to
                reconstruct which keys were in it. */
@@ -4414,7 +4563,7 @@ async function handle(req) {
            restore says it worked. So a new kind of record is added to
            this line in the same release that starts writing one. */
         const allowed =
-          /^(user|key|course|deck|owncards|mycards|card|numsys|timesys|mysystems|flag|clip|image|code|index|org|slug):/;
+          /^(user|key|course|deck|owncards|mycards|card|numsys|timesys|mysystems|flag|clip|image|code|index|org|slug|former|gone):/;
         let written = 0;
         for (const k of keys) {
           if (!allowed.test(k) || k.length > 200) continue;
@@ -4588,6 +4737,91 @@ async function handle(req) {
         return json({ ok: true, removed, kept: want.has("people") ? mine : "" });
       }
 
+      /* Suspending someone (64a) and reactivating them (67a): a space
+         admin for people in their space, but never another space admin or
+         an App admin — those are the App admin's (70a). */
+      if (action === "admin-suspend-user" || action === "admin-reactivate-user") {
+        const handle = String(body.handle || "");
+        const target = await readUser(store, handle);
+        if (!target) return json({ error: "no-user" }, 404);
+        if (handle === mine) return json({ error: "not-yourself" }, 400);
+        if (target.admin) return json({ error: "admin-only" }, 403);
+        if (!iAmAdmin && (actingOrgDoc.admins || []).includes(handle)) return json({ error: "admin-only" }, 403);
+        if (action === "admin-suspend-user") {
+          if (target.suspended) return json({ ok: true });
+          await suspend(target, "removed", mine);
+          return json({ ok: true });
+        }
+        if (!target.suspended) return json({ ok: true });
+        for (const c of target.suspended.courses || []) {
+          await updateJson(store, K.course(c.id), (/** @type {Course | null} */ fresh) => {
+            if (!fresh || !inScope(fresh)) return null;
+            const next = { ...fresh, teachers: fresh.teachers.slice(), students: fresh.students.slice() };
+            if ((c.roles || []).includes("teacher") && !next.teachers.includes(handle)) next.teachers.push(handle);
+            if ((c.roles || []).includes("student") && !next.students.includes(handle)) next.students.push(handle);
+            return next;
+          });
+        }
+        const { suspended: _was, ...back } = /** @type {any} */ (target);
+        await writeJson(store, K.user(handle), back);
+        await updateJson(store, K.former(orgOf(target)), (/** @type {any} */ cur) =>
+          (cur || []).some((/** @type {any} */ r) => r.handle === handle)
+            ? cur.filter((/** @type {any} */ r) => r.handle !== handle)
+            : null
+        );
+        return json({ ok: true });
+      }
+
+      /* A new invitation link for the space (37a): the old one stops working. */
+      if (action === "admin-new-invite") {
+        const code = makeCode();
+        const old = actingOrgDoc.inviteCode;
+        await updateJson(store, K.org(acting), (/** @type {any} */ o) => (o ? { ...o, inviteCode: code } : null));
+        await writeJson(store, K.code(code), `org:${acting}`);
+        if (old) await store.delete(K.code(old)).catch(() => {});
+        return json({ ok: true, inviteCode: code });
+      }
+
+      /* A former member's material, handed to someone still here (31a, 85a):
+         every deck and card they made for the space, never their numbers
+         (79a) — decks keep using those. */
+      if (action === "admin-hand-over") {
+        const from = String(body.from || "");
+        const to = String(body.to || "");
+        const former = (await readJson(store, K.former(acting))) || [];
+        if (!former.some((/** @type {any} */ r) => r.handle === from)) return json({ error: "not-former" }, 400);
+        const heir = await readUser(store, to);
+        if (!heir || heir.suspended) return json({ error: "not-in-space" }, 400);
+        const deckIds = await readIndex(store, "decks");
+        const decks = here(await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(
+          (d) => d && d.owner === from && !d.personal
+        );
+        for (const d of decks) {
+          await updateJson(store, K.deck(d.id), (/** @type {any} */ f) => (f ? { ...f, owner: to, updated: Date.now() } : null));
+        }
+        const theirs = (await readJson(store, K.myCards(from))) || [];
+        const cards = here(await readManyJson(store, theirs.map((/** @type {string} */ id) => K.card(id)))).filter(
+          (c) => c && c.owner === from && !c.personal
+        );
+        for (const c of cards) {
+          await updateJson(store, K.card(c.id), (/** @type {any} */ f) => (f ? { ...f, owner: to } : null));
+        }
+        const moved = new Set(cards.map((c) => c.id));
+        await updateJson(store, K.myCards(from), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !moved.has(x)));
+        await updateJson(store, K.myCards(to), (/** @type {any} */ cur) => [...new Set((cur || []).concat([...moved]))]);
+        return json({ ok: true, decks: decks.length, cards: cards.length });
+      }
+
+      /* Taking one record off Former members, by hand, when asked (A5). */
+      if (action === "admin-remove-former") {
+        if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+        const handle = String(body.handle || "");
+        await updateJson(store, K.former(acting), (/** @type {any} */ cur) =>
+          (cur || []).filter((/** @type {any} */ r) => r.handle !== handle)
+        );
+        return json({ ok: true });
+      }
+
       /*
        * A new space, with its first space admin (65a), whose key is
        * returned once — the way admin-create-user hands one over.
@@ -4607,7 +4841,7 @@ async function handle(req) {
         if (took !== id) return json({ error: "slug-taken" }, 409);
 
         const handles = await readIndex(store, "users");
-        const handle = makeHandle(adminName, handles);
+        const handle = makeHandle(adminName, handles.concat(await readIndex(store, "gone")));
         const key = makeKey();
         const user = {
           handle,
@@ -4616,6 +4850,7 @@ async function handle(req) {
           org: id,
           created: Date.now(),
           lastSeen: 0,
+          keySaved: false,
           createdBy: mine,
         };
         await writeJson(store, K.user(handle), { ...user, keyHash: sha(key) });
@@ -4773,6 +5008,18 @@ async function handle(req) {
         for (const f of goneFlags) await store.delete(K.flag(f)).catch(() => {});
         await updateJson(store, K.index("flags"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !goneFlags.includes(x)));
 
+        await store.delete(K.former(id)).catch(() => {});
+        const goneHandles = await readIndex(store, "gone");
+        /** @type {string[]} */
+        const goneHere = [];
+        for (const h of goneHandles) {
+          const g = await readJson(store, K.gone(h));
+          if (g && g.org === id) {
+            goneHere.push(h);
+            await store.delete(K.gone(h)).catch(() => {});
+          }
+        }
+        await updateJson(store, K.index("gone"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !goneHere.includes(x)));
         if (org.inviteCode) await store.delete(K.code(org.inviteCode)).catch(() => {});
         for (const slug of [org.slug].concat(org.formerSlugs || [])) await store.delete(K.slug(slug)).catch(() => {});
         await store.delete(K.org(id)).catch(() => {});
@@ -4785,7 +5032,7 @@ async function handle(req) {
         if (!displayName) return json({ error: "name-required" }, 400);
 
         const handles = await readIndex(store, "users");
-        const handle = makeHandle(displayName, handles);
+        const handle = makeHandle(displayName, handles.concat(await readIndex(store, "gone")));
         const key = makeKey();
         const user = {
           handle,
@@ -4796,6 +5043,7 @@ async function handle(req) {
           /* Never seen: they haven't signed in yet. The people list uses
              this to show who still hasn't picked up their key. */
           lastSeen: 0,
+          keySaved: false,
           createdBy: mine,
         };
         await writeJson(store, K.user(handle), { ...user, keyHash: sha(key) });
@@ -4832,6 +5080,11 @@ async function handle(req) {
         const handle = String(body.handle || "");
         const target = await readUser(store, handle);
         if (!target) return json({ error: "no-user" }, 404);
+        if (!iAmAdmin && (target.admin || (actingOrgDoc.admins || []).includes(handle))) {
+          /* A space admin's key, and an App admin's, are the App admin's to
+             replace (70a). */
+          return json({ error: "admin-only" }, 403);
+        }
         const key = makeKey();
         if (target.keyHash) await store.delete(K.keyOf(target.keyHash)).catch(() => {});
         await writeJson(store, K.user(handle), { ...target, keyHash: sha(key) });
@@ -4852,7 +5105,7 @@ async function handle(req) {
         if ((await readJson(store, K.user(handle))) && !(await readUser(store, handle))) {
           return json({ error: "no-user" }, 404);
         }
-        const gone = await wipeAccount(store, handle);
+        const gone = await wipeAccount(store, handle, { by: mine });
         if (!gone) return json({ error: "no-user" }, 404);
         return json({ ok: true });
       }

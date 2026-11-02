@@ -8,6 +8,34 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.544 — 2 November 2026
+
+**Space admins run their own space.**
+
+- A space admin sees Admin and Teaching for their space: they can make
+  courses, add people and make them teachers or students, issue a new key
+  to someone who lost theirs, read learners' reports, and see and edit all
+  of the space's decks and cards. Deleting courses and people, backups,
+  and everything about the space itself stay with you.
+- **Suspending.** A space admin can suspend someone: they can't sign in,
+  come off their courses, and appear under **Former members**, where they
+  can be reactivated and put back on their courses. Only you can suspend a
+  space admin, or give one a new key.
+- **Leaving.** Anyone but you can leave their space from Settings, which
+  suspends them in the same way.
+- **Deleting an account** — your own, or someone's by you — now keeps what
+  they made for the space, under their name, and leaves a record under
+  Former members. Their My space and practice history go. A space admin can
+  hand a former teacher's decks and cards to another teacher.
+- **Invitation link.** The space's link sits at the top of People, to copy,
+  or to replace when it has gone too far.
+- **Deleting someone else's deck or card** first says who made it, and that
+  it leaves every course for every student.
+- **Saving your key.** Right after signing up, and the first time someone
+  signs in to an account another person made, they tick "I've saved my key
+  somewhere safe" before carrying on. The sign-in page says who to ask about
+  a lost key: your space's admin, or contact@manytongues.co.
+
 ## 0.543 — 2 November 2026
 
 **Spaces can be created, each with its own address.**

@@ -795,6 +795,22 @@ export interface User {
   displayName: string;
   admin: boolean;
   created: Millis;
+  /**
+   * The space (org) this account belongs to (0.542). Stored as its id;
+   * whoami answers with the space's card. Absent on older accounts: Main.
+   */
+  org?: string | { id: string; slug: string; name: string; logo: string; colour: string };
+  /** Whether this account runs its space (0.544). Worked out by whoami, never stored. */
+  orgAdmin?: boolean;
+  /** False until the person has ticked that their key is saved (0.544). Absent: saved. */
+  keySaved?: boolean;
+  /** While suspended: when, by whom, why, and the courses to put back (0.544). */
+  suspended?: {
+    at: Millis;
+    by: string;
+    why: "left" | "removed";
+    courses: { id: string; title: string; roles: string[] }[];
+  };
   /** Signed in or asked who they are. */
   lastSeen?: Millis;
   /** The app said a session was practiced. */
@@ -1258,6 +1274,10 @@ export interface AdminOverview {
   courses: Course[];
   decks: (Deck & { cardCount: number; ownerName: string; courseTitles: string[] })[];
   flags: Flag[];
+  /** Who has left the space this overview is of (0.544). */
+  former?: FormerMember[];
+  /** The space's invitation link and its admins (0.544). */
+  invite?: { code: string; slug: string; name: string; admins: string[] } | null;
 }
 
 /* ---- the schedule ---- */
@@ -1886,4 +1906,15 @@ export interface Flag {
   release?: string;
   /** Added when the report is read, never stored. */
   cardState?: CardState;
+}
+
+/** One Former members record (0.544; docs/PLAN-spaces.md, B2). */
+export interface FormerMember {
+  handle: string;
+  displayName: string;
+  joined: Millis;
+  left: Millis;
+  courses: { id: string; title: string; roles: string[] }[];
+  why: "left" | "removed" | "deleted-self" | "deleted-by-admin";
+  by: string;
 }

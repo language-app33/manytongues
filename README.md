@@ -1536,6 +1536,23 @@ Addresses and joining (since 0.543):
   space, also erases each account's practice history (`forgetSyncDoc` in
   `server/api/sync.js`).
 
+Running a space (since 0.544):
+
+- A space admin is an account named in its org's `admins`, never an App
+  admin. In their own space they get `iManage` on the server — courses,
+  people, every non-personal deck and card, reports — and the `admin-`
+  actions in `SPACE_ADMIN_MAY`; the rest stays the App admin's. Only the App
+  admin acts on a space admin's account.
+- Suspending (removed by a space admin, or left by the person) keeps the
+  account, takes it off its rosters and remembers them on `suspended`, and
+  writes a Former members record (`former:<org>`). Reactivating puts them
+  back.
+- Deleting an account (`wipeAccount`) keeps what it made for the space and
+  its numbers, deletes its personal material and practice history, keeps
+  its name under `gone:<handle>` (so the handle is never reused and the
+  material keeps its author), and writes a Former members record.
+  `admin-hand-over` gives a former member's material to someone still here.
+
 ## How it fits together
 
 ```

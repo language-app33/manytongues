@@ -336,6 +336,14 @@ export const orgAdmins = (id: string, change: { add?: string; remove?: string })
 export const archiveOrg = (id: string, archived: boolean) =>
   call(archived ? "admin-archive-org" : "admin-reopen-org", { body: { id } });
 export const deleteOrg = (id: string, confirm: string) => call("admin-delete-org", { body: { id, confirm } });
+/* ---- running a space (0.544) ---- */
+export const newInvite = (): Promise<{ ok: true; inviteCode: string }> => call("admin-new-invite", { body: {} });
+export const suspendUser = (handle: string) => call("admin-suspend-user", { body: { handle } });
+export const reactivateUser = (handle: string) => call("admin-reactivate-user", { body: { handle } });
+export const handOver = (from: string, to: string) => call("admin-hand-over", { body: { from, to } });
+export const removeFormer = (handle: string) => call("admin-remove-former", { body: { handle } });
+export const keySaved = () => call("key-saved", { body: {} });
+export const leaveSpace = () => call("leave-space", { body: {} });
 export const backupManifest = () => call("admin-backup-manifest");
 export const backupChunk = (keys: string[]) => call("admin-backup-chunk", { body: { keys } });
 export const restoreChunk = (records: Record<string, unknown>) => call("admin-restore-chunk", { body: { records } });

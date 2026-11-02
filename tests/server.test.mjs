@@ -3258,7 +3258,10 @@ test("a deck says which of its number parts reach nobody yet", async () => {
   assert.deepEqual(await waitingNow(), ["numbers:11-99"]);
 });
 
-test("closing an account takes its numbers with it", async () => {
+/* Until 0.544 closing an account took its numbers with it. Since then a
+   deleted teacher's numbers stay, so decks that use them keep working (85a;
+   docs/PLAN-spaces.md). */
+test("closing an account leaves its numbers for the decks that use them", async () => {
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Omar" } });
   const key = made.json.key;
   const saved = await api("/api/courses?action=save-system", {
@@ -3271,12 +3274,12 @@ test("closing an account takes its numbers with it", async () => {
 
   const { getStore } = await import("../server/store.js");
   const store = getStore("arabic-courses");
-  assert.equal(await store.get(`numsys:${id}`, { type: "text" }), null, "the system is gone");
-  assert.equal(
+  assert.ok(await store.get(`numsys:${id}`, { type: "text" }), "the system stays");
+  assert.ok(
     await store.get(`mysystems:${made.json.user.handle}`, { type: "text" }),
-    null,
-    "and the index that pointed at it",
+    "and the index that points at it",
   );
+  assert.equal(await store.get(`user:${made.json.user.handle}`, { type: "text" }), null, "the account is gone");
 });
 
 test("an unreadable record fails the request rather than reading as absent", async () => {

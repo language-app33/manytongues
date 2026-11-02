@@ -7273,3 +7273,23 @@ getting it wrong deletes another space's audio. Left behind, one costs
 storage and nothing else. So a deleted space's media stays; a later tidy-up
 can collect what nothing points at, the way `admin-clear` already does.
 
+---
+
+## Deleting an account no longer rewrites the list of decks
+
+**2 November 2026** · `wipeAccount` in `server/api/courses.js`
+
+`wipeAccount` read every deck, kept the ones it could see that weren't the
+person's, and wrote that back as the site's list of decks. Since 0.542 a
+request sees one space, so deleting one account would have dropped every
+other space's decks from the list. It was caught writing 0.544, before
+anything shipped. Every list `wipeAccount` touches is now changed by taking
+out what it names (`updateJson` with a filter), and a test deletes an
+account and checks that no deck anywhere fell off the list.
+
+It also read the person's cards from `owncards:`, a list nothing writes any
+more; cards are listed under `mycards:`. So deleting an account had
+quietly left its cards behind. With 0.544's rule (85a) the space's cards are
+meant to stay; the person's private ones are now found under `mycards:` and
+deleted.
+

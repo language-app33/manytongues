@@ -15230,7 +15230,7 @@ export default function ArabicTrainer() {
           </React.Suspense>
         )}
 
-        {space === "admin" && account && account.admin && (
+        {space === "admin" && account && (account.admin || account.orgAdmin) && (
           <React.Suspense fallback={<ChunkFallback />}>
             <AdminSpace
               account={account}
@@ -15384,9 +15384,12 @@ export default function ArabicTrainer() {
           sections, and beside them what is true wherever you are — which
           space and which languages, and you. */}
       {(() => {
+        /* A space admin sees Teaching, for the space's material (6a), and
+           Admin, for its people and courses (0.544). */
+        const runs = !!(account && (account.admin || account.orgAdmin));
         const spaces = ["learn"]
-          .concat(teaches || (account && account.admin) ? ["teach"] : [])
-          .concat(account && account.admin ? ["admin"] : []);
+          .concat(teaches || runs ? ["teach"] : [])
+          .concat(runs ? ["admin"] : []);
         const choices = space === "learn" ? langChoices : space === "teach" ? teachChoices : [];
         return (
           <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
@@ -19687,7 +19690,7 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
         lede={
           <>
             Five words that sign you in on any device and keep them together.{" "}
-            <em>Never share it</em> — anyone who has it is you. If you lose it, your administrator
+            <em>Never share it</em> — anyone who has it is you. If you lose it, your space's admin
             can issue a new one; you keep your handle, your courses and everything you have learnt.
           </>
         }
@@ -19732,6 +19735,40 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
 
 /* Closing an account is irreversible, so it asks for the handle rather
    than a yes/no anyone taps through. */
+/* Leaving one's space (0.544, 52a), asked once more before it happens. */
+function LeaveSpace({ onLeft }: { onLeft: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <>
+      <Notice kind="error">{error}</Notice>
+      <Button variant="danger" size="sm" onClick={() => setAsking(true)}>Leave this space</Button>
+      {asking && (
+        <ConfirmModal
+          title="Leave this space?"
+          confirmLabel="Leave"
+          busy={busy}
+          body={<p>You won't be able to sign in until your space's admin reactivates you.</p>}
+          onCancel={() => setAsking(false)}
+          onConfirm={async () => {
+            setBusy(true);
+            try {
+              await API.leaveSpace();
+              API.clearAccount();
+              onLeft();
+            } catch (e) {
+              setError(API.explain(e));
+              setBusy(false);
+              setAsking(false);
+            }
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 function CloseAccount({ handle, onClosed }: { handle: string; onClosed: () => void }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
@@ -20455,7 +20492,7 @@ function AccountSettings({
           body={
             <p>
               You'll need your sign-in key to get back in, and nobody can recover it for you except
-              your administrator. Your account, courses and progress stay exactly as they are.
+              your space's admin. Your account, courses and progress stay exactly as they are.
             </p>
           }
           onCancel={() => setLoggingOut(false)}
@@ -20535,9 +20572,21 @@ function AccountSettings({
               />
             )}
 
+            {/* Leaving the space (52a): suspended until its admin reactivates
+                you. Never offered to the App admin, who would be locked out
+                of their own app. */}
+            {!account.admin && (
+              <FormField
+                label="Leave this space"
+                lede="You won't be able to sign in until your space's admin reactivates you. Nothing is deleted, and they can put you back on your courses."
+              >
+                <LeaveSpace onLeft={onCloseAccount} />
+              </FormField>
+            )}
+
             <FormField
               label="Close this account"
-              lede="Removes your account from the server: your handle, your courses, and any decks you made for them. Cards on this device stay until you clear them. There is no undoing it and no way to get the handle back."
+              lede="Deletes your account, your My space and your practice history from the server, and takes you off every course. Decks and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
             >
               <CloseAccount onClosed={onCloseAccount} handle={account.handle} />
             </FormField>

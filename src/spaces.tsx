@@ -199,6 +199,8 @@ export function Onboarding({ onDone, place = {} }: {
   const [error, setError] = useState("");
   const [made, setMade] = useState<User & { key: string } | null>(null);
   const [showKey, setShowKey] = useState(false);
+  /* "I've saved my key somewhere safe", ticked before carrying on (19b). */
+  const [keyTicked, setKeyTicked] = useState(false);
   /* An invitation or a course code: what decides which space a new account
      is in (24b). Pre-filled from an invite link. */
   const [signupCode, setSignupCode] = useState(place.joinCode || "");
@@ -243,6 +245,13 @@ export function Onboarding({ onDone, place = {} }: {
       const r = await API.whoAmI(key.trim(), org ? org.id : "");
       const account = { ...r.user, key: key.trim() };
       API.saveAccount(account);
+      /* An account someone else made, signed in to for the first time, is
+         asked to save its key before anything else (18a). */
+      if (r.user && r.user.keySaved === false) {
+        setMade(account);
+        setStep("key");
+        return;
+      }
       onDone(account);
     } catch (e) {
       const there = otherSpace(e);
@@ -424,6 +433,10 @@ export function Onboarding({ onDone, place = {} }: {
                 {busy ? "Checking…" : "Sign in"}
               </Button>
             </form>
+            <Help className="at-mt3">
+              Lost your key? Ask your space's admin for a new one. Everyone else:
+              contact@manytongues.co
+            </Help>
             <Button variant="ghost" wide className="at-mt3" onClick={() => setStep("choose")}>
               Back
             </Button>
@@ -435,7 +448,8 @@ export function Onboarding({ onDone, place = {} }: {
             <h2>Keep this somewhere safe</h2>
             <Lede>
               This is your sign-in key. It brings your cards to another device, and it is the only
-              way back into your account. Nobody can recover it for you except your administrator.
+              way back into your account. Save it in a password manager, or write it down somewhere
+              safe. If you lose it, only your space's admin can give you a new one.
             </Lede>
             <p className="at-key">{made.key}</p>
             <div className="at-row at-mt3">
@@ -455,7 +469,11 @@ export function Onboarding({ onDone, place = {} }: {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                onDone(made);
+                if (!keyTicked) return;
+                /* Recorded, so the reminder isn't shown again; carrying on
+                   doesn't wait for it. */
+                API.keySaved().catch(() => {});
+                onDone({ ...made, keySaved: true });
               }}
             >
               <input
@@ -478,8 +496,12 @@ export function Onboarding({ onDone, place = {} }: {
                 aria-hidden="true"
                 className="at-hiddenuser"
               />
-              <Button variant="primary" wide className="at-mt4" type="submit">
-                I've saved it
+              <label className="at-tickrow at-mt4">
+                <input type="checkbox" checked={keyTicked} onChange={(e) => setKeyTicked(e.target.checked)} />
+                <span>I've saved my key somewhere safe</span>
+              </label>
+              <Button variant="primary" wide className="at-mt4" type="submit" disabled={!keyTicked}>
+                Carry on
               </Button>
             </form>
           </>
@@ -693,8 +715,8 @@ export const BACKUP_PARTS: {
     key: "spaces",
     title: "Spaces",
     what: "Each space's name, address, look and admins, and every address it has had.",
-    kinds: ["org", "slug"],
-    prefixes: ["org:", "slug:"],
+    kinds: ["org", "slug", "former", "gone"],
+    prefixes: ["org:", "slug:", "former:", "gone:"],
     index: "orgs",
     count: "orgs",
     unit: "space",
@@ -1255,7 +1277,8 @@ function CourseSettings({
   onSetLanguage: (id: LangId) => void;
   onNewCode: (which: "teacher" | "student") => void;
   onSetRole: (handle: string, name: string, role: "teacher" | "student", on: boolean) => void;
-  onDelete: () => void;
+  /** Absent for a space admin: deleting a course is the App admin's (4b). */
+  onDelete?: () => void;
   onClose: () => void;
 }) {
   const [adding, setAdding] = useState(false);
@@ -1480,6 +1503,7 @@ function CourseSettings({
 
       {/* At the foot, away from everyday taps, as on a card and a deck.
           It still asks first. */}
+      {onDelete ? (
       <div className="at-formblock at-mt5">
         <div className="at-formhead">
           <span className="at-formnum">Delete course</span>
@@ -1487,6 +1511,7 @@ function CourseSettings({
         <p className="at-dangerline">Deleting a course is permanent and cannot be undone.</p>
         <Button variant="danger" icon="delete" onClick={onDelete}>Delete course</Button>
       </div>
+      ) : null}
     </Screen>
   );
 }
@@ -1640,6 +1665,8 @@ export function AdminSpace({ account, languages, onClose }: {
   /* One slot for whatever is waiting to be confirmed, so only one of these
      can ever be on screen at a time. */
   const [confirm, setConfirm] = useState<Pending | null>(null);
+  /* The space's admins, from the overview (0.544). */
+  const leads = new Set((data && data.invite && data.invite.admins) || []);
 
   /* Answers whether it worked, which is what the background poll reads to
      know whether to back off — see useLiveRefresh. */
@@ -1887,7 +1914,7 @@ export function AdminSpace({ account, languages, onClose }: {
               action: () => API.removeMember(c.id, h, role),
             });
           }}
-          onDelete={() =>
+          onDelete={!account.admin ? undefined : () =>
             setConfirm({
               title: `Delete ${c.title}?`,
               confirmLabel: "Delete the course",
@@ -1926,7 +1953,8 @@ export function AdminSpace({ account, languages, onClose }: {
         ["decks", "Decks", "folder"],
         ["flags", "Flags", "flag"],
         ...(account.admin ? [["orgs", "Spaces", "hash"] as [string, string, string]] : []),
-        ["app", "App", "tune"],
+        /* Backups, restores and clearing are the App admin's alone (4b). */
+        ...(account.admin ? [["app", "App", "tune"] as [string, string, string]] : []),
       ]}
       tab={tab}
       onTab={setTab}
@@ -2044,6 +2072,15 @@ export function AdminSpace({ account, languages, onClose }: {
 
           {tab === "people" && (
             <>
+              {data && data.invite ? (
+                <InviteLink invite={data.invite} busy={busy}
+                  onReplace={() => setConfirm({
+                    title: "Replace the invitation link?",
+                    confirmLabel: "Replace the link",
+                    body: <p>The old link will stop working. Anyone who already joined stays.</p>,
+                    action: () => API.newInvite(),
+                  })} />
+              ) : null}
               {newKey && (
                 <div className="at-sub">
                   <p className="at-eyebrow">
@@ -2254,6 +2291,7 @@ export function AdminSpace({ account, languages, onClose }: {
                         <div className="at-deckmeta">{u.handle}</div>
                       </div>
                       <div className="at-deckacts">
+                        {(account.admin || !(u.admin || leads.has(u.handle))) && (
                         <IconButton icon="key" label="Issue a new sign-in key" onClick={() =>
                             setConfirm({
                               title: `New sign-in key for ${u.displayName}?`,
@@ -2275,7 +2313,27 @@ export function AdminSpace({ account, languages, onClose }: {
                               },
                             })
                           } />
-                        {u.handle !== account.handle && (
+                        )}
+                        {/* Suspending (64a): never yourself, an App admin, or —
+                            unless you are the App admin — a space admin (70a). */}
+                        {u.handle !== account.handle && !u.admin && (account.admin || !leads.has(u.handle)) && (
+                          <IconButton icon="lock" label="Suspend" onClick={() =>
+                            setConfirm({
+                              title: `Suspend ${u.displayName}?`,
+                              confirmLabel: "Suspend them",
+                              body: (
+                                <p>
+                                  They can't sign in until they are reactivated, and they come off
+                                  every course. They move to Former members, where you can
+                                  reactivate them and put them back on their courses. Nothing is
+                                  deleted.
+                                </p>
+                              ),
+                              action: () => API.suspendUser(u.handle),
+                            })
+                          } />
+                        )}
+                        {account.admin && u.handle !== account.handle && (
                           <IconButton icon="delete" label="Delete person" danger onClick={() =>
                               setConfirm({
                                 title: `Delete ${u.displayName}?`,
@@ -2283,9 +2341,11 @@ export function AdminSpace({ account, languages, onClose }: {
                                 confirmWord: u.handle,
                                 body: (
                                   <p>
-                                    Their account, their sign-in key and their place in every
-                                    course go. The decks and cards they made go with them. There
-                                    is no undoing this and no way to get the handle back.
+                                    Their account, their sign-in key, their My space, their practice
+                                    history and their place in every course go. The decks and cards
+                                    they made for the space stay, under their name, and can be handed
+                                    to someone else. A record stays under Former members. There is
+                                    no undoing this.
                                   </p>
                                 ),
                                 action: () => API.deleteUser(u.handle),
@@ -2296,9 +2356,9 @@ export function AdminSpace({ account, languages, onClose }: {
                     </div>
                     {/* Admin is a flag on the person, not a course they are
                         in, so it stays a badge and keeps the row to itself. */}
-                    {u.admin && (
+                    {(u.admin || leads.has(u.handle)) && (
                       <div className="at-flags">
-                        <span className="at-flag flagged">Admin</span>
+                        <span className="at-flag flagged">{u.admin ? "Admin" : "Space admin"}</span>
                       </div>
                     )}
                     {/* "Hasn't signed in yet" was a pill up here. The lines
@@ -2345,6 +2405,15 @@ export function AdminSpace({ account, languages, onClose }: {
                   </div>
                 )}
               />
+              {data && data.former && data.former.length ? (
+                <FormerMembers
+                  former={data.former}
+                  people={(data.users || []).filter((u) => !u.suspended)}
+                  isAppAdmin={!!account.admin}
+                  busy={busy}
+                  ask={setConfirm}
+                />
+              ) : null}
             </>
           )}
 
@@ -2488,11 +2557,14 @@ export function AdminSpace({ account, languages, onClose }: {
                               confirmLabel: "Delete the deck",
                               confirmWord: d.title,
                               body: (
-                                <p>
-                                  Its {plural(d.cardCount || 0, "card")} go with it,
-                                  out of every course it is in and out of the apps of everyone
-                                  studying it. {d.ownerName} loses the work.
-                                </p>
+                                <>
+                                  {d.owner !== account.handle ? <OthersWork name={d.ownerName} what="deck" /> : null}
+                                  <p>
+                                    Its {plural(d.cardCount || 0, "card")} go with it,
+                                    out of every course it is in and out of the apps of everyone
+                                    studying it. {d.ownerName} loses the work.
+                                  </p>
+                                </>
                               ),
                               action: () => API.deleteDeck(d.id),
                             });
@@ -2759,7 +2831,7 @@ export function AdminSpace({ account, languages, onClose }: {
             </>
           )}
 
-          {tab === "app" && (
+          {tab === "app" && account.admin && (
             <>
               <p className="at-eyebrow">
                 Backup
@@ -6816,6 +6888,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               busy={busy}
               body={
                 <>
+                  {confirm.card.owner && confirm.card.owner !== account.handle ? <OthersWork what="card" /> : null}
                   <p>
                     Gone from every deck, and from your students' apps. Recordings go too. This
                     can't be undone.
@@ -8606,11 +8679,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                                 confirmLabel: "Delete the deck",
                                 confirmWord: d.title,
                                 body: (
-                                  <p>
-                                    Its {plural(d.cardCount || 0, "card")} go with
-                                    it, out of every course and out of the apps of everyone
-                                    studying it. There is no undoing this.
-                                  </p>
+                                  <>
+                                    {d.owner !== account.handle ? <OthersWork name={(d as any).ownerName} what="deck" /> : null}
+                                    <p>
+                                      Its {plural(d.cardCount || 0, "card")} go with
+                                      it, out of every course and out of the apps of everyone
+                                      studying it. There is no undoing this.
+                                    </p>
+                                  </>
                                 ),
                                 action: () => API.deleteDeck(d.id),
                               });
@@ -9062,5 +9138,136 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
         </Section>
       ) : null}
     </Screen>
+  );
+}
+
+/*
+ * The space's invitation link, at the top of People (0.544, 37a): to copy
+ * and send, and to replace when it has gone somewhere it shouldn't.
+ */
+function InviteLink({ invite, busy, onReplace }: {
+  invite: { code: string; slug: string; name: string };
+  busy: boolean;
+  onReplace: () => void;
+}) {
+  const link = `${window.location.origin}/${invite.slug}?join=${invite.code}`;
+  return (
+    <Field label="Invitation link" lede={`Anyone with it can make an account in ${invite.name}. You then give them a role.`}>
+      <p className="at-key">{link}</p>
+      <div className="at-row">
+        <Button size="sm" icon="copy" onClick={() => navigator.clipboard && navigator.clipboard.writeText(link)}>
+          Copy the link
+        </Button>
+        <Button variant="ghost" size="sm" disabled={busy} onClick={onReplace}>Replace the link</Button>
+      </div>
+    </Field>
+  );
+}
+
+const FORMER_WHY: Record<string, string> = {
+  left: "Left",
+  removed: "Removed",
+  "deleted-self": "Deleted their account",
+  "deleted-by-admin": "Deleted by the app admin",
+};
+
+/*
+ * Former members (0.544; 25a, 30c, 67a, 31a): who left, was removed or was
+ * deleted, with what can still be done — reactivate a suspended account,
+ * hand someone's material to a teacher who is still here, and, for the App
+ * admin, take a record off by hand.
+ */
+function FormerMembers({ former, people, isAppAdmin, busy, ask }: {
+  former: import("./types.ts").FormerMember[];
+  people: { handle: string; displayName: string }[];
+  isAppAdmin: boolean;
+  busy: boolean;
+  ask: (p: Pending) => void;
+}) {
+  const [handingFrom, setHandingFrom] = useState<string | null>(null);
+  const [heir, setHeir] = useState("");
+  return (
+    <Section title="Former members" lede="People who left, were removed or were deleted.">
+      {former.slice().reverse().map((r) => {
+        const suspended = r.why === "left" || r.why === "removed";
+        return (
+          <Tile key={r.handle}
+            title={r.displayName}
+            meta={`${FORMER_WHY[r.why] || r.why} · ${shortDate(r.left)} · joined ${shortDate(r.joined)}${
+              r.courses.length ? ` · was in ${r.courses.map((c) => c.title).join(", ")}` : ""}`}
+            actions={
+              <>
+                {suspended && (
+                  <Button size="sm" disabled={busy}
+                    onClick={() => ask({
+                      title: `Reactivate ${r.displayName}?`,
+                      confirmLabel: "Reactivate",
+                      body: <p>They can sign in again and are put back on the courses they were in.</p>,
+                      action: () => API.reactivateUser(r.handle),
+                    })}>
+                    Reactivate
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" disabled={busy}
+                  onClick={() => {
+                    setHeir("");
+                    setHandingFrom(r.handle);
+                  }}>
+                  Hand their material to…
+                </Button>
+                {isAppAdmin && (
+                  <IconButton icon="remove" label="Remove this record"
+                    onClick={() => ask({
+                      title: `Remove ${r.displayName}'s record?`,
+                      confirmLabel: "Remove the record",
+                      body: <p>Only the record goes. Nothing else changes.</p>,
+                      action: () => API.removeFormer(r.handle),
+                    })} />
+                )}
+              </>
+            }
+          />
+        );
+      })}
+      {handingFrom ? (
+        <ConfirmModal
+          title="Hand their material to…"
+          confirmLabel="Hand it over"
+          danger={false}
+          busy={busy || !heir}
+          body={
+            <RadioGroup
+              name="hand-over"
+              label="Who should own their decks and cards now"
+              value={heir}
+              onChange={setHeir}
+              options={people.map((p) => ({ value: p.handle, label: p.displayName }))}
+            />
+          }
+          onCancel={() => setHandingFrom(null)}
+          onConfirm={() => {
+            const from = handingFrom;
+            setHandingFrom(null);
+            ask({
+              title: "Hand it over?",
+              confirmLabel: "Hand it over",
+              danger: false,
+              body: <p>Every deck and card they made for the space becomes theirs to look after. Their numbers stay theirs.</p>,
+              action: () => API.handOver(from, heir),
+            } as Pending);
+          }}
+        />
+      ) : null}
+    </Section>
+  );
+}
+
+/* Deleting what somebody else made (0.544, 94a): said first, in so many words. */
+function OthersWork({ name, what }: { name?: string; what: "deck" | "card" }) {
+  return (
+    <Notice kind="warn">
+      {name ? `${name} made this ${what}.` : `Someone else made this ${what}.`} Deleting it removes it from
+      every course it's in, for every student. This can't be undone.
+    </Notice>
   );
 }

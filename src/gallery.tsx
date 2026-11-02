@@ -265,6 +265,10 @@ const PLACES: Record<string, [string, string]> = {
   /* Admin */
   AdminSpace: [ADMIN, "The Admin space"],
   SpacesTab: [ADMIN, "The Spaces tab"],
+  InviteLink: [ADMIN, "The People tab · the space's invitation link"],
+  FormerMembers: [ADMIN, "The People tab · Former members"],
+  OthersWork: [TEACH, "Deleting a deck or card someone else made"],
+  LeaveSpace: [LEARN, "Settings · leaving your space"],
   SpaceScreen: [ADMIN, "The Spaces tab · one space"],
   SpaceLine: [LEARN, "The You menu · the space you are in"],
   BackupScreen: [ADMIN, "App · backing up and restoring"],

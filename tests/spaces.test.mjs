@@ -268,6 +268,9 @@ const PLACED = {
   spaces: [
     "org-info", "admin-orgs", "admin-update-org", "admin-org-admins", "admin-archive-org",
     "admin-reopen-org", "admin-delete-org",
+    /* Stage 4: running a space, tried below. */
+    "admin-suspend-user", "admin-reactivate-user", "admin-new-invite", "admin-hand-over",
+    "admin-remove-former", "key-saved", "leave-space",
   ],
   own: [
     "signup", "signin", "whoami", "practiced", "delete-account", "rename", "claim-admin",
@@ -380,4 +383,115 @@ test("deleting a space takes everything in it, frees its addresses, and leaves M
   assert.ok(await store.get(`deck:${main.deck.id}`, { type: "text" }));
   assert.ok(await store.get(`card:${b.card.id}`, { type: "text" }));
   assert.equal((await api("admin-delete-org", { key: admin.key, body: { id: "main", confirm: "Main" } })).status, 400);
+});
+
+/* ------------------------------------------------------- stage 4 (0.544) */
+
+/** A fresh space with its admin, a teacher, a student and material. */
+async function another(/** @type {string} */ slug) {
+  const r = await api("admin-create-org", { key: admin.key, body: { name: slug, slug, adminName: `Admin ${slug}` } });
+  const id = r.json.org.id;
+  const lead = { key: r.json.key, handle: r.json.admin.handle };
+  /* The space admin furnishes it — no App admin needed. */
+  const course = (await api("create-course", { key: lead.key, body: { title: `C ${slug}`, language: "ar-PS" } })).json.course;
+  assert.ok(course, "a space admin makes a course");
+  const t = (await api("admin-create-user", { key: lead.key, body: { displayName: `T ${slug}`, courseId: course.id, roles: ["teacher"] } })).json;
+  const st = (await api("admin-create-user", { key: lead.key, body: { displayName: `S ${slug}`, courseId: course.id, roles: ["student"] } })).json;
+  const teacher = { key: t.key, handle: t.user.handle };
+  const student = { key: st.key, handle: st.user.handle };
+  const deck = (await api("create-deck", { key: teacher.key, body: { title: `D ${slug}`, description: "", lang: "ar-PS" } })).json.deck;
+  await api("attach-deck", { key: teacher.key, body: { deckId: deck.id, courseId: course.id } });
+  const saved = (await api("save-card", { key: teacher.key, body: { card: card(`w-${slug}`), decks: [deck.id] } })).json.card;
+  return { id, lead, course, teacher, student, deck, card: saved };
+}
+
+test("a space admin runs their own space, and nothing more", async () => {
+  const c = await another("run-space");
+  /* Sees every deck in the space, and may delete a teacher's (94a). */
+  const decks = (await api("my-decks", { key: c.lead.key })).json.decks.map((/** @type {any} */ d) => d.id);
+  assert.ok(decks.includes(c.deck.id));
+  const report = await api("report-flag", { key: c.student.key, body: { kind: "other", note: "x", cardId: c.card.id, deckId: c.deck.id } });
+  const reports = (await api("my-reports", { key: c.lead.key })).json.flags.map((/** @type {any} */ f) => f.id);
+  assert.ok(reports.includes(report.json.id), "reports reach the space admin");
+  /* Whoami says so. */
+  assert.equal((await api("whoami", { key: c.lead.key })).json.user.orgAdmin, true);
+  assert.equal((await api("whoami", { key: c.teacher.key })).json.user.orgAdmin, false);
+  /* The App admin's tools stay the App admin's. */
+  for (const [action, body] of /** @type {[string, any][]} */ ([
+    ["admin-delete-user", { handle: c.student.handle }],
+    ["admin-delete-course", { courseId: c.course.id }],
+    ["admin-update-org", { id: c.id, name: "Mine" }],
+    ["admin-remove-former", { handle: c.student.handle }],
+  ])) {
+    assert.equal((await api(action, { key: c.lead.key, body })).status, 403, action);
+  }
+  assert.equal((await api("admin-backup-manifest", { key: c.lead.key })).status, 403);
+  /* And none of it in another space. */
+  assert.ok((await api("deck-cards", { key: c.lead.key, params: { deck: b.deck.id } })).status >= 400);
+  /* A new key for a student, not for a fellow space admin (70a). */
+  assert.equal((await api("admin-reissue-key", { key: c.lead.key, body: { handle: c.student.handle } })).status, 200);
+  await api("admin-org-admins", { key: admin.key, body: { id: c.id, add: c.teacher.handle } });
+  assert.equal((await api("admin-reissue-key", { key: c.lead.key, body: { handle: c.teacher.handle } })).status, 403);
+  assert.equal((await api("admin-suspend-user", { key: c.lead.key, body: { handle: c.teacher.handle } })).status, 403);
+  assert.equal((await api("delete-deck", { key: c.lead.key, body: { deckId: c.deck.id } })).status, 200);
+});
+
+test("suspended, listed as a former member, and reactivated with their courses", async () => {
+  const c = await another("suspend-space");
+  assert.equal((await api("admin-suspend-user", { key: c.lead.key, body: { handle: c.student.handle } })).status, 200);
+  assert.equal((await api("whoami", { key: c.student.key })).json.error, "suspended");
+  assert.equal((await api("my-material", { key: c.student.key })).status, 403);
+  const over = (await api("admin-overview", { key: c.lead.key })).json;
+  const rec = over.former.find((/** @type {any} */ r) => r.handle === c.student.handle);
+  assert.equal(rec.why, "removed");
+  assert.deepEqual(rec.courses.map((/** @type {any} */ x) => x.id), [c.course.id]);
+  assert.ok(!over.courses.find((/** @type {any} */ x) => x.id === c.course.id).students.includes(c.student.handle));
+
+  assert.equal((await api("admin-reactivate-user", { key: c.lead.key, body: { handle: c.student.handle } })).status, 200);
+  assert.equal((await api("whoami", { key: c.student.key })).status, 200);
+  const back = (await api("admin-overview", { key: c.lead.key })).json;
+  assert.ok(back.courses.find((/** @type {any} */ x) => x.id === c.course.id).students.includes(c.student.handle));
+  assert.ok(!back.former.some((/** @type {any} */ r) => r.handle === c.student.handle));
+
+  /* Leaving is the same, by the person themselves; never the App admin. */
+  assert.equal((await api("leave-space", { key: c.student.key, body: {} })).status, 200);
+  assert.equal((await api("whoami", { key: c.student.key })).json.error, "suspended");
+  assert.equal((await api("leave-space", { key: admin.key, body: {} })).status, 400);
+});
+
+test("a teacher who deletes their account leaves their material, and every other space's lists are untouched", async () => {
+  const c = await another("delete-space");
+  const store = getStore("arabic-courses");
+  const decksBefore = JSON.parse(String(await store.get("index:decks", { type: "text" })));
+  assert.equal((await api("delete-account", { key: c.teacher.key, body: {} })).status, 200);
+  /* The deck and card stay, under the teacher's name, and still reach the student. */
+  assert.ok(await store.get(`deck:${c.deck.id}`, { type: "text" }));
+  assert.ok(await store.get(`card:${c.card.id}`, { type: "text" }));
+  const material = (await api("my-material", { key: c.student.key })).json;
+  const sent = material.decks.find((/** @type {any} */ d) => d.id === c.deck.id);
+  assert.equal(sent.ownerName, `T delete-space`);
+  /* No other space's deck fell off the site's list (the 0.544 regression). */
+  const decksAfter = JSON.parse(String(await store.get("index:decks", { type: "text" })));
+  for (const id of decksBefore) assert.ok(decksAfter.includes(id), `deck ${id} kept on the list`);
+  /* The record, and a handover. */
+  const over = (await api("admin-overview", { key: c.lead.key })).json;
+  assert.equal(over.former.find((/** @type {any} */ r) => r.handle === c.teacher.handle).why, "deleted-self");
+  const heir = (await api("admin-create-user", { key: c.lead.key, body: { displayName: "Heir", courseId: c.course.id, roles: ["teacher"] } })).json;
+  const handed = await api("admin-hand-over", { key: c.lead.key, body: { from: c.teacher.handle, to: heir.user.handle } });
+  assert.equal(handed.status, 200);
+  assert.equal(handed.json.decks, 1);
+  assert.equal(JSON.parse(String(await store.get(`deck:${c.deck.id}`, { type: "text" }))).owner, heir.user.handle);
+});
+
+test("a new account is asked to save its key until it says so; an invitation can be replaced", async () => {
+  const c = await another("key-space");
+  assert.equal((await api("whoami", { key: c.student.key })).json.user.keySaved, false);
+  await api("key-saved", { key: c.student.key, body: {} });
+  assert.equal((await api("whoami", { key: c.student.key })).json.user.keySaved, true);
+  const orgsBefore = (await api("admin-orgs", { key: admin.key })).json.orgs.find((/** @type {any} */ o) => o.id === c.id);
+  const fresh = await api("admin-new-invite", { key: c.lead.key, body: {} });
+  assert.equal(fresh.status, 200);
+  assert.notEqual(fresh.json.inviteCode, orgsBefore.inviteCode);
+  assert.equal((await api("signup", { body: { displayName: "Late", code: orgsBefore.inviteCode } })).status, 403);
+  assert.equal((await api("signup", { body: { displayName: "OnTime", code: fresh.json.inviteCode } })).status, 200);
 });
