@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import type { OnboardingPlace } from "./spaces.tsx";
 import type {
   Course, DayMoves, Deck, Doc, ExerciseSpec, ExerciseState, FlagKind, FlagVerdict, Form, Item,
   Lang, LangId, Millis, Question, SavedSession, Settings, User,
@@ -10141,6 +10142,63 @@ export default function ArabicTrainer() {
   const [account, setAccount] = useState(() => API.loadAccount());
 
   /*
+   * The address, read once (0.543; docs/PLAN-spaces.md, B6). Its first part
+   * names a space; `?join=` carries an invite. The space's public face is
+   * fetched at once, signed in or not: Onboarding shows it, and an App admin
+   * works in it (x-org, set through setAddressOrg).
+   */
+  const [address] = useState(() => {
+    const slug = (window.location.pathname.split("/")[1] || "").toLowerCase();
+    const join = new URLSearchParams(window.location.search).get("join") || "";
+    return { slug, join };
+  });
+  const [addressSpace, setAddressSpace] = useState<OnboardingPlace["org"] | null>(null);
+  const [addressUnknown, setAddressUnknown] = useState(false);
+  /* Why the device was just signed out — a closed space, a suspension. */
+  const [signedOutWhy, setSignedOutWhy] = useState("");
+  useEffect(() => {
+    let live = true;
+    const look = (slug: string, hops = 0): void => {
+      if (!slug) return;
+      API.orgInfo(slug).then(
+        (r) => {
+          if (!live) return;
+          if (r.moved && hops < 3) {
+            window.history.replaceState(null, "", `/${r.moved}${window.location.search}`);
+            look(r.moved, hops + 1);
+          } else if (r.org) {
+            API.setAddressOrg(r.org.id);
+            setAddressSpace(r.org);
+          }
+        },
+        (e) => {
+          if (live && String(e && (e as Error).message) === "no-space") setAddressUnknown(true);
+        },
+      );
+    };
+    look(address.slug);
+    return () => {
+      live = false;
+    };
+  }, [address.slug]);
+
+  /*
+   * Being signed in means being at your own space's address (B6). An App
+   * admin may open any space and stays where they are; somebody who
+   * followed another space's invite link is asked what they meant (82b).
+   */
+  const accountOrg = account && (account as any).org;
+  const [inviteSetAside, setInviteSetAside] = useState(false);
+  const strayInvite =
+    !inviteSetAside && !!account && !account.admin && !!accountOrg && !!address.join &&
+    !!addressSpace && addressSpace.id !== accountOrg.id;
+  useEffect(() => {
+    if (!account || account.admin || !accountOrg || !accountOrg.slug || strayInvite) return;
+    const here = (window.location.pathname.split("/")[1] || "").toLowerCase();
+    if (here !== accountOrg.slug) window.history.replaceState(null, "", `/${accountOrg.slug}`);
+  }, [account, accountOrg, strayInvite]);
+
+  /*
    * Who the account is, rather than which object holds it. A re-render can
    * hand back a fresh object for the same person, and every hook below
    * wants to re-run when the person changes and not when the reference
@@ -10307,8 +10365,15 @@ export default function ArabicTrainer() {
         API.saveAccount(merged);
         setAccount(merged);
       })
-      .catch(() => {
-        /* offline, or the key was replaced — keep working locally */
+      .catch((e) => {
+        /* Offline, or the key was replaced: keep working locally. Only a
+           closed space or a suspended account signs the device out (B8). */
+        const why = String(e && (e as Error).message);
+        if (why === "space-closed" || why === "suspended") {
+          API.clearAccount();
+          setAccount(null);
+          setSignedOutWhy(why === "suspended" ? "This account is suspended. Ask your space's admin." : "This space is closed.");
+        }
       });
   /* The key, not the account object: a re-render hands back a new
      object for the same person, and re-checking who they are on
@@ -13559,11 +13624,55 @@ export default function ArabicTrainer() {
     }
   }, [timeLeft, session, exercise]);
 
+  /* Signed in, holding another space's invite link (82b). */
+  if (ready && account && strayInvite && addressSpace && accountOrg) {
+    return (
+      <div className={`at ${settings.theme || "auto"}`}>
+        <div className="ob">
+          <div className="ob-box">
+            <h2>This link is for {addressSpace.name}</h2>
+            <Lede>
+              You're signed in to {accountOrg.name}. To join {addressSpace.name}, make a new
+              account. Your current one stays, and its key still signs you in to {accountOrg.name}.
+            </Lede>
+            <Button variant="primary" wide className="at-mt4"
+              onClick={() => {
+                API.clearAccount();
+                setAccount(null);
+              }}
+            >
+              Make a new account
+            </Button>
+            <Button variant="ghost" wide className="at-mt3"
+              onClick={() => {
+                window.history.replaceState(null, "", `/${accountOrg.slug}`);
+                setInviteSetAside(true);
+              }}
+            >
+              Back to {accountOrg.name}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (ready && !account) {
     return (
       <div className={`at ${settings.theme || "auto"}`}>
         <React.Suspense fallback={<ChunkFallback />}>
-          <Onboarding onDone={(a: any) => setAccount(a)} />
+          <Onboarding
+            onDone={(a: any) => {
+              setSignedOutWhy("");
+              setAccount(a);
+            }}
+            place={{
+              org: addressSpace || undefined,
+              unknown: addressUnknown,
+              joinCode: address.join,
+              notice: signedOutWhy,
+            }}
+          />
         </React.Suspense>
       </div>
     );
@@ -15288,6 +15397,11 @@ export default function ArabicTrainer() {
             <div className="at-dockmain" ref={setDockSlot} />
             <div className="at-docksub">
               <CornerMenu
+                spaceShown={
+                  account && account.admin && addressSpace
+                    ? addressSpace
+                    : accountOrg || null
+                }
                 account={account}
                 /* The dot stands for the whole action, so it stays lit until
                    every part of it is done — this device's cards, the courses,
@@ -19932,8 +20046,11 @@ function AppVersion() {
   );
 }
 
-function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide }: {
+function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide, spaceShown }: {
   account: User | null;
+  /** The space you are in, named at the top (0.543): its name, and its
+      logo as a data URL or a stored picture's hash. */
+  spaceShown?: { name: string; logoData?: string; logo?: string } | null;
   syncState?: string;
   /** What to say about it. Worked out by the app, which is the only thing
       that knows whether this was the connection or the passphrase. */
@@ -19973,6 +20090,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
 
       {open && (
         <Popover className="at-cmenu">
+          {spaceShown ? <SpaceLine space={spaceShown} /> : null}
           <div className="at-cwho">
             <span className="at-cavatar">{initialsOf(account && account.displayName)}</span>
             <span className="at-cwhotext">
@@ -20548,3 +20666,33 @@ export function homeLine({ review, fresh, behind }: Ready): string {
   return "All caught up — a practice session now still helps them stick";
 }
 
+/*
+ * The space you are in, at the top of the You menu (0.543, 28a): its logo
+ * and name, read-only. Built from the menu's own "who" row, so it needs no
+ * styling of its own. A logo comes as a data URL (from the address) or as
+ * a stored picture's hash (from the account), fetched the way any picture
+ * is.
+ */
+function SpaceLine({ space }: { space: { name: string; logoData?: string; logo?: string } }) {
+  const [src, setSrc] = useState(space.logoData || "");
+  useEffect(() => {
+    if (space.logoData || !space.logo) return;
+    let live = true;
+    API.getImage(space.logo).then(
+      (r) => live && setSrc(r.data),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [space.logo, space.logoData]);
+  return (
+    <div className="at-cwho" aria-label={`Space: ${space.name}`}>
+      {src ? <img className="at-cavatar" src={src} alt="" /> : <span className="at-cavatar">{initialsOf(space.name)}</span>}
+      <span className="at-cwhotext">
+        <b>{space.name}</b>
+        <i>Space</i>
+      </span>
+    </div>
+  );
+}

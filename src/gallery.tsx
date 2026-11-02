@@ -164,6 +164,7 @@ const PLACES: Record<string, [string, string]> = {
   CoursesPage: [TEACH, "The Courses tab"],
   CourseSettings: [TEACH, "Course settings"],
   NewDeck: [TEACH, "Making a new deck"],
+  NumbersFrom: [TEACH, "A deck's screen · whose numbers it uses"],
   ExportScreen: [TEACH, "Exporting cards or decks"],
   ImportScreen: [TEACH, "Importing cards or decks"],
   LockMark: [TEACH, "A locked deck's padlock"],
@@ -263,6 +264,9 @@ const PLACES: Record<string, [string, string]> = {
 
   /* Admin */
   AdminSpace: [ADMIN, "The Admin space"],
+  SpacesTab: [ADMIN, "The Spaces tab"],
+  SpaceScreen: [ADMIN, "The Spaces tab · one space"],
+  SpaceLine: [LEARN, "The You menu · the space you are in"],
   BackupScreen: [ADMIN, "App · backing up and restoring"],
   ClearScreen: [ADMIN, "App · clearing the site"],
 

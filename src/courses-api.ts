@@ -19,6 +19,25 @@ export function setKey(key?: string | null) {
   currentKey = key || "";
 }
 
+/*
+ * The space whose address is open (0.543), sent with every request as
+ * x-org. The server reads it only from an App admin, who may work in any
+ * space; for everybody else their own space decides.
+ */
+let addressOrg = "";
+export function setAddressOrg(id?: string | null) {
+  addressOrg = id || "";
+}
+
+/** A space as the app is told of it. */
+export interface OrgCard {
+  id: string;
+  slug: string;
+  name: string;
+  logo: string;
+  colour: string;
+}
+
 /* The account lives beside the trainer's own data rather than inside it,
    so signing in on a new device doesn't have to wait for a sync. */
 export function loadAccount(): (User & { key: string }) | null {
@@ -75,6 +94,7 @@ async function call(
   const headers: Record<string, string> = { "content-type": "application/json" };
   const use = key !== undefined ? key : currentKey;
   if (use) headers["x-key"] = use;
+  if (addressOrg) headers["x-org"] = addressOrg;
 
   const abort = new AbortController();
   const deadline = setTimeout(() => abort.abort(), CALL_TIMEOUT_MS);
@@ -107,16 +127,25 @@ async function call(
   if (data === null || typeof data !== "object") {
     throw new Error(res.ok ? "bad-response" : `http-${res.status}`);
   }
-  if (!res.ok) throw new Error(data.error || `http-${res.status}`);
+  /* With the whole answer attached: some errors say more than their code —
+     "other-space" names the space the key belongs to (0.543). */
+  if (!res.ok) throw Object.assign(new Error(data.error || `http-${res.status}`), { data });
   /* Material written under a language's old id, by a device still on an
      older build, reads as the language it is now. See lang-ids.ts. */
   return renameLangIds(data);
 }
 
 /* ---- accounts ---- */
-export const signUp = (displayName: string, signupCode?: string) =>
-  call("signup", { body: { displayName, signupCode: signupCode || "" }, key: "" });
-export const whoAmI = (key: string) => call("whoami", { key });
+/* With an invite or course code, which decides the space; `org` is the
+   space whose address is open, so a code from elsewhere is caught (0.543). */
+export const signUp = (displayName: string, code?: string, org?: string) =>
+  call("signup", { body: { displayName, code: code || "", org: org || "" }, key: "" });
+export const whoAmI = (key: string, org?: string) =>
+  call("whoami", { key, params: org ? { org } : {} });
+/** What a space's address shows before anyone signs in. */
+export const orgInfo = (slug: string): Promise<
+  { ok: true; org?: OrgCard & { logoData: string; closed: boolean }; moved?: string }
+> => call("org-info", { params: { slug }, key: "" });
 export const rename = (displayName: string) => call("rename", { body: { displayName } });
 /* "Some learning just happened." The server keeps the moment and nothing
    else — what was practiced and how it went are in the device's own
@@ -287,6 +316,26 @@ export const exportChunk = (keys: string[]) => call("export-chunk", { body: { ke
 
 /* ---- admin ---- */
 export const adminOverview = () => call("admin-overview");
+/* ---- spaces, the App admin's (0.543) ---- */
+export interface OrgRow extends OrgCard {
+  formerSlugs: string[];
+  admins: string[];
+  inviteCode: string;
+  created: number;
+  archived?: number;
+  people: { handle: string; displayName: string }[];
+}
+export const adminOrgs = (): Promise<{ ok: true; orgs: OrgRow[] }> => call("admin-orgs");
+export const createOrg = (name: string, slug: string, adminName: string, logo = "", colour = ""):
+  Promise<{ ok: true; org: OrgRow; admin: User; key: string }> =>
+  call("admin-create-org", { body: { name, slug, adminName, logo, colour } });
+export const updateOrg = (id: string, change: { name?: string; slug?: string; logo?: string; colour?: string }) =>
+  call("admin-update-org", { body: { id, ...change } });
+export const orgAdmins = (id: string, change: { add?: string; remove?: string }) =>
+  call("admin-org-admins", { body: { id, ...change } });
+export const archiveOrg = (id: string, archived: boolean) =>
+  call(archived ? "admin-archive-org" : "admin-reopen-org", { body: { id } });
+export const deleteOrg = (id: string, confirm: string) => call("admin-delete-org", { body: { id, confirm } });
 export const backupManifest = () => call("admin-backup-manifest");
 export const backupChunk = (keys: string[]) => call("admin-backup-chunk", { body: { keys } });
 export const restoreChunk = (records: Record<string, unknown>) => call("admin-restore-chunk", { body: { records } });
@@ -353,7 +402,17 @@ export function explain(err: unknown): string {
     {
       offline: "Can't reach the server. Your own cards still work.",
       "bad-key": "That sign-in key isn't recognised.",
-      "bad-code": "No course has that code.",
+      "bad-code": "Nothing has that code. Check it with whoever gave it to you.",
+      "code-required": "You need a code to join: an invitation link, or a course code from your teacher.",
+      "other-space": "That belongs to another space.",
+      "space-closed": "This space is closed.",
+      "suspended": "This account is suspended. Ask your space's admin.",
+      "no-space": "There's no space at this address.",
+      "slug-taken": "That address is taken. Addresses are never reused.",
+      "slug-invalid": "An address is 3 to 40 lower-case letters, digits and dashes, starting with a letter, and some words are kept for the app.",
+      "not-in-space": "That person isn't in this space.",
+      "main-stays": "Main can't be closed or deleted.",
+      "confirm-name": "Type the space's name exactly to confirm.",
       "admin-only": "Only the administrator can do that.",
       "not-allowed": "That administrator key isn't right.",
       "not-yours": "That deck belongs to another teacher.",

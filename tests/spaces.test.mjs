@@ -15,6 +15,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 const dir = await mkdtemp(path.join(tmpdir(), "manytongues-spaces-"));
 process.env.DATA_DIR = dir;
@@ -127,8 +128,16 @@ test("records made in a space carry it; older ones read as Main", async () => {
   assert.equal((await read(`user:${b.teacher.handle}`)).org, B);
   assert.equal((await read(`flag:${b.flagId}`)).org, B);
   /* A record written before spaces has no org at all, and is Main's. */
-  const old = await read(`user:${admin.handle}`);
-  assert.equal(old.org, undefined);
+  await store.set("course:legacy", JSON.stringify({
+    id: "legacy", title: "Old course", language: "ar-PS", teachers: [], students: [], decks: [],
+  }));
+  await store.set("index:courses", JSON.stringify(
+    JSON.parse(String(await store.get("index:courses", { type: "text" }))).concat(["legacy"])
+  ));
+  const inMain = (await api("admin-overview", { key: admin.key })).json.courses.map((/** @type {any} */ c) => c.id);
+  assert.ok(inMain.includes("legacy"));
+  const inB = (await api("admin-overview", { key: admin.key, org: B })).json.courses.map((/** @type {any} */ c) => c.id);
+  assert.ok(!inB.includes("legacy"));
 });
 
 /** Each probe: [action, a request from Main's teacher aimed at B's records]. */
@@ -255,6 +264,11 @@ const PLACED = {
     "remove-member", "export-plan", "export-chunk", "create-course", "create-deck", "report-flag",
     "admin-create-user", "admin-create-org",
   ],
+  /* The App admin's tools for spaces themselves (stage 3), tried below. */
+  spaces: [
+    "org-info", "admin-orgs", "admin-update-org", "admin-org-admins", "admin-archive-org",
+    "admin-reopen-org", "admin-delete-org",
+  ],
   own: [
     "signup", "signin", "whoami", "practiced", "delete-account", "rename", "claim-admin",
     "my-systems", "save-system", "sign-system", "delete-system",
@@ -269,4 +283,101 @@ test("every action on the server is placed in this file", async () => {
   const placed = new Set(Object.values(PLACED).flat());
   const missing = actions.filter((a) => !placed.has(a));
   assert.deepEqual(missing, [], `place these in tests/spaces.test.mjs: ${missing.join(", ")}`);
+});
+
+/* ------------------------------------------------------- stage 3 (0.543) */
+
+test("a space's address shows its face, and an old address forwards", async () => {
+  const info = await api("org-info", { params: { slug: "lingua" } });
+  assert.equal(info.status, 200);
+  assert.equal(info.json.org.name, "Lingua");
+  assert.equal(info.json.org.closed, false);
+  assert.equal(JSON.stringify(info.json).includes(b.teacher.handle), false, "never its people");
+  assert.equal((await api("org-info", { params: { slug: "nowhere" } })).status, 404);
+
+  const moved = await api("admin-update-org", { key: admin.key, body: { id: B, slug: "lingua-school", colour: "#123456" } });
+  assert.equal(moved.status, 200, JSON.stringify(moved.json));
+  assert.equal((await api("org-info", { params: { slug: "lingua" } })).json.moved, "lingua-school");
+  assert.equal((await api("org-info", { params: { slug: "lingua-school" } })).json.org.colour, "#123456");
+  /* The old address stays B's for ever. */
+  const reuse = await api("admin-create-org", { key: admin.key, body: { name: "Other", slug: "lingua", adminName: "X" } });
+  assert.equal(reuse.status, 409);
+  /* Only an App admin changes a space. */
+  assert.equal((await api("admin-update-org", { key: bAdmin.key, body: { id: B, name: "Mine" } })).status, 403);
+});
+
+test("signing up needs a code, and the code decides the space", async () => {
+  assert.equal((await api("signup", { body: { displayName: "Nobody" } })).status, 403);
+  assert.equal((await api("signup", { body: { displayName: "Nobody", code: "no-such-code" } })).status, 403);
+  const orgs = (await api("admin-orgs", { key: admin.key })).json.orgs;
+  const inviteB = orgs.find((/** @type {any} */ o) => o.id === B).inviteCode;
+  const joined = await api("signup", { body: { displayName: "Newcomer", code: inviteB } });
+  assert.equal(joined.status, 200);
+  assert.equal(joined.json.user.org.id, B);
+  /* At Main's address, B's code is stopped, and says whose it is. */
+  const wrong = await api("signup", { body: { displayName: "Lost", code: inviteB, org: "main" } });
+  assert.equal(wrong.status, 409);
+  assert.equal(wrong.json.space.id, B);
+  /* A course code puts them on the course. */
+  const course = (await api("my-courses", { key: b.teacher.key })).json.courses.find((/** @type {any} */ c) => c.id === b.course.id);
+  const pupil = await api("signup", { body: { displayName: "Pupil", code: course.code } });
+  assert.equal(pupil.status, 200);
+  const roster = (await api("admin-overview", { key: admin.key, org: B })).json.courses.find((/** @type {any} */ c) => c.id === b.course.id);
+  assert.ok(roster.students.includes(pupil.json.user.handle));
+});
+
+test("signing in at another space's address says whose the key is", async () => {
+  const wrong = await api("whoami", { key: b.student.key, params: { org: "main" } });
+  assert.equal(wrong.status, 409);
+  assert.equal(wrong.json.space.id, B);
+  const right = await api("whoami", { key: b.student.key, params: { org: B } });
+  assert.equal(right.status, 200);
+  assert.equal(right.json.user.org.id, B);
+  /* An App admin may open any address. */
+  assert.equal((await api("whoami", { key: admin.key, params: { org: B } })).status, 200);
+  /* A course code from another space, used by someone signed in, says whose. */
+  const course = (await api("my-courses", { key: b.teacher.key })).json.courses.find((/** @type {any} */ c) => c.id === b.course.id);
+  const join = await api("join-course", { key: main.student.key, body: { code: course.code } });
+  assert.equal(join.status, 409);
+  assert.equal(join.json.space.id, B);
+});
+
+test("a closed space refuses its people until it reopens", async () => {
+  assert.equal((await api("admin-archive-org", { key: admin.key, body: { id: B } })).status, 200);
+  assert.equal((await api("whoami", { key: b.student.key })).json.error, "space-closed");
+  assert.equal((await api("my-material", { key: b.student.key })).status, 403);
+  assert.equal((await api("org-info", { params: { slug: "lingua-school" } })).json.org.closed, true);
+  assert.equal((await api("admin-archive-org", { key: admin.key, body: { id: "main" } })).status, 400);
+  assert.equal((await api("admin-reopen-org", { key: admin.key, body: { id: B } })).status, 200);
+  assert.equal((await api("whoami", { key: b.student.key })).status, 200);
+});
+
+test("deleting a space takes everything in it, frees its addresses, and leaves Main alone", async () => {
+  const made = await api("admin-create-org", { key: admin.key, body: { name: "Test", slug: "test-space", adminName: "T" } });
+  const T = made.json.org.id;
+  const t = await furnish(T, "t");
+  /* The student has practice history on the server. */
+  const token = createHash("sha256").update(t.student.key).digest("hex");
+  await fetch(`${origin}/api/sync`, {
+    method: "POST",
+    headers: { "content-type": "application/json", "x-sync-token": token },
+    body: JSON.stringify({ data: { items: [] } }),
+  });
+  const before = await fetch(`${origin}/api/sync`, { headers: { "x-sync-token": token } }).then((r) => r.json());
+  assert.ok(before.data, "the practice document exists first");
+
+  assert.equal((await api("admin-delete-org", { key: admin.key, body: { id: T, confirm: "wrong" } })).status, 400);
+  assert.equal((await api("admin-delete-org", { key: admin.key, body: { id: T, confirm: "Test" } })).status, 200);
+
+  const store = getStore("arabic-courses");
+  for (const k of [`org:${T}`, `course:${t.course.id}`, `deck:${t.deck.id}`, `card:${t.card.id}`, `user:${t.student.handle}`, `flag:${t.flagId}`]) {
+    assert.equal(await store.get(k, { type: "text" }), null, k);
+  }
+  const after = await fetch(`${origin}/api/sync`, { headers: { "x-sync-token": token } }).then((r) => r.json());
+  assert.equal(after.data, null, "the practice history is gone");
+  assert.equal((await api("org-info", { params: { slug: "test-space" } })).status, 404);
+  /* Main and B are untouched. */
+  assert.ok(await store.get(`deck:${main.deck.id}`, { type: "text" }));
+  assert.ok(await store.get(`card:${b.card.id}`, { type: "text" }));
+  assert.equal((await api("admin-delete-org", { key: admin.key, body: { id: "main", confirm: "Main" } })).status, 400);
 });

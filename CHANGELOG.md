@@ -8,6 +8,30 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.543 — 2 November 2026
+
+**Spaces can be created, each with its own address.**
+
+- In Admin, a new **Spaces** tab (yours only) lists every space. Create one
+  with a name, an address such as `manytongues.co/lingua-academy`, and its
+  first space admin, whose sign-in key you're shown to hand over. Later you
+  can change its name, address, logo and colour, choose its admins, close
+  it, reopen it, or delete it for good after typing its name.
+- A space's address shows its own sign-in page, with its name, logo and
+  colour. A colour too faint to see is ignored, and the Spaces tab says so.
+- Making an account now needs a code: a space's invitation link, or a
+  course code from a teacher. The code decides which space the account is
+  in. The old single sign-up code is gone.
+- Signing in with a key, or using a code, from another space says whose it
+  is, with a button to go there or to make a new account here. Someone
+  signed in who follows another space's invitation is asked what they meant.
+- Once signed in, the address always shows your own space. The space's
+  name and logo are at the top of the You menu.
+- A closed space's people see "This space is closed" until it reopens.
+- Deleting an account now also erases its practice history from the server.
+- **To do by hand:** if the server has a `SIGNUP_CODE` setting, remove it.
+  It no longer does anything.
+
 ## 0.542 — 2 November 2026
 
 **Spaces, underneath. Nothing changes on screen.**

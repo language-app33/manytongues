@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { mainInviteCode } from "./helpers.mjs";
 
 const dir = await mkdtemp(path.join(tmpdir(), "manytongues-numbers-choice-"));
 process.env.DATA_DIR = dir;
@@ -58,7 +59,8 @@ const system = () => ({
 
 /** @param {string} name */
 async function person(name) {
-  const r = await api("signup", { body: { displayName: name } });
+  const code = await mainInviteCode(origin, "numbers-choice-admin");
+  const r = await api("signup", { body: { displayName: name, code } });
   return { key: r.json.key, handle: r.json.user.handle };
 }
 

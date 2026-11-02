@@ -7244,3 +7244,32 @@ action is placed in its table. Two slips it caught on the first run:
 `wipeAccount`, and the export let an administrator take any card. Both are
 now limited to the acting org.
 
+---
+
+## An account is made with a code, except the very first
+
+**2 November 2026** · `signup` and `codeTarget` in `server/api/courses.js`
+
+Since 0.543 the code someone signs up with decides their space: a space's
+invitation code or a course code (24b). An empty site has nobody to invite
+anyone, so the first account on it is made without a code, into Main —
+the owner's, who then claims admin. Tests that make many accounts sign up
+with Main's invitation code, read through `admin-orgs`, the way a person
+would (`mainInviteCode` in `tests/helpers.mjs`).
+
+Space invitation codes share the one table of codes with course codes;
+an invitation is recorded as `org:<id>` where a course code records the
+course's id, so `codeTarget` tells them apart and `courseForCode` still
+finds a restored course's codes.
+
+## Deleting a space leaves recordings and pictures
+
+**2 November 2026** · `admin-delete-org`
+
+The plan said to delete the recordings and pictures nothing else uses.
+They are stored by their content and shared across spaces, so working out
+"nothing else" means reading every card and number system on the site, and
+getting it wrong deletes another space's audio. Left behind, one costs
+storage and nothing else. So a deleted space's media stays; a later tidy-up
+can collect what nothing points at, the way `admin-clear` already does.
+

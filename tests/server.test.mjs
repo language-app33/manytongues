@@ -101,7 +101,37 @@ after(async () => {
  * @param {string} pathname
  * @param {{ method?: string, key?: string, token?: string, body?: unknown }} [opts]
  */
-async function api(pathname, { method = "GET", key, token, body } = {}) {
+/*
+ * Since 0.543 an account is made with an invite or course code; only the
+ * first account on an empty site needs none. These tests make accounts by
+ * the dozen, so the helper does what a person would: it signs up with
+ * Main's invite code, read by a first account made for the purpose.
+ */
+/** @type {Promise<string> | null} */
+let mainCode = null;
+function codeForMain() {
+  if (!mainCode) {
+    mainCode = (async () => {
+      const first = await raw("/api/courses?action=signup", { method: "POST", body: { displayName: "Site owner" } });
+      const key = first.json.key;
+      await raw("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
+      const orgs = await raw("/api/courses?action=admin-orgs", { key });
+      return orgs.json.orgs.find((/** @type {any} */ o) => o.id === "main").inviteCode;
+    })();
+  }
+  return mainCode;
+}
+
+/** @param {string} pathname @param {any} [opts] */
+async function api(pathname, opts = {}) {
+  if (pathname.includes("action=signup") && opts.body && !("code" in opts.body)) {
+    opts = { ...opts, body: { ...opts.body, code: await codeForMain() } };
+  }
+  return raw(pathname, opts);
+}
+
+/** @param {string} pathname @param {any} [opts] */
+async function raw(pathname, { method = "GET", key, token, body } = {}) {
   /** @type {Record<string, string>} */
   const headers = { "content-type": "application/json" };
   if (key) headers["x-key"] = key;

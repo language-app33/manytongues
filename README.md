@@ -1473,7 +1473,6 @@ Environment variables:
 |---|---|
 | `PORT` | port to listen on. Defaults to 3000; most hosts set this for you. |
 | `DATA_DIR` | where documents are written. Overrides an attached volume. |
-| `SIGNUP_CODE` | if set, making an account requires this code. Leave unset to let anyone sign up. |
 | `ADMIN_KEY` | if set, an account can promote itself to administrator once by entering it. |
 
 ### Version numbers
@@ -1518,6 +1517,24 @@ How the wall is kept, in `server/api/courses.js` (since 0.542):
   filtered with `inScope` where they are read.
 - `tests/spaces.test.mjs` tries every action across two real spaces, and
   fails if a new action is added without being placed in its table.
+
+Addresses and joining (since 0.543):
+
+- A space lives at `manytongues.co/<address>`. The app reads the address
+  once at start (`org-info` gives the space's name, logo and colour, or
+  where an old address moved to), shows that space's own sign-in page, and
+  once someone is signed in keeps the address on their own space. An App
+  admin stays wherever they opened, and works in that space.
+- An account is made with a code: a space's invitation
+  (`/<address>?join=<code>`) or a course code, and the code decides the
+  space. The only account made without one is the very first on an empty
+  site, which is the owner's. `SIGNUP_CODE` is gone.
+- A key or code from another space is stopped and named, with the way
+  there. A closed space refuses its people until it reopens.
+- Spaces are made, renamed, given an address, logo and colour, closed,
+  reopened and deleted in Admin → Spaces. Deleting an account, or a whole
+  space, also erases each account's practice history (`forgetSyncDoc` in
+  `server/api/sync.js`).
 
 ## How it fits together
 
