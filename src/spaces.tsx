@@ -8274,6 +8274,12 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 onChange={setTab}
                 label="Decks or cards"
               />
+              {/* Which of the two you are in, in one line (0.551). */}
+              <Help className="at-mb3">
+                {mineSide
+                  ? "Only you see these. Copy or move them to the space when they're ready."
+                  : `${spaceName}'s decks and cards, shared with its teachers.`}
+              </Help>
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
                   <LanguageRadio
@@ -8649,6 +8655,12 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 onChange={setTab}
                 label="Decks or cards"
               />
+              {/* Which of the two you are in, in one line (0.551). */}
+              <Help className="at-mb3">
+                {mineSide
+                  ? "Only you see these. Copy or move them to the space when they're ready."
+                  : `${spaceName}'s decks and cards, shared with its teachers.`}
+              </Help>
               {deckAction && (
                 <Screen
                   title={

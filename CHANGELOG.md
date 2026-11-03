@@ -8,6 +8,14 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.551 — 3 November 2026
+
+**Material and My space say which one you're in.**
+
+- Under the Decks / Cards tabs, one line: in Material, "{your space}'s
+  decks and cards, shared with its teachers."; in My space, "Only you see
+  these. Copy or move them to the space when they're ready."
+
 ## 0.550 — 3 November 2026
 
 **Teaching: Material and My space. Students no longer have a My space.**
