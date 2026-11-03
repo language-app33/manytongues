@@ -3150,6 +3150,9 @@ button.at-stat { transition: border-color 140ms ease; }
 .at-section:first-of-type { margin-top:20px; }
 .at-sectionhead { font-family: var(--ui); font-size:19px; font-weight:800;
   margin:0 0 10px; color: var(--ink); letter-spacing:-.01em; }
+/* A tab's name at its top (0.553): the space a section is given above and
+   below its heading. */
+.at-sectionhead.at-tabtitle { margin:20px 0 16px; }
 .at-joinbox { border:2px solid var(--line); border-radius: var(--r-lg);
   padding:16px; background: var(--surface); }
 .at-joinbox .at-toolbar { margin-bottom:0; }

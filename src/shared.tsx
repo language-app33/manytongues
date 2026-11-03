@@ -1006,8 +1006,17 @@ export function Field({ label, lede, hint, optional, htmlFor, children, classNam
    whatever is waiting to be confirmed, the error and busy lines, then a
    tab strip and the tab's contents. Both built that by hand, which is how
    one of them came to show the busy line and the other not. */
-export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, children }: {
+/* --- TabTitle -----------------------------------------------------
+   The name of the tab a page is, at its top (0.553): the heading size
+   used inside Progress, scrolling away with the page. */
+export function TabTitle({ children }: { children?: Node }) {
+  return <h2 className="at-sectionhead at-tabtitle">{children}</h2>;
+}
+
+export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, children }: {
   tabs: [string, string, string?][];
+  /** The space's name, heading each tab as "{space} · {tab}" (0.553). */
+  space?: string;
   tab?: string;
   onTab: (key: string) => void;
   error?: Node;
@@ -1048,6 +1057,11 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
           </div>
           <Notice kind="error">{error}</Notice>
           <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} dock />
+          {/* The tab's own name at the top (0.553), in the words of the bar.
+              A screen opened over the tab covers it, with its own title. */}
+          {space && tabs.find((t) => t[0] === tab) ? (
+            <TabTitle>{`${space} · ${(tabs.find((t) => t[0] === tab) as [string, string])[1]}`}</TabTitle>
+          ) : null}
           {children}
         </div>
       </div>

@@ -62,6 +62,7 @@ import {
   useSlowWait,
   useSnackbar,
   useSnackbarState,
+  TabTitle,
 } from "./shared.tsx";
 import { renameLangIds } from "./lang-ids.ts";
 
@@ -15218,6 +15219,7 @@ export default function ArabicTrainer() {
         )}
 
         {/* ============ ITEMS ============ */}
+        {tab === "items" && !inExercise && <TabTitle>Cards</TabTitle>}
         {tab === "items" && (
           <ItemsTab
             items={shown}
@@ -15242,6 +15244,7 @@ export default function ArabicTrainer() {
         )}
 
         {/* ============ PROGRESS ============ */}
+        {tab === "progress" && !inExercise && <TabTitle>Progress</TabTitle>}
         {tab === "progress" && (
           <ProgressTab
             items={shown}
@@ -15508,8 +15511,8 @@ export default function ArabicTrainer() {
       {/* The app's name heads the learning page and scrolls away with it;
           a space frame carries its own. */}
       {/* Home has it large and centred, as the page's title. Progress and
-          Cards go without a heading, the section in the bar being the
-          title; Courses, reached from the menu, is headed with its name. */}
+          Cards are headed with their name, as every tab is (0.553);
+          Courses, reached from the menu, is headed with its own. */}
       {!inExercise && space === "learn" && tab === "home" && (
         <div className="at-brand at-brand-home">
           <img className="at-brandmark" src="/logo.svg" alt="" width={48} height={48} />

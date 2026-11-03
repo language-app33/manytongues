@@ -1958,6 +1958,7 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
 
   return (
     <SpaceFrame
+      space={superMode ? "Super admin" : "Admin"}
       tabs={superMode
         ? [
             /* Super admin (0.547): what is the whole app's, not one space's. */
@@ -2104,7 +2105,7 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                   })} />
                 </Section>
               ) : null}
-              <Section head title="People">
+              <Section>
               {newKey && (
                 <div className="at-sub">
                   <p className="at-eyebrow">
@@ -8173,6 +8174,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
   return (
     <SpaceFrame
+      space="Teaching"
       tabs={[
         ["courses", "Courses", "school"],
         /* Material is the space's decks and cards, My space the teacher's

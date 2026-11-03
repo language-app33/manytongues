@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.553 — 3 November 2026
+
+**Every tab says which one it is at the top.**
+
+- In Learning, Progress and Cards are headed with their name. Home and the
+  Courses page are unchanged.
+- In Teaching, Admin and Super admin, the heading names the space too:
+  "Teaching · Material", "Admin · People", "Super admin · Reports" and so
+  on, in the words of the bar at the foot of the window. Inside Material
+  and My space, the Decks and Cards tabs aren't part of the heading.
+- The headings are the size used inside Progress and scroll away with the
+  page. A screen opened over a tab — a course, a deck, a person — keeps
+  its own title instead.
+- Admin → People no longer has a second "People" heading under the new one.
+- Released without running the test suite, at the owner's request.
+
 ## 0.552 — 3 November 2026
 
 **Share feedback, deleting former members for good, and opening any space.**
