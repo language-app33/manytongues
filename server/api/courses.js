@@ -4565,24 +4565,39 @@ async function handle(req) {
          carries a digest, so a file can be verified long after it was made,
          without a restore and without trusting that the download finished. */
 
-      if (action === "admin-backup-manifest") {
-        const handles = await readIndex(store, "users");
-        const courseIds = await readIndex(store, "courses");
-        const deckIds = await readIndex(store, "decks");
+      /*
+       * A backup of the whole site, or (0.546; 63a, 72a) an export of one
+       * space: the same manifest, with everything outside that space left
+       * out, and everyone's My space too. Its chunks are fetched with
+       * admin-backup-chunk like a backup's.
+       */
+      if (action === "admin-backup-manifest" || action === "admin-export-org-manifest" || action === "admin-org-usage") {
+        const only = action === "admin-backup-manifest" ? "" : String(body.id || url.searchParams.get("id") || "");
+        if (action !== "admin-backup-manifest" && !(await readJson(store, K.org(only)))) return json({ error: "no-space" }, 404);
+        const keep = (/** @type {any} */ rec) => !only || (rec && orgOf(rec) === only && !rec.personal);
+        const pick = async (/** @type {string[]} */ ids, /** @type {(id: string) => string} */ keyOf) =>
+          only ? (await readManyJson(store, ids.map(keyOf))).map((r, i) => (keep(r) ? ids[i] : null)).filter((x) => x !== null) : ids;
+        const handles = /** @type {string[]} */ (await pick(await readIndex(store, "users"), K.user));
+        const courseIds = /** @type {string[]} */ (await pick(await readIndex(store, "courses"), K.course));
+        const deckIds = /** @type {string[]} */ (await pick(await readIndex(store, "decks"), K.deck));
         /* Reports were the one thing on the site a backup did not hold, so
            a restore quietly threw away every problem anybody had reported
            and not yet fixed. They are small and they are somebody's words
            about a card that is in the file beside them. */
-        const flagIds = await readIndex(store, "flags");
+        const flagIds = /** @type {string[]} */ (await pick(await readIndex(store, "flags"), K.flag));
         /* And the spaces, with every address each has had (0.542). */
-        const orgIds = await readIndex(store, "orgs");
+        const orgIds = only ? [only] : await readIndex(store, "orgs");
         const orgDocs = (await readManyJson(store, orgIds.map((id) => K.org(id)))).filter(Boolean);
         const slugNames = [...new Set(orgDocs.flatMap((o) => [o.slug].concat(o.formerSlugs || [])).filter(Boolean))];
 
         /* Card ids come from each owner's list rather than a global index,
-           which is where they actually live. */
+           which is where they actually live — and, for one space, from its
+           decks too, which can hold an App admin's card. */
         const cardLists = await readManyJson(store, handles.map((h) => K.myCards(h)));
-        const cardIds = [...new Set(cardLists.flatMap((l) => l || []))];
+        const deckCards = only
+          ? (await readManyJson(store, deckIds.map((id) => K.deck(id)))).flatMap((d) => (d && d.cardIds) || [])
+          : [];
+        const cardIds = /** @type {string[]} */ (await pick([...new Set(cardLists.flatMap((l) => l || []).concat(deckCards))], K.card));
 
         /* Clip hashes are only discoverable from the cards that use them, so
            the cards have to be read to know what a complete backup contains.
@@ -4637,8 +4652,31 @@ async function handle(req) {
         batch("flag", flagIds.map(K.flag), 60);
         batch("org", orgIds.map(K.org), 60);
         batch("former", orgIds.map(K.former), 60);
-        const goneHandles = await readIndex(store, "gone");
-        batch("gone", goneHandles.map(K.gone), 100);
+        const goneHandles = only
+          ? (await Promise.all((await readIndex(store, "gone")).map(async (h) => ((await readJson(store, K.gone(h))) || {}).org === only ? h : null))).filter((h) => h !== null)
+          : await readIndex(store, "gone");
+        batch("gone", /** @type {string[]} */ (goneHandles).map(K.gone), 100);
+
+        /* How much a space holds (60a): the counts, and the bytes of the
+           recordings and pictures its cards and numbers use. One shared by
+           two spaces counts in both. */
+        if (action === "admin-org-usage") {
+          const sizeOf = async (/** @type {string} */ key) => {
+            if (typeof store.size === "function") return (await store.size(key)) || 0;
+            const v = await store.get(key, { type: "text" }).catch(() => null);
+            return v ? String(v).length : 0;
+          };
+          let bytes = 0;
+          for (const h of clipHashes) bytes += await sizeOf(K.clip(h));
+          for (const h of imageHashes) bytes += await sizeOf(K.image(h));
+          return json({
+            ok: true,
+            usage: {
+              people: handles.length, courses: courseIds.length, decks: deckIds.length,
+              cards: cardIds.length, recordings: clipHashes.length, pictures: imageHashes.length, bytes,
+            },
+          });
+        }
         batch("slug", slugNames.map(K.slug), 100);
         batch("clip", clipHashes.map(K.clip), 3);
         batch("image", imageHashes.map(K.image), 2);

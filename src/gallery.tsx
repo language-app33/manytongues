@@ -272,6 +272,7 @@ const PLACES: Record<string, [string, string]> = {
   BorrowedCards: [TEACH, "A My space deck · cards from your courses"],
   LeaveSpace: [LEARN, "Settings · leaving your space"],
   SpaceScreen: [ADMIN, "The Spaces tab · one space"],
+  SpaceExtras: [ADMIN, "The Spaces tab · a space's storage and export"],
   SpaceLine: [LEARN, "The You menu · the space you are in"],
   BackupScreen: [ADMIN, "App · backing up and restoring"],
   ClearScreen: [ADMIN, "App · clearing the site"],

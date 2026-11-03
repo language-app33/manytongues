@@ -273,6 +273,8 @@ const PLACED = {
     "admin-remove-former", "key-saved", "leave-space",
     /* Stage 5: My space, tried below. */
     "set-deck-practise", "borrow-cards", "copy-to-space",
+    /* Stage 6, tried below. */
+    "admin-export-org-manifest", "admin-org-usage",
   ],
   own: [
     "signup", "signin", "whoami", "practiced", "delete-account", "rename", "claim-admin",
@@ -561,4 +563,26 @@ test("a teacher copies a My space deck into the space, as separate cards", async
   /* A learner can't copy into the space. */
   const sdeck = (await api("create-deck", { key: c.student.key, body: { title: "S", lang: "ar-PS", personal: true } })).json.deck;
   assert.equal((await api("copy-to-space", { key: c.student.key, body: { deckId: sdeck.id } })).status, 403);
+});
+
+/* ------------------------------------------------------- stage 6 (0.546) */
+
+test("a space's export holds that space and nothing else, and its usage is counted", async () => {
+  const c = await another("export-space");
+  const mine = (await api("create-deck", { key: c.student.key, body: { title: "Private", lang: "ar-PS", personal: true } })).json.deck;
+  const manifest = (await api("admin-export-org-manifest", { key: admin.key, body: { id: c.id } })).json.manifest;
+  const keys = manifest.plan.flatMap((/** @type {any} */ ch) => ch.keys);
+  assert.ok(keys.includes(`deck:${c.deck.id}`));
+  assert.ok(keys.includes(`card:${c.card.id}`));
+  assert.ok(keys.includes(`course:${c.course.id}`));
+  assert.ok(keys.includes(`org:${c.id}`));
+  assert.ok(!keys.includes(`deck:${mine.id}`), "no one's My space");
+  assert.ok(!keys.includes(`deck:${main.deck.id}`), "nothing of another space");
+  assert.ok(!keys.includes(`user:${main.teacher.handle}`));
+  /* Space admins can't export, or see usage. */
+  assert.equal((await api("admin-export-org-manifest", { key: c.lead.key, body: { id: c.id } })).status, 403);
+  const usage = (await api("admin-org-usage", { key: admin.key, body: { id: c.id } })).json.usage;
+  assert.equal(usage.decks, 1);
+  assert.equal(usage.courses, 1);
+  assert.equal(usage.people, 3);
 });

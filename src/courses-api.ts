@@ -349,6 +349,13 @@ export const orgAdmins = (id: string, change: { add?: string; remove?: string })
 export const archiveOrg = (id: string, archived: boolean) =>
   call(archived ? "admin-archive-org" : "admin-reopen-org", { body: { id } });
 export const deleteOrg = (id: string, confirm: string) => call("admin-delete-org", { body: { id, confirm } });
+/* ---- a space's export and storage (0.546) ---- */
+export interface OrgUsage {
+  people: number; courses: number; decks: number; cards: number;
+  recordings: number; pictures: number; bytes: number;
+}
+export const exportOrgManifest = (id: string) => call("admin-export-org-manifest", { body: { id } });
+export const orgUsage = (id: string): Promise<{ ok: true; usage: OrgUsage }> => call("admin-org-usage", { body: { id } });
 /* ---- running a space (0.544) ---- */
 export const newInvite = (): Promise<{ ok: true; inviteCode: string }> => call("admin-new-invite", { body: {} });
 export const suspendUser = (handle: string) => call("admin-suspend-user", { body: { handle } });

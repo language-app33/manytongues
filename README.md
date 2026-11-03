@@ -1567,6 +1567,11 @@ My space (since 0.545):
   course. Teaching shows one side at a time (`side` in `TeachSpace`); a
   learner's "My space" is `TeachSpace` with `personalOnly`.
 
+A space's export and storage (since 0.546): `admin-export-org-manifest` is
+the backup manifest limited to one org and without personal records, its
+chunks fetched like a backup's; `admin-org-usage` counts what an org holds
+and the bytes of its media. Both are the App admin's, from Admin → Spaces.
+
 ## How it fits together
 
 ```

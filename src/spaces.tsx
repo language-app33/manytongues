@@ -816,8 +816,13 @@ function includedIn(file: any) {
  * @param parts  Which of BACKUP_PARTS to put in. Everything by
  *   default, which is what a backup meant before it could be less.
  */
-export async function buildBackup(onProgress: (done: number, total: number) => void, parts: string[] = ALL_PARTS) {
-  const { manifest } = await API.backupManifest();
+export async function buildBackup(
+  onProgress: (done: number, total: number) => void,
+  parts: string[] = ALL_PARTS,
+  /* Where the manifest comes from: the whole site, or one space (0.546). */
+  source: () => Promise<{ manifest: any }> = API.backupManifest,
+) {
+  const { manifest } = await source();
   const chosen = partsChosen(parts);
   const kinds = new Set(chosen.flatMap((p) => p.kinds));
   const plan = (manifest.plan || []).filter((c: any) => kinds.has(c.kind));
@@ -9139,6 +9144,7 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
           />
         ))}
       </Section>
+      <SpaceExtras org={org} />
       {!isMain ? (
         <Section title="Closing">
           <div className="at-row">
@@ -9433,5 +9439,61 @@ function BorrowedCards({ deck }: { deck: Deck }) {
         }}
       />
     </Field>
+  );
+}
+
+/*
+ * A space's storage figures and its export (0.546; 60a, 63a): how much it
+ * holds, and the whole of it in one file — its people, courses, decks,
+ * cards, recordings and pictures, without anyone's My space.
+ */
+function SpaceExtras({ org }: { org: API.OrgRow }) {
+  const [usage, setUsage] = useState<API.OrgUsage | null>(null);
+  const [progress, setProgress] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    API.orgUsage(org.id).then((r) => live && setUsage(r.usage), () => {});
+    return () => {
+      live = false;
+    };
+  }, [org.id]);
+  const megabytes = usage ? (usage.bytes / (1024 * 1024)).toFixed(1) : "";
+  return (
+    <Section title="Storage and export">
+      <Notice kind="error">{error}</Notice>
+      {usage ? (
+        <Help>
+          {plural(usage.people, "person")}, {plural(usage.courses, "course")}, {plural(usage.decks, "deck")},{" "}
+          {plural(usage.cards, "card")}; {plural(usage.recordings, "recording")} and {plural(usage.pictures, "picture")},{" "}
+          about {megabytes} MB. A recording used by two spaces counts in both.
+        </Help>
+      ) : null}
+      <Button size="sm" icon="download" disabled={!!progress}
+        onClick={async () => {
+          setError("");
+          setProgress("Starting…");
+          try {
+            const { blob, manifest } = await buildBackup(
+              (done, total) => setProgress(`${done} of ${total}`),
+              ALL_PARTS,
+              () => API.exportOrgManifest(org.id),
+            );
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            const stamp = new Date(manifest.takenAt).toISOString().slice(0, 16).replace(/[:T]/g, "-");
+            a.href = url;
+            a.download = `space-${org.slug}-${stamp}.json`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+          } catch (e) {
+            setError(API.explain(e));
+          } finally {
+            setProgress("");
+          }
+        }}>
+        {progress ? `Exporting · ${progress}` : "Export this space"}
+      </Button>
+    </Section>
   );
 }

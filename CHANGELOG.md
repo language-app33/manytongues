@@ -8,6 +8,17 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.546 — 3 November 2026
+
+**A space's storage, and the whole space in one file.**
+
+- In Admin → Spaces, each space now shows how much it holds: people,
+  courses, decks, cards, recordings and pictures, and about how many
+  megabytes. A recording used by two spaces counts in both.
+- **Export this space** saves the whole space as one file: its people,
+  courses, decks, cards, recordings and pictures. Nobody's My space is in
+  it. It's for keeping; there's no restoring a single space yet.
+
 ## 0.545 — 3 November 2026
 
 **My space: everyone's own decks and cards.**
