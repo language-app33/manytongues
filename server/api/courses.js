@@ -661,7 +661,11 @@ const orgScope = new AsyncLocalStorage();
 /** @type {(rec: any) => boolean} */
 const inScope = (rec) => {
   const at = orgScope.getStore();
-  return !rec || !at || !at.org || sameOrg(rec, at.org);
+  if (!rec || !at || !at.org) return true;
+  /* Someone's My space (0.545): a personal deck or card is its owner's
+     alone — not a co-teacher's, a space admin's or an App admin's (48a, 71a). */
+  if (rec.personal && at.self && rec.owner !== at.self) return false;
+  return sameOrg(rec, at.org);
 };
 /** @type {<T>(rec: T) => T | null} */
 const scoped = (rec) => (inScope(rec) ? rec : null);
@@ -1369,6 +1373,8 @@ async function handle(req) {
          news to whoever is reading it. */
       const cardId = cardIdOf(String(body.cardId || "").slice(0, 64));
       const flagged = cardId ? await readCard(store, cardId) : null;
+      /* Your own card in My space is yours to fix, not to report (0.545). */
+      if (flagged && flagged.personal) return json({ error: "not-reportable" }, 400);
 
       const flag = {
         id: randomBytes(8).toString("hex"),
@@ -1434,10 +1440,17 @@ async function handle(req) {
     if (action === "create-deck") {
       const title = String(body.title || "").trim().slice(0, 60);
       if (!title) return json({ error: "title-required" }, 400);
+      /* My space (0.545): anyone may make a personal deck; a deck of the
+         space is made by its teachers, space admins and App admins (33a). */
+      const personal = body.personal === true;
+      if (!personal && !iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) {
+        return json({ error: "not-teaching" }, 403);
+      }
       const id = `d${randomBytes(6).toString("hex")}`;
       const deck = {
         id,
         org: acting,
+        ...(personal ? { personal: true, practise: true } : {}),
         owner: mine,
         title,
         description: String(body.description || "").slice(0, 300),
@@ -2701,6 +2714,8 @@ async function handle(req) {
         saved = {
           id: newId,
           org: acting,
+          /* Personal or not is decided here, once (0.545). */
+          ...(body.personal === true ? { personal: true } : {}),
           owner: mine,
           ...fields,
           /* The card screen makes every card a draft, and an import makes
@@ -2753,6 +2768,9 @@ async function handle(req) {
           if (has) final.push(did);
           continue;
         }
+        /* A personal card stays in My space (0.545): never into a deck of
+           the space — that is what copying a deck is for. */
+        if (want && !has && saved.personal && !d.personal) continue;
         /* A locked deck's cards stay as they are, whoever asks. Left as it
            was and named in the answer, so a save queued offline before the
            lock still lands its words and the teacher is told which deck
@@ -3308,6 +3326,104 @@ async function handle(req) {
       return json({ ok: true, numbersFrom: from, partsWaiting: waiting || [] });
     }
 
+    /* ================= My space (0.545) ================= */
+
+    /* "Practise this myself" on one of your own personal decks (59b). */
+    if (action === "set-deck-practise") {
+      const deck = await readDeck(store, String(body.deckId || ""));
+      if (!deck || !deck.personal || deck.owner !== mine) return json({ error: "not-yours" }, 403);
+      const practise = !!body.practise;
+      await updateJson(store, K.deck(deck.id), (/** @type {any} */ f) =>
+        f ? { ...f, practise, version: (f.version || 1) + 1, updated: Date.now() } : null
+      );
+      return json({ ok: true, practise });
+    }
+
+    /*
+     * Course cards into one of your personal decks, or out of it (66b): the
+     * same card, practised once, not a copy. Only a card you can see — in a
+     * deck of a course you study, or one you could edit.
+     */
+    if (action === "borrow-cards") {
+      const deck = await readDeck(store, String(body.deckId || ""));
+      if (!deck || !deck.personal || deck.owner !== mine) return json({ error: "not-yours" }, 403);
+      const on = body.on !== false;
+      const asked = (Array.isArray(body.cardIds) ? body.cardIds : []).map(String).slice(0, 200);
+      const studied = new Set(
+        (await everyCourse(store)).filter((c) => inCourse(c, mine)).flatMap((c) => c.decks || [])
+      );
+      /** @type {string[]} */
+      const ok = [];
+      for (const id of asked) {
+        const card = await loadCard(id);
+        if (!card || card.personal) continue;
+        const holders = await decksHolding(card);
+        if (!on || holders.some((x) => studied.has(x)) || (await mayEditCard(card))) ok.push(id);
+      }
+      await updateJson(store, K.deck(deck.id), (/** @type {any} */ f) => {
+        if (!f) return null;
+        const ids = on ? [...new Set((f.cardIds || []).concat(ok))] : (f.cardIds || []).filter((/** @type {string} */ x) => !ok.includes(x));
+        return { ...f, cardIds: ids, cardCount: ids.length, version: (f.version || 1) + 1, updated: Date.now() };
+      });
+      for (const id of ok) {
+        await updateJson(store, K.card(id), (/** @type {any} */ c) => {
+          if (!c) return null;
+          const held = Array.isArray(c.inDecks) ? c.inDecks : [];
+          const next = on ? [...new Set(held.concat([deck.id]))] : held.filter((/** @type {string} */ x) => x !== deck.id);
+          return { ...c, inDecks: next };
+        });
+      }
+      return json({ ok: true, cardIds: ok });
+    }
+
+    /*
+     * A personal deck copied into the space (15a): a new deck of the space,
+     * with new copies of the cards you made in it; course cards it borrowed
+     * are already the space's and are referenced, not copied. Recordings
+     * and pictures are shared by their content, so nothing is uploaded.
+     */
+    if (action === "copy-to-space") {
+      const deck = await readDeck(store, String(body.deckId || ""));
+      if (!deck || !deck.personal || deck.owner !== mine) return json({ error: "not-yours" }, 403);
+      if (!iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) return json({ error: "not-teaching" }, 403);
+      const newDeck = `d${randomBytes(6).toString("hex")}`;
+      /** @type {string[]} */
+      const ids = [];
+      /** @type {string[]} */
+      const madeIds = [];
+      for (const cid of deck.cardIds || []) {
+        const c = await loadCard(cid);
+        if (!c) continue;
+        if (!c.personal) {
+          ids.push(cid);
+          continue;
+        }
+        const copyId = `k${randomBytes(6).toString("hex")}`;
+        const { personal: _p, inDecks: _d, ...rest } = /** @type {any} */ (c);
+        await writeJson(store, K.card(copyId), { ...rest, id: copyId, org: acting, owner: mine, rev: 1, inDecks: [newDeck], created: Date.now(), updated: Date.now() });
+        ids.push(copyId);
+        madeIds.push(copyId);
+      }
+      if (madeIds.length) await updateJson(store, K.myCards(mine), (/** @type {any} */ cur) => (cur || []).concat(madeIds));
+      const { personal: _p, practise: _q, ...deckRest } = /** @type {any} */ (deck);
+      const copy = {
+        ...deckRest,
+        id: newDeck,
+        org: acting,
+        owner: mine,
+        title: String(body.title || deck.title).slice(0, 60),
+        courses: [],
+        cardIds: ids,
+        cardCount: ids.length,
+        version: 1,
+        updated: Date.now(),
+      };
+      await writeJson(store, K.deck(newDeck), copy);
+      await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).concat([newDeck]));
+      await taught();
+      return json({ ok: true, deck: copy });
+    }
+
     /* The deck goes; the cards it held stay in the library. A locked deck
        is unlocked first: deleting it is the largest change there is to
        which cards it holds. */
@@ -3345,6 +3461,7 @@ async function handle(req) {
       if (!(await canEditDeck(store, deck, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       if (!isTeacher(course, mine) && !iManage) return json({ error: "not-teaching" }, 403);
+      if (deck.personal) return json({ error: "personal-deck" }, 400);
 
       const adding = action === "attach-deck";
       /* Whether the course held it before this, which decides whether the
@@ -3688,6 +3805,28 @@ async function handle(req) {
          too, so the app needn't ask a second time on every launch. */
       const teaches = allCourses.some((c) => isTeacher(c, mine));
 
+      /*
+       * My space (0.545, 59b, 56a): the person's own decks marked "practise
+       * this myself" arrive as one more course, "My space", built here and
+       * never stored — so Learning shows and deals them like any course.
+       * Added after `teaches` is worked out, and last, so nothing else
+       * mistakes it for a real course. Costs one read of the site's decks
+       * per refresh that finds anything changed.
+       */
+      const studiedDecks = new Set(courseRows.flatMap((c) => c.decks || []));
+      const ownDecks = here(
+        await readManyJson(store, (await readIndex(store, "decks")).map((id) => K.deck(id)), EVENTUAL)
+      ).filter((d) => d && d.personal && d.owner === mine && d.practise);
+      if (ownDecks.length) {
+        courseRows.push(/** @type {any} */ ({
+          id: "my-space", title: "My space", personal: true, language: "",
+          decks: ownDecks.map((d) => d.id), teachers: [], students: [mine],
+        }));
+      }
+      /* The cards a personal deck may carry to its owner: their own, and
+         course cards still in a deck of a course they study (66b). */
+      const ownCardIds = new Set((await readJson(store, K.myCards(mine), EVENTUAL)) || []);
+
       /* A deck in two of the person's courses is still one deck; listing
          it twice gave the app two cards with one id. First course wins. */
       const deckToCourse = new Map();
@@ -3791,7 +3930,13 @@ async function handle(req) {
       for (const d of deckRows) {
         const course = deckToCourse.get(d.id);
         const link = (d.courses || []).find((/** @type {{ courseId: string }} */ c) => c.courseId === course.id);
-        const cardIds = await deckCardIds(d);
+        let cardIds = await deckCardIds(d);
+        if (d.personal) {
+          const studiedCards = new Set(
+            deckRows.filter((x) => !x.personal && studiedDecks.has(x.id)).flatMap((x) => x.cardIds || [])
+          );
+          cardIds = cardIds.filter((id) => ownCardIds.has(id) || studiedCards.has(id));
+        }
         /* Which number system and clock fill this deck's number parts: the
            chosen person's, in the deck's language (0.541). null when that
            person has none, so the device files nothing rather than
@@ -3821,7 +3966,7 @@ async function handle(req) {
          they publish them. See isPublished. */
       allCardIds.forEach((id, i) => {
         const c = cardRows[i];
-        if (c && isPublished(c)) cardById.set(id, studentView(c));
+        if (c && inScope(c) && isPublished(c)) cardById.set(id, studentView(c));
       });
       /*
        * The values a deck's phrases need, sent with it.
@@ -3860,7 +4005,7 @@ async function handle(req) {
         const ids = (await readJson(store, K.myCards(owner), EVENTUAL)) || [];
         const rows = await readManyJson(store, ids.map((id) => K.card(id)), EVENTUAL);
         const out = rows
-          .filter((/** @type {any} */ c) => c && isPublished(c))
+          .filter((/** @type {any} */ c) => c && inScope(c) && isPublished(c))
           .map((/** @type {any} */ c) => studentView(c))
           .map((/** @type {any} */ c) => ({ card: c, fills: fillsOf(c) }));
         libraries.set(owner, out);

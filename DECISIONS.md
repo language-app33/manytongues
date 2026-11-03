@@ -7293,3 +7293,21 @@ quietly left its cards behind. With 0.544's rule (85a) the space's cards are
 meant to stay; the person's private ones are now found under `mycards:` and
 deleted.
 
+---
+
+## My space is private by the same wall as spaces
+
+**3 November 2026** · `inScope` in `server/api/courses.js`
+
+A personal deck or card is hidden from everyone but its owner by one line
+in `inScope`, the check every scoped reader and list already goes through
+since 0.542. So "someone else's My space" reads as nothing at all,
+everywhere at once, without each action knowing about My space.
+
+In Learning, a learner's practised decks arrive as a course built on the
+fly, `my-space`, so the app's existing course handling deals, groups and
+counts them. Costs, accepted: `my-material` reads the site's deck list on
+each refresh that finds a change, to find the person's own decks; and a
+learner's own cards can't be reported (they are theirs to fix), so a report
+from My space names only the card.
+

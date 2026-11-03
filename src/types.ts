@@ -1002,6 +1002,10 @@ export interface VerbExample {
  * without knowing which language uses which.
  */
 export type Card = {
+  /** Its space (0.542); absent: Main. */
+  org?: string;
+  /** Made in its owner's My space (0.545): theirs alone. */
+  personal?: boolean;
   id: string;
   owner?: string;
   lang: LangId;
@@ -1230,6 +1234,12 @@ export interface Deck {
    * fileIntoDecks in numbers/generate.ts.
    */
   parts?: string[];
+  /** Its space (0.542); absent: Main. */
+  org?: string;
+  /** A deck in its owner's My space (0.545): theirs alone, never in a course. */
+  personal?: boolean;
+  /** My space decks only: whether its owner practises it (59b). */
+  practise?: boolean;
   /** Whose numbers and clock fill `parts`; absent means the owner (0.541). */
   numbersFrom?: string;
   /**
@@ -1249,6 +1259,10 @@ export interface Deck {
 }
 
 export interface Course {
+  /** Its space (0.542); absent: Main. */
+  org?: string;
+  /** The "My space" group in Learning (0.545), made on the fly and never stored. */
+  personal?: boolean;
   id: string;
   title: string;
   description?: string;

@@ -1553,6 +1553,20 @@ Running a space (since 0.544):
   material keeps its author), and writes a Former members record.
   `admin-hand-over` gives a former member's material to someone still here.
 
+My space (since 0.545):
+
+- A deck or card made in someone's My space carries `personal: true`, set
+  once when it is made. `inScope` hides it from everyone but its owner, so
+  every reader and list keeps it private without code of its own.
+- A personal card goes only into personal decks; a personal deck never
+  onto a course (`copy-to-space` makes a separate copy for that). Course
+  cards can be borrowed into a personal deck (`borrow-cards`) and reach the
+  owner only while a course of theirs still carries them.
+- `my-material` adds the owner's practised personal decks as a course made
+  on the fly, `my-space`, never stored, so Learning deals them like any
+  course. Teaching shows one side at a time (`side` in `TeachSpace`); a
+  learner's "My space" is `TeachSpace` with `personalOnly`.
+
 ## How it fits together
 
 ```

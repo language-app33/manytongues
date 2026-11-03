@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.545 — 3 November 2026
+
+**My space: everyone's own decks and cards.**
+
+- Everyone has a **My space**: a private place for their own decks and
+  cards. Nobody else sees it, not a teacher, not the space's admin, not
+  you.
+- **Learners** find "My space" in the You menu, next to Learning. It is the
+  same screens teachers use, showing only their own decks and cards.
+- **Teachers** get a Space / My space switch at the top of Decks and Cards
+  in Teaching, to prepare material privately. A My space deck can be
+  copied to the space for a course; the copy and the original are
+  separate from then on.
+- Each My space deck has **Practise this myself**, ticked when it is made.
+  Practised decks appear in Learning as one more group, **My space**, and
+  are dealt in the same daily sessions as courses. The deck list says
+  "Not practised" on the ones left out.
+- A My space deck can also hold **cards from your courses**: the same
+  card, practised once. If the course stops carrying it, it drops out.
+- Only a space's teachers and admins now make decks for the space;
+  everyone else makes theirs in My space.
+
 ## 0.544 — 2 November 2026
 
 **Space admins run their own space.**

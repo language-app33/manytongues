@@ -5051,8 +5051,10 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
    back on is this line. */
 const SHOW_IN_CONTEXT = false;
 
-export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose }: {
+export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose, personalOnly = false }: {
   account: User;
+  /** A learner's My space (0.545): only their own decks and cards, no courses. */
+  personalOnly?: boolean;
   languages: Record<LangId, Lang>;
   settings?: any;
   /* The languages switched off by the switch above the space, which lives
@@ -5081,15 +5083,23 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      Read from the prop at the first render only, so this is where the
      teacher was rather than where they have since gone. */
   const back = useRef(resume || null).current;
-  const [tab, setTab] = useState((back && back.tab) || "courses");
+  const [tab, setTab] = useState((back && back.tab) || (personalOnly ? "decks" : "courses"));
   const [courses, setCourses] = useState<Course[]>(last ? last.courses : []);
-  const [decks, setDecks] = useState<Deck[]>(last ? unlockedDecks(last.decks) : []);
+  /* Everything this person may work on, both sides; `decks` and `cards`
+     below are the side on screen (0.545): the space's, or My space. Every
+     write goes through the setters, whole or by function, so the side not
+     on screen is never lost. */
+  const [allDecks, setDecks] = useState<Deck[]>(last ? unlockedDecks(last.decks) : []);
+  const [side, setSide] = useState<"space" | "mine">(personalOnly ? "mine" : "space");
+  const mineSide = side === "mine";
+  const decks = useMemo(() => allDecks.filter((d) => !!d.personal === mineSide), [allDecks, mineSide]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const [courseView, setCourseView] = useState<any | null>(null);
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
-  const [cards, setCards] = useState<Card[]>(last ? last.cards : []);
+  const [allCards, setCards] = useState<Card[]>(last ? last.cards : []);
+  const cards = useMemo(() => allCards.filter((c) => !!c.personal === mineSide), [allCards, mineSide]);
   /* Which recordings those cards name that the server does not hold, told
      with the cards. Set for the screens that show it as this renders —
      see setLostRecordings. */
@@ -6295,11 +6305,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   /* A save straight to the server, naming what it changed — for the
      screens that do not keep a save for later. */
   const saveNamed = (card: Partial<Card>, decks: string[]) =>
-    API.saveCard(card, decks, card.id ? { touched: touchedBy(card, decks) } : {});
+    API.saveCard(card, decks, card.id ? { touched: touchedBy(card, decks) } : { personal: mineSide });
   const sendOrKeep = useCallback(async (card: Partial<Card>, decks: string[], given: API.SaveExtra = {}) => {
-    const extra: API.SaveExtra = given.touched || given.walk || given.into || !card.id
-      ? given
-      : { ...given, touched: touchedBy(card, decks) };
+    /* A new card made on the My space side is personal, for good (0.545). */
+    const withSide = !card.id && mineSide ? { ...given, personal: true } : given;
+    const extra: API.SaveExtra = withSide.touched || withSide.walk || withSide.into || !card.id
+      ? withSide
+      : { ...withSide, touched: touchedBy(card, decks) };
     try {
       return await API.saveCard(card, decks, extra);
     } catch (e) {
@@ -6309,7 +6321,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       return { kept: true };
     }
   /* touchedBy reads the cards through a ref, so this is made once. */
-  }, []);
+  }, [mineSide]);
 
   /* And send them when there is something to send them down. One at a
      time, oldest first; a card the server refuses outright is dropped,
@@ -6456,7 +6468,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     if (!title) return;
     run(
       async () => {
-        const r = await API.createDeck(title, "", newDeckLang);
+        const r = await API.createDeck(title, "", newDeckLang, mineSide);
         const made = r && r.deck;
         if (made) {
           setDecks((prev) => prev.concat([made]));
@@ -6535,7 +6547,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         onSave={(title, lang) =>
           run(
             async () => {
-              const r = await API.createDeck(title, "", lang || soleLangOn);
+              const r = await API.createDeck(title, "", lang || soleLangOn, mineSide);
               setNaming(null);
               await refresh();
               if (r && r.deck && r.deck.id) setOpenDeck(r.deck.id);
@@ -7773,6 +7785,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 {/* Which courses carry it, as a card says which decks it
                     is in: the names, each with its way out, and the way to
                     add another on the end of the row. */}
+                {/* A My space deck is in no course; in their place, whether its
+                    owner practises it (0.545, 59b, 61a). */}
+                {d.personal ? (
+                  <PersonalDeckFields deck={d} canCopy={!personalOnly} onCopied={() => refresh()} />
+                ) : (
                 <Field label="Courses" lede="Students in these courses see this deck.">
                   {!shown.courses.length ? (
                     <Nudge
@@ -7820,6 +7837,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     />
                   )}
                 </Field>
+                )}
 
               </fieldset>
 
@@ -8084,7 +8102,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   return (
     <SpaceFrame
       tabs={[
-        ["courses", "Courses", "school"],
+        /* A learner's My space has no courses (0.545). */
+        ...(personalOnly ? [] : [["courses", "Courses", "school"] as [string, string, string]]),
         ["decks", "Decks", "folder"],
         ["cards", "Cards", "cards"],
         /* In context is hidden for now, on the owner's word, and comes
@@ -8177,6 +8196,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
           {tab === "cards" && (
             <>
+              {!personalOnly && (
+                <Segmented
+                  label="Whose"
+                  value={side}
+                  onChange={setSide}
+                  options={[{ value: "space", label: "Space" }, { value: "mine", label: "My space" }]}
+                />
+              )}
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
                   <LanguageRadio
@@ -8504,6 +8531,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
           {tab === "decks" && (
             <>
+              {!personalOnly && (
+                <Segmented
+                  label="Whose"
+                  value={side}
+                  onChange={setSide}
+                  options={[{ value: "space", label: "Space" }, { value: "mine", label: "My space" }]}
+                />
+              )}
               {deckAction && (
                 <Screen
                   title={
@@ -8694,6 +8729,12 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                         </>
                       }
                       footer={
+                        d.personal ? (
+                          /* My space (0.545, 59b): whether you practise it. */
+                          <TileNote live={d.practise !== false}>
+                            {d.practise !== false ? "Practised in your Learning" : "Not practised"}
+                          </TileNote>
+                        ) : (
                         <TileNote live={live}>
                           {live ? (
                             <>
@@ -8705,6 +8746,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                             <>Not in a course yet — nobody can see it</>
                           )}
                         </TileNote>
+                        )
                       }
                     />
                   );
@@ -9269,5 +9311,127 @@ function OthersWork({ name, what }: { name?: string; what: "deck" | "card" }) {
       {name ? `${name} made this ${what}.` : `Someone else made this ${what}.`} Deleting it removes it from
       every course it's in, for every student. This can't be undone.
     </Notice>
+  );
+}
+
+/*
+ * A My space deck's own fields (0.545): "Practise this myself", saved as it
+ * is ticked; for a teacher, copying it into the space (15a); and the cards
+ * of the person's courses, to borrow into it (66b).
+ */
+function PersonalDeckFields({ deck, canCopy, onCopied }: {
+  deck: Deck;
+  canCopy: boolean;
+  onCopied: () => void;
+}) {
+  const [practise, setPractise] = useState(deck.practise !== false);
+  const [error, setError] = useState("");
+  const [copying, setCopying] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const snack = useSnackbar();
+  return (
+    <>
+      <Notice kind="error">{error}</Notice>
+      <Field label="Practise this myself" lede="Its published cards are in your Learning.">
+        <CheckList
+          options={[{ id: "on", title: "Practise this deck in my Learning" }]}
+          chosen={practise ? ["on"] : []}
+          onToggle={async (_id: string, wasOn: boolean) => {
+            const next = !wasOn;
+            setPractise(next);
+            try {
+              await API.setDeckPractise(deck.id, next);
+            } catch (e) {
+              setPractise(!next);
+              setError(API.explain(e));
+            }
+          }}
+        />
+      </Field>
+      <BorrowedCards deck={deck} />
+      {canCopy && (
+        <Field label="Copy to the space" lede="A copy for your courses. The copy and the original won't stay in sync.">
+          <Button size="sm" icon="copy" disabled={busy} onClick={() => setCopying(true)}>Copy to the space</Button>
+        </Field>
+      )}
+      {copying && (
+        <ConfirmModal
+          title={`Copy ${deck.title} to the space?`}
+          confirmLabel="Copy it"
+          danger={false}
+          busy={busy}
+          body={<p>A new deck of the space is made, with copies of your cards in it. From then on the copy and this deck are separate: a change to one doesn't reach the other.</p>}
+          onCancel={() => setCopying(false)}
+          onConfirm={async () => {
+            setBusy(true);
+            try {
+              await API.copyToSpace(deck.id);
+              snack(`${deck.title} copied to the space`);
+              setCopying(false);
+              onCopied();
+            } catch (e) {
+              setError(API.explain(e));
+            } finally {
+              setBusy(false);
+            }
+          }}
+        />
+      )}
+    </>
+  );
+}
+
+/*
+ * Cards from your courses, in one of your My space decks (0.545, 66b): the
+ * same cards, practised once. Listed from what your courses send you.
+ */
+function BorrowedCards({ deck }: { deck: Deck }) {
+  const [offered, setOffered] = useState<{ id: string; label: string; course: string }[] | null>(null);
+  const [chosen, setChosen] = useState<string[]>(deck.cardIds || []);
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    API.myMaterial().then(
+      (r: any) => {
+        if (!live) return;
+        const titleOf: Record<string, string> = {};
+        for (const d of r.decks || []) if (!d.personal) titleOf[d.id] = d.courseTitle || d.title;
+        const out: { id: string; label: string; course: string }[] = [];
+        const seen = new Set<string>();
+        for (const d of r.decks || []) {
+          if (d.personal || (d.lang && deck.lang && d.lang !== deck.lang)) continue;
+          for (const id of d.cardIds || []) {
+            if (seen.has(id)) continue;
+            seen.add(id);
+            const c = (r.cards || []).find((x: any) => x.id === id);
+            const lead = c && c.forms && c.forms[0];
+            out.push({ id, label: lead ? `${lead.ar} · ${lead.en}` : id, course: titleOf[d.id] || "" });
+          }
+        }
+        setOffered(out);
+      },
+      (e: unknown) => live && setError(API.explain(e)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [deck.id, deck.lang]);
+  if (error) return <Notice kind="error">{error}</Notice>;
+  if (!offered || !offered.length) return null;
+  return (
+    <Field label="From your courses" lede="Add a course's card to this deck: it's the same card, practised once.">
+      <CheckList
+        options={offered.map((o) => ({ id: o.id, title: o.label, note: o.course }))}
+        chosen={chosen}
+        onToggle={async (id: string, wasOn: boolean) => {
+          setChosen((prev) => (wasOn ? prev.filter((x) => x !== id) : prev.concat([id])));
+          try {
+            await API.borrowCards(deck.id, [id], !wasOn);
+          } catch (e) {
+            setError(API.explain(e));
+          }
+        }}
+      />
+    </Field>
   );
 }

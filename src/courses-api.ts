@@ -188,7 +188,11 @@ export type FlagReport = Pick<
 };
 
 export const reportFlag = (flag: FlagReport): Promise<{ ok: true; id: string }> =>
-  call("report-flag", { body: flag });
+  /* My space is no course and its decks are private (0.545): a report from
+     there names the card alone. */
+  call("report-flag", {
+    body: (flag as any).courseId === "my-space" ? { ...flag, courseId: "", deckId: "" } : flag,
+  });
 
 /* ---- courses ---- */
 export const myCourses = () => call("my-courses");
@@ -209,8 +213,15 @@ export const myMaterial = (version?: string) =>
 
 /* ---- decks and cards ---- */
 export const myDecks = () => call("my-decks");
-export const createDeck = (title: string, description: string, lang: LangId) =>
-  call("create-deck", { body: { title, description, lang } });
+export const createDeck = (title: string, description: string, lang: LangId, personal = false) =>
+  call("create-deck", { body: { title, description, lang, ...(personal ? { personal: true } : {}) } });
+/* ---- My space (0.545) ---- */
+export const setDeckPractise = (deckId: string, practise: boolean) =>
+  call("set-deck-practise", { body: { deckId, practise } });
+export const borrowCards = (deckId: string, cardIds: string[], on: boolean) =>
+  call("borrow-cards", { body: { deckId, cardIds, on } });
+export const copyToSpace = (deckId: string): Promise<{ ok: true; deck: any }> =>
+  call("copy-to-space", { body: { deckId } });
 export const renameDeck = (deckId: string, title: string) => call("rename-deck", { body: { deckId, title } });
 export const deleteDeck = (deckId: string) => call("delete-deck", { body: { deckId } });
 /* A locked deck keeps the cards it has: nothing added, nothing taken out. */
@@ -244,6 +255,8 @@ export type SaveExtra = {
   into?: "changes";
   walk?: { renames?: { from: string; to: string }[]; drops?: string[] };
   status?: "draft" | "review";
+  /** A new card made in My space (0.545). */
+  personal?: boolean;
 };
 export const saveCard = (card: Partial<Card>, decks: string[], extra: SaveExtra = {}) =>
   call("save-card", { body: { card, decks, ...extra } });
@@ -420,6 +433,9 @@ export function explain(err: unknown): string {
       "slug-invalid": "An address is 3 to 40 lower-case letters, digits and dashes, starting with a letter, and some words are kept for the app.",
       "not-in-space": "That person isn't in this space.",
       "main-stays": "Main can't be closed or deleted.",
+      "not-reportable": "That's your own card. You can change it in My space.",
+      "personal-deck": "A deck in My space can't go on a course. Copy it to the space first.",
+      "personal-card": "A card in My space can't go in a deck of the space. Copy its deck to the space first.",
       "confirm-name": "Type the space's name exactly to confirm.",
       "admin-only": "Only the administrator can do that.",
       "not-allowed": "That administrator key isn't right.",

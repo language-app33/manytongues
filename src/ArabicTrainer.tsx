@@ -15230,6 +15230,36 @@ export default function ArabicTrainer() {
           </React.Suspense>
         )}
 
+        {space === "mine" && account && (
+          <React.Suspense fallback={<ChunkFallback />}>
+            <TeachSpace
+              personalOnly
+              account={account}
+              languages={LANGUAGES}
+              settings={settings}
+              langsOff={teachLangsOff}
+              onLangChoices={reportTeachChoices}
+              onTry={tryExercise}
+              /* Read once, as this mounts. Cleared on the way out so that
+                 opening Teaching again tomorrow is opening Teaching, not
+                 reopening whatever was last tried. */
+              resume={trialBack}
+              /* A recording the server has lost, sent again from this
+                 device if it still holds it. */
+              onResend={async (hash: string) => {
+                const blob = await localClipBlob(hash);
+                if (!blob) return false;
+                await API.putClip(hash, await blobToBase64(blob));
+                return true;
+              }}
+              onClose={() => {
+                setTrialBack(null);
+                setSpace("learn");
+              }}
+            />
+          </React.Suspense>
+        )}
+
         {space === "admin" && account && (account.admin || account.orgAdmin) && (
           <React.Suspense fallback={<ChunkFallback />}>
             <AdminSpace
@@ -15387,10 +15417,11 @@ export default function ArabicTrainer() {
         /* A space admin sees Teaching, for the space's material (6a), and
            Admin, for its people and courses (0.544). */
         const runs = !!(account && (account.admin || account.orgAdmin));
+        /* Somebody with no Teaching gets My space instead (0.545, 58a). */
         const spaces = ["learn"]
-          .concat(teaches || runs ? ["teach"] : [])
+          .concat(teaches || runs ? ["teach"] : account ? ["mine"] : [])
           .concat(runs ? ["admin"] : []);
-        const choices = space === "learn" ? langChoices : space === "teach" ? teachChoices : [];
+        const choices = space === "learn" ? langChoices : space === "teach" || space === "mine" ? teachChoices : [];
         return (
           <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
             {/* One bar: the space's sections, then the space and languages,
@@ -15432,8 +15463,8 @@ export default function ArabicTrainer() {
                     setSpace(to);
                   },
                   choices,
-                  off: space === "teach" ? teachLangsOff : langsOff,
-                  onLangs: (next) => setSetting(space === "teach" ? "teachLangsOff" : "langsOff", next),
+                  off: space === "teach" || space === "mine" ? teachLangsOff : langsOff,
+                  onLangs: (next) => setSetting(space === "teach" || space === "mine" ? "teachLangsOff" : "langsOff", next),
                   note:
                     space === "teach"
                       ? "Select the languages you see in your courses, decks, and cards. This doesn't change anything for your students."
@@ -19845,8 +19876,8 @@ const initialsOf = (name?: string | null) =>
     .join("")
     .toUpperCase() || "?";
 
-const SPACE_LABEL: Record<string, string> = { learn: "Learning", teach: "Teaching", admin: "Admin" };
-const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", admin: "tune" };
+const SPACE_LABEL: Record<string, string> = { learn: "Learning", teach: "Teaching", admin: "Admin", mine: "My space" };
+const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", admin: "tune", mine: "person" };
 
 
 /*

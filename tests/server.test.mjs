@@ -122,6 +122,33 @@ function codeForMain() {
   return mainCode;
 }
 
+/*
+ * Since 0.545 only a space's teachers and admins make its decks (33a). A
+ * test whose account makes decks without teaching anything makes it a
+ * teacher first, of a staff course the site owner keeps for the purpose.
+ */
+/** @type {{ key: string, course: string } | null} */
+let staff = null;
+/** @param {string} handle */
+async function teaching(handle) {
+  const assign = () => staff
+    ? raw("/api/courses?action=assign-teacher", { method: "POST", key: staff.key, body: { courseId: staff.course, handle } })
+    : Promise.resolve({ status: 0 });
+  if ((await assign()).status === 200) return;
+  /* First time, or a test since cleared the site: a fresh staff room, run
+     by an administrator made through Main's invitation. */
+  const boss = await raw("/api/courses?action=signup", {
+    method: "POST", body: { displayName: "Staff room", code: await codeForMain() },
+  });
+  await raw("/api/courses?action=claim-admin", { method: "POST", key: boss.json.key, body: { adminKey: ADMIN_KEY } });
+  const course = await raw("/api/courses?action=create-course", {
+    method: "POST", key: boss.json.key, body: { title: "Staff room", language: "ar-PS" },
+  });
+  staff = { key: boss.json.key, course: course.json.course.id };
+  const done = await assign();
+  assert.equal(done.status, 200, "made a teacher of the staff room");
+}
+
 /** @param {string} pathname @param {any} [opts] */
 async function api(pathname, opts = {}) {
   if (pathname.includes("action=signup") && opts.body && !("code" in opts.body)) {
@@ -283,6 +310,7 @@ test("the deployed version is whatever is in dist, read fresh", async () => {
 test("a card remembers which words it teaches, and keeps the list clean", async () => {
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rana" } });
   const key = made.json.key;
+  await teaching(made.json.user.handle);
   await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
 
   const word = await api("/api/courses?action=save-card", {
@@ -1202,6 +1230,7 @@ test("a card that says nothing about being a sentence is read by its holes", asy
 test("cards saved at the same moment all reach the deck and the collection", async () => {
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Suha" } });
   const key = made.json.key;
+  await teaching(made.json.user.handle);
   const deck = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Lesson 1", lang: "ar-PS" },
   });
@@ -1518,6 +1547,7 @@ test("signing in, practising and writing a card are recorded apart", async () =>
 test("a teaching action that is refused is not recorded as work done", async () => {
   const owner = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Yara" } });
   const other = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Fadi" } });
+  await teaching(owner.json.user.handle);
   const deck = await api("/api/courses?action=create-deck", {
     method: "POST", key: owner.json.key, body: { title: "Yara's deck" },
   });
@@ -3294,6 +3324,7 @@ test("an unreadable record fails the request rather than reading as absent", asy
    */
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Ziad" } });
   const key = made.json.key;
+  await teaching(made.json.user.handle);
   const deck = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Lesson 1", description: "", lang: "ar-PS" },
   });
@@ -3469,6 +3500,7 @@ test("a teacher of neither the deck nor the course cannot attach one to the othe
      */
     const boss = await anAdmin("Layla");
     const teacher = await someone("Samir");
+    await teaching(teacher.handle);
     const mine = await aDeck(teacher.key, "Samir's deck");
     const hers = await aDeck(boss.key, "Layla's deck");
     const theirCourse = await aCourse(boss.key, "Taught by Samir");
@@ -4445,6 +4477,7 @@ test("a sentence card waits for review, and only its teachers can review it or r
 test("a deck marked locked keeps the mark but refuses nothing while locks are set aside", async () => {
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rana" } });
   const key = made.json.key;
+  await teaching(made.json.user.handle);
   const deckOf = async (/** @type {string} */ title) =>
     (await api("/api/courses?action=create-deck", { method: "POST", key, body: { title, lang: "ar-PS" } }))
       .json.deck.id;
@@ -4498,6 +4531,7 @@ test("a deck marked locked keeps the mark but refuses nothing while locks are se
 test("a teacher exports a deck or a card, and only their own", async () => {
   const t = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rana" } });
   const key = t.json.key;
+  await teaching(t.json.user.handle);
   const other = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Ziad" } });
 
   const deck = await api("/api/courses?action=create-deck", {

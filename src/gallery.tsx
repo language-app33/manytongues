@@ -268,6 +268,8 @@ const PLACES: Record<string, [string, string]> = {
   InviteLink: [ADMIN, "The People tab · the space's invitation link"],
   FormerMembers: [ADMIN, "The People tab · Former members"],
   OthersWork: [TEACH, "Deleting a deck or card someone else made"],
+  PersonalDeckFields: [TEACH, "A My space deck · practising it, copying it to the space"],
+  BorrowedCards: [TEACH, "A My space deck · cards from your courses"],
   LeaveSpace: [LEARN, "Settings · leaving your space"],
   SpaceScreen: [ADMIN, "The Spaces tab · one space"],
   SpaceLine: [LEARN, "The You menu · the space you are in"],
