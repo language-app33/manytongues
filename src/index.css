@@ -212,7 +212,10 @@ button {
   background: var(--bg); color: var(--text); font-family: var(--ui);
   min-height: 100vh; min-height: 100dvh; box-sizing: border-box;
   padding: 66px 16px 108px; -webkit-font-smoothing: antialiased;
-  max-width: 100%; overflow-x: hidden;
+  /* clip, not hidden (0.556): hidden makes this a scroll container of its
+     own, and a tab's title, held at the top with position:sticky, then
+     held to this box — which never scrolls — instead of the window. */
+  max-width: 100%; overflow-x: hidden; overflow-x: clip;
 }
 /* The padding counts inside the screen's height, not on top of it: as a
    content box the page was always a screen plus 174px tall, so a home
@@ -3163,6 +3166,8 @@ button.at-stat { transition: border-color 140ms ease; }
 .at-screen .at-pagetitle { top:0; }
 .at-pagetitle .at-sectionhead { margin:0; }
 .at-pagetitle .at-brandmark { width:28px; height:28px; }
+/* Progress is one white sheet; its title is on the same ground. */
+.at:has(> .at-wrap > .at-ruled) .at-pagetitle { background: var(--surface); }
 .at-joinbox { border:2px solid var(--line); border-radius: var(--r-lg);
   padding:16px; background: var(--surface); }
 .at-joinbox .at-toolbar { margin-bottom:0; }

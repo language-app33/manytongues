@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.556 — 3 November 2026
+
+**Learning's tab titles stay at the top too.**
+
+- In Learning, Progress and Cards now keep their title at the top while
+  the page scrolls, as the other spaces already did. In 0.555 they
+  scrolled away with the page.
+- Progress's title sits on the same white as the rest of that page.
+- Checked in a browser at phone size: every tab with a title, in all four
+  spaces, shows the logo and the line beneath, and keeps its title in
+  place while scrolling.
+- Released without running the test suite, at the owner's request.
+
 ## 0.555 — 3 November 2026
 
 **Tab titles stay at the top, with the logo and a line under them.**
