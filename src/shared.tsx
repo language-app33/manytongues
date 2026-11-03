@@ -1008,9 +1008,16 @@ export function Field({ label, lede, hint, optional, htmlFor, children, classNam
    one of them came to show the busy line and the other not. */
 /* --- TabTitle -----------------------------------------------------
    The name of the tab a page is, at its top (0.553): the heading size
-   used inside Progress, scrolling away with the page. */
+   used inside Progress, held in place as the page scrolls (0.555). */
 export function TabTitle({ children }: { children?: Node }) {
-  return <h2 className="at-sectionhead at-pagetitle">{children}</h2>;
+  /* Held at the top while the page scrolls under it (0.555), with the
+     app's mark beside it and a rule beneath. */
+  return (
+    <div className="at-pagetitle">
+      <img className="at-brandmark" src="/logo.svg" alt="" width={28} height={28} />
+      <h2 className="at-sectionhead">{children}</h2>
+    </div>
+  );
 }
 
 export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, children }: {

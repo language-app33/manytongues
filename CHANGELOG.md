@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.555 — 3 November 2026
+
+**Tab titles stay at the top, with the logo and a line under them.**
+
+- Each tab's title now stays in place at the top while the page scrolls
+  under it, in every space.
+- The ManyTongues logo sits just left of the title, and a thin line runs
+  across beneath it.
+- Released without running the test suite, at the owner's request.
+
 ## 0.554 — 3 November 2026
 
 **Tab titles sit in the page, and the app name is gone from Teaching, Admin and Super admin.**
