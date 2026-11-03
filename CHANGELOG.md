@@ -8,6 +8,17 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.554 — 3 November 2026
+
+**Tab titles sit in the page, and the app name is gone from Teaching, Admin and Super admin.**
+
+- The titles added in 0.553 were pinned to the top of the window, over the
+  app name and the page. They now sit at the top of the page and scroll
+  away with it.
+- Teaching, Admin and Super admin no longer show the app name and logo
+  above the page. Home in Learning keeps its large one.
+- Released without running the test suite, at the owner's request.
+
 ## 0.553 — 3 November 2026
 
 **Every tab says which one it is at the top.**

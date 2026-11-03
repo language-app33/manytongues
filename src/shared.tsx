@@ -1010,7 +1010,7 @@ export function Field({ label, lede, hint, optional, htmlFor, children, classNam
    The name of the tab a page is, at its top (0.553): the heading size
    used inside Progress, scrolling away with the page. */
 export function TabTitle({ children }: { children?: Node }) {
-  return <h2 className="at-sectionhead at-tabtitle">{children}</h2>;
+  return <h2 className="at-sectionhead at-pagetitle">{children}</h2>;
 }
 
 export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, children }: {
@@ -1048,13 +1048,8 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
       {dialog}
       <div className="at-screenbody" ref={bodyRef}>
         <div className="at-screeninner">
-          {/* The app's name heads the space and scrolls away with it, as it
-              does in Learning. The space's sections are in the bar at the
-              foot of the window. */}
-          <div className="at-brand">
-            <img className="at-brandmark" src="/logo.svg" alt="" width={24} height={24} />
-            ManyTongues
-          </div>
+          {/* No app name here (0.554): each tab is headed with its own name
+              below. The space's sections are in the bar at the foot. */}
           <Notice kind="error">{error}</Notice>
           <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} dock />
           {/* The tab's own name at the top (0.553), in the words of the bar.
