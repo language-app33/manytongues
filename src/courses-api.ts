@@ -222,8 +222,10 @@ export const setDeckPractise = (deckId: string, practise: boolean) =>
   call("set-deck-practise", { body: { deckId, practise } });
 export const borrowCards = (deckId: string, cardIds: string[], on: boolean) =>
   call("borrow-cards", { body: { deckId, cardIds, on } });
-export const copyToSpace = (deckId: string): Promise<{ ok: true; deck: any }> =>
-  call("copy-to-space", { body: { deckId } });
+export const copyToSpace = (deckId: string, move = false, courses: string[] = []): Promise<{ ok: true; deck: any }> =>
+  call("copy-to-space", { body: { deckId, move, courses } });
+export const cardToSpace = (cardId: string, deckId: string, move = false) =>
+  call("card-to-space", { body: { cardId, deckId, move } });
 export const renameDeck = (deckId: string, title: string) => call("rename-deck", { body: { deckId, title } });
 export const deleteDeck = (deckId: string) => call("delete-deck", { body: { deckId } });
 /* A locked deck keeps the cards it has: nothing added, nothing taken out. */

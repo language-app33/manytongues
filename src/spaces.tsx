@@ -617,12 +617,14 @@ export function Modal({ title, children, onClose }: { title?: Node; children?: N
 
 
 
-export function CodeBox({ label, code, hint, onNew, busy }: {
+export function CodeBox({ label, code, hint, onNew, busy, long = false }: {
   label?: Node;
   code?: string;
   hint?: Node;
   onNew?: () => void;
   busy?: boolean;
+  /** A link rather than a code (0.549): the whole width, its buttons on a line underneath. */
+  long?: boolean;
 }) {
   return (
     <div className="at-codeblock">
@@ -630,7 +632,7 @@ export function CodeBox({ label, code, hint, onNew, busy }: {
       {/* What the code is for, under its name and before the code itself,
           the way a field is explained in the card editor. */}
       {hint && <p className="at-fieldlede">{hint}</p>}
-      <div className="at-codebox">
+      <div className={`at-codebox${long ? " long" : ""}`}>
         <b>{code || "—"}</b>
         <Button variant="ghost" size="sm"
           disabled={!code}
@@ -5107,6 +5109,19 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const [allDecks, setDecks] = useState<Deck[]>(last ? unlockedDecks(last.decks) : []);
   const [side, setSide] = useState<"space" | "mine">(personalOnly ? "mine" : "space");
   const mineSide = side === "mine";
+  /* A My space deck on its way into the space, and the courses ticked for it. */
+  const [toSpace, setToSpace] = useState<{ deck: Deck; move: boolean } | null>(null);
+  const [toCourses, setToCourses] = useState<string[]>([]);
+  /* A My space card on its way into a deck of the space, and that deck. */
+  const [cardToSpace, setCardToSpace] = useState<{ card: Card; move: boolean } | null>(null);
+  const [cardDeck, setCardDeck] = useState("");
+  /* The space's own name on the toggle (0.549), cut short when long, in full on hover. */
+  const spaceName = (account.org && typeof account.org === "object" && account.org.name) || "Space";
+  const spaceLabel = (
+    <span title={spaceName} style={{ display: "inline-block", maxWidth: "14ch", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "bottom" }}>
+      {spaceName}
+    </span>
+  );
   const decks = useMemo(() => allDecks.filter((d) => !!d.personal === mineSide), [allDecks, mineSide]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -6611,6 +6626,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           return c && c.id ? <StatusMenu card={c} disabled={busy || off} onStatus={(to) => setStatus(c, to)} /> : null;
         }}
         onExport={editing.card && editing.card.id ? () => exportCards([editing.card!.id]) : undefined}
+        /* A My space card into the space (0.549, 3a): teachers and admins. */
+        onToSpace={editing.card && editing.card.id && editing.card.personal && !personalOnly
+          ? (move: boolean) => {
+              setCardDeck("");
+              setCardToSpace({ card: editing.card as Card, move });
+            }
+          : undefined}
         about={
           editing.card && editing.card.id ? (
             <ReviewLine state={reviewMap.get(editing.card.id)} onOpen={() => setReviewing(editing.card)} />
@@ -6906,7 +6928,39 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               })()
             : undefined
         }
-        confirming={
+        confirming={cardToSpace ? (
+          <ConfirmModal
+            title={`${cardToSpace.move ? "Move" : "Copy"} this card to ${spaceName}?`}
+            confirmLabel={cardToSpace.move ? "Move it" : "Copy it"}
+            danger={false}
+            busy={busy || !cardDeck}
+            body={
+              <>
+                <p>
+                  {cardToSpace.move
+                    ? "The card becomes the space's, in the deck you choose. Nothing stays in My space."
+                    : "A copy goes into the deck you choose. The copy and this card won't stay in sync."}
+                </p>
+                <RadioGroup
+                  name="card-to-space"
+                  label="Into which deck"
+                  value={cardDeck}
+                  onChange={setCardDeck}
+                  options={allDecks.filter((x) => !x.personal).map((x) => ({ value: x.id, label: x.title }))}
+                />
+              </>
+            }
+            onCancel={() => setCardToSpace(null)}
+            onConfirm={() =>
+              run(async () => {
+                await API.cardToSpace(cardToSpace.card.id, cardDeck, cardToSpace.move);
+                setCardToSpace(null);
+                setEditing(null);
+                await refresh();
+              })
+            }
+          />
+        ) : 
           exportScreen ? exportScreen : confirm && confirm.kind === "card" && confirm.card ? (
             <ConfirmModal
               title={`Delete "${leadOf(confirm.card).en || leadOf(confirm.card).ar}"?`}
@@ -7802,9 +7856,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     add another on the end of the row. */}
                 {/* A My space deck is in no course; in their place, whether its
                     owner practises it (0.545, 59b, 61a). */}
-                {d.personal ? (
-                  <PersonalDeckFields deck={d} canCopy={!personalOnly} onCopied={() => refresh()} />
-                ) : (
+                {d.personal ? null : (
                 <Field label="Courses" lede="Students in these courses see this deck.">
                   {!shown.courses.length ? (
                     <Nudge
@@ -7857,6 +7909,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               </fieldset>
 
               {(d.parts || []).length ? <NumbersFrom deckId={d.id} /> : null}
+              {/* A My space deck's course cards (0.549, 6a): chosen here, and
+                  working without Edit, since each tick saves at once. */}
+              {d.personal ? <BorrowedCards deck={d} /> : null}
 
               {/* The whole deck, whatever the list below is showing: what a
                   deck covers is a fact about the deck, not about the cards
@@ -8216,7 +8271,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   label="Whose"
                   value={side}
                   onChange={setSide}
-                  options={[{ value: "space", label: "Space" }, { value: "mine", label: "My space" }]}
+                  options={[{ value: "space", label: spaceLabel }, { value: "mine", label: "My space" }]}
                 />
               )}
               {newCardLang !== null && (
@@ -8546,12 +8601,52 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
           {tab === "decks" && (
             <>
+              {toSpace && (
+                <ConfirmModal
+                  title={`${toSpace.move ? "Move" : "Copy"} ${toSpace.deck.title} to ${spaceName}?`}
+                  confirmLabel={toSpace.move ? "Move it" : "Copy it"}
+                  danger={false}
+                  busy={busy}
+                  body={
+                    <>
+                      <p>
+                        {toSpace.move
+                          ? "The deck and your cards in it become the space's. Nothing stays in My space."
+                          : "A new deck of the space is made, with copies of your cards. The copy and this deck won't stay in sync."}
+                      </p>
+                      {courses.filter((c: any) => c.teaching || account.admin || account.orgAdmin).length ? (
+                        <CheckList
+                          options={courses
+                            .filter((c: any) => c.teaching || account.admin || account.orgAdmin)
+                            .map((c) => ({ id: c.id, title: c.title }))}
+                          chosen={toCourses}
+                          onToggle={(id: string, wasOn: boolean) =>
+                            setToCourses((prev) => (wasOn ? prev.filter((x) => x !== id) : prev.concat([id])))}
+                        />
+                      ) : null}
+                      <Help>Tick the courses to put it in, or none for now.</Help>
+                    </>
+                  }
+                  onCancel={() => {
+                    setToSpace(null);
+                    setToCourses([]);
+                  }}
+                  onConfirm={() =>
+                    run(async () => {
+                      await API.copyToSpace(toSpace.deck.id, toSpace.move, toCourses);
+                      setToSpace(null);
+                      setToCourses([]);
+                      await refresh();
+                    })
+                  }
+                />
+              )}
               {!personalOnly && (
                 <Segmented
                   label="Whose"
                   value={side}
                   onChange={setSide}
-                  options={[{ value: "space", label: "Space" }, { value: "mine", label: "My space" }]}
+                  options={[{ value: "space", label: spaceLabel }, { value: "mine", label: "My space" }]}
                 />
               )}
               {deckAction && (
@@ -8717,6 +8812,19 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                               e.stopPropagation();
                               exportDecks([d.id]);
                             }} />
+                          {/* A My space deck into the space (0.549; 2a, 9b, 10a). */}
+                          {d.personal && !personalOnly && (
+                            <>
+                              <IconButton icon="copy" label="Copy to the space" onClick={(e: React.MouseEvent) => {
+                                e.stopPropagation();
+                                setToSpace({ deck: d, move: false });
+                              }} />
+                              <IconButton icon="upload" label="Move to the space" onClick={(e: React.MouseEvent) => {
+                                e.stopPropagation();
+                                setToSpace({ deck: d, move: true });
+                              }} />
+                            </>
+                          )}
                           <IconButton icon="delete" label="Delete deck" danger onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
                               if (d.locked && DECK_LOCKS) {
@@ -8832,6 +8940,11 @@ export function StudentCourses({
       }}
       renderCourse={(c) => {
         const mine = decks.filter((d) => d.courseId === c.id);
+        /* My space (0.549, 8a): each of your own decks with its Practise tick
+           — the ones switched off too, so they can come back. */
+        if (c.personal) {
+          return <MySpaceGroup course={c as any} practised={mine} onChanged={onRefresh} onPractise={onPractise} />;
+        }
         return (
           <Tile
             title={c.title}
@@ -9129,9 +9242,8 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
         ) : null}
         {colour ? <Button variant="ghost" size="sm" onClick={() => setColour("")}>No colour</Button> : null}
       </Field>
-      <Field label="Invitation link" lede="Anyone with it can make an account in this space.">
-        <p className="at-key">manytongues.co/{org.slug}?join={org.inviteCode}</p>
-      </Field>
+      <CodeBox long label="Invitation link" hint="Anyone with it can make an account in this space."
+        code={`${window.location.origin}/${org.slug}?join=${org.inviteCode}`} />
       <Section title="Space admins" lede="They run this space: its courses, its people, its reports.">
         {org.people.length === 0 ? <Help>Nobody is in this space yet.</Help> : null}
         {org.people.map((p) => (
@@ -9208,17 +9320,16 @@ function InviteLink({ invite, busy, onReplace }: {
   busy: boolean;
   onReplace: () => void;
 }) {
-  const link = `${window.location.origin}/${invite.slug}?join=${invite.code}`;
+  /* The join codes' own box (0.549), laid out for something as long as a link. */
   return (
-    <Field label="Invitation link" lede={`Anyone with it can make an account in ${invite.name}. You then give them a role.`}>
-      <p className="at-key">{link}</p>
-      <div className="at-row">
-        <Button size="sm" icon="copy" onClick={() => navigator.clipboard && navigator.clipboard.writeText(link)}>
-          Copy the link
-        </Button>
-        <Button variant="ghost" size="sm" disabled={busy} onClick={onReplace}>Replace the link</Button>
-      </div>
-    </Field>
+    <CodeBox
+      long
+      label="Invitation link"
+      hint={`Anyone with it can make an account in ${invite.name}. You then give them a role.`}
+      code={`${window.location.origin}/${invite.slug}?join=${invite.code}`}
+      busy={busy}
+      onNew={onReplace}
+    />
   );
 }
 
@@ -9327,73 +9438,6 @@ function OthersWork({ name, what }: { name?: string; what: "deck" | "card" }) {
       {name ? `${name} made this ${what}.` : `Someone else made this ${what}.`} Deleting it removes it from
       every course it's in, for every student. This can't be undone.
     </Notice>
-  );
-}
-
-/*
- * A My space deck's own fields (0.545): "Practise this myself", saved as it
- * is ticked; for a teacher, copying it into the space (15a); and the cards
- * of the person's courses, to borrow into it (66b).
- */
-function PersonalDeckFields({ deck, canCopy, onCopied }: {
-  deck: Deck;
-  canCopy: boolean;
-  onCopied: () => void;
-}) {
-  const [practise, setPractise] = useState(deck.practise !== false);
-  const [error, setError] = useState("");
-  const [copying, setCopying] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const snack = useSnackbar();
-  return (
-    <>
-      <Notice kind="error">{error}</Notice>
-      <Field label="Practise this myself" lede="Its published cards are in your Learning.">
-        <CheckList
-          options={[{ id: "on", title: "Practise this deck in my Learning" }]}
-          chosen={practise ? ["on"] : []}
-          onToggle={async (_id: string, wasOn: boolean) => {
-            const next = !wasOn;
-            setPractise(next);
-            try {
-              await API.setDeckPractise(deck.id, next);
-            } catch (e) {
-              setPractise(!next);
-              setError(API.explain(e));
-            }
-          }}
-        />
-      </Field>
-      <BorrowedCards deck={deck} />
-      {canCopy && (
-        <Field label="Copy to the space" lede="A copy for your courses. The copy and the original won't stay in sync.">
-          <Button size="sm" icon="copy" disabled={busy} onClick={() => setCopying(true)}>Copy to the space</Button>
-        </Field>
-      )}
-      {copying && (
-        <ConfirmModal
-          title={`Copy ${deck.title} to the space?`}
-          confirmLabel="Copy it"
-          danger={false}
-          busy={busy}
-          body={<p>A new deck of the space is made, with copies of your cards in it. From then on the copy and this deck are separate: a change to one doesn't reach the other.</p>}
-          onCancel={() => setCopying(false)}
-          onConfirm={async () => {
-            setBusy(true);
-            try {
-              await API.copyToSpace(deck.id);
-              snack(`${deck.title} copied to the space`);
-              setCopying(false);
-              onCopied();
-            } catch (e) {
-              setError(API.explain(e));
-            } finally {
-              setBusy(false);
-            }
-          }}
-        />
-      )}
-    </>
   );
 }
 
@@ -9656,5 +9700,55 @@ function EveryReport() {
         />
       ))}
     </>
+  );
+}
+
+/*
+ * The "My space" group in Learning (0.549, 8a): every one of your own decks
+ * with a "Practise" tick, saved at once. A deck ticked off leaves your
+ * sessions and stays listed here, unticked, to be switched back on.
+ */
+function MySpaceGroup({ course, practised, onChanged, onPractise }: {
+  course: Course & { notPractised?: { id: string; title: string }[] };
+  practised: Deck[];
+  onChanged?: () => void;
+  onPractise: (deckTitle: string) => void;
+}) {
+  const [error, setError] = useState("");
+  const off = course.notPractised || [];
+  const all = practised.map((d) => ({ id: d.id, title: d.title })).concat(off);
+  return (
+    <Tile
+      title="My space"
+      meta={`${plural(practised.length, "deck")} practised${off.length ? ` · ${off.length} not` : ""}`}
+      footer={
+        <>
+          <Notice kind="error">{error}</Notice>
+          <CheckList
+            options={all.map((d) => ({ id: d.id, title: d.title, note: practised.some((p) => p.id === d.id) ? undefined : "Not practised" }))}
+            chosen={practised.map((d) => d.id)}
+            onToggle={async (id: string, wasOn: boolean) => {
+              try {
+                await API.setDeckPractise(id, !wasOn);
+                if (onChanged) onChanged();
+              } catch (e) {
+                setError(API.explain(e));
+              }
+            }}
+          />
+        </>
+      }
+      actions={
+        practised.length ? (
+          <Button size="sm" icon="cards"
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onPractise(practised[0].title);
+            }}>
+            Practice
+          </Button>
+        ) : null
+      }
+    />
   );
 }

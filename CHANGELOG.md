@@ -8,6 +8,26 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.549 — 3 November 2026
+
+**Moving your own material into the space, and practising it from Learning.**
+
+- **Copy or move into the space.** In Teaching → Decks → My space, each
+  deck's tile has **Copy to the space** and **Move to the space**. Moving
+  leaves nothing in My space; copying keeps your version, separate from
+  then on. Either way you can tick the courses to put it in, or none for
+  now. A single card can be copied or moved too, from its own screen, into
+  any deck of the space you can change.
+- **Practise from Learning.** "Practise this myself" now lives in Learning,
+  in the My space group: a tick beside each of your decks. Decks switched
+  off stay listed there, so they can be switched back on.
+- **Cards from your courses** are chosen on a My space deck's screen as
+  before, and now work without tapping Edit.
+- **The Teaching toggle** says your space's name instead of "Space".
+- **The invitation link** sits in the same box as the join codes, across
+  the full width, with Copy and Replace underneath.
+- Released without running the test suite, at the owner's request.
+
 ## 0.548 — 3 November 2026
 
 **The You menu's toggle is back in shape.**

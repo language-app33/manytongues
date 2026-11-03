@@ -277,6 +277,8 @@ const PLACED = {
     "admin-export-org-manifest", "admin-org-usage",
     /* Super admin (0.547): the App admin's view of every space. */
     "admin-everyone", "admin-all-reports",
+    /* 0.549: one My space card into the space. */
+    "card-to-space",
   ],
   own: [
     "signup", "signin", "whoami", "practiced", "delete-account", "rename", "claim-admin",

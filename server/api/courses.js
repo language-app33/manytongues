@@ -3382,46 +3382,103 @@ async function handle(req) {
      * are already the space's and are referenced, not copied. Recordings
      * and pictures are shared by their content, so nothing is uploaded.
      */
+    /*
+     * A My space deck into the space (0.549; 15a, 2a, 9b, 10a): copied —
+     * a new deck of the space with copies of your cards, the original kept
+     * — or moved — the deck itself and your cards in it become the space's,
+     * nothing left behind. Either way it can go straight onto any of the
+     * courses you may put decks on. Course cards it borrowed are already
+     * the space's and stay as they are.
+     */
     if (action === "copy-to-space") {
       const deck = await readDeck(store, String(body.deckId || ""));
       if (!deck || !deck.personal || deck.owner !== mine) return json({ error: "not-yours" }, 403);
       if (!iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) return json({ error: "not-teaching" }, 403);
-      const newDeck = `d${randomBytes(6).toString("hex")}`;
-      /** @type {string[]} */
-      const ids = [];
-      /** @type {string[]} */
-      const madeIds = [];
-      for (const cid of deck.cardIds || []) {
-        const c = await loadCard(cid);
-        if (!c) continue;
-        if (!c.personal) {
-          ids.push(cid);
-          continue;
+      const move = body.move === true;
+      const courses = (await everyCourse(store)).filter(
+        (c) => (Array.isArray(body.courses) ? body.courses.map(String) : []).includes(c.id) && (iManage || isTeacher(c, mine))
+      );
+      let landed;
+      if (move) {
+        for (const cid of deck.cardIds || []) {
+          await updateJson(store, K.card(cid), (/** @type {any} */ c) => {
+            if (!c || !c.personal || c.owner !== mine) return null;
+            const { personal: _p, ...rest } = c;
+            return { ...rest, updated: Date.now() };
+          });
         }
-        const copyId = `k${randomBytes(6).toString("hex")}`;
-        const { personal: _p, inDecks: _d, ...rest } = /** @type {any} */ (c);
-        await writeJson(store, K.card(copyId), { ...rest, id: copyId, org: acting, owner: mine, rev: 1, inDecks: [newDeck], created: Date.now(), updated: Date.now() });
-        ids.push(copyId);
-        madeIds.push(copyId);
+        landed = await updateJson(store, K.deck(deck.id), (/** @type {any} */ d) => {
+          if (!d) return null;
+          const { personal: _p, practise: _q, ...rest } = d;
+          return { ...rest, version: (d.version || 1) + 1, updated: Date.now() };
+        });
+      } else {
+        const newDeck = `d${randomBytes(6).toString("hex")}`;
+        /** @type {string[]} */
+        const ids = [];
+        /** @type {string[]} */
+        const madeIds = [];
+        for (const cid of deck.cardIds || []) {
+          const c = await loadCard(cid);
+          if (!c) continue;
+          if (!c.personal) {
+            ids.push(cid);
+            continue;
+          }
+          const copyId = `k${randomBytes(6).toString("hex")}`;
+          const { personal: _p, inDecks: _d, ...rest } = /** @type {any} */ (c);
+          await writeJson(store, K.card(copyId), { ...rest, id: copyId, org: acting, owner: mine, rev: 1, inDecks: [newDeck], created: Date.now(), updated: Date.now() });
+          ids.push(copyId);
+          madeIds.push(copyId);
+        }
+        if (madeIds.length) await updateJson(store, K.myCards(mine), (/** @type {any} */ cur) => (cur || []).concat(madeIds));
+        const { personal: _p, practise: _q, ...deckRest } = /** @type {any} */ (deck);
+        landed = {
+          ...deckRest, id: newDeck, org: acting, owner: mine, title: String(body.title || deck.title).slice(0, 60),
+          courses: [], cardIds: ids, cardCount: ids.length, version: 1, updated: Date.now(),
+        };
+        await writeJson(store, K.deck(newDeck), landed);
+        await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).concat([newDeck]));
       }
-      if (madeIds.length) await updateJson(store, K.myCards(mine), (/** @type {any} */ cur) => (cur || []).concat(madeIds));
-      const { personal: _p, practise: _q, ...deckRest } = /** @type {any} */ (deck);
-      const copy = {
-        ...deckRest,
-        id: newDeck,
-        org: acting,
-        owner: mine,
-        title: String(body.title || deck.title).slice(0, 60),
-        courses: [],
-        cardIds: ids,
-        cardCount: ids.length,
-        version: 1,
-        updated: Date.now(),
-      };
-      await writeJson(store, K.deck(newDeck), copy);
-      await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).concat([newDeck]));
+      for (const c of courses) {
+        await updateJson(store, K.course(c.id), (/** @type {any} */ fresh) =>
+          fresh && !(fresh.decks || []).includes(landed.id) ? { ...fresh, decks: (fresh.decks || []).concat([landed.id]) } : null
+        );
+      }
       await taught();
-      return json({ ok: true, deck: copy });
+      return json({ ok: true, deck: landed, courses: courses.map((c) => c.id) });
+    }
+
+    /*
+     * One My space card into a deck of the space (0.549, 3a): a copy, or the
+     * card itself. A moved card stays in any of your My space decks that
+     * held it, where it now reads as a borrowed course card.
+     */
+    if (action === "card-to-space") {
+      const card = await loadCard(String(body.cardId || ""));
+      if (!card || !card.personal || card.owner !== mine) return json({ error: "not-yours" }, 403);
+      const deck = await readDeck(store, String(body.deckId || ""));
+      if (!deck || deck.personal || !(await canEditDeck(store, deck, mine, iManage))) return json({ error: "not-yours" }, 403);
+      let id = card.id;
+      if (body.move === true) {
+        await updateJson(store, K.card(card.id), (/** @type {any} */ c) => {
+          if (!c) return null;
+          const { personal: _p, ...rest } = c;
+          return { ...rest, inDecks: [...new Set((c.inDecks || []).concat([deck.id]))], updated: Date.now() };
+        });
+      } else {
+        id = `k${randomBytes(6).toString("hex")}`;
+        const { personal: _p, inDecks: _d, ...rest } = /** @type {any} */ (card);
+        await writeJson(store, K.card(id), { ...rest, id, org: acting, owner: mine, rev: 1, inDecks: [deck.id], created: Date.now(), updated: Date.now() });
+        await updateJson(store, K.myCards(mine), (/** @type {any} */ cur) => (cur || []).concat([id]));
+      }
+      await updateJson(store, K.deck(deck.id), (/** @type {any} */ d) => {
+        if (!d) return null;
+        const ids = [...new Set((d.cardIds || []).concat([id]))];
+        return { ...d, cardIds: ids, cardCount: ids.length, version: (d.version || 1) + 1, updated: Date.now() };
+      });
+      await taught();
+      return json({ ok: true, cardId: id });
     }
 
     /* The deck goes; the cards it held stay in the library. A locked deck
@@ -3814,13 +3871,17 @@ async function handle(req) {
        * per refresh that finds anything changed.
        */
       const studiedDecks = new Set(courseRows.flatMap((c) => c.decks || []));
-      const ownDecks = here(
+      const allOwn = here(
         await readManyJson(store, (await readIndex(store, "decks")).map((id) => K.deck(id)), EVENTUAL)
-      ).filter((d) => d && d.personal && d.owner === mine && d.practise);
-      if (ownDecks.length) {
+      ).filter((d) => d && d.personal && d.owner === mine);
+      const ownDecks = allOwn.filter((d) => d.practise);
+      /* Shown whenever the person has any My space deck, with the ones
+         switched off named, so Learning can switch them back on (0.549, 8a). */
+      if (allOwn.length) {
         courseRows.push(/** @type {any} */ ({
           id: "my-space", title: "My space", personal: true, language: "",
           decks: ownDecks.map((d) => d.id), teachers: [], students: [mine],
+          notPractised: allOwn.filter((d) => !d.practise).map((d) => ({ id: d.id, title: d.title })),
         }));
       }
       /* The cards a personal deck may carry to its owner: their own, and
