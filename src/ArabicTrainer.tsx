@@ -19935,7 +19935,11 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part
     <div className="at-place">
       {spacesToo && (
         <>
-          <div className="at-spacepick" role="radiogroup" aria-label="Space">
+          <div className="at-spacepick" role="radiogroup" aria-label="Space"
+            /* Exactly as many columns as the first row holds, so Super admin
+               can span them on a row of its own without crushing the rest
+               (0.548). */
+            style={{ gridTemplateColumns: `repeat(${Math.max(1, spaces.filter((x) => x !== "super").length)}, minmax(0, 1fr))` }}>
             {spaces.map((sp) => (
               <button
                 key={sp}

@@ -8,6 +8,15 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.548 — 3 November 2026
+
+**The You menu's toggle is back in shape.**
+
+- In 0.547, Learning, Teaching and Admin were squeezed into slivers at the
+  left of the toggle, with Super admin stretched across. They are back on
+  one row, evenly spaced, with Super admin full width underneath.
+- Released without running the test suite, at the owner's request.
+
 ## 0.547 — 3 November 2026
 
 **Super admin: the app admin's own tools, in every space.**
