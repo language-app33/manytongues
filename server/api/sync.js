@@ -1,5 +1,6 @@
 import { getStore } from "../store.js";
 import { createHash } from "node:crypto";
+import { formsOf } from "../../src/cards.ts";
 
 /*
  * Sync endpoint.
@@ -35,6 +36,39 @@ function json(body, status = 200) {
     status,
     headers: { "content-type": "application/json", "cache-control": "no-store" },
   });
+}
+
+/**
+ * Erase a learner's practice history: their document and every recording
+ * it names (0.543; docs/PLAN-spaces.md, 86a). Called when an account is
+ * deleted. `token` is the SHA-256 hex of the sign-in key — the device's
+ * tokenFor(key), and the keyHash the courses store already keeps — so the
+ * server can find the document without ever knowing the key.
+ *
+ * A document that cannot be read is deleted anyway; its recordings, which
+ * only it names, are then left behind, which is the lesser loss.
+ * @param {string} token
+ */
+export async function forgetSyncDoc(token) {
+  if (!/^[a-f0-9]{64}$/.test(String(token || ""))) return;
+  const store = getStore(STORE);
+  const key = keyFor(token);
+  /** @type {string[]} */
+  let ids = [];
+  try {
+    const held = await store.get(key, { type: "text", consistency: "strong" });
+    const doc = held ? JSON.parse(String(held)) : null;
+    for (const it of (doc && doc.items) || []) {
+      for (const f of formsOf(it)) for (const r of f.recs || []) ids.push(String(r.id));
+      for (const ln of it.lines || []) for (const r of ln.recs || []) ids.push(String(r.id));
+    }
+  } catch (e) {
+    ids = [];
+  }
+  for (const id of new Set(ids)) {
+    if (/^[A-Za-z0-9_-]{1,64}$/.test(id)) await store.delete(keyFor(`${token}:audio:${id}`)).catch(() => {});
+  }
+  await store.delete(key).catch(() => {});
 }
 
 /** @param {Request} req */

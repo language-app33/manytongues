@@ -7190,3 +7190,124 @@ Advanced tab's state in the draft, and only the save trims it: `basicCard`
 cuts what is written down to the first form, and `droppedByBasic` names
 what that cut would lose, for the line under the box. The cost is two word
 drafts per screen; only the shown one is saved.
+
+---
+
+## A deck's numbers come from one person
+
+**2 November 2026** · `number-sources`, `set-deck-numbers` and `partsWaiting`
+in `server/api/courses.js`, `src/number-decks.ts`
+
+A deck holds number *parts* (0 to 10, telling the hour), and the words come
+from a teacher's number system. The device was sent every system of every
+teacher connected to the learner's courses and filed each into every deck of
+its language, so a course with two teachers who had numbers gave each number
+twice. A deck now names one source, `numbersFrom`, defaulting to its owner;
+the server stamps each deck it sends with that person's system and clock ids,
+and the device files a system only into the decks that name it
+(`decksForSystem`).
+
+Weighed: keeping "everyone's" and de-duplicating on the device. Rejected
+because two teachers' recordings of the same number are different answers,
+and only a person can say which one a class should hear. A deck answered by
+an older server carries no `numbersSystemId` and is filed as before, so a
+deploy caught half way doesn't empty anyone's numbers. Progress already made
+on a system is kept: items are keyed by the system's id, and a system no
+longer filed into a deck is simply not dealt.
+
+Part of the spaces plan (`docs/PLAN-spaces.md`, stage 1).
+
+---
+
+## The space a request acts in is held for the whole request
+
+**2 November 2026** · `orgScope`, `inScope` and the record readers in
+`server/api/courses.js`
+
+The plan (`docs/PLAN-spaces.md`, B3) asked for an org check in every
+action and a changed signature for `canEditDeck`. There are some sixty
+actions, and every one written by hand is one more place to forget. So
+the org is worked out once, after the caller is known, and kept in an
+`AsyncLocalStorage` for the rest of the request — per request rather than
+per process, because requests interleave. While it is set, `readCourse`,
+`readDeck`, `readCard` and `readUser` answer null for another org's record,
+`everyCourse` and `canEditDeck` see only this org, and the lists read
+straight off an index are filtered with `inScope`. Another space's record
+looks like no record at all, and every action already knows what to do
+with that.
+
+Cost: a raw `readJson` of a course, deck, card or user bypasses the wall,
+so new code reads through the four readers or filters with `inScope`.
+`tests/spaces.test.mjs` is what catches a slip, and it fails until a new
+action is placed in its table. Two slips it caught on the first run:
+`admin-delete-user` took a stranger off every roster through
+`wipeAccount`, and the export let an administrator take any card. Both are
+now limited to the acting org.
+
+---
+
+## An account is made with a code, except the very first
+
+**2 November 2026** · `signup` and `codeTarget` in `server/api/courses.js`
+
+Since 0.543 the code someone signs up with decides their space: a space's
+invitation code or a course code (24b). An empty site has nobody to invite
+anyone, so the first account on it is made without a code, into Main —
+the owner's, who then claims admin. Tests that make many accounts sign up
+with Main's invitation code, read through `admin-orgs`, the way a person
+would (`mainInviteCode` in `tests/helpers.mjs`).
+
+Space invitation codes share the one table of codes with course codes;
+an invitation is recorded as `org:<id>` where a course code records the
+course's id, so `codeTarget` tells them apart and `courseForCode` still
+finds a restored course's codes.
+
+## Deleting a space leaves recordings and pictures
+
+**2 November 2026** · `admin-delete-org`
+
+The plan said to delete the recordings and pictures nothing else uses.
+They are stored by their content and shared across spaces, so working out
+"nothing else" means reading every card and number system on the site, and
+getting it wrong deletes another space's audio. Left behind, one costs
+storage and nothing else. So a deleted space's media stays; a later tidy-up
+can collect what nothing points at, the way `admin-clear` already does.
+
+---
+
+## Deleting an account no longer rewrites the list of decks
+
+**2 November 2026** · `wipeAccount` in `server/api/courses.js`
+
+`wipeAccount` read every deck, kept the ones it could see that weren't the
+person's, and wrote that back as the site's list of decks. Since 0.542 a
+request sees one space, so deleting one account would have dropped every
+other space's decks from the list. It was caught writing 0.544, before
+anything shipped. Every list `wipeAccount` touches is now changed by taking
+out what it names (`updateJson` with a filter), and a test deletes an
+account and checks that no deck anywhere fell off the list.
+
+It also read the person's cards from `owncards:`, a list nothing writes any
+more; cards are listed under `mycards:`. So deleting an account had
+quietly left its cards behind. With 0.544's rule (85a) the space's cards are
+meant to stay; the person's private ones are now found under `mycards:` and
+deleted.
+
+---
+
+## My space is private by the same wall as spaces
+
+**3 November 2026** · `inScope` in `server/api/courses.js`
+
+A personal deck or card is hidden from everyone but its owner by one line
+in `inScope`, the check every scoped reader and list already goes through
+since 0.542. So "someone else's My space" reads as nothing at all,
+everywhere at once, without each action knowing about My space.
+
+In Learning, a learner's practised decks arrive as a course built on the
+fly, `my-space`, so the app's existing course handling deals, groups and
+counts them. Costs, accepted: `my-material` reads the site's deck list on
+each refresh that finds a change, to find the person's own decks; and a
+learner's own cards can't be reported (they are theirs to fix), so a report
+from My space names only the card.
+

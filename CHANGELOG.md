@@ -8,6 +8,191 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.551 — 3 November 2026
+
+**Material and My space say which one you're in.**
+
+- Under the Decks / Cards tabs, one line: in Material, "{your space}'s
+  decks and cards, shared with its teachers."; in My space, "Only you see
+  these. Copy or move them to the space when they're ready."
+
+## 0.550 — 3 November 2026
+
+**Teaching: Material and My space. Students no longer have a My space.**
+
+- In Teaching, **Decks** and **Cards** become two tabs: **Material**, the
+  space's own decks and cards and nothing that is only yours, and **My
+  space**, your own. Inside each, the same row of tabs as the card screen
+  chooses between Decks and Cards. The Space / My space switch is gone.
+- **Students** no longer have a My space: it's gone from the You menu, and
+  they can't make decks or cards. What students had made there is deleted
+  the first time this release runs.
+- **Nobody practises My space decks in Learning** any more; the My space
+  group there is gone. My space is a place to prepare material, then copy
+  or move it into the space.
+- A My space deck no longer holds cards borrowed from courses.
+- A teacher who stops teaching keeps their My space, hidden, for when they
+  teach again.
+- Released without running the test suite, at the owner's request.
+
+## 0.549 — 3 November 2026
+
+**Moving your own material into the space, and practising it from Learning.**
+
+- **Copy or move into the space.** In Teaching → Decks → My space, each
+  deck's tile has **Copy to the space** and **Move to the space**. Moving
+  leaves nothing in My space; copying keeps your version, separate from
+  then on. Either way you can tick the courses to put it in, or none for
+  now. A single card can be copied or moved too, from its own screen, into
+  any deck of the space you can change.
+- **Practise from Learning.** "Practise this myself" now lives in Learning,
+  in the My space group: a tick beside each of your decks. Decks switched
+  off stay listed there, so they can be switched back on.
+- **Cards from your courses** are chosen on a My space deck's screen as
+  before, and now work without tapping Edit.
+- **The Teaching toggle** says your space's name instead of "Space".
+- **The invitation link** sits in the same box as the join codes, across
+  the full width, with Copy and Replace underneath.
+- Released without running the test suite, at the owner's request.
+
+## 0.548 — 3 November 2026
+
+**The You menu's toggle is back in shape.**
+
+- In 0.547, Learning, Teaching and Admin were squeezed into slivers at the
+  left of the toggle, with Super admin stretched across. They are back on
+  one row, evenly spaced, with Super admin full width underneath.
+- Released without running the test suite, at the owner's request.
+
+## 0.547 — 3 November 2026
+
+**Super admin: the app admin's own tools, in every space.**
+
+- A new **Super admin** button in the You menu, on its own full-width row
+  under Learning, Teaching and Admin. Only app admins see it, whichever
+  space they are in.
+- Super admin holds what belongs to the whole app: **Spaces**, **People**
+  (everyone in every space, grouped by space, with one search across all
+  of them, and a new key, suspend, reactivate or delete for anyone),
+  **Reports** (learners' reports from every space, to read and dismiss),
+  and **App** (backups, restore, clearing).
+- **Admin** is now only about the space you're in, for space admins and
+  the app admin alike.
+- Released without running the test suite, at the owner's request.
+
+## 0.546 — 3 November 2026
+
+**A space's storage, and the whole space in one file.**
+
+- In Admin → Spaces, each space now shows how much it holds: people,
+  courses, decks, cards, recordings and pictures, and about how many
+  megabytes. A recording used by two spaces counts in both.
+- **Export this space** saves the whole space as one file: its people,
+  courses, decks, cards, recordings and pictures. Nobody's My space is in
+  it. It's for keeping; there's no restoring a single space yet.
+
+## 0.545 — 3 November 2026
+
+**My space: everyone's own decks and cards.**
+
+- Everyone has a **My space**: a private place for their own decks and
+  cards. Nobody else sees it, not a teacher, not the space's admin, not
+  you.
+- **Learners** find "My space" in the You menu, next to Learning. It is the
+  same screens teachers use, showing only their own decks and cards.
+- **Teachers** get a Space / My space switch at the top of Decks and Cards
+  in Teaching, to prepare material privately. A My space deck can be
+  copied to the space for a course; the copy and the original are
+  separate from then on.
+- Each My space deck has **Practise this myself**, ticked when it is made.
+  Practised decks appear in Learning as one more group, **My space**, and
+  are dealt in the same daily sessions as courses. The deck list says
+  "Not practised" on the ones left out.
+- A My space deck can also hold **cards from your courses**: the same
+  card, practised once. If the course stops carrying it, it drops out.
+- Only a space's teachers and admins now make decks for the space;
+  everyone else makes theirs in My space.
+
+## 0.544 — 2 November 2026
+
+**Space admins run their own space.**
+
+- A space admin sees Admin and Teaching for their space: they can make
+  courses, add people and make them teachers or students, issue a new key
+  to someone who lost theirs, read learners' reports, and see and edit all
+  of the space's decks and cards. Deleting courses and people, backups,
+  and everything about the space itself stay with you.
+- **Suspending.** A space admin can suspend someone: they can't sign in,
+  come off their courses, and appear under **Former members**, where they
+  can be reactivated and put back on their courses. Only you can suspend a
+  space admin, or give one a new key.
+- **Leaving.** Anyone but you can leave their space from Settings, which
+  suspends them in the same way.
+- **Deleting an account** — your own, or someone's by you — now keeps what
+  they made for the space, under their name, and leaves a record under
+  Former members. Their My space and practice history go. A space admin can
+  hand a former teacher's decks and cards to another teacher.
+- **Invitation link.** The space's link sits at the top of People, to copy,
+  or to replace when it has gone too far.
+- **Deleting someone else's deck or card** first says who made it, and that
+  it leaves every course for every student.
+- **Saving your key.** Right after signing up, and the first time someone
+  signs in to an account another person made, they tick "I've saved my key
+  somewhere safe" before carrying on. The sign-in page says who to ask about
+  a lost key: your space's admin, or contact@manytongues.co.
+
+## 0.543 — 2 November 2026
+
+**Spaces can be created, each with its own address.**
+
+- In Admin, a new **Spaces** tab (yours only) lists every space. Create one
+  with a name, an address such as `manytongues.co/lingua-academy`, and its
+  first space admin, whose sign-in key you're shown to hand over. Later you
+  can change its name, address, logo and colour, choose its admins, close
+  it, reopen it, or delete it for good after typing its name.
+- A space's address shows its own sign-in page, with its name, logo and
+  colour. A colour too faint to see is ignored, and the Spaces tab says so.
+- Making an account now needs a code: a space's invitation link, or a
+  course code from a teacher. The code decides which space the account is
+  in. The old single sign-up code is gone.
+- Signing in with a key, or using a code, from another space says whose it
+  is, with a button to go there or to make a new account here. Someone
+  signed in who follows another space's invitation is asked what they meant.
+- Once signed in, the address always shows your own space. The space's
+  name and logo are at the top of the You menu.
+- A closed space's people see "This space is closed" until it reopens.
+- Deleting an account now also erases its practice history from the server.
+- **To do by hand:** if the server has a `SIGNUP_CODE` setting, remove it.
+  It no longer does anything.
+
+## 0.542 — 2 November 2026
+
+**Spaces, underneath. Nothing changes on screen.**
+
+- Everything in the app now belongs to a space: the first one, called
+  Main, holds everything there is today. The server refuses anything that
+  crosses from one space to another, and checks of every kind of request
+  prove it.
+- Nobody will notice a difference yet. Creating spaces, and their
+  addresses, come next.
+- Two gaps found while checking, both only reachable by the app admin, are
+  closed: deleting a person from another space, and exporting another
+  space's cards.
+
+## 0.541 — 2 November 2026
+
+**A deck's numbers come from one teacher, chosen on the deck.**
+
+- A course with two teachers who both had numbers gave its students every
+  number twice, once in each teacher's words and voice. Now each number
+  comes once.
+- A deck that holds numbers has a new choice on its screen, **Numbers
+  from**: the deck owner's own numbers, or any other teacher's who has
+  numbers in that language. It starts on the owner's. Changing it takes
+  effect for students the next time their app checks in.
+- A teacher with no numbers of their own can make a numbers deck from a
+  colleague's numbers instead of writing their own.
+
 ## 0.540 — 31 October 2026
 
 **Everything since 0.521 checked, and two bugs it found fixed.**

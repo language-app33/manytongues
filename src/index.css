@@ -480,6 +480,8 @@ button {
 /* The selected tab carries a dark grey outline, so which one is active reads
    at a glance rather than by shade alone. */
 .at-tab2.on { background: var(--raised); color: var(--text); border-color: var(--tab-stroke); }
+/* A link in the same box (0.549): the whole width, then its buttons. */
+.at-codebox.long b { flex:1 1 100%; overflow-wrap:anywhere; word-break:break-all; }
 .at-codebox { display:flex; align-items:center; gap:10px; flex-wrap:wrap;
   border:2px solid var(--tag-line); background: var(--tag-bg); border-radius: var(--r-sm);
   padding:9px 11px; }

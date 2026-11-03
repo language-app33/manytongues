@@ -6659,7 +6659,7 @@ function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, d
  * the Advanced tab writes it in — so ticking the box carries it over
  * without anything to copy: it is the same form.
  */
-function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onExport, onDelete }: {
+function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onExport, onToSpace, onDelete }: {
   lang: Lang;
   scene: boolean;
   word: WordDraft;
@@ -6675,6 +6675,8 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   onToggleDeck: (id: string, on: boolean) => void;
   /** Export the card, where it can be — on a saved card being read. */
   onExport?: () => void;
+  /** A My space card into the space (0.549): copy or move it into a deck. */
+  onToSpace?: (move: boolean) => void;
   /** Delete the card — on a saved card being edited, at the foot. */
   onDelete?: () => void;
 }) {
@@ -6693,6 +6695,16 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
             <Button reads size="sm" className="iconly" aria-label="Export this card" title="Export this card" onClick={onExport}>
               <Icon name="download" />
             </Button>
+            {onToSpace ? (
+              <>
+                <Button reads size="sm" className="iconly" aria-label="Copy to the space" title="Copy to the space" onClick={() => onToSpace(false)}>
+                  <Icon name="copy" />
+                </Button>
+                <Button reads size="sm" className="iconly" aria-label="Move to the space" title="Move to the space" onClick={() => onToSpace(true)}>
+                  <Icon name="upload" />
+                </Button>
+              </>
+            ) : null}
           </span>
         ) : null}
       </div>
@@ -10513,7 +10525,7 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   );
 }
 
-export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, about, below }: {
+export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below }: {
   card: Card | null;
   lang: Lang;
   decks: Deck[];
@@ -10557,6 +10569,8 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   status?: (off: boolean) => Node;
   /** Export this card, beside Edit while it is locked. */
   onExport?: () => void;
+  /** A My space card into the space (0.549): copy or move it into a deck. */
+  onToSpace?: (move: boolean) => void;
   /** Drawn over the tabs, and on the Exercises tab, and never locked: the
       line about sentences waiting for review, and the exercises to try. */
   about?: Node;
@@ -10880,6 +10894,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
                 setChosen((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
               }
               onExport={locked ? onExport : undefined}
+              onToSpace={locked ? onToSpace : undefined}
               onDelete={!locked && stored && onDelete ? onDelete : undefined}
             />
           </TabPanel>

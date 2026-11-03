@@ -5,7 +5,9 @@
  * @typedef {ReturnType<typeof getStore>} Store
  */
 import { getStore } from "../store.js";
+import { forgetSyncDoc } from "./sync.js";
 import { createHash, randomBytes } from "node:crypto";
+import { AsyncLocalStorage } from "node:async_hooks";
 /* The one list of grammatical fields a card may carry, shared with the app so
    that adding an axis to a language does not silently drop it here. */
 import { answerFields, grammarFields } from "../../src/languages.ts";
@@ -458,6 +460,18 @@ const K = {
   flag: (id) => `flag:${id}`,
   /** @param {string} what */
   index: (what) => `index:${what}`,
+  /** A space (on screen) — an org (in code). See docs/PLAN-spaces.md. */
+  /** @param {string} id */
+  org: (id) => `org:${id}`,
+  /** An address, to the org it belongs to. Kept for ever (8b). */
+  /** @param {string} name */
+  slug: (name) => `slug:${name}`,
+  /** An org's Former members list (0.544). */
+  /** @param {string} org */
+  former: (org) => `former:${org}`,
+  /** A deleted account's name, kept for what it made (0.544). */
+  /** @param {string} handle */
+  gone: (handle) => `gone:${handle}`,
 };
 
 /*
@@ -621,14 +635,55 @@ async function updateJson(store, key, change) {
  * the point it is read, which is the only place the answer is known — and
  * they read better than the raw call besides.
  */
+/*
+ * Spaces, called orgs in code (0.542; docs/PLAN-spaces.md, B1–B3).
+ *
+ * Every person, course, deck, card and report belongs to one org. A record
+ * written before orgs existed has no `org` and is in Main: `orgOf` is the
+ * only way anything here reads it, so no migration was ever needed.
+ *
+ * The org a request acts in is worked out once, after the caller is known,
+ * and held for the rest of the request in `orgScope` — per request, not per
+ * process, because requests interleave. While it is set, the four readers
+ * below answer null for a record from another org, so a course, deck, card
+ * or person in another space reads exactly like one that doesn't exist,
+ * whichever action asked. Lists read straight off an index are filtered
+ * with `inScope` where they are read.
+ */
+const MAIN = "main";
+/** @type {(rec: any) => string} */
+const orgOf = (rec) => (rec && rec.org) || MAIN;
+/** @type {(rec: any, org: string) => boolean} */
+const sameOrg = (rec, org) => orgOf(rec) === org;
+/** @type {AsyncLocalStorage<{ org: string | null, self: string }>} */
+const orgScope = new AsyncLocalStorage();
+/** Whether a record is in the org this request acts in (always, outside one). */
+/** @type {(rec: any) => boolean} */
+const inScope = (rec) => {
+  const at = orgScope.getStore();
+  if (!rec || !at || !at.org) return true;
+  /* Someone's My space (0.545): a personal deck or card is its owner's
+     alone — not a co-teacher's, a space admin's or an App admin's (48a, 71a). */
+  if (rec.personal && at.self && rec.owner !== at.self) return false;
+  return sameOrg(rec, at.org);
+};
+/** @type {<T>(rec: T) => T | null} */
+const scoped = (rec) => (inScope(rec) ? rec : null);
+
 /** @type {(store: Store, id: string) => Promise<Course | null>} */
-const readCourse = (store, id) => readJson(store, K.course(id));
+const readCourse = async (store, id) => scoped(await readJson(store, K.course(id)));
 /** @type {(store: Store, id: string) => Promise<Deck | null>} */
-const readDeck = (store, id) => readJson(store, K.deck(id));
+const readDeck = async (store, id) => scoped(await readJson(store, K.deck(id)));
 /** @type {(store: Store, id: string) => Promise<Card | null>} */
-const readCard = (store, id) => readJson(store, K.card(id));
+const readCard = async (store, id) => scoped(await readJson(store, K.card(id)));
+/* The caller themselves is always readable: an App admin working in another
+   org is still the person they are. */
 /** @type {(store: Store, h: string) => Promise<(User & { keyHash?: string }) | null>} */
-const readUser = (store, h) => readJson(store, K.user(h));
+const readUser = async (store, h) => {
+  const u = await readJson(store, K.user(h));
+  const at = orgScope.getStore();
+  return u && at && at.self === h ? u : scoped(u);
+};
 
 /**
  * The ids under an index. Always a list: a missing index reads as empty
@@ -733,7 +788,7 @@ function linksOf(deck, courses) {
  */
 async function everyCourse(store) {
   const ids = await readIndex(store, "courses");
-  return (await readManyJson(store, ids.map((id) => K.course(id)))).filter(Boolean);
+  return (await readManyJson(store, ids.map((id) => K.course(id)))).filter((c) => c && inScope(c));
 }
 
 /**
@@ -785,7 +840,7 @@ async function dropFromCourses(store, deckId) {
  * @param {boolean} isAdmin
  */
 async function canEditDeck(store, deck, handle, isAdmin) {
-  if (!deck) return false;
+  if (!deck || !inScope(deck)) return false;
   if (isAdmin || deck.owner === handle) return true;
   return (await everyCourse(store)).some((c) => (c.decks || []).includes(deck.id) && isTeacher(c, handle));
 }
@@ -865,7 +920,7 @@ async function dropFromRosters(store, handle) {
   let found = false;
   for (const id of await readIndex(store, "courses")) {
     await updateJson(store, K.course(id), (/** @type {Course | null} */ c) => {
-      if (!c || !(c.teachers.includes(handle) || c.students.includes(handle))) return null;
+      if (!c || !inScope(c) || !(c.teachers.includes(handle) || c.students.includes(handle))) return null;
       found = true;
       return {
         ...c,
@@ -900,67 +955,264 @@ async function courseForCode(store, given) {
 }
 
 /**
+ * Former members (0.544; docs/PLAN-spaces.md, B2): one list per org of the
+ * people who left, were removed or were deleted, newest last. A record is
+ * replaced, not doubled, when the same person's story moves on (suspended,
+ * then deleted).
+ * @param {Store} store
+ * @param {string} org
+ * @param {Record<string, any>} rec
+ */
+async function noteFormer(store, org, rec) {
+  await updateJson(store, K.former(org), (/** @type {any} */ cur) =>
+    (cur || []).filter((/** @type {any} */ r) => r.handle !== rec.handle).concat([rec])
+  );
+}
+
+/**
+ * The courses someone is on, with their roles and titles — what a record
+ * keeps and what reactivating puts back. This org's courses only.
  * @param {Store} store
  * @param {string} handle
  */
-async function wipeAccount(store, handle) {
+async function coursesOf(store, handle) {
+  return (await everyCourse(store))
+    .filter((c) => isTeacher(c, handle) || isStudent(c, handle))
+    .map((c) => ({
+      id: c.id,
+      title: c.title,
+      roles: /** @type {string[]} */ ([]).concat(isTeacher(c, handle) ? ["teacher"] : [], isStudent(c, handle) ? ["student"] : []),
+    }));
+}
+
+/**
+ * Deleting an account (0.544; 85a, 86a, 83a, 84a).
+ *
+ * What the person made for their space stays, under their name — decks,
+ * cards, numbers and clock — so courses keep working and a space admin can
+ * hand it on. Their own private material (My space: personal decks and
+ * cards) goes, and so does their practice history. Their place on every
+ * roster goes, and a Former members record says who they were.
+ *
+ * Every list here is changed by taking out what is named, never rewritten
+ * from what this request can see: since 0.542 a request sees one org, and
+ * a list rewritten from that would lose every other org's entries.
+ * @param {Store} store
+ * @param {string} handle
+ * @param {{ why?: string, by?: string }} [how]
+ */
+async function wipeAccount(store, handle, how = {}) {
   const user = await readUser(store, handle);
   /* A course restored from a backup brings its roster back as it was, and
      that can name somebody whose account has since gone. There is nothing
      of theirs left to remove but their place on the rosters. */
   if (!user) return dropFromRosters(store, handle);
+  const org = orgOf(user);
+  const courses = user.suspended && Array.isArray(user.suspended.courses) && user.suspended.courses.length
+    ? user.suspended.courses
+    : await coursesOf(store, handle);
 
-  /* The person's cards go, so they come out of everyone's decks too —
-     locked or not, the same as deleting a card does. Left in, another
-     teacher's deck would point at cards that no longer exist. */
-  const ownIds = new Set((await readJson(store, K.ownCards(handle))) || []);
-  const deckIds = await readIndex(store, "decks");
-  const keptDecks = [];
-  for (const id of deckIds) {
-    const d = await readDeck(store, id);
-    if (!d) continue;
-    if (d.owner !== handle) {
-      keptDecks.push(id);
-      if (ownIds.size && (d.cardIds || []).some((/** @type {string} */ x) => ownIds.has(x))) {
-        await updateJson(store, K.deck(id), (fresh) => {
-          if (!fresh) return null;
-          const next = (fresh.cardIds || []).filter((/** @type {string} */ x) => !ownIds.has(x));
-          return {
-            ...fresh,
-            cardIds: next,
-            cardCount: next.length,
-            version: (fresh.version || 1) + 1,
-            updated: Date.now(),
-          };
-        });
-      }
-      continue;
+  /* Their personal cards, taken out of whatever decks hold them, then gone. */
+  const listed = (await readJson(store, K.myCards(handle))) || [];
+  const cards = (await readManyJson(store, listed.map((/** @type {string} */ id) => K.card(id)))).filter(Boolean);
+  const personalCards = new Set(cards.filter((c) => c.personal).map((c) => c.id));
+  for (const c of cards.filter((x) => x.personal)) {
+    for (const did of c.inDecks || []) {
+      await updateJson(store, K.deck(did), (/** @type {any} */ fresh) => {
+        if (!fresh || !(fresh.cardIds || []).includes(c.id)) return null;
+        const next = fresh.cardIds.filter((/** @type {string} */ x) => x !== c.id);
+        return { ...fresh, cardIds: next, cardCount: next.length, version: (fresh.version || 1) + 1, updated: Date.now() };
+      });
     }
-    await dropFromCourses(store, id);
-    await store.delete(K.deck(id)).catch(() => {});
+    await store.delete(K.card(c.id)).catch(() => {});
   }
-  await writeJson(store, K.index("decks"), keptDecks);
-
-  for (const id of (await readJson(store, K.ownCards(handle))) || []) {
-    await store.delete(K.card(id)).catch(() => {});
+  if (personalCards.size) {
+    await updateJson(store, K.myCards(handle), (/** @type {any} */ cur) =>
+      (cur || []).filter((/** @type {string} */ x) => !personalCards.has(x))
+    );
   }
-  await store.delete(K.ownCards(handle)).catch(() => {});
 
-  for (const key of await systemKeysOf(store, handle)) await store.delete(key).catch(() => {});
-  await store.delete(K.mySystems(handle)).catch(() => {});
-  await store.delete(K.tagLift(handle)).catch(() => {});
+  /* Their personal decks. A deck borrowing course cards (66b) goes alone:
+     those cards are the space's. */
+  const deckIds = await readIndex(store, "decks");
+  const decks = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(
+    (d) => d && d.owner === handle && d.personal
+  );
+  for (const d of decks) await store.delete(K.deck(d.id)).catch(() => {});
+  if (decks.length) {
+    const goneDecks = new Set(decks.map((d) => d.id));
+    await updateJson(store, K.index("decks"), (/** @type {any} */ cur) =>
+      (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x))
+    );
+  }
 
   await dropFromRosters(store, handle);
+  await updateJson(store, K.org(org), (/** @type {any} */ o) =>
+    o && (o.admins || []).includes(handle) ? { ...o, admins: o.admins.filter((/** @type {string} */ x) => x !== handle) } : null
+  );
 
   if (user.keyHash) await store.delete(K.keyOf(user.keyHash)).catch(() => {});
+  /* And the practice history, which the key's digest finds (86a). */
+  if (user.keyHash) await forgetSyncDoc(user.keyHash).catch(() => {});
   await store.delete(K.user(handle)).catch(() => {});
-  const users = await readIndex(store, "users");
-  await writeJson(store, K.index("users"), users.filter((x) => x !== handle));
+  await updateJson(store, K.index("users"), (/** @type {any} */ cur) =>
+    (cur || []).filter((/** @type {string} */ x) => x !== handle)
+  );
+
+  /* Their name, kept for the material that stays, and so the handle is
+     never given to somebody else. */
+  await writeJson(store, K.gone(handle), { displayName: user.displayName, org, at: Date.now() });
+  await updateJson(store, K.index("gone"), (/** @type {any} */ cur) =>
+    (cur || []).includes(handle) ? null : (cur || []).concat([handle])
+  );
+  const who = how.by || handle;
+  await noteFormer(store, org, {
+    handle,
+    displayName: user.displayName,
+    joined: user.created || 0,
+    left: Date.now(),
+    courses,
+    why: who === handle ? "deleted-self" : "deleted-by-admin",
+    by: who,
+  });
   return true;
 }
 
+/**
+ * What a code opens (0.543): a space's invite (recorded as `org:<id>`) or a
+ * course, as student or teacher. Course codes go through courseForCode,
+ * which also finds the codes of a course restored from a backup.
+ * @param {Store} store
+ * @param {string} given
+ * @returns {Promise<{ kind: "org", org: any } | { kind: "course", course: Course, asTeacher: boolean } | null>}
+ */
+async function codeTarget(store, given) {
+  if (!given) return null;
+  const at = await readJson(store, K.code(given));
+  if (typeof at === "string" && at.startsWith("org:")) {
+    const org = await readJson(store, K.org(at.slice(4)));
+    return org && org.inviteCode === given ? { kind: "org", org } : null;
+  }
+  const id = await courseForCode(store, given);
+  const course = id ? await readJson(store, K.course(id)) : null;
+  if (!course) return null;
+  if (course.teacherCode && given === course.teacherCode) return { kind: "course", course, asTeacher: true };
+  if (given === course.code) return { kind: "course", course, asTeacher: false };
+  return null;
+}
+
+/** A space as anyone may be told of it. @param {any} org */
+const orgCard = (org) => ({
+  id: org.id, slug: org.slug, name: org.name, logo: org.logo || "", colour: org.colour || "",
+});
+
+/*
+ * Making sure Main exists (0.542). Everything written before orgs is in it
+ * already, by `orgOf`; this is only its document, address and invite code,
+ * created once and never twice — updateJson creates only when the key is
+ * missing. Checked once per process, and again after a clear.
+ */
+/** @type {Promise<void> | null} */
+let mainReady = null;
+/** @param {Store} store */
+function ensureMain(store) {
+  if (!mainReady) {
+    mainReady = (async () => {
+      const code = makeCode();
+      const made = await updateJson(store, K.org(MAIN), (/** @type {any} */ cur) =>
+        cur ? null : {
+          id: MAIN, slug: MAIN, formerSlugs: [], name: "Main", logo: "", colour: "",
+          admins: [], inviteCode: code, created: Date.now(),
+        }
+      );
+      await updateJson(store, K.slug(MAIN), (/** @type {any} */ cur) => (cur ? null : MAIN));
+      if (made && made.inviteCode === code) {
+        await updateJson(store, K.code(code), (/** @type {any} */ cur) => (cur ? null : `org:${MAIN}`));
+      }
+      await updateJson(store, K.index("orgs"), (/** @type {any} */ cur) =>
+        (cur || []).includes(MAIN) ? null : (cur || []).concat([MAIN])
+      );
+    })().catch((e) => {
+      mainReady = null;
+      throw e;
+    });
+  }
+  return mainReady;
+}
+
+/*
+ * A space's address (B2). Lower-case letters, digits and single dashes,
+ * starting with a letter; never a name the app itself answers to.
+ */
+const RESERVED_SLUGS = new Set([
+  "api", "assets", "main", "admin", "new", "join", "www", "app", "static", "index",
+  "favicon", "logo", "apple-touch-icon", "icon-192", "icon-512", "icon-512-maskable",
+  "manifest", "manifest.webmanifest", "sw", "registersw", "workbox",
+]);
+/** @param {string} slug */
+export function slugProblem(slug) {
+  if (!/^[a-z][a-z0-9-]{2,39}$/.test(slug) || slug.includes("--") || slug.endsWith("-")) return "slug-invalid";
+  if (RESERVED_SLUGS.has(slug)) return "slug-invalid";
+  return "";
+}
+/** A hex colour or nothing. @param {unknown} c */
+const colourOf = (c) => (/^#[0-9a-f]{6}$/i.test(String(c || "")) ? String(c).toLowerCase() : "");
+
+/*
+ * Students' My space, removed once (0.550, 7a). Since 0.550 only teachers
+ * and those who run a space have a My space; what students made in it under
+ * 0.545–0.549 is deleted the first time this release runs, and never again
+ * (the stamp is written first, so two processes can't both do it). A
+ * teacher's My space is kept even when they later stop teaching (9a).
+ */
+/** @type {Promise<void> | null} */
+let sweptStudents = null;
+/** @param {Store} store */
+function sweepStudentMySpace(store) {
+  if (!sweptStudents) {
+    sweptStudents = (async () => {
+      const at = Date.now();
+      const stamp = await updateJson(store, "stamp:student-myspace-0550", (/** @type {any} */ cur) => (cur ? null : { at }));
+      if (!stamp || stamp.at !== at) return;
+      const courses = (await readManyJson(store, (await readIndex(store, "courses")).map((id) => K.course(id)))).filter(Boolean);
+      const orgs = (await readManyJson(store, (await readIndex(store, "orgs")).map((id) => K.org(id)))).filter(Boolean);
+      const runs = new Set(orgs.flatMap((o) => o.admins || []));
+      const teaches = new Set(courses.flatMap((c) => c.teachers || []));
+      const deckIds = await readIndex(store, "decks");
+      const decks = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(Boolean);
+      const students = new Set();
+      for (const d of decks.filter((x) => x.personal)) {
+        const owner = await readJson(store, K.user(d.owner));
+        if (owner && (owner.admin || runs.has(d.owner) || teaches.has(d.owner))) continue;
+        students.add(d.owner);
+        await store.delete(K.deck(d.id)).catch(() => {});
+      }
+      const goneDecks = new Set(decks.filter((x) => x.personal && students.has(x.owner)).map((x) => x.id));
+      if (goneDecks.size) {
+        await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x)));
+      }
+      for (const h of (await readIndex(store, "users"))) {
+        const u = await readJson(store, K.user(h));
+        if (!u || u.admin || runs.has(h) || teaches.has(h)) continue;
+        const ids = (await readJson(store, K.myCards(h))) || [];
+        const cards = (await readManyJson(store, ids.map((/** @type {string} */ id) => K.card(id)))).filter((c) => c && c.personal);
+        if (!cards.length) continue;
+        for (const c of cards) await store.delete(K.card(c.id)).catch(() => {});
+        const gone = new Set(cards.map((c) => c.id));
+        await updateJson(store, K.myCards(h), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !gone.has(x)));
+      }
+    })().catch(() => {
+      sweptStudents = null;
+    });
+  }
+  return sweptStudents;
+}
+
 /** @param {Request} req */
-export default async (req) => {
+export default (req) => orgScope.run({ org: null, self: "" }, () => handle(req));
+
+/** @param {Request} req */
+async function handle(req) {
   /* Everything, the setup included, runs inside the try. getStore throws
      outright on a site with no Blobs configuration, and a throw out here
      is not an answer at all: the platform replies 500 with a body that
@@ -974,49 +1226,140 @@ export default async (req) => {
 
     /* ================= accounts ================= */
 
+    /*
+     * A space's public face (0.543): what its address shows before anyone
+     * signs in — its name, logo and colour, or where it moved to. Never its
+     * people or material. The logo travels as its data URL, because the
+     * image action needs a key.
+     */
+    if (action === "org-info") {
+      await ensureMain(store);
+      const slug = String(url.searchParams.get("slug") || "").toLowerCase();
+      const id = slug ? await readJson(store, K.slug(slug)) : null;
+      const org = typeof id === "string" ? await readJson(store, K.org(id)) : null;
+      if (!org) return json({ error: "no-space" }, 404);
+      if (org.slug !== slug) return json({ ok: true, moved: org.slug });
+      const logoData = org.logo ? (await store.get(K.image(org.logo), { type: "text" }).catch(() => null)) || "" : "";
+      return json({ ok: true, org: { ...orgCard(org), logoData, closed: !!org.archived } });
+    }
+
+    /*
+     * Making an account (0.543): with a space's invite code or a course
+     * code, which decides the space (24b, 23a). The one exception is the
+     * very first account on an empty site, which has nobody to be invited
+     * by: it goes into Main, and is the owner's.
+     */
     if (action === "signup") {
+      await ensureMain(store);
       const displayName = String(body.displayName || "").trim().slice(0, 40);
       if (!displayName) return json({ error: "name-required" }, 400);
 
-      /* With SIGNUP_CODE set in the site's environment, an account can only
-         be made by someone who was given the code. Without it, anyone who
-         finds the address can fill the people list. The app asks for the
-         code only after being told it is needed, so a site without one never
-         shows the field. */
-      const needed = String(process.env.SIGNUP_CODE || "").trim();
-      if (needed && String(body.signupCode || "").trim() !== needed) {
-        return json({ error: "signup-code-required" }, 403);
-      }
-
       const handles = await readIndex(store, "users");
-      const handle = makeHandle(displayName, handles);
+      const given = String(body.code || "").replace(/\s+/g, "").toLowerCase();
+      const target = await codeTarget(store, given);
+      if (!target && (given || handles.length)) return json({ error: given ? "bad-code" : "code-required" }, 403);
+      const orgId = !target ? MAIN : target.kind === "org" ? target.org.id : orgOf(target.course);
+      const org = await readJson(store, K.org(orgId));
+      if (!org) return json({ error: "no-space" }, 404);
+      if (org.archived) return json({ error: "space-closed" }, 403);
+      const at = String(body.org || "");
+      if (at && at !== orgId) return json({ error: "other-space", space: orgCard(org) }, 409);
+
+      const handle = makeHandle(displayName, handles.concat(await readIndex(store, "gone")));
       const key = makeKey();
       const user = {
         handle,
         displayName,
         admin: false,
+        org: orgId,
         created: Date.now(),
         lastSeen: Date.now(),
+        keySaved: false,
       };
       await writeJson(store, K.user(handle), { ...user, keyHash: sha(key) });
       await writeJson(store, K.keyOf(sha(key)), handle);
-      await indexAdd(store, "users", handle);
+      await updateJson(store, K.index("users"), (/** @type {any} */ cur) => (cur || []).concat([handle]));
+      /* A course code puts them on the course, as the code says. */
+      if (target && target.kind === "course") {
+        const as = target.asTeacher ? "teachers" : "students";
+        await updateJson(store, K.course(target.course.id), (/** @type {Course | null} */ c) =>
+          c && !c[as].includes(handle) ? { ...c, [as]: c[as].concat([handle]) } : null
+        );
+      }
       // The key is shown once and cannot be read back from the digest.
-      return json({ ok: true, user, key });
+      return json({ ok: true, user: { ...user, org: orgCard(org) }, key });
     }
 
     if (action === "signin" || action === "whoami") {
+      await ensureMain(store);
       const me = await currentUser(req, store);
       if (!me) return json({ error: "bad-key" }, 401);
+      if (me.suspended) return json({ error: "suspended" }, 403);
+      const org = await readJson(store, K.org(orgOf(me)));
+      if (org && org.archived && !me.admin) return json({ error: "space-closed" }, 403);
+      /* Signing in at another space's address (53b): say whose the key is,
+         without signing in. An App admin may open any address (35a). */
+      const at = String(url.searchParams.get("org") || "");
+      if (at && org && at !== org.id && !me.admin) {
+        return json({ error: "other-space", space: orgCard(org) }, 409);
+      }
       await touch(store, me, "lastSeen");
       const { keyHash, ...safe } = me;
-      return json({ ok: true, user: safe });
+      return json({
+        ok: true,
+        user: {
+          ...safe,
+          org: org ? orgCard(org) : { id: MAIN, slug: MAIN, name: "Main", logo: "", colour: "" },
+          orgAdmin: !!org && (org.admins || []).includes(me.handle),
+        },
+      });
     }
 
     const me = await currentUser(req, store);
     if (!me) return json({ error: "bad-key" }, 401);
     const mine = me.handle;
     const iAmAdmin = !!me.admin;
+    /* A suspended account can do nothing until reactivated (64a). */
+    if (me.suspended) return json({ error: "suspended" }, 403);
+
+    /* A closed space's people can't do anything until it reopens (62a). */
+    if (!me.admin) {
+      const own = await readJson(store, K.org(orgOf(me)));
+      if (own && own.archived) return json({ error: "space-closed" }, 403);
+    }
+
+    /* The org this request acts in (B3): the caller's own, or — for an App
+       admin only — the one named by x-org, when it exists. From here on the
+       readers answer null for anything in another org. */
+    await ensureMain(store);
+    await sweepStudentMySpace(store);
+    let acting = orgOf(me);
+    if (iAmAdmin) {
+      const asked = String(req.headers.get("x-org") || "");
+      if (asked && (await readJson(store, K.org(asked)))) acting = asked;
+    }
+    const scope = orgScope.getStore();
+    if (scope) {
+      scope.org = acting;
+      scope.self = mine;
+    }
+    /* Who runs the space this request acts in (0.544): its space admins,
+       acting in their own space, and App admins anywhere. A space admin is
+       never an App admin: everything that was the App admin's alone stays
+       so unless it is named for space admins below. */
+    const actingOrgDoc = await readJson(store, K.org(acting));
+    const iRunThis = !!actingOrgDoc && orgOf(me) === acting && (actingOrgDoc.admins || []).includes(mine);
+    const iManage = iAmAdmin || iRunThis;
+    /** Names for handles whose accounts were deleted (0.544): what they made keeps their name. */
+    async function nameTheGone(/** @type {Record<string, string>} */ nameOf, /** @type {string[]} */ handles) {
+      for (const h of [...new Set(handles)]) {
+        if (!h || (nameOf[h] && nameOf[h] !== h)) continue;
+        const g = await readJson(store, K.gone(h));
+        if (g && g.displayName) nameOf[h] = g.displayName;
+      }
+    }
+    /** Rows read straight off an index, with another org's blanked (kept in place, so ids still line up). */
+    const here = (/** @type {any[]} */ rows) => rows.map((r) => (r && inScope(r) ? r : null));
 
     /* Stamped where a teaching action has gone through, never where one was
        merely attempted: a save refused as not-yours is not work done. Which
@@ -1081,9 +1424,12 @@ export default async (req) => {
          news to whoever is reading it. */
       const cardId = cardIdOf(String(body.cardId || "").slice(0, 64));
       const flagged = cardId ? await readCard(store, cardId) : null;
+      /* Your own card in My space is yours to fix, not to report (0.545). */
+      if (flagged && flagged.personal) return json({ error: "not-reportable" }, 400);
 
       const flag = {
         id: randomBytes(8).toString("hex"),
+        org: acting,
         kind,
         note,
         handle: mine,
@@ -1145,9 +1491,19 @@ export default async (req) => {
     if (action === "create-deck") {
       const title = String(body.title || "").trim().slice(0, 60);
       if (!title) return json({ error: "title-required" }, 400);
+      /* My space (0.545): anyone may make a personal deck; a deck of the
+         space is made by its teachers, space admins and App admins (33a). */
+      /* Since 0.550, students make nothing at all: My space too is for those
+         who teach or run the space. */
+      const personal = body.personal === true;
+      if (!iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) {
+        return json({ error: "not-teaching" }, 403);
+      }
       const id = `d${randomBytes(6).toString("hex")}`;
       const deck = {
         id,
+        org: acting,
+        ...(personal ? { personal: true, practise: true } : {}),
         owner: mine,
         title,
         description: String(body.description || "").slice(0, 300),
@@ -1341,13 +1697,10 @@ export default async (req) => {
       for (const d of withParts) {
         const holding = courses.filter((c) => (c.decks || []).includes(d.id));
         const lang = d.lang || (holding[0] && holding[0].language) || "";
-        const whose = [
-          ...new Set(
-            [d.owner]
-              .concat(holding.flatMap((c) => (c.teachers || []).concat((c.decks || []).map((x) => ownerOf.get(x) || ""))))
-              .filter(Boolean),
-          ),
-        ];
+        /* The one person whose numbers the deck uses (0.541): its own
+           choice, or its owner. Every teacher's used to count, which sent
+           students each number once per teacher. */
+        const whose = [d.numbersFrom || d.owner].filter(Boolean);
         /** @type {Set<string>} */
         const open = new Set();
         for (const ids of await Promise.all(whose.map((h) => opens(h, lang)))) for (const id of ids) open.add(id);
@@ -1496,7 +1849,7 @@ export default async (req) => {
           result.missing.push(id);
           continue;
         }
-        if (card.owner !== mine && !iAmAdmin) {
+        if (card.owner !== mine && !iManage) {
           result.refused.push(id);
           continue;
         }
@@ -1549,6 +1902,7 @@ export default async (req) => {
         await writeJson(store, K.card(id), {
           ...c,
           id,
+          org: orgOf(deck),
           owner: deck.owner,
           lang: deck.lang || "",
           rev: 1,
@@ -1576,9 +1930,9 @@ export default async (req) => {
       const deckIds = await readIndex(store, "decks");
       const courseIds = await readIndex(store, "courses");
       const [cardRows, deckRows, courseRows] = await Promise.all([
-        readManyJson(store, ids.map((id) => K.card(id))),
-        readManyJson(store, deckIds.map((id) => K.deck(id))),
-        readManyJson(store, courseIds.map((id) => K.course(id))),
+        readManyJson(store, ids.map((id) => K.card(id))).then(here),
+        readManyJson(store, deckIds.map((id) => K.deck(id))).then(here),
+        readManyJson(store, courseIds.map((id) => K.course(id))).then(here),
       ]);
 
       /* The decks I may work on: mine, plus every deck in a course I teach.
@@ -1587,7 +1941,9 @@ export default async (req) => {
       const teaching = new Set(
         courseRows.filter((c) => c && isTeacher(c, mine)).flatMap((c) => c.decks || [])
       );
-      const editable = deckRows.filter((d) => d && (d.owner === mine || teaching.has(d.id)));
+      /* A space admin looks after every deck in the space (6a), except
+         anyone's My space. */
+      const editable = deckRows.filter((d) => d && (d.owner === mine || teaching.has(d.id) || (iManage && !d.personal)));
 
       /** @type {Record<string, string[]>} */
       const holding = {};
@@ -1631,13 +1987,13 @@ export default async (req) => {
         if (!existing) return json({ error: "no-card" }, 404);
         wasFilling = fillsOf(existing).length > 0;
         current = await decksHolding(existing);
-        if (existing.owner !== mine && !me.admin) {
+        if (existing.owner !== mine && !iManage) {
           /* A card in a deck I teach is mine to correct — a deck it is
              actually in, not one the request happens to name. */
           let allowed = false;
           for (const did of current) {
             const d = await readDeck(store, did);
-            if (await canEditDeck(store, d, mine, me.admin)) {
+            if (await canEditDeck(store, d, mine, iManage)) {
               allowed = true;
               break;
             }
@@ -2400,13 +2756,22 @@ export default async (req) => {
               }
             : undefined,
           rev: (existing.rev || 1) + 1,
+          /* Its org, whatever the rebuild above kept: a card that lost it
+             would fall back into Main. */
+          ...(existing.org ? { org: existing.org } : {}),
           updated: Date.now(),
         };
       } else {
         const newId = `k${randomBytes(6).toString("hex")}`;
         const now = Date.now();
+        if (body.personal === true && !iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) {
+          return json({ error: "not-teaching" }, 403);
+        }
         saved = {
           id: newId,
+          org: acting,
+          /* Personal or not is decided here, once (0.545). */
+          ...(body.personal === true ? { personal: true } : {}),
           owner: mine,
           ...fields,
           /* The card screen makes every card a draft, and an import makes
@@ -2454,11 +2819,14 @@ export default async (req) => {
         if (!d) continue;
         const has = current.includes(did);
         const want = wanted.has(did);
-        if (want !== has && !(await canEditDeck(store, d, mine, me.admin))) {
+        if (want !== has && !(await canEditDeck(store, d, mine, iManage))) {
           /* Not this person's deck to change: leave it as it was. */
           if (has) final.push(did);
           continue;
         }
+        /* A personal card stays in My space (0.545): never into a deck of
+           the space — that is what copying a deck is for. */
+        if (want && !has && saved.personal && !d.personal) continue;
         /* A locked deck's cards stay as they are, whoever asks. Left as it
            was and named in the answer, so a save queued offline before the
            lock still lands its words and the teacher is told which deck
@@ -2627,9 +2995,9 @@ export default async (req) => {
     /** @param {Card} card */
     async function mayEditCard(card) {
       if (!card) return false;
-      if (card.owner === mine || iAmAdmin) return true;
+      if (card.owner === mine || iManage) return true;
       for (const did of await decksHolding(card)) {
-        if (await canEditDeck(store, await readDeck(store, did), mine, iAmAdmin)) return true;
+        if (await canEditDeck(store, await readDeck(store, did), mine, iManage)) return true;
       }
       return false;
     }
@@ -2781,9 +3149,9 @@ export default async (req) => {
      * an older build still on a teacher's device simply shows none.
      */
     if (action === "my-reports") {
-      if (!iAmAdmin) return json({ ok: true, flags: [], cards: [] });
+      if (!iManage) return json({ ok: true, flags: [], cards: [] });
       const flagIds = await readIndex(store, "flags");
-      const rows = (await readManyJson(store, flagIds.map((x) => K.flag(x)))).filter(Boolean);
+      const rows = here(await readManyJson(store, flagIds.map((x) => K.flag(x)))).filter(Boolean);
       /** @type {Map<string, any>} */
       const cardsById = new Map();
       /** @type {Map<string, boolean>} */
@@ -2797,7 +3165,7 @@ export default async (req) => {
         if (!allowed.has(cid)) {
           let may = card ? await mayEditCard(card) : false;
           if (!may && !card && f.deckId) {
-            may = await canEditDeck(store, await readDeck(store, String(f.deckId)), mine, me.admin);
+            may = await canEditDeck(store, await readDeck(store, String(f.deckId)), mine, iManage);
           }
           allowed.set(cid, may);
         }
@@ -2815,7 +3183,7 @@ export default async (req) => {
        administrator's dismissal counts — see my-reports. The Flags list
        loses it too: there is one report, and it has been answered. */
     if (action === "dismiss-reports") {
-      if (!iAmAdmin) return json({ ok: true, deleted: 0 });
+      if (!iManage) return json({ ok: true, deleted: 0 });
       const wanted = new Set((Array.isArray(body.flagIds) ? body.flagIds : []).map(String).slice(0, 100));
       if (!wanted.size) return json({ ok: true, deleted: 0 });
       const ids = await readIndex(store, "flags");
@@ -2824,11 +3192,11 @@ export default async (req) => {
       for (const fid of ids) {
         if (!wanted.has(fid)) continue;
         const f = await readJson(store, K.flag(fid));
-        if (!f) continue;
+        if (!f || !inScope(f)) continue;
         const card = await loadCard(cardIdOf(f.cardId));
         const may = card
           ? await mayEditCard(card)
-          : !!f.deckId && (await canEditDeck(store, await readDeck(store, String(f.deckId)), mine, me.admin));
+          : !!f.deckId && (await canEditDeck(store, await readDeck(store, String(f.deckId)), mine, iManage));
         if (!may) continue;
         await store.delete(K.flag(fid)).catch(() => {});
         gone.push(fid);
@@ -2863,7 +3231,7 @@ export default async (req) => {
 
     if (action === "my-decks") {
       const ids = await readIndex(store, "decks");
-      const rows = (await readManyJson(store, ids.map((id) => K.deck(id)))).filter(Boolean);
+      const rows = here(await readManyJson(store, ids.map((id) => K.deck(id)))).filter(Boolean);
 
       /* Mine, plus every deck in a course I teach — those are mine to work on
          too, and hiding them meant a co-teacher could not find the material
@@ -2874,7 +3242,7 @@ export default async (req) => {
       /* With the courses that hold each one read off those courses, which
          is what the course screen, Manage decks and a deck's settings all
          show — see linksOf. */
-      const shown = rows.filter((d) => d.owner === mine || teaching.has(d.id));
+      const shown = rows.filter((d) => d.owner === mine || teaching.has(d.id) || (iManage && !d.personal));
       /* And which of its number parts reach nobody yet — see partsWaiting. */
       const waiting = await partsWaiting(shown, courses);
       const decks = shown.map((d) => ({
@@ -2890,7 +3258,7 @@ export default async (req) => {
     if (action === "rename-deck") {
       const deck = await readDeck(store, String(body.deckId || ""));
       if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin)))
+      if (!(await canEditDeck(store, deck, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       const title = String(body.title || "").trim().slice(0, 60);
       if (!title) return json({ error: "title-required" }, 400);
@@ -2913,7 +3281,7 @@ export default async (req) => {
     if (action === "lock-deck") {
       const deck = await readDeck(store, String(body.deckId || ""));
       if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin)))
+      if (!(await canEditDeck(store, deck, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       const locked = !!body.locked;
       await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
@@ -2939,7 +3307,7 @@ export default async (req) => {
     if (action === "set-deck-parts") {
       const deck = await readDeck(store, String(body.deckId || ""));
       if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin)))
+      if (!(await canEditDeck(store, deck, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
       const asked = Array.isArray(body.parts) ? body.parts : [];
@@ -2961,13 +3329,178 @@ export default async (req) => {
       return json({ ok: true, parts, partsWaiting: waiting || [] });
     }
 
+    /*
+     * Whose numbers a deck uses (0.541).
+     *
+     * A deck holding number parts is filled from one person's numbers and
+     * clock: its own choice, or its owner's. number-sources lists who may be
+     * chosen — the owner and every teacher with a number system in the
+     * deck's language — and set-deck-numbers records the choice.
+     */
+    async function numberSources(/** @type {Deck} */ deck) {
+      const courses = await everyCourse(store);
+      const holding = courses.filter((c) => (c.decks || []).includes(deck.id));
+      const lang = deck.lang || (holding[0] && holding[0].language) || "";
+      const handles = [...new Set([deck.owner].concat(courses.flatMap((c) => c.teachers || [])).filter(Boolean))];
+      const out = [];
+      for (const h of handles) {
+        const index = await systemIndex(h);
+        if (!index.numbers[lang]) continue;
+        const u = await readUser(store, h);
+        out.push({ handle: h, displayName: (u && u.displayName) || h, numbers: true, times: !!index.times[lang] });
+      }
+      const owner = out.filter((x) => x.handle === deck.owner);
+      const rest = out.filter((x) => x.handle !== deck.owner).sort((a, b) => a.displayName.localeCompare(b.displayName));
+      return owner.concat(rest);
+    }
+
+    if (action === "number-sources") {
+      const deck = await readDeck(store, url.searchParams.get("deck") || "");
+      if (!deck) return json({ error: "no-deck" }, 404);
+      if (!(await canEditDeck(store, deck, mine, iManage))) return json({ error: "not-yours" }, 403);
+      return json({ ok: true, sources: await numberSources(deck), chosen: deck.numbersFrom || deck.owner });
+    }
+
+    if (action === "set-deck-numbers") {
+      const deck = await readDeck(store, String(body.deckId || ""));
+      if (!deck) return json({ error: "no-deck" }, 404);
+      if (!(await canEditDeck(store, deck, mine, iManage))) return json({ error: "not-yours" }, 403);
+      const from = String(body.from || "");
+      if (!(await numberSources(deck)).some((x) => x.handle === from)) return json({ error: "bad-source" }, 400);
+      const next = await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
+        if (!fresh) return null;
+        const { numbersFrom: _was, ...rest } = /** @type {any} */ (fresh);
+        return {
+          ...rest,
+          ...(from === fresh.owner ? null : { numbersFrom: from }),
+          version: (fresh.version || 1) + 1,
+          updated: Date.now(),
+        };
+      });
+      await taught();
+      const waiting = next ? (await partsWaiting([next], await everyCourse(store))).get(next.id) : null;
+      return json({ ok: true, numbersFrom: from, partsWaiting: waiting || [] });
+    }
+
+    /* ================= My space (0.545) ================= */
+
+    /* "Practise this myself" on one of your own personal decks (59b). */
+    if (action === "set-deck-practise") {
+      const deck = await readDeck(store, String(body.deckId || ""));
+      if (!deck || !deck.personal || deck.owner !== mine) return json({ error: "not-yours" }, 403);
+      const practise = !!body.practise;
+      await updateJson(store, K.deck(deck.id), (/** @type {any} */ f) =>
+        f ? { ...f, practise, version: (f.version || 1) + 1, updated: Date.now() } : null
+      );
+      return json({ ok: true, practise });
+    }
+
+    /*
+     * A My space deck into the space (0.549; 15a, 2a, 9b, 10a): copied —
+     * a new deck of the space with copies of your cards, the original kept
+     * — or moved — the deck itself and your cards in it become the space's,
+     * nothing left behind. Either way it can go straight onto any of the
+     * courses you may put decks on. Course cards it borrowed are already
+     * the space's and stay as they are.
+     */
+    if (action === "copy-to-space") {
+      const deck = await readDeck(store, String(body.deckId || ""));
+      if (!deck || !deck.personal || deck.owner !== mine) return json({ error: "not-yours" }, 403);
+      if (!iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) return json({ error: "not-teaching" }, 403);
+      const move = body.move === true;
+      const courses = (await everyCourse(store)).filter(
+        (c) => (Array.isArray(body.courses) ? body.courses.map(String) : []).includes(c.id) && (iManage || isTeacher(c, mine))
+      );
+      let landed;
+      if (move) {
+        for (const cid of deck.cardIds || []) {
+          await updateJson(store, K.card(cid), (/** @type {any} */ c) => {
+            if (!c || !c.personal || c.owner !== mine) return null;
+            const { personal: _p, ...rest } = c;
+            return { ...rest, updated: Date.now() };
+          });
+        }
+        landed = await updateJson(store, K.deck(deck.id), (/** @type {any} */ d) => {
+          if (!d) return null;
+          const { personal: _p, practise: _q, ...rest } = d;
+          return { ...rest, version: (d.version || 1) + 1, updated: Date.now() };
+        });
+      } else {
+        const newDeck = `d${randomBytes(6).toString("hex")}`;
+        /** @type {string[]} */
+        const ids = [];
+        /** @type {string[]} */
+        const madeIds = [];
+        for (const cid of deck.cardIds || []) {
+          const c = await loadCard(cid);
+          if (!c) continue;
+          if (!c.personal) {
+            ids.push(cid);
+            continue;
+          }
+          const copyId = `k${randomBytes(6).toString("hex")}`;
+          const { personal: _p, inDecks: _d, ...rest } = /** @type {any} */ (c);
+          await writeJson(store, K.card(copyId), { ...rest, id: copyId, org: acting, owner: mine, rev: 1, inDecks: [newDeck], created: Date.now(), updated: Date.now() });
+          ids.push(copyId);
+          madeIds.push(copyId);
+        }
+        if (madeIds.length) await updateJson(store, K.myCards(mine), (/** @type {any} */ cur) => (cur || []).concat(madeIds));
+        const { personal: _p, practise: _q, ...deckRest } = /** @type {any} */ (deck);
+        landed = {
+          ...deckRest, id: newDeck, org: acting, owner: mine, title: String(body.title || deck.title).slice(0, 60),
+          courses: [], cardIds: ids, cardCount: ids.length, version: 1, updated: Date.now(),
+        };
+        await writeJson(store, K.deck(newDeck), landed);
+        await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).concat([newDeck]));
+      }
+      for (const c of courses) {
+        await updateJson(store, K.course(c.id), (/** @type {any} */ fresh) =>
+          fresh && !(fresh.decks || []).includes(landed.id) ? { ...fresh, decks: (fresh.decks || []).concat([landed.id]) } : null
+        );
+      }
+      await taught();
+      return json({ ok: true, deck: landed, courses: courses.map((c) => c.id) });
+    }
+
+    /*
+     * One My space card into a deck of the space (0.549, 3a): a copy, or the
+     * card itself. A moved card stays in any of your My space decks that
+     * held it, where it now reads as a borrowed course card.
+     */
+    if (action === "card-to-space") {
+      const card = await loadCard(String(body.cardId || ""));
+      if (!card || !card.personal || card.owner !== mine) return json({ error: "not-yours" }, 403);
+      const deck = await readDeck(store, String(body.deckId || ""));
+      if (!deck || deck.personal || !(await canEditDeck(store, deck, mine, iManage))) return json({ error: "not-yours" }, 403);
+      let id = card.id;
+      if (body.move === true) {
+        await updateJson(store, K.card(card.id), (/** @type {any} */ c) => {
+          if (!c) return null;
+          const { personal: _p, ...rest } = c;
+          return { ...rest, inDecks: [...new Set((c.inDecks || []).concat([deck.id]))], updated: Date.now() };
+        });
+      } else {
+        id = `k${randomBytes(6).toString("hex")}`;
+        const { personal: _p, inDecks: _d, ...rest } = /** @type {any} */ (card);
+        await writeJson(store, K.card(id), { ...rest, id, org: acting, owner: mine, rev: 1, inDecks: [deck.id], created: Date.now(), updated: Date.now() });
+        await updateJson(store, K.myCards(mine), (/** @type {any} */ cur) => (cur || []).concat([id]));
+      }
+      await updateJson(store, K.deck(deck.id), (/** @type {any} */ d) => {
+        if (!d) return null;
+        const ids = [...new Set((d.cardIds || []).concat([id]))];
+        return { ...d, cardIds: ids, cardCount: ids.length, version: (d.version || 1) + 1, updated: Date.now() };
+      });
+      await taught();
+      return json({ ok: true, cardId: id });
+    }
+
     /* The deck goes; the cards it held stay in the library. A locked deck
        is unlocked first: deleting it is the largest change there is to
        which cards it holds. */
     if (action === "delete-deck") {
       const deck = await readDeck(store, String(body.deckId || ""));
       if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin)))
+      if (!(await canEditDeck(store, deck, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
 
@@ -2995,9 +3528,10 @@ export default async (req) => {
       const deck = await readDeck(store, String(body.deckId || ""));
       const course = await readCourse(store, String(body.courseId || ""));
       if (!deck || !course) return json({ error: "not-found" }, 404);
-      if (!(await canEditDeck(store, deck, mine, me.admin)))
+      if (!(await canEditDeck(store, deck, mine, iManage)))
         return json({ error: "not-yours" }, 403);
-      if (!isTeacher(course, mine) && !me.admin) return json({ error: "not-teaching" }, 403);
+      if (!isTeacher(course, mine) && !iManage) return json({ error: "not-teaching" }, 403);
+      if (deck.personal) return json({ error: "personal-deck" }, 400);
 
       const adding = action === "attach-deck";
       /* Whether the course held it before this, which decides whether the
@@ -3035,7 +3569,7 @@ export default async (req) => {
     /* ================= courses ================= */
 
     if (action === "create-course") {
-      if (!me.admin) return json({ error: "admin-only" }, 403);
+      if (!iManage) return json({ error: "admin-only" }, 403);
       const title = String(body.title || "").trim().slice(0, 80);
       if (!title) return json({ error: "title-required" }, 400);
       const id = `c${randomBytes(6).toString("hex")}`;
@@ -3046,6 +3580,7 @@ export default async (req) => {
       const teacherCode = makeCode();
       const course = {
         id,
+        org: acting,
         title,
         description: String(body.description || "").slice(0, 400),
         /* The language the course teaches. Everything downstream leans on
@@ -3072,7 +3607,7 @@ export default async (req) => {
        has to be enrolled as a student to get them. Assigning one no longer
        removes the other. */
     if (action === "assign-teacher" || action === "assign-student" || action === "remove-member") {
-      if (!me.admin) return json({ error: "admin-only" }, 403);
+      if (!iManage) return json({ error: "admin-only" }, 403);
       const course = await readCourse(store, String(body.courseId || ""));
       const handle = String(body.handle || "");
       const target = await readUser(store, handle);
@@ -3107,7 +3642,14 @@ export default async (req) => {
       const id = await courseForCode(store, given);
       if (!id) return json({ error: "bad-code" }, 404);
       const course = await readCourse(store, id);
-      if (!course) return json({ error: "not-found" }, 404);
+      if (!course) {
+        /* Another space's course (53b): say which, so the app can offer a
+           new account there. */
+        const raw = await readJson(store, K.course(id));
+        const there = raw ? await readJson(store, K.org(orgOf(raw))) : null;
+        if (there) return json({ error: "other-space", space: orgCard(there) }, 409);
+        return json({ error: "not-found" }, 404);
+      }
 
       /* Which code was used decides what they become. A code that no longer
          matches the course it points at has been replaced. */
@@ -3130,7 +3672,7 @@ export default async (req) => {
     if (action === "my-courses") {
       const ids = await readIndex(store, "courses");
       const out = (await readManyJson(store, ids.map((id) => K.course(id))))
-        .filter((c) => c && inCourse(c, mine))
+        .filter((c) => c && inScope(c) && inCourse(c, mine))
         .map((c) => {
           const teaching = isTeacher(c, mine);
           const studying = isStudent(c, mine);
@@ -3327,11 +3869,14 @@ export default async (req) => {
       const courseIds = (await readJson(store, K.index("courses"), EVENTUAL)) || [];
       const allCourses = (
         await readManyJson(store, courseIds.map((id) => K.course(id)), EVENTUAL)
-      ).filter(Boolean);
+      ).filter((c) => c && inScope(c));
       const courseRows = allCourses.filter((c) => isStudent(c, mine));
       /* Whether the Teaching space exists for this person is answered here
          too, so the app needn't ask a second time on every launch. */
       const teaches = allCourses.some((c) => isTeacher(c, mine));
+
+      /* My space is no longer practised in Learning (0.550, 8b): nothing of
+         it is sent here. */
 
       /* A deck in two of the person's courses is still one deck; listing
          it twice gave the app two cards with one id. First course wins. */
@@ -3355,6 +3900,9 @@ export default async (req) => {
           deckRows
             .map((/** @type {any} */ d) => d.owner)
             .concat(courseRows.flatMap((/** @type {any} */ c) => c.teachers || []))
+            /* And whoever a deck takes its numbers from (0.541), who may
+               teach none of these courses. */
+            .concat(deckRows.map((/** @type {any} */ d) => d.numbersFrom || ""))
             .filter(Boolean)
         ),
       ];
@@ -3427,14 +3975,23 @@ export default async (req) => {
       /** @type {Record<string, string>} */
       const nameOf = {};
       ownerHandles.forEach((h, i) => (nameOf[h] = owners[i] ? owners[i].displayName : h));
+      await nameTheGone(nameOf, ownerHandles);
 
       const decks = [];
       for (const d of deckRows) {
         const course = deckToCourse.get(d.id);
         const link = (d.courses || []).find((/** @type {{ courseId: string }} */ c) => c.courseId === course.id);
         const cardIds = await deckCardIds(d);
+        /* Which number system and clock fill this deck's number parts: the
+           chosen person's, in the deck's language (0.541). null when that
+           person has none, so the device files nothing rather than
+           everything. */
+        const numLang = d.lang || course.language || "";
+        const numIndex = await systemIndex(d.numbersFrom || d.owner);
         decks.push({
           ...d,
+          numbersSystemId: numIndex.numbers[numLang] || null,
+          timeSystemId: numIndex.times[numLang] || null,
           cardIds,
           cardCount: cardIds.length,
           ownerName: nameOf[d.owner],
@@ -3454,7 +4011,7 @@ export default async (req) => {
          they publish them. See isPublished. */
       allCardIds.forEach((id, i) => {
         const c = cardRows[i];
-        if (c && isPublished(c)) cardById.set(id, studentView(c));
+        if (c && inScope(c) && isPublished(c)) cardById.set(id, studentView(c));
       });
       /*
        * The values a deck's phrases need, sent with it.
@@ -3493,7 +4050,7 @@ export default async (req) => {
         const ids = (await readJson(store, K.myCards(owner), EVENTUAL)) || [];
         const rows = await readManyJson(store, ids.map((id) => K.card(id)), EVENTUAL);
         const out = rows
-          .filter((/** @type {any} */ c) => c && isPublished(c))
+          .filter((/** @type {any} */ c) => c && inScope(c) && isPublished(c))
           .map((/** @type {any} */ c) => studentView(c))
           .map((/** @type {any} */ c) => ({ card: c, fills: fillsOf(c) }));
         libraries.set(owner, out);
@@ -3620,7 +4177,7 @@ export default async (req) => {
     if (action === "course-decks") {
       const course = await readCourse(store, url.searchParams.get("course") || "");
       if (!course) return json({ error: "not-found" }, 404);
-      if (!inCourse(course, mine) && !me.admin) return json({ error: "not-in-course" }, 403);
+      if (!inCourse(course, mine) && !iManage) return json({ error: "not-in-course" }, 403);
 
       const rows = (await readManyJson(store, course.decks.map((id) => K.deck(id)))).filter(
         Boolean
@@ -3630,6 +4187,7 @@ export default async (req) => {
       /** @type {Record<string, string>} */
       const nameOf = {};
       ownerHandles.forEach((h, i) => (nameOf[h] = owners[i] ? owners[i].displayName : h));
+      await nameTheGone(nameOf, ownerHandles);
       const decks = rows.map((d) => {
         const link = d.courses.find((/** @type {{ courseId: string }} */ c) => c.courseId === course.id);
         return {
@@ -3655,7 +4213,7 @@ export default async (req) => {
          what sends it to them in the first place. */
       const allowed =
         deck.owner === mine ||
-        me.admin ||
+        iManage ||
         (await everyCourse(store)).some((c) => (c.decks || []).includes(deck.id) && inCourse(c, mine));
       if (!allowed) return json({ error: "no-access" }, 403);
 
@@ -3686,9 +4244,9 @@ export default async (req) => {
       const courses = await everyCourse(store);
       const teaching = new Set(courses.filter((c) => isTeacher(c, mine)).flatMap((c) => c.decks || []));
       const deckRows = (await readManyJson(store, (await readIndex(store, "decks")).map((id) => K.deck(id))))
-        .filter(Boolean);
+        .filter((d) => d && inScope(d));
       /* An administrator may take anything, as a backup would. */
-      const admin = !!(me && me.admin);
+      const admin = iManage;
       const decks = deckRows.filter((d) => admin || d.owner === mine || teaching.has(d.id));
       const cards = new Set(own.concat(decks.flatMap((d) => d.cardIds || [])));
       return { decks: new Map(decks.map((d) => [d.id, d])), cards, admin };
@@ -3705,7 +4263,7 @@ export default async (req) => {
          would be an empty deck that says it holds cards. */
       const wanted = new Set(askedCards.concat(deckIds.flatMap((id) => may.decks.get(id).cardIds || [])));
       const ids = [...wanted].filter((id) => may.admin || may.cards.has(id));
-      const cards = (await readManyJson(store, ids.map((id) => K.card(id)))).filter(Boolean);
+      const cards = here(await readManyJson(store, ids.map((id) => K.card(id)))).filter(Boolean);
       const withMedia = body.media !== false;
       const clips = withMedia ? [...new Set(cards.flatMap(clipsOfCard))] : [];
       const images = withMedia ? [...new Set(cards.flatMap(imagesOfCard))] : [];
@@ -3771,6 +4329,10 @@ export default async (req) => {
             : readJson(store, k)
         )
       );
+      /* An administrator may take any card — in the org this request acts in. */
+      if (values.some((v, i) => !keys[i].startsWith("clip:") && !keys[i].startsWith("image:") && v && !inScope(v))) {
+        return json({ error: "no-access" }, 403);
+      }
       /** @type {Record<string, any>} */
       const records = {};
       keys.forEach((k, i) => {
@@ -3860,10 +4422,53 @@ export default async (req) => {
       return json({ ok: true, hash, data });
     }
 
+    /* ================= one's own account in a space (0.544) ================= */
+
+    /* "I've saved my key somewhere safe" (19b). */
+    if (action === "key-saved") {
+      await writeJson(store, K.user(mine), { ...me, keySaved: true });
+      return json({ ok: true });
+    }
+
+    /* Leaving the space (25a, 52a): suspended, with a record, until a space
+       admin or the App admin reactivates. Never an App admin. */
+    if (action === "leave-space") {
+      if (iAmAdmin) return json({ error: "admin-stays" }, 400);
+      await suspend(me, "left", mine);
+      return json({ ok: true });
+    }
+
+    /**
+     * Suspend an account: off every roster, the courses kept to put back,
+     * and a Former members record.
+     * @param {any} user @param {"left" | "removed"} why @param {string} by
+     */
+    async function suspend(user, why, by) {
+      const courses = await coursesOf(store, user.handle);
+      await dropFromRosters(store, user.handle);
+      await writeJson(store, K.user(user.handle), { ...user, suspended: { at: Date.now(), by, why, courses } });
+      await noteFormer(store, orgOf(user), {
+        handle: user.handle,
+        displayName: user.displayName,
+        joined: user.created || 0,
+        left: Date.now(),
+        courses,
+        why,
+        by,
+      });
+    }
+
     /* ================= admin ================= */
 
     if (action.startsWith("admin-")) {
-      if (!me.admin) return json({ error: "admin-only" }, 403);
+      /* A space admin may use these, in their own space (0.544; B4); every
+         other admin- action is the App admin's alone. */
+      const SPACE_ADMIN_MAY = new Set([
+        "admin-overview", "admin-create-user", "admin-reissue-key", "admin-rename-course",
+        "admin-course-language", "admin-new-code", "admin-card", "admin-delete-flags",
+        "admin-suspend-user", "admin-reactivate-user", "admin-new-invite", "admin-hand-over",
+      ]);
+      if (!iAmAdmin && !(iRunThis && SPACE_ADMIN_MAY.has(action))) return json({ error: "admin-only" }, 403);
 
       if (action === "admin-overview") {
         const userIds = await readIndex(store, "users");
@@ -3872,10 +4477,10 @@ export default async (req) => {
         const flagIds = await readIndex(store, "flags");
 
         const [courseRows, userRows, deckRows, flagRows] = await Promise.all([
-          readManyJson(store, courseIds.map((id) => K.course(id))),
-          readManyJson(store, userIds.map((h) => K.user(h))),
-          readManyJson(store, deckIds.map((id) => K.deck(id))),
-          readManyJson(store, flagIds.map((id) => K.flag(id))),
+          readManyJson(store, courseIds.map((id) => K.course(id))).then(here),
+          readManyJson(store, userIds.map((h) => K.user(h))).then(here),
+          readManyJson(store, deckIds.map((id) => K.deck(id))).then(here),
+          readManyJson(store, flagIds.map((id) => K.flag(id))).then(here),
         ]);
         const courses = courseRows.filter(Boolean);
         const users = [];
@@ -3899,6 +4504,7 @@ export default async (req) => {
         /** @type {Record<string, string>} */
       const nameOf = {};
         for (const u of userRows) if (u) nameOf[u.handle] = u.displayName;
+        await nameTheGone(nameOf, deckRows.filter(Boolean).map((d) => d.owner));
         /* Which courses hold a deck, said by the courses — see linksOf —
            and which of its number parts reach nobody yet. */
         const waiting = await partsWaiting(deckRows.filter(Boolean), courses);
@@ -3973,7 +4579,11 @@ export default async (req) => {
             };
           })
           .sort((a, b) => (b.at || 0) - (a.at || 0));
-        return json({ ok: true, users, courses, decks, flags });
+        /* And who has left the space (30c). */
+        const former = (await readJson(store, K.former(acting))) || [];
+        /* And the space's invitation, for its admins to share (37a). */
+        const invite = actingOrgDoc ? { code: actingOrgDoc.inviteCode, slug: actingOrgDoc.slug, name: actingOrgDoc.name, admins: actingOrgDoc.admins || [] } : null;
+        return json({ ok: true, users, courses, decks, flags, former, invite });
       }
 
       /* A lost key: the handle survives, so memberships and progress do too. */
@@ -4000,20 +4610,39 @@ export default async (req) => {
          carries a digest, so a file can be verified long after it was made,
          without a restore and without trusting that the download finished. */
 
-      if (action === "admin-backup-manifest") {
-        const handles = await readIndex(store, "users");
-        const courseIds = await readIndex(store, "courses");
-        const deckIds = await readIndex(store, "decks");
+      /*
+       * A backup of the whole site, or (0.546; 63a, 72a) an export of one
+       * space: the same manifest, with everything outside that space left
+       * out, and everyone's My space too. Its chunks are fetched with
+       * admin-backup-chunk like a backup's.
+       */
+      if (action === "admin-backup-manifest" || action === "admin-export-org-manifest" || action === "admin-org-usage") {
+        const only = action === "admin-backup-manifest" ? "" : String(body.id || url.searchParams.get("id") || "");
+        if (action !== "admin-backup-manifest" && !(await readJson(store, K.org(only)))) return json({ error: "no-space" }, 404);
+        const keep = (/** @type {any} */ rec) => !only || (rec && orgOf(rec) === only && !rec.personal);
+        const pick = async (/** @type {string[]} */ ids, /** @type {(id: string) => string} */ keyOf) =>
+          only ? (await readManyJson(store, ids.map(keyOf))).map((r, i) => (keep(r) ? ids[i] : null)).filter((x) => x !== null) : ids;
+        const handles = /** @type {string[]} */ (await pick(await readIndex(store, "users"), K.user));
+        const courseIds = /** @type {string[]} */ (await pick(await readIndex(store, "courses"), K.course));
+        const deckIds = /** @type {string[]} */ (await pick(await readIndex(store, "decks"), K.deck));
         /* Reports were the one thing on the site a backup did not hold, so
            a restore quietly threw away every problem anybody had reported
            and not yet fixed. They are small and they are somebody's words
            about a card that is in the file beside them. */
-        const flagIds = await readIndex(store, "flags");
+        const flagIds = /** @type {string[]} */ (await pick(await readIndex(store, "flags"), K.flag));
+        /* And the spaces, with every address each has had (0.542). */
+        const orgIds = only ? [only] : await readIndex(store, "orgs");
+        const orgDocs = (await readManyJson(store, orgIds.map((id) => K.org(id)))).filter(Boolean);
+        const slugNames = [...new Set(orgDocs.flatMap((o) => [o.slug].concat(o.formerSlugs || [])).filter(Boolean))];
 
         /* Card ids come from each owner's list rather than a global index,
-           which is where they actually live. */
+           which is where they actually live — and, for one space, from its
+           decks too, which can hold an App admin's card. */
         const cardLists = await readManyJson(store, handles.map((h) => K.myCards(h)));
-        const cardIds = [...new Set(cardLists.flatMap((l) => l || []))];
+        const deckCards = only
+          ? (await readManyJson(store, deckIds.map((id) => K.deck(id)))).flatMap((d) => (d && d.cardIds) || [])
+          : [];
+        const cardIds = /** @type {string[]} */ (await pick([...new Set(cardLists.flatMap((l) => l || []).concat(deckCards))], K.card));
 
         /* Clip hashes are only discoverable from the cards that use them, so
            the cards have to be read to know what a complete backup contains.
@@ -4066,6 +4695,34 @@ export default async (req) => {
         batch("system", systemKeys, 10);
         batch("mysystems", handles.map(K.mySystems), 60);
         batch("flag", flagIds.map(K.flag), 60);
+        batch("org", orgIds.map(K.org), 60);
+        batch("former", orgIds.map(K.former), 60);
+        const goneHandles = only
+          ? (await Promise.all((await readIndex(store, "gone")).map(async (h) => ((await readJson(store, K.gone(h))) || {}).org === only ? h : null))).filter((h) => h !== null)
+          : await readIndex(store, "gone");
+        batch("gone", /** @type {string[]} */ (goneHandles).map(K.gone), 100);
+
+        /* How much a space holds (60a): the counts, and the bytes of the
+           recordings and pictures its cards and numbers use. One shared by
+           two spaces counts in both. */
+        if (action === "admin-org-usage") {
+          const sizeOf = async (/** @type {string} */ key) => {
+            if (typeof store.size === "function") return (await store.size(key)) || 0;
+            const v = await store.get(key, { type: "text" }).catch(() => null);
+            return v ? String(v).length : 0;
+          };
+          let bytes = 0;
+          for (const h of clipHashes) bytes += await sizeOf(K.clip(h));
+          for (const h of imageHashes) bytes += await sizeOf(K.image(h));
+          return json({
+            ok: true,
+            usage: {
+              people: handles.length, courses: courseIds.length, decks: deckIds.length,
+              cards: cardIds.length, recordings: clipHashes.length, pictures: imageHashes.length, bytes,
+            },
+          });
+        }
+        batch("slug", slugNames.map(K.slug), 100);
         batch("clip", clipHashes.map(K.clip), 3);
         batch("image", imageHashes.map(K.image), 2);
 
@@ -4084,8 +4741,9 @@ export default async (req) => {
               clips: clipHashes.length,
               images: imageHashes.length,
               keys: keyHashes.length,
+              orgs: orgIds.length,
             },
-            indexes: { users: handles, courses: courseIds, decks: deckIds, flags: flagIds },
+            indexes: { users: handles, courses: courseIds, decks: deckIds, flags: flagIds, orgs: orgIds, gone: goneHandles },
             chunks: chunks.map((c) => ({ id: c.id, kind: c.kind, keys: c.keys.length })),
             /* Repeated so a chunk can be fetched without the client having to
                reconstruct which keys were in it. */
@@ -4133,7 +4791,7 @@ export default async (req) => {
            restore says it worked. So a new kind of record is added to
            this line in the same release that starts writing one. */
         const allowed =
-          /^(user|key|course|deck|owncards|mycards|card|numsys|timesys|mysystems|flag|clip|image|code|index):/;
+          /^(user|key|course|deck|owncards|mycards|card|numsys|timesys|mysystems|flag|clip|image|code|index|org|slug|former|gone):/;
         let written = 0;
         for (const k of keys) {
           if (!allowed.test(k) || k.length > 200) continue;
@@ -4307,21 +4965,338 @@ export default async (req) => {
         return json({ ok: true, removed, kept: want.has("people") ? mine : "" });
       }
 
+      /* Suspending someone (64a) and reactivating them (67a): a space
+         admin for people in their space, but never another space admin or
+         an App admin — those are the App admin's (70a). */
+      if (action === "admin-suspend-user" || action === "admin-reactivate-user") {
+        const handle = String(body.handle || "");
+        const target = await readUser(store, handle);
+        if (!target) return json({ error: "no-user" }, 404);
+        if (handle === mine) return json({ error: "not-yourself" }, 400);
+        if (target.admin) return json({ error: "admin-only" }, 403);
+        if (!iAmAdmin && (actingOrgDoc.admins || []).includes(handle)) return json({ error: "admin-only" }, 403);
+        if (action === "admin-suspend-user") {
+          if (target.suspended) return json({ ok: true });
+          await suspend(target, "removed", mine);
+          return json({ ok: true });
+        }
+        if (!target.suspended) return json({ ok: true });
+        for (const c of target.suspended.courses || []) {
+          await updateJson(store, K.course(c.id), (/** @type {Course | null} */ fresh) => {
+            if (!fresh || !inScope(fresh)) return null;
+            const next = { ...fresh, teachers: fresh.teachers.slice(), students: fresh.students.slice() };
+            if ((c.roles || []).includes("teacher") && !next.teachers.includes(handle)) next.teachers.push(handle);
+            if ((c.roles || []).includes("student") && !next.students.includes(handle)) next.students.push(handle);
+            return next;
+          });
+        }
+        const { suspended: _was, ...back } = /** @type {any} */ (target);
+        await writeJson(store, K.user(handle), back);
+        await updateJson(store, K.former(orgOf(target)), (/** @type {any} */ cur) =>
+          (cur || []).some((/** @type {any} */ r) => r.handle === handle)
+            ? cur.filter((/** @type {any} */ r) => r.handle !== handle)
+            : null
+        );
+        return json({ ok: true });
+      }
+
+      /* A new invitation link for the space (37a): the old one stops working. */
+      if (action === "admin-new-invite") {
+        const code = makeCode();
+        const old = actingOrgDoc.inviteCode;
+        await updateJson(store, K.org(acting), (/** @type {any} */ o) => (o ? { ...o, inviteCode: code } : null));
+        await writeJson(store, K.code(code), `org:${acting}`);
+        if (old) await store.delete(K.code(old)).catch(() => {});
+        return json({ ok: true, inviteCode: code });
+      }
+
+      /* A former member's material, handed to someone still here (31a, 85a):
+         every deck and card they made for the space, never their numbers
+         (79a) — decks keep using those. */
+      if (action === "admin-hand-over") {
+        const from = String(body.from || "");
+        const to = String(body.to || "");
+        const former = (await readJson(store, K.former(acting))) || [];
+        if (!former.some((/** @type {any} */ r) => r.handle === from)) return json({ error: "not-former" }, 400);
+        const heir = await readUser(store, to);
+        if (!heir || heir.suspended) return json({ error: "not-in-space" }, 400);
+        const deckIds = await readIndex(store, "decks");
+        const decks = here(await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(
+          (d) => d && d.owner === from && !d.personal
+        );
+        for (const d of decks) {
+          await updateJson(store, K.deck(d.id), (/** @type {any} */ f) => (f ? { ...f, owner: to, updated: Date.now() } : null));
+        }
+        const theirs = (await readJson(store, K.myCards(from))) || [];
+        const cards = here(await readManyJson(store, theirs.map((/** @type {string} */ id) => K.card(id)))).filter(
+          (c) => c && c.owner === from && !c.personal
+        );
+        for (const c of cards) {
+          await updateJson(store, K.card(c.id), (/** @type {any} */ f) => (f ? { ...f, owner: to } : null));
+        }
+        const moved = new Set(cards.map((c) => c.id));
+        await updateJson(store, K.myCards(from), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !moved.has(x)));
+        await updateJson(store, K.myCards(to), (/** @type {any} */ cur) => [...new Set((cur || []).concat([...moved]))]);
+        return json({ ok: true, decks: decks.length, cards: cards.length });
+      }
+
+      /* Taking one record off Former members, by hand, when asked (A5). */
+      if (action === "admin-remove-former") {
+        if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+        const handle = String(body.handle || "");
+        await updateJson(store, K.former(acting), (/** @type {any} */ cur) =>
+          (cur || []).filter((/** @type {any} */ r) => r.handle !== handle)
+        );
+        return json({ ok: true });
+      }
+
+      /*
+       * A new space, with its first space admin (65a), whose key is
+       * returned once — the way admin-create-user hands one over.
+       */
+      if (action === "admin-create-org") {
+        const name = String(body.name || "").trim().slice(0, 60);
+        if (!name) return json({ error: "name-required" }, 400);
+        const slug = String(body.slug || "").trim().toLowerCase();
+        const problem = slugProblem(slug);
+        if (problem) return json({ error: problem }, 400);
+        const adminName = String(body.adminName || "").trim().slice(0, 40);
+        if (!adminName) return json({ error: "name-required" }, 400);
+        const id = `o${randomBytes(6).toString("hex")}`;
+        /* The address first: taking it is what can fail, and it is never
+           given back (8b). */
+        const took = await updateJson(store, K.slug(slug), (/** @type {any} */ cur) => (cur ? null : id));
+        if (took !== id) return json({ error: "slug-taken" }, 409);
+
+        const handles = await readIndex(store, "users");
+        const handle = makeHandle(adminName, handles.concat(await readIndex(store, "gone")));
+        const key = makeKey();
+        const user = {
+          handle,
+          displayName: adminName,
+          admin: false,
+          org: id,
+          created: Date.now(),
+          lastSeen: 0,
+          keySaved: false,
+          createdBy: mine,
+        };
+        await writeJson(store, K.user(handle), { ...user, keyHash: sha(key) });
+        await writeJson(store, K.keyOf(sha(key)), handle);
+        await updateJson(store, K.index("users"), (/** @type {any} */ cur) => (cur || []).concat([handle]));
+
+        const inviteCode = makeCode();
+        const org = {
+          id,
+          slug,
+          formerSlugs: [],
+          name,
+          logo: /^[a-f0-9]{64}$/.test(String(body.logo || "")) ? String(body.logo) : "",
+          colour: colourOf(body.colour),
+          admins: [handle],
+          inviteCode,
+          created: Date.now(),
+        };
+        await writeJson(store, K.org(id), org);
+        await writeJson(store, K.code(inviteCode), `org:${id}`);
+        await updateJson(store, K.index("orgs"), (/** @type {any} */ cur) =>
+          (cur || []).includes(id) ? null : (cur || []).concat([id])
+        );
+        return json({ ok: true, org, admin: user, key });
+      }
+
+      /*
+       * Super admin (0.547): everyone in every space, and every space's
+       * reports — the App admin's alone. Acting on one of them goes through
+       * the ordinary actions, sent with that person's or report's space as
+       * x-org.
+       */
+      if (action === "admin-everyone" || action === "admin-all-reports") {
+        if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+        const orgIds = await readIndex(store, "orgs");
+        const orgs = (await readManyJson(store, orgIds.map((id) => K.org(id)))).filter(Boolean)
+          .map((o) => ({ id: o.id, name: o.name, slug: o.slug, admins: o.admins || [], archived: !!o.archived }));
+        if (action === "admin-everyone") {
+          const rows = (await readManyJson(store, (await readIndex(store, "users")).map((h) => K.user(h)))).filter(Boolean);
+          const people = rows.map((u) => {
+            const { keyHash: _k, ...safe } = u;
+            return { ...safe, org: orgOf(u) };
+          });
+          return json({ ok: true, orgs, people });
+        }
+        const flags = (await readManyJson(store, (await readIndex(store, "flags")).map((x) => K.flag(x))))
+          .filter(Boolean)
+          .map((f) => ({ ...f, org: orgOf(f) }));
+        return json({ ok: true, orgs, flags });
+      }
+
+      /* Every space, for the Spaces tab: App admins only. */
+      if (action === "admin-orgs") {
+        if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+        const ids = await readIndex(store, "orgs");
+        const orgs = (await readManyJson(store, ids.map((id) => K.org(id)))).filter(Boolean);
+        const users = (await readManyJson(store, (await readIndex(store, "users")).map((h) => K.user(h)))).filter(Boolean);
+        return json({
+          ok: true,
+          orgs: orgs.map((o) => ({
+            ...o,
+            people: users.filter((u) => orgOf(u) === o.id).map((u) => ({ handle: u.handle, displayName: u.displayName })),
+          })),
+        });
+      }
+
+      /* A space's name, address, logo and colour (21a), App admins only.
+         A new address keeps the old one forwarding, for ever (8b). */
+      if (action === "admin-update-org") {
+        if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+        const id = String(body.id || "");
+        const org = await readJson(store, K.org(id));
+        if (!org) return json({ error: "no-space" }, 404);
+        const slug = body.slug === undefined ? org.slug : String(body.slug || "").trim().toLowerCase();
+        if (slug !== org.slug) {
+          if (id === MAIN) return json({ error: "slug-invalid" }, 400);
+          const problem = slugProblem(slug);
+          if (problem) return json({ error: problem }, 400);
+          const took = await updateJson(store, K.slug(slug), (/** @type {any} */ cur) => (cur ? null : id));
+          if (took !== id) return json({ error: "slug-taken" }, 409);
+        }
+        const next = await updateJson(store, K.org(id), (/** @type {any} */ o) => {
+          if (!o) return null;
+          const moved = slug !== o.slug;
+          return {
+            ...o,
+            ...(body.name !== undefined && String(body.name).trim() ? { name: String(body.name).trim().slice(0, 60) } : {}),
+            ...(body.logo !== undefined ? { logo: /^[a-f0-9]{64}$/.test(String(body.logo || "")) ? String(body.logo) : "" } : {}),
+            ...(body.colour !== undefined ? { colour: colourOf(body.colour) } : {}),
+            ...(moved ? { slug, formerSlugs: [...new Set((o.formerSlugs || []).concat([o.slug]))] } : {}),
+          };
+        });
+        return json({ ok: true, org: next });
+      }
+
+      /* Who runs a space (36a): someone in it, not suspended. */
+      if (action === "admin-org-admins") {
+        if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+        const id = String(body.id || "");
+        if (!(await readJson(store, K.org(id)))) return json({ error: "no-space" }, 404);
+        const add = String(body.add || "");
+        const remove = String(body.remove || "");
+        if (add) {
+          const u = await readJson(store, K.user(add));
+          if (!u || orgOf(u) !== id || u.suspended) return json({ error: "not-in-space" }, 400);
+        }
+        const next = await updateJson(store, K.org(id), (/** @type {any} */ o) => {
+          if (!o) return null;
+          let admins = (o.admins || []).filter((/** @type {string} */ h) => h !== remove);
+          if (add && !admins.includes(add)) admins = admins.concat([add]);
+          return { ...o, admins };
+        });
+        return json({ ok: true, org: next });
+      }
+
+      /* Closing a space, and opening it again (22a, 62a). Main can't close. */
+      if (action === "admin-archive-org" || action === "admin-reopen-org") {
+        if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+        const id = String(body.id || "");
+        if (id === MAIN) return json({ error: "main-stays" }, 400);
+        const next = await updateJson(store, K.org(id), (/** @type {any} */ o) => {
+          if (!o) return null;
+          const { archived: _was, ...rest } = o;
+          return action === "admin-archive-org" ? { ...rest, archived: Date.now() } : rest;
+        });
+        if (!next) return json({ error: "no-space" }, 404);
+        return json({ ok: true, org: next });
+      }
+
+      /*
+       * Deleting a space for good (93b): its accounts (each with its practice
+       * history), courses and their codes, decks, cards, reports, invite code
+       * and every address it has had, which are then free again. Main can't
+       * go. The name has to be typed. Recordings and pictures are left: they
+       * are shared by content across spaces, and one left behind costs
+       * storage, where one deleted wrongly costs another space its audio.
+       */
+      if (action === "admin-delete-org") {
+        if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+        const id = String(body.id || "");
+        if (id === MAIN) return json({ error: "main-stays" }, 400);
+        const org = await readJson(store, K.org(id));
+        if (!org) return json({ error: "no-space" }, 404);
+        if (String(body.confirm || "") !== org.name) return json({ error: "confirm-name" }, 400);
+        const scopeNow = orgScope.getStore();
+        if (scopeNow) scopeNow.org = id;
+
+        const handles = await readIndex(store, "users");
+        const users = (await readManyJson(store, handles.map((h) => K.user(h)))).filter((u) => u && orgOf(u) === id);
+        /* Every card of this org, gathered before any account goes: from
+           its decks, and from everyone's own lists (a card can be in no
+           deck, and an App admin's card can be in this org). */
+        const decksBefore = (await readManyJson(store, (await readIndex(store, "decks")).map((x) => K.deck(x)))).filter((d) => d && orgOf(d) === id);
+        const cardIds = new Set(decksBefore.flatMap((d) => d.cardIds || []));
+        for (const list of await readManyJson(store, handles.map((h) => K.myCards(h)))) {
+          for (const cid of list || []) cardIds.add(cid);
+        }
+        for (const u of users) {
+          await wipeAccount(store, u.handle);
+          await store.delete(K.myCards(u.handle)).catch(() => {});
+        }
+
+        for (const c of (await readManyJson(store, (await readIndex(store, "courses")).map((x) => K.course(x)))).filter((c) => c && orgOf(c) === id)) {
+          for (const code of [c.code, c.teacherCode].filter(Boolean)) await store.delete(K.code(code)).catch(() => {});
+          await store.delete(K.course(c.id)).catch(() => {});
+          await updateJson(store, K.index("courses"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => x !== c.id));
+        }
+        const decks = (await readManyJson(store, (await readIndex(store, "decks")).map((x) => K.deck(x)))).filter((d) => d && orgOf(d) === id);
+        for (const cid of cardIds) {
+          const c = await readJson(store, K.card(cid));
+          if (c && orgOf(c) === id) await store.delete(K.card(cid)).catch(() => {});
+        }
+        for (const d of decks) await store.delete(K.deck(d.id)).catch(() => {});
+        await updateJson(store, K.index("decks"), (/** @type {any} */ cur) =>
+          (cur || []).filter((/** @type {string} */ x) => !decks.some((d) => d.id === x))
+        );
+        const flagIds = await readIndex(store, "flags");
+        const flags = await readManyJson(store, flagIds.map((x) => K.flag(x)));
+        const goneFlags = flagIds.filter((_, i) => flags[i] && orgOf(flags[i]) === id);
+        for (const f of goneFlags) await store.delete(K.flag(f)).catch(() => {});
+        await updateJson(store, K.index("flags"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !goneFlags.includes(x)));
+
+        await store.delete(K.former(id)).catch(() => {});
+        const goneHandles = await readIndex(store, "gone");
+        /** @type {string[]} */
+        const goneHere = [];
+        for (const h of goneHandles) {
+          const g = await readJson(store, K.gone(h));
+          if (g && g.org === id) {
+            goneHere.push(h);
+            await store.delete(K.gone(h)).catch(() => {});
+          }
+        }
+        await updateJson(store, K.index("gone"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !goneHere.includes(x)));
+        if (org.inviteCode) await store.delete(K.code(org.inviteCode)).catch(() => {});
+        for (const slug of [org.slug].concat(org.formerSlugs || [])) await store.delete(K.slug(slug)).catch(() => {});
+        await store.delete(K.org(id)).catch(() => {});
+        await updateJson(store, K.index("orgs"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => x !== id));
+        return json({ ok: true, deleted: { people: users.length, decks: decks.length } });
+      }
+
       if (action === "admin-create-user") {
         const displayName = String(body.displayName || "").trim().slice(0, 40);
         if (!displayName) return json({ error: "name-required" }, 400);
 
         const handles = await readIndex(store, "users");
-        const handle = makeHandle(displayName, handles);
+        const handle = makeHandle(displayName, handles.concat(await readIndex(store, "gone")));
         const key = makeKey();
         const user = {
           handle,
           displayName,
           admin: false,
+          org: acting,
           created: Date.now(),
           /* Never seen: they haven't signed in yet. The people list uses
              this to show who still hasn't picked up their key. */
           lastSeen: 0,
+          keySaved: false,
           createdBy: mine,
         };
         await writeJson(store, K.user(handle), { ...user, keyHash: sha(key) });
@@ -4358,6 +5333,11 @@ export default async (req) => {
         const handle = String(body.handle || "");
         const target = await readUser(store, handle);
         if (!target) return json({ error: "no-user" }, 404);
+        if (!iAmAdmin && (target.admin || (actingOrgDoc.admins || []).includes(handle))) {
+          /* A space admin's key, and an App admin's, are the App admin's to
+             replace (70a). */
+          return json({ error: "admin-only" }, 403);
+        }
         const key = makeKey();
         if (target.keyHash) await store.delete(K.keyOf(target.keyHash)).catch(() => {});
         await writeJson(store, K.user(handle), { ...target, keyHash: sha(key) });
@@ -4373,7 +5353,12 @@ export default async (req) => {
       if (action === "admin-delete-user") {
         const handle = String(body.handle || "");
         if (handle === mine) return json({ error: "use-delete-account" }, 400);
-        const gone = await wipeAccount(store, handle);
+        /* Only someone in the org this request acts in. wipeAccount alone
+           would take a stranger's handle off every roster on the site. */
+        if ((await readJson(store, K.user(handle))) && !(await readUser(store, handle))) {
+          return json({ error: "no-user" }, 404);
+        }
+        const gone = await wipeAccount(store, handle, { by: mine });
         if (!gone) return json({ error: "no-user" }, 404);
         return json({ ok: true });
       }
@@ -4469,6 +5454,8 @@ export default async (req) => {
         const wanted = new Set((Array.isArray(body.flagIds) ? body.flagIds : []).map(String));
         if (!wanted.size) return json({ ok: true, deleted: 0 });
         const ids = await readIndex(store, "flags");
+        /* Only this org's reports, whatever was asked for. */
+        for (const id of [...wanted]) if (!inScope(await readJson(store, K.flag(id)))) wanted.delete(id);
         for (const id of ids) if (wanted.has(id)) await store.delete(K.flag(id)).catch(() => {});
         await writeJson(store, K.index("flags"), ids.filter((id) => !wanted.has(id)));
         return json({ ok: true, deleted: ids.filter((id) => wanted.has(id)).length });
@@ -4487,4 +5474,4 @@ export default async (req) => {
     }
     return json({ error: "server", detail }, 500);
   }
-};
+}

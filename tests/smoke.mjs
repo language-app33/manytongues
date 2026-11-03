@@ -452,6 +452,8 @@ const fakeFetch = async (input, opts = {}) => {
       lockedDecks.push(body);
       return json({ ok: true });
     }
+    /* Whose numbers a deck uses (0.541): nobody here has any. */
+    if (action === "number-sources") return json({ ok: true, sources: [], chosen: "" });
     if (action === "set-deck-parts") {
       const body = JSON.parse(opts.body || "{}");
       savedParts.push(body);

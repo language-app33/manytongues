@@ -1269,6 +1269,13 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   word already cleared is given its reading as done and starts on writing
   — `creditNumbers` again.
 
+  **A deck's numbers come from one person** (since 0.541): its own
+  choice, `numbersFrom`, set on the deck's screen under "Numbers from",
+  or its owner. The server stamps each deck it sends a learner with that
+  person's system and clock ids, and the device files a system only into
+  the decks that name it (`decksForSystem` in `src/number-decks.ts`), so
+  two teachers with numbers no longer give a course every number twice.
+
   **A deck holds the parts it teaches.** A system is one document per
   language and not cards, so a deck cannot list it among its cards: it
   names the ranges it teaches (`parts` on the deck, set through
@@ -1466,7 +1473,6 @@ Environment variables:
 |---|---|
 | `PORT` | port to listen on. Defaults to 3000; most hosts set this for you. |
 | `DATA_DIR` | where documents are written. Overrides an attached volume. |
-| `SIGNUP_CODE` | if set, making an account requires this code. Leave unset to let anyone sign up. |
 | `ADMIN_KEY` | if set, an account can promote itself to administrator once by entering it. |
 
 ### Version numbers
@@ -1487,6 +1493,84 @@ what I merged actually running?" — see `scripts/version.mjs` for where it
 comes from. The app compares its own commit against `/api/version` and
 offers a Reload when a service worker is still serving an older copy, so a
 release number alone is never taken as proof of a deploy.
+
+## Spaces
+
+A **space** is a walled-off part of the app for one organisation, with its
+own people, courses, decks and cards; nothing in one can be seen or
+touched from another. In code it is an **org**, because "space" already
+names Learning, Teaching and Admin there. Everything that existed before
+spaces is in the first one, **Main**. The plan, the decisions behind it
+and the stages still to come are in `docs/PLAN-spaces.md`.
+
+How the wall is kept, in `server/api/courses.js` (since 0.542):
+
+- Every person, course, deck, card and report carries `org`. One written
+  before spaces has none and is Main's: `orgOf` is the only reader of it,
+  so no migration was written.
+- A request acts in the caller's own org, or, for an App admin, in the
+  one its `x-org` header names. That org is held for the request in
+  `orgScope`, and while it is set the record readers (`readCourse`,
+  `readDeck`, `readCard`, `readUser`) answer null for another org's record.
+  So something in another space reads exactly like something that doesn't
+  exist, whichever action asked. Lists read straight off an index are
+  filtered with `inScope` where they are read.
+- `tests/spaces.test.mjs` tries every action across two real spaces, and
+  fails if a new action is added without being placed in its table.
+
+Addresses and joining (since 0.543):
+
+- A space lives at `manytongues.co/<address>`. The app reads the address
+  once at start (`org-info` gives the space's name, logo and colour, or
+  where an old address moved to), shows that space's own sign-in page, and
+  once someone is signed in keeps the address on their own space. An App
+  admin stays wherever they opened, and works in that space.
+- An account is made with a code: a space's invitation
+  (`/<address>?join=<code>`) or a course code, and the code decides the
+  space. The only account made without one is the very first on an empty
+  site, which is the owner's. `SIGNUP_CODE` is gone.
+- A key or code from another space is stopped and named, with the way
+  there. A closed space refuses its people until it reopens.
+- Spaces are made, renamed, given an address, logo and colour, closed,
+  reopened and deleted in Admin → Spaces. Deleting an account, or a whole
+  space, also erases each account's practice history (`forgetSyncDoc` in
+  `server/api/sync.js`).
+
+Running a space (since 0.544):
+
+- A space admin is an account named in its org's `admins`, never an App
+  admin. In their own space they get `iManage` on the server — courses,
+  people, every non-personal deck and card, reports — and the `admin-`
+  actions in `SPACE_ADMIN_MAY`; the rest stays the App admin's. Only the App
+  admin acts on a space admin's account.
+- Suspending (removed by a space admin, or left by the person) keeps the
+  account, takes it off its rosters and remembers them on `suspended`, and
+  writes a Former members record (`former:<org>`). Reactivating puts them
+  back.
+- Deleting an account (`wipeAccount`) keeps what it made for the space and
+  its numbers, deletes its personal material and practice history, keeps
+  its name under `gone:<handle>` (so the handle is never reused and the
+  material keeps its author), and writes a Former members record.
+  `admin-hand-over` gives a former member's material to someone still here.
+
+My space (since 0.545):
+
+- A deck or card made in someone's My space carries `personal: true`, set
+  once when it is made. `inScope` hides it from everyone but its owner, so
+  every reader and list keeps it private without code of its own.
+- A personal card goes only into personal decks; a personal deck never
+  onto a course (`copy-to-space` makes a separate copy for that). Course
+  cards can be borrowed into a personal deck (`borrow-cards`) and reach the
+  owner only while a course of theirs still carries them.
+- `my-material` adds the owner's practised personal decks as a course made
+  on the fly, `my-space`, never stored, so Learning deals them like any
+  course. Teaching shows one side at a time (`side` in `TeachSpace`); a
+  learner's "My space" is `TeachSpace` with `personalOnly`.
+
+A space's export and storage (since 0.546): `admin-export-org-manifest` is
+the backup manifest limited to one org and without personal records, its
+chunks fetched like a backup's; `admin-org-usage` counts what an org holds
+and the bytes of its media. Both are the App admin's, from Admin → Spaces.
 
 ## How it fits together
 

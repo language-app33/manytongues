@@ -5,6 +5,7 @@
  * being parsed by every student on every launch.
  */
 
+import { decksForSystem } from "./number-decks.ts";
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
 import type { Card, Course, Deck, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
 import { formsOf, leadOf, wordOf } from "./cards.ts";
@@ -5150,8 +5151,7 @@ export async function pullCourses(
     /* And only the parts a deck holds, filed under that deck: numbers
        arrive the way every other card does — see fileIntoDecks. A deck in
        another language holds none of this system's. */
-    const holding = decks
-      .filter((d: Deck & { courseLanguage?: string }) => (d.lang || d.courseLanguage) === set.numbers.languageId)
+    const holding = decksForSystem(decks, set.numbers.languageId, set.numbers.id)
       .map((d: Deck) => ({ title: String(d.title || ""), parts: d.parts || [] }));
     const filed = fileIntoDecks(handed, { composer, sys: set.numbers, timeComposer, timeSys: set.times }, holding);
     for (const item of filed) {
@@ -5895,3 +5895,4 @@ export function ChoiceSwitch<T extends string>({ ask, label, lede, icon, name, o
     </div>
   );
 }
+

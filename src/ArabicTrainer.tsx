@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import type { OnboardingPlace } from "./spaces.tsx";
 import type {
   Course, DayMoves, Deck, Doc, ExerciseSpec, ExerciseState, FlagKind, FlagVerdict, Form, Item,
   Lang, LangId, Millis, Question, SavedSession, Settings, User,
@@ -10141,6 +10142,63 @@ export default function ArabicTrainer() {
   const [account, setAccount] = useState(() => API.loadAccount());
 
   /*
+   * The address, read once (0.543; docs/PLAN-spaces.md, B6). Its first part
+   * names a space; `?join=` carries an invite. The space's public face is
+   * fetched at once, signed in or not: Onboarding shows it, and an App admin
+   * works in it (x-org, set through setAddressOrg).
+   */
+  const [address] = useState(() => {
+    const slug = (window.location.pathname.split("/")[1] || "").toLowerCase();
+    const join = new URLSearchParams(window.location.search).get("join") || "";
+    return { slug, join };
+  });
+  const [addressSpace, setAddressSpace] = useState<OnboardingPlace["org"] | null>(null);
+  const [addressUnknown, setAddressUnknown] = useState(false);
+  /* Why the device was just signed out — a closed space, a suspension. */
+  const [signedOutWhy, setSignedOutWhy] = useState("");
+  useEffect(() => {
+    let live = true;
+    const look = (slug: string, hops = 0): void => {
+      if (!slug) return;
+      API.orgInfo(slug).then(
+        (r) => {
+          if (!live) return;
+          if (r.moved && hops < 3) {
+            window.history.replaceState(null, "", `/${r.moved}${window.location.search}`);
+            look(r.moved, hops + 1);
+          } else if (r.org) {
+            API.setAddressOrg(r.org.id);
+            setAddressSpace(r.org);
+          }
+        },
+        (e) => {
+          if (live && String(e && (e as Error).message) === "no-space") setAddressUnknown(true);
+        },
+      );
+    };
+    look(address.slug);
+    return () => {
+      live = false;
+    };
+  }, [address.slug]);
+
+  /*
+   * Being signed in means being at your own space's address (B6). An App
+   * admin may open any space and stays where they are; somebody who
+   * followed another space's invite link is asked what they meant (82b).
+   */
+  const accountOrg = account && (account as any).org;
+  const [inviteSetAside, setInviteSetAside] = useState(false);
+  const strayInvite =
+    !inviteSetAside && !!account && !account.admin && !!accountOrg && !!address.join &&
+    !!addressSpace && addressSpace.id !== accountOrg.id;
+  useEffect(() => {
+    if (!account || account.admin || !accountOrg || !accountOrg.slug || strayInvite) return;
+    const here = (window.location.pathname.split("/")[1] || "").toLowerCase();
+    if (here !== accountOrg.slug) window.history.replaceState(null, "", `/${accountOrg.slug}`);
+  }, [account, accountOrg, strayInvite]);
+
+  /*
    * Who the account is, rather than which object holds it. A re-render can
    * hand back a fresh object for the same person, and every hook below
    * wants to re-run when the person changes and not when the reference
@@ -10307,8 +10365,15 @@ export default function ArabicTrainer() {
         API.saveAccount(merged);
         setAccount(merged);
       })
-      .catch(() => {
-        /* offline, or the key was replaced — keep working locally */
+      .catch((e) => {
+        /* Offline, or the key was replaced: keep working locally. Only a
+           closed space or a suspended account signs the device out (B8). */
+        const why = String(e && (e as Error).message);
+        if (why === "space-closed" || why === "suspended") {
+          API.clearAccount();
+          setAccount(null);
+          setSignedOutWhy(why === "suspended" ? "This account is suspended. Ask your space's admin." : "This space is closed.");
+        }
       });
   /* The key, not the account object: a re-render hands back a new
      object for the same person, and re-checking who they are on
@@ -13559,11 +13624,55 @@ export default function ArabicTrainer() {
     }
   }, [timeLeft, session, exercise]);
 
+  /* Signed in, holding another space's invite link (82b). */
+  if (ready && account && strayInvite && addressSpace && accountOrg) {
+    return (
+      <div className={`at ${settings.theme || "auto"}`}>
+        <div className="ob">
+          <div className="ob-box">
+            <h2>This link is for {addressSpace.name}</h2>
+            <Lede>
+              You're signed in to {accountOrg.name}. To join {addressSpace.name}, make a new
+              account. Your current one stays, and its key still signs you in to {accountOrg.name}.
+            </Lede>
+            <Button variant="primary" wide className="at-mt4"
+              onClick={() => {
+                API.clearAccount();
+                setAccount(null);
+              }}
+            >
+              Make a new account
+            </Button>
+            <Button variant="ghost" wide className="at-mt3"
+              onClick={() => {
+                window.history.replaceState(null, "", `/${accountOrg.slug}`);
+                setInviteSetAside(true);
+              }}
+            >
+              Back to {accountOrg.name}
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (ready && !account) {
     return (
       <div className={`at ${settings.theme || "auto"}`}>
         <React.Suspense fallback={<ChunkFallback />}>
-          <Onboarding onDone={(a: any) => setAccount(a)} />
+          <Onboarding
+            onDone={(a: any) => {
+              setSignedOutWhy("");
+              setAccount(a);
+            }}
+            place={{
+              org: addressSpace || undefined,
+              unknown: addressUnknown,
+              joinCode: address.join,
+              notice: signedOutWhy,
+            }}
+          />
         </React.Suspense>
       </div>
     );
@@ -15121,9 +15230,21 @@ export default function ArabicTrainer() {
           </React.Suspense>
         )}
 
-        {space === "admin" && account && account.admin && (
+
+        {space === "admin" && account && (account.admin || account.orgAdmin) && (
           <React.Suspense fallback={<ChunkFallback />}>
             <AdminSpace
+              account={account}
+              languages={LANGUAGES}
+              onClose={() => setSpace("learn")}
+            />
+          </React.Suspense>
+        )}
+
+        {space === "super" && account && account.admin && (
+          <React.Suspense fallback={<ChunkFallback />}>
+            <AdminSpace
+              superMode
               account={account}
               languages={LANGUAGES}
               onClose={() => setSpace("learn")}
@@ -15275,10 +15396,17 @@ export default function ArabicTrainer() {
           sections, and beside them what is true wherever you are — which
           space and which languages, and you. */}
       {(() => {
+        /* A space admin sees Teaching, for the space's material (6a), and
+           Admin, for its people and courses (0.544). */
+        const runs = !!(account && (account.admin || account.orgAdmin));
+        /* Somebody with no Teaching gets My space instead (0.545, 58a). */
         const spaces = ["learn"]
-          .concat(teaches || (account && account.admin) ? ["teach"] : [])
-          .concat(account && account.admin ? ["admin"] : []);
-        const choices = space === "learn" ? langChoices : space === "teach" ? teachChoices : [];
+          /* Students have no My space (0.550). */
+          .concat(teaches || runs ? ["teach"] : [])
+          .concat(runs ? ["admin"] : [])
+          /* The app admin's own tools, whichever space they are in (0.547). */
+          .concat(account && account.admin ? ["super"] : []);
+        const choices = space === "learn" ? langChoices : space === "teach" || space === "mine" ? teachChoices : [];
         return (
           <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
             {/* One bar: the space's sections, then the space and languages,
@@ -15288,6 +15416,11 @@ export default function ArabicTrainer() {
             <div className="at-dockmain" ref={setDockSlot} />
             <div className="at-docksub">
               <CornerMenu
+                spaceShown={
+                  account && account.admin && addressSpace
+                    ? addressSpace
+                    : accountOrg || null
+                }
                 account={account}
                 /* The dot stands for the whole action, so it stays lit until
                    every part of it is done — this device's cards, the courses,
@@ -15315,8 +15448,8 @@ export default function ArabicTrainer() {
                     setSpace(to);
                   },
                   choices,
-                  off: space === "teach" ? teachLangsOff : langsOff,
-                  onLangs: (next) => setSetting(space === "teach" ? "teachLangsOff" : "langsOff", next),
+                  off: space === "teach" || space === "mine" ? teachLangsOff : langsOff,
+                  onLangs: (next) => setSetting(space === "teach" || space === "mine" ? "teachLangsOff" : "langsOff", next),
                   note:
                     space === "teach"
                       ? "Select the languages you see in your courses, decks, and cards. This doesn't change anything for your students."
@@ -19573,7 +19706,7 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
         lede={
           <>
             Five words that sign you in on any device and keep them together.{" "}
-            <em>Never share it</em> — anyone who has it is you. If you lose it, your administrator
+            <em>Never share it</em> — anyone who has it is you. If you lose it, your space's admin
             can issue a new one; you keep your handle, your courses and everything you have learnt.
           </>
         }
@@ -19618,6 +19751,40 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
 
 /* Closing an account is irreversible, so it asks for the handle rather
    than a yes/no anyone taps through. */
+/* Leaving one's space (0.544, 52a), asked once more before it happens. */
+function LeaveSpace({ onLeft }: { onLeft: () => void }) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  return (
+    <>
+      <Notice kind="error">{error}</Notice>
+      <Button variant="danger" size="sm" onClick={() => setAsking(true)}>Leave this space</Button>
+      {asking && (
+        <ConfirmModal
+          title="Leave this space?"
+          confirmLabel="Leave"
+          busy={busy}
+          body={<p>You won't be able to sign in until your space's admin reactivates you.</p>}
+          onCancel={() => setAsking(false)}
+          onConfirm={async () => {
+            setBusy(true);
+            try {
+              await API.leaveSpace();
+              API.clearAccount();
+              onLeft();
+            } catch (e) {
+              setError(API.explain(e));
+              setBusy(false);
+              setAsking(false);
+            }
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 function CloseAccount({ handle, onClosed }: { handle: string; onClosed: () => void }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
@@ -19694,8 +19861,8 @@ const initialsOf = (name?: string | null) =>
     .join("")
     .toUpperCase() || "?";
 
-const SPACE_LABEL: Record<string, string> = { learn: "Learning", teach: "Teaching", admin: "Admin" };
-const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", admin: "tune" };
+const SPACE_LABEL: Record<string, string> = { learn: "Learning", teach: "Teaching", admin: "Admin", mine: "My space", super: "Super admin" };
+const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", admin: "tune", mine: "person", super: "key" };
 
 
 /*
@@ -19740,13 +19907,19 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part
     <div className="at-place">
       {spacesToo && (
         <>
-          <div className="at-spacepick" role="radiogroup" aria-label="Space">
+          <div className="at-spacepick" role="radiogroup" aria-label="Space"
+            /* Exactly as many columns as the first row holds, so Super admin
+               can span them on a row of its own without crushing the rest
+               (0.548). */
+            style={{ gridTemplateColumns: `repeat(${Math.max(1, spaces.filter((x) => x !== "super").length)}, minmax(0, 1fr))` }}>
             {spaces.map((sp) => (
               <button
                 key={sp}
                 role="radio"
                 aria-checked={space === sp}
                 className={`at-spacebtn${space === sp ? " on" : ""}`}
+                /* Super admin sits on a row of its own, full width (0.547). */
+                style={sp === "super" ? { gridColumn: "1 / -1" } : undefined}
                 onClick={() => onSpace(sp)}
               >
                 <Icon name={SPACE_ICON[sp]} size={18} />
@@ -19932,8 +20105,11 @@ function AppVersion() {
   );
 }
 
-function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide }: {
+function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide, spaceShown }: {
   account: User | null;
+  /** The space you are in, named at the top (0.543): its name, and its
+      logo as a data URL or a stored picture's hash. */
+  spaceShown?: { name: string; logoData?: string; logo?: string } | null;
   syncState?: string;
   /** What to say about it. Worked out by the app, which is the only thing
       that knows whether this was the connection or the passphrase. */
@@ -19973,6 +20149,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
 
       {open && (
         <Popover className="at-cmenu">
+          {spaceShown ? <SpaceLine space={spaceShown} /> : null}
           <div className="at-cwho">
             <span className="at-cavatar">{initialsOf(account && account.displayName)}</span>
             <span className="at-cwhotext">
@@ -20337,7 +20514,7 @@ function AccountSettings({
           body={
             <p>
               You'll need your sign-in key to get back in, and nobody can recover it for you except
-              your administrator. Your account, courses and progress stay exactly as they are.
+              your space's admin. Your account, courses and progress stay exactly as they are.
             </p>
           }
           onCancel={() => setLoggingOut(false)}
@@ -20417,9 +20594,21 @@ function AccountSettings({
               />
             )}
 
+            {/* Leaving the space (52a): suspended until its admin reactivates
+                you. Never offered to the App admin, who would be locked out
+                of their own app. */}
+            {!account.admin && (
+              <FormField
+                label="Leave this space"
+                lede="You won't be able to sign in until your space's admin reactivates you. Nothing is deleted, and they can put you back on your courses."
+              >
+                <LeaveSpace onLeft={onCloseAccount} />
+              </FormField>
+            )}
+
             <FormField
               label="Close this account"
-              lede="Removes your account from the server: your handle, your courses, and any decks you made for them. Cards on this device stay until you clear them. There is no undoing it and no way to get the handle back."
+              lede="Deletes your account, your My space and your practice history from the server, and takes you off every course. Decks and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
             >
               <CloseAccount onClosed={onCloseAccount} handle={account.handle} />
             </FormField>
@@ -20548,3 +20737,33 @@ export function homeLine({ review, fresh, behind }: Ready): string {
   return "All caught up — a practice session now still helps them stick";
 }
 
+/*
+ * The space you are in, at the top of the You menu (0.543, 28a): its logo
+ * and name, read-only. Built from the menu's own "who" row, so it needs no
+ * styling of its own. A logo comes as a data URL (from the address) or as
+ * a stored picture's hash (from the account), fetched the way any picture
+ * is.
+ */
+function SpaceLine({ space }: { space: { name: string; logoData?: string; logo?: string } }) {
+  const [src, setSrc] = useState(space.logoData || "");
+  useEffect(() => {
+    if (space.logoData || !space.logo) return;
+    let live = true;
+    API.getImage(space.logo).then(
+      (r) => live && setSrc(r.data),
+      () => {},
+    );
+    return () => {
+      live = false;
+    };
+  }, [space.logo, space.logoData]);
+  return (
+    <div className="at-cwho" aria-label={`Space: ${space.name}`}>
+      {src ? <img className="at-cavatar" src={src} alt="" /> : <span className="at-cavatar">{initialsOf(space.name)}</span>}
+      <span className="at-cwhotext">
+        <b>{space.name}</b>
+        <i>Space</i>
+      </span>
+    </div>
+  );
+}

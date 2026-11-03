@@ -795,6 +795,22 @@ export interface User {
   displayName: string;
   admin: boolean;
   created: Millis;
+  /**
+   * The space (org) this account belongs to (0.542). Stored as its id;
+   * whoami answers with the space's card. Absent on older accounts: Main.
+   */
+  org?: string | { id: string; slug: string; name: string; logo: string; colour: string };
+  /** Whether this account runs its space (0.544). Worked out by whoami, never stored. */
+  orgAdmin?: boolean;
+  /** False until the person has ticked that their key is saved (0.544). Absent: saved. */
+  keySaved?: boolean;
+  /** While suspended: when, by whom, why, and the courses to put back (0.544). */
+  suspended?: {
+    at: Millis;
+    by: string;
+    why: "left" | "removed";
+    courses: { id: string; title: string; roles: string[] }[];
+  };
   /** Signed in or asked who they are. */
   lastSeen?: Millis;
   /** The app said a session was practiced. */
@@ -986,6 +1002,10 @@ export interface VerbExample {
  * without knowing which language uses which.
  */
 export type Card = {
+  /** Its space (0.542); absent: Main. */
+  org?: string;
+  /** Made in its owner's My space (0.545): theirs alone. */
+  personal?: boolean;
   id: string;
   owner?: string;
   lang: LangId;
@@ -1214,6 +1234,21 @@ export interface Deck {
    * fileIntoDecks in numbers/generate.ts.
    */
   parts?: string[];
+  /** Its space (0.542); absent: Main. */
+  org?: string;
+  /** A deck in its owner's My space (0.545): theirs alone, never in a course. */
+  personal?: boolean;
+  /** My space decks only: whether its owner practises it (59b). */
+  practise?: boolean;
+  /** Whose numbers and clock fill `parts`; absent means the owner (0.541). */
+  numbersFrom?: string;
+  /**
+   * Sent with a learner's decks: the number system and clock `parts` are
+   * filled from, or null for none. Absent on an answer from an older
+   * server, where every system is filed as before.
+   */
+  numbersSystemId?: string | null;
+  timeSystemId?: string | null;
   /**
    * Which of `parts` its students get nothing from yet, because the words
    * those parts are built of are not all written. Worked out by the
@@ -1224,6 +1259,10 @@ export interface Deck {
 }
 
 export interface Course {
+  /** Its space (0.542); absent: Main. */
+  org?: string;
+  /** The "My space" group in Learning (0.545), made on the fly and never stored. */
+  personal?: boolean;
   id: string;
   title: string;
   description?: string;
@@ -1249,6 +1288,10 @@ export interface AdminOverview {
   courses: Course[];
   decks: (Deck & { cardCount: number; ownerName: string; courseTitles: string[] })[];
   flags: Flag[];
+  /** Who has left the space this overview is of (0.544). */
+  former?: FormerMember[];
+  /** The space's invitation link and its admins (0.544). */
+  invite?: { code: string; slug: string; name: string; admins: string[] } | null;
 }
 
 /* ---- the schedule ---- */
@@ -1877,4 +1920,15 @@ export interface Flag {
   release?: string;
   /** Added when the report is read, never stored. */
   cardState?: CardState;
+}
+
+/** One Former members record (0.544; docs/PLAN-spaces.md, B2). */
+export interface FormerMember {
+  handle: string;
+  displayName: string;
+  joined: Millis;
+  left: Millis;
+  courses: { id: string; title: string; roles: string[] }[];
+  why: "left" | "removed" | "deleted-self" | "deleted-by-admin";
+  by: string;
 }

@@ -14,7 +14,7 @@
 
 import { test, after } from "node:test";
 import assert from "node:assert/strict";
-import { must } from "./helpers.mjs";
+import { must, mainInviteCode } from "./helpers.mjs";
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -40,6 +40,10 @@ after(async () => {
  * @param {{ key?: string, body?: unknown, query?: string }} [opts]
  */
 async function api(action, { key, body, query = "" } = {}) {
+  /* An account is made with Main's invite code since 0.543. */
+  if (action === "signup" && body && typeof body === "object" && !("code" in body)) {
+    body = { ...body, code: await mainInviteCode(origin, "test-admin-key") };
+  }
   /** @type {Record<string, string>} */
   const headers = { "content-type": "application/json" };
   if (key) headers["x-key"] = key;

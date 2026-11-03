@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from "react"
 import * as API from "./courses-api.ts";
 import type { Card, Course, Deck, Flag, Form, Lang, LangId, User } from "./types.ts";
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
-import { CardEditor } from "./card-editor.tsx";
+import { CardEditor, ImageScreen } from "./card-editor.tsx";
+import { usableAccent } from "./contrast.ts";
 import type { CardShape } from "./card-editor.tsx";
 import { formsOf, leadOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
@@ -112,6 +113,7 @@ import {
   ClipList,
   clipHashes,
   ConfirmModal,
+  RadioGroup,
   Field,
   FilterBar,
   formHasAudio,
@@ -129,6 +131,7 @@ import {
   Section,
   Segmented,
   SpaceFrame,
+  Tabs,
   Tile,
   TileNote,
   TopBanner,
@@ -170,18 +173,41 @@ export { ConfirmModal, useLiveRefresh, cardToItem, localIdFor };
    First run
    ------------------------------------------------------------------ */
 
-export function Onboarding({ onDone }: { onDone: (account?: User & { key: string }) => void }) {
-  const [step, setStep] = useState("choose"); // choose | new | existing | key
+/*
+ * Where Onboarding is shown (0.543): the space whose address is open, if
+ * any, what that address turned out to be, a code an invite link brought,
+ * and why the device was just signed out.
+ */
+export interface OnboardingPlace {
+  org?: API.OrgCard & { logoData: string; closed: boolean };
+  /** The address names no space. */
+  unknown?: boolean;
+  /** From an invite link, `?join=`. */
+  joinCode?: string;
+  /** Said once at the top: a closed space, a suspended account. */
+  notice?: string;
+}
+
+export function Onboarding({ onDone, place = {} }: {
+  onDone: (account?: User & { key: string }) => void;
+  place?: OnboardingPlace;
+}) {
+  const org = place.org;
+  const [step, setStep] = useState(place.joinCode && !(org && org.closed) ? "new" : "choose"); // choose | new | existing | key
   const [name, setName] = useState("");
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [made, setMade] = useState<User & { key: string } | null>(null);
   const [showKey, setShowKey] = useState(false);
-  /* Asked for only once the server has said it wants one, so a site that
-     lets anyone sign up never shows the field. */
-  const [codeNeeded, setCodeNeeded] = useState(false);
-  const [signupCode, setSignupCode] = useState("");
+  /* "I've saved my key somewhere safe", ticked before carrying on (19b). */
+  const [keyTicked, setKeyTicked] = useState(false);
+  /* An invitation or a course code: what decides which space a new account
+     is in (24b). Pre-filled from an invite link. */
+  const [signupCode, setSignupCode] = useState(place.joinCode || "");
+  /* The space a key or code turned out to belong to, when it isn't this
+     address's (53b): said, with the way there. */
+  const [elsewhere, setElsewhere] = useState<API.OrgCard | null>(null);
 
   /*
    * The app's general wording for a request that could not be made is
@@ -199,18 +225,15 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
     setBusy(true);
     setError("");
     try {
-      const r = await API.signUp(name.trim(), signupCode.trim());
+      const r = await API.signUp(name.trim(), signupCode.trim(), org ? org.id : "");
       const account = { ...r.user, key: r.key };
       API.saveAccount(account);
       setMade(account);
       setStep("key");
     } catch (e) {
-      if (String(e && (e as any).message) === "signup-code-required") {
-        setCodeNeeded(true);
-        setError(signupCode.trim() ? "That invitation code isn't right." : "");
-      } else {
-        setError(explainHere(e));
-      }
+      const there = otherSpace(e);
+      if (there) setElsewhere(there);
+      else setError(explainHere(e));
     } finally {
       setBusy(false);
     }
@@ -220,24 +243,73 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
     setBusy(true);
     setError("");
     try {
-      const r = await API.whoAmI(key.trim());
+      const r = await API.whoAmI(key.trim(), org ? org.id : "");
       const account = { ...r.user, key: key.trim() };
       API.saveAccount(account);
+      /* An account someone else made, signed in to for the first time, is
+         asked to save its key before anything else (18a). */
+      if (r.user && r.user.keySaved === false) {
+        setMade(account);
+        setStep("key");
+        return;
+      }
       onDone(account);
     } catch (e) {
-      setError(explainHere(e));
+      const there = otherSpace(e);
+      if (there) setElsewhere(there);
+      else setError(explainHere(e));
     } finally {
       setBusy(false);
     }
   }
 
+  /* The space's colour, as the accent on this page only, if it can be seen
+     on both themes (29a; src/contrast.ts). */
+  const accent = org && org.colour && usableAccent(org.colour) ? org.colour : "";
+  const closed = !!(org && org.closed);
+
   return (
-    <div className="ob">
+    <div className="ob" style={accent ? ({ "--accent": accent } as React.CSSProperties) : undefined}>
       <div className="ob-box">
-        {step === "choose" && (
+        {place.notice ? <Notice kind="warn">{place.notice}</Notice> : null}
+        {elsewhere ? (
+          /* A key or code from another space (53b): whose it is, and the two
+             ways forward. */
           <>
-            <img className="ob-logo" src="/logo.svg" alt="" width={72} height={72} />
-            <h1>ManyTongues</h1>
+            <Notice kind="warn">
+              {step === "existing"
+                ? `This key belongs to the space ${elsewhere.name}.`
+                : `This code belongs to the space ${elsewhere.name}.`}
+            </Notice>
+            <Button variant="primary" wide className="at-mt3"
+              onClick={() => {
+                const join = step === "new" && signupCode.trim() ? `?join=${encodeURIComponent(signupCode.trim())}` : "";
+                window.location.assign(`/${elsewhere.slug}${join}`);
+              }}
+            >
+              Go to {elsewhere.name}
+            </Button>
+            <Button variant="ghost" wide className="at-mt3"
+              onClick={() => {
+                setElsewhere(null);
+                setSignupCode("");
+                setStep("new");
+              }}
+            >
+              Make a new account here
+            </Button>
+          </>
+        ) : null}
+        {!elsewhere && step === "choose" && (
+          <>
+            <img className="ob-logo" src={org && org.logoData ? org.logoData : "/logo.svg"} alt="" width={72} height={72} />
+            <h1>{org ? org.name : "ManyTongues"}</h1>
+            {place.unknown ? (
+              <Notice kind="warn">
+                There's no space at this address. <a href="/">Go to the home page</a>.
+              </Notice>
+            ) : null}
+            {closed ? <Notice kind="warn">This space is closed.</Notice> : null}
             {/* What it used to say: "an account only matters if you join a
                 course or use more than one device". Both exits from this
                 screen are requests to the server, so an account is not
@@ -248,9 +320,11 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
               Learn a language a card at a time. Setting up takes a moment and a connection; after
               that your cards and your progress live on this device, and the app works without one.
             </Lede>
-            <Button variant="primary" wide onClick={() => setStep("new")}>
-              Set up
-            </Button>
+            {!closed && !place.unknown ? (
+              <Button variant="primary" wide onClick={() => setStep("new")}>
+                Set up
+              </Button>
+            ) : null}
             <Button variant="ghost" wide
               className="at-mt3"
               onClick={() => setStep("existing")}
@@ -260,7 +334,7 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
           </>
         )}
 
-        {step === "new" && (
+        {!elsewhere && step === "new" && (
           <>
             <h2>What should people call you?</h2>
             <Lede>
@@ -274,30 +348,23 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && name.trim() && create()}
             />
-            {codeNeeded && (
-              <>
-                <Help className="at-mb2">
-                  This site asks for an invitation code from your teacher.
-                </Help>
-                <input
-                  className="at-input"
-                  placeholder="Invitation code"
-                  value={signupCode}
-                  autoFocus
-                  onChange={(e) => {
-                    setSignupCode(e.target.value);
-                    setError("");
-                  }}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && name.trim() && signupCode.trim() && create()
-                  }
-                />
-              </>
-            )}
+            <Help className="at-mt3 at-mb2">
+              Your invitation code, or a course code from your teacher.
+            </Help>
+            <input
+              className="at-input"
+              placeholder="Invitation or course code"
+              value={signupCode}
+              onChange={(e) => {
+                setSignupCode(e.target.value);
+                setError("");
+              }}
+              onKeyDown={(e) => e.key === "Enter" && name.trim() && create()}
+            />
             <Notice kind="error">{error}</Notice>
             <Button variant="primary" wide
               className="at-mt4"
-              disabled={!name.trim() || busy || (codeNeeded && !signupCode.trim())}
+              disabled={!name.trim() || busy}
               onClick={create}
             >
               {busy ? "Setting up…" : "Continue"}
@@ -308,7 +375,7 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
           </>
         )}
 
-        {step === "existing" && (
+        {!elsewhere && step === "existing" && (
           <>
             <h2>Your sign-in key</h2>
             <Lede>
@@ -367,18 +434,23 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
                 {busy ? "Checking…" : "Sign in"}
               </Button>
             </form>
+            <Help className="at-mt3">
+              Lost your key? Ask your space's admin for a new one. Everyone else:
+              contact@manytongues.co
+            </Help>
             <Button variant="ghost" wide className="at-mt3" onClick={() => setStep("choose")}>
               Back
             </Button>
           </>
         )}
 
-        {step === "key" && made && (
+        {!elsewhere && step === "key" && made && (
           <>
             <h2>Keep this somewhere safe</h2>
             <Lede>
               This is your sign-in key. It brings your cards to another device, and it is the only
-              way back into your account. Nobody can recover it for you except your administrator.
+              way back into your account. Save it in a password manager, or write it down somewhere
+              safe. If you lose it, only your space's admin can give you a new one.
             </Lede>
             <p className="at-key">{made.key}</p>
             <div className="at-row at-mt3">
@@ -398,7 +470,11 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                onDone(made);
+                if (!keyTicked) return;
+                /* Recorded, so the reminder isn't shown again; carrying on
+                   doesn't wait for it. */
+                API.keySaved().catch(() => {});
+                onDone({ ...made, keySaved: true });
               }}
             >
               <input
@@ -421,8 +497,12 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
                 aria-hidden="true"
                 className="at-hiddenuser"
               />
-              <Button variant="primary" wide className="at-mt4" type="submit">
-                I've saved it
+              <label className="at-tickrow at-mt4">
+                <input type="checkbox" checked={keyTicked} onChange={(e) => setKeyTicked(e.target.checked)} />
+                <span>I've saved my key somewhere safe</span>
+              </label>
+              <Button variant="primary" wide className="at-mt4" type="submit" disabled={!keyTicked}>
+                Carry on
               </Button>
             </form>
           </>
@@ -538,12 +618,14 @@ export function Modal({ title, children, onClose }: { title?: Node; children?: N
 
 
 
-export function CodeBox({ label, code, hint, onNew, busy }: {
+export function CodeBox({ label, code, hint, onNew, busy, long = false }: {
   label?: Node;
   code?: string;
   hint?: Node;
   onNew?: () => void;
   busy?: boolean;
+  /** A link rather than a code (0.549): the whole width, its buttons on a line underneath. */
+  long?: boolean;
 }) {
   return (
     <div className="at-codeblock">
@@ -551,7 +633,7 @@ export function CodeBox({ label, code, hint, onNew, busy }: {
       {/* What the code is for, under its name and before the code itself,
           the way a field is explained in the card editor. */}
       {hint && <p className="at-fieldlede">{hint}</p>}
-      <div className="at-codebox">
+      <div className={`at-codebox${long ? " long" : ""}`}>
         <b>{code || "—"}</b>
         <Button variant="ghost" size="sm"
           disabled={!code}
@@ -632,6 +714,16 @@ export const BACKUP_PARTS: {
   count: string;
   unit: string;
 }[] = [
+  {
+    key: "spaces",
+    title: "Spaces",
+    what: "Each space's name, address, look and admins, and every address it has had.",
+    kinds: ["org", "slug", "former", "gone"],
+    prefixes: ["org:", "slug:", "former:", "gone:"],
+    index: "orgs",
+    count: "orgs",
+    unit: "space",
+  },
   {
     key: "people",
     title: "People",
@@ -727,8 +819,13 @@ function includedIn(file: any) {
  * @param parts  Which of BACKUP_PARTS to put in. Everything by
  *   default, which is what a backup meant before it could be less.
  */
-export async function buildBackup(onProgress: (done: number, total: number) => void, parts: string[] = ALL_PARTS) {
-  const { manifest } = await API.backupManifest();
+export async function buildBackup(
+  onProgress: (done: number, total: number) => void,
+  parts: string[] = ALL_PARTS,
+  /* Where the manifest comes from: the whole site, or one space (0.546). */
+  source: () => Promise<{ manifest: any }> = API.backupManifest,
+) {
+  const { manifest } = await source();
   const chosen = partsChosen(parts);
   const kinds = new Set(chosen.flatMap((p) => p.kinds));
   const plan = (manifest.plan || []).filter((c: any) => kinds.has(c.kind));
@@ -1188,7 +1285,8 @@ function CourseSettings({
   onSetLanguage: (id: LangId) => void;
   onNewCode: (which: "teacher" | "student") => void;
   onSetRole: (handle: string, name: string, role: "teacher" | "student", on: boolean) => void;
-  onDelete: () => void;
+  /** Absent for a space admin: deleting a course is the App admin's (4b). */
+  onDelete?: () => void;
   onClose: () => void;
 }) {
   const [adding, setAdding] = useState(false);
@@ -1413,6 +1511,7 @@ function CourseSettings({
 
       {/* At the foot, away from everyday taps, as on a card and a deck.
           It still asks first. */}
+      {onDelete ? (
       <div className="at-formblock at-mt5">
         <div className="at-formhead">
           <span className="at-formnum">Delete course</span>
@@ -1420,6 +1519,7 @@ function CourseSettings({
         <p className="at-dangerline">Deleting a course is permanent and cannot be undone.</p>
         <Button variant="danger" icon="delete" onClick={onDelete}>Delete course</Button>
       </div>
+      ) : null}
     </Screen>
   );
 }
@@ -1521,12 +1621,14 @@ function scriptStyle(languages: Record<LangId, Lang>, langId?: LangId) {
   return { ...(lang.fontStack ? { fontFamily: lang.fontStack } : null), ...scriptVars(lang) };
 }
 
-export function AdminSpace({ account, languages, onClose }: {
+export function AdminSpace({ account, languages, onClose, superMode = false }: {
   account: User;
+  /** Super admin (0.547): the App admin's own tools, whichever space they are in. */
+  superMode?: boolean;
   languages: Record<LangId, Lang>;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState("courses");
+  const [tab, setTab] = useState(superMode ? "orgs" : "courses");
   const [data, setData] = useState<import("./types.ts").AdminOverview | null>(recallSpace("admin", account.handle));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1573,6 +1675,8 @@ export function AdminSpace({ account, languages, onClose }: {
   /* One slot for whatever is waiting to be confirmed, so only one of these
      can ever be on screen at a time. */
   const [confirm, setConfirm] = useState<Pending | null>(null);
+  /* The space's admins, from the overview (0.544). */
+  const leads = new Set((data && data.invite && data.invite.admins) || []);
 
   /* Answers whether it worked, which is what the background poll reads to
      know whether to back off — see useLiveRefresh. */
@@ -1820,7 +1924,7 @@ export function AdminSpace({ account, languages, onClose }: {
               action: () => API.removeMember(c.id, h, role),
             });
           }}
-          onDelete={() =>
+          onDelete={!account.admin ? undefined : () =>
             setConfirm({
               title: `Delete ${c.title}?`,
               confirmLabel: "Delete the course",
@@ -1853,13 +1957,21 @@ export function AdminSpace({ account, languages, onClose }: {
 
   return (
     <SpaceFrame
-      tabs={[
-        ["courses", "Courses", "school"],
-        ["people", "People", "group"],
-        ["decks", "Decks", "folder"],
-        ["flags", "Flags", "flag"],
-        ["app", "App", "tune"],
-      ]}
+      tabs={superMode
+        ? [
+            /* Super admin (0.547): what is the whole app's, not one space's. */
+            ["orgs", "Spaces", "hash"],
+            ["everyone", "People", "group"],
+            ["allflags", "Reports", "flag"],
+            ["app", "App", "tune"],
+          ]
+        : [
+            /* Admin is the space you are in, for everyone who runs it. */
+            ["courses", "Courses", "school"],
+            ["people", "People", "group"],
+            ["decks", "Decks", "folder"],
+            ["flags", "Flags", "flag"],
+          ]}
       tab={tab}
       onTab={setTab}
       error={error}
@@ -1880,6 +1992,10 @@ export function AdminSpace({ account, languages, onClose }: {
         ) : null
       }
     >
+
+          {superMode && tab === "orgs" && account.admin && <SpacesTab />}
+          {superMode && tab === "everyone" && account.admin && <EveryonePeople me={account.handle} />}
+          {superMode && tab === "allflags" && account.admin && <EveryReport />}
 
           {tab === "courses" && (
             <>
@@ -1974,6 +2090,15 @@ export function AdminSpace({ account, languages, onClose }: {
 
           {tab === "people" && (
             <>
+              {data && data.invite ? (
+                <InviteLink invite={data.invite} busy={busy}
+                  onReplace={() => setConfirm({
+                    title: "Replace the invitation link?",
+                    confirmLabel: "Replace the link",
+                    body: <p>The old link will stop working. Anyone who already joined stays.</p>,
+                    action: () => API.newInvite(),
+                  })} />
+              ) : null}
               {newKey && (
                 <div className="at-sub">
                   <p className="at-eyebrow">
@@ -2184,6 +2309,7 @@ export function AdminSpace({ account, languages, onClose }: {
                         <div className="at-deckmeta">{u.handle}</div>
                       </div>
                       <div className="at-deckacts">
+                        {(account.admin || !(u.admin || leads.has(u.handle))) && (
                         <IconButton icon="key" label="Issue a new sign-in key" onClick={() =>
                             setConfirm({
                               title: `New sign-in key for ${u.displayName}?`,
@@ -2205,7 +2331,27 @@ export function AdminSpace({ account, languages, onClose }: {
                               },
                             })
                           } />
-                        {u.handle !== account.handle && (
+                        )}
+                        {/* Suspending (64a): never yourself, an App admin, or —
+                            unless you are the App admin — a space admin (70a). */}
+                        {u.handle !== account.handle && !u.admin && (account.admin || !leads.has(u.handle)) && (
+                          <IconButton icon="lock" label="Suspend" onClick={() =>
+                            setConfirm({
+                              title: `Suspend ${u.displayName}?`,
+                              confirmLabel: "Suspend them",
+                              body: (
+                                <p>
+                                  They can't sign in until they are reactivated, and they come off
+                                  every course. They move to Former members, where you can
+                                  reactivate them and put them back on their courses. Nothing is
+                                  deleted.
+                                </p>
+                              ),
+                              action: () => API.suspendUser(u.handle),
+                            })
+                          } />
+                        )}
+                        {account.admin && u.handle !== account.handle && (
                           <IconButton icon="delete" label="Delete person" danger onClick={() =>
                               setConfirm({
                                 title: `Delete ${u.displayName}?`,
@@ -2213,9 +2359,11 @@ export function AdminSpace({ account, languages, onClose }: {
                                 confirmWord: u.handle,
                                 body: (
                                   <p>
-                                    Their account, their sign-in key and their place in every
-                                    course go. The decks and cards they made go with them. There
-                                    is no undoing this and no way to get the handle back.
+                                    Their account, their sign-in key, their My space, their practice
+                                    history and their place in every course go. The decks and cards
+                                    they made for the space stay, under their name, and can be handed
+                                    to someone else. A record stays under Former members. There is
+                                    no undoing this.
                                   </p>
                                 ),
                                 action: () => API.deleteUser(u.handle),
@@ -2226,9 +2374,9 @@ export function AdminSpace({ account, languages, onClose }: {
                     </div>
                     {/* Admin is a flag on the person, not a course they are
                         in, so it stays a badge and keeps the row to itself. */}
-                    {u.admin && (
+                    {(u.admin || leads.has(u.handle)) && (
                       <div className="at-flags">
-                        <span className="at-flag flagged">Admin</span>
+                        <span className="at-flag flagged">{u.admin ? "Admin" : "Space admin"}</span>
                       </div>
                     )}
                     {/* "Hasn't signed in yet" was a pill up here. The lines
@@ -2275,6 +2423,15 @@ export function AdminSpace({ account, languages, onClose }: {
                   </div>
                 )}
               />
+              {data && data.former && data.former.length ? (
+                <FormerMembers
+                  former={data.former}
+                  people={(data.users || []).filter((u) => !u.suspended)}
+                  isAppAdmin={!!account.admin}
+                  busy={busy}
+                  ask={setConfirm}
+                />
+              ) : null}
             </>
           )}
 
@@ -2418,11 +2575,14 @@ export function AdminSpace({ account, languages, onClose }: {
                               confirmLabel: "Delete the deck",
                               confirmWord: d.title,
                               body: (
-                                <p>
-                                  Its {plural(d.cardCount || 0, "card")} go with it,
-                                  out of every course it is in and out of the apps of everyone
-                                  studying it. {d.ownerName} loses the work.
-                                </p>
+                                <>
+                                  {d.owner !== account.handle ? <OthersWork name={d.ownerName} what="deck" /> : null}
+                                  <p>
+                                    Its {plural(d.cardCount || 0, "card")} go with it,
+                                    out of every course it is in and out of the apps of everyone
+                                    studying it. {d.ownerName} loses the work.
+                                  </p>
+                                </>
                               ),
                               action: () => API.deleteDeck(d.id),
                             });
@@ -2689,7 +2849,7 @@ export function AdminSpace({ account, languages, onClose }: {
             </>
           )}
 
-          {tab === "app" && (
+          {superMode && tab === "app" && account.admin && (
             <>
               <p className="at-eyebrow">
                 Backup
@@ -4909,8 +5069,10 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
    back on is this line. */
 const SHOW_IN_CONTEXT = false;
 
-export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose }: {
+export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose, personalOnly = false }: {
   account: User;
+  /** A learner's My space (0.545): only their own decks and cards, no courses. */
+  personalOnly?: boolean;
   languages: Record<LangId, Lang>;
   settings?: any;
   /* The languages switched off by the switch above the space, which lives
@@ -4939,15 +5101,31 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      Read from the prop at the first render only, so this is where the
      teacher was rather than where they have since gone. */
   const back = useRef(resume || null).current;
-  const [tab, setTab] = useState((back && back.tab) || "courses");
+  const [tab, setTab] = useState((back && back.tab) || (personalOnly ? "decks" : "courses"));
   const [courses, setCourses] = useState<Course[]>(last ? last.courses : []);
-  const [decks, setDecks] = useState<Deck[]>(last ? unlockedDecks(last.decks) : []);
+  /* Everything this person may work on, both sides; `decks` and `cards`
+     below are the side on screen (0.545): the space's, or My space. Every
+     write goes through the setters, whole or by function, so the side not
+     on screen is never lost. */
+  const [allDecks, setDecks] = useState<Deck[]>(last ? unlockedDecks(last.decks) : []);
+  const [side, setSide] = useState<"space" | "mine">(personalOnly ? "mine" : "space");
+  const mineSide = side === "mine";
+  /* A My space deck on its way into the space, and the courses ticked for it. */
+  const [toSpace, setToSpace] = useState<{ deck: Deck; move: boolean } | null>(null);
+  const [toCourses, setToCourses] = useState<string[]>([]);
+  /* A My space card on its way into a deck of the space, and that deck. */
+  const [cardToSpace, setCardToSpace] = useState<{ card: Card; move: boolean } | null>(null);
+  const [cardDeck, setCardDeck] = useState("");
+  /* The space's own name on the toggle (0.549), cut short when long, in full on hover. */
+  const spaceName = (account.org && typeof account.org === "object" && account.org.name) || "Space";
+  const decks = useMemo(() => allDecks.filter((d) => !!d.personal === mineSide), [allDecks, mineSide]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   const [courseView, setCourseView] = useState<any | null>(null);
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
-  const [cards, setCards] = useState<Card[]>(last ? last.cards : []);
+  const [allCards, setCards] = useState<Card[]>(last ? last.cards : []);
+  const cards = useMemo(() => allCards.filter((c) => !!c.personal === mineSide), [allCards, mineSide]);
   /* Which recordings those cards name that the server does not hold, told
      with the cards. Set for the screens that show it as this renders —
      see setLostRecordings. */
@@ -6153,11 +6331,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   /* A save straight to the server, naming what it changed — for the
      screens that do not keep a save for later. */
   const saveNamed = (card: Partial<Card>, decks: string[]) =>
-    API.saveCard(card, decks, card.id ? { touched: touchedBy(card, decks) } : {});
+    API.saveCard(card, decks, card.id ? { touched: touchedBy(card, decks) } : { personal: mineSide });
   const sendOrKeep = useCallback(async (card: Partial<Card>, decks: string[], given: API.SaveExtra = {}) => {
-    const extra: API.SaveExtra = given.touched || given.walk || given.into || !card.id
-      ? given
-      : { ...given, touched: touchedBy(card, decks) };
+    /* A new card made on the My space side is personal, for good (0.545). */
+    const withSide = !card.id && mineSide ? { ...given, personal: true } : given;
+    const extra: API.SaveExtra = withSide.touched || withSide.walk || withSide.into || !card.id
+      ? withSide
+      : { ...withSide, touched: touchedBy(card, decks) };
     try {
       return await API.saveCard(card, decks, extra);
     } catch (e) {
@@ -6167,7 +6347,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       return { kept: true };
     }
   /* touchedBy reads the cards through a ref, so this is made once. */
-  }, []);
+  }, [mineSide]);
 
   /* And send them when there is something to send them down. One at a
      time, oldest first; a card the server refuses outright is dropped,
@@ -6314,7 +6494,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     if (!title) return;
     run(
       async () => {
-        const r = await API.createDeck(title, "", newDeckLang);
+        const r = await API.createDeck(title, "", newDeckLang, mineSide);
         const made = r && r.deck;
         if (made) {
           setDecks((prev) => prev.concat([made]));
@@ -6393,7 +6573,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         onSave={(title, lang) =>
           run(
             async () => {
-              const r = await API.createDeck(title, "", lang || soleLangOn);
+              const r = await API.createDeck(title, "", lang || soleLangOn, mineSide);
               setNaming(null);
               await refresh();
               if (r && r.deck && r.deck.id) setOpenDeck(r.deck.id);
@@ -6442,6 +6622,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           return c && c.id ? <StatusMenu card={c} disabled={busy || off} onStatus={(to) => setStatus(c, to)} /> : null;
         }}
         onExport={editing.card && editing.card.id ? () => exportCards([editing.card!.id]) : undefined}
+        /* A My space card into the space (0.549, 3a): teachers and admins. */
+        onToSpace={editing.card && editing.card.id && editing.card.personal && !personalOnly
+          ? (move: boolean) => {
+              setCardDeck("");
+              setCardToSpace({ card: editing.card as Card, move });
+            }
+          : undefined}
         about={
           editing.card && editing.card.id ? (
             <ReviewLine state={reviewMap.get(editing.card.id)} onOpen={() => setReviewing(editing.card)} />
@@ -6737,7 +6924,39 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               })()
             : undefined
         }
-        confirming={
+        confirming={cardToSpace ? (
+          <ConfirmModal
+            title={`${cardToSpace.move ? "Move" : "Copy"} this card to ${spaceName}?`}
+            confirmLabel={cardToSpace.move ? "Move it" : "Copy it"}
+            danger={false}
+            busy={busy || !cardDeck}
+            body={
+              <>
+                <p>
+                  {cardToSpace.move
+                    ? "The card becomes the space's, in the deck you choose. Nothing stays in My space."
+                    : "A copy goes into the deck you choose. The copy and this card won't stay in sync."}
+                </p>
+                <RadioGroup
+                  name="card-to-space"
+                  label="Into which deck"
+                  value={cardDeck}
+                  onChange={setCardDeck}
+                  options={allDecks.filter((x) => !x.personal).map((x) => ({ value: x.id, label: x.title }))}
+                />
+              </>
+            }
+            onCancel={() => setCardToSpace(null)}
+            onConfirm={() =>
+              run(async () => {
+                await API.cardToSpace(cardToSpace.card.id, cardDeck, cardToSpace.move);
+                setCardToSpace(null);
+                setEditing(null);
+                await refresh();
+              })
+            }
+          />
+        ) : 
           exportScreen ? exportScreen : confirm && confirm.kind === "card" && confirm.card ? (
             <ConfirmModal
               title={`Delete "${leadOf(confirm.card).en || leadOf(confirm.card).ar}"?`}
@@ -6746,6 +6965,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               busy={busy}
               body={
                 <>
+                  {confirm.card.owner && confirm.card.owner !== account.handle ? <OthersWork what="card" /> : null}
                   <p>
                     Gone from every deck, and from your students' apps. Recordings go too. This
                     can't be undone.
@@ -7630,6 +7850,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 {/* Which courses carry it, as a card says which decks it
                     is in: the names, each with its way out, and the way to
                     add another on the end of the row. */}
+                {/* A My space deck is in no course; in their place, whether its
+                    owner practises it (0.545, 59b, 61a). */}
+                {d.personal ? null : (
                 <Field label="Courses" lede="Students in these courses see this deck.">
                   {!shown.courses.length ? (
                     <Nudge
@@ -7677,8 +7900,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     />
                   )}
                 </Field>
+                )}
 
               </fieldset>
+
+              {(d.parts || []).length ? <NumbersFrom deckId={d.id} /> : null}
 
               {/* The whole deck, whatever the list below is showing: what a
                   deck covers is a fact about the deck, not about the cards
@@ -7940,14 +8166,22 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     <SpaceFrame
       tabs={[
         ["courses", "Courses", "school"],
-        ["decks", "Decks", "folder"],
-        ["cards", "Cards", "cards"],
+        /* Material is the space's decks and cards, My space the teacher's
+           own (0.550): the same lists, one side each. Decks and Cards are
+           chosen inside each. */
+        ["material", "Material", "folder"],
+        ["myspace", "My space", "person"],
         /* In context is hidden for now, on the owner's word, and comes
            back later; what it shows is still built when it is asked for. */
         ...(SHOW_IN_CONTEXT ? [["context", "In context", "search"] as [string, string, string]] : []),
       ]}
-      tab={tab}
-      onTab={setTab}
+      tab={tab === "decks" || tab === "cards" ? (mineSide ? "myspace" : "material") : tab}
+      onTab={(k: string) => {
+        if (k === "material" || k === "myspace") {
+          setSide(k === "myspace" ? "mine" : "space");
+          if (tab !== "decks" && tab !== "cards") setTab("decks");
+        } else setTab(k);
+      }}
       error={error}
       busy={busy}
     >
@@ -8032,6 +8266,20 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
           {tab === "cards" && (
             <>
+              {/* Decks or Cards, inside Material and My space (0.550): the card
+                  screen's own tab row. */}
+              <Tabs
+                tabs={[["decks", "Decks", "folder"], ["cards", "Cards", "cards"]]}
+                value={tab}
+                onChange={setTab}
+                label="Decks or cards"
+              />
+              {/* Which of the two you are in, in one line (0.551). */}
+              <Help className="at-mb3">
+                {mineSide
+                  ? "Only you see these. Copy or move them to the space when they're ready."
+                  : `${spaceName}'s decks and cards, shared with its teachers.`}
+              </Help>
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
                   <LanguageRadio
@@ -8359,6 +8607,60 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
           {tab === "decks" && (
             <>
+              {toSpace && (
+                <ConfirmModal
+                  title={`${toSpace.move ? "Move" : "Copy"} ${toSpace.deck.title} to ${spaceName}?`}
+                  confirmLabel={toSpace.move ? "Move it" : "Copy it"}
+                  danger={false}
+                  busy={busy}
+                  body={
+                    <>
+                      <p>
+                        {toSpace.move
+                          ? "The deck and your cards in it become the space's. Nothing stays in My space."
+                          : "A new deck of the space is made, with copies of your cards. The copy and this deck won't stay in sync."}
+                      </p>
+                      {courses.filter((c: any) => c.teaching || account.admin || account.orgAdmin).length ? (
+                        <CheckList
+                          options={courses
+                            .filter((c: any) => c.teaching || account.admin || account.orgAdmin)
+                            .map((c) => ({ id: c.id, title: c.title }))}
+                          chosen={toCourses}
+                          onToggle={(id: string, wasOn: boolean) =>
+                            setToCourses((prev) => (wasOn ? prev.filter((x) => x !== id) : prev.concat([id])))}
+                        />
+                      ) : null}
+                      <Help>Tick the courses to put it in, or none for now.</Help>
+                    </>
+                  }
+                  onCancel={() => {
+                    setToSpace(null);
+                    setToCourses([]);
+                  }}
+                  onConfirm={() =>
+                    run(async () => {
+                      await API.copyToSpace(toSpace.deck.id, toSpace.move, toCourses);
+                      setToSpace(null);
+                      setToCourses([]);
+                      await refresh();
+                    })
+                  }
+                />
+              )}
+              {/* Decks or Cards, inside Material and My space (0.550): the card
+                  screen's own tab row. */}
+              <Tabs
+                tabs={[["decks", "Decks", "folder"], ["cards", "Cards", "cards"]]}
+                value={tab}
+                onChange={setTab}
+                label="Decks or cards"
+              />
+              {/* Which of the two you are in, in one line (0.551). */}
+              <Help className="at-mb3">
+                {mineSide
+                  ? "Only you see these. Copy or move them to the space when they're ready."
+                  : `${spaceName}'s decks and cards, shared with its teachers.`}
+              </Help>
               {deckAction && (
                 <Screen
                   title={
@@ -8522,6 +8824,19 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                               e.stopPropagation();
                               exportDecks([d.id]);
                             }} />
+                          {/* A My space deck into the space (0.549; 2a, 9b, 10a). */}
+                          {d.personal && !personalOnly && (
+                            <>
+                              <IconButton icon="copy" label="Copy to the space" onClick={(e: React.MouseEvent) => {
+                                e.stopPropagation();
+                                setToSpace({ deck: d, move: false });
+                              }} />
+                              <IconButton icon="upload" label="Move to the space" onClick={(e: React.MouseEvent) => {
+                                e.stopPropagation();
+                                setToSpace({ deck: d, move: true });
+                              }} />
+                            </>
+                          )}
                           <IconButton icon="delete" label="Delete deck" danger onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
                               if (d.locked && DECK_LOCKS) {
@@ -8534,11 +8849,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                                 confirmLabel: "Delete the deck",
                                 confirmWord: d.title,
                                 body: (
-                                  <p>
-                                    Its {plural(d.cardCount || 0, "card")} go with
-                                    it, out of every course and out of the apps of everyone
-                                    studying it. There is no undoing this.
-                                  </p>
+                                  <>
+                                    {d.owner !== account.handle ? <OthersWork name={(d as any).ownerName} what="deck" /> : null}
+                                    <p>
+                                      Its {plural(d.cardCount || 0, "card")} go with
+                                      it, out of every course and out of the apps of everyone
+                                      studying it. There is no undoing this.
+                                    </p>
+                                  </>
                                 ),
                                 action: () => API.deleteDeck(d.id),
                               });
@@ -8546,6 +8864,12 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                         </>
                       }
                       footer={
+                        d.personal ? (
+                          /* My space (0.545, 59b): whether you practise it. */
+                          <TileNote live={d.practise !== false}>
+                            {d.practise !== false ? "Practised in your Learning" : "Not practised"}
+                          </TileNote>
+                        ) : (
                         <TileNote live={live}>
                           {live ? (
                             <>
@@ -8557,6 +8881,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                             <>Not in a course yet — nobody can see it</>
                           )}
                         </TileNote>
+                        )
                       }
                     />
                   );
@@ -8662,3 +8987,672 @@ export function StudentCourses({
     />
   );
 }
+
+/*
+ * Whose numbers a deck's number parts use (0.541).
+ *
+ * Saved as soon as it is chosen, like a deck's parts: it is not part of the
+ * deck's Edit, because it changes what students hear rather than what the
+ * deck is called. Shown only on a deck that holds number parts.
+ */
+function NumbersFrom({ deckId }: { deckId: string }) {
+  const [sources, setSources] = useState<{ handle: string; displayName: string }[] | null>(null);
+  const [chosen, setChosen] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    API.numberSources(deckId).then(
+      (r) => {
+        if (!live) return;
+        setSources(r.sources);
+        setChosen(r.chosen);
+      },
+      (e) => live && setError(API.explain(e)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [deckId]);
+  if (error) return <Notice kind="error">{error}</Notice>;
+  if (!sources || !sources.length) return null;
+  return (
+    <Field label="Numbers from" lede="Whose numbers and recordings this deck's students practise.">
+      <RadioGroup
+        name={`numbers-from-${deckId}`}
+        label="Numbers from"
+        quiet
+        value={chosen}
+        options={sources.map((x) => ({ value: x.handle, label: x.displayName }))}
+        onChange={async (h) => {
+          const was = chosen;
+          setChosen(h);
+          try {
+            await API.setDeckNumbers(deckId, h);
+          } catch (e) {
+            setChosen(was);
+            setError(API.explain(e));
+          }
+        }}
+      />
+    </Field>
+  );
+}
+
+/** The space a refused key or code belongs to, when the server said so (53b). */
+function otherSpace(e: unknown): API.OrgCard | null {
+  const err = e as { message?: string; data?: { space?: API.OrgCard } } | null;
+  return err && err.message === "other-space" && err.data && err.data.space ? err.data.space : null;
+}
+
+/* ------------------------------------------------------------------
+   Spaces, for the App admin (0.543; docs/PLAN-spaces.md, B7 stage 3)
+
+   Every space: create one with its first space admin, change its name,
+   address, logo and colour, choose its admins, close and reopen it, or
+   delete it for good. Built from the screens the rest of Admin uses: tiles
+   for the list, a Screen for one space, ConfirmModal for anything that
+   can't be taken back.
+   ------------------------------------------------------------------ */
+function SpacesTab() {
+  const [orgs, setOrgs] = useState<API.OrgRow[] | null>(null);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [making, setMaking] = useState<{ name: string; slug: string; adminName: string } | null>(null);
+  const [made, setMade] = useState<{ name: string; admin: string; key: string; slug: string } | null>(null);
+  const [confirm, setConfirm] = useState<Pending | null>(null);
+  const snack = useSnackbar();
+
+  const load = useCallback(async () => {
+    try {
+      setOrgs((await API.adminOrgs()).orgs);
+    } catch (e) {
+      setError(API.explain(e));
+    }
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  async function run(work: () => Promise<unknown>, said?: string) {
+    setBusy(true);
+    setError("");
+    try {
+      await work();
+      await load();
+      if (said) snack(said);
+      return true;
+    } catch (e) {
+      setError(API.explain(e));
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const open = orgs && openId ? orgs.find((o) => o.id === openId) || null : null;
+  const dialog = confirm ? (
+    <ConfirmModal
+      {...confirm}
+      busy={busy}
+      onCancel={() => setConfirm(null)}
+      onConfirm={async () => {
+        const ok = await run(confirm.action);
+        if (ok) {
+          setConfirm(null);
+          if (confirm.closeAfter) setOpenId(null);
+        }
+      }}
+    />
+  ) : null;
+
+  if (making) {
+    const slugNote = making.slug ? `manytongues.co/${making.slug}` : "manytongues.co/…";
+    return (
+      <Screen
+        title="New space"
+        onBack={() => setMaking(null)}
+        action={
+          <Button variant="primary" size="sm" icon="check"
+            disabled={busy || !making.name.trim() || !making.slug.trim() || !making.adminName.trim()}
+            onClick={() =>
+              run(async () => {
+                const r = await API.createOrg(making.name.trim(), making.slug.trim().toLowerCase(), making.adminName.trim());
+                setMade({ name: r.org.name, admin: r.admin.displayName, key: r.key, slug: r.org.slug });
+                setMaking(null);
+              }, `${making.name.trim()} created`)
+            }
+          >
+            {busy ? "Saving…" : "Create"}
+          </Button>
+        }
+      >
+        <Notice kind="error">{error}</Notice>
+        <Field label={<>Name <span className="req">required</span></>}>
+          <input className="at-input" placeholder="Lingua Academy" value={making.name} autoFocus
+            onChange={(e) => setMaking({ ...making, name: e.target.value })} />
+        </Field>
+        <Field label={<>Address <span className="req">required</span></>} lede={slugNote}>
+          <input className="at-input" placeholder="lingua-academy" value={making.slug}
+            onChange={(e) => setMaking({ ...making, slug: e.target.value.toLowerCase().replace(/\s+/g, "-") })} />
+        </Field>
+        <Help>An address can be changed later, and the old one keeps working. Once used, it is never given to another space.</Help>
+        <Field label={<>Its first space admin <span className="req">required</span></>} lede="Their account is made in the new space, and you'll be shown their sign-in key to hand over.">
+          <input className="at-input" placeholder="Their name" value={making.adminName}
+            onChange={(e) => setMaking({ ...making, adminName: e.target.value })} />
+        </Field>
+      </Screen>
+    );
+  }
+
+  if (open) return <SpaceScreen org={open} busy={busy} error={error} dialog={dialog}
+    onBack={() => setOpenId(null)} run={run} ask={setConfirm} />;
+
+  return (
+    <>
+      {dialog}
+      <Notice kind="error">{error}</Notice>
+      <Button variant="primary" icon="add" style={{ marginBottom: 14 }}
+        onClick={() => setMaking({ name: "", slug: "", adminName: "" })}>
+        New space
+      </Button>
+      {made && (
+        <div className="at-sub">
+          <p className="at-eyebrow">Sign-in key for {made.admin}, space admin of {made.name}</p>
+          <p className="at-key">{made.key}</p>
+          <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
+            <Button size="sm" icon="copy" onClick={() => navigator.clipboard && navigator.clipboard.writeText(made.key)}>
+              Copy the key
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => setMade(null)}>Done</Button>
+          </div>
+          <Help>
+            Send it to them through something private, with the address manytongues.co/{made.slug}.
+            You won't see it again, but you can issue another.
+          </Help>
+        </div>
+      )}
+      {!orgs ? null : orgs.map((o) => (
+        <Tile key={o.id}
+          title={o.name}
+          meta={`manytongues.co/${o.slug} · ${plural(o.people.length, "person")}`}
+          onOpen={() => setOpenId(o.id)}
+          footer={o.archived ? <TileNote>Closed</TileNote> : null}
+        />
+      ))}
+    </>
+  );
+}
+
+/* One space, as the App admin manages it. */
+function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
+  org: API.OrgRow;
+  busy: boolean;
+  error: string;
+  dialog: React.ReactNode;
+  onBack: () => void;
+  run: (work: () => Promise<unknown>, said?: string) => Promise<boolean>;
+  ask: (p: Pending) => void;
+}) {
+  const [name, setName] = useState(org.name);
+  const [slug, setSlug] = useState(org.slug);
+  const [colour, setColour] = useState(org.colour || "");
+  const [picking, setPicking] = useState(false);
+  const isMain = org.id === "main";
+  const changed = name.trim() !== org.name || slug.trim() !== org.slug || colour !== (org.colour || "");
+  if (picking) {
+    return (
+      <ImageScreen
+        title={`${org.name}'s logo`}
+        images={org.logo ? [org.logo] : []}
+        onChange={(next) => run(() => API.updateOrg(org.id, { logo: next[next.length - 1] || "" }), "Logo saved")}
+        onClose={() => setPicking(false)}
+      />
+    );
+  }
+  const admins = new Set(org.admins || []);
+  return (
+    <Screen
+      title={org.name}
+      onBack={onBack}
+      action={
+        <Button variant="primary" size="sm" icon="save" disabled={busy || !changed || !name.trim()}
+          onClick={() =>
+            run(() => API.updateOrg(org.id, {
+              name: name.trim(),
+              ...(slug.trim() !== org.slug ? { slug: slug.trim().toLowerCase() } : {}),
+              colour,
+            }), "Saved")
+          }
+        >
+          {busy ? "Saving…" : "Save"}
+        </Button>
+      }
+    >
+      {dialog}
+      <Notice kind="error">{error}</Notice>
+      {org.archived ? <Notice kind="warn">This space is closed. Its people can't sign in.</Notice> : null}
+      <Field label="Name">
+        <input className="at-input" value={name} onChange={(e) => setName(e.target.value)} />
+      </Field>
+      <Field label="Address" lede={`manytongues.co/${slug || "…"}${org.formerSlugs.length ? ` · still answers to ${org.formerSlugs.map((x) => `/${x}`).join(", ")}` : ""}`}>
+        <input className="at-input" value={slug} disabled={isMain}
+          onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))} />
+      </Field>
+      <Field label="Logo" lede="Shown on the space's sign-in page and at the top of the You menu.">
+        <Button size="sm" icon="image" onClick={() => setPicking(true)}>{org.logo ? "Change the logo" : "Add a logo"}</Button>
+      </Field>
+      <Field label="Colour" lede="Used on the space's sign-in page only.">
+        <input type="color" value={colour || "#3b5bdb"} onChange={(e) => setColour(e.target.value)} />
+        {colour && !usableAccent(colour) ? (
+          <Help>This colour is too faint to use; the app's own will be shown.</Help>
+        ) : null}
+        {colour ? <Button variant="ghost" size="sm" onClick={() => setColour("")}>No colour</Button> : null}
+      </Field>
+      <CodeBox long label="Invitation link" hint="Anyone with it can make an account in this space."
+        code={`${window.location.origin}/${org.slug}?join=${org.inviteCode}`} />
+      <Section title="Space admins" lede="They run this space: its courses, its people, its reports.">
+        {org.people.length === 0 ? <Help>Nobody is in this space yet.</Help> : null}
+        {org.people.map((p) => (
+          <Tile key={p.handle}
+            title={p.displayName}
+            meta={admins.has(p.handle) ? "Space admin" : p.handle}
+            actions={
+              admins.has(p.handle) ? (
+                <Button variant="ghost" size="sm" disabled={busy}
+                  onClick={() => run(() => API.orgAdmins(org.id, { remove: p.handle }), `${p.displayName} is no longer a space admin`)}>
+                  Remove as admin
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" disabled={busy}
+                  onClick={() => run(() => API.orgAdmins(org.id, { add: p.handle }), `${p.displayName} is now a space admin`)}>
+                  Make space admin
+                </Button>
+              )
+            }
+          />
+        ))}
+      </Section>
+      <SpaceExtras org={org} />
+      {!isMain ? (
+        <Section title="Closing">
+          <div className="at-row">
+            {org.archived ? (
+              <Button disabled={busy} onClick={() => run(() => API.archiveOrg(org.id, false), `${org.name} reopened`)}>
+                Reopen the space
+              </Button>
+            ) : (
+              <Button disabled={busy}
+                onClick={() => ask({
+                  title: `Close ${org.name}?`,
+                  confirmLabel: "Close the space",
+                  body: <p>Its people won't be able to sign in until you reopen it. Nothing is deleted.</p>,
+                  action: () => API.archiveOrg(org.id, true),
+                })}>
+                Close the space
+              </Button>
+            )}
+            <Button variant="danger" disabled={busy}
+              onClick={() => ask({
+                title: `Delete ${org.name} for good?`,
+                confirmLabel: "Delete the space",
+                confirmWord: org.name,
+                closeAfter: true,
+                body: (
+                  <>
+                    <p>
+                      Every account in it ({plural(org.people.length, "person")}), with their practice history, and every
+                      course, deck and card in it are deleted. Its address becomes free again.
+                    </p>
+                    <p>This can't be undone.</p>
+                  </>
+                ),
+                action: () => API.deleteOrg(org.id, org.name),
+              })}>
+              Delete the space
+            </Button>
+          </div>
+        </Section>
+      ) : null}
+    </Screen>
+  );
+}
+
+/*
+ * The space's invitation link, at the top of People (0.544, 37a): to copy
+ * and send, and to replace when it has gone somewhere it shouldn't.
+ */
+function InviteLink({ invite, busy, onReplace }: {
+  invite: { code: string; slug: string; name: string };
+  busy: boolean;
+  onReplace: () => void;
+}) {
+  /* The join codes' own box (0.549), laid out for something as long as a link. */
+  return (
+    <CodeBox
+      long
+      label="Invitation link"
+      hint={`Anyone with it can make an account in ${invite.name}. You then give them a role.`}
+      code={`${window.location.origin}/${invite.slug}?join=${invite.code}`}
+      busy={busy}
+      onNew={onReplace}
+    />
+  );
+}
+
+const FORMER_WHY: Record<string, string> = {
+  left: "Left",
+  removed: "Removed",
+  "deleted-self": "Deleted their account",
+  "deleted-by-admin": "Deleted by the app admin",
+};
+
+/*
+ * Former members (0.544; 25a, 30c, 67a, 31a): who left, was removed or was
+ * deleted, with what can still be done — reactivate a suspended account,
+ * hand someone's material to a teacher who is still here, and, for the App
+ * admin, take a record off by hand.
+ */
+function FormerMembers({ former, people, isAppAdmin, busy, ask }: {
+  former: import("./types.ts").FormerMember[];
+  people: { handle: string; displayName: string }[];
+  isAppAdmin: boolean;
+  busy: boolean;
+  ask: (p: Pending) => void;
+}) {
+  const [handingFrom, setHandingFrom] = useState<string | null>(null);
+  const [heir, setHeir] = useState("");
+  return (
+    <Section title="Former members" lede="People who left, were removed or were deleted.">
+      {former.slice().reverse().map((r) => {
+        const suspended = r.why === "left" || r.why === "removed";
+        return (
+          <Tile key={r.handle}
+            title={r.displayName}
+            meta={`${FORMER_WHY[r.why] || r.why} · ${shortDate(r.left)} · joined ${shortDate(r.joined)}${
+              r.courses.length ? ` · was in ${r.courses.map((c) => c.title).join(", ")}` : ""}`}
+            actions={
+              <>
+                {suspended && (
+                  <Button size="sm" disabled={busy}
+                    onClick={() => ask({
+                      title: `Reactivate ${r.displayName}?`,
+                      confirmLabel: "Reactivate",
+                      body: <p>They can sign in again and are put back on the courses they were in.</p>,
+                      action: () => API.reactivateUser(r.handle),
+                    })}>
+                    Reactivate
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" disabled={busy}
+                  onClick={() => {
+                    setHeir("");
+                    setHandingFrom(r.handle);
+                  }}>
+                  Hand their material to…
+                </Button>
+                {isAppAdmin && (
+                  <IconButton icon="remove" label="Remove this record"
+                    onClick={() => ask({
+                      title: `Remove ${r.displayName}'s record?`,
+                      confirmLabel: "Remove the record",
+                      body: <p>Only the record goes. Nothing else changes.</p>,
+                      action: () => API.removeFormer(r.handle),
+                    })} />
+                )}
+              </>
+            }
+          />
+        );
+      })}
+      {handingFrom ? (
+        <ConfirmModal
+          title="Hand their material to…"
+          confirmLabel="Hand it over"
+          danger={false}
+          busy={busy || !heir}
+          body={
+            <RadioGroup
+              name="hand-over"
+              label="Who should own their decks and cards now"
+              value={heir}
+              onChange={setHeir}
+              options={people.map((p) => ({ value: p.handle, label: p.displayName }))}
+            />
+          }
+          onCancel={() => setHandingFrom(null)}
+          onConfirm={() => {
+            const from = handingFrom;
+            setHandingFrom(null);
+            ask({
+              title: "Hand it over?",
+              confirmLabel: "Hand it over",
+              danger: false,
+              body: <p>Every deck and card they made for the space becomes theirs to look after. Their numbers stay theirs.</p>,
+              action: () => API.handOver(from, heir),
+            } as Pending);
+          }}
+        />
+      ) : null}
+    </Section>
+  );
+}
+
+/* Deleting what somebody else made (0.544, 94a): said first, in so many words. */
+function OthersWork({ name, what }: { name?: string; what: "deck" | "card" }) {
+  return (
+    <Notice kind="warn">
+      {name ? `${name} made this ${what}.` : `Someone else made this ${what}.`} Deleting it removes it from
+      every course it's in, for every student. This can't be undone.
+    </Notice>
+  );
+}
+
+
+/*
+ * A space's storage figures and its export (0.546; 60a, 63a): how much it
+ * holds, and the whole of it in one file — its people, courses, decks,
+ * cards, recordings and pictures, without anyone's My space.
+ */
+function SpaceExtras({ org }: { org: API.OrgRow }) {
+  const [usage, setUsage] = useState<API.OrgUsage | null>(null);
+  const [progress, setProgress] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    API.orgUsage(org.id).then((r) => live && setUsage(r.usage), () => {});
+    return () => {
+      live = false;
+    };
+  }, [org.id]);
+  const megabytes = usage ? (usage.bytes / (1024 * 1024)).toFixed(1) : "";
+  return (
+    <Section title="Storage and export">
+      <Notice kind="error">{error}</Notice>
+      {usage ? (
+        <Help>
+          {plural(usage.people, "person")}, {plural(usage.courses, "course")}, {plural(usage.decks, "deck")},{" "}
+          {plural(usage.cards, "card")}; {plural(usage.recordings, "recording")} and {plural(usage.pictures, "picture")},{" "}
+          about {megabytes} MB. A recording used by two spaces counts in both.
+        </Help>
+      ) : null}
+      <Button size="sm" icon="download" disabled={!!progress}
+        onClick={async () => {
+          setError("");
+          setProgress("Starting…");
+          try {
+            const { blob, manifest } = await buildBackup(
+              (done, total) => setProgress(`${done} of ${total}`),
+              ALL_PARTS,
+              () => API.exportOrgManifest(org.id),
+            );
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            const stamp = new Date(manifest.takenAt).toISOString().slice(0, 16).replace(/[:T]/g, "-");
+            a.href = url;
+            a.download = `space-${org.slug}-${stamp}.json`;
+            a.click();
+            setTimeout(() => URL.revokeObjectURL(url), 60000);
+          } catch (e) {
+            setError(API.explain(e));
+          } finally {
+            setProgress("");
+          }
+        }}>
+        {progress ? `Exporting · ${progress}` : "Export this space"}
+      </Button>
+    </Section>
+  );
+}
+
+/*
+ * Super admin · People (0.547; 6b, 7b): everyone in every space, under each
+ * space's name, with one search over all of them. A new key, suspending,
+ * reactivating and deleting work wherever the person is: each call is sent
+ * as from their space.
+ */
+function EveryonePeople({ me }: { me: string }) {
+  const [data, setData] = useState<{ orgs: API.SuperOrg[]; people: (User & { org: string })[] } | null>(null);
+  const [q, setQ] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<Pending | null>(null);
+  const [newKey, setNewKey] = useState<{ name: string; key: string } | null>(null);
+  const load = useCallback(() => API.everyone().then((r) => setData(r), (e) => setError(API.explain(e))), []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  const needle = q.trim().toLowerCase();
+  const match = (u: User) => !needle || `${u.displayName} ${u.handle}`.toLowerCase().includes(needle);
+  return (
+    <>
+      {confirm && (
+        <ConfirmModal {...confirm} busy={busy} onCancel={() => setConfirm(null)}
+          onConfirm={async () => {
+            setBusy(true);
+            try {
+              await confirm.action();
+              setConfirm(null);
+              await load();
+            } catch (e) {
+              setError(API.explain(e));
+            } finally {
+              setBusy(false);
+            }
+          }} />
+      )}
+      <Notice kind="error">{error}</Notice>
+      <input className="at-input" placeholder="Search everyone, in every space" value={q}
+        onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 14 }} />
+      {newKey && (
+        <div className="at-sub">
+          <p className="at-eyebrow">New sign-in key for {newKey.name}</p>
+          <p className="at-key">{newKey.key}</p>
+          <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
+            <Button size="sm" icon="copy" onClick={() => navigator.clipboard && navigator.clipboard.writeText(newKey.key)}>Copy the key</Button>
+            <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>Done</Button>
+          </div>
+        </div>
+      )}
+      {data && data.orgs.map((o) => {
+        const here = data.people.filter((u) => u.org === o.id && match(u));
+        if (!here.length) return null;
+        return (
+          <Section key={o.id} title={o.name} lede={`manytongues.co/${o.slug}`}>
+            {here.map((u) => (
+              <Tile key={u.handle}
+                title={u.displayName}
+                meta={`${u.handle}${u.admin ? " · App admin" : o.admins.includes(u.handle) ? " · Space admin" : ""}${u.suspended ? " · Suspended" : ""}`}
+                actions={
+                  <>
+                    <IconButton icon="key" label="Issue a new sign-in key" onClick={() => setConfirm({
+                      title: `New sign-in key for ${u.displayName}?`,
+                      confirmLabel: "Issue a new key",
+                      body: <p>Their current key stops working at once. You'll see the new one once.</p>,
+                      action: async () => {
+                        const r = await API.reissueKey(u.handle, o.id);
+                        setNewKey({ name: u.displayName, key: r.key });
+                      },
+                    })} />
+                    {u.handle !== me && !u.admin && (u.suspended ? (
+                      <IconButton icon="unlock" label="Reactivate" onClick={() => setConfirm({
+                        title: `Reactivate ${u.displayName}?`,
+                        confirmLabel: "Reactivate",
+                        body: <p>They can sign in again and are put back on their courses.</p>,
+                        action: () => API.reactivateUser(u.handle, o.id),
+                      })} />
+                    ) : (
+                      <IconButton icon="lock" label="Suspend" onClick={() => setConfirm({
+                        title: `Suspend ${u.displayName}?`,
+                        confirmLabel: "Suspend them",
+                        body: <p>They can't sign in until reactivated, and come off every course. Nothing is deleted.</p>,
+                        action: () => API.suspendUser(u.handle, o.id),
+                      })} />
+                    ))}
+                    {u.handle !== me && (
+                      <IconButton icon="delete" label="Delete person" danger onClick={() => setConfirm({
+                        title: `Delete ${u.displayName}?`,
+                        confirmLabel: "Delete for good",
+                        confirmWord: u.handle,
+                        body: (
+                          <p>
+                            Their account, key, My space, practice history and course places go. What they made
+                            for {o.name} stays, under their name. There is no undoing this.
+                          </p>
+                        ),
+                        action: () => API.deleteUser(u.handle, o.id),
+                      })} />
+                    )}
+                  </>
+                }
+              />
+            ))}
+          </Section>
+        );
+      })}
+    </>
+  );
+}
+
+/*
+ * Super admin · Reports (0.547; 1c, 8b): learners' reports from every
+ * space, each with its space, to read and dismiss. A card is fixed from
+ * inside its space.
+ */
+function EveryReport() {
+  const [data, setData] = useState<{ orgs: API.SuperOrg[]; flags: (Flag & { org: string })[] } | null>(null);
+  const [error, setError] = useState("");
+  const load = useCallback(() => API.allReports().then((r) => setData(r), (e) => setError(API.explain(e))), []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  if (!data) return <Notice kind="error">{error}</Notice>;
+  const nameOf = (id: string) => (data.orgs.find((o) => o.id === id) || { name: id }).name;
+  const flags = data.flags.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+  return (
+    <>
+      <Notice kind="error">{error}</Notice>
+      {!flags.length ? <Help>No reports in any space.</Help> : null}
+      {flags.map((f) => (
+        <Tile key={f.id}
+          title={`${flagTitle(f.kind)}${f.prompt ? ` · ${f.prompt}` : ""}`}
+          meta={`${nameOf(f.org)} · ${f.handleName || f.handle} · ${shortDate(f.at)}${f.note ? ` · "${f.note}"` : ""}`}
+          actions={
+            <Button variant="ghost" size="sm"
+              onClick={async () => {
+                try {
+                  await API.deleteFlagsIn([f.id], f.org);
+                  await load();
+                } catch (e) {
+                  setError(API.explain(e));
+                }
+              }}>
+              Dismiss
+            </Button>
+          }
+        />
+      ))}
+    </>
+  );
+}
+
