@@ -1618,12 +1618,14 @@ function scriptStyle(languages: Record<LangId, Lang>, langId?: LangId) {
   return { ...(lang.fontStack ? { fontFamily: lang.fontStack } : null), ...scriptVars(lang) };
 }
 
-export function AdminSpace({ account, languages, onClose }: {
+export function AdminSpace({ account, languages, onClose, superMode = false }: {
   account: User;
+  /** Super admin (0.547): the App admin's own tools, whichever space they are in. */
+  superMode?: boolean;
   languages: Record<LangId, Lang>;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState("courses");
+  const [tab, setTab] = useState(superMode ? "orgs" : "courses");
   const [data, setData] = useState<import("./types.ts").AdminOverview | null>(recallSpace("admin", account.handle));
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -1952,15 +1954,21 @@ export function AdminSpace({ account, languages, onClose }: {
 
   return (
     <SpaceFrame
-      tabs={[
-        ["courses", "Courses", "school"],
-        ["people", "People", "group"],
-        ["decks", "Decks", "folder"],
-        ["flags", "Flags", "flag"],
-        ...(account.admin ? [["orgs", "Spaces", "hash"] as [string, string, string]] : []),
-        /* Backups, restores and clearing are the App admin's alone (4b). */
-        ...(account.admin ? [["app", "App", "tune"] as [string, string, string]] : []),
-      ]}
+      tabs={superMode
+        ? [
+            /* Super admin (0.547): what is the whole app's, not one space's. */
+            ["orgs", "Spaces", "hash"],
+            ["everyone", "People", "group"],
+            ["allflags", "Reports", "flag"],
+            ["app", "App", "tune"],
+          ]
+        : [
+            /* Admin is the space you are in, for everyone who runs it. */
+            ["courses", "Courses", "school"],
+            ["people", "People", "group"],
+            ["decks", "Decks", "folder"],
+            ["flags", "Flags", "flag"],
+          ]}
       tab={tab}
       onTab={setTab}
       error={error}
@@ -1982,7 +1990,9 @@ export function AdminSpace({ account, languages, onClose }: {
       }
     >
 
-          {tab === "orgs" && account.admin && <SpacesTab />}
+          {superMode && tab === "orgs" && account.admin && <SpacesTab />}
+          {superMode && tab === "everyone" && account.admin && <EveryonePeople me={account.handle} />}
+          {superMode && tab === "allflags" && account.admin && <EveryReport />}
 
           {tab === "courses" && (
             <>
@@ -2836,7 +2846,7 @@ export function AdminSpace({ account, languages, onClose }: {
             </>
           )}
 
-          {tab === "app" && account.admin && (
+          {superMode && tab === "app" && account.admin && (
             <>
               <p className="at-eyebrow">
                 Backup
@@ -9495,5 +9505,156 @@ function SpaceExtras({ org }: { org: API.OrgRow }) {
         {progress ? `Exporting · ${progress}` : "Export this space"}
       </Button>
     </Section>
+  );
+}
+
+/*
+ * Super admin · People (0.547; 6b, 7b): everyone in every space, under each
+ * space's name, with one search over all of them. A new key, suspending,
+ * reactivating and deleting work wherever the person is: each call is sent
+ * as from their space.
+ */
+function EveryonePeople({ me }: { me: string }) {
+  const [data, setData] = useState<{ orgs: API.SuperOrg[]; people: (User & { org: string })[] } | null>(null);
+  const [q, setQ] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [confirm, setConfirm] = useState<Pending | null>(null);
+  const [newKey, setNewKey] = useState<{ name: string; key: string } | null>(null);
+  const load = useCallback(() => API.everyone().then((r) => setData(r), (e) => setError(API.explain(e))), []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  const needle = q.trim().toLowerCase();
+  const match = (u: User) => !needle || `${u.displayName} ${u.handle}`.toLowerCase().includes(needle);
+  return (
+    <>
+      {confirm && (
+        <ConfirmModal {...confirm} busy={busy} onCancel={() => setConfirm(null)}
+          onConfirm={async () => {
+            setBusy(true);
+            try {
+              await confirm.action();
+              setConfirm(null);
+              await load();
+            } catch (e) {
+              setError(API.explain(e));
+            } finally {
+              setBusy(false);
+            }
+          }} />
+      )}
+      <Notice kind="error">{error}</Notice>
+      <input className="at-input" placeholder="Search everyone, in every space" value={q}
+        onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 14 }} />
+      {newKey && (
+        <div className="at-sub">
+          <p className="at-eyebrow">New sign-in key for {newKey.name}</p>
+          <p className="at-key">{newKey.key}</p>
+          <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
+            <Button size="sm" icon="copy" onClick={() => navigator.clipboard && navigator.clipboard.writeText(newKey.key)}>Copy the key</Button>
+            <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>Done</Button>
+          </div>
+        </div>
+      )}
+      {data && data.orgs.map((o) => {
+        const here = data.people.filter((u) => u.org === o.id && match(u));
+        if (!here.length) return null;
+        return (
+          <Section key={o.id} title={o.name} lede={`manytongues.co/${o.slug}`}>
+            {here.map((u) => (
+              <Tile key={u.handle}
+                title={u.displayName}
+                meta={`${u.handle}${u.admin ? " · App admin" : o.admins.includes(u.handle) ? " · Space admin" : ""}${u.suspended ? " · Suspended" : ""}`}
+                actions={
+                  <>
+                    <IconButton icon="key" label="Issue a new sign-in key" onClick={() => setConfirm({
+                      title: `New sign-in key for ${u.displayName}?`,
+                      confirmLabel: "Issue a new key",
+                      body: <p>Their current key stops working at once. You'll see the new one once.</p>,
+                      action: async () => {
+                        const r = await API.reissueKey(u.handle, o.id);
+                        setNewKey({ name: u.displayName, key: r.key });
+                      },
+                    })} />
+                    {u.handle !== me && !u.admin && (u.suspended ? (
+                      <IconButton icon="unlock" label="Reactivate" onClick={() => setConfirm({
+                        title: `Reactivate ${u.displayName}?`,
+                        confirmLabel: "Reactivate",
+                        body: <p>They can sign in again and are put back on their courses.</p>,
+                        action: () => API.reactivateUser(u.handle, o.id),
+                      })} />
+                    ) : (
+                      <IconButton icon="lock" label="Suspend" onClick={() => setConfirm({
+                        title: `Suspend ${u.displayName}?`,
+                        confirmLabel: "Suspend them",
+                        body: <p>They can't sign in until reactivated, and come off every course. Nothing is deleted.</p>,
+                        action: () => API.suspendUser(u.handle, o.id),
+                      })} />
+                    ))}
+                    {u.handle !== me && (
+                      <IconButton icon="delete" label="Delete person" danger onClick={() => setConfirm({
+                        title: `Delete ${u.displayName}?`,
+                        confirmLabel: "Delete for good",
+                        confirmWord: u.handle,
+                        body: (
+                          <p>
+                            Their account, key, My space, practice history and course places go. What they made
+                            for {o.name} stays, under their name. There is no undoing this.
+                          </p>
+                        ),
+                        action: () => API.deleteUser(u.handle, o.id),
+                      })} />
+                    )}
+                  </>
+                }
+              />
+            ))}
+          </Section>
+        );
+      })}
+    </>
+  );
+}
+
+/*
+ * Super admin · Reports (0.547; 1c, 8b): learners' reports from every
+ * space, each with its space, to read and dismiss. A card is fixed from
+ * inside its space.
+ */
+function EveryReport() {
+  const [data, setData] = useState<{ orgs: API.SuperOrg[]; flags: (Flag & { org: string })[] } | null>(null);
+  const [error, setError] = useState("");
+  const load = useCallback(() => API.allReports().then((r) => setData(r), (e) => setError(API.explain(e))), []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  if (!data) return <Notice kind="error">{error}</Notice>;
+  const nameOf = (id: string) => (data.orgs.find((o) => o.id === id) || { name: id }).name;
+  const flags = data.flags.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+  return (
+    <>
+      <Notice kind="error">{error}</Notice>
+      {!flags.length ? <Help>No reports in any space.</Help> : null}
+      {flags.map((f) => (
+        <Tile key={f.id}
+          title={`${flagTitle(f.kind)}${f.prompt ? ` · ${f.prompt}` : ""}`}
+          meta={`${nameOf(f.org)} · ${f.handleName || f.handle} · ${shortDate(f.at)}${f.note ? ` · "${f.note}"` : ""}`}
+          actions={
+            <Button variant="ghost" size="sm"
+              onClick={async () => {
+                try {
+                  await API.deleteFlagsIn([f.id], f.org);
+                  await load();
+                } catch (e) {
+                  setError(API.explain(e));
+                }
+              }}>
+              Dismiss
+            </Button>
+          }
+        />
+      ))}
+    </>
   );
 }

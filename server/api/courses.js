@@ -5060,6 +5060,31 @@ async function handle(req) {
         return json({ ok: true, org, admin: user, key });
       }
 
+      /*
+       * Super admin (0.547): everyone in every space, and every space's
+       * reports — the App admin's alone. Acting on one of them goes through
+       * the ordinary actions, sent with that person's or report's space as
+       * x-org.
+       */
+      if (action === "admin-everyone" || action === "admin-all-reports") {
+        if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+        const orgIds = await readIndex(store, "orgs");
+        const orgs = (await readManyJson(store, orgIds.map((id) => K.org(id)))).filter(Boolean)
+          .map((o) => ({ id: o.id, name: o.name, slug: o.slug, admins: o.admins || [], archived: !!o.archived }));
+        if (action === "admin-everyone") {
+          const rows = (await readManyJson(store, (await readIndex(store, "users")).map((h) => K.user(h)))).filter(Boolean);
+          const people = rows.map((u) => {
+            const { keyHash: _k, ...safe } = u;
+            return { ...safe, org: orgOf(u) };
+          });
+          return json({ ok: true, orgs, people });
+        }
+        const flags = (await readManyJson(store, (await readIndex(store, "flags")).map((x) => K.flag(x))))
+          .filter(Boolean)
+          .map((f) => ({ ...f, org: orgOf(f) }));
+        return json({ ok: true, orgs, flags });
+      }
+
       /* Every space, for the Spaces tab: App admins only. */
       if (action === "admin-orgs") {
         if (!iAmAdmin) return json({ error: "admin-only" }, 403);

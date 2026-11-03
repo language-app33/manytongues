@@ -85,7 +85,7 @@ const CALL_TIMEOUT_MS = 20000;
  */
 async function call(
   action: string,
-  { body, params, key }: { body?: unknown; params?: Record<string, string>; key?: string } = {},
+  { body, params, key, org }: { body?: unknown; params?: Record<string, string>; key?: string; org?: string } = {},
 ): Promise<any> {
   const url = new URL(ENDPOINT, window.location.origin);
   url.searchParams.set("action", action);
@@ -94,7 +94,9 @@ async function call(
   const headers: Record<string, string> = { "content-type": "application/json" };
   const use = key !== undefined ? key : currentKey;
   if (use) headers["x-key"] = use;
-  if (addressOrg) headers["x-org"] = addressOrg;
+  /* One call can name its own space: Super admin acting on someone
+     elsewhere (0.547). */
+  if (org || addressOrg) headers["x-org"] = org || addressOrg;
 
   const abort = new AbortController();
   const deadline = setTimeout(() => abort.abort(), CALL_TIMEOUT_MS);
@@ -358,8 +360,16 @@ export const exportOrgManifest = (id: string) => call("admin-export-org-manifest
 export const orgUsage = (id: string): Promise<{ ok: true; usage: OrgUsage }> => call("admin-org-usage", { body: { id } });
 /* ---- running a space (0.544) ---- */
 export const newInvite = (): Promise<{ ok: true; inviteCode: string }> => call("admin-new-invite", { body: {} });
-export const suspendUser = (handle: string) => call("admin-suspend-user", { body: { handle } });
-export const reactivateUser = (handle: string) => call("admin-reactivate-user", { body: { handle } });
+export const suspendUser = (handle: string, org?: string) => call("admin-suspend-user", { body: { handle }, org });
+export const reactivateUser = (handle: string, org?: string) => call("admin-reactivate-user", { body: { handle }, org });
+/* ---- Super admin (0.547) ---- */
+export type SuperOrg = { id: string; name: string; slug: string; admins: string[]; archived: boolean };
+export const everyone = (): Promise<{ ok: true; orgs: SuperOrg[]; people: (User & { org: string })[] }> =>
+  call("admin-everyone");
+export const allReports = (): Promise<{ ok: true; orgs: SuperOrg[]; flags: (Flag & { org: string })[] }> =>
+  call("admin-all-reports");
+export const deleteFlagsIn = (flagIds: string[], org: string) =>
+  call("admin-delete-flags", { body: { flagIds }, org });
 export const handOver = (from: string, to: string) => call("admin-hand-over", { body: { from, to } });
 export const removeFormer = (handle: string) => call("admin-remove-former", { body: { handle } });
 export const keySaved = () => call("key-saved", { body: {} });
@@ -379,8 +389,8 @@ export const clearData = (adminKey: string, parts: string[]) => call("admin-clea
    second by hand. */
 export const createUser = (displayName: string, courseId: string, roles: ("teacher" | "student")[]): Promise<any> =>
   call("admin-create-user", { body: { displayName, courseId, roles } });
-export const reissueKey = (handle: string) => call("admin-reissue-key", { body: { handle } });
-export const deleteUser = (handle: string) => call("admin-delete-user", { body: { handle } });
+export const reissueKey = (handle: string, org?: string) => call("admin-reissue-key", { body: { handle }, org });
+export const deleteUser = (handle: string, org?: string) => call("admin-delete-user", { body: { handle }, org });
 export const newCourseCode = (courseId: string, which: "teacher" | "student") =>
   call("admin-new-code", { body: { courseId, which } });
 export const deleteCourse = (courseId: string) => call("admin-delete-course", { body: { courseId } });

@@ -15270,6 +15270,17 @@ export default function ArabicTrainer() {
           </React.Suspense>
         )}
 
+        {space === "super" && account && account.admin && (
+          <React.Suspense fallback={<ChunkFallback />}>
+            <AdminSpace
+              superMode
+              account={account}
+              languages={LANGUAGES}
+              onClose={() => setSpace("learn")}
+            />
+          </React.Suspense>
+        )}
+
         {leaving && (
           <ConfirmModal
             title="Leave this session?"
@@ -15420,7 +15431,9 @@ export default function ArabicTrainer() {
         /* Somebody with no Teaching gets My space instead (0.545, 58a). */
         const spaces = ["learn"]
           .concat(teaches || runs ? ["teach"] : account ? ["mine"] : [])
-          .concat(runs ? ["admin"] : []);
+          .concat(runs ? ["admin"] : [])
+          /* The app admin's own tools, whichever space they are in (0.547). */
+          .concat(account && account.admin ? ["super"] : []);
         const choices = space === "learn" ? langChoices : space === "teach" || space === "mine" ? teachChoices : [];
         return (
           <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
@@ -19876,8 +19889,8 @@ const initialsOf = (name?: string | null) =>
     .join("")
     .toUpperCase() || "?";
 
-const SPACE_LABEL: Record<string, string> = { learn: "Learning", teach: "Teaching", admin: "Admin", mine: "My space" };
-const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", admin: "tune", mine: "person" };
+const SPACE_LABEL: Record<string, string> = { learn: "Learning", teach: "Teaching", admin: "Admin", mine: "My space", super: "Super admin" };
+const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", admin: "tune", mine: "person", super: "key" };
 
 
 /*
@@ -19929,6 +19942,8 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part
                 role="radio"
                 aria-checked={space === sp}
                 className={`at-spacebtn${space === sp ? " on" : ""}`}
+                /* Super admin sits on a row of its own, full width (0.547). */
+                style={sp === "super" ? { gridColumn: "1 / -1" } : undefined}
                 onClick={() => onSpace(sp)}
               >
                 <Icon name={SPACE_ICON[sp]} size={18} />

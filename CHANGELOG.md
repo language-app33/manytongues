@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.547 — 3 November 2026
+
+**Super admin: the app admin's own tools, in every space.**
+
+- A new **Super admin** button in the You menu, on its own full-width row
+  under Learning, Teaching and Admin. Only app admins see it, whichever
+  space they are in.
+- Super admin holds what belongs to the whole app: **Spaces**, **People**
+  (everyone in every space, grouped by space, with one search across all
+  of them, and a new key, suspend, reactivate or delete for anyone),
+  **Reports** (learners' reports from every space, to read and dismiss),
+  and **App** (backups, restore, clearing).
+- **Admin** is now only about the space you're in, for space admins and
+  the app admin alike.
+- Released without running the test suite, at the owner's request.
+
 ## 0.546 — 3 November 2026
 
 **A space's storage, and the whole space in one file.**

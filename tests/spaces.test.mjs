@@ -275,6 +275,8 @@ const PLACED = {
     "set-deck-practise", "borrow-cards", "copy-to-space",
     /* Stage 6, tried below. */
     "admin-export-org-manifest", "admin-org-usage",
+    /* Super admin (0.547): the App admin's view of every space. */
+    "admin-everyone", "admin-all-reports",
   ],
   own: [
     "signup", "signin", "whoami", "practiced", "delete-account", "rename", "claim-admin",
