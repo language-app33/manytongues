@@ -8,6 +8,17 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.557 — 3 November 2026
+
+**Learning's tab titles match Teaching's.**
+
+- Progress and Cards no longer leave a gap above their title, so it no
+  longer slides up a little before staying put. It sits at the very top
+  from the start, as in Teaching.
+- Every tab title now sits on a white bar, in all four spaces.
+- Checked in a browser at phone size against Teaching.
+- Released without running the test suite, at the owner's request.
+
 ## 0.556 — 3 November 2026
 
 **Learning's tab titles stay at the top too.**
