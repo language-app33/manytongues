@@ -1428,8 +1428,11 @@ async function handle(req) {
          news to whoever is reading it. */
       const cardId = cardIdOf(String(body.cardId || "").slice(0, 64));
       const flagged = cardId ? await readCard(store, cardId) : null;
-      /* Your own card in My space is yours to fix, not to report (0.545). */
-      if (flagged && flagged.personal) return json({ error: "not-reportable" }, 400);
+      /* A card in My space is its owner's to fix, not to report (0.545).
+         Read unscoped (0.557): to anyone but its owner a My space card reads
+         as missing, and a missing card is otherwise reportable. */
+      const raw = cardId && !flagged ? await readJson(store, K.card(cardId)) : flagged;
+      if (raw && raw.personal) return json({ error: "not-reportable" }, 400);
 
       const flag = {
         id: randomBytes(8).toString("hex"),
