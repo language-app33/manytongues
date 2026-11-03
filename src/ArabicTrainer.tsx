@@ -15230,35 +15230,6 @@ export default function ArabicTrainer() {
           </React.Suspense>
         )}
 
-        {space === "mine" && account && (
-          <React.Suspense fallback={<ChunkFallback />}>
-            <TeachSpace
-              personalOnly
-              account={account}
-              languages={LANGUAGES}
-              settings={settings}
-              langsOff={teachLangsOff}
-              onLangChoices={reportTeachChoices}
-              onTry={tryExercise}
-              /* Read once, as this mounts. Cleared on the way out so that
-                 opening Teaching again tomorrow is opening Teaching, not
-                 reopening whatever was last tried. */
-              resume={trialBack}
-              /* A recording the server has lost, sent again from this
-                 device if it still holds it. */
-              onResend={async (hash: string) => {
-                const blob = await localClipBlob(hash);
-                if (!blob) return false;
-                await API.putClip(hash, await blobToBase64(blob));
-                return true;
-              }}
-              onClose={() => {
-                setTrialBack(null);
-                setSpace("learn");
-              }}
-            />
-          </React.Suspense>
-        )}
 
         {space === "admin" && account && (account.admin || account.orgAdmin) && (
           <React.Suspense fallback={<ChunkFallback />}>
@@ -15430,7 +15401,8 @@ export default function ArabicTrainer() {
         const runs = !!(account && (account.admin || account.orgAdmin));
         /* Somebody with no Teaching gets My space instead (0.545, 58a). */
         const spaces = ["learn"]
-          .concat(teaches || runs ? ["teach"] : account ? ["mine"] : [])
+          /* Students have no My space (0.550). */
+          .concat(teaches || runs ? ["teach"] : [])
           .concat(runs ? ["admin"] : [])
           /* The app admin's own tools, whichever space they are in (0.547). */
           .concat(account && account.admin ? ["super"] : []);

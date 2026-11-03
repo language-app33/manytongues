@@ -1158,6 +1158,56 @@ export function slugProblem(slug) {
 /** A hex colour or nothing. @param {unknown} c */
 const colourOf = (c) => (/^#[0-9a-f]{6}$/i.test(String(c || "")) ? String(c).toLowerCase() : "");
 
+/*
+ * Students' My space, removed once (0.550, 7a). Since 0.550 only teachers
+ * and those who run a space have a My space; what students made in it under
+ * 0.545–0.549 is deleted the first time this release runs, and never again
+ * (the stamp is written first, so two processes can't both do it). A
+ * teacher's My space is kept even when they later stop teaching (9a).
+ */
+/** @type {Promise<void> | null} */
+let sweptStudents = null;
+/** @param {Store} store */
+function sweepStudentMySpace(store) {
+  if (!sweptStudents) {
+    sweptStudents = (async () => {
+      const at = Date.now();
+      const stamp = await updateJson(store, "stamp:student-myspace-0550", (/** @type {any} */ cur) => (cur ? null : { at }));
+      if (!stamp || stamp.at !== at) return;
+      const courses = (await readManyJson(store, (await readIndex(store, "courses")).map((id) => K.course(id)))).filter(Boolean);
+      const orgs = (await readManyJson(store, (await readIndex(store, "orgs")).map((id) => K.org(id)))).filter(Boolean);
+      const runs = new Set(orgs.flatMap((o) => o.admins || []));
+      const teaches = new Set(courses.flatMap((c) => c.teachers || []));
+      const deckIds = await readIndex(store, "decks");
+      const decks = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(Boolean);
+      const students = new Set();
+      for (const d of decks.filter((x) => x.personal)) {
+        const owner = await readJson(store, K.user(d.owner));
+        if (owner && (owner.admin || runs.has(d.owner) || teaches.has(d.owner))) continue;
+        students.add(d.owner);
+        await store.delete(K.deck(d.id)).catch(() => {});
+      }
+      const goneDecks = new Set(decks.filter((x) => x.personal && students.has(x.owner)).map((x) => x.id));
+      if (goneDecks.size) {
+        await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x)));
+      }
+      for (const h of (await readIndex(store, "users"))) {
+        const u = await readJson(store, K.user(h));
+        if (!u || u.admin || runs.has(h) || teaches.has(h)) continue;
+        const ids = (await readJson(store, K.myCards(h))) || [];
+        const cards = (await readManyJson(store, ids.map((/** @type {string} */ id) => K.card(id)))).filter((c) => c && c.personal);
+        if (!cards.length) continue;
+        for (const c of cards) await store.delete(K.card(c.id)).catch(() => {});
+        const gone = new Set(cards.map((c) => c.id));
+        await updateJson(store, K.myCards(h), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !gone.has(x)));
+      }
+    })().catch(() => {
+      sweptStudents = null;
+    });
+  }
+  return sweptStudents;
+}
+
 /** @param {Request} req */
 export default (req) => orgScope.run({ org: null, self: "" }, () => handle(req));
 
@@ -1282,6 +1332,7 @@ async function handle(req) {
        admin only — the one named by x-org, when it exists. From here on the
        readers answer null for anything in another org. */
     await ensureMain(store);
+    await sweepStudentMySpace(store);
     let acting = orgOf(me);
     if (iAmAdmin) {
       const asked = String(req.headers.get("x-org") || "");
@@ -1442,8 +1493,10 @@ async function handle(req) {
       if (!title) return json({ error: "title-required" }, 400);
       /* My space (0.545): anyone may make a personal deck; a deck of the
          space is made by its teachers, space admins and App admins (33a). */
+      /* Since 0.550, students make nothing at all: My space too is for those
+         who teach or run the space. */
       const personal = body.personal === true;
-      if (!personal && !iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) {
+      if (!iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) {
         return json({ error: "not-teaching" }, 403);
       }
       const id = `d${randomBytes(6).toString("hex")}`;
@@ -2711,6 +2764,9 @@ async function handle(req) {
       } else {
         const newId = `k${randomBytes(6).toString("hex")}`;
         const now = Date.now();
+        if (body.personal === true && !iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) {
+          return json({ error: "not-teaching" }, 403);
+        }
         saved = {
           id: newId,
           org: acting,
@@ -3340,49 +3396,6 @@ async function handle(req) {
     }
 
     /*
-     * Course cards into one of your personal decks, or out of it (66b): the
-     * same card, practised once, not a copy. Only a card you can see — in a
-     * deck of a course you study, or one you could edit.
-     */
-    if (action === "borrow-cards") {
-      const deck = await readDeck(store, String(body.deckId || ""));
-      if (!deck || !deck.personal || deck.owner !== mine) return json({ error: "not-yours" }, 403);
-      const on = body.on !== false;
-      const asked = (Array.isArray(body.cardIds) ? body.cardIds : []).map(String).slice(0, 200);
-      const studied = new Set(
-        (await everyCourse(store)).filter((c) => inCourse(c, mine)).flatMap((c) => c.decks || [])
-      );
-      /** @type {string[]} */
-      const ok = [];
-      for (const id of asked) {
-        const card = await loadCard(id);
-        if (!card || card.personal) continue;
-        const holders = await decksHolding(card);
-        if (!on || holders.some((x) => studied.has(x)) || (await mayEditCard(card))) ok.push(id);
-      }
-      await updateJson(store, K.deck(deck.id), (/** @type {any} */ f) => {
-        if (!f) return null;
-        const ids = on ? [...new Set((f.cardIds || []).concat(ok))] : (f.cardIds || []).filter((/** @type {string} */ x) => !ok.includes(x));
-        return { ...f, cardIds: ids, cardCount: ids.length, version: (f.version || 1) + 1, updated: Date.now() };
-      });
-      for (const id of ok) {
-        await updateJson(store, K.card(id), (/** @type {any} */ c) => {
-          if (!c) return null;
-          const held = Array.isArray(c.inDecks) ? c.inDecks : [];
-          const next = on ? [...new Set(held.concat([deck.id]))] : held.filter((/** @type {string} */ x) => x !== deck.id);
-          return { ...c, inDecks: next };
-        });
-      }
-      return json({ ok: true, cardIds: ok });
-    }
-
-    /*
-     * A personal deck copied into the space (15a): a new deck of the space,
-     * with new copies of the cards you made in it; course cards it borrowed
-     * are already the space's and are referenced, not copied. Recordings
-     * and pictures are shared by their content, so nothing is uploaded.
-     */
-    /*
      * A My space deck into the space (0.549; 15a, 2a, 9b, 10a): copied —
      * a new deck of the space with copies of your cards, the original kept
      * — or moved — the deck itself and your cards in it become the space's,
@@ -3862,31 +3875,8 @@ async function handle(req) {
          too, so the app needn't ask a second time on every launch. */
       const teaches = allCourses.some((c) => isTeacher(c, mine));
 
-      /*
-       * My space (0.545, 59b, 56a): the person's own decks marked "practise
-       * this myself" arrive as one more course, "My space", built here and
-       * never stored — so Learning shows and deals them like any course.
-       * Added after `teaches` is worked out, and last, so nothing else
-       * mistakes it for a real course. Costs one read of the site's decks
-       * per refresh that finds anything changed.
-       */
-      const studiedDecks = new Set(courseRows.flatMap((c) => c.decks || []));
-      const allOwn = here(
-        await readManyJson(store, (await readIndex(store, "decks")).map((id) => K.deck(id)), EVENTUAL)
-      ).filter((d) => d && d.personal && d.owner === mine);
-      const ownDecks = allOwn.filter((d) => d.practise);
-      /* Shown whenever the person has any My space deck, with the ones
-         switched off named, so Learning can switch them back on (0.549, 8a). */
-      if (allOwn.length) {
-        courseRows.push(/** @type {any} */ ({
-          id: "my-space", title: "My space", personal: true, language: "",
-          decks: ownDecks.map((d) => d.id), teachers: [], students: [mine],
-          notPractised: allOwn.filter((d) => !d.practise).map((d) => ({ id: d.id, title: d.title })),
-        }));
-      }
-      /* The cards a personal deck may carry to its owner: their own, and
-         course cards still in a deck of a course they study (66b). */
-      const ownCardIds = new Set((await readJson(store, K.myCards(mine), EVENTUAL)) || []);
+      /* My space is no longer practised in Learning (0.550, 8b): nothing of
+         it is sent here. */
 
       /* A deck in two of the person's courses is still one deck; listing
          it twice gave the app two cards with one id. First course wins. */
@@ -3991,13 +3981,7 @@ async function handle(req) {
       for (const d of deckRows) {
         const course = deckToCourse.get(d.id);
         const link = (d.courses || []).find((/** @type {{ courseId: string }} */ c) => c.courseId === course.id);
-        let cardIds = await deckCardIds(d);
-        if (d.personal) {
-          const studiedCards = new Set(
-            deckRows.filter((x) => !x.personal && studiedDecks.has(x.id)).flatMap((x) => x.cardIds || [])
-          );
-          cardIds = cardIds.filter((id) => ownCardIds.has(id) || studiedCards.has(id));
-        }
+        const cardIds = await deckCardIds(d);
         /* Which number system and clock fill this deck's number parts: the
            chosen person's, in the deck's language (0.541). null when that
            person has none, so the device files nothing rather than

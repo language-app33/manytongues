@@ -272,7 +272,7 @@ const PLACED = {
     "admin-suspend-user", "admin-reactivate-user", "admin-new-invite", "admin-hand-over",
     "admin-remove-former", "key-saved", "leave-space",
     /* Stage 5: My space, tried below. */
-    "set-deck-practise", "borrow-cards", "copy-to-space",
+    "set-deck-practise", "copy-to-space",
     /* Stage 6, tried below. */
     "admin-export-org-manifest", "admin-org-usage",
     /* Super admin (0.547): the App admin's view of every space. */
@@ -506,46 +506,25 @@ test("a new account is asked to save its key until it says so; an invitation can
 
 /* ------------------------------------------------------- stage 5 (0.545) */
 
-test("My space: a learner's own decks reach their Learning, and nobody else's eyes", async () => {
+test("My space is a teacher's private corner; students have none (0.550)", async () => {
   const c = await another("my-space");
-  /* A learner may make a personal deck, never a deck of the space. */
-  assert.equal((await api("create-deck", { key: c.student.key, body: { title: "Not mine to make", lang: "ar-PS" } })).status, 403);
-  const deck = (await api("create-deck", { key: c.student.key, body: { title: "My words", lang: "ar-PS", personal: true } })).json.deck;
+  /* A student makes nothing: no deck of the space, no My space. */
+  assert.equal((await api("create-deck", { key: c.student.key, body: { title: "Mine", lang: "ar-PS", personal: true } })).status, 403);
+  assert.equal((await api("save-card", { key: c.student.key, body: { card: card("mine"), decks: [], personal: true } })).status, 403);
+  /* A teacher's My space deck. */
+  const deck = (await api("create-deck", { key: c.teacher.key, body: { title: "Prep", lang: "ar-PS", personal: true } })).json.deck;
   assert.equal(deck.personal, true);
-  assert.equal(deck.practise, true);
-  const own = (await api("save-card", { key: c.student.key, body: { card: card("mine"), decks: [deck.id], personal: true } })).json.card;
+  const own = (await api("save-card", { key: c.teacher.key, body: { card: card("prep"), decks: [deck.id], personal: true } })).json.card;
   assert.equal(own.personal, true);
-
-  let material = (await api("my-material", { key: c.student.key })).json;
-  assert.ok(material.courses.some((/** @type {any} */ x) => x.id === "my-space" && x.personal));
-  const sent = material.decks.find((/** @type {any} */ d) => d.id === deck.id);
-  assert.equal(sent.courseId, "my-space");
-  assert.ok(material.cards.flatMap((/** @type {any} */ d) => d.cards || [d]).some((/** @type {any} */ x) => x.id === own.id) ||
-    JSON.stringify(material.cards).includes(own.id), "the learner's own card is sent");
-
-  /* Nobody else sees it: teacher, space admin, App admin. */
-  for (const who of [c.teacher.key, c.lead.key]) {
-    assert.ok((await api("deck-cards", { key: who, params: { deck: deck.id } })).status >= 400);
-    assert.ok(!(await api("my-decks", { key: who })).json.decks.some((/** @type {any} */ d) => d.id === deck.id));
-  }
-  assert.ok((await api("deck-cards", { key: admin.key, org: c.id, params: { deck: deck.id } })).status >= 400);
-  assert.ok(!(await api("admin-overview", { key: admin.key, org: c.id })).json.decks.some((/** @type {any} */ d) => d.id === deck.id));
-  /* Not a thing to report; not a thing to put on a course. */
-  assert.equal((await api("report-flag", { key: c.student.key, body: { kind: "other", note: "x", cardId: own.id } })).status, 400);
-  assert.equal((await api("attach-deck", { key: c.lead.key, body: { deckId: deck.id, courseId: c.course.id } })).status >= 400, true);
-
-  /* Borrowing a course card: sent while the course has it, gone when it doesn't. */
-  assert.deepEqual((await api("borrow-cards", { key: c.student.key, body: { deckId: deck.id, cardIds: [c.card.id] } })).json.cardIds, [c.card.id]);
-  material = (await api("my-material", { key: c.student.key })).json;
-  assert.ok(material.decks.find((/** @type {any} */ d) => d.id === deck.id).cardIds.includes(c.card.id));
-  await api("detach-deck", { key: c.teacher.key, body: { deckId: c.deck.id, courseId: c.course.id } });
-  material = (await api("my-material", { key: c.student.key })).json;
-  assert.ok(!material.decks.find((/** @type {any} */ d) => d.id === deck.id).cardIds.includes(c.card.id), "withdrawn, it drops out");
-
-  /* Practise off: the My space group goes. */
-  await api("set-deck-practise", { key: c.student.key, body: { deckId: deck.id, practise: false } });
-  material = (await api("my-material", { key: c.student.key })).json;
+  /* Never practised in Learning, and nobody else sees it. */
+  const material = (await api("my-material", { key: c.teacher.key })).json;
   assert.ok(!material.courses.some((/** @type {any} */ x) => x.id === "my-space"));
+  assert.ok((await api("deck-cards", { key: c.lead.key, params: { deck: deck.id } })).status >= 400);
+  assert.ok(!(await api("my-decks", { key: c.lead.key })).json.decks.some((/** @type {any} */ d) => d.id === deck.id));
+  assert.ok((await api("deck-cards", { key: admin.key, org: c.id, params: { deck: deck.id } })).status >= 400);
+  /* Not reportable, and not onto a course except by copying or moving. */
+  assert.equal((await api("report-flag", { key: c.student.key, body: { kind: "other", note: "x", cardId: own.id } })).status, 400);
+  assert.ok((await api("attach-deck", { key: c.teacher.key, body: { deckId: deck.id, courseId: c.course.id } })).status >= 400);
 });
 
 test("a teacher copies a My space deck into the space, as separate cards", async () => {
@@ -564,16 +543,20 @@ test("a teacher copies a My space deck into the space, as separate cards", async
   const leads = (await api("my-decks", { key: c.lead.key })).json.decks.map((/** @type {any} */ d) => d.id);
   assert.ok(leads.includes(copied.json.deck.id));
   assert.ok(!leads.includes(deck.id));
-  /* A learner can't copy into the space. */
-  const sdeck = (await api("create-deck", { key: c.student.key, body: { title: "S", lang: "ar-PS", personal: true } })).json.deck;
-  assert.equal((await api("copy-to-space", { key: c.student.key, body: { deckId: sdeck.id } })).status, 403);
+  /* Moving: the deck itself becomes the space's, onto a course. */
+  const second = (await api("create-deck", { key: c.teacher.key, body: { title: "Ready", lang: "ar-PS", personal: true } })).json.deck;
+  const moved = await api("copy-to-space", { key: c.teacher.key, body: { deckId: second.id, move: true, courses: [c.course.id] } });
+  assert.equal(moved.status, 200, JSON.stringify(moved.json));
+  assert.equal(moved.json.deck.id, second.id);
+  assert.equal(moved.json.deck.personal, undefined);
+  assert.deepEqual(moved.json.courses, [c.course.id]);
 });
 
 /* ------------------------------------------------------- stage 6 (0.546) */
 
 test("a space's export holds that space and nothing else, and its usage is counted", async () => {
   const c = await another("export-space");
-  const mine = (await api("create-deck", { key: c.student.key, body: { title: "Private", lang: "ar-PS", personal: true } })).json.deck;
+  const mine = (await api("create-deck", { key: c.teacher.key, body: { title: "Private", lang: "ar-PS", personal: true } })).json.deck;
   const manifest = (await api("admin-export-org-manifest", { key: admin.key, body: { id: c.id } })).json.manifest;
   const keys = manifest.plan.flatMap((/** @type {any} */ ch) => ch.keys);
   assert.ok(keys.includes(`deck:${c.deck.id}`));

@@ -131,6 +131,7 @@ import {
   Section,
   Segmented,
   SpaceFrame,
+  Tabs,
   Tile,
   TileNote,
   TopBanner,
@@ -5117,11 +5118,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const [cardDeck, setCardDeck] = useState("");
   /* The space's own name on the toggle (0.549), cut short when long, in full on hover. */
   const spaceName = (account.org && typeof account.org === "object" && account.org.name) || "Space";
-  const spaceLabel = (
-    <span title={spaceName} style={{ display: "inline-block", maxWidth: "14ch", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", verticalAlign: "bottom" }}>
-      {spaceName}
-    </span>
-  );
   const decks = useMemo(() => allDecks.filter((d) => !!d.personal === mineSide), [allDecks, mineSide]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -7909,9 +7905,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               </fieldset>
 
               {(d.parts || []).length ? <NumbersFrom deckId={d.id} /> : null}
-              {/* A My space deck's course cards (0.549, 6a): chosen here, and
-                  working without Edit, since each tick saves at once. */}
-              {d.personal ? <BorrowedCards deck={d} /> : null}
 
               {/* The whole deck, whatever the list below is showing: what a
                   deck covers is a fact about the deck, not about the cards
@@ -8172,16 +8165,23 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   return (
     <SpaceFrame
       tabs={[
-        /* A learner's My space has no courses (0.545). */
-        ...(personalOnly ? [] : [["courses", "Courses", "school"] as [string, string, string]]),
-        ["decks", "Decks", "folder"],
-        ["cards", "Cards", "cards"],
+        ["courses", "Courses", "school"],
+        /* Material is the space's decks and cards, My space the teacher's
+           own (0.550): the same lists, one side each. Decks and Cards are
+           chosen inside each. */
+        ["material", "Material", "folder"],
+        ["myspace", "My space", "person"],
         /* In context is hidden for now, on the owner's word, and comes
            back later; what it shows is still built when it is asked for. */
         ...(SHOW_IN_CONTEXT ? [["context", "In context", "search"] as [string, string, string]] : []),
       ]}
-      tab={tab}
-      onTab={setTab}
+      tab={tab === "decks" || tab === "cards" ? (mineSide ? "myspace" : "material") : tab}
+      onTab={(k: string) => {
+        if (k === "material" || k === "myspace") {
+          setSide(k === "myspace" ? "mine" : "space");
+          if (tab !== "decks" && tab !== "cards") setTab("decks");
+        } else setTab(k);
+      }}
       error={error}
       busy={busy}
     >
@@ -8266,14 +8266,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
           {tab === "cards" && (
             <>
-              {!personalOnly && (
-                <Segmented
-                  label="Whose"
-                  value={side}
-                  onChange={setSide}
-                  options={[{ value: "space", label: spaceLabel }, { value: "mine", label: "My space" }]}
-                />
-              )}
+              {/* Decks or Cards, inside Material and My space (0.550): the card
+                  screen's own tab row. */}
+              <Tabs
+                tabs={[["decks", "Decks", "folder"], ["cards", "Cards", "cards"]]}
+                value={tab}
+                onChange={setTab}
+                label="Decks or cards"
+              />
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
                   <LanguageRadio
@@ -8641,14 +8641,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   }
                 />
               )}
-              {!personalOnly && (
-                <Segmented
-                  label="Whose"
-                  value={side}
-                  onChange={setSide}
-                  options={[{ value: "space", label: spaceLabel }, { value: "mine", label: "My space" }]}
-                />
-              )}
+              {/* Decks or Cards, inside Material and My space (0.550): the card
+                  screen's own tab row. */}
+              <Tabs
+                tabs={[["decks", "Decks", "folder"], ["cards", "Cards", "cards"]]}
+                value={tab}
+                onChange={setTab}
+                label="Decks or cards"
+              />
               {deckAction && (
                 <Screen
                   title={
@@ -8940,11 +8940,6 @@ export function StudentCourses({
       }}
       renderCourse={(c) => {
         const mine = decks.filter((d) => d.courseId === c.id);
-        /* My space (0.549, 8a): each of your own decks with its Practise tick
-           — the ones switched off too, so they can come back. */
-        if (c.personal) {
-          return <MySpaceGroup course={c as any} practised={mine} onChanged={onRefresh} onPractise={onPractise} />;
-        }
         return (
           <Tile
             title={c.title}
@@ -9441,60 +9436,6 @@ function OthersWork({ name, what }: { name?: string; what: "deck" | "card" }) {
   );
 }
 
-/*
- * Cards from your courses, in one of your My space decks (0.545, 66b): the
- * same cards, practised once. Listed from what your courses send you.
- */
-function BorrowedCards({ deck }: { deck: Deck }) {
-  const [offered, setOffered] = useState<{ id: string; label: string; course: string }[] | null>(null);
-  const [chosen, setChosen] = useState<string[]>(deck.cardIds || []);
-  const [error, setError] = useState("");
-  useEffect(() => {
-    let live = true;
-    API.myMaterial().then(
-      (r: any) => {
-        if (!live) return;
-        const titleOf: Record<string, string> = {};
-        for (const d of r.decks || []) if (!d.personal) titleOf[d.id] = d.courseTitle || d.title;
-        const out: { id: string; label: string; course: string }[] = [];
-        const seen = new Set<string>();
-        for (const d of r.decks || []) {
-          if (d.personal || (d.lang && deck.lang && d.lang !== deck.lang)) continue;
-          for (const id of d.cardIds || []) {
-            if (seen.has(id)) continue;
-            seen.add(id);
-            const c = (r.cards || []).find((x: any) => x.id === id);
-            const lead = c && c.forms && c.forms[0];
-            out.push({ id, label: lead ? `${lead.ar} · ${lead.en}` : id, course: titleOf[d.id] || "" });
-          }
-        }
-        setOffered(out);
-      },
-      (e: unknown) => live && setError(API.explain(e)),
-    );
-    return () => {
-      live = false;
-    };
-  }, [deck.id, deck.lang]);
-  if (error) return <Notice kind="error">{error}</Notice>;
-  if (!offered || !offered.length) return null;
-  return (
-    <Field label="From your courses" lede="Add a course's card to this deck: it's the same card, practised once.">
-      <CheckList
-        options={offered.map((o) => ({ id: o.id, title: o.label, note: o.course }))}
-        chosen={chosen}
-        onToggle={async (id: string, wasOn: boolean) => {
-          setChosen((prev) => (wasOn ? prev.filter((x) => x !== id) : prev.concat([id])));
-          try {
-            await API.borrowCards(deck.id, [id], !wasOn);
-          } catch (e) {
-            setError(API.explain(e));
-          }
-        }}
-      />
-    </Field>
-  );
-}
 
 /*
  * A space's storage figures and its export (0.546; 60a, 63a): how much it
@@ -9703,52 +9644,3 @@ function EveryReport() {
   );
 }
 
-/*
- * The "My space" group in Learning (0.549, 8a): every one of your own decks
- * with a "Practise" tick, saved at once. A deck ticked off leaves your
- * sessions and stays listed here, unticked, to be switched back on.
- */
-function MySpaceGroup({ course, practised, onChanged, onPractise }: {
-  course: Course & { notPractised?: { id: string; title: string }[] };
-  practised: Deck[];
-  onChanged?: () => void;
-  onPractise: (deckTitle: string) => void;
-}) {
-  const [error, setError] = useState("");
-  const off = course.notPractised || [];
-  const all = practised.map((d) => ({ id: d.id, title: d.title })).concat(off);
-  return (
-    <Tile
-      title="My space"
-      meta={`${plural(practised.length, "deck")} practised${off.length ? ` · ${off.length} not` : ""}`}
-      footer={
-        <>
-          <Notice kind="error">{error}</Notice>
-          <CheckList
-            options={all.map((d) => ({ id: d.id, title: d.title, note: practised.some((p) => p.id === d.id) ? undefined : "Not practised" }))}
-            chosen={practised.map((d) => d.id)}
-            onToggle={async (id: string, wasOn: boolean) => {
-              try {
-                await API.setDeckPractise(id, !wasOn);
-                if (onChanged) onChanged();
-              } catch (e) {
-                setError(API.explain(e));
-              }
-            }}
-          />
-        </>
-      }
-      actions={
-        practised.length ? (
-          <Button size="sm" icon="cards"
-            onClick={(e: React.MouseEvent) => {
-              e.stopPropagation();
-              onPractise(practised[0].title);
-            }}>
-            Practice
-          </Button>
-        ) : null
-      }
-    />
-  );
-}

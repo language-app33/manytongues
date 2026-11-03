@@ -220,8 +220,6 @@ export const createDeck = (title: string, description: string, lang: LangId, per
 /* ---- My space (0.545) ---- */
 export const setDeckPractise = (deckId: string, practise: boolean) =>
   call("set-deck-practise", { body: { deckId, practise } });
-export const borrowCards = (deckId: string, cardIds: string[], on: boolean) =>
-  call("borrow-cards", { body: { deckId, cardIds, on } });
 export const copyToSpace = (deckId: string, move = false, courses: string[] = []): Promise<{ ok: true; deck: any }> =>
   call("copy-to-space", { body: { deckId, move, courses } });
 export const cardToSpace = (cardId: string, deckId: string, move = false) =>

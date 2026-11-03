@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.550 — 3 November 2026
+
+**Teaching: Material and My space. Students no longer have a My space.**
+
+- In Teaching, **Decks** and **Cards** become two tabs: **Material**, the
+  space's own decks and cards and nothing that is only yours, and **My
+  space**, your own. Inside each, the same row of tabs as the card screen
+  chooses between Decks and Cards. The Space / My space switch is gone.
+- **Students** no longer have a My space: it's gone from the You menu, and
+  they can't make decks or cards. What students had made there is deleted
+  the first time this release runs.
+- **Nobody practises My space decks in Learning** any more; the My space
+  group there is gone. My space is a place to prepare material, then copy
+  or move it into the space.
+- A My space deck no longer holds cards borrowed from courses.
+- A teacher who stops teaching keeps their My space, hidden, for when they
+  teach again.
+- Released without running the test suite, at the owner's request.
+
 ## 0.549 — 3 November 2026
 
 **Moving your own material into the space, and practising it from Learning.**
