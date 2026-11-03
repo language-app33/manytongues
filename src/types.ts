@@ -1818,6 +1818,23 @@ export interface DayMoves {
  */
 export type WireDoc = Partial<Doc>;
 
+/* ---- feedback about the app (0.552) ---- */
+
+/** Something a person said about the app itself, from the You menu. */
+export interface Feedback {
+  id: string;
+  kind: "broken" | "idea";
+  note: string;
+  handle: string;
+  handleName: string;
+  /** The space they were in. */
+  org: string;
+  /** Where in the app they were when they sent it, in words. */
+  screen: string;
+  release?: string;
+  at: Millis;
+}
+
 /* ---- reported problems ---- */
 
 /** Which of the four things a learner said — three complaints, and "too

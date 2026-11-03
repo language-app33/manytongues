@@ -8,6 +8,37 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.552 — 3 November 2026
+
+**Share feedback, deleting former members for good, and opening any space.**
+
+- **Share feedback** in the You menu, for everyone signed in. It opens the
+  same screen as flagging a question, with two options: "Something isn't
+  working properly" and "I have an idea of something to improve". Words are
+  required. It goes to the super admin alone, with the sender's space and
+  the part of the app they were in.
+- **Super admin → Reports** has a toggle at the top: **Card reports** ·
+  **Feedback**. It opens on whichever you used last. Feedback is dismissed
+  the same way as card reports.
+- **Admin → People → Former members:** "Delete permanently" replaces
+  "Remove this record", for space admins as well as the super admin. For
+  someone who left or was removed, their account goes for good, along with
+  every deck and card they made in the space, including any in courses.
+  The warning suggests handing their material over first. For someone
+  already deleted, it clears their entry. Reports they sent stay.
+- **Super admin → Spaces:** each space's tile has an **Open** button. It
+  takes you into that space as its admin sees it, with a band at the top
+  naming the space and a **Back to Spaces** button.
+- **New space:** you can choose "I'll be this space's admin" instead of
+  making a new admin account. No key to hand over.
+- Tiles in Super admin's Spaces, People and Reports have space between
+  them, as everywhere else.
+- Headings in Super admin's People and App, an opened space, and Admin →
+  People now look and are spaced like Settings and Progress.
+- To check by hand: Open on a space and Back to Spaces; deleting a
+  suspended former member. Feedback isn't in backups yet.
+- Released without running the test suite, at the owner's request.
+
 ## 0.551 — 3 November 2026
 
 **Material and My space say which one you're in.**

@@ -6,7 +6,7 @@
  * throws with the server's own error string, which the screens turn into
  * something a person can read.
  */
-import type { Card, Flag, LangId, User } from "./types.ts";
+import type { Card, Feedback, Flag, LangId, User } from "./types.ts";
 import { renameLangIds } from "./lang-ids.ts";
 
 const ENDPOINT = "/api/courses";
@@ -341,9 +341,11 @@ export interface OrgRow extends OrgCard {
   people: { handle: string; displayName: string }[];
 }
 export const adminOrgs = (): Promise<{ ok: true; orgs: OrgRow[] }> => call("admin-orgs");
-export const createOrg = (name: string, slug: string, adminName: string, logo = "", colour = ""):
+/* `selfAdmin` (0.552): the App admin is the new space's admin, and no
+   account or key is made; `adminName` is then ignored and `key` is empty. */
+export const createOrg = (name: string, slug: string, adminName: string, logo = "", colour = "", selfAdmin = false):
   Promise<{ ok: true; org: OrgRow; admin: User; key: string }> =>
-  call("admin-create-org", { body: { name, slug, adminName, logo, colour } });
+  call("admin-create-org", { body: { name, slug, adminName, logo, colour, selfAdmin } });
 export const updateOrg = (id: string, change: { name?: string; slug?: string; logo?: string; colour?: string }) =>
   call("admin-update-org", { body: { id, ...change } });
 export const orgAdmins = (id: string, change: { add?: string; remove?: string }) =>
@@ -366,8 +368,16 @@ export const reactivateUser = (handle: string, org?: string) => call("admin-reac
 export type SuperOrg = { id: string; name: string; slug: string; admins: string[]; archived: boolean };
 export const everyone = (): Promise<{ ok: true; orgs: SuperOrg[]; people: (User & { org: string })[] }> =>
   call("admin-everyone");
-export const allReports = (): Promise<{ ok: true; orgs: SuperOrg[]; flags: (Flag & { org: string })[] }> =>
+export const allReports = (): Promise<{ ok: true; orgs: SuperOrg[]; flags: (Flag & { org: string })[]; feedback?: Feedback[] }> =>
   call("admin-all-reports");
+/* Feedback about the app (0.552): anyone signed in sends it; the App admin
+   alone reads and dismisses it. */
+export const sendFeedback = (f: { kind: Feedback["kind"]; note: string; screen: string; release?: string }): Promise<{ ok: true; id: string }> =>
+  call("send-feedback", { body: f });
+export const deleteFeedback = (ids: string[]) => call("admin-delete-feedback", { body: { ids } });
+/* Deleting a former member for good (0.552): their account if it is still
+   there, their decks and cards, and their entry on Former members. */
+export const purgeFormer = (handle: string) => call("admin-purge-former", { body: { handle } });
 export const deleteFlagsIn = (flagIds: string[], org: string) =>
   call("admin-delete-flags", { body: { flagIds }, org });
 export const handOver = (from: string, to: string) => call("admin-hand-over", { body: { from, to } });

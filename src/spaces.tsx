@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
-import type { Card, Course, Deck, Flag, Form, Lang, LangId, User } from "./types.ts";
+import type { Card, Course, Deck, Feedback, Flag, Form, Lang, LangId, User } from "./types.ts";
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
 import { CardEditor, ImageScreen } from "./card-editor.tsx";
 import { usableAccent } from "./contrast.ts";
@@ -119,6 +119,7 @@ import {
   formHasAudio,
   FilterMenu,
   flagTitle,
+  feedbackTitle,
   Help,
   Icon,
   IconButton,
@@ -2089,8 +2090,11 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
           )}
 
           {tab === "people" && (
-            <>
+            /* Three parts, headed the way Settings and Progress head theirs
+               (0.552): the way in, who is here, and who was. */
+            <div className="at-ruled">
               {data && data.invite ? (
+                <Section head title="Invite people">
                 <InviteLink invite={data.invite} busy={busy}
                   onReplace={() => setConfirm({
                     title: "Replace the invitation link?",
@@ -2098,7 +2102,9 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                     body: <p>The old link will stop working. Anyone who already joined stays.</p>,
                     action: () => API.newInvite(),
                   })} />
+                </Section>
               ) : null}
+              <Section head title="People">
               {newKey && (
                 <div className="at-sub">
                   <p className="at-eyebrow">
@@ -2423,16 +2429,16 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                   </div>
                 )}
               />
+              </Section>
               {data && data.former && data.former.length ? (
                 <FormerMembers
                   former={data.former}
                   people={(data.users || []).filter((u) => !u.suspended)}
-                  isAppAdmin={!!account.admin}
                   busy={busy}
                   ask={setConfirm}
                 />
               ) : null}
-            </>
+            </div>
           )}
 
           {tab === "decks" && (
@@ -2850,10 +2856,9 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
           )}
 
           {superMode && tab === "app" && account.admin && (
-            <>
-              <p className="at-eyebrow">
-                Backup
-              </p>
+            /* Headed the way Settings and Progress head their parts (0.552). */
+            <div className="at-ruled">
+            <Section head title="Backup">
               <Help>
                 Everything on the site in one file: people and their courses, the decks, the
                 cards and their recordings. Sign-in keys are held only as fingerprints, so the
@@ -2885,7 +2890,8 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
               {/* Verifying needs no options and no screen: it is one file in,
                   one answer out, and the answer is wanted where the question
                   was asked. */}
-              <p className="at-eyebrow at-mt5">Verify a backup</p>
+            </Section>
+            <Section head title="Verify a backup">
               <Help>
                 Reads a file you already have and checks it against what it says
                 about itself: that every part it lists actually arrived, and that
@@ -2983,10 +2989,9 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                 anyone able to restore it can change who has access.
               </Help>
 
-              {/* Last on the tab, under everything it could undo. */}
-              <p className="at-eyebrow at-mt6" style={{ color: "var(--rose)" }}>
-                Danger zone
-              </p>
+            </Section>
+            {/* Last of the site's own parts, under everything it could undo. */}
+            <Section head title={<span style={{ color: "var(--rose)" }}>Danger zone</span>}>
               <Help>
                 Removes what a backup would have held — the same parts, chosen
                 the same way — from the site, for everyone. There is no undo and
@@ -2999,7 +3004,8 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                 </Button>
               </div>
 
-              <p className="at-eyebrow at-mt6">Components</p>
+            </Section>
+            <Section head title="Components">
               <Help>
                 Every reusable component, rendered live with its variants. Worth a look before
                 building anything new: if something here fits, use it rather than raw markup —
@@ -3022,7 +3028,8 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                 </React.Suspense>
               )}
 
-              <p className="at-eyebrow at-mt6">Text styles</p>
+            </Section>
+            <Section head title="Text styles">
               <Help>
                 Every size a person actually reads, drawn at the size it is drawn at in the
                 app and labelled with what that size comes out as. The same reason the
@@ -3042,7 +3049,8 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                 </React.Suspense>
               )}
 
-              <p className="at-eyebrow at-mt6">A question and an answer</p>
+            </Section>
+            <Section head title="A question and an answer">
               <Help>
                 Every named piece of the two practice screens, with an example of
                 what it holds. Worth opening before asking for a change to either:
@@ -3061,7 +3069,8 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                   <ScreenElements />
                 </React.Suspense>
               )}
-            </>
+            </Section>
+            </div>
           )}
 
           {backupMode && (
@@ -9058,7 +9067,7 @@ function SpacesTab() {
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [openId, setOpenId] = useState<string | null>(null);
-  const [making, setMaking] = useState<{ name: string; slug: string; adminName: string } | null>(null);
+  const [making, setMaking] = useState<{ name: string; slug: string; adminName: string; self: boolean } | null>(null);
   const [made, setMade] = useState<{ name: string; admin: string; key: string; slug: string } | null>(null);
   const [confirm, setConfirm] = useState<Pending | null>(null);
   const snack = useSnackbar();
@@ -9114,11 +9123,13 @@ function SpacesTab() {
         onBack={() => setMaking(null)}
         action={
           <Button variant="primary" size="sm" icon="check"
-            disabled={busy || !making.name.trim() || !making.slug.trim() || !making.adminName.trim()}
+            disabled={busy || !making.name.trim() || !making.slug.trim() || (!making.self && !making.adminName.trim())}
             onClick={() =>
               run(async () => {
-                const r = await API.createOrg(making.name.trim(), making.slug.trim().toLowerCase(), making.adminName.trim());
-                setMade({ name: r.org.name, admin: r.admin.displayName, key: r.key, slug: r.org.slug });
+                const r = await API.createOrg(making.name.trim(), making.slug.trim().toLowerCase(),
+                  making.self ? "" : making.adminName.trim(), "", "", making.self);
+                /* No key to show when you are its admin yourself (0.552). */
+                setMade(r.key ? { name: r.org.name, admin: r.admin.displayName, key: r.key, slug: r.org.slug } : null);
                 setMaking(null);
               }, `${making.name.trim()} created`)
             }
@@ -9137,10 +9148,24 @@ function SpacesTab() {
             onChange={(e) => setMaking({ ...making, slug: e.target.value.toLowerCase().replace(/\s+/g, "-") })} />
         </Field>
         <Help>An address can be changed later, and the old one keeps working. Once used, it is never given to another space.</Help>
-        <Field label={<>Its first space admin <span className="req">required</span></>} lede="Their account is made in the new space, and you'll be shown their sign-in key to hand over.">
-          <input className="at-input" placeholder="Their name" value={making.adminName}
-            onChange={(e) => setMaking({ ...making, adminName: e.target.value })} />
-        </Field>
+        {/* You as its admin (0.552), so running a new space needs no second
+            account. Others can be made its admins later, from the space. */}
+        <RadioGroup
+          name="new-space-admin"
+          label="Its first space admin"
+          value={making.self ? "me" : "new"}
+          onChange={(v) => setMaking({ ...making, self: v === "me" })}
+          options={[
+            { value: "me", label: "I'll be this space's admin" },
+            { value: "new", label: "Create a new admin account" },
+          ]}
+        />
+        {!making.self && (
+          <Field label={<>Their name <span className="req">required</span></>} lede="Their account is made in the new space, and you'll be shown their sign-in key to hand over.">
+            <input className="at-input" placeholder="Their name" value={making.adminName}
+              onChange={(e) => setMaking({ ...making, adminName: e.target.value })} />
+          </Field>
+        )}
       </Screen>
     );
   }
@@ -9153,7 +9178,7 @@ function SpacesTab() {
       {dialog}
       <Notice kind="error">{error}</Notice>
       <Button variant="primary" icon="add" style={{ marginBottom: 14 }}
-        onClick={() => setMaking({ name: "", slug: "", adminName: "" })}>
+        onClick={() => setMaking({ name: "", slug: "", adminName: "", self: true })}>
         New space
       </Button>
       {made && (
@@ -9172,14 +9197,27 @@ function SpacesTab() {
           </Help>
         </div>
       )}
-      {!orgs ? null : orgs.map((o) => (
-        <Tile key={o.id}
-          title={o.name}
-          meta={`manytongues.co/${o.slug} · ${plural(o.people.length, "person")}`}
-          onOpen={() => setOpenId(o.id)}
-          footer={o.archived ? <TileNote>Closed</TileNote> : null}
-        />
-      ))}
+      <div className="at-decklist2">
+        {!orgs ? null : orgs.map((o) => (
+          <Tile key={o.id}
+            title={o.name}
+            meta={`manytongues.co/${o.slug} · ${plural(o.people.length, "person")}`}
+            onOpen={() => setOpenId(o.id)}
+            /* Open goes into the space itself, as its admin sees it (0.552);
+               the tile still opens its settings. */
+            actions={o.archived ? null : (
+              <Button size="sm" variant="ghost"
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  window.location.assign(`/${o.slug}?open=admin`);
+                }}>
+                Open
+              </Button>
+            )}
+            footer={o.archived ? <TileNote>Closed</TileNote> : null}
+          />
+        ))}
+      </div>
     </>
   );
 }
@@ -9212,9 +9250,11 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
   }
   const admins = new Set(org.admins || []);
   return (
+    /* Laid out like Settings (0.552): each part a band with a heading. */
     <Screen
       title={org.name}
       onBack={onBack}
+      className="cardform"
       action={
         <Button variant="primary" size="sm" icon="save" disabled={busy || !changed || !name.trim()}
           onClick={() =>
@@ -9232,6 +9272,7 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
       {dialog}
       <Notice kind="error">{error}</Notice>
       {org.archived ? <Notice kind="warn">This space is closed. Its people can't sign in.</Notice> : null}
+      <Section title="About this space">
       <Field label="Name">
         <input className="at-input" value={name} onChange={(e) => setName(e.target.value)} />
       </Field>
@@ -9249,8 +9290,11 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
         ) : null}
         {colour ? <Button variant="ghost" size="sm" onClick={() => setColour("")}>No colour</Button> : null}
       </Field>
+      </Section>
+      <Section title="Invite people">
       <CodeBox long label="Invitation link" hint="Anyone with it can make an account in this space."
         code={`${window.location.origin}/${org.slug}?join=${org.inviteCode}`} />
+      </Section>
       <Section title="Space admins" lede="They run this space: its courses, its people, its reports.">
         {org.people.length === 0 ? <Help>Nobody is in this space yet.</Help> : null}
         {org.people.map((p) => (
@@ -9350,20 +9394,20 @@ const FORMER_WHY: Record<string, string> = {
 /*
  * Former members (0.544; 25a, 30c, 67a, 31a): who left, was removed or was
  * deleted, with what can still be done — reactivate a suspended account,
- * hand someone's material to a teacher who is still here, and, for the App
- * admin, take a record off by hand.
+ * hand someone's material to a teacher who is still here, and delete them
+ * for good (0.552): their account, everything they made here, and the entry.
  */
-function FormerMembers({ former, people, isAppAdmin, busy, ask }: {
+function FormerMembers({ former, people, busy, ask }: {
   former: import("./types.ts").FormerMember[];
   people: { handle: string; displayName: string }[];
-  isAppAdmin: boolean;
   busy: boolean;
   ask: (p: Pending) => void;
 }) {
   const [handingFrom, setHandingFrom] = useState<string | null>(null);
   const [heir, setHeir] = useState("");
   return (
-    <Section title="Former members" lede="People who left, were removed or were deleted.">
+    <Section head title="Former members" lede="People who left, were removed or were deleted.">
+      <div className="at-decklist2">
       {former.slice().reverse().map((r) => {
         const suspended = r.why === "left" || r.why === "removed";
         return (
@@ -9391,20 +9435,39 @@ function FormerMembers({ former, people, isAppAdmin, busy, ask }: {
                   }}>
                   Hand their material to…
                 </Button>
-                {isAppAdmin && (
-                  <IconButton icon="remove" label="Remove this record"
-                    onClick={() => ask({
-                      title: `Remove ${r.displayName}'s record?`,
-                      confirmLabel: "Remove the record",
-                      body: <p>Only the record goes. Nothing else changes.</p>,
-                      action: () => API.removeFormer(r.handle),
-                    })} />
-                )}
+                {/* For good (0.552): a space admin's to do as well as the App
+                    admin's. Someone already deleted has nothing left but
+                    this entry, which is all it clears. */}
+                <IconButton icon="delete" label="Delete permanently" danger
+                  onClick={() => ask({
+                    title: `Delete ${r.displayName} permanently?`,
+                    confirmLabel: "Delete permanently",
+                    confirmWord: suspended ? r.handle : undefined,
+                    body: suspended ? (
+                      <>
+                        <p>
+                          Their account goes, so they can never sign in or be brought back, and so do
+                          every deck and card they made in this space — including any in courses.
+                        </p>
+                        <p>
+                          To keep their material, use "Hand their material to…" first. Reports they sent
+                          stay. There is no undoing this.
+                        </p>
+                      </>
+                    ) : (
+                      <p>
+                        Their account is already gone. This takes them off this list, and deletes any
+                        decks and cards of theirs still in this space. There is no undoing this.
+                      </p>
+                    ),
+                    action: () => API.purgeFormer(r.handle),
+                  })} />
               </>
             }
           />
         );
       })}
+      </div>
       {handingFrom ? (
         <ConfirmModal
           title="Hand their material to…"
@@ -9554,11 +9617,15 @@ function EveryonePeople({ me }: { me: string }) {
           </div>
         </div>
       )}
+      {/* Each space a part of its own, headed the way Settings and
+          Progress head theirs (0.552). */}
+      <div className="at-ruled">
       {data && data.orgs.map((o) => {
         const here = data.people.filter((u) => u.org === o.id && match(u));
         if (!here.length) return null;
         return (
-          <Section key={o.id} title={o.name} lede={`manytongues.co/${o.slug}`}>
+          <Section head key={o.id} title={o.name} lede={`manytongues.co/${o.slug}`}>
+            <div className="at-decklist2">
             {here.map((u) => (
               <Tile key={u.handle}
                 title={u.displayName}
@@ -9607,9 +9674,11 @@ function EveryonePeople({ me }: { me: string }) {
                 }
               />
             ))}
+            </div>
           </Section>
         );
       })}
+      </div>
     </>
   );
 }
@@ -9620,8 +9689,25 @@ function EveryonePeople({ me }: { me: string }) {
  * inside its space.
  */
 function EveryReport() {
-  const [data, setData] = useState<{ orgs: API.SuperOrg[]; flags: (Flag & { org: string })[] } | null>(null);
+  const [data, setData] = useState<{ orgs: API.SuperOrg[]; flags: (Flag & { org: string })[]; feedback?: Feedback[] } | null>(null);
   const [error, setError] = useState("");
+  /* Card reports or feedback about the app (0.552), and whichever was
+     looked at last opens next time. */
+  const [kind, setKindState] = useState<"cards" | "feedback">(() => {
+    try {
+      return localStorage.getItem(REPORTS_KIND_KEY) === "feedback" ? "feedback" : "cards";
+    } catch (e) {
+      return "cards";
+    }
+  });
+  const setKind = (next: "cards" | "feedback") => {
+    setKindState(next);
+    try {
+      localStorage.setItem(REPORTS_KIND_KEY, next);
+    } catch (e) {
+      /* private browsing: it opens on card reports next time */
+    }
+  };
   const load = useCallback(() => API.allReports().then((r) => setData(r), (e) => setError(API.explain(e))), []);
   useEffect(() => {
     load();
@@ -9629,30 +9715,65 @@ function EveryReport() {
   if (!data) return <Notice kind="error">{error}</Notice>;
   const nameOf = (id: string) => (data.orgs.find((o) => o.id === id) || { name: id }).name;
   const flags = data.flags.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+  const feedback = (data.feedback || []).slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+  const dismiss = async (work: () => Promise<unknown>) => {
+    try {
+      await work();
+      await load();
+    } catch (e) {
+      setError(API.explain(e));
+    }
+  };
   return (
     <>
+      <Segmented
+        label="Which reports"
+        style={{ marginBottom: 14 }}
+        options={[
+          { value: "cards" as const, label: "Card reports" },
+          { value: "feedback" as const, label: "Feedback" },
+        ]}
+        value={kind}
+        onChange={setKind}
+      />
       <Notice kind="error">{error}</Notice>
-      {!flags.length ? <Help>No reports in any space.</Help> : null}
-      {flags.map((f) => (
-        <Tile key={f.id}
-          title={`${flagTitle(f.kind)}${f.prompt ? ` · ${f.prompt}` : ""}`}
-          meta={`${nameOf(f.org)} · ${f.handleName || f.handle} · ${shortDate(f.at)}${f.note ? ` · "${f.note}"` : ""}`}
-          actions={
-            <Button variant="ghost" size="sm"
-              onClick={async () => {
-                try {
-                  await API.deleteFlagsIn([f.id], f.org);
-                  await load();
-                } catch (e) {
-                  setError(API.explain(e));
+      {kind === "cards" ? (
+        <>
+          {!flags.length ? <Help>No reports in any space.</Help> : null}
+          <div className="at-decklist2">
+            {flags.map((f) => (
+              <Tile key={f.id}
+                title={`${flagTitle(f.kind)}${f.prompt ? ` · ${f.prompt}` : ""}`}
+                meta={`${nameOf(f.org)} · ${f.handleName || f.handle} · ${shortDate(f.at)}${f.note ? ` · "${f.note}"` : ""}`}
+                actions={
+                  <Button variant="ghost" size="sm" onClick={() => dismiss(() => API.deleteFlagsIn([f.id], f.org))}>
+                    Dismiss
+                  </Button>
                 }
-              }}>
-              Dismiss
-            </Button>
-          }
-        />
-      ))}
+              />
+            ))}
+          </div>
+        </>
+      ) : (
+        <>
+          {!feedback.length ? <Help>No feedback from any space.</Help> : null}
+          <div className="at-decklist2">
+            {feedback.map((f) => (
+              <Tile key={f.id}
+                title={feedbackTitle(f.kind)}
+                meta={`${nameOf(f.org)} · ${f.handleName || f.handle} · ${shortDate(f.at)}${f.screen ? ` · on ${f.screen}` : ""} · "${f.note}"`}
+                actions={
+                  <Button variant="ghost" size="sm" onClick={() => dismiss(() => API.deleteFeedback([f.id]))}>
+                    Dismiss
+                  </Button>
+                }
+              />
+            ))}
+          </div>
+        </>
+      )}
     </>
   );
 }
+const REPORTS_KIND_KEY = "arabic-trainer:super-reports";
 

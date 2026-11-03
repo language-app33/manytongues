@@ -172,6 +172,7 @@ const ICONS: Record<string, string> = {
      from the type around them. */
   soundOff:
     "M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z",
+  feedback: "M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2zm0-4h-2V6h2z",
   flag: "M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z",
   menu: "M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z",
   help:
@@ -1319,6 +1320,33 @@ export const FLAG_NOTE_MAX = 500;
 export function flagTitle(kind: string) {
   const found = FLAG_KINDS.find((k) => k.key === kind);
   return found ? found.title : String(kind || "Something else");
+}
+
+/*
+ * Feedback about the app itself (0.552), sent from the You menu. The same
+ * screen as flagging a question, with these two options in place of the
+ * four about a card. Read by the App admin alone, in Super admin → Reports.
+ * Both take the person's own words: the option alone says nothing anybody
+ * could act on.
+ */
+export type FeedbackKind = "broken" | "idea";
+export const FEEDBACK_KINDS: { key: FeedbackKind; title: string; what: string; asks: true }[] = [
+  {
+    key: "broken",
+    title: "Something isn't working properly",
+    what: "Something went wrong, looks broken, or didn't do what you expected.",
+    asks: true,
+  },
+  {
+    key: "idea",
+    title: "I have an idea of something to improve",
+    what: "Something new the app could do, or a way to make it easier to use.",
+    asks: true,
+  },
+];
+export function feedbackTitle(kind: string) {
+  const found = FEEDBACK_KINDS.find((k) => k.key === kind);
+  return found ? found.title : String(kind || "Feedback");
 }
 
 /* --- the two speeds a word is recorded at -------------------------
