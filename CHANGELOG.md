@@ -8,6 +8,98 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.557 — 3 November 2026
+
+**Learning's tab titles match Teaching's.**
+
+- Progress and Cards no longer leave a gap above their title, so it no
+  longer slides up a little before staying put. It sits at the very top
+  from the start, as in Teaching.
+- Every tab title now sits on a white bar, in all four spaces.
+- Checked in a browser at phone size against Teaching.
+- Released without running the test suite, at the owner's request.
+
+## 0.556 — 3 November 2026
+
+**Learning's tab titles stay at the top too.**
+
+- In Learning, Progress and Cards now keep their title at the top while
+  the page scrolls, as the other spaces already did. In 0.555 they
+  scrolled away with the page.
+- Progress's title sits on the same white as the rest of that page.
+- Checked in a browser at phone size: every tab with a title, in all four
+  spaces, shows the logo and the line beneath, and keeps its title in
+  place while scrolling.
+- Released without running the test suite, at the owner's request.
+
+## 0.555 — 3 November 2026
+
+**Tab titles stay at the top, with the logo and a line under them.**
+
+- Each tab's title now stays in place at the top while the page scrolls
+  under it, in every space.
+- The ManyTongues logo sits just left of the title, and a thin line runs
+  across beneath it.
+- Released without running the test suite, at the owner's request.
+
+## 0.554 — 3 November 2026
+
+**Tab titles sit in the page, and the app name is gone from Teaching, Admin and Super admin.**
+
+- The titles added in 0.553 were pinned to the top of the window, over the
+  app name and the page. They now sit at the top of the page and scroll
+  away with it.
+- Teaching, Admin and Super admin no longer show the app name and logo
+  above the page. Home in Learning keeps its large one.
+- Released without running the test suite, at the owner's request.
+
+## 0.553 — 3 November 2026
+
+**Every tab says which one it is at the top.**
+
+- In Learning, Progress and Cards are headed with their name. Home and the
+  Courses page are unchanged.
+- In Teaching, Admin and Super admin, the heading names the space too:
+  "Teaching · Material", "Admin · People", "Super admin · Reports" and so
+  on, in the words of the bar at the foot of the window. Inside Material
+  and My space, the Decks and Cards tabs aren't part of the heading.
+- The headings are the size used inside Progress and scroll away with the
+  page. A screen opened over a tab — a course, a deck, a person — keeps
+  its own title instead.
+- Admin → People no longer has a second "People" heading under the new one.
+- Released without running the test suite, at the owner's request.
+
+## 0.552 — 3 November 2026
+
+**Share feedback, deleting former members for good, and opening any space.**
+
+- **Share feedback** in the You menu, for everyone signed in. It opens the
+  same screen as flagging a question, with two options: "Something isn't
+  working properly" and "I have an idea of something to improve". Words are
+  required. It goes to the super admin alone, with the sender's space and
+  the part of the app they were in.
+- **Super admin → Reports** has a toggle at the top: **Card reports** ·
+  **Feedback**. It opens on whichever you used last. Feedback is dismissed
+  the same way as card reports.
+- **Admin → People → Former members:** "Delete permanently" replaces
+  "Remove this record", for space admins as well as the super admin. For
+  someone who left or was removed, their account goes for good, along with
+  every deck and card they made in the space, including any in courses.
+  The warning suggests handing their material over first. For someone
+  already deleted, it clears their entry. Reports they sent stay.
+- **Super admin → Spaces:** each space's tile has an **Open** button. It
+  takes you into that space as its admin sees it, with a band at the top
+  naming the space and a **Back to Spaces** button.
+- **New space:** you can choose "I'll be this space's admin" instead of
+  making a new admin account. No key to hand over.
+- Tiles in Super admin's Spaces, People and Reports have space between
+  them, as everywhere else.
+- Headings in Super admin's People and App, an opened space, and Admin →
+  People now look and are spaced like Settings and Progress.
+- To check by hand: Open on a space and Back to Spaces; deleting a
+  suspended former member. Feedback isn't in backups yet.
+- Released without running the test suite, at the owner's request.
+
 ## 0.551 — 3 November 2026
 
 **Material and My space say which one you're in.**

@@ -4431,7 +4431,11 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      learner's own nav and card list are still in the document behind it,
      so everything below is looked for inside the frame. */
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
+  /* Since 0.550 the space's cards are under Material, chosen there with
+     its own Decks / Cards tabs. */
+  click(frameButtons(frame).find((b) => /^Material$/.test((b.textContent || "").trim())) || null);
+  await sleep(500);
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test((b.textContent || "").trim()));
   check("the teaching space has a Cards tab of its own", teachTabs.length > 0,
     [...document.querySelectorAll('.at-dock [role="tab"]')].map((b) => b.textContent).join("|"));
   click(teachTabs[teachTabs.length - 1]);
@@ -10844,9 +10848,12 @@ const openPronounTables = async () => {
     .map((t) => (t.textContent || "").replace(/\s+/g, " "));
   const hasHouse = () => listed().some((t) => /house/i.test(t));
   const learnOff = () => JSON.stringify((JSON.parse(localStorage.getItem("arabic-trainer:arabic-trainer-v3") || "{}").settings || {}).langsOff);
-  const cardsTab = [...host.querySelectorAll(".at-dock [role=tab]"), ...((frame() || host).querySelectorAll("button"))]
-    .filter((b) => /^Cards$/.test(b.textContent || ""))[0];
-  click(cardsTab);
+  /* Since 0.550 the space's cards are under Material, then its Cards tab. */
+  const inFrame = (/** @type {RegExp} */ re) => [...host.querySelectorAll(".at-dock [role=tab]"), ...((frame() || host).querySelectorAll("button"))]
+    .filter((b) => re.test((b.textContent || "").trim())).pop();
+  click(inFrame(/^Material$/) || null);
+  await sleep(500);
+  click(inFrame(/^Cards$/) || null);
   await sleep(500);
 
   /* The languages are at the top of the menu behind your initial. */

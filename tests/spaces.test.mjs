@@ -279,6 +279,8 @@ const PLACED = {
     "admin-everyone", "admin-all-reports",
     /* 0.549: one My space card into the space. */
     "card-to-space",
+    /* 0.552: feedback about the app, and deleting a former member for good. */
+    "send-feedback", "admin-delete-feedback", "admin-purge-former",
   ],
   own: [
     "signup", "signin", "whoami", "practiced", "delete-account", "rename", "claim-admin",
@@ -465,6 +467,53 @@ test("suspended, listed as a former member, and reactivated with their courses",
   assert.equal((await api("leave-space", { key: c.student.key, body: {} })).status, 200);
   assert.equal((await api("whoami", { key: c.student.key })).json.error, "suspended");
   assert.equal((await api("leave-space", { key: admin.key, body: {} })).status, 400);
+});
+
+test("feedback about the app reaches the App admin alone, with its space (0.552)", async () => {
+  const c = await another("feedback-space");
+  assert.equal((await api("send-feedback", { key: c.student.key, body: { kind: "idea", note: "" } })).status, 400, "words are owed");
+  assert.equal((await api("send-feedback", { key: c.student.key, body: { kind: "nope", note: "x" } })).status, 400);
+  const sent = await api("send-feedback", { key: c.student.key, body: { kind: "broken", note: "Sync spins", screen: "Learning · home" } });
+  assert.equal(sent.status, 200);
+  /* Not a card report: the space admin's list never has it. */
+  assert.ok(!(await api("my-reports", { key: c.lead.key })).json.flags.some((/** @type {any} */ f) => f.id === sent.json.id));
+  assert.equal((await api("admin-all-reports", { key: c.lead.key })).status, 403);
+  const all = (await api("admin-all-reports", { key: admin.key })).json;
+  const got = all.feedback.find((/** @type {any} */ f) => f.id === sent.json.id);
+  assert.equal(got.org, c.id);
+  assert.equal(got.screen, "Learning · home");
+  assert.equal((await api("admin-delete-feedback", { key: c.lead.key, body: { ids: [sent.json.id] } })).status, 403);
+  assert.equal((await api("admin-delete-feedback", { key: admin.key, body: { ids: [sent.json.id] } })).json.deleted, 1);
+  assert.ok(!(await api("admin-all-reports", { key: admin.key })).json.feedback.some((/** @type {any} */ f) => f.id === sent.json.id));
+});
+
+test("a former member deleted for good takes their account and material with them (0.552)", async () => {
+  const c = await another("purge-space");
+  /* Only someone on Former members. */
+  assert.equal((await api("admin-purge-former", { key: c.lead.key, body: { handle: c.teacher.handle } })).status, 404);
+  assert.equal((await api("admin-suspend-user", { key: c.lead.key, body: { handle: c.teacher.handle } })).status, 200);
+  const done = await api("admin-purge-former", { key: c.lead.key, body: { handle: c.teacher.handle } });
+  assert.equal(done.status, 200, JSON.stringify(done.json));
+  assert.equal(done.json.decks, 1);
+  assert.equal(done.json.cards, 1);
+  /* Gone: the account, the deck from the course, and the entry. */
+  assert.ok((await api("whoami", { key: c.teacher.key })).status >= 400);
+  const over = (await api("admin-overview", { key: c.lead.key })).json;
+  assert.ok(!over.former.some((/** @type {any} */ r) => r.handle === c.teacher.handle));
+  assert.ok(!over.courses.find((/** @type {any} */ x) => x.id === c.course.id).decks.includes(c.deck.id));
+  assert.ok((await api("deck-cards", { key: c.lead.key, params: { deck: c.deck.id } })).status >= 400);
+  /* Not someone in another space. */
+  assert.equal((await api("admin-purge-former", { key: c.lead.key, body: { handle: b.teacher.handle } })).status, 404);
+});
+
+test("the App admin can be a new space's admin, with no account made (0.552)", async () => {
+  const r = await api("admin-create-org", { key: admin.key, body: { name: "Mine too", slug: "mine-too", selfAdmin: true } });
+  assert.equal(r.status, 200, JSON.stringify(r.json));
+  assert.equal(r.json.key, "");
+  assert.deepEqual(r.json.org.admins, [r.json.admin.handle]);
+  assert.equal(r.json.admin.admin, true);
+  /* Without it, a name is still owed. */
+  assert.equal((await api("admin-create-org", { key: admin.key, body: { name: "No admin", slug: "no-admin" } })).status, 400);
 });
 
 test("a teacher who deletes their account leaves their material, and every other space's lists are untouched", async () => {

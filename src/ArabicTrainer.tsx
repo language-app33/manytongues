@@ -25,6 +25,8 @@ import {
   Empty,
   Field as FormField,
   FLAG_KINDS,
+  FEEDBACK_KINDS,
+  type FeedbackKind,
   FLAG_NOTE_MAX,
   BannerHost,
   Help,
@@ -60,6 +62,7 @@ import {
   useSlowWait,
   useSnackbar,
   useSnackbarState,
+  TabTitle,
 } from "./shared.tsx";
 import { renameLangIds } from "./lang-ids.ts";
 
@@ -9879,72 +9882,150 @@ function AfterAnswer({ ok, overridden, onOverride, onFlag, flagged, onContinue }
           a screen has the whole window, the way out where every other
           screen keeps it, and Send at its foot. */}
       {open && (
-        <Screen
+        <ReportScreen
           title="Flag a problem"
-          onBack={close}
-          rise
           backLabel="Back to the question"
-          footer={
-            <Button variant="primary" disabled={!ready} onClick={send}>
-              Send
-            </Button>
-          }
-        >
-          <div className="at-flagmenu" data-el="flag-menu">
-            {/* Why it is worth the half minute. Reporting a bad question
-                is a favour done for the next person to meet it, and
-                nothing on the screen said so. */}
-            <p className="at-flagmenu-lede" data-el="flag-menu-lede">
-              Any issue or feedback you report helps us improve the app.
-            </p>
-            <div className="at-flagopts">
-              {FLAG_KINDS.map((k) => (
-                <button
-                  key={k.key}
-                  className={`at-flagopt${picked === k.key ? " on" : ""}`}
-                  aria-pressed={picked === k.key}
-                  onClick={() => setPicked(k.key)}
-                >
-                  <span className="at-flagopt-title">{k.title}</span>
-                  <span className="at-flagopt-what">{k.what}</span>
-                  {/* Said only where it is true: on a right answer, or
-                      one already overturned, there is nothing to count. */}
-                  {k.fixes && !ok && !overridden && (
-                    <span className="at-flagopt-does">Counts it correct</span>
-                  )}
-                </button>
-              ))}
-            </div>
-            {/* One box for all four, under them: whichever is picked, there
-                may be more to say, and a box that belonged to one option
-                said there was only room for words on that one. It asks
-                for them outright only where they are owed. */}
-            <div className="at-flagnote" data-el="flag-note">
-              <label className="at-flagnote-label" htmlFor="flag-note-input">
-                Tell us what happened
-                <span className="at-flagnote-need" data-el="flag-note-need">
-                  {needsNote ? "Required" : "Optional"}
-                </span>
-              </label>
-              <textarea
-                id="flag-note-input"
-                data-el="flag-note-input"
-                className="at-input at-flagtext"
-                rows={4}
-                maxLength={FLAG_NOTE_MAX}
-                placeholder="The recording plays the wrong word…"
-                value={note}
-                aria-required={needsNote}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </div>
-          </div>
-        </Screen>
+          options={FLAG_KINDS.map((k) => ({
+            ...k,
+            /* Said only where it is true: on a right answer, or one
+               already overturned, there is nothing to count. */
+            does: k.fixes && !ok && !overridden ? "Counts it correct" : undefined,
+          }))}
+          picked={picked}
+          onPick={(k) => setPicked(k as FlagKind)}
+          note={note}
+          onNote={setNote}
+          needsNote={needsNote}
+          ready={ready}
+          placeholder="The recording plays the wrong word…"
+          onClose={close}
+          onSend={send}
+        />
       )}
     </div>
   );
 }
 
+
+/*
+ * The screen a report is written on: a set of options, one box for the
+ * person's own words, and Send at the foot. Flagging a question uses it
+ * with the four kinds of problem with a card; Share feedback in the You
+ * menu (0.552) uses it with its two, so the two read and work the same.
+ */
+function ReportScreen({ title, backLabel, options, picked, onPick, note, onNote, needsNote, ready, placeholder, onClose, onSend }: {
+  title: string;
+  backLabel: string;
+  options: { key: string; title: string; what: string; does?: string }[];
+  picked: string | null;
+  onPick: (key: string) => void;
+  note: string;
+  onNote: (next: string) => void;
+  needsNote: boolean;
+  ready: boolean;
+  placeholder: string;
+  onClose: () => void;
+  onSend: () => void;
+}) {
+  /* A screen of its own rather than a panel over the foot. The panel had
+     four cards, a box and two buttons to fit into whatever the keyboard
+     left of a phone, and scrolled inside itself to do it; a screen has the
+     whole window, the way out where every other screen keeps it, and Send
+     at its foot. */
+  return (
+    <Screen
+      title={title}
+      onBack={onClose}
+      rise
+      backLabel={backLabel}
+      footer={
+        <Button variant="primary" disabled={!ready} onClick={onSend}>
+          Send
+        </Button>
+      }
+    >
+      <div className="at-flagmenu" data-el="flag-menu">
+        {/* Why it is worth the half minute. Reporting a problem is a
+            favour done for the next person to meet it, and nothing on the
+            screen said so. */}
+        <p className="at-flagmenu-lede" data-el="flag-menu-lede">
+          Any issue or feedback you report helps us improve the app.
+        </p>
+        <div className="at-flagopts">
+          {options.map((k) => (
+            <button
+              key={k.key}
+              className={`at-flagopt${picked === k.key ? " on" : ""}`}
+              aria-pressed={picked === k.key}
+              onClick={() => onPick(k.key)}
+            >
+              <span className="at-flagopt-title">{k.title}</span>
+              <span className="at-flagopt-what">{k.what}</span>
+              {k.does ? <span className="at-flagopt-does">{k.does}</span> : null}
+            </button>
+          ))}
+        </div>
+        {/* One box for every option, under them: whichever is picked, there
+            may be more to say, and a box that belonged to one option said
+            there was only room for words on that one. It asks for them
+            outright only where they are owed. */}
+        <div className="at-flagnote" data-el="flag-note">
+          <label className="at-flagnote-label" htmlFor="flag-note-input">
+            Tell us what happened
+            <span className="at-flagnote-need" data-el="flag-note-need">
+              {needsNote ? "Required" : "Optional"}
+            </span>
+          </label>
+          <textarea
+            id="flag-note-input"
+            data-el="flag-note-input"
+            className="at-input at-flagtext"
+            rows={4}
+            maxLength={FLAG_NOTE_MAX}
+            placeholder={placeholder}
+            value={note}
+            aria-required={needsNote}
+            onChange={(e) => onNote(e.target.value)}
+          />
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+/*
+ * Share feedback (0.552): about the app rather than a card, from the You
+ * menu. Both options need words. It goes to the App admin alone, with the
+ * space the person is in and where in the app they were.
+ */
+function FeedbackScreen({ onClose, onSend }: {
+  onClose: () => void;
+  onSend: (kind: FeedbackKind, note: string) => void;
+}) {
+  const [picked, setPicked] = useState<FeedbackKind | null>(null);
+  const [note, setNote] = useState("");
+  const ready = !!picked && !!note.trim();
+  return (
+    <ReportScreen
+      title="Share feedback"
+      backLabel="Back"
+      options={FEEDBACK_KINDS}
+      picked={picked}
+      onPick={(k) => setPicked(k as FeedbackKind)}
+      note={note}
+      onNote={setNote}
+      needsNote
+      ready={ready}
+      placeholder={picked === "idea" ? "It would help if…" : "When I tap…, nothing happens"}
+      onClose={onClose}
+      onSend={() => {
+        if (!picked || !ready) return;
+        onSend(picked, note.trim());
+        onClose();
+      }}
+    />
+  );
+}
 
 /* ==================================================================
    Main
@@ -10213,12 +10294,28 @@ export default function ArabicTrainer() {
      depends on it. */
   const accountAdmin = !!(account && account.admin);
   /* A teacher opens into teaching; everyone else into learning. */
-  const [space, setSpace] = useState(() => (loadTeaches() ? "teach" : "learn"));
+  /* `?open=admin` or `?open=super` (0.552): an App admin arriving from
+     Open on a space's tile, or from the way back to Spaces, lands where they
+     asked rather than where they last were. */
+  const [space, setSpace] = useState(() => {
+    const open = new URLSearchParams(window.location.search).get("open");
+    if (open === "admin" || open === "super") return open;
+    return loadTeaches() ? "teach" : "learn";
+  });
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (!q.has("open")) return;
+    q.delete("open");
+    const rest = q.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+  }, []);
   /* Where a space's sections go in the bar at the foot of the window. State
      rather than a ref, so the tab strips that portal into it render again
      once it exists. */
   const [dockSlot, setDockSlot] = useState<HTMLElement | null>(null);
   const [screen, setScreen] = useState<string | null>(null); // null | "settings" | "guide"
+  /* Share feedback (0.552), open over whatever screen it was asked from. */
+  const [sharing, setSharing] = useState(false);
   /* Remembered, because it decides whether the Teaching option exists at all.
      Deriving it only from a fresh network call meant a slow or failed request
      took the space selector away, with no way back but signing out. */
@@ -13435,6 +13532,19 @@ export default function ArabicTrainer() {
     snack.show(msg, kind);
   }
 
+  /*
+   * Feedback about the app (0.552). It says where it was sent from in
+   * words — the space and the section — because "it doesn't work" is
+   * answerable only once you know where. Not kept for later when offline:
+   * it is about the app, not a card, and there is no card to note it on.
+   */
+  function sendFeedback(kind: FeedbackKind, note: string) {
+    const where = [SPACE_LABEL[space] || space, session ? "practice session" : tab].filter(Boolean).join(" · ");
+    API.sendFeedback({ kind, note: note.slice(0, FLAG_NOTE_MAX), screen: where, release: APP_BUILD })
+      .then(() => flash("Thank you for the feedback 🫶", "good"))
+      .catch((e) => flash(API.explain(e), "warn"));
+  }
+
   function undoDelete() {
     if (!lastDeleted || !lastDeleted.length) return;
     // A later `updated` than the tombstone, so the restore also wins on
@@ -13754,6 +13864,20 @@ export default function ArabicTrainer() {
       {/* A problem reported without a connection is kept and sent later;
           until then the learner is told so in the band, not only in the
           corner menu, where it was easy to never look. */}
+      {/* An App admin inside a space other than their own (0.552): which
+          one, and the way back to the list of spaces it was opened from. */}
+      {account && account.admin && addressSpace && accountOrg && addressSpace.id !== accountOrg.id && (
+        <TopBanner
+          actions={
+            <Button size="sm" variant="ghost" icon="back"
+              onClick={() => window.location.assign(`/${accountOrg.slug || ""}?open=super`)}>
+              Back to Spaces
+            </Button>
+          }
+        >
+          {`You're in ${addressSpace.name}.`}
+        </TopBanner>
+      )}
       {toSend > 0 && (
         <TopBanner>
           {`${plural(toSend, "report")} saved on this device, waiting for a connection. `}
@@ -15095,6 +15219,7 @@ export default function ArabicTrainer() {
         )}
 
         {/* ============ ITEMS ============ */}
+        {tab === "items" && !inExercise && <TabTitle>Cards</TabTitle>}
         {tab === "items" && (
           <ItemsTab
             items={shown}
@@ -15119,6 +15244,7 @@ export default function ArabicTrainer() {
         )}
 
         {/* ============ PROGRESS ============ */}
+        {tab === "progress" && !inExercise && <TabTitle>Progress</TabTitle>}
         {tab === "progress" && (
           <ProgressTab
             items={shown}
@@ -15266,6 +15392,10 @@ export default function ArabicTrainer() {
           />
         )}
 
+        {sharing && (
+          <FeedbackScreen onClose={() => setSharing(false)} onSend={sendFeedback} />
+        )}
+
         {screen && (
           <SettingsScreen
             kind={screen}
@@ -15381,8 +15511,8 @@ export default function ArabicTrainer() {
       {/* The app's name heads the learning page and scrolls away with it;
           a space frame carries its own. */}
       {/* Home has it large and centred, as the page's title. Progress and
-          Cards go without a heading, the section in the bar being the
-          title; Courses, reached from the menu, is headed with its name. */}
+          Cards are headed with their name, as every tab is (0.553);
+          Courses, reached from the menu, is headed with its own. */}
       {!inExercise && space === "learn" && tab === "home" && (
         <div className="at-brand at-brand-home">
           <img className="at-brandmark" src="/logo.svg" alt="" width={48} height={48} />
@@ -15467,6 +15597,7 @@ export default function ArabicTrainer() {
                 }
                 onSettings={() => setScreen("settings")}
                 onGuide={() => setScreen("guide")}
+                onFeedback={account ? () => setSharing(true) : undefined}
               />
             </div>
             </div>
@@ -20105,7 +20236,7 @@ function AppVersion() {
   );
 }
 
-function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide, spaceShown }: {
+function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide, onFeedback, spaceShown }: {
   account: User | null;
   /** The space you are in, named at the top (0.543): its name, and its
       logo as a data URL or a stored picture's hash. */
@@ -20123,6 +20254,8 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
   onCourses?: () => void;
   onSettings: () => void;
   onGuide: () => void;
+  /** Share feedback about the app (0.552), for anyone signed in. */
+  onFeedback?: () => void;
 }) {
   const [open, setOpen] = useState(false);
 
@@ -20199,6 +20332,20 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
             </span>
             <span className="at-clinetext">How it works</span>
           </button>
+          {onFeedback && (
+            <button
+              className="at-cline at-cbig"
+              onClick={() => {
+                setOpen(false);
+                onFeedback();
+              }}
+            >
+              <span className="at-cico">
+                <Icon name="feedback" size={22} />
+              </span>
+              <span className="at-clinetext">Share feedback</span>
+            </button>
+          )}
 
           <div className="at-crule" />
           {/* The row states where sync has got to; the button is the only

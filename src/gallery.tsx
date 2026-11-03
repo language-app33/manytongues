@@ -131,6 +131,8 @@ const PLACES: Record<string, [string, string]> = {
   PlacePicker: [LEARN, "Choosing the space and the languages, in the menu behind your initial"],
   Guide: [LEARN, "How it works"],
   AfterAnswer: [LEARN, "A practice session · after answering"],
+  ReportScreen: [LEARN, "Flag a problem, and Share feedback in the You menu"],
+  FeedbackScreen: [LEARN, "You menu · Share feedback"],
   AlsoBox: [LEARN, "A practice session · what else is worth knowing"],
   AudioPrompt: [LEARN, "A practice session · playing a recording"],
   Scene: [LEARN, "A practice session · a conversation"],

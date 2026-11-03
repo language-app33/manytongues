@@ -458,6 +458,9 @@ const K = {
   image: (h) => `image:${h}`,
   /** @param {string} id */
   flag: (id) => `flag:${id}`,
+  /** Feedback about the app (0.552), read by the App admin alone. */
+  /** @param {string} id */
+  feedback: (id) => `feedback:${id}`,
   /** @param {string} what */
   index: (what) => `index:${what}`,
   /** A space (on screen) — an org (in code). See docs/PLAN-spaces.md. */
@@ -489,6 +492,7 @@ const K = {
  * would fill the admin screen with whatever anyone posted.
  */
 const FLAG_KINDS = ["strict", "data", "easy", "other"];
+const FEEDBACK_KINDS = ["broken", "idea"];
 const FLAG_NOTE_MAX = 500;
 
 /*
@@ -1424,8 +1428,11 @@ async function handle(req) {
          news to whoever is reading it. */
       const cardId = cardIdOf(String(body.cardId || "").slice(0, 64));
       const flagged = cardId ? await readCard(store, cardId) : null;
-      /* Your own card in My space is yours to fix, not to report (0.545). */
-      if (flagged && flagged.personal) return json({ error: "not-reportable" }, 400);
+      /* A card in My space is its owner's to fix, not to report (0.545).
+         Read unscoped (0.557): to anyone but its owner a My space card reads
+         as missing, and a missing card is otherwise reportable. */
+      const raw = cardId && !flagged ? await readJson(store, K.card(cardId)) : flagged;
+      if (raw && raw.personal) return json({ error: "not-reportable" }, 400);
 
       const flag = {
         id: randomBytes(8).toString("hex"),
@@ -1475,6 +1482,36 @@ async function handle(req) {
       for (const id of dropped) await store.delete(K.flag(id)).catch(() => {});
       await writeJson(store, K.index("flags"), ids.slice(dropped.length));
       return json({ ok: true, id: flag.id });
+    }
+
+    /*
+     * Feedback about the app (0.552), from the You menu. Anyone signed in
+     * may send it; only the App admin reads it, in Super admin → Reports —
+     * a space admin never sees it. It carries the space and where in the
+     * app it was sent from. Both kinds need words.
+     */
+    if (action === "send-feedback") {
+      const kind = String(body.kind || "");
+      if (!FEEDBACK_KINDS.includes(kind)) return json({ error: "bad-feedback" }, 400);
+      const note = String(body.note || "").trim().slice(0, FLAG_NOTE_MAX);
+      if (!note) return json({ error: "note-required" }, 400);
+      const item = {
+        id: randomBytes(8).toString("hex"),
+        org: acting,
+        kind,
+        note,
+        handle: mine,
+        handleName: me.displayName || mine,
+        screen: String(body.screen || "").slice(0, 80),
+        release: String(body.release || "").slice(0, 40),
+        at: Date.now(),
+      };
+      await writeJson(store, K.feedback(item.id), item);
+      const ids = (await readIndex(store, "feedback")).concat([item.id]);
+      const dropped = ids.slice(0, Math.max(0, ids.length - MAX_FLAGS));
+      for (const id of dropped) await store.delete(K.feedback(id)).catch(() => {});
+      await writeJson(store, K.index("feedback"), ids.slice(dropped.length));
+      return json({ ok: true, id: item.id });
     }
 
     /* One-time promotion, so the first admin can exist at all. */
@@ -4467,6 +4504,7 @@ async function handle(req) {
         "admin-overview", "admin-create-user", "admin-reissue-key", "admin-rename-course",
         "admin-course-language", "admin-new-code", "admin-card", "admin-delete-flags",
         "admin-suspend-user", "admin-reactivate-user", "admin-new-invite", "admin-hand-over",
+        "admin-purge-former",
       ]);
       if (!iAmAdmin && !(iRunThis && SPACE_ADMIN_MAY.has(action))) return json({ error: "admin-only" }, 403);
 
@@ -5051,6 +5089,60 @@ async function handle(req) {
       }
 
       /*
+       * Deleting a former member for good (0.552), from Former members, by
+       * a space admin or the App admin. Someone who left or was removed is
+       * only suspended: their account goes now, the way admin-delete-user
+       * takes it. Then everything they made in this space — decks and
+       * cards, the space's as well as their own — and last their entry on
+       * the list. Reports they sent stay, under the name they carry.
+       */
+      if (action === "admin-purge-former") {
+        const handle = String(body.handle || "");
+        if (!handle || handle === mine) return json({ error: "no-user" }, 400);
+        const list = (await readJson(store, K.former(acting))) || [];
+        if (!list.some((/** @type {any} */ r) => r.handle === handle)) return json({ error: "not-former" }, 404);
+        /* Their decks first, off every course that holds them. */
+        const deckIds = await readIndex(store, "decks");
+        const theirDecks = here(await readManyJson(store, deckIds.map((id) => K.deck(id))))
+          .filter((d) => d && d.owner === handle);
+        for (const d of theirDecks) {
+          await dropFromCourses(store, d.id);
+          await store.delete(K.deck(d.id)).catch(() => {});
+          await store.delete(K.cards(d.id)).catch(() => {});
+        }
+        if (theirDecks.length) {
+          const goneDecks = new Set(theirDecks.map((d) => d.id));
+          await updateJson(store, K.index("decks"), (/** @type {any} */ cur) =>
+            (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x))
+          );
+        }
+        /* Then their cards, out of whatever decks of others still hold them. */
+        const cardIds = (await readJson(store, K.myCards(handle))) || [];
+        let cards = 0;
+        for (let i = 0; i < cardIds.length; i += 100) {
+          cards += (await deleteCards(cardIds.slice(i, i + 100))).deleted.length;
+        }
+        await store.delete(K.myCards(handle)).catch(() => {});
+        /* The account itself, where it is still there (left or removed). */
+        if (await readUser(store, handle)) await wipeAccount(store, handle, { by: mine });
+        await updateJson(store, K.former(acting), (/** @type {any} */ cur) =>
+          (cur || []).filter((/** @type {any} */ r) => r.handle !== handle)
+        );
+        if (theirDecks.length || cards) await taught();
+        return json({ ok: true, decks: theirDecks.length, cards });
+      }
+
+      /* Dismissing feedback about the app (0.552): the App admin's alone. */
+      if (action === "admin-delete-feedback") {
+        const wanted = new Set((Array.isArray(body.ids) ? body.ids : []).map(String));
+        if (!wanted.size) return json({ ok: true, deleted: 0 });
+        const ids = await readIndex(store, "feedback");
+        for (const id of ids) if (wanted.has(id)) await store.delete(K.feedback(id)).catch(() => {});
+        await writeJson(store, K.index("feedback"), ids.filter((id) => !wanted.has(id)));
+        return json({ ok: true, deleted: ids.filter((id) => wanted.has(id)).length });
+      }
+
+      /*
        * A new space, with its first space admin (65a), whose key is
        * returned once — the way admin-create-user hands one over.
        */
@@ -5060,30 +5152,38 @@ async function handle(req) {
         const slug = String(body.slug || "").trim().toLowerCase();
         const problem = slugProblem(slug);
         if (problem) return json({ error: problem }, 400);
+        /* The App admin as the new space's admin (0.552): no account to
+           make and no key to hand over. */
+        const selfAdmin = body.selfAdmin === true;
         const adminName = String(body.adminName || "").trim().slice(0, 40);
-        if (!adminName) return json({ error: "name-required" }, 400);
+        if (!selfAdmin && !adminName) return json({ error: "name-required" }, 400);
         const id = `o${randomBytes(6).toString("hex")}`;
         /* The address first: taking it is what can fail, and it is never
            given back (8b). */
         const took = await updateJson(store, K.slug(slug), (/** @type {any} */ cur) => (cur ? null : id));
         if (took !== id) return json({ error: "slug-taken" }, 409);
 
-        const handles = await readIndex(store, "users");
-        const handle = makeHandle(adminName, handles.concat(await readIndex(store, "gone")));
-        const key = makeKey();
-        const user = {
-          handle,
-          displayName: adminName,
-          admin: false,
-          org: id,
-          created: Date.now(),
-          lastSeen: 0,
-          keySaved: false,
-          createdBy: mine,
-        };
-        await writeJson(store, K.user(handle), { ...user, keyHash: sha(key) });
-        await writeJson(store, K.keyOf(sha(key)), handle);
-        await updateJson(store, K.index("users"), (/** @type {any} */ cur) => (cur || []).concat([handle]));
+        /** @type {any} */
+        let user = { handle: mine, displayName: me.displayName || mine, admin: true, org: orgOf(me) };
+        let key = "";
+        if (!selfAdmin) {
+          const handles = await readIndex(store, "users");
+          const handle = makeHandle(adminName, handles.concat(await readIndex(store, "gone")));
+          key = makeKey();
+          user = {
+            handle,
+            displayName: adminName,
+            admin: false,
+            org: id,
+            created: Date.now(),
+            lastSeen: 0,
+            keySaved: false,
+            createdBy: mine,
+          };
+          await writeJson(store, K.user(handle), { ...user, keyHash: sha(key) });
+          await writeJson(store, K.keyOf(sha(key)), handle);
+          await updateJson(store, K.index("users"), (/** @type {any} */ cur) => (cur || []).concat([handle]));
+        }
 
         const inviteCode = makeCode();
         const org = {
@@ -5093,7 +5193,7 @@ async function handle(req) {
           name,
           logo: /^[a-f0-9]{64}$/.test(String(body.logo || "")) ? String(body.logo) : "",
           colour: colourOf(body.colour),
-          admins: [handle],
+          admins: [user.handle],
           inviteCode,
           created: Date.now(),
         };
@@ -5127,7 +5227,10 @@ async function handle(req) {
         const flags = (await readManyJson(store, (await readIndex(store, "flags")).map((x) => K.flag(x))))
           .filter(Boolean)
           .map((f) => ({ ...f, org: orgOf(f) }));
-        return json({ ok: true, orgs, flags });
+        /* And feedback about the app (0.552), which is only ever read here. */
+        const feedback = (await readManyJson(store, (await readIndex(store, "feedback")).map((x) => K.feedback(x))))
+          .filter(Boolean);
+        return json({ ok: true, orgs, flags, feedback });
       }
 
       /* Every space, for the Spaces tab: App admins only. */
