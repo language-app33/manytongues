@@ -10269,6 +10269,10 @@ export default function ArabicTrainer() {
    * followed another space's invite link is asked what they meant (82b).
    */
   const accountOrg = account && (account as any).org;
+  /* The space on screen: an App admin works in the one at the address,
+     everyone else in their own. Named once, so the corner menu and
+     Teaching cannot disagree about it. */
+  const shownSpace = account && account.admin && addressSpace ? addressSpace : accountOrg || null;
   const [inviteSetAside, setInviteSetAside] = useState(false);
   const strayInvite =
     !inviteSetAside && !!account && !account.admin && !!accountOrg && !!address.join &&
@@ -15331,6 +15335,7 @@ export default function ArabicTrainer() {
           <React.Suspense fallback={<ChunkFallback />}>
             <TeachSpace
               account={account}
+              spaceName={shownSpace && shownSpace.name}
               languages={LANGUAGES}
               settings={settings}
               langsOff={teachLangsOff}
@@ -15546,11 +15551,7 @@ export default function ArabicTrainer() {
             <div className="at-dockmain" ref={setDockSlot} />
             <div className="at-docksub">
               <CornerMenu
-                spaceShown={
-                  account && account.admin && addressSpace
-                    ? addressSpace
-                    : accountOrg || null
-                }
+                spaceShown={shownSpace}
                 account={account}
                 /* The dot stands for the whole action, so it stays lit until
                    every part of it is done — this device's cards, the courses,

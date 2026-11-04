@@ -5019,8 +5019,11 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
    back on is this line. */
 const SHOW_IN_CONTEXT = false;
 
-export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose, personalOnly = false }: {
+export function TeachSpace({ account, spaceName: shownName, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose, personalOnly = false }: {
   account: User;
+  /** The name of the space on screen — for an App admin, the one at the
+      address rather than their own. */
+  spaceName?: string | null;
   /** A learner's My space (0.545): only their own decks and cards, no courses. */
   personalOnly?: boolean;
   languages: Record<LangId, Lang>;
@@ -5067,7 +5070,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const [cardToSpace, setCardToSpace] = useState<{ card: Card; move: boolean } | null>(null);
   const [cardDeck, setCardDeck] = useState("");
   /* The space's own name on the toggle (0.549), cut short when long, in full on hover. */
-  const spaceName = (account.org && typeof account.org === "object" && account.org.name) || "Space";
+  const spaceName = shownName || (account.org && typeof account.org === "object" && account.org.name) || "Space";
   const decks = useMemo(() => allDecks.filter((d) => !!d.personal === mineSide), [allDecks, mineSide]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);

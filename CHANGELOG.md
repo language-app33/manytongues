@@ -8,6 +8,20 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.568 — 4 November 2026
+
+**Teaching names the space you are in, also for a super admin.**
+
+- The line at the top of Material → Decks and Cards ("…'s decks and
+  cards, shared with its teachers.") and the Copy/Move to the space
+  confirmations named the super admin's own space, even while they were
+  working in another one. They now name the space being worked in, as the
+  menu behind your initial already did. Nothing changes for anyone else.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: as super admin, open another space's Teaching →
+Material and read the line above the list; it names that space.
+
 ## 0.567 — 4 November 2026
 
 **Teaching → Material → Decks prompts you to make your first deck.**
