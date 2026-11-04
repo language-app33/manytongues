@@ -8,6 +8,21 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.558 — 4 November 2026
+
+**Tiles: a larger title and details line, centred on their buttons.**
+
+- Everywhere tiles are used (Admin's and Super admin's lists, course
+  tiles in Teaching and Learning, the number system screens), the title is
+  a little larger and so is the line of details under it.
+- The title and details now sit centred on the buttons beside them,
+  rather than lined up with their top.
+- On a phone, the buttons stay on the right and a long title wraps beside
+  them. A tile with three or more buttons still puts them under the text
+  on a phone, so the title isn't squeezed.
+- Admin → People's tiles change the same way.
+- Released without running the test suite, at the owner's request.
+
 ## 0.557 — 3 November 2026
 
 **Learning's tab titles match Teaching's.**

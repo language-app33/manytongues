@@ -1402,10 +1402,18 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-decklist2 { display:flex; flex-direction:column; gap:10px; }
 .at-deckcard { border:2px solid var(--line); border-radius: var(--r-lg);
   padding:14px 16px; background: var(--surface); }
-.at-deckrow2 { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
-.at-deckmain { flex:1 1 180px; min-width:0; }
-.at-decktitle { font-size:17px; font-weight:800; overflow-wrap:anywhere; }
-.at-deckmeta { font-size:12px; color: var(--muted); margin-top:3px; }
+/* Tile (0.558): the title and its line of facts centred on the buttons, and
+   the buttons kept on the right — a long title wraps beside them. Three or
+   more buttons go under the text on a phone, so the title is not squeezed
+   to a word a line. */
+.at-deckrow2 { display:flex; align-items:center; gap:12px; flex-wrap:nowrap; }
+.at-deckmain { flex:1 1 0; min-width:0; }
+.at-decktitle { font-size:18px; font-weight:800; overflow-wrap:anywhere; }
+.at-deckmeta { font-size:13px; color: var(--muted); margin-top:3px; }
+@media (max-width: 480px) {
+  .at-deckrow2:has(> .at-deckacts > :nth-child(3)) { flex-wrap:wrap; }
+  .at-deckrow2:has(> .at-deckacts > :nth-child(3)) > .at-deckmain { flex-basis:100%; }
+}
 .at-deckacts { display:flex; gap:6px; flex:0 0 auto; margin-left:auto; }
 /* A reported problem, under the title of the tile carrying it. The question
    as it was asked and, if there was one, what the person typed about it —
