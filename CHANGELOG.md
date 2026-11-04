@@ -8,6 +8,21 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.565 — 4 November 2026
+
+**The title bar at the top of each tab spans the whole window.**
+
+- The bar holding a tab's title ("Teaching · Courses", "Progress" and so
+  on) and the line under it now run edge to edge on a wide window, as
+  they already did on a phone. The logo and title stay in line with the
+  page beneath.
+- Checked in a browser on a wide window and at phone size: the bar reaches
+  both edges, and nothing scrolls sideways.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: on a computer, open a tab in Teaching or Admin, and
+Progress or Cards in Learning, and see the white bar reach both sides.
+
 ## 0.564 — 4 November 2026
 
 **New wording across Settings, Progress, the welcome screen and Teaching,
