@@ -50,10 +50,8 @@ const TextStyles = React.lazy(() =>
   import("./gallery.tsx").then((m) => ({ default: m.TextStyles })),
 );
 import {
-  contextCoverage,
   dimValues,
   exOf,
-  supportsContext,
   LANGUAGES,
   DEFAULT_LANGUAGE,
   categoriesOf,
@@ -143,6 +141,7 @@ import {
   narrowing,
   plural,
   deckSize,
+  notReaching,
   shortDate,
   pullAdmin,
   pullTeaching,
@@ -4499,10 +4498,9 @@ const FIX_ICON: Record<string, string> = {
 
 /*
  * A deck's quality (0.561): the score with a bar and where the top
- * suggestions would take it; the suggestions as cards, each with what it is
- * worth and, where it is about particular words, those words to tap; and,
- * last and quieter, every word with the sentences it is paired with — what
- * "Show the pairings" was, folded into the one place.
+ * suggestions would take it; the suggestions as cards, each with what to do,
+ * why, what it is worth and, where it is about particular cards, those
+ * cards to tap (0.563).
  */
 function DeckQuality({ quality, cards, lang, onOpenCard }: {
   quality: Quality;
@@ -4510,8 +4508,6 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
   lang: Partial<Lang>;
   onOpenCard: (id: string) => void;
 }) {
-  const [every, setEvery] = useState(false);
-  const report = useMemo(() => (every ? contextCoverage(cards, lang) : null), [every, cards, lang]);
   if (quality.score === null) {
     return <Help>Nothing to score yet: add words and sentences that use them.</Help>;
   }
@@ -4545,10 +4541,8 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
                     <li className="at-qfix" key={f.key}>
                       <span className="at-qfixico"><Icon name={FIX_ICON[f.key] || "star"} size={20} /></span>
                       <div className="at-qfixbody">
+                        <p className="at-qfixtitle">{f.title}</p>
                         <p className="at-qfixtext">{f.text}</p>
-                        {f.key === "words" && ids.length ? (
-                          <p className="at-qfixhint">Tap a word to open it. The number is how many more sentences it needs.</p>
-                        ) : null}
                         {ids.length ? (
                           <div className="at-qfixwords">
                             {ids.map((id) => {
@@ -4566,6 +4560,11 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
                             })}
                           </div>
                         ) : null}
+                        {ids.length ? (
+                          <p className="at-qfixhint">
+                            {f.key === "words" ? "Tap a word to open it. The number is how many more sentences it needs." : "Tap one to open it."}
+                          </p>
+                        ) : null}
                       </div>
                       <span className="at-qfixgain"><b>{`+${gainOf(f.gain)}`}</b><small>points</small></span>
                     </li>
@@ -4574,46 +4573,6 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
               </ul>
         </>
       )}
-      {/* Every word and what it is paired with, for checking a pairing
-          rather than for raising the score. Only where the language says
-          how to find a word inside a phrase. */}
-      {supportsContext(lang) && (
-        <Button variant="ghost" size="sm" className="at-mt3" icon={every ? "chevronUp" : "chevronDown"}
-          onClick={() => setEvery((v) => !v)}>
-          {every ? "Hide every word and its sentences" : "See every word and its sentences"}
-        </Button>
-      )}
-      {every && report ? <Pairings report={report} lang={lang} /> : null}
-    </>
-  );
-}
-
-/* Each word of a deck with the phrases it appears in. Words in none are the
-   quality tip's to name (0.562), counted the way the score counts them. */
-function Pairings({ report, lang }: { report: ReturnType<typeof contextCoverage>; lang: Partial<Lang> }) {
-  const withContext = report.words.filter((w) => w.contexts.length > 0);
-  const script = { fontFamily: lang.fontStack, ...scriptVars(lang as Lang) };
-  if (!report.words.length) return <Help className="at-mt3">No single-word cards in this deck yet.</Help>;
-  return (
-    <>
-      <div className="at-mt3">
-        {withContext.map((w) => (
-          <div className="at-ctxrow" key={w.id}>
-            <p className="at-ctxword">
-              <b lang={lang.id} dir={lang.direction} style={script}>{w.ar}</b>
-              <i>{asMeaning(w.en)}</i>
-            </p>
-            <ul className="at-ctxlist">
-              {w.contexts.map((c) => (
-                <li key={c.id}>
-                  <span lang={lang.id} dir={lang.direction} style={script}>{c.ar}</span>
-                  <em>{asMeaning(c.en)}</em>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ))}
-      </div>
     </>
   );
 }
@@ -6454,6 +6413,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   /* How many of a deck's cards are waiting for review, said on the deck —
      a teacher looks after a deck, and what in it is not yet reaching
      students is the thing worth seeing without opening it. */
+  const cardById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const deckWaiting = (deck: Deck): string => {
     const n = (deck.cardIds || []).filter((id) => waitingIds.has(id)).length;
     return n ? ` · ${n} to review` : "";
@@ -7833,8 +7793,16 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     <Icon name="download" />
                   </Button>
                 </span>
+                {/* The language, then what the deck holds on a line of its own,
+                    and, only when some of it sends students nothing, why
+                    (0.563). */}
                 <span className="at-formrole">
-                  {(langOfDeck(d) || {}).name} · {deckSize(d, held.length)}
+                  <span className="at-formline">{(langOfDeck(d) || {}).name}</span>
+                  <span className="at-formline">{deckSize(d, held.length)}</span>
+                  {(() => {
+                    const off = notReaching(d, held);
+                    return off ? <span className="at-formline at-notreach">{off.long}</span> : null;
+                  })()}
                 </span>
               </div>
               <fieldset className="at-cardlock" disabled={!editing}
@@ -8810,6 +8778,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                         <>
                           <LockMark locked={d.locked && DECK_LOCKS} />
                           {`${(langOfDeck(d) || { name: "" }).name} · ${deckSize(d)}${deckWaiting(d)}`}
+                          {(() => {
+                            /* Its cards that send students nothing yet (0.563). */
+                            const off = notReaching(d, (d.cardIds || []).map((id) => cardById.get(id)).filter(Boolean) as Card[]);
+                            return off ? <span className="at-notreach">{` · ${off.short}`}</span> : null;
+                          })()}
                           <QualityMark quality={qualities.get(d.id)} />
                           {(() => {
                             /* How many of its cards have a recording the

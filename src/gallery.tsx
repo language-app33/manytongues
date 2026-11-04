@@ -224,7 +224,6 @@ const PLACES: Record<string, [string, string]> = {
   ImageScreen: [TEACH, "Editing a card · adding a picture"],
   FullImage: [TEACH, "Reading a card · a picture full screen"],
   StoredImage: [TEACH, "Editing a card · a picture on a form"],
-  Pairings: [TEACH, "A deck · every word and its sentences, under its quality"],
   DeckQuality: [TEACH, "A deck · its quality, and what would raise it"],
   PronounsEditor: [TEACH, "A language's pronouns, written once"],
   NumberSystemEditor: [TEACH, "A language's number system"],

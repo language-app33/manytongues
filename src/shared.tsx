@@ -396,30 +396,42 @@ export function plural(n: number, one: string, many?: string) {
 }
 
 /**
- * How much a deck holds, said on the deck: its cards and its number parts.
- *
- * A part is not a card — it is one skill on the teacher's numbers, held by
- * the deck as an id (Deck.parts) — so counting cardIds alone left a deck
- * of numbers saying "0 cards". The parts are said beside the cards rather
- * than added into them, and a deck of nothing but parts leaves the
- * "0 cards" off.
- *
- * And it says when a part sends students nothing. A part is a promise of
- * numbers that only the teacher's words keep, and "5 number parts" on a
- * deck whose numbers were never written read as a full deck while its
- * students were told there was nothing to practise. Said only where the
- * server has worked it out (`partsWaiting`), so a deck from anywhere else
- * says what it always did.
+ * How much a deck holds, said on the deck: its cards, number parts among
+ * them (0.563) — a part is one skill on the teacher's numbers, held by the
+ * deck as an id (Deck.parts), and counted as the card it is to a student.
  */
-export function deckSize(d: { cardCount?: number; parts?: string[]; partsWaiting?: string[] }, cards = d.cardCount || 0) {
+export function deckSize(d: { cardCount?: number; parts?: string[] }, cards = d.cardCount || 0) {
+  /* A number part is a card like any other (0.563): it is counted with
+     them, and whether it reaches students is notReaching's to say. */
+  return plural(cards + (d.parts || []).length, "card");
+}
+
+/*
+ * How many of a deck's cards don't reach students yet, and why (0.563):
+ * drafts, cards waiting for review, and number parts whose number words
+ * aren't written. Null when every card does. `cards` are the deck's cards
+ * as the teacher holds them, which say their status.
+ */
+export function notReaching(
+  d: { parts?: string[]; partsWaiting?: string[] },
+  cards: { status?: string }[],
+): { n: number; long: string; short: string } | null {
+  const drafts = cards.filter((c) => c.status === "draft").length;
+  const review = cards.filter((c) => c.status === "review").length;
   const held = d.parts || [];
-  const parts = held.length;
-  if (!parts) return plural(cards, "card");
-  const waiting = (d.partsWaiting || []).filter((p) => held.includes(p)).length;
-  const said =
-    plural(parts, "number part") +
-    (waiting === parts ? " · none ready yet" : waiting ? ` · ${waiting} not ready yet` : "");
-  return cards ? `${plural(cards, "card")} · ${said}` : said;
+  const numbers = (d.partsWaiting || []).filter((p) => held.includes(p)).length;
+  const n = drafts + review + numbers;
+  if (!n) return null;
+  const why = [
+    drafts ? plural(drafts, "draft") : "",
+    review ? `${review} waiting for review` : "",
+    numbers ? `${numbers} ${numbers === 1 ? "needs its" : "need their"} number words written` : "",
+  ].filter(Boolean).join(", ");
+  return {
+    n,
+    long: `${n} ${n === 1 ? "doesn't" : "don't"} reach students yet: ${why}`,
+    short: `${n} not reaching students`,
+  };
 }
 
 /* --- Button -------------------------------------------------------

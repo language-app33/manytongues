@@ -66,7 +66,7 @@ await build({
   loader: { ".jsx": "jsx" },
   logLevel: "silent",
 });
-const { localIdFor, cardToItem, serverCardId, foldCourses, deckSize } = await import(path.join(out, "shared.js"));
+const { localIdFor, cardToItem, serverCardId, foldCourses, deckSize, notReaching } = await import(path.join(out, "shared.js"));
 
 /* And which recording a question leads with, which is a plain function of a
    card's progress and belongs with the rest of them. The trainer is bundled
@@ -2955,34 +2955,29 @@ test("a noun opened from storage reads its old grammar into the boxes, and saves
   assert.deepEqual(placed.extras, []);
 });
 
-/* A deck of numbers holds parts, not cards, and used to say "0 cards" for
-   it — the teacher had just added them and the deck said it was empty. */
-test("a deck's size counts its number parts beside its cards", () => {
+/* A number part is counted as a card like any other (0.563): a deck of
+   numbers used to say "0 cards" while it held them. */
+test("a deck's size counts its number parts as cards", () => {
   assert.equal(deckSize({ cardCount: 0 }), "0 cards");
   assert.equal(deckSize({ cardCount: 1, parts: [] }), "1 card");
-  assert.equal(deckSize({ cardCount: 0, parts: ["numbers:0-10", "time:hours"] }), "2 number parts");
-  assert.equal(deckSize({ cardCount: 5, parts: ["numbers:0-10"] }), "5 cards · 1 number part");
+  assert.equal(deckSize({ cardCount: 0, parts: ["numbers:0-10", "time:hours"] }), "2 cards");
+  assert.equal(deckSize({ cardCount: 5, parts: ["numbers:0-10"] }), "6 cards");
   /* An open deck counts the cards it has in hand rather than the record's. */
-  assert.equal(deckSize({ cardCount: 9, parts: ["numbers:0-10"] }, 3), "3 cards · 1 number part");
+  assert.equal(deckSize({ cardCount: 9, parts: ["numbers:0-10"] }, 3), "4 cards");
 });
 
-/* And it says when a part sends students nothing: a deck of numbers nobody
-   had written said "5 number parts" while its students had nothing. */
-test("a deck's size says when its number parts are not ready", () => {
+/* And which of them don't reach students yet, and why: drafts, cards
+   waiting for review, number parts whose words nobody has written. */
+test("a deck says which of its cards don't reach students yet", () => {
   const five = ["numbers:0-9", "numbers:10-19", "numbers:20-99", "numbers:100-999", "numbers:1000+"];
-  assert.equal(deckSize({ cardCount: 0, parts: five, partsWaiting: five }), "5 number parts · none ready yet");
+  assert.equal(notReaching({ parts: five, partsWaiting: [] }, [{}, { status: "published" }]), null);
   assert.equal(
-    deckSize({ cardCount: 0, parts: five, partsWaiting: ["numbers:20-99", "numbers:100-999", "numbers:1000+"] }),
-    "5 number parts · 3 not ready yet",
+    notReaching({ parts: five, partsWaiting: ["numbers:20-99", "numbers:100-999"] }, [{ status: "draft" }, { status: "review" }, {}]).long,
+    "4 don't reach students yet: 1 draft, 1 waiting for review, 2 need their number words written",
   );
-  assert.equal(deckSize({ cardCount: 0, parts: five, partsWaiting: [] }), "5 number parts");
-  assert.equal(
-    deckSize({ cardCount: 4, parts: ["numbers:0-9"], partsWaiting: ["numbers:0-9"] }),
-    "4 cards · 1 number part · none ready yet",
-  );
-  /* A part no longer on the deck is not counted against it — the deck
-     can change before the next look says which parts wait. */
-  assert.equal(deckSize({ cardCount: 0, parts: ["numbers:0-9"], partsWaiting: ["numbers:10-19"] }), "1 number part");
+  assert.equal(notReaching({ parts: [], partsWaiting: [] }, [{ status: "draft" }]).short, "1 not reaching students");
+  /* A part no longer on the deck is not counted against it. */
+  assert.equal(notReaching({ parts: ["numbers:0-9"], partsWaiting: ["numbers:10-19"] }, []), null);
 });
 
 test("filtering by kind of card, and by the subtypes of each kind", () => {

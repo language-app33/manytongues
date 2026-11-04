@@ -2100,17 +2100,23 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 .at-qfixico { flex:none; width:38px; height:38px; border-radius:12px; display:grid; place-items:center;
   background: var(--jade-bg); color: var(--jade); }
 .at-qfixbody { flex:1 1 auto; min-width:0; }
-.at-qfixtext { margin:0; font-size: var(--fs-md); line-height:1.4; color: var(--text); }
 .at-qfixgain { flex:none; display:flex; flex-direction:column; align-items:center; line-height:1.1;
   padding:6px 10px; border-radius:12px; background: var(--jade-bg); color: var(--jade); }
 .at-qfixgain b { font-size:18px; font-weight:800; }
 .at-qfixgain small { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
 .at-qfixwords { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-.at-qfixword { display:inline-flex; align-items:baseline; gap:6px; padding:6px 10px; cursor:pointer; width:auto; flex:none; min-height:0;
+.at-qfixword { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; cursor:pointer;
+  width:auto; flex:none; min-height:0; max-width:100%; line-height:1;
   border:1px solid var(--line); border-radius:999px; background: var(--well); color: var(--text); font:inherit; }
 .at-qfixword:hover { border-color: var(--jade); }
-.at-qfixword b { font-weight:700; }
-.at-qfixword i { font-style:normal; font-size:12px; color: var(--muted); }
+/* Centred on the pill's middle rather than on the text's baseline (0.563):
+   the script and the Latin "+2" sit on that line differently, which left
+   some pills lopsided. Each part is its own box of the same line height. */
+.at-qfixword b { font-weight:700; display:block; line-height:1.5;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.at-qfixword i { font-style:normal; font-size:12px; color: var(--muted); display:block; line-height:1; flex:none; }
+.at-qfixtitle { margin:0; font-size: var(--fs-md); font-weight:800; line-height:1.3; color: var(--ink); }
+.at-qfixtext { margin:4px 0 0; font-size: var(--fs-sm); line-height:1.4; color: var(--text-soft); }
 .at-qfixhint { margin:6px 0 0; font-size:12px; color: var(--muted); }
 .at-ctxbare { display:flex; flex-wrap:wrap; gap:8px; }
 .at-ctxbare span { display:inline-flex; align-items:baseline; gap:6px; padding:6px 10px;
@@ -4571,3 +4577,8 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
 .at-addrinput input { flex:1 1 auto; min-width:0; border:0; padding:0; margin:0;
   background:transparent; font:inherit; color:inherit; outline:none; }
 .at-input.at-addrinput:focus-within { border-color: var(--brass); }
+
+/* A deck's facts under "This deck", a line each (0.563), and the note of
+   cards that don't reach students yet, on its screen and its tile. */
+.at-formrole .at-formline { display:block; }
+.at-notreach { color: var(--rose); font-weight:600; }

@@ -8,6 +8,30 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.563 — 4 November 2026
+
+**Deck quality tips say what to do, and a deck counts number parts as cards.**
+
+- Each quality tip now has a bold headline saying what to do ("Record 5
+  words or sentences", "Link 1 sentence to its words"), and a line under it
+  saying why or how.
+- Every tip about particular cards lists them, to tap and open: unlinked
+  sentences, sentences with untaught words, recordings, pronunciation,
+  pictures, sentences to check, repeated words and long sentences, as well
+  as words that need more sentences.
+- The word and the number in each of those pills are centred.
+- "See every word and its sentences" is gone.
+- **Number parts count as cards**: a deck with 2 cards and 1 number part says
+  "3 cards", everywhere a deck's size is shown.
+- On a deck's screen, under "This deck", the language and the number of
+  cards are each on a line of their own. When some cards don't reach
+  students, a third line says how many and why: "3 don't reach students
+  yet: 1 draft, 1 waiting for review, 1 needs its number words written".
+  Deck tiles in Material say "3 not reaching students". This replaces
+  "none ready yet".
+- Released without running the test suite, at the owner's request. The
+  tests for the new wording and the deck's size were updated to match.
+
 ## 0.562 — 4 November 2026
 
 **A deck's quality tips are always shown.**
