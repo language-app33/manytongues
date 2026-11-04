@@ -4496,8 +4496,6 @@ const FIX_ICON: Record<string, string> = {
   recordings: "mic", pictures: "image", pronunciation: "language", reviewed: "verify",
   repeats: "copy", long: "sort", scene: "group",
 };
-/* How many word chips a suggestion shows before "and N more". */
-const FIX_CHIPS = 12;
 
 /*
  * A deck's quality (0.561): the score with a bar and where the top
@@ -4512,7 +4510,6 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
   lang: Partial<Lang>;
   onOpenCard: (id: string) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const [every, setEvery] = useState(false);
   const report = useMemo(() => (every ? contextCoverage(cards, lang) : null), [every, cards, lang]);
   if (quality.score === null) {
@@ -4534,18 +4531,10 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
         <span className={`now ${tone}`} style={{ width: `${quality.score}%` }} />
         {fixes.length ? <span className="then" style={{ left: `${quality.score}%`, width: `${reach - quality.score}%` }} /> : null}
       </div>
+      {/* Always shown (0.562): there are at most three, and they are the
+          most useful thing here. */}
       {fixes.length > 0 && (
         <>
-          <Button
-            className="at-mt3"
-            size="sm"
-            icon={open ? "chevronUp" : "chevronDown"}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? "Hide what would raise it" : "What would raise it"}
-          </Button>
-          {open && (
-            <>
               <p className="at-qualityreach">
                 {reach >= 100 ? "These would take it to 100." : `These would take it to about ${reach}.`}
               </p>
@@ -4562,7 +4551,7 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
                         ) : null}
                         {ids.length ? (
                           <div className="at-qfixwords">
-                            {ids.slice(0, FIX_CHIPS).map((id) => {
+                            {ids.map((id) => {
                               const row = f.key === "words" ? rowOf.get(id) : null;
                               const owed = row ? row.forms.reduce((t, x) => t + Math.max(0, x.need - x.met), 0) : 0;
                               return (
@@ -4575,7 +4564,6 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
                                 </button>
                               );
                             })}
-                            {ids.length > FIX_CHIPS ? <span className="at-qfixmore">{`and ${ids.length - FIX_CHIPS} more`}</span> : null}
                           </div>
                         ) : null}
                       </div>
@@ -4584,8 +4572,6 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
                   );
                 })}
               </ul>
-            </>
-          )}
         </>
       )}
       {/* Every word and what it is paired with, for checking a pairing
@@ -4602,10 +4588,10 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
   );
 }
 
-/* Each word of a deck with the phrases it appears in, then those in none. */
+/* Each word of a deck with the phrases it appears in. Words in none are the
+   quality tip's to name (0.562), counted the way the score counts them. */
 function Pairings({ report, lang }: { report: ReturnType<typeof contextCoverage>; lang: Partial<Lang> }) {
   const withContext = report.words.filter((w) => w.contexts.length > 0);
-  const bare = report.words.filter((w) => w.contexts.length === 0);
   const script = { fontFamily: lang.fontStack, ...scriptVars(lang as Lang) };
   if (!report.words.length) return <Help className="at-mt3">No single-word cards in this deck yet.</Help>;
   return (
@@ -4628,19 +4614,6 @@ function Pairings({ report, lang }: { report: ReturnType<typeof contextCoverage>
           </div>
         ))}
       </div>
-      {bare.length > 0 && (
-        <div className="at-mt4">
-          <p className="at-label">Not in any phrase yet</p>
-          <div className="at-ctxbare">
-            {bare.map((w) => (
-              <span key={w.id}>
-                <b lang={lang.id} dir={lang.direction} style={script}>{w.ar}</b>
-                <i>{asMeaning(w.en)}</i>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
     </>
   );
 }

@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.562 — 4 November 2026
+
+**A deck's quality tips are always shown.**
+
+- The tips that would raise a deck's quality show under the score without
+  a tap; the "What would raise it" button is gone.
+- The words tip lists every word that needs more sentences, not just the
+  first 12.
+- "Not in any phrase yet" is gone from the list of every word and its
+  sentences. The words tip names them, counted the same way as the score,
+  so the two no longer disagree.
+- Released without running the test suite, at the owner's request.
+
 ## 0.561 — 4 November 2026
 
 **A deck's quality: one place to see what to fix, and on which words.**
