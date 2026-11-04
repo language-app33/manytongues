@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.566 — 4 November 2026
+
+**Admin → People heads its list "This space's people".**
+
+- The part of People where you add someone and see everyone in the space
+  now has a heading, "This space's people", like Invite people above it
+  and Former members below.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: open Admin → People and see the new heading above the
+list.
+
 ## 0.565 — 4 November 2026
 
 **The title bar at the top of each tab spans the whole window.**

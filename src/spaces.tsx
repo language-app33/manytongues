@@ -2098,7 +2098,7 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                   })} />
                 </Section>
               ) : null}
-              <Section>
+              <Section head title="This space's people">
               {newKey && (
                 <div className="at-sub">
                   <p className="at-eyebrow">
