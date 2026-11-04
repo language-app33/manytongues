@@ -459,7 +459,7 @@ export function explain(err: unknown): string {
       "slug-taken": "That address is taken. Addresses are never reused.",
       "slug-invalid": "An address is 3 to 40 lower-case letters, digits and dashes, starting with a letter, and some words are kept for the app.",
       "not-in-space": "That person isn't in this space.",
-      "main-stays": "Main can't be closed or deleted.",
+      "own-space": "You can't close or delete the space your own account is in.",
       "not-reportable": "That's your own card. You can change it in My space.",
       "personal-deck": "A deck in My space can't go on a course. Copy it to the space first.",
       "personal-card": "A card in My space can't go in a deck of the space. Copy its deck to the space first.",

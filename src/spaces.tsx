@@ -9118,7 +9118,6 @@ function SpacesTab() {
   ) : null;
 
   if (making) {
-    const slugNote = making.slug ? `manytongues.co/${making.slug}` : "manytongues.co/…";
     return (
       <Screen
         title="New space"
@@ -9145,9 +9144,9 @@ function SpacesTab() {
           <input className="at-input" placeholder="Lingua Academy" value={making.name} autoFocus
             onChange={(e) => setMaking({ ...making, name: e.target.value })} />
         </Field>
-        <Field label={<>Address <span className="req">required</span></>} lede={slugNote}>
-          <input className="at-input" placeholder="lingua-academy" value={making.slug}
-            onChange={(e) => setMaking({ ...making, slug: e.target.value.toLowerCase().replace(/\s+/g, "-") })} />
+        <Field label={<>Address <span className="req">required</span></>}>
+          <AddressInput placeholder="lingua-academy" value={making.slug}
+            onChange={(slug) => setMaking({ ...making, slug })} />
         </Field>
         <Help>An address can be changed later, and the old one keeps working. Once used, it is never given to another space.</Help>
         {/* You as its admin (0.552), so running a new space needs no second
@@ -9224,6 +9223,29 @@ function SpacesTab() {
   );
 }
 
+/*
+ * A space's address as one line (0.560): the fixed part of it, then the
+ * box the space's own part is typed in, so what is typed is read as the
+ * whole address it makes.
+ */
+function AddressInput({ value, onChange, placeholder }: {
+  value: string;
+  onChange: (slug: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="at-input at-addrinput">
+      <span className="at-addrpre" aria-hidden="true">manytongues.co/</span>
+      <input
+        aria-label="Address, after manytongues.co/"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
+      />
+    </label>
+  );
+}
+
 /* One space, as the App admin manages it. */
 function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
   org: API.OrgRow;
@@ -9240,7 +9262,6 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
   const [draft, setDraft] = useState<SpaceDraft | null>(null);
   const [picking, setPicking] = useState(false);
   const snack = useSnackbar();
-  const isMain = org.id === "main";
   const editing = !!draft;
   const saved: SpaceDraft = { name: org.name, slug: org.slug, colour: org.colour || "" };
   const shown = draft || saved;
@@ -9313,9 +9334,15 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
           <Field label={<>Name<span className="at-reqstar" aria-hidden="true" /></>}>
             <input className="at-input" value={shown.name} onChange={(e) => edit({ name: e.target.value })} />
           </Field>
-          <Field label="Address" lede={`manytongues.co/${shown.slug || "…"}${org.formerSlugs.length ? ` · still answers to ${org.formerSlugs.map((x) => `/${x}`).join(", ")}` : ""}`}>
-            <input className="at-input" value={shown.slug} disabled={isMain}
-              onChange={(e) => edit({ slug: e.target.value.toLowerCase().replace(/\s+/g, "-") })} />
+          <Field label="Address">
+            {editing ? (
+              <AddressInput value={shown.slug} onChange={(slug) => edit({ slug })} />
+            ) : (
+              <p className="at-readvalue">manytongues.co/{shown.slug}</p>
+            )}
+            {org.formerSlugs.length ? (
+              <Help>Still answers to {org.formerSlugs.map((x) => `/${x}`).join(", ")}</Help>
+            ) : null}
           </Field>
           <Field label="Logo" lede="Shown on the space's sign-in page and at the top of the You menu.">
             {editing ? (
@@ -9373,8 +9400,9 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
         ))}
       </Section>
       <SpaceExtras org={org} />
-      {!isMain ? (
-        <Section title="Closing">
+      {/* Main closes and goes like any other space (0.560); the server
+          refuses the one your own account is in. */}
+      <Section title="Closing">
           <div className="at-row">
             {org.archived ? (
               <Button disabled={busy} onClick={() => run(() => API.archiveOrg(org.id, false), `${org.name} reopened`)}>
@@ -9412,7 +9440,6 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
             </Button>
           </div>
         </Section>
-      ) : null}
     </Screen>
   );
 }

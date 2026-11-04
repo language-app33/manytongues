@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.560 — 4 November 2026
+
+**A space's address is typed straight after manytongues.co/, and Main is a space like any other.**
+
+- On a space's screen and on the New space form, "manytongues.co/" now sits
+  fixed at the start of the address box, with the address typed right after
+  it, instead of on a line of its own above. Read, the address is one line:
+  "manytongues.co/…". A space that has had other addresses says under the
+  field which ones it still answers to.
+- **Main's address can be changed**, and Main can be closed and deleted,
+  like any other space. Its old address forwards to the new one.
+- Trade-off: nobody can close or delete the space their own account is in,
+  since that would lock them out or delete them. For the super admin that
+  is Main, unless their account is elsewhere.
+- Released without running the test suite, at the owner's request.
+
 ## 0.559 — 4 November 2026
 
 **A space's screen in Super admin reads first, then edits, like a deck's.**
