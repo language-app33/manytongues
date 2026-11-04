@@ -8,6 +8,33 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.564 — 4 November 2026
+
+**New wording across Settings, Progress, the welcome screen and Teaching,
+from the owner's review in the wording workshop.**
+
+- Settings: the display name, handle and sign-in key are explained more
+  plainly ("The name your teachers and classmates see.", "This is a
+  permanent username…", "The key you use to sign into the app."). The
+  warning about sharing the key is gone from that line.
+- Settings: "Reset scheduling" is now "Reset progress", in its label,
+  button and confirmation; "Close this account" is now "Delete your
+  account"; "On-screen keys" is now "On-screen keyboard"; the Sounds,
+  Log out, administrator and device-recordings explanations are
+  shorter; "Remove from this device" is now "Remove all from this
+  device".
+- Progress: the ladder and Prep mode explanations are shorter.
+- Welcome screen: "Your language journey starts here. After a quick
+  setup, you can learn anywhere, with or without internet."
+- Teaching: Export and Import explain themselves more simply; deck
+  quality now reads "Decks with higher scores tend to achieve better
+  learning outcomes."
+- Removed: the note under Saved sessions about deleted cards, and the
+  warning under a new course's language choice.
+
+To check by hand: open Settings, Progress, the welcome screen (signed
+out), and a deck's Export screen in Teaching, and read the new lines.
+
 ## 0.563 — 4 November 2026
 
 **Deck quality tips say what to do, and a deck counts number parts as cards.**

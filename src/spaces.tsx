@@ -317,8 +317,7 @@ export function Onboarding({ onDone, place = {} }: {
                 where there is no signal was being told, by the one screen
                 standing in their way, that it should not have been. */}
             <Lede>
-              Learn a language a card at a time. Setting up takes a moment and a connection; after
-              that your cards and your progress live on this device, and the app works without one.
+              Your language journey starts here. After a quick setup, you can learn anywhere, with or without internet.
             </Lede>
             {!closed && !place.unknown ? (
               <Button variant="primary" wide onClick={() => setStep("new")}>
@@ -2048,11 +2047,6 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                     onChange={setLang}
                     label="Language taught"
                   />
-                  <Help>
-                    Pick carefully — this sets the script, the keyboard and how answers are marked
-                    for everything in the course, and changing it later doesn't convert what's
-                    already written.
-                  </Help>
                 </Screen>
               )}
 
@@ -3499,8 +3493,7 @@ function ExportScreen({ ask, onDone, onClose }: {
       }
     >
       <Help>
-        {ask.what} as one file. An administrator can put it back with Restore, and without the
-        recordings it is small enough to give to an AI and ask what cards to make next.
+        {ask.what} will be exported as one file. An administrator can import it back with Restore. Exporting without recordings and images makes the file much smaller.
       </Help>
       <Notice kind="error">{err}</Notice>
       <div className="at-field at-mt4">
@@ -3615,8 +3608,7 @@ function ImportScreen({ cards, decks, langName, busy, failed, onImport, onClose 
       }
     >
       <Help>
-        A file made with Export, here or by another teacher, or a backup of the whole site. Every
-        card is checked against yours first, and nothing is changed until you tap Import.
+        Select a backup of a deck or of the whole app. You will be able to review every card before it is actually imported.
       </Help>
       <div className="at-row at-mt3">
         <label className="at-btn ghost" style={{ cursor: "pointer" }}>
@@ -4485,9 +4477,7 @@ function QualityMark({ quality }: { quality?: Quality | null }) {
 /* What the score is made of, said under the Deck quality heading before
    the score rather than after it, as the card editor explains a section. */
 const QUALITY_LEDE =
-  "Most of it is whether every word, and every form of it, is practised inside sentences in " +
-  "this deck. The rest is recordings, pictures, pronunciation, reviewed sentences, no repeated " +
-  "words, sentences that aren't too long, and a conversation or text.";
+  "Decks with higher scores tend to achieve better learning outcomes.";
 
 /* The picture beside each suggestion: what it asks you to go and add. */
 const FIX_ICON: Record<string, string> = {

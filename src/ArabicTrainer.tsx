@@ -17526,12 +17526,6 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
         })}
       </div>
 
-      {list.some((s) => missingFromSaved(s, items).length) && (
-        <Help className="at-mt3">
-          A session keeps the cards it was built from by name, so one you
-          have since deleted is no longer in it.
-        </Help>
-      )}
     </Screen>
   );
 }
@@ -19451,7 +19445,7 @@ function ProgressTab({
       <Section
         head
         title="The ladder"
-        lede="Where your cards are on the learning ladder. A card moves up a level once you have answered everything below it right twice running — and counts as learnt once it has come back twice since and you were right."
+        lede="See how well you know each card. Answer a card correctly twice in a row to move it up a level."
       >
 
       {/* A number you want to see the cards behind is a number worth
@@ -19643,7 +19637,7 @@ function ProgressTab({
           decks it is about. The button starts
           one, or opens the one there is; the line beside it says what is
           being prepped for. */}
-      <Section head title="Prep mode" lede="Get some decks ready by a set date, like an exam or the start of a class.">
+      <Section head title="Prep mode" lede="Get some decks ready by a set date, like an exam, an upcoming trip, or the start of a class.">
         <div className="at-prepbar">
           <Button variant="ghost" onClick={() => setPrepOpen(true)} aria-haspopup="dialog">
             {prep ? "Edit prep mode" : "Start prep mode"}
@@ -19817,7 +19811,7 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
         <span className="at-formnum">Your account</span>
       </div>
 
-      <FormField label="Display name" lede="What teachers and classmates see. Change it whenever you like.">
+      <FormField label="Display name" lede="The name your teachers and classmates see.">
         <input
           className="at-input"
           defaultValue={me.displayName}
@@ -19827,7 +19821,7 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
 
       <FormField
         label="Handle"
-        lede="Fixed for good, because course rosters point at it. Safe to share — it identifies you without letting anyone in."
+        lede="This is a permanent username for admins to add you to a course or identify your account. You cannot change it."
       >
         <p className="at-handle">{me.handle}</p>
       </FormField>
@@ -19836,9 +19830,7 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
         label="Sign-in key"
         lede={
           <>
-            Five words that sign you in on any device and keep them together.{" "}
-            <em>Never share it</em> — anyone who has it is you. If you lose it, your space's admin
-            can issue a new one; you keep your handle, your courses and everything you have learnt.
+            The key you use to sign into the app.
           </>
         }
       >
@@ -20514,7 +20506,7 @@ function DeviceMedia({ allClipIds, onDevice, allImageIds, imagesOnDevice, onDown
     <div className="at-formblock">
       <div className="at-formhead">
         <span className="at-formnum">Recordings and pictures on this device</span>
-        <span className="at-formrole">Saved here so you can keep practising without an internet connection.</span>
+        <span className="at-formrole">These are the recordings and pictures saved on your device so you can keep practicing without an internet connection.</span>
       </div>
       <p className="at-devicefigures">
         {stats ? (held ? `${both(stats.clips, stats.images)}, ${formatBytes(stats.bytes)}` : "Nothing saved yet.") : "Counting…"}
@@ -20552,7 +20544,7 @@ function DeviceMedia({ allClipIds, onDevice, allImageIds, imagesOnDevice, onDown
           )}
           {held > 0 && !busy && (
             <Button variant="ghost" size="sm" onClick={() => setRemoving(true)} icon="delete">
-              Remove from this device
+              Remove all from this device
             </Button>
           )}
         </div>
@@ -20646,8 +20638,7 @@ function AccountSettings({
         <div className="at-formhead">
           <span className="at-formnum">Sign out</span>
           <span className="at-formrole">
-            Leaves this device signed out. Nothing on the server changes, and your key brings it
-            all back — so only do this if you have the key written down somewhere.
+            Make sure to save your sign-in key somewhere before logging out!
           </span>
         </div>
         <Button onClick={() => setLoggingOut(true)}>Log out</Button>
@@ -20697,8 +20688,8 @@ function AccountSettings({
               label="Running this site"
               lede={
                 isAdmin
-                  ? "You create courses, decide who teaches them, and can delete either. Nothing done in there can be taken back."
-                  : "Only needed by whoever runs this site. An administrator key turns this account into the one that manages everyone else's."
+                  ? "Where you can create courses, decide who teaches them, and can delete either."
+                  : "Only needed by whoever runs this app."
               }
             >
               {isAdmin ? (
@@ -20713,24 +20704,22 @@ function AccountSettings({
             </FormField>
 
             <FormField
-              label="Reset scheduling"
+              label="Reset progress"
               lede="Sends every card back to the start, as though never practiced. Your cards, forms, decks and recordings all stay. What goes is everything the app has worked out about how well you know them — intervals, ease, difficulty and history. Nothing will be due until you practice it again."
             >
               <Button variant="danger" size="sm" onClick={() => setResetting(true)}>
-                Reset scheduling
+                Reset progress
               </Button>
             </FormField>
 
             {resetting && (
               <ConfirmModal
-                title="Reset scheduling on every card?"
-                confirmLabel="Reset scheduling"
+                title="Reset progress on every card?"
+                confirmLabel="Reset progress"
                 confirmWord="reset"
                 body={
                   <p>
-                    Every card goes back to the beginning. The cards themselves are kept; what you
-                    lose is the record of how well you know them, which can't be rebuilt except by
-                    practicing again.
+                    Every card resets to the beginning: you lose the record of how well you know each card, which can't be rebuilt except by practicing again.
                   </p>
                 }
                 onCancel={() => setResetting(false)}
@@ -20754,7 +20743,7 @@ function AccountSettings({
             )}
 
             <FormField
-              label="Close this account"
+              label="Delete your account"
               lede="Deletes your account, your My space and your practice history from the server, and takes you off every course. Decks and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
             >
               <CloseAccount onClosed={onCloseAccount} handle={account.handle} />
@@ -20807,8 +20796,8 @@ function AppPreferences({ settings, setSetting }: {
           />
         </FormField>
         <FormField
-          label="On-screen keys"
-          lede="Keys for the language you're learning, when your device hasn't got them."
+          label="On-screen keyboard"
+          lede="Display an on-screen keyboard for the language you're learning."
         >
           <Segmented
             options={[{ value: "auto", label: "When needed" }, { value: "always", label: "Always" }, { value: "never", label: "Never" }]}
@@ -20824,7 +20813,7 @@ function AppPreferences({ settings, setSetting }: {
         </div>
         <FormField
           label="Sounds"
-          lede="The short sounds after an answer. Loud carries on a bus; soft is for a quiet room."
+          lede="The short sounds the app plays after you answer an exercise."
         >
           <div className="at-row">
             <Segmented
