@@ -9234,12 +9234,18 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
   run: (work: () => Promise<unknown>, said?: string) => Promise<boolean>;
   ask: (p: Pending) => void;
 }) {
-  const [name, setName] = useState(org.name);
-  const [slug, setSlug] = useState(org.slug);
-  const [colour, setColour] = useState(org.colour || "");
+  /* Read until Edit, as a deck is (0.559): the draft is what Edit opened
+     with, and nothing reaches the server until Save. */
+  type SpaceDraft = { name: string; slug: string; colour: string };
+  const [draft, setDraft] = useState<SpaceDraft | null>(null);
   const [picking, setPicking] = useState(false);
+  const snack = useSnackbar();
   const isMain = org.id === "main";
-  const changed = name.trim() !== org.name || slug.trim() !== org.slug || colour !== (org.colour || "");
+  const editing = !!draft;
+  const saved: SpaceDraft = { name: org.name, slug: org.slug, colour: org.colour || "" };
+  const shown = draft || saved;
+  const edit = (change: Partial<SpaceDraft>) => setDraft((d) => ({ ...(d || saved), ...change }));
+  const changed = !!draft && (draft.name.trim() !== org.name || draft.slug.trim() !== org.slug || draft.colour !== (org.colour || ""));
   if (picking) {
     return (
       <ImageScreen
@@ -9252,47 +9258,94 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
   }
   const admins = new Set(org.admins || []);
   return (
-    /* Laid out like Settings (0.552): each part a band with a heading. */
+    /* Laid out like a deck's screen (0.559): read first, Edit and Save
+       floating in the corner, the cross asking before anything is lost. */
     <Screen
-      title={org.name}
-      onBack={onBack}
+      title={editing ? "Edit space" : "Space"}
+      scrollKey={org.id}
       className="cardform"
-      action={
-        <Button variant="primary" size="sm" icon="save" disabled={busy || !changed || !name.trim()}
-          onClick={() =>
-            run(() => API.updateOrg(org.id, {
-              name: name.trim(),
-              ...(slug.trim() !== org.slug ? { slug: slug.trim().toLowerCase() } : {}),
-              colour,
-            }), "Saved")
+      onBack={
+        editing
+          ? () => (changed
+            ? ask({
+              title: "Discard your changes?",
+              confirmLabel: "Discard",
+              body: <p>What you changed about {org.name} hasn't been saved.</p>,
+              action: async () => setDraft(null),
+            })
+            : setDraft(null))
+          : onBack
+      }
+      backIcon={editing ? "close" : "back"}
+      backLabel={editing ? "Cancel" : "Back"}
+      fab={
+        editing
+          ? {
+            icon: "save",
+            label: "Save",
+            off: !changed || !shown.name.trim(),
+            busy,
+            onClick: async () => {
+              if (busy || !draft) return;
+              if (!changed) return snack("No changes to save.");
+              if (!draft.name.trim()) return snack("Some required fields are missing. They're marked with *.", "warn");
+              const ok = await run(() => API.updateOrg(org.id, {
+                name: draft.name.trim(),
+                ...(draft.slug.trim() !== org.slug ? { slug: draft.slug.trim().toLowerCase() } : {}),
+                colour: draft.colour,
+              }), "Saved");
+              if (ok) setDraft(null);
+            },
           }
-        >
-          {busy ? "Saving…" : "Save"}
-        </Button>
+          : { icon: "edit", label: "Edit", onClick: () => setDraft(saved) }
       }
     >
       {dialog}
       <Notice kind="error">{error}</Notice>
       {org.archived ? <Notice kind="warn">This space is closed. Its people can't sign in.</Notice> : null}
-      <Section title="About this space">
-      <Field label="Name">
-        <input className="at-input" value={name} onChange={(e) => setName(e.target.value)} />
-      </Field>
-      <Field label="Address" lede={`manytongues.co/${slug || "…"}${org.formerSlugs.length ? ` · still answers to ${org.formerSlugs.map((x) => `/${x}`).join(", ")}` : ""}`}>
-        <input className="at-input" value={slug} disabled={isMain}
-          onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))} />
-      </Field>
-      <Field label="Logo" lede="Shown on the space's sign-in page and at the top of the You menu.">
-        <Button size="sm" icon="image" onClick={() => setPicking(true)}>{org.logo ? "Change the logo" : "Add a logo"}</Button>
-      </Field>
-      <Field label="Colour" lede="Used on the space's sign-in page only.">
-        <input type="color" value={colour || "#3b5bdb"} onChange={(e) => setColour(e.target.value)} />
-        {colour && !usableAccent(colour) ? (
-          <Help>This colour is too faint to use; the app's own will be shown.</Help>
-        ) : null}
-        {colour ? <Button variant="ghost" size="sm" onClick={() => setColour("")}>No colour</Button> : null}
-      </Field>
-      </Section>
+      {/* The space's own facts, headed the way a deck heads "This deck".
+          Read, they are the edit's own controls held still. */}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">About this space</span>
+        </div>
+        <fieldset className="at-cardlock" disabled={!editing}>
+          <Field label={<>Name<span className="at-reqstar" aria-hidden="true" /></>}>
+            <input className="at-input" value={shown.name} onChange={(e) => edit({ name: e.target.value })} />
+          </Field>
+          <Field label="Address" lede={`manytongues.co/${shown.slug || "…"}${org.formerSlugs.length ? ` · still answers to ${org.formerSlugs.map((x) => `/${x}`).join(", ")}` : ""}`}>
+            <input className="at-input" value={shown.slug} disabled={isMain}
+              onChange={(e) => edit({ slug: e.target.value.toLowerCase().replace(/\s+/g, "-") })} />
+          </Field>
+          <Field label="Logo" lede="Shown on the space's sign-in page and at the top of the You menu.">
+            {editing ? (
+              <Button size="sm" icon="image" onClick={() => setPicking(true)}>{org.logo ? "Change the logo" : "Add a logo"}</Button>
+            ) : (
+              <p className="at-readvalue">{org.logo ? "Set" : "None"}</p>
+            )}
+          </Field>
+          <Field label="Colour" lede="Used on the space's sign-in page only.">
+            {editing ? (
+              <>
+                <input type="color" value={shown.colour || "#3b5bdb"} onChange={(e) => edit({ colour: e.target.value })} />
+                {shown.colour ? <Button variant="ghost" size="sm" onClick={() => edit({ colour: "" })}>No colour</Button> : null}
+              </>
+            ) : (
+              <p className="at-readvalue">
+                {shown.colour ? (
+                  <>
+                    <span aria-hidden="true" style={{ display: "inline-block", width: 14, height: 14, borderRadius: 4, background: shown.colour, verticalAlign: "-2px", marginInlineEnd: 6 }} />
+                    {shown.colour}
+                  </>
+                ) : "None"}
+              </p>
+            )}
+            {shown.colour && !usableAccent(shown.colour) ? (
+              <Help>This colour is too faint to use; the app's own will be shown.</Help>
+            ) : null}
+          </Field>
+        </fieldset>
+      </div>
       <Section title="Invite people">
       <CodeBox long label="Invitation link" hint="Anyone with it can make an account in this space."
         code={`${window.location.origin}/${org.slug}?join=${org.inviteCode}`} />

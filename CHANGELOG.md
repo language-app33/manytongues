@@ -8,6 +8,21 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.559 — 4 November 2026
+
+**A space's screen in Super admin reads first, then edits, like a deck's.**
+
+- Super admin → Spaces → a space now opens to read: its name, address,
+  logo and colour as plain text, with **Edit** floating in the bottom
+  corner. Edit turns them into fields, and **Save** floats where Edit was.
+  The cross at the top cancels, and asks first if something was changed.
+- The screen is titled "Space", or "Edit space" while editing, as a deck's
+  is "Deck" or "Edit deck".
+- The big gap above "About this space" is gone.
+- The logo is still saved as soon as it is chosen, and the invitation
+  link, space admins, storage and closing work in either mode, as before.
+- Released without running the test suite, at the owner's request.
+
 ## 0.558 — 4 November 2026
 
 **Tiles: a larger title and details line, centred on their buttons.**
