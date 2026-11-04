@@ -98,6 +98,9 @@ export interface Fix {
   text: string;
   /** About how many points doing it would add. */
   gain: number;
+  /** The cards it is about, worst first, where it is about particular ones
+      (0.561): the words that need sentences, the words without a picture. */
+  cards?: string[];
 }
 
 export interface Quality {
@@ -519,13 +522,14 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
 
   /* ---- what would raise it ---- */
   const fixes: Fix[] = [];
-  const add = (key: string, gain: number, text: string) => {
-    if (gain > 0.05) fixes.push({ key, gain, text });
+  const add = (key: string, gain: number, text: string, cards?: string[]) => {
+    if (gain > 0.05) fixes.push({ key, gain, text, ...(cards && cards.length ? { cards } : null) });
   };
   if (short.length) {
     const lost = wordRows.reduce((t, w) => t + (1 - w.share), 0) / wordRows.length;
     add("words", worth("words") * lost,
-      `${count(short.length, "word")} ${verb(short.length, "needs", "need")} more sentences in this deck. The word itself wants two, and each other form one.`);
+      `${count(short.length, "word")} ${verb(short.length, "needs", "need")} more sentences in this deck. The word itself wants two, and each other form one.`,
+      short.slice().sort((a, b) => a.share - b.share).map((w) => w.id));
   } else if (!said.length && words.length) {
     add("words", worth("words"), "Add sentences that use this deck's words.");
   }
@@ -576,7 +580,8 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
   add("recordings", worth("recordings") * (1 - share(unrecorded.length, units.length)),
     `${count(unrecorded.length, "word, form or sentence", "words, forms or sentences")} ${verb(unrecorded.length, "has", "have")} no recording.`);
   add("pictures", worth("pictures") * (1 - share(unpictured.length, words.length)),
-    `${count(unpictured.length, "word")} ${verb(unpictured.length, "has", "have")} no picture.`);
+    `${count(unpictured.length, "word")} ${verb(unpictured.length, "has", "have")} no picture.`,
+    unpictured.map((c) => String(c.id)));
   add("pronunciation", worth("pronunciation") * (1 - share(unspelt.length, units.length)),
     `${count(unspelt.length, "word, form or sentence", "words, forms or sentences")} ${verb(unspelt.length, "has", "have")} no pronunciation written.`);
   add("reviewed", worth("reviewed") * (1 - share(unreviewed.length, reviewing.length)),

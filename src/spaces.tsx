@@ -4490,17 +4490,50 @@ const QUALITY_LEDE =
   "this deck. The rest is recordings, pictures, pronunciation, reviewed sentences, no repeated " +
   "words, sentences that aren't too long, and a conversation or text.";
 
-function DeckQuality({ quality }: { quality: Quality }) {
+/* The picture beside each suggestion: what it asks you to go and add. */
+const FIX_ICON: Record<string, string> = {
+  words: "cards", sentences: "add", confirm: "check", unlinked: "edit", unknown: "search", both: "edit",
+  recordings: "mic", pictures: "image", pronunciation: "language", reviewed: "verify",
+  repeats: "copy", long: "sort", scene: "group",
+};
+/* How many word chips a suggestion shows before "and N more". */
+const FIX_CHIPS = 12;
+
+/*
+ * A deck's quality (0.561): the score with a bar and where the top
+ * suggestions would take it; the suggestions as cards, each with what it is
+ * worth and, where it is about particular words, those words to tap; and,
+ * last and quieter, every word with the sentences it is paired with — what
+ * "Show the pairings" was, folded into the one place.
+ */
+function DeckQuality({ quality, cards, lang, onOpenCard }: {
+  quality: Quality;
+  cards: Card[];
+  lang: Partial<Lang>;
+  onOpenCard: (id: string) => void;
+}) {
   const [open, setOpen] = useState(false);
+  const [every, setEvery] = useState(false);
+  const report = useMemo(() => (every ? contextCoverage(cards, lang) : null), [every, cards, lang]);
   if (quality.score === null) {
     return <Help>Nothing to score yet: add words and sentences that use them.</Help>;
   }
   const fixes = quality.fixes.slice(0, FIXES_SHOWN);
+  const gainOf = (g: number) => Math.max(1, Math.round(g));
+  const reach = Math.min(100, quality.score + fixes.reduce((t, f) => t + gainOf(f.gain), 0));
+  const tone = qualityTone(quality.score);
+  const byId = new Map(cards.map((c) => [String(c.id), c]));
+  const rowOf = new Map(quality.words.map((w) => [w.id, w]));
+  const script = { fontFamily: lang.fontStack, ...scriptVars(lang as Lang) };
   return (
     <>
-      <p className={`at-qualityscore ${qualityTone(quality.score)}`}>
+      <p className={`at-qualityscore ${tone}`}>
         <b>{quality.score}</b> <span>out of 100</span>
       </p>
+      <div className="at-qualitybar" aria-hidden="true">
+        <span className={`now ${tone}`} style={{ width: `${quality.score}%` }} />
+        {fixes.length ? <span className="then" style={{ left: `${quality.score}%`, width: `${reach - quality.score}%` }} /> : null}
+      </div>
       {fixes.length > 0 && (
         <>
           <Button
@@ -4512,116 +4545,101 @@ function DeckQuality({ quality }: { quality: Quality }) {
             {open ? "Hide what would raise it" : "What would raise it"}
           </Button>
           {open && (
-            <ul className="at-qualityfixes">
-              {fixes.map((f) => (
-                <li key={f.key}>
-                  <span>{f.text}</span>
-                  <b>{`+${Math.max(1, Math.round(f.gain))}`}</b>
-                </li>
-              ))}
-            </ul>
+            <>
+              <p className="at-qualityreach">
+                {reach >= 100 ? "These would take it to 100." : `These would take it to about ${reach}.`}
+              </p>
+              <ul className="at-qfixes">
+                {fixes.map((f) => {
+                  const ids = (f.cards || []).filter((id) => byId.has(id));
+                  return (
+                    <li className="at-qfix" key={f.key}>
+                      <span className="at-qfixico"><Icon name={FIX_ICON[f.key] || "star"} size={20} /></span>
+                      <div className="at-qfixbody">
+                        <p className="at-qfixtext">{f.text}</p>
+                        {f.key === "words" && ids.length ? (
+                          <p className="at-qfixhint">Tap a word to open it. The number is how many more sentences it needs.</p>
+                        ) : null}
+                        {ids.length ? (
+                          <div className="at-qfixwords">
+                            {ids.slice(0, FIX_CHIPS).map((id) => {
+                              const row = f.key === "words" ? rowOf.get(id) : null;
+                              const owed = row ? row.forms.reduce((t, x) => t + Math.max(0, x.need - x.met), 0) : 0;
+                              return (
+                                <button type="button" className="at-qfixword" key={id} onClick={() => onOpenCard(id)}
+                                  title={owed ? `Needs ${plural(owed, "more sentence")} · open this card` : "Open this card"}>
+                                  <b lang={lang.id} dir={lang.direction} style={script}>
+                                    {cardWords(byId.get(id) as Card, lang as Lang).word}
+                                  </b>
+                                  {owed ? <i aria-label={`needs ${plural(owed, "more sentence")}`}>{`+${owed}`}</i> : null}
+                                </button>
+                              );
+                            })}
+                            {ids.length > FIX_CHIPS ? <span className="at-qfixmore">{`and ${ids.length - FIX_CHIPS} more`}</span> : null}
+                          </div>
+                        ) : null}
+                      </div>
+                      <span className="at-qfixgain"><b>{`+${gainOf(f.gain)}`}</b><small>points</small></span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </>
       )}
+      {/* Every word and what it is paired with, for checking a pairing
+          rather than for raising the score. Only where the language says
+          how to find a word inside a phrase. */}
+      {supportsContext(lang) && (
+        <Button variant="ghost" size="sm" className="at-mt3" icon={every ? "chevronUp" : "chevronDown"}
+          onClick={() => setEvery((v) => !v)}>
+          {every ? "Hide every word and its sentences" : "See every word and its sentences"}
+        </Button>
+      )}
+      {every && report ? <Pairings report={report} lang={lang} /> : null}
     </>
   );
 }
 
-function ContextReport({ cards, lang }: { cards: Card[]; lang: Partial<Lang> }) {
-  const [open, setOpen] = useState(false);
-  const report = useMemo(() => contextCoverage(cards, lang), [cards, lang]);
-
-  if (!supportsContext(lang)) {
-    return (
-      <Help>
-        {(lang || {}).name || "This language"} does not describe how to find a word inside a
-        phrase, so nothing here can be measured yet.
-      </Help>
-    );
-  }
-
-  const { counts, covered, links, words } = report;
-  const total = words.length;
-  const withContext = words.filter((w) => w.contexts.length > 0);
-  const bare = words.filter((w) => w.contexts.length === 0);
-
+/* Each word of a deck with the phrases it appears in, then those in none. */
+function Pairings({ report, lang }: { report: ReturnType<typeof contextCoverage>; lang: Partial<Lang> }) {
+  const withContext = report.words.filter((w) => w.contexts.length > 0);
+  const bare = report.words.filter((w) => w.contexts.length === 0);
+  const script = { fontFamily: lang.fontStack, ...scriptVars(lang as Lang) };
+  if (!report.words.length) return <Help className="at-mt3">No single-word cards in this deck yet.</Help>;
   return (
     <>
-      <Lede>
-        {total === 0
-          ? "No single-word cards in this deck yet."
-          : `${covered} of ${plural(total, "word")} appear in at least one phrase you have recorded.`}
-      </Lede>
-      <Help>
-        {plural(counts.word, "word")} · {plural(counts.phrase, "phrase")} ·{" "}
-        {plural(counts.sentence, "sentence")}
-        {/* Conversations are counted as the cards they are and matched as
-            the turns they hold, so this is the deck a teacher wrote rather
-            than the number of lines in it. */}
-        {counts.dialog ? ` · ${plural(counts.dialog, "conversation")}` : ""}
-        {links ? ` · ${plural(links, "pairing")} in all` : ""}
-      </Help>
-
-      {total > 0 && (
-        <>
-          <Button
-            className="at-mt3"
-            size="sm"
-            icon={open ? "chevronUp" : "chevronDown"}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? "Hide the pairings" : "Show the pairings"}
-          </Button>
-          {open && (
-            <div className="at-mt3">
-              {withContext.map((w) => (
-                <div className="at-ctxrow" key={w.id}>
-                  <p className="at-ctxword">
-                    <b lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack, ...scriptVars(lang) }}>
-                      {w.ar}
-                    </b>
-                    <i>{asMeaning(w.en)}</i>
-                  </p>
-                  <ul className="at-ctxlist">
-                    {w.contexts.map((c) => (
-                      <li key={c.id}>
-                        <span lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack, ...scriptVars(lang) }}>
-                          {c.ar}
-                        </span>
-                        <em>{asMeaning(c.en)}</em>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+      <div className="at-mt3">
+        {withContext.map((w) => (
+          <div className="at-ctxrow" key={w.id}>
+            <p className="at-ctxword">
+              <b lang={lang.id} dir={lang.direction} style={script}>{w.ar}</b>
+              <i>{asMeaning(w.en)}</i>
+            </p>
+            <ul className="at-ctxlist">
+              {w.contexts.map((c) => (
+                <li key={c.id}>
+                  <span lang={lang.id} dir={lang.direction} style={script}>{c.ar}</span>
+                  <em>{asMeaning(c.en)}</em>
+                </li>
               ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {open && bare.length > 0 && (
-        /* The actionable half. "3 of 4" says how rich the deck is; this says
-           which word to record a phrase for next. */
+            </ul>
+          </div>
+        ))}
+      </div>
+      {bare.length > 0 && (
         <div className="at-mt4">
           <p className="at-label">Not in any phrase yet</p>
           <div className="at-ctxbare">
             {bare.map((w) => (
               <span key={w.id}>
-                <b lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack, ...scriptVars(lang) }}>
-                  {w.ar}
-                </b>
+                <b lang={lang.id} dir={lang.direction} style={script}>{w.ar}</b>
                 <i>{asMeaning(w.en)}</i>
               </span>
             ))}
           </div>
         </div>
-      )}
-
-      {total > 0 && covered === 0 && (
-        <Help className="at-mt3">
-          Nothing to pair yet. It grows on its own as you add phrases that use words already in the
-          deck — each phrase becomes a context for every word inside it.
-        </Help>
       )}
     </>
   );
@@ -7922,10 +7940,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   in context is part of the same score, so it is read under
                   it rather than under a heading of its own. */}
               <Field label="Deck quality" lede={QUALITY_LEDE}>
-                {openQuality && <DeckQuality quality={openQuality} />}
-                <div className="at-mt4">
-                  <ContextReport cards={held} lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]} />
-                </div>
+                {openQuality && (
+                  <DeckQuality quality={openQuality} cards={held}
+                    lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]}
+                    onOpenCard={(id) => openCard(held.find((c) => String(c.id) === id))} />
+                )}
               </Field>
             </div>
 

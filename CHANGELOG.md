@@ -8,6 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.561 — 4 November 2026
+
+**A deck's quality: one place to see what to fix, and on which words.**
+
+- **What would raise it** now shows each suggestion as a card of its own:
+  an icon for what to add, the points it is worth, and where it is about
+  particular words, those words. "Words need more sentences" lists the
+  words, worst first, each with how many more sentences it needs; tap one
+  to open its card. "No picture" lists the words without one the same way.
+- Under the score, a bar shows where the deck stands, and a fainter part of
+  it shows where the suggestions would take it ("These would take it to
+  about 87.").
+- **Show the pairings** is gone, with the line above it. Every word and the
+  sentences it is paired with is still there, under a quieter **See every
+  word and its sentences**, for checking a pairing.
+- Released without running the test suite, at the owner's request.
+
 ## 0.560 — 4 November 2026
 
 **A space's address is typed straight after manytongues.co/, and Main is a space like any other.**
