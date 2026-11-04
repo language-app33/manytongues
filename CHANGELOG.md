@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.567 — 4 November 2026
+
+**Teaching → Material → Decks prompts you to make your first deck.**
+
+- With no decks yet, the Decks tab shows the same kind of panel the Cards
+  tab shows with no cards: a short line on what a deck is and a New deck
+  button, in place of an empty list.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: in a space with no decks, open Teaching → Material →
+Decks and see the panel; press New deck and make one.
+
 ## 0.566 — 4 November 2026
 
 **Admin → People heads its list "This space's people".**

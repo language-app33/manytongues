@@ -8716,6 +8716,20 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     ? "No decks in the languages switched on."
                     : "No decks yet. Make one, then add it to a course so students can see it."
                 }
+                /* With no decks at all, the same prompt the Cards tab shows
+                   with no cards, in place of an empty list. */
+                emptyPanel={decks.length ? undefined : (
+                  <Nudge
+                    icon="folder"
+                    action={
+                      <Button variant="primary" icon="add" onClick={() => setNaming("new")}>
+                        New deck
+                      </Button>
+                    }
+                  >
+                    No decks yet. A deck is a set of cards. Make your first one, then add it to a course so students can see it.
+                  </Nudge>
+                )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
                 tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
                 onNew={() => setNaming("new")}
