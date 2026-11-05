@@ -18,6 +18,9 @@ export interface PlaceSpace {
   id: string;
   slug: string;
   name: string;
+  /** A stored picture's hash, or a data URL from the address (0.576). */
+  logo?: string;
+  logoData?: string;
 }
 
 export interface Place {
@@ -25,6 +28,10 @@ export interface Place {
   id: string;
   slug: string;
   label: string;
+  logo?: string;
+  logoData?: string;
+  /** The space opened from Super admin, not one of yours (0.576). */
+  opened?: boolean;
 }
 
 export function placeRows(o: {
@@ -51,14 +58,14 @@ export function placeRows(o: {
   /** The toggle at the foot. [] at Super admin. */
   modes: Mode[];
 } {
-  const asPlace = (s: PlaceSpace): Place => ({ id: s.id, slug: s.slug, label: s.name });
+  const asPlace = (s: PlaceSpace): Place => ({ id: s.id, slug: s.slug, label: s.name, logo: s.logo, logoData: s.logoData });
   const placeNow = o.space === "super" ? "super" : o.hereId;
 
   let places: Place[];
   if (o.admin) {
     places = [{ id: "super", slug: "", label: "Super admin" } as Place]
       .concat(o.mine.map(asPlace))
-      .concat(o.trying && o.opened && !o.mine.some((s) => s.id === o.opened!.id) ? [asPlace(o.opened)] : []);
+      .concat(o.trying && o.opened && !o.mine.some((s) => s.id === o.opened!.id) ? [{ ...asPlace(o.opened), opened: true }] : []);
   } else {
     places = o.mine.length > 1 ? o.mine.map(asPlace) : [];
   }

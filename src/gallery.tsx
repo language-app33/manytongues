@@ -276,6 +276,9 @@ const PLACES: Record<string, [string, string]> = {
   SpaceScreen: [ADMIN, "The Spaces tab · one space"],
   SpaceExtras: [ADMIN, "The Spaces tab · a space's storage and export"],
   SpaceLine: [LEARN, "The You menu · the space you are in"],
+  SpaceBadge: [LEARN, "A space's logo or initials, in a small square"],
+  SpacePlaces: [LEARN, "The You menu · where you are, one place per line"],
+  LearnSpaceButton: [LEARN, "Learning · which space, from the top right corner"],
   BackupScreen: [ADMIN, "App · backing up and restoring"],
   ClearScreen: [ADMIN, "App · clearing the site"],
 

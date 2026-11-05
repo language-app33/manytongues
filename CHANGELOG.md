@@ -8,6 +8,40 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.576 — 5 November 2026
+
+**Spaces are listed one per line, and Learning's space choice moves to a
+button in the top right corner.**
+
+- **The You menu's "Where you are" (super admin) and "Your spaces"** are
+  now a list under one heading, one place per line: the space's logo or
+  initials in a small square, its name, and a tick on the one you are in.
+  A long name is cut short with "…", so the menu no longer runs off the
+  right edge with more than a few spaces. Super admin is first, with its
+  key; a space opened from Super admin is marked "Opened".
+- **A space is no longer drawn like a person.** Someone in one space sees
+  its name as one quiet line with its square badge, above their own name.
+- **Learning's "All · space · space" row is gone.** For someone in more
+  than one space, a round button in the top right corner opens the list:
+  "All your spaces", then each space. With one space chosen, the button
+  fills green and shows that space's initials, so a narrowed Learning
+  never looks like the whole of it. Someone in one space sees no button.
+- **The app's logo and name on Learning's Home are at the left**, leaving
+  the top right corner to the space button.
+- Released without running the tests, at the owner's request. The type
+  check, lint and build were run, and the menu and the button were looked
+  at in a browser at phone width.
+
+To check by hand, on the deployed app:
+
+- As the super admin with several spaces, open the You menu: one line per
+  place, nothing past the right edge, the tick on where you are.
+- As a learner in two or more spaces, the button in the top right of
+  Learning opens the list; choosing a space narrows Home, Progress and
+  Cards, and the button shows its initials; "All your spaces" undoes it.
+- A learner in one space sees no button, and their space's name as one
+  line at the top of the You menu.
+
 ## 0.575 — 5 November 2026
 
 **The super admin can add themselves to an existing space.**

@@ -1806,6 +1806,38 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-cline.as-field:hover .at-clinetext { color: var(--text-soft); font-weight:600; }
 .at-cseg { padding:2px 10px 8px 34px; }
 .at-crule { height:2px; background: var(--line); margin:8px 4px; border-radius:2px; }
+/* ---- Spaces as places (0.576) ----
+   A space is drawn as a square badge and a plain name, never like a person
+   (round badge, bold name, handle under it). */
+.at-spacebadge { width:28px; height:28px; border-radius:8px; flex:none; display:inline-flex;
+  align-items:center; justify-content:center; object-fit:cover; background: var(--brass);
+  color: var(--onbrass); font-family: var(--ui); font-size:11px; font-weight:800; }
+.at-spacebadge.plain { background: var(--raised); color: var(--brass); }
+.at-spaceline { display:flex; align-items:center; gap:10px; padding:8px 10px;
+  font-family: var(--ui); font-size:14px; font-weight:700; color: var(--text-soft); min-width:0; }
+.at-spacename { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* One place per line: any number fits, a long name is cut short. */
+.at-places { display:flex; flex-direction:column; gap:2px; padding:0 0 2px; }
+.at-placeshead { margin:0; padding:6px 10px 4px; font-family: var(--ui); font-size:11px;
+  font-weight:800; letter-spacing:.06em; text-transform:uppercase; color: var(--muted); }
+.at-place-row { display:flex; align-items:center; gap:10px; width:100%; min-height:44px;
+  padding:6px 8px; border:0; border-radius:12px; background:none; cursor:pointer; text-align:left;
+  font-family: var(--ui); font-size:14px; font-weight:700; color: var(--text-soft); }
+.at-place-row:hover { background: var(--raised); color: var(--text); }
+.at-place-row.on { background: color-mix(in srgb, var(--jade) 14%, transparent); color: var(--text); font-weight:800; }
+.at-place-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.at-place-tag { flex:none; font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  color: var(--brass); border:1px solid var(--brass); border-radius:6px; padding:2px 5px; }
+.at-place-tick { flex:none; display:inline-flex; color: var(--jade); }
+/* Learning's space button, in the top right corner (0.576). */
+.at-learnspace { position:absolute; top:calc(12px + var(--banner-h, 0px)); right:12px; z-index: var(--z-chrome); }
+.at-learnspacebtn { width:44px; height:44px; border-radius:999px; padding:0; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; border:2px solid var(--line);
+  background: var(--surface); color: var(--text-soft); font-family: var(--ui); font-size:13px; font-weight:800; }
+.at-learnspacebtn:hover { color: var(--text); }
+.at-learnspacebtn.open { border-color: var(--jade); color: var(--jade); }
+.at-learnspacebtn.on { background: var(--jade); border-color: var(--jade); color: var(--onjade); }
+.at-cmenu.at-learnspacemenu { bottom:auto; top:calc(100% + 8px); right:0; width:min(300px, calc(100vw - 24px)); }
 /* The version, at the foot of the menu. Quieter than the rows above it —
    it is a fact to look up, not somewhere to go — until the server turns out
    to be serving a newer build, when it becomes the one thing in the menu
@@ -4436,8 +4468,10 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    other tabs carry their own name in the same place. The content under it
    sits on the page itself rather than in a card: one centred column, its
    parts set apart by space alone. */
-.at-brand.at-brand-home { left:0; right:0; margin:0 auto; width:max-content; height:64px;
-  padding:0 12px; gap:12px; font-size:32px; color: var(--text); }
+/* Left-aligned since 0.576, so the space button can have the top right
+   corner to itself. */
+.at-brand.at-brand-home { left:12px; right:auto; margin:0; width:max-content; height:64px;
+  padding:0 12px 0 6px; gap:12px; font-size:32px; color: var(--text); }
 .at-brand.at-brand-home .at-brandmark { width:48px; height:48px; }
 .at.on-home { padding-top:104px; }
 /* Progress and Cards are headed by their tab title (0.553), which is held

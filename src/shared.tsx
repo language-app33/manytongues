@@ -119,6 +119,7 @@ const ICONS: Record<string, string> = {
   viewList: "M3 5h3v3H3V5zm5 0h13v3H8V5zM3 10.5h3v3H3v-3zm5 0h13v3H8v-3zM3 16h3v3H3v-3zm5 0h13v3H8v-3z",
   viewTable: "M3 3v18h18V3H3zm2 6h4v4H5V9zm0 6h4v4H5v-4zm6 4v-4h8v4h-8zm8-6h-8V9h8v4z",
   check: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+  layers: "M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z",
   back: "M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z",
   save:
     "M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z",

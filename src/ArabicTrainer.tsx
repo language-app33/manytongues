@@ -14136,11 +14136,9 @@ export default function ArabicTrainer() {
               one (memberships): all of them, or one. Every tab follows it,
               and so does the session started from it. */}
           {!inExercise && space === "learn" && !session && learnSpaces.length > 1 && (
-            <Segmented
-              label="Which space"
-              data-el="space-filter"
+            <LearnSpaceButton
+              spaces={learnSpaces}
               value={spaceNow}
-              options={[{ value: "", label: "All" }, ...learnSpaces.map((o) => ({ value: o.id, label: o.name }))]}
               onChange={(id) => setSpaceFilter(id)}
             />
           )}
@@ -15776,7 +15774,7 @@ export default function ArabicTrainer() {
 
       {/* The app's name heads the learning page and scrolls away with it;
           a space frame carries its own. */}
-      {/* Home has it large and centred, as the page's title. Progress and
+      {/* Home has it large, at the left (0.576), as the page's title. Progress and
           Cards are headed with their name, as every tab is (0.553);
           Courses, reached from the menu, is headed with its own. */}
       {!inExercise && space === "learn" && tab === "home" && (
@@ -20579,7 +20577,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
   /** Where you can be (0.574): every space this account is in, when it is
       in more than one (memberships); for the App admin, Super admin first,
       then their spaces, then the space they opened. */
-  mySpaces?: { id: string; slug: string; label: string }[];
+  mySpaces?: { id: string; slug: string; label: string; logo?: string; logoData?: string; opened?: boolean }[];
   /** Which of them is current: "super", or a space id. */
   placeNow?: string;
   /** "Your spaces", or "Where you are" for the App admin. */
@@ -20629,19 +20627,21 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
 
       {open && (
         <Popover className="at-cmenu">
-          {spaceShown ? <SpaceLine space={spaceShown} /> : null}
+          {/* Where you are (0.576): a list under one heading when there is
+              a choice, else the space's name as one quiet line. */}
           {mySpaces && mySpaces.length > 1 && onMySpace ? (
-            <Segmented
+            <SpacePlaces
               label={placesLabel || "Your spaces"}
-              data-el="my-spaces"
-              value={placeNow}
-              options={mySpaces.map((o) => ({ value: o.id, label: o.label }))}
-              onChange={(id) => {
-                const to = mySpaces.find((o) => o.id === id);
-                if (to && to.id !== placeNow) onMySpace(to);
+              places={mySpaces}
+              now={placeNow || ""}
+              onPick={(to) => {
+                if (to.id !== placeNow) onMySpace(to);
               }}
             />
+          ) : spaceShown ? (
+            <SpaceLine space={spaceShown} />
           ) : null}
+          {(mySpaces && mySpaces.length > 1) || spaceShown ? <div className="at-crule" /> : null}
           <div className="at-cwho">
             <span className="at-cavatar">{initialsOf(account && account.displayName)}</span>
             <span className="at-cwhotext">
@@ -21277,25 +21277,134 @@ export function homeLine({ review, fresh, behind }: Ready): string {
  * is.
  */
 function SpaceLine({ space }: { space: { name: string; logoData?: string; logo?: string } }) {
-  const [src, setSrc] = useState(space.logoData || "");
+  /* A place, not a person (0.576): a square badge and a plain name, so it
+     is not read as a second account above your own. */
+  return (
+    <div className="at-spaceline" aria-label={`Space: ${space.name}`}>
+      <SpaceBadge space={space} />
+      <span className="at-spacename">{space.name}</span>
+    </div>
+  );
+}
+
+/*
+ * A space's logo, or its initials, in a small square (0.576). Super admin,
+ * which is no space, has its key instead. A logo comes as a data URL (from
+ * the address) or as a stored picture's hash (from the account), fetched
+ * the way any picture is.
+ */
+function SpaceBadge({ space, icon }: { space?: { name: string; logoData?: string; logo?: string }; icon?: string }) {
+  const logo = space && space.logo;
+  const logoData = space && space.logoData;
+  const [src, setSrc] = useState(logoData || "");
   useEffect(() => {
-    if (space.logoData || !space.logo) return;
+    if (logoData || !logo) return;
     let live = true;
-    API.getImage(space.logo).then(
+    API.getImage(logo).then(
       (r) => live && setSrc(r.data),
       () => {},
     );
     return () => {
       live = false;
     };
-  }, [space.logo, space.logoData]);
-  return (
-    <div className="at-cwho" aria-label={`Space: ${space.name}`}>
-      {src ? <img className="at-cavatar" src={src} alt="" /> : <span className="at-cavatar">{initialsOf(space.name)}</span>}
-      <span className="at-cwhotext">
-        <b>{space.name}</b>
-        <i>Space</i>
+  }, [logo, logoData]);
+  if (icon) {
+    return (
+      <span className="at-spacebadge plain" aria-hidden="true">
+        <Icon name={icon} size={16} />
       </span>
+    );
+  }
+  return src
+    ? <img className="at-spacebadge" src={src} alt="" />
+    : <span className="at-spacebadge" aria-hidden="true">{initialsOf((space && space.name) || "")}</span>;
+}
+
+/*
+ * A list of places to choose from, one per line (0.576): the You menu's
+ * "Where you are" / "Your spaces", and the list behind Learning's space
+ * button. One per line, so any number of spaces fits, and a long name is
+ * cut short rather than pushing the menu wider.
+ */
+function SpacePlaces({ label, places, now, onPick, elName = "my-spaces" }: {
+  label: string;
+  places: { id: string; label: string; logo?: string; logoData?: string; opened?: boolean; icon?: string }[];
+  now: string;
+  onPick: (place: any) => void;
+  elName?: string;
+}) {
+  return (
+    <div className="at-places" role="radiogroup" aria-label={label} data-el={elName}>
+      <p className="at-placeshead">{label}</p>
+      {places.map((p) => {
+        const on = p.id === now;
+        return (
+          <button
+            key={p.id}
+            role="radio"
+            aria-checked={on}
+            className={`at-place-row${on ? " on" : ""}`}
+            onClick={() => onPick(p)}
+          >
+            <SpaceBadge
+              space={{ name: p.label, logo: p.logo, logoData: p.logoData }}
+              icon={p.icon || (p.id === "super" ? SPACE_ICON.super : undefined)}
+            />
+            <span className="at-place-name">{p.label}</span>
+            {p.opened && <span className="at-place-tag">Opened</span>}
+            {on && <span className="at-place-tick"><Icon name="check" size={18} /></span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/*
+ * Which of your spaces Learning shows (0.576), as a button in the top
+ * right corner instead of a row across the page: the row ran off the edge
+ * with more than a few spaces. Showing all of them, the button carries the
+ * layers icon; narrowed to one, it fills and carries that space's initials,
+ * so a narrowed Learning never looks like the whole of it.
+ */
+function LearnSpaceButton({ spaces, value, onChange }: {
+  spaces: { id: string; name: string; logo?: string }[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (!open) return undefined;
+    const close = () => setOpen(false);
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, [open]);
+  const chosen = spaces.find((o) => o.id === value) || null;
+  return (
+    <div className="at-learnspace" onClick={(e) => e.stopPropagation()}>
+      <button
+        className={`at-learnspacebtn${chosen ? " on" : ""}${open ? " open" : ""}`}
+        aria-label={`Which space: ${chosen ? chosen.name : "all of them"}`}
+        aria-expanded={open}
+        data-el="space-filter"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {chosen ? initialsOf(chosen.name) : <Icon name="layers" size={20} />}
+      </button>
+      {open && (
+        <Popover className="at-cmenu at-learnspacemenu">
+          <SpacePlaces
+            label="Which space"
+            elName="space-filter-list"
+            places={[{ id: "", label: "All your spaces", icon: "layers" }, ...spaces.map((o) => ({ id: o.id, label: o.name, logo: o.logo }))]}
+            now={value}
+            onPick={(p) => {
+              setOpen(false);
+              onChange(p.id);
+            }}
+          />
+        </Popover>
+      )}
     </div>
   );
 }
