@@ -8,6 +8,186 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.568 — 4 November 2026
+
+**Teaching names the space you are in, also for a super admin.**
+
+- The line at the top of Material → Decks and Cards ("…'s decks and
+  cards, shared with its teachers.") and the Copy/Move to the space
+  confirmations named the super admin's own space, even while they were
+  working in another one. They now name the space being worked in, as the
+  menu behind your initial already did. Nothing changes for anyone else.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: as super admin, open another space's Teaching →
+Material and read the line above the list; it names that space.
+
+## 0.567 — 4 November 2026
+
+**Teaching → Material → Decks prompts you to make your first deck.**
+
+- With no decks yet, the Decks tab shows the same kind of panel the Cards
+  tab shows with no cards: a short line on what a deck is and a New deck
+  button, in place of an empty list.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: in a space with no decks, open Teaching → Material →
+Decks and see the panel; press New deck and make one.
+
+## 0.566 — 4 November 2026
+
+**Admin → People heads its list "This space's people".**
+
+- The part of People where you add someone and see everyone in the space
+  now has a heading, "This space's people", like Invite people above it
+  and Former members below.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: open Admin → People and see the new heading above the
+list.
+
+## 0.565 — 4 November 2026
+
+**The title bar at the top of each tab spans the whole window.**
+
+- The bar holding a tab's title ("Teaching · Courses", "Progress" and so
+  on) and the line under it now run edge to edge on a wide window, as
+  they already did on a phone. The logo and title stay in line with the
+  page beneath.
+- Checked in a browser on a wide window and at phone size: the bar reaches
+  both edges, and nothing scrolls sideways.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: on a computer, open a tab in Teaching or Admin, and
+Progress or Cards in Learning, and see the white bar reach both sides.
+
+## 0.564 — 4 November 2026
+
+**New wording across Settings, Progress, the welcome screen and Teaching,
+from the owner's review in the wording workshop.**
+
+- Settings: the display name, handle and sign-in key are explained more
+  plainly ("The name your teachers and classmates see.", "This is a
+  permanent username…", "The key you use to sign into the app."). The
+  warning about sharing the key is gone from that line.
+- Settings: "Reset scheduling" is now "Reset progress", in its label,
+  button and confirmation; "Close this account" is now "Delete your
+  account"; "On-screen keys" is now "On-screen keyboard"; the Sounds,
+  Log out, administrator and device-recordings explanations are
+  shorter; "Remove from this device" is now "Remove all from this
+  device".
+- Progress: the ladder and Prep mode explanations are shorter.
+- Welcome screen: "Your language journey starts here. After a quick
+  setup, you can learn anywhere, with or without internet."
+- Teaching: Export and Import explain themselves more simply; deck
+  quality now reads "Decks with higher scores tend to achieve better
+  learning outcomes."
+- Removed: the note under Saved sessions about deleted cards, and the
+  warning under a new course's language choice.
+
+To check by hand: open Settings, Progress, the welcome screen (signed
+out), and a deck's Export screen in Teaching, and read the new lines.
+
+## 0.563 — 4 November 2026
+
+**Deck quality tips say what to do, and a deck counts number parts as cards.**
+
+- Each quality tip now has a bold headline saying what to do ("Record 5
+  words or sentences", "Link 1 sentence to its words"), and a line under it
+  saying why or how.
+- Every tip about particular cards lists them, to tap and open: unlinked
+  sentences, sentences with untaught words, recordings, pronunciation,
+  pictures, sentences to check, repeated words and long sentences, as well
+  as words that need more sentences.
+- The word and the number in each of those pills are centred.
+- "See every word and its sentences" is gone.
+- **Number parts count as cards**: a deck with 2 cards and 1 number part says
+  "3 cards", everywhere a deck's size is shown.
+- On a deck's screen, under "This deck", the language and the number of
+  cards are each on a line of their own. When some cards don't reach
+  students, a third line says how many and why: "3 don't reach students
+  yet: 1 draft, 1 waiting for review, 1 needs its number words written".
+  Deck tiles in Material say "3 not reaching students". This replaces
+  "none ready yet".
+- Released without running the test suite, at the owner's request. The
+  tests for the new wording and the deck's size were updated to match.
+
+## 0.562 — 4 November 2026
+
+**A deck's quality tips are always shown.**
+
+- The tips that would raise a deck's quality show under the score without
+  a tap; the "What would raise it" button is gone.
+- The words tip lists every word that needs more sentences, not just the
+  first 12.
+- "Not in any phrase yet" is gone from the list of every word and its
+  sentences. The words tip names them, counted the same way as the score,
+  so the two no longer disagree.
+- Released without running the test suite, at the owner's request.
+
+## 0.561 — 4 November 2026
+
+**A deck's quality: one place to see what to fix, and on which words.**
+
+- **What would raise it** now shows each suggestion as a card of its own:
+  an icon for what to add, the points it is worth, and where it is about
+  particular words, those words. "Words need more sentences" lists the
+  words, worst first, each with how many more sentences it needs; tap one
+  to open its card. "No picture" lists the words without one the same way.
+- Under the score, a bar shows where the deck stands, and a fainter part of
+  it shows where the suggestions would take it ("These would take it to
+  about 87.").
+- **Show the pairings** is gone, with the line above it. Every word and the
+  sentences it is paired with is still there, under a quieter **See every
+  word and its sentences**, for checking a pairing.
+- Released without running the test suite, at the owner's request.
+
+## 0.560 — 4 November 2026
+
+**A space's address is typed straight after manytongues.co/, and Main is a space like any other.**
+
+- On a space's screen and on the New space form, "manytongues.co/" now sits
+  fixed at the start of the address box, with the address typed right after
+  it, instead of on a line of its own above. Read, the address is one line:
+  "manytongues.co/…". A space that has had other addresses says under the
+  field which ones it still answers to.
+- **Main's address can be changed**, and Main can be closed and deleted,
+  like any other space. Its old address forwards to the new one.
+- Trade-off: nobody can close or delete the space their own account is in,
+  since that would lock them out or delete them. For the super admin that
+  is Main, unless their account is elsewhere.
+- Released without running the test suite, at the owner's request.
+
+## 0.559 — 4 November 2026
+
+**A space's screen in Super admin reads first, then edits, like a deck's.**
+
+- Super admin → Spaces → a space now opens to read: its name, address,
+  logo and colour as plain text, with **Edit** floating in the bottom
+  corner. Edit turns them into fields, and **Save** floats where Edit was.
+  The cross at the top cancels, and asks first if something was changed.
+- The screen is titled "Space", or "Edit space" while editing, as a deck's
+  is "Deck" or "Edit deck".
+- The big gap above "About this space" is gone.
+- The logo is still saved as soon as it is chosen, and the invitation
+  link, space admins, storage and closing work in either mode, as before.
+- Released without running the test suite, at the owner's request.
+
+## 0.558 — 4 November 2026
+
+**Tiles: a larger title and details line, centred on their buttons.**
+
+- Everywhere tiles are used (Admin's and Super admin's lists, course
+  tiles in Teaching and Learning, the number system screens), the title is
+  a little larger and so is the line of details under it.
+- The title and details now sit centred on the buttons beside them,
+  rather than lined up with their top.
+- On a phone, the buttons stay on the right and a long title wraps beside
+  them. A tile with three or more buttons still puts them under the text
+  on a phone, so the title isn't squeezed.
+- Admin → People's tiles change the same way.
+- Released without running the test suite, at the owner's request.
+
 ## 0.557 — 3 November 2026
 
 **Learning's tab titles match Teaching's.**

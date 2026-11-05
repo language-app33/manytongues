@@ -50,10 +50,8 @@ const TextStyles = React.lazy(() =>
   import("./gallery.tsx").then((m) => ({ default: m.TextStyles })),
 );
 import {
-  contextCoverage,
   dimValues,
   exOf,
-  supportsContext,
   LANGUAGES,
   DEFAULT_LANGUAGE,
   categoriesOf,
@@ -143,6 +141,7 @@ import {
   narrowing,
   plural,
   deckSize,
+  notReaching,
   shortDate,
   pullAdmin,
   pullTeaching,
@@ -318,8 +317,7 @@ export function Onboarding({ onDone, place = {} }: {
                 where there is no signal was being told, by the one screen
                 standing in their way, that it should not have been. */}
             <Lede>
-              Learn a language a card at a time. Setting up takes a moment and a connection; after
-              that your cards and your progress live on this device, and the app works without one.
+              Your language journey starts here. After a quick setup, you can learn anywhere, with or without internet.
             </Lede>
             {!closed && !place.unknown ? (
               <Button variant="primary" wide onClick={() => setStep("new")}>
@@ -2049,11 +2047,6 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                     onChange={setLang}
                     label="Language taught"
                   />
-                  <Help>
-                    Pick carefully — this sets the script, the keyboard and how answers are marked
-                    for everything in the course, and changing it later doesn't convert what's
-                    already written.
-                  </Help>
                 </Screen>
               )}
 
@@ -2105,7 +2098,7 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                   })} />
                 </Section>
               ) : null}
-              <Section>
+              <Section head title="This space's people">
               {newKey && (
                 <div className="at-sub">
                   <p className="at-eyebrow">
@@ -3500,8 +3493,7 @@ function ExportScreen({ ask, onDone, onClose }: {
       }
     >
       <Help>
-        {ask.what} as one file. An administrator can put it back with Restore, and without the
-        recordings it is small enough to give to an AI and ask what cards to make next.
+        {ask.what} will be exported as one file. An administrator can import it back with Restore. Exporting without recordings and images makes the file much smaller.
       </Help>
       <Notice kind="error">{err}</Notice>
       <div className="at-field at-mt4">
@@ -3616,8 +3608,7 @@ function ImportScreen({ cards, decks, langName, busy, failed, onImport, onClose 
       }
     >
       <Help>
-        A file made with Export, here or by another teacher, or a backup of the whole site. Every
-        card is checked against yours first, and nothing is changed until you tap Import.
+        Select a backup of a deck or of the whole app. You will be able to review every card before it is actually imported.
       </Help>
       <div className="at-row at-mt3">
         <label className="at-btn ghost" style={{ cursor: "pointer" }}>
@@ -4486,142 +4477,91 @@ function QualityMark({ quality }: { quality?: Quality | null }) {
 /* What the score is made of, said under the Deck quality heading before
    the score rather than after it, as the card editor explains a section. */
 const QUALITY_LEDE =
-  "Most of it is whether every word, and every form of it, is practised inside sentences in " +
-  "this deck. The rest is recordings, pictures, pronunciation, reviewed sentences, no repeated " +
-  "words, sentences that aren't too long, and a conversation or text.";
+  "Decks with higher scores tend to achieve better learning outcomes.";
 
-function DeckQuality({ quality }: { quality: Quality }) {
-  const [open, setOpen] = useState(false);
+/* The picture beside each suggestion: what it asks you to go and add. */
+const FIX_ICON: Record<string, string> = {
+  words: "cards", sentences: "add", confirm: "check", unlinked: "edit", unknown: "search", both: "edit",
+  recordings: "mic", pictures: "image", pronunciation: "language", reviewed: "verify",
+  repeats: "copy", long: "sort", scene: "group",
+};
+
+/*
+ * A deck's quality (0.561): the score with a bar and where the top
+ * suggestions would take it; the suggestions as cards, each with what to do,
+ * why, what it is worth and, where it is about particular cards, those
+ * cards to tap (0.563).
+ */
+function DeckQuality({ quality, cards, lang, onOpenCard }: {
+  quality: Quality;
+  cards: Card[];
+  lang: Partial<Lang>;
+  onOpenCard: (id: string) => void;
+}) {
   if (quality.score === null) {
     return <Help>Nothing to score yet: add words and sentences that use them.</Help>;
   }
   const fixes = quality.fixes.slice(0, FIXES_SHOWN);
+  const gainOf = (g: number) => Math.max(1, Math.round(g));
+  const reach = Math.min(100, quality.score + fixes.reduce((t, f) => t + gainOf(f.gain), 0));
+  const tone = qualityTone(quality.score);
+  const byId = new Map(cards.map((c) => [String(c.id), c]));
+  const rowOf = new Map(quality.words.map((w) => [w.id, w]));
+  const script = { fontFamily: lang.fontStack, ...scriptVars(lang as Lang) };
   return (
     <>
-      <p className={`at-qualityscore ${qualityTone(quality.score)}`}>
+      <p className={`at-qualityscore ${tone}`}>
         <b>{quality.score}</b> <span>out of 100</span>
       </p>
+      <div className="at-qualitybar" aria-hidden="true">
+        <span className={`now ${tone}`} style={{ width: `${quality.score}%` }} />
+        {fixes.length ? <span className="then" style={{ left: `${quality.score}%`, width: `${reach - quality.score}%` }} /> : null}
+      </div>
+      {/* Always shown (0.562): there are at most three, and they are the
+          most useful thing here. */}
       {fixes.length > 0 && (
         <>
-          <Button
-            className="at-mt3"
-            size="sm"
-            icon={open ? "chevronUp" : "chevronDown"}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? "Hide what would raise it" : "What would raise it"}
-          </Button>
-          {open && (
-            <ul className="at-qualityfixes">
-              {fixes.map((f) => (
-                <li key={f.key}>
-                  <span>{f.text}</span>
-                  <b>{`+${Math.max(1, Math.round(f.gain))}`}</b>
-                </li>
-              ))}
-            </ul>
-          )}
+              <p className="at-qualityreach">
+                {reach >= 100 ? "These would take it to 100." : `These would take it to about ${reach}.`}
+              </p>
+              <ul className="at-qfixes">
+                {fixes.map((f) => {
+                  const ids = (f.cards || []).filter((id) => byId.has(id));
+                  return (
+                    <li className="at-qfix" key={f.key}>
+                      <span className="at-qfixico"><Icon name={FIX_ICON[f.key] || "star"} size={20} /></span>
+                      <div className="at-qfixbody">
+                        <p className="at-qfixtitle">{f.title}</p>
+                        <p className="at-qfixtext">{f.text}</p>
+                        {ids.length ? (
+                          <div className="at-qfixwords">
+                            {ids.map((id) => {
+                              const row = f.key === "words" ? rowOf.get(id) : null;
+                              const owed = row ? row.forms.reduce((t, x) => t + Math.max(0, x.need - x.met), 0) : 0;
+                              return (
+                                <button type="button" className="at-qfixword" key={id} onClick={() => onOpenCard(id)}
+                                  title={owed ? `Needs ${plural(owed, "more sentence")} · open this card` : "Open this card"}>
+                                  <b lang={lang.id} dir={lang.direction} style={script}>
+                                    {cardWords(byId.get(id) as Card, lang as Lang).word}
+                                  </b>
+                                  {owed ? <i aria-label={`needs ${plural(owed, "more sentence")}`}>{`+${owed}`}</i> : null}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                        {ids.length ? (
+                          <p className="at-qfixhint">
+                            {f.key === "words" ? "Tap a word to open it. The number is how many more sentences it needs." : "Tap one to open it."}
+                          </p>
+                        ) : null}
+                      </div>
+                      <span className="at-qfixgain"><b>{`+${gainOf(f.gain)}`}</b><small>points</small></span>
+                    </li>
+                  );
+                })}
+              </ul>
         </>
-      )}
-    </>
-  );
-}
-
-function ContextReport({ cards, lang }: { cards: Card[]; lang: Partial<Lang> }) {
-  const [open, setOpen] = useState(false);
-  const report = useMemo(() => contextCoverage(cards, lang), [cards, lang]);
-
-  if (!supportsContext(lang)) {
-    return (
-      <Help>
-        {(lang || {}).name || "This language"} does not describe how to find a word inside a
-        phrase, so nothing here can be measured yet.
-      </Help>
-    );
-  }
-
-  const { counts, covered, links, words } = report;
-  const total = words.length;
-  const withContext = words.filter((w) => w.contexts.length > 0);
-  const bare = words.filter((w) => w.contexts.length === 0);
-
-  return (
-    <>
-      <Lede>
-        {total === 0
-          ? "No single-word cards in this deck yet."
-          : `${covered} of ${plural(total, "word")} appear in at least one phrase you have recorded.`}
-      </Lede>
-      <Help>
-        {plural(counts.word, "word")} · {plural(counts.phrase, "phrase")} ·{" "}
-        {plural(counts.sentence, "sentence")}
-        {/* Conversations are counted as the cards they are and matched as
-            the turns they hold, so this is the deck a teacher wrote rather
-            than the number of lines in it. */}
-        {counts.dialog ? ` · ${plural(counts.dialog, "conversation")}` : ""}
-        {links ? ` · ${plural(links, "pairing")} in all` : ""}
-      </Help>
-
-      {total > 0 && (
-        <>
-          <Button
-            className="at-mt3"
-            size="sm"
-            icon={open ? "chevronUp" : "chevronDown"}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? "Hide the pairings" : "Show the pairings"}
-          </Button>
-          {open && (
-            <div className="at-mt3">
-              {withContext.map((w) => (
-                <div className="at-ctxrow" key={w.id}>
-                  <p className="at-ctxword">
-                    <b lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack, ...scriptVars(lang) }}>
-                      {w.ar}
-                    </b>
-                    <i>{asMeaning(w.en)}</i>
-                  </p>
-                  <ul className="at-ctxlist">
-                    {w.contexts.map((c) => (
-                      <li key={c.id}>
-                        <span lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack, ...scriptVars(lang) }}>
-                          {c.ar}
-                        </span>
-                        <em>{asMeaning(c.en)}</em>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {open && bare.length > 0 && (
-        /* The actionable half. "3 of 4" says how rich the deck is; this says
-           which word to record a phrase for next. */
-        <div className="at-mt4">
-          <p className="at-label">Not in any phrase yet</p>
-          <div className="at-ctxbare">
-            {bare.map((w) => (
-              <span key={w.id}>
-                <b lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack, ...scriptVars(lang) }}>
-                  {w.ar}
-                </b>
-                <i>{asMeaning(w.en)}</i>
-              </span>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {total > 0 && covered === 0 && (
-        <Help className="at-mt3">
-          Nothing to pair yet. It grows on its own as you add phrases that use words already in the
-          deck — each phrase becomes a context for every word inside it.
-        </Help>
       )}
     </>
   );
@@ -5079,8 +5019,11 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
    back on is this line. */
 const SHOW_IN_CONTEXT = false;
 
-export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose, personalOnly = false }: {
+export function TeachSpace({ account, spaceName: shownName, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose, personalOnly = false }: {
   account: User;
+  /** The name of the space on screen — for an App admin, the one at the
+      address rather than their own. */
+  spaceName?: string | null;
   /** A learner's My space (0.545): only their own decks and cards, no courses. */
   personalOnly?: boolean;
   languages: Record<LangId, Lang>;
@@ -5127,7 +5070,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   const [cardToSpace, setCardToSpace] = useState<{ card: Card; move: boolean } | null>(null);
   const [cardDeck, setCardDeck] = useState("");
   /* The space's own name on the toggle (0.549), cut short when long, in full on hover. */
-  const spaceName = (account.org && typeof account.org === "object" && account.org.name) || "Space";
+  const spaceName = shownName || (account.org && typeof account.org === "object" && account.org.name) || "Space";
   const decks = useMemo(() => allDecks.filter((d) => !!d.personal === mineSide), [allDecks, mineSide]);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -6463,6 +6406,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   /* How many of a deck's cards are waiting for review, said on the deck —
      a teacher looks after a deck, and what in it is not yet reaching
      students is the thing worth seeing without opening it. */
+  const cardById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const deckWaiting = (deck: Deck): string => {
     const n = (deck.cardIds || []).filter((id) => waitingIds.has(id)).length;
     return n ? ` · ${n} to review` : "";
@@ -7842,8 +7786,16 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     <Icon name="download" />
                   </Button>
                 </span>
+                {/* The language, then what the deck holds on a line of its own,
+                    and, only when some of it sends students nothing, why
+                    (0.563). */}
                 <span className="at-formrole">
-                  {(langOfDeck(d) || {}).name} · {deckSize(d, held.length)}
+                  <span className="at-formline">{(langOfDeck(d) || {}).name}</span>
+                  <span className="at-formline">{deckSize(d, held.length)}</span>
+                  {(() => {
+                    const off = notReaching(d, held);
+                    return off ? <span className="at-formline at-notreach">{off.long}</span> : null;
+                  })()}
                 </span>
               </div>
               <fieldset className="at-cardlock" disabled={!editing}
@@ -7922,10 +7874,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   in context is part of the same score, so it is read under
                   it rather than under a heading of its own. */}
               <Field label="Deck quality" lede={QUALITY_LEDE}>
-                {openQuality && <DeckQuality quality={openQuality} />}
-                <div className="at-mt4">
-                  <ContextReport cards={held} lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]} />
-                </div>
+                {openQuality && (
+                  <DeckQuality quality={openQuality} cards={held}
+                    lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]}
+                    onOpenCard={(id) => openCard(held.find((c) => String(c.id) === id))} />
+                )}
               </Field>
             </div>
 
@@ -8766,6 +8719,20 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     ? "No decks in the languages switched on."
                     : "No decks yet. Make one, then add it to a course so students can see it."
                 }
+                /* With no decks at all, the same prompt the Cards tab shows
+                   with no cards, in place of an empty list. */
+                emptyPanel={decks.length ? undefined : (
+                  <Nudge
+                    icon="folder"
+                    action={
+                      <Button variant="primary" icon="add" onClick={() => setNaming("new")}>
+                        New deck
+                      </Button>
+                    }
+                  >
+                    No decks yet. A deck is a set of cards. Make your first one, then add it to a course so students can see it.
+                  </Nudge>
+                )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
                 tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
                 onNew={() => setNaming("new")}
@@ -8818,6 +8785,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                         <>
                           <LockMark locked={d.locked && DECK_LOCKS} />
                           {`${(langOfDeck(d) || { name: "" }).name} · ${deckSize(d)}${deckWaiting(d)}`}
+                          {(() => {
+                            /* Its cards that send students nothing yet (0.563). */
+                            const off = notReaching(d, (d.cardIds || []).map((id) => cardById.get(id)).filter(Boolean) as Card[]);
+                            return off ? <span className="at-notreach">{` · ${off.short}`}</span> : null;
+                          })()}
                           <QualityMark quality={qualities.get(d.id)} />
                           {(() => {
                             /* How many of its cards have a recording the
@@ -9118,7 +9090,6 @@ function SpacesTab() {
   ) : null;
 
   if (making) {
-    const slugNote = making.slug ? `manytongues.co/${making.slug}` : "manytongues.co/…";
     return (
       <Screen
         title="New space"
@@ -9145,9 +9116,9 @@ function SpacesTab() {
           <input className="at-input" placeholder="Lingua Academy" value={making.name} autoFocus
             onChange={(e) => setMaking({ ...making, name: e.target.value })} />
         </Field>
-        <Field label={<>Address <span className="req">required</span></>} lede={slugNote}>
-          <input className="at-input" placeholder="lingua-academy" value={making.slug}
-            onChange={(e) => setMaking({ ...making, slug: e.target.value.toLowerCase().replace(/\s+/g, "-") })} />
+        <Field label={<>Address <span className="req">required</span></>}>
+          <AddressInput placeholder="lingua-academy" value={making.slug}
+            onChange={(slug) => setMaking({ ...making, slug })} />
         </Field>
         <Help>An address can be changed later, and the old one keeps working. Once used, it is never given to another space.</Help>
         {/* You as its admin (0.552), so running a new space needs no second
@@ -9224,6 +9195,29 @@ function SpacesTab() {
   );
 }
 
+/*
+ * A space's address as one line (0.560): the fixed part of it, then the
+ * box the space's own part is typed in, so what is typed is read as the
+ * whole address it makes.
+ */
+function AddressInput({ value, onChange, placeholder }: {
+  value: string;
+  onChange: (slug: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="at-input at-addrinput">
+      <span className="at-addrpre" aria-hidden="true">manytongues.co/</span>
+      <input
+        aria-label="Address, after manytongues.co/"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
+      />
+    </label>
+  );
+}
+
 /* One space, as the App admin manages it. */
 function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
   org: API.OrgRow;
@@ -9234,12 +9228,17 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
   run: (work: () => Promise<unknown>, said?: string) => Promise<boolean>;
   ask: (p: Pending) => void;
 }) {
-  const [name, setName] = useState(org.name);
-  const [slug, setSlug] = useState(org.slug);
-  const [colour, setColour] = useState(org.colour || "");
+  /* Read until Edit, as a deck is (0.559): the draft is what Edit opened
+     with, and nothing reaches the server until Save. */
+  type SpaceDraft = { name: string; slug: string; colour: string };
+  const [draft, setDraft] = useState<SpaceDraft | null>(null);
   const [picking, setPicking] = useState(false);
-  const isMain = org.id === "main";
-  const changed = name.trim() !== org.name || slug.trim() !== org.slug || colour !== (org.colour || "");
+  const snack = useSnackbar();
+  const editing = !!draft;
+  const saved: SpaceDraft = { name: org.name, slug: org.slug, colour: org.colour || "" };
+  const shown = draft || saved;
+  const edit = (change: Partial<SpaceDraft>) => setDraft((d) => ({ ...(d || saved), ...change }));
+  const changed = !!draft && (draft.name.trim() !== org.name || draft.slug.trim() !== org.slug || draft.colour !== (org.colour || ""));
   if (picking) {
     return (
       <ImageScreen
@@ -9252,47 +9251,100 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
   }
   const admins = new Set(org.admins || []);
   return (
-    /* Laid out like Settings (0.552): each part a band with a heading. */
+    /* Laid out like a deck's screen (0.559): read first, Edit and Save
+       floating in the corner, the cross asking before anything is lost. */
     <Screen
-      title={org.name}
-      onBack={onBack}
+      title={editing ? "Edit space" : "Space"}
+      scrollKey={org.id}
       className="cardform"
-      action={
-        <Button variant="primary" size="sm" icon="save" disabled={busy || !changed || !name.trim()}
-          onClick={() =>
-            run(() => API.updateOrg(org.id, {
-              name: name.trim(),
-              ...(slug.trim() !== org.slug ? { slug: slug.trim().toLowerCase() } : {}),
-              colour,
-            }), "Saved")
+      onBack={
+        editing
+          ? () => (changed
+            ? ask({
+              title: "Discard your changes?",
+              confirmLabel: "Discard",
+              body: <p>What you changed about {org.name} hasn't been saved.</p>,
+              action: async () => setDraft(null),
+            })
+            : setDraft(null))
+          : onBack
+      }
+      backIcon={editing ? "close" : "back"}
+      backLabel={editing ? "Cancel" : "Back"}
+      fab={
+        editing
+          ? {
+            icon: "save",
+            label: "Save",
+            off: !changed || !shown.name.trim(),
+            busy,
+            onClick: async () => {
+              if (busy || !draft) return;
+              if (!changed) return snack("No changes to save.");
+              if (!draft.name.trim()) return snack("Some required fields are missing. They're marked with *.", "warn");
+              const ok = await run(() => API.updateOrg(org.id, {
+                name: draft.name.trim(),
+                ...(draft.slug.trim() !== org.slug ? { slug: draft.slug.trim().toLowerCase() } : {}),
+                colour: draft.colour,
+              }), "Saved");
+              if (ok) setDraft(null);
+            },
           }
-        >
-          {busy ? "Saving…" : "Save"}
-        </Button>
+          : { icon: "edit", label: "Edit", onClick: () => setDraft(saved) }
       }
     >
       {dialog}
       <Notice kind="error">{error}</Notice>
       {org.archived ? <Notice kind="warn">This space is closed. Its people can't sign in.</Notice> : null}
-      <Section title="About this space">
-      <Field label="Name">
-        <input className="at-input" value={name} onChange={(e) => setName(e.target.value)} />
-      </Field>
-      <Field label="Address" lede={`manytongues.co/${slug || "…"}${org.formerSlugs.length ? ` · still answers to ${org.formerSlugs.map((x) => `/${x}`).join(", ")}` : ""}`}>
-        <input className="at-input" value={slug} disabled={isMain}
-          onChange={(e) => setSlug(e.target.value.toLowerCase().replace(/\s+/g, "-"))} />
-      </Field>
-      <Field label="Logo" lede="Shown on the space's sign-in page and at the top of the You menu.">
-        <Button size="sm" icon="image" onClick={() => setPicking(true)}>{org.logo ? "Change the logo" : "Add a logo"}</Button>
-      </Field>
-      <Field label="Colour" lede="Used on the space's sign-in page only.">
-        <input type="color" value={colour || "#3b5bdb"} onChange={(e) => setColour(e.target.value)} />
-        {colour && !usableAccent(colour) ? (
-          <Help>This colour is too faint to use; the app's own will be shown.</Help>
-        ) : null}
-        {colour ? <Button variant="ghost" size="sm" onClick={() => setColour("")}>No colour</Button> : null}
-      </Field>
-      </Section>
+      {/* The space's own facts, headed the way a deck heads "This deck".
+          Read, they are the edit's own controls held still. */}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">About this space</span>
+        </div>
+        <fieldset className="at-cardlock" disabled={!editing}>
+          <Field label={<>Name<span className="at-reqstar" aria-hidden="true" /></>}>
+            <input className="at-input" value={shown.name} onChange={(e) => edit({ name: e.target.value })} />
+          </Field>
+          <Field label="Address">
+            {editing ? (
+              <AddressInput value={shown.slug} onChange={(slug) => edit({ slug })} />
+            ) : (
+              <p className="at-readvalue">manytongues.co/{shown.slug}</p>
+            )}
+            {org.formerSlugs.length ? (
+              <Help>Still answers to {org.formerSlugs.map((x) => `/${x}`).join(", ")}</Help>
+            ) : null}
+          </Field>
+          <Field label="Logo" lede="Shown on the space's sign-in page and at the top of the You menu.">
+            {editing ? (
+              <Button size="sm" icon="image" onClick={() => setPicking(true)}>{org.logo ? "Change the logo" : "Add a logo"}</Button>
+            ) : (
+              <p className="at-readvalue">{org.logo ? "Set" : "None"}</p>
+            )}
+          </Field>
+          <Field label="Colour" lede="Used on the space's sign-in page only.">
+            {editing ? (
+              <>
+                <input type="color" value={shown.colour || "#3b5bdb"} onChange={(e) => edit({ colour: e.target.value })} />
+                {shown.colour ? <Button variant="ghost" size="sm" onClick={() => edit({ colour: "" })}>No colour</Button> : null}
+              </>
+            ) : (
+              <p className="at-readvalue">
+                {shown.colour ? (
+                  <>
+                    <span aria-hidden="true" style={{ display: "inline-block", width: 14, height: 14, borderRadius: 4, background: shown.colour, verticalAlign: "-2px", marginInlineEnd: 6 }} />
+                    {shown.colour}
+                  </>
+                ) : "None"}
+              </p>
+            )}
+            {shown.colour && !usableAccent(shown.colour) ? (
+              <Help>This colour is too faint to use; the app's own will be shown.</Help>
+            ) : null}
+          </Field>
+        </fieldset>
+      </div>
       <Section title="Invite people">
       <CodeBox long label="Invitation link" hint="Anyone with it can make an account in this space."
         code={`${window.location.origin}/${org.slug}?join=${org.inviteCode}`} />
@@ -9320,8 +9372,9 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
         ))}
       </Section>
       <SpaceExtras org={org} />
-      {!isMain ? (
-        <Section title="Closing">
+      {/* Main closes and goes like any other space (0.560); the server
+          refuses the one your own account is in. */}
+      <Section title="Closing">
           <div className="at-row">
             {org.archived ? (
               <Button disabled={busy} onClick={() => run(() => API.archiveOrg(org.id, false), `${org.name} reopened`)}>
@@ -9359,7 +9412,6 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
             </Button>
           </div>
         </Section>
-      ) : null}
     </Screen>
   );
 }

@@ -5256,8 +5256,9 @@ async function handle(req) {
         const org = await readJson(store, K.org(id));
         if (!org) return json({ error: "no-space" }, 404);
         const slug = body.slug === undefined ? org.slug : String(body.slug || "").trim().toLowerCase();
+        /* Main's address changes like any other's (0.560); its old one
+           forwards, as every space's does. */
         if (slug !== org.slug) {
-          if (id === MAIN) return json({ error: "slug-invalid" }, 400);
           const problem = slugProblem(slug);
           if (problem) return json({ error: problem }, 400);
           const took = await updateJson(store, K.slug(slug), (/** @type {any} */ cur) => (cur ? null : id));
@@ -5297,11 +5298,13 @@ async function handle(req) {
         return json({ ok: true, org: next });
       }
 
-      /* Closing a space, and opening it again (22a, 62a). Main can't close. */
+      /* Closing a space, and opening it again (22a, 62a). Main is a space
+         like any other (0.560); what can't be closed is the space your own
+         account is in, which would close you out of the app. */
       if (action === "admin-archive-org" || action === "admin-reopen-org") {
         if (!iAmAdmin) return json({ error: "admin-only" }, 403);
         const id = String(body.id || "");
-        if (id === MAIN) return json({ error: "main-stays" }, 400);
+        if (action === "admin-archive-org" && orgOf(me) === id) return json({ error: "own-space" }, 400);
         const next = await updateJson(store, K.org(id), (/** @type {any} */ o) => {
           if (!o) return null;
           const { archived: _was, ...rest } = o;
@@ -5314,15 +5317,16 @@ async function handle(req) {
       /*
        * Deleting a space for good (93b): its accounts (each with its practice
        * history), courses and their codes, decks, cards, reports, invite code
-       * and every address it has had, which are then free again. Main can't
-       * go. The name has to be typed. Recordings and pictures are left: they
+       * and every address it has had, which are then free again. Main can
+       * go like any other (0.560), but never the space your own account is
+       * in: you would be among the accounts deleted. The name has to be typed. Recordings and pictures are left: they
        * are shared by content across spaces, and one left behind costs
        * storage, where one deleted wrongly costs another space its audio.
        */
       if (action === "admin-delete-org") {
         if (!iAmAdmin) return json({ error: "admin-only" }, 403);
         const id = String(body.id || "");
-        if (id === MAIN) return json({ error: "main-stays" }, 400);
+        if (orgOf(me) === id) return json({ error: "own-space" }, 400);
         const org = await readJson(store, K.org(id));
         if (!org) return json({ error: "no-space" }, 404);
         if (String(body.confirm || "") !== org.name) return json({ error: "confirm-name" }, 400);

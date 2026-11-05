@@ -441,14 +441,14 @@ export const TEXT_STYLES: [string, TextStyle[]][] = [
     },
     {
       name: ".at-decktitle",
-      size: "17px",
+      size: "18px",
       what: "A deck's name in the teacher's list.",
       example: "Lesson 1 — greetings",
       cls: "at-decktitle",
     },
     {
       name: ".at-deckmeta",
-      size: "12px",
+      size: "13px",
       what: "What is in it, under the name.",
       example: "18 cards · 4 with audio",
       cls: "at-deckmeta",
