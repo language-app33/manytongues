@@ -164,6 +164,7 @@ const PLACES: Record<string, [string, string]> = {
   /* Teaching */
   TeachSpace: [TEACH, "The Teaching space"],
   CoursesPage: [TEACH, "The Courses tab"],
+  HeadSearch: [TEACH, "The Courses tab · searching your courses"],
   CourseSettings: [TEACH, "Course settings"],
   NewDeck: [TEACH, "Making a new deck"],
   NumbersFrom: [TEACH, "A deck's screen · whose numbers it uses"],
