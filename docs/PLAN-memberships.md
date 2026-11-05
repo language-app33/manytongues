@@ -43,6 +43,12 @@ everyone today, sees no difference at all.
   says "Join {space}?" with a Join button. A course code from another
   space, typed into Learning's course-code box, joins that course and its
   space in one step, instead of being refused.
+- **You can add an existing person to a space.** In Super admin → People,
+  each person has "Add to a space", offering the spaces they're not in.
+  No key changes hands: their own key now opens that space too. Someone
+  who had left or been removed from that space is put back as a
+  reactivation. Space admins can't do this; for them, the invitation link
+  and course codes are the way in.
 - **The address still means the space you're in.** When you're in several,
   the You menu lists them under the space's name and logo; tapping one
   takes you to that space's address. Teaching and Admin are of the space
@@ -112,7 +118,7 @@ everyone today, sees no difference at all.
   only their space; a new key for someone in two spaces is refused with a
   sentence saying to ask you.
 - **You:** Super admin → People lists a person under every space they are
-  in, with their account-wide dates.
+  in, with their account-wide dates, and "Add to a space" on each.
 
 ## A4. Stages
 
@@ -127,7 +133,8 @@ test suite plus new tests, then by hand on the deployed app.
    who joins a second course this way sees it listed with their others.
 2. **Joining and moving around.** "Join {space}?" on another space's
    invitation, the list of your spaces in the You menu, one Leave line per
-   space in Settings, landing in the space you were last in.
+   space in Settings, landing in the space you were last in, and "Add to
+   a space" in Super admin → People.
 3. **Learning across spaces.** Headings per space, the All · … row, the
    session that follows it, and "Last practised" per space in Admin.
 
@@ -380,7 +387,48 @@ and the action name no longer matters (the client sends `join-course`
 from the course-code box and `join-space` from an invitation; the server
 treats them alike). Replace the body of `join-course` with
 `return joinByCode(given)`, and add `if (action === "join-space") return joinByCode(…)`
-right under it. The helper, defined inside `handle` after `taught`:
+right under it.
+
+The membership itself is written by one helper, shared with
+`admin-add-member` below. Define it next to `wipeAccount` (it takes the
+store, not the request):
+
+```js
+/**
+ * Putting an account into a space it is not in, or back into one it left:
+ * the membership written once, and a rejoin treated as a reactivation
+ * (0.544) — back on the courses the suspension kept, off Former members.
+ * Returns the fresh user record, or null when the account is gone.
+ * The caller has already checked the space exists and is open, and that
+ * the person was not *removed* from it — whoever removed them puts them
+ * back, through admin-reactivate-user or admin-add-member.
+ */
+async function addMembership(store, handle, orgId) {
+  const before = await readJson(store, K.user(handle));
+  if (!before) return null;
+  const was = suspensionIn(before, orgId);
+  const fresh = await updateJson(store, K.user(handle), (cur) => {
+    if (!cur) return null;
+    const u = normalisedUser(cur);
+    const orgs = u.orgs.includes(orgId) ? u.orgs : u.orgs.concat([orgId]);
+    const { [orgId]: _gone, ...suspendedIn } = u.suspendedIn;
+    return { ...u, orgs, suspendedIn };
+  });
+  if (!fresh) return null;
+  const scopeNow = orgScope.getStore();
+  const kept = scopeNow ? { org: scopeNow.org, wide: scopeNow.wide } : null;
+  if (scopeNow) { scopeNow.org = orgId; scopeNow.wide = false; }
+  if (was) {
+    /* Back on the courses they were on, the way admin-reactivate-user does it. */
+    for (const c of was.courses || []) { …same loop as 5022–5030, with `handle`… }
+    await updateJson(store, K.former(orgId), (cur) => (cur || []).some((r) => r.handle === handle) ? cur.filter((r) => r.handle !== handle) : null);
+  }
+  if (scopeNow && kept) { scopeNow.org = kept.org; scopeNow.wide = kept.wide; }
+  return fresh;
+}
+```
+
+`joinByCode`, defined inside `handle` after `taught`:
 
 ```js
 /**
@@ -397,22 +445,9 @@ async function joinByCode(given) {
   if (org.archived) return json({ error: "space-closed" }, 403);
   const was = suspensionIn(me, orgId);
   if (was && was.why === "removed") return json({ error: "removed", space: orgCard(org) }, 403);
-  /* The membership, written once. A rejoin is a reactivation (0.544). */
-  const fresh = await updateJson(store, K.user(mine), (cur) => {
-    if (!cur) return null;
-    const u = normalisedUser(cur);
-    const orgs = u.orgs.includes(orgId) ? u.orgs : u.orgs.concat([orgId]);
-    const { [orgId]: _gone, ...suspendedIn } = u.suspendedIn;
-    return { ...u, orgs, suspendedIn };
-  });
-  if (!fresh) return json({ error: "bad-key" }, 401);
+  if (!(await addMembership(store, mine, orgId))) return json({ error: "bad-key" }, 401);
   const scopeNow = orgScope.getStore();
   if (scopeNow) { scopeNow.org = orgId; scopeNow.wide = false; }
-  if (was) {
-    /* Back on the courses they were on, the way admin-reactivate-user does it. */
-    for (const c of was.courses || []) { …same loop as 5022–5030, with `mine` for `handle`… }
-    await updateJson(store, K.former(orgId), (cur) => (cur || []).some((r) => r.handle === mine) ? cur.filter((r) => r.handle !== mine) : null);
-  }
   if (target.kind === "course") {
     const as = target.asTeacher ? "teachers" : "students";
     const joined = await updateJson(store, K.course(target.course.id), (c) =>
@@ -494,6 +529,32 @@ with `why: "deleted-by-admin"` instead; else `wipeAccount` as today.
 **`admin-hand-over` (5054).** `heir.suspended` → `suspensionIn(heir, acting)`.
 
 **`admin-create-user` (5390).** Write `orgs: [acting]` beside `org: acting`.
+
+**New `admin-add-member`** (A2): the App admin puts an existing account
+into a space. App admin only — **not** in `SPACE_ADMIN_MAY`. Body
+`{ handle, org }`. Place it beside `admin-org-admins`:
+
+```js
+if (action === "admin-add-member") {
+  if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+  const handle = String(body.handle || "");
+  const id = String(body.org || "");
+  const org = await readJson(store, K.org(id));
+  if (!org) return json({ error: "no-space" }, 404);
+  if (org.archived) return json({ error: "space-closed" }, 403);
+  const target = await readJson(store, K.user(handle));   // unscoped: they may be in no space of this request's
+  if (!target || target.admin) return json({ error: "no-user" }, 404);
+  const fresh = await addMembership(store, handle, id);
+  if (!fresh) return json({ error: "no-user" }, 404);
+  return json({ ok: true, orgs: memberOf(fresh) });
+}
+```
+
+Unlike `joinByCode`, a person *removed* from the space is put back: the
+App admin outranks the space admin who removed them, as with
+`admin-reactivate-user`. Already a member: `ok`, nothing written twice
+(`addMembership` is idempotent). An App admin's own account is refused
+(`no-user`): App admins act in any space without being in it (35a).
 
 **`admin-everyone` (5214).** For each person send `orgs: memberOf(u)` and
 `suspendedIn: normalisedUser(u).suspendedIn` (so an old `suspended` is
@@ -597,6 +658,7 @@ absent on an older server: just `org`"). Document `suspendedIn`,
 
 - `whoAmI(key, org?, code?)`: `params` gain `code` when given.
 - `joinSpace(code)` → `call("join-space", { body: { code } })`.
+- `addMember(handle, org)` → `call("admin-add-member", { body: { handle, org } })`.
 - `leaveSpace(org?)` → `call("leave-space", { body: {}, org })`.
 - `practiced(orgs: string[])` → body `{ orgs }`.
 - `reissueKey`, `suspendUser`, etc. already take `org`.
@@ -686,6 +748,17 @@ display shows the explain() sentence. Super admin `EveryonePeople` (9624):
 and `u.suspended` → `u.suspendedIn && u.suspendedIn[o.id]` in the meta
 and the suspend/reactivate choice.
 
+**"Add to a space" (stage 2), in `EveryonePeople`.** On each person's
+`Tile` (not an App admin's), an `IconButton icon="add" label="Add to a
+space"`. It opens the screen's existing `ConfirmModal` (`setConfirm`)
+titled "Add {name} to a space", whose body is a `RadioGroup` of the
+spaces in `data.orgs` the person is not in (`!u.orgs.includes(o.id)`),
+open ones only; the button reads "Add". Nothing to offer (in every open
+space) → the `IconButton` is not rendered. On confirm:
+`API.addMember(u.handle, chosen)`, then reload the list (the same
+`API.everyone()` call the screen makes at start). The person then appears
+under that space too. No key is shown: theirs already opens it.
+
 **Smoke harness (`tests/smoke.mjs`).** The `whoami` stub (368) answers
 `orgs: [account.org]` from stage 1. Stage 2 adds `join-space` and the
 `org` of `leave-space`; stage 3 adds a walk with two spaces in `orgs`: the
@@ -710,8 +783,8 @@ and `practiced` is sent with `orgs`.
   through `suspensionIn` and `memberOf`. `grep -n "\.suspended\b\|orgOf(u\|orgOf(me\|orgOf(target\|orgOf(user" server/api/courses.js`
   after each stage: every hit must be one this plan names.
 - **The `PLACED` table in `tests/spaces.test.mjs`** (257–291) must gain
-  `join-space` (under `crossed`), or the "every action is placed" test
-  fails.
+  `join-space` (under `crossed`) and `admin-add-member` (under `spaces`),
+  or the "every action is placed" test fails.
 - **Deck titles are tags.** Progress groups by `item.tags`; two spaces may
   each have "Lesson 1". Stage 3 keys the tiles by space as well (B4).
 - **`TEACHES_KEY`** (ArabicTrainer 10039) caches whether Teaching shows.
@@ -736,7 +809,7 @@ Server (`server/api/courses.js`):
 - [ ] `signin`/`whoami`: `active`, landing, `orgs` in the answer, `code`.
 - [ ] `touch` as `updateJson`; `practiced` with `orgs`; `taught` per space.
 - [ ] `report-flag` org stamp; `my-material` `teaches` and `org` on courses; `my-courses` `org`.
-- [ ] `joinByCode`; `join-course` and `join-space` through it.
+- [ ] `addMembership`; `joinByCode`; `join-course` and `join-space` through it; `admin-add-member`.
 - [ ] `suspend` per space; suspend/reactivate; `leave-space` by `x-org`.
 - [ ] `admin-overview` per-space view; `admin-reissue-key` rule; `admin-delete-user`; `admin-purge-former`; `admin-hand-over`.
 - [ ] `admin-everyone`, `admin-orgs`, `admin-org-admins`, archive/delete org.
@@ -757,7 +830,8 @@ Tests (`tests/spaces.test.mjs`), a new block "memberships (0.564)":
 - [ ] `admin-delete-user` for `both` by Lingua's admin → `removed: "membership"`, still signs in, in Main only; rejoin by course code.
 - [ ] `delete-account` by `both` → Former members record in both spaces; key refused.
 - [ ] `admin-delete-org` of a third space with a member who is also in Main → that member still signs in.
-- [ ] `PLACED.crossed` gains `join-space`.
+- [ ] `admin-add-member` for Main's teacher into Lingua by the App admin → 200 with two `orgs`; by Lingua's admin → 403 `admin-only`; a second time → 200 and no duplicate; for the App admin's own handle → 404; into an archived space → 403 `space-closed`; for someone Lingua's admin removed → 200, back on their courses, off Former members.
+- [ ] `PLACED.crossed` gains `join-space`; `PLACED.spaces` gains `admin-add-member`.
 
 Docs: `CHANGELOG.md` entry in A's terms; `README.md` "Memberships (since
 stage 1's release)"; `DECISIONS.md` for the key rule, per-space stamps,
@@ -765,7 +839,8 @@ and "a course code joins the space".
 
 ### Stage 2 — joining and moving around
 
-- [ ] `courses-api.ts`: `joinSpace`, `leaveSpace(org)`, `whoAmI` with `code`, `rememberSpace`/`lastSpace`.
+- [ ] `courses-api.ts`: `joinSpace`, `addMember`, `leaveSpace(org)`, `whoAmI` with `code`, `rememberSpace`/`lastSpace`.
+- [ ] Super admin → People: "Add to a space" on each person's tile.
 - [ ] Launch and sign-in pass the address or remembered space; remember on success; drop `otherSpace` on sign-in.
 - [ ] `strayInvite` by membership; the "Join {space}?" screen; `removed` notice; `?join=` for a space already joined.
 - [ ] You menu `Segmented` of spaces; reload on choice.
