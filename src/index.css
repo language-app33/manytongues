@@ -3237,6 +3237,13 @@ button.at-stat { transition: border-color 140ms ease; }
   padding:0 52px 0 12px; border-radius: var(--r-sm); font-size:14px;
   opacity:0; pointer-events:none; transition: opacity .18s ease; }
 .at-headsearch.open .at-headsearchfield { opacity:1; pointer-events:auto; }
+/* The field's own clear button is the cross at its far end; the browser's
+   smaller one beside it would be a second way to do the same thing. */
+.at-headsearchfield::-webkit-search-cancel-button,
+.at-headsearchfield::-webkit-search-decoration { -webkit-appearance:none; appearance:none; display:none; }
+/* The courses page's headings at the card editor's heading size (0.571). */
+.at-coursesection .at-sectionhead { font-size:25px; font-weight:800;
+  letter-spacing:-.015em; line-height:1.15; }
 .at-headsearch .at-headsearchbtn { position:absolute; top:0; right:0; flex:0 0 auto;
   width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
 .at-headsearch.open .at-headsearchbtn { border-color: transparent; background: transparent; }

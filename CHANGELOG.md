@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.571 — 5 November 2026
+
+**Courses: one clear button, bigger headings.**
+
+- Typing in the course search no longer shows two crosses at its right
+  end. Only the larger one, which closes the search, is left.
+- "My courses" and the heading over the box for joining a course are now
+  the size of the headings in the card editor.
+- Released without running the test suite, at the owner's request.
+
 ## 0.570 — 5 November 2026
 
 **Courses are searched from a button beside "My courses".**

@@ -1214,7 +1214,7 @@ export function CoursesPage({
           says what to do, so the join box below is the whole screen until
           there is a first course. */}
       {courses.length > 0 && (
-        <section className="at-section">
+        <section className="at-section at-coursesection">
           <div className="at-headrow">
             <h3 className="at-sectionhead">My courses</h3>
             <HeadSearch label="Search courses" query={query} onQuery={setQuery} />
@@ -1233,7 +1233,7 @@ export function CoursesPage({
       )}
 
       {/* The heading names the section; the box holds only the doing. */}
-      <section className="at-section">
+      <section className="at-section at-coursesection">
         <h3 className="at-sectionhead">{joinTitle}</h3>
         <div className="at-joinbox">
           <Help>
