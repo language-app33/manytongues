@@ -1572,6 +1572,37 @@ the backup manifest limited to one org and without personal records, its
 chunks fetched like a backup's; `admin-org-usage` counts what an org holds
 and the bytes of its media. Both are the App admin's, from Admin → Spaces.
 
+Memberships (since 0.569; `docs/PLAN-memberships.md`, all three stages in one release):
+
+- An account may be in several spaces. `orgs` on the user record lists
+  them; one written before has only `org` and is in that one space.
+  `memberOf` is the only reader of either. `org` is still written, as the
+  first space.
+- Suspension is per space (`suspendedIn`, read through `suspensionIn`,
+  which also reads an old `suspended`), and so are "last practised" and
+  "last changed material" (`lastLearnedIn`, `lastTaughtIn`). The
+  account-wide moments stay, for Super admin.
+- A request still acts in one org. For a member it is the one `x-org`
+  names, when they may act there (in it, not suspended, not closed), else
+  the first they may. Three actions read across every space the caller may
+  use, and only those (`WIDE`): `my-material`, `report-flag` and
+  `practiced`. Not `my-courses`, which is Teaching's list and of one space. `inScope` treats a user record as in scope when one of
+  its spaces is.
+- Joining is by code (`joinByCode`): a course code or an invitation, signed
+  in or at sign-in, adds the space. `addMembership` and `removeMembership`
+  are the two writes of a membership; reactivating, rejoining and the App
+  admin's `admin-add-member` all go through the first, removal from one
+  space of several through the second. `wipeAccount` walks every space.
+- A space admin may give a new key only to someone in their space alone
+  (`many-spaces`).
+- In the app, the address is the space you are in when it is one of yours
+  (`atOwnAddress` in the trainer); a member's requests carry it as `x-org`.
+  Going to another of your spaces, from the You menu, reloads at its
+  address. Learning's space row narrows `inPlay`, the same test the
+  languages switch narrows, so every reader of `shown` follows it. A
+  card's space is its course's (`spaceOfItem`); a learner's own card is in
+  none and is shown under every choice.
+
 ## How it fits together
 
 ```

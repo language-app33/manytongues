@@ -160,10 +160,10 @@ const crossing = () => /** @type {[string, any][]} */ ([
 ]);
 
 test("a teacher in Main can't reach anything of B's", async () => {
-  const course = (await api("my-courses", { key: b.teacher.key })).json.courses.find((/** @type {any} */ c) => c.id === b.course.id);
   for (const [action, req] of crossing()) {
     const r = /** @type {any} */ (req);
-    if (action === "join-course") r.body = { code: course.code };
+    /* A real course code from another space joins it (memberships), which
+       the block below tests; here, a code that names nothing. */
     const res = await api(action, { key: main.teacher.key, ...r });
     assert.ok(res.status >= 400, `${action} answered ${res.status}: ${JSON.stringify(res.json)}`);
   }
@@ -262,7 +262,7 @@ const PLACED = {
     "admin-delete-user", "admin-delete-course", "admin-rename-course", "admin-course-language",
     "admin-new-code", "admin-card", "admin-delete-flags", "assign-student", "assign-teacher",
     "remove-member", "export-plan", "export-chunk", "create-course", "create-deck", "report-flag",
-    "admin-create-user", "admin-create-org",
+    "admin-create-user", "admin-create-org", "join-space",
   ],
   /* The App admin's tools for spaces themselves (stage 3), tried below. */
   spaces: [
@@ -281,6 +281,8 @@ const PLACED = {
     "card-to-space",
     /* 0.552: feedback about the app, and deleting a former member for good. */
     "send-feedback", "admin-delete-feedback", "admin-purge-former",
+    /* Memberships: the App admin adds an existing person to a space. */
+    "admin-add-member",
   ],
   own: [
     "signup", "signin", "whoami", "practiced", "delete-account", "rename", "claim-admin",
@@ -339,20 +341,19 @@ test("signing up needs a code, and the code decides the space", async () => {
   assert.ok(roster.students.includes(pupil.json.user.handle));
 });
 
-test("signing in at another space's address says whose the key is", async () => {
+test("signing in at a space you're not in lands you in your own", async () => {
+  /* Memberships: no longer refused as "other-space". */
   const wrong = await api("whoami", { key: b.student.key, params: { org: "main" } });
-  assert.equal(wrong.status, 409);
-  assert.equal(wrong.json.space.id, B);
+  assert.equal(wrong.status, 200);
+  assert.equal(wrong.json.user.org.id, B);
+  assert.deepEqual(wrong.json.user.orgs.map((/** @type {any} */ o) => o.id), [B]);
   const right = await api("whoami", { key: b.student.key, params: { org: B } });
   assert.equal(right.status, 200);
   assert.equal(right.json.user.org.id, B);
+  /* Nothing kept about memberships leaves the server. */
+  for (const k of ["keyHash", "suspendedIn", "lastLearnedIn", "lastTaughtIn"]) assert.equal(k in right.json.user, false, k);
   /* An App admin may open any address. */
   assert.equal((await api("whoami", { key: admin.key, params: { org: B } })).status, 200);
-  /* A course code from another space, used by someone signed in, says whose. */
-  const course = (await api("my-courses", { key: b.teacher.key })).json.courses.find((/** @type {any} */ c) => c.id === b.course.id);
-  const join = await api("join-course", { key: main.student.key, body: { code: course.code } });
-  assert.equal(join.status, 409);
-  assert.equal(join.json.space.id, B);
 });
 
 test("a closed space refuses its people until it reopens", async () => {
@@ -621,4 +622,214 @@ test("a space's export holds that space and nothing else, and its usage is count
   assert.equal(usage.decks, 1);
   assert.equal(usage.courses, 1);
   assert.equal(usage.people, 3);
+});
+
+/* ------------------------------------------------- memberships (docs/PLAN-memberships.md) */
+
+/** A course's student code, read as its teacher sees it. */
+async function codeOf(/** @type {{ key: string }} */ teacher, /** @type {string} */ courseId) {
+  const course = (await api("my-courses", { key: teacher.key })).json.courses.find((/** @type {any} */ c) => c.id === courseId);
+  return course.code;
+}
+/** A space's invitation code, read as its admin sees it. */
+async function inviteOf(/** @type {{ key: string }} */ lead) {
+  return (await api("admin-overview", { key: lead.key })).json.invite.code;
+}
+const orgIds = (/** @type {any} */ r) => r.json.user.orgs.map((/** @type {any} */ o) => o.id);
+const handles = (/** @type {any[]} */ rows) => (rows || []).map((u) => u.handle);
+
+test("a course code from another space joins it, and the account is in both", async () => {
+  const p = await another("both-p");
+  const q = await another("both-q");
+  const both = p.student;
+  const join = await api("join-course", { key: both.key, body: { code: await codeOf(q.teacher, q.course.id) } });
+  assert.equal(join.status, 200, JSON.stringify(join.json));
+  assert.equal(join.json.space.id, q.id);
+  /* Whoami lands where asked, among the spaces it may use. */
+  const atQ = await api("whoami", { key: both.key, params: { org: q.id } });
+  assert.equal(atQ.json.user.org.id, q.id);
+  assert.deepEqual(orgIds(atQ).sort(), [p.id, q.id].sort());
+  assert.equal((await api("whoami", { key: both.key, params: { org: p.id } })).json.user.org.id, p.id);
+  /* Learning holds both spaces' courses, each saying its space. */
+  const material = (await api("my-material", { key: both.key })).json;
+  const courses = material.courses.map((/** @type {any} */ c) => [c.id, c.org]);
+  assert.deepEqual(courses.sort(), [[p.course.id, p.id], [q.course.id, q.id]].sort());
+  assert.ok(material.decks.some((/** @type {any} */ d) => d.id === q.deck.id && d.courseId === q.course.id));
+  assert.equal(material.teaches, false);
+  /* Nobody else reads across: Q's teacher still sees Q alone. */
+  const qMaterial = (await api("my-material", { key: q.student.key })).json;
+  assert.deepEqual(qMaterial.courses.map((/** @type {any} */ c) => c.id), [q.course.id]);
+  /* Each space's admin sees them; nothing says they are elsewhere. */
+  const pPeople = (await api("admin-overview", { key: p.lead.key })).json.users;
+  const qPeople = (await api("admin-overview", { key: q.lead.key })).json.users;
+  assert.ok(handles(pPeople).includes(both.handle));
+  assert.ok(handles(qPeople).includes(both.handle));
+  const row = qPeople.find((/** @type {any} */ u) => u.handle === both.handle);
+  for (const k of ["orgs", "suspendedIn", "lastLearnedIn", "lastTaughtIn", "keyHash"]) assert.equal(k in row, false, k);
+  /* A request still acts in one space: x-org names one the account is in. */
+  assert.equal((await api("course-decks", { key: both.key, org: q.id, params: { course: q.course.id } })).status, 200);
+  assert.ok((await api("deck-cards", { key: both.key, org: q.id, params: { deck: b.deck.id } })).status >= 400);
+  /* And a space it isn't in means nothing. */
+  assert.ok((await api("deck-cards", { key: both.key, org: B, params: { deck: b.deck.id } })).status >= 400);
+});
+
+test("an invitation joins a second space while signed in, once", async () => {
+  const p = await another("inv-p");
+  const q = await another("inv-q");
+  const code = await inviteOf(q.lead);
+  assert.equal((await api("join-space", { key: p.teacher.key, body: { code } })).status, 200);
+  assert.equal((await api("join-space", { key: p.teacher.key, body: { code } })).status, 200);
+  const store = getStore("arabic-courses");
+  const rec = JSON.parse(String(await store.get(`user:${p.teacher.handle}`, { type: "text" })));
+  assert.deepEqual(rec.orgs, [p.id, q.id], "no duplicate membership");
+  /* Teaching is of the space acted in: they teach in P, not Q. */
+  assert.equal((await api("my-material", { key: p.teacher.key, org: p.id })).json.teaches, true);
+  assert.equal((await api("my-material", { key: p.teacher.key, org: q.id })).json.teaches, false);
+  assert.equal((await api("join-space", { key: p.teacher.key, body: { code: "nothing-here" } })).status, 404);
+});
+
+test("leaving and suspension are per space, and a rejoin puts you back", async () => {
+  const p = await another("leave-p");
+  const q = await another("leave-q");
+  const both = p.student;
+  await api("join-course", { key: both.key, body: { code: await codeOf(q.teacher, q.course.id) } });
+  /* Leaving Q. */
+  assert.equal((await api("leave-space", { key: both.key, org: q.id, body: {} })).status, 200);
+  const qOver = (await api("admin-overview", { key: q.lead.key })).json;
+  assert.ok(handles(qOver.former).includes(both.handle));
+  assert.ok(!handles((await api("admin-overview", { key: p.lead.key })).json.former).includes(both.handle));
+  const after = (await api("my-material", { key: both.key })).json;
+  assert.deepEqual(after.courses.map((/** @type {any} */ c) => c.id), [p.course.id]);
+  assert.deepEqual(orgIds(await api("whoami", { key: both.key })), [p.id]);
+  /* The invitation brings them back, with their course, off Former members. */
+  assert.equal((await api("join-space", { key: both.key, body: { code: await inviteOf(q.lead) } })).status, 200);
+  const back = (await api("my-material", { key: both.key })).json;
+  assert.ok(back.courses.some((/** @type {any} */ c) => c.id === q.course.id));
+  assert.ok(!handles((await api("admin-overview", { key: q.lead.key })).json.former).includes(both.handle));
+
+  /* Q's admin suspends them in Q: Q says suspended, P doesn't. */
+  assert.equal((await api("admin-suspend-user", { key: q.lead.key, body: { handle: both.handle } })).status, 200);
+  const inQ = (await api("admin-overview", { key: q.lead.key })).json.users.find((/** @type {any} */ u) => u.handle === both.handle);
+  const inP = (await api("admin-overview", { key: p.lead.key })).json.users.find((/** @type {any} */ u) => u.handle === both.handle);
+  assert.ok(inQ.suspended);
+  assert.ok(!inP.suspended);
+  assert.equal((await api("whoami", { key: both.key })).status, 200, "still signs in, to P");
+  /* Removed: a code can't bring them back; their admin can. */
+  const refused = await api("join-space", { key: both.key, body: { code: await inviteOf(q.lead) } });
+  assert.equal(refused.status, 403);
+  assert.equal(refused.json.error, "removed");
+  assert.equal((await api("admin-reactivate-user", { key: q.lead.key, body: { handle: both.handle } })).status, 200);
+  assert.ok((await api("my-material", { key: both.key })).json.courses.some((/** @type {any} */ c) => c.id === q.course.id));
+});
+
+test("a space admin gives a new key only to someone in their space alone", async () => {
+  const p = await another("key-p");
+  const q = await another("key-q");
+  await api("join-course", { key: p.student.key, body: { code: await codeOf(q.teacher, q.course.id) } });
+  const refused = await api("admin-reissue-key", { key: q.lead.key, body: { handle: p.student.handle } });
+  assert.equal(refused.status, 403);
+  assert.equal(refused.json.error, "many-spaces");
+  assert.equal((await api("admin-reissue-key", { key: q.lead.key, body: { handle: q.student.handle } })).status, 200);
+  assert.equal((await api("admin-reissue-key", { key: admin.key, org: q.id, body: { handle: p.student.handle } })).status, 200);
+});
+
+test("practice is counted per space for space admins, and account-wide for Super admin", async () => {
+  const p = await another("seen-p");
+  const q = await another("seen-q");
+  const both = p.student;
+  await api("join-course", { key: both.key, body: { code: await codeOf(q.teacher, q.course.id) } });
+  assert.equal((await api("practiced", { key: both.key, body: { orgs: [p.id] } })).status, 200);
+  const row = async (/** @type {{ key: string }} */ lead) =>
+    (await api("admin-overview", { key: lead.key })).json.users.find((/** @type {any} */ u) => u.handle === both.handle);
+  assert.ok((await row(p.lead)).lastLearned > 0);
+  assert.ok(!(await row(q.lead)).lastLearned);
+  const everyone = (await api("admin-everyone", { key: admin.key })).json.people.find((/** @type {any} */ u) => u.handle === both.handle);
+  assert.ok(everyone.lastLearned > 0);
+  assert.deepEqual(everyone.orgs.sort(), [p.id, q.id].sort());
+  /* A space it isn't in is not stamped. */
+  await api("practiced", { key: both.key, body: { orgs: [B] } });
+  const store = getStore("arabic-courses");
+  const rec = JSON.parse(String(await store.get(`user:${both.handle}`, { type: "text" })));
+  assert.equal(B in (rec.lastLearnedIn || {}), false);
+});
+
+test("a closed space hides its courses; only every space closed locks you out", async () => {
+  const p = await another("shut-p");
+  const q = await another("shut-q");
+  const both = p.student;
+  await api("join-course", { key: both.key, body: { code: await codeOf(q.teacher, q.course.id) } });
+  assert.equal((await api("admin-archive-org", { key: admin.key, body: { id: q.id } })).status, 200);
+  const who = await api("whoami", { key: both.key, params: { org: q.id } });
+  assert.equal(who.status, 200);
+  assert.equal(who.json.user.org.id, p.id);
+  assert.deepEqual(orgIds(who), [p.id]);
+  assert.deepEqual((await api("my-material", { key: both.key })).json.courses.map((/** @type {any} */ c) => c.id), [p.course.id]);
+  assert.equal((await api("whoami", { key: q.student.key })).json.error, "space-closed");
+  assert.equal((await api("admin-reopen-org", { key: admin.key, body: { id: q.id } })).status, 200);
+});
+
+test("removing someone in two spaces from one keeps the other; deleting the account leaves a record in each", async () => {
+  const p = await another("gone-p");
+  const q = await another("gone-q");
+  const both = p.student;
+  await api("join-course", { key: both.key, body: { code: await codeOf(q.teacher, q.course.id) } });
+  /* Q's admin suspends, then deletes for good from Former members: only Q goes. */
+  await api("admin-suspend-user", { key: q.lead.key, body: { handle: both.handle } });
+  assert.equal((await api("admin-purge-former", { key: q.lead.key, body: { handle: both.handle } })).status, 200);
+  const still = await api("whoami", { key: both.key });
+  assert.equal(still.status, 200);
+  assert.deepEqual(orgIds(still), [p.id]);
+  assert.ok(!handles((await api("admin-overview", { key: q.lead.key })).json.users).includes(both.handle));
+  /* They can rejoin by course code. */
+  assert.equal((await api("join-course", { key: both.key, body: { code: await codeOf(q.teacher, q.course.id) } })).status, 200);
+  /* Deleting the account: a Former members record in each space, and the key refused. */
+  assert.equal((await api("delete-account", { key: both.key, body: {} })).status, 200);
+  assert.ok(handles((await api("admin-overview", { key: p.lead.key })).json.former).includes(both.handle));
+  assert.ok(handles((await api("admin-overview", { key: q.lead.key })).json.former).includes(both.handle));
+  assert.equal((await api("whoami", { key: both.key })).status, 401);
+});
+
+test("deleting a space keeps a member who is also in another", async () => {
+  const p = await another("del-p");
+  const q = await another("del-q");
+  await api("join-course", { key: p.student.key, body: { code: await codeOf(q.teacher, q.course.id) } });
+  const gone = await api("admin-delete-org", { key: admin.key, body: { id: q.id, confirm: "del-q" } });
+  assert.equal(gone.status, 200, JSON.stringify(gone.json));
+  const who = await api("whoami", { key: p.student.key });
+  assert.equal(who.status, 200);
+  assert.deepEqual(orgIds(who), [p.id]);
+  assert.equal((await api("whoami", { key: q.student.key })).status, 401);
+});
+
+test("the App admin adds an existing person to a space; nobody else can", async () => {
+  const p = await another("add-p");
+  const q = await another("add-q");
+  const added = await api("admin-add-member", { key: admin.key, body: { handle: p.teacher.handle, org: q.id } });
+  assert.equal(added.status, 200, JSON.stringify(added.json));
+  assert.deepEqual(added.json.orgs, [p.id, q.id]);
+  assert.equal((await api("admin-add-member", { key: admin.key, body: { handle: p.teacher.handle, org: q.id } })).status, 200);
+  const store = getStore("arabic-courses");
+  const rec = JSON.parse(String(await store.get(`user:${p.teacher.handle}`, { type: "text" })));
+  assert.deepEqual(rec.orgs, [p.id, q.id], "no duplicate");
+  assert.equal((await api("admin-add-member", { key: q.lead.key, body: { handle: p.student.handle, org: q.id } })).status, 403);
+  assert.equal((await api("admin-add-member", { key: admin.key, body: { handle: admin.handle, org: q.id } })).status, 404);
+  /* Into a closed space: no. */
+  await api("admin-archive-org", { key: admin.key, body: { id: p.id } });
+  assert.equal((await api("admin-add-member", { key: admin.key, body: { handle: q.student.handle, org: p.id } })).status, 403);
+  await api("admin-reopen-org", { key: admin.key, body: { id: p.id } });
+  /* Someone a space admin removed is put back, with their course. */
+  await api("admin-suspend-user", { key: q.lead.key, body: { handle: q.student.handle } });
+  assert.equal((await api("admin-add-member", { key: admin.key, body: { handle: q.student.handle, org: q.id } })).status, 200);
+  assert.ok((await api("my-material", { key: q.student.key })).json.courses.some((/** @type {any} */ c) => c.id === q.course.id));
+  assert.ok(!handles((await api("admin-overview", { key: q.lead.key })).json.former).includes(q.student.handle));
+});
+
+test("Teaching's list of courses is of the space acted in, for a teacher in two", async () => {
+  const p = await another("teach-p");
+  const q = await another("teach-q");
+  await api("join-space", { key: p.teacher.key, body: { code: await inviteOf(q.lead) } });
+  const atP = (await api("my-courses", { key: p.teacher.key, org: p.id })).json.courses.map((/** @type {any} */ c) => c.id);
+  const atQ = (await api("my-courses", { key: p.teacher.key, org: q.id })).json.courses.map((/** @type {any} */ c) => c.id);
+  assert.deepEqual(atP, [p.course.id]);
+  assert.deepEqual(atQ, []);
 });

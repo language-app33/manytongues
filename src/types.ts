@@ -802,6 +802,14 @@ export interface User {
   org?: string | { id: string; slug: string; name: string; logo: string; colour: string };
   /** Whether this account runs its space (0.544). Worked out by whoami, never stored. */
   orgAdmin?: boolean;
+  /**
+   * Every space this account may use, as whoami answers them
+   * (memberships). Absent from an older server: `org` alone. On the server
+   * the record keeps `orgs` as ids, with `suspendedIn`, `lastLearnedIn`
+   * and `lastTaughtIn` per space; none of those is ever sent, like the
+   * key's digest.
+   */
+  orgs?: { id: string; slug: string; name: string; logo: string; colour: string }[];
   /** False until the person has ticked that their key is saved (0.544). Absent: saved. */
   keySaved?: boolean;
   /** While suspended: when, by whom, why, and the courses to put back (0.544). */

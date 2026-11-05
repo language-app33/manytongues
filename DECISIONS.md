@@ -7311,3 +7311,83 @@ each refresh that finds a change, to find the person's own decks; and a
 learner's own cards can't be reported (they are theirs to fix), so a report
 from My space names only the card.
 
+
+---
+
+## One account, several spaces, without a migration
+
+**5 November 2026** · `memberOf`, `suspensionIn`, `inScope` in `server/api/courses.js`
+
+An account now carries `orgs`, the spaces it is in. Nothing rewrites the
+accounts that exist: `memberOf` reads an account without `orgs` as being
+in its one `org`, and `suspensionIn` reads an old `suspended` as a
+suspension in that space. This is the same choice `orgOf` made when
+spaces came in, for the same reason: a migration pass is one more thing
+that can half-run. `org` is still written, as the first space, so a reader
+that was missed keeps meaning something, and a backup restored into an
+older build still finds its people.
+
+What was per account and became per space: suspension, Former members,
+"last practised" and "last changed material". "Last seen" stays one date,
+because signing in is not in any space. The account-wide moments are kept
+beside the per-space ones for Super admin (the owner's answer, 3a for
+Super admin, 3b for space admins). A space admin sees the old account-wide
+date until the person practises again, because there is nothing better to
+show and showing "never" would be wrong.
+
+A request still acts in one space. Three learner actions read across every
+space the caller may use (`WIDE`); everything else is unchanged, so every
+check that already kept spaces apart still does. The cost: an action added
+to `WIDE` later reads across spaces with no other check, so it must be one
+that only ever reads the caller's own things.
+
+---
+
+## A space admin can't give a new key to someone in two spaces
+
+**5 November 2026** · `admin-reissue-key` in `server/api/courses.js`
+
+One key opens every space its person is in. A space admin issuing one
+would be handing out a way into spaces they don't run. So a space admin
+may issue a key only to someone in their space alone; for anyone else the
+super admin does it (the owner's answer 3a). A suspended membership
+counts: the key would open it the day it is reactivated. Cost: a space
+admin who is refused learns the person is in more than one space, though
+not which.
+
+---
+
+## A course code from another space joins it
+
+**5 November 2026** · `joinByCode` in `server/api/courses.js`
+
+Typed in Learning, a course code from another space used to be refused as
+"other-space" with an offer to make a new account. It now joins the
+course and the space, which is the whole point of one account. Someone a
+space's admin removed can't come back this way: the code would undo the
+admin's decision. They come back when that admin, or the super admin,
+puts them back. Someone who left of their own accord can rejoin by code.
+
+---
+
+## Learning's space row narrows the same test the languages do
+
+**5 November 2026** · `inPlay` and `spaceOfItem` in `src/ArabicTrainer.tsx`
+
+Learning already had one place that decides what a learner is shown and
+practises: `inPlay`, which the languages switch narrows, and `shown`, which
+every Learning screen and every session builder reads. The space row is a
+second clause in that same test rather than a filter applied screen by
+screen, so Home's count, the session, Progress and Cards cannot disagree
+about which space is chosen. A card's space is its course's; a number's
+is the space of a deck its system fills; a card the learner wrote is in
+none and is shown whichever space is chosen, because hiding a learner's
+own work behind a space they didn't put it in would be wrong.
+
+Going to another of your spaces from the You menu reloads the page at its
+address, as Super admin's Open does. Cost: a reload. What it buys: every
+screen, Teaching above all, reads the space it is in from one place.
+
+The three stages of `docs/PLAN-memberships.md` shipped as one release,
+0.569, because the owner asked for the whole plan at once; the plan's
+stage boundaries are kept in its checklists.

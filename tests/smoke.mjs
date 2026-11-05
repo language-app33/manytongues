@@ -321,6 +321,14 @@ const signedUp = [];
    whatever else is in hand — so for that one the course is emptied and the
    only thing left is the skills. */
 let materialQuiet = false;
+/* Memberships: an account in two spaces, each with a course of its own.
+   Off except in the walk that sets it. */
+let materialTwoSpaces = false;
+/** @type {any[]} */
+const joinedSpaces = [];
+/* Who whoami answers as, where a walk signs somebody else in. */
+/** @type {any} */
+let whoamiAs = null;
 /* Saves the stub takes, where a walk turns them on — see save-card below. */
 let takeSaves = false;
 /** @type {any[]} */
@@ -365,9 +373,31 @@ const fakeFetch = async (input, opts = {}) => {
   }
 
   if (url.pathname === "/api/courses") {
-    if (action === "whoami") return json({ ok: true, user: { ...account, key: undefined } });
+    /* With every space the account may use (memberships): the account's
+       own `orgs` where a test gives it several, else its one space. */
+    if (action === "whoami") {
+      const own = /** @type {any} */ (whoamiAs || account);
+      const orgs = own && Array.isArray(own.orgs) ? own.orgs : own && own.org ? [own.org] : [];
+      return json({ ok: true, user: { ...own, key: undefined, orgs } });
+    }
     if (action === "my-material") {
       materialHits += 1;
+      if (materialTwoSpaces) {
+        const lingua = { ...card, id: "k999999999999", ar: "قلم", en: "pen", lat: "qalam", subs: [], clips: [] };
+        return json({
+          ok: true, version: "v-two", teaches: false,
+          courses: [
+            { id: "c1", org: "main", title: "Arabic 101", language: "ar-PS", decks: ["d1"], role: "student", studying: true, teaching: false },
+            { id: "c9", org: "lingua", title: "Lingua Arabic", language: "ar-PS", decks: ["d9"], role: "student", studying: true, teaching: false },
+          ],
+          decks: [
+            { id: "d1", title: "Lesson 1", owner: "t-1", cardIds: [card.id, phrase.id], cardCount: 2, courseId: "c1", courseTitle: "Arabic 101", courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: 1 }], version: 3 },
+            { id: "d9", title: "Lesson 1", owner: "t-9", cardIds: [lingua.id], cardCount: 1, courseId: "c9", courseTitle: "Lingua Arabic", courseLanguage: "ar-PS", courses: [{ courseId: "c9", addedAt: 1 }], version: 1 },
+          ],
+          cards: [{ deckId: "d1", cards: [card, phrase] }, { deckId: "d9", cards: [lingua] }],
+          systems: [],
+        });
+      }
       if (materialQuiet) {
         return json({
           ok: true, version: "v-quiet", teaches: true,
@@ -508,6 +538,18 @@ const fakeFetch = async (input, opts = {}) => {
       reported.push(JSON.parse(opts.body || "{}"));
       return json({ ok: true, id: "flag-1" });
     }
+    /* Memberships: a space's public face, and joining it signed in. */
+    if (action === "org-info" && materialTwoSpaces) {
+      const slug = url.searchParams.get("slug");
+      if (slug === "lingua") return json({ ok: true, org: { id: "lingua", slug: "lingua", name: "Lingua", logo: "", colour: "", logoData: "", closed: false } });
+      if (slug === "main") return json({ ok: true, org: { id: "main", slug: "main", name: "Main", logo: "", colour: "", logoData: "", closed: false } });
+      return json({ error: "no-space" }, 404);
+    }
+    if (action === "join-space") {
+      joinedSpaces.push(JSON.parse(opts.body || "{}"));
+      return json({ ok: true, space: { id: "lingua", slug: "lingua", name: "Lingua", logo: "", colour: "" } });
+    }
+    if (action === "practiced" || action === "leave-space") return json({ ok: true });
     return json({ error: "unknown-action" }, 400);
   }
   if (url.pathname === "/api/sync") {
@@ -11282,6 +11324,116 @@ const openPronounTables = async () => {
   root8.unmount();
   host8.remove();
   anyWindow.fetch = anyGlobal.fetch = fetchBefore;
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+}
+
+/* ---- memberships: one account, two spaces ----
+
+   Learning shows both spaces' courses, a row at the top narrows every tab
+   to one, and the You menu lists both. An account in one space sees no
+   row. And another space's invitation, followed signed in, asks to join
+   it rather than to make a new account. */
+{
+  const MAIN = { id: "main", slug: "main", name: "Main", logo: "", colour: "" };
+  const LINGUA = { id: "lingua", slug: "lingua", name: "Lingua", logo: "", colour: "" };
+  const both = { ...account, org: MAIN, orgs: [MAIN, LINGUA] };
+  const fresh = () => {
+    localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, items: [],
+    }));
+    localStorage.removeItem("arabic-trainer:space-filter");
+  };
+  materialTwoSpaces = true;
+  /* A learner: the device opens in Learning. The harness's first app is
+     still mounted and polling, and an answer already on its way when the
+     stub changed can write "teaches" back, so that settles first. */
+  await sleep(1500);
+  localStorage.setItem("arabic-trainer-teaches", "0");
+  localStorage.setItem("arabic-account", JSON.stringify(both));
+  whoamiAs = both;
+  fresh();
+  window.history.replaceState(null, "", "/main");
+
+  const hostM = document.createElement("div");
+  document.body.appendChild(hostM);
+  const rootM = createRoot(hostM);
+  rootM.render(React.createElement(App));
+  await sleep(2500);
+  const ready = () => Number((hostM.querySelector(".at-home[data-ready]") || { getAttribute: () => "-1" }).getAttribute("data-ready"));
+  const row = () => hostM.querySelector('[data-el="space-filter"]');
+  const rowButton = (/** @type {RegExp} */ re) =>
+    [...(row() || { querySelectorAll: () => [] }).querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
+  check("an account in two spaces sees which space Learning shows", !!row() && !!rowButton(/^All$/) && !!rowButton(/^Lingua$/) && !!rowButton(/^Main$/),
+    row() ? (row() || { textContent: "" }).textContent || "" : `no row; ${hostM.querySelector(".at-screen") ? "Teaching open" : "Learning open"}`);
+  const all = ready();
+  click(rowButton(/^Lingua$/));
+  await sleep(400);
+  const inLingua = ready();
+  click(rowButton(/^Main$/));
+  await sleep(400);
+  const inMain = ready();
+  check("choosing a space narrows what is ready to practise", all > 0 && inLingua > 0 && inMain > 0 && inLingua < all && inMain < all,
+    `all ${all}, Lingua ${inLingua}, Main ${inMain}`);
+  check("and the choice is remembered on the device", localStorage.getItem("arabic-trainer:space-filter") === "main",
+    String(localStorage.getItem("arabic-trainer:space-filter")));
+  click(rowButton(/^All$/));
+  await sleep(300);
+  check("All shows everything again", ready() === all, `${ready()} of ${all}`);
+
+  click(hostM.querySelector(".at-cornerbtn"));
+  await sleep(300);
+  const listed = hostM.querySelector('[data-el="my-spaces"]');
+  check("the You menu lists both spaces", !!listed && /Main/.test(listed.textContent || "") && /Lingua/.test(listed.textContent || ""),
+    listed ? (listed.textContent || "") : "not listed");
+  rootM.unmount();
+  hostM.remove();
+
+  /* One space: no row, and no list in the menu. */
+  whoamiAs = { ...account, org: MAIN, orgs: [MAIN] };
+  localStorage.setItem("arabic-account", JSON.stringify(whoamiAs));
+  fresh();
+  const hostO = document.createElement("div");
+  document.body.appendChild(hostO);
+  const rootO = createRoot(hostO);
+  rootO.render(React.createElement(App));
+  await sleep(2000);
+  check("an account in one space sees no row of spaces", !hostO.querySelector('[data-el="space-filter"]'));
+
+  /* Another space's invitation, followed signed in. */
+  rootO.unmount();
+  hostO.remove();
+  window.history.replaceState(null, "", "/lingua?join=lingua-code");
+  const hostJ = document.createElement("div");
+  document.body.appendChild(hostJ);
+  const rootJ = createRoot(hostJ);
+  rootJ.render(React.createElement(App));
+  await sleep(2000);
+  const text = hostJ.textContent || "";
+  check("another space's invitation asks to join it", /Join Lingua\?/.test(text) && !/make a new account/i.test(text),
+    text.slice(0, 160));
+  const join = [...hostJ.querySelectorAll("button")].find((b) => /^Join Lingua$/.test((b.textContent || "").trim()));
+  /* jsdom does not navigate: the reload into the space is all that is left. */
+  const assign = window.location.assign;
+  try {
+    Object.defineProperty(window.location, "assign", { value: () => {}, configurable: true });
+  } catch (e) {
+    /* a jsdom that will not let it be replaced: the join call is still checked */
+  }
+  click(join);
+  await sleep(600);
+  check("joining sends the invitation's code", joinedSpaces.length === 1 && joinedSpaces[0].code === "lingua-code",
+    JSON.stringify(joinedSpaces));
+  try {
+    Object.defineProperty(window.location, "assign", { value: assign, configurable: true });
+  } catch (e) {
+    /* as above */
+  }
+  rootJ.unmount();
+  hostJ.remove();
+
+  materialTwoSpaces = false;
+  whoamiAs = null;
+  window.history.replaceState(null, "", "/");
   localStorage.setItem("arabic-account", JSON.stringify(account));
 }
 

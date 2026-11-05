@@ -1,6 +1,6 @@
 # Plan: one account, several spaces
 
-**Status: settled, not started.** Written from the owner's answers to the
+**Status: built, in 0.569** (all three stages in one release). Written from the owner's answers to the
 questions in the conversation of 4–5 November 2026 and a reading of the
 repository at 0.563. No questions are open. Anything new that comes up
 while building goes back to the owner, in the way `CLAUDE.md` describes,
@@ -309,7 +309,7 @@ Two sets, declared next to `SPACE_ADMIN_MAY`'s style near the top of
 ```js
 /* Actions that read across every space the caller is in: what a learner
    holds is the union of their spaces. Everything else acts in one. */
-const WIDE = new Set(["my-material", "my-courses", "report-flag", "practiced"]);
+const WIDE = new Set(["my-material", "report-flag", "practiced"]);  // built: not my-courses, which is Teaching's list
 /* Actions a key may use even with no space to act in: the code decides. */
 const JOINS = new Set(["join-course", "join-space"]);
 ```

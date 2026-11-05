@@ -243,9 +243,15 @@ export function Onboarding({ onDone, place = {} }: {
     setBusy(true);
     setError("");
     try {
-      const r = await API.whoAmI(key.trim(), org ? org.id : "");
+      /* At a space's address, land there if the account is in it; anywhere
+         else, in the space last used on this device. A key from a space
+         this address isn't is no longer refused: it lands in its own
+         (memberships). The invitation followed lets an account with no
+         open space back in. */
+      const r = await API.whoAmI(key.trim(), org ? org.id : API.lastSpace(), place.joinCode || "");
       const account = { ...r.user, key: key.trim() };
       API.saveAccount(account);
+      if (!r.user.admin && r.user.org) API.rememberSpace(r.user.org.id);
       /* An account someone else made, signed in to for the first time, is
          asked to save its key before anything else (18a). */
       if (r.user && r.user.keySaved === false) {
@@ -255,9 +261,7 @@ export function Onboarding({ onDone, place = {} }: {
       }
       onDone(account);
     } catch (e) {
-      const there = otherSpace(e);
-      if (there) setElsewhere(there);
-      else setError(explainHere(e));
+      setError(explainHere(e));
     } finally {
       setBusy(false);
     }
@@ -277,9 +281,7 @@ export function Onboarding({ onDone, place = {} }: {
              ways forward. */
           <>
             <Notice kind="warn">
-              {step === "existing"
-                ? `This key belongs to the space ${elsewhere.name}.`
-                : `This code belongs to the space ${elsewhere.name}.`}
+              {`This code belongs to the space ${elsewhere.name}.`}
             </Notice>
             <Button variant="primary" wide className="at-mt3"
               onClick={() => {
@@ -1121,8 +1123,12 @@ export function CoursesPage({
   onJoin,
   renderCourse,
   footer,
+  groups,
 }: {
   courses: Course[];
+  /** The courses under a heading each, in place of one "My courses" list:
+      a learner's spaces, when they are in more than one (memberships). */
+  groups?: { key: string; title: string; courses: Course[] }[];
   languages: Record<LangId, Lang>;
   busy?: boolean;
   error?: Node;
@@ -1150,7 +1156,21 @@ export function CoursesPage({
           an empty box only asks what went missing. The lead above already
           says what to do, so the join box below is the whole screen until
           there is a first course. */}
-      {courses.length > 0 && (
+      {courses.length > 0 && groups && groups.map((g) => g.courses.length > 0 && (
+        <section className="at-section" key={g.key} data-el="courses-of-space">
+          <h3 className="at-sectionhead">{g.title}</h3>
+          <ItemList
+            noun="course"
+            items={g.courses}
+            size="large"
+            busy={busy}
+            empty=""
+            match={(c, q) => c.title.toLowerCase().includes(q)}
+            renderItem={renderCourse}
+          />
+        </section>
+      ))}
+      {courses.length > 0 && !groups && (
         <section className="at-section">
           <h3 className="at-sectionhead">My courses</h3>
           <ItemList
@@ -8902,8 +8922,15 @@ export function StudentCourses({
   onJoin,
   onRefresh,
   onPractise,
+  spaces,
+  mySpaceIds,
 }: {
   courses: Course[];
+  /** Every space the account is in, to say so when a code joins another. */
+  mySpaceIds?: string[];
+  /** Your spaces, when Learning shows more than one: the courses go under
+      a heading per space (memberships). */
+  spaces?: { id: string; name: string }[];
   decks: (Deck & { courseId: string, courseTitle?: string })[];
   languages: Record<LangId, Lang>;
   busy?: boolean;
@@ -8913,9 +8940,13 @@ export function StudentCourses({
   onPractise: (deckTitle: string) => void;
 }) {
   const [note, setNote] = useState("");
+  const groups = spaces && spaces.length > 1
+    ? spaces.map((o) => ({ key: o.id, title: o.name, courses: courses.filter((c) => (c as any).org === o.id) }))
+    : undefined;
   return (
     <CoursesPage
       courses={courses}
+      groups={groups}
       languages={languages}
       busy={busy}
       error={error}
@@ -8928,7 +8959,13 @@ export function StudentCourses({
       onJoin={async (code) => {
         try {
           const r = await onJoin(code);
-          setNote(r && r.course ? `Joined ${r.course.title}.` : "Joined.");
+          setNote(
+            r && r.course
+              ? r.space && mySpaceIds && mySpaceIds.length && !mySpaceIds.includes(r.space.id)
+                ? `Joined ${r.course.title}, in ${r.space.name}.`
+                : `Joined ${r.course.title}.`
+              : "Joined."
+          );
         } catch (e) {
           setNote(API.explain(e));
         }
@@ -9629,7 +9666,15 @@ function SpaceExtras({ org }: { org: API.OrgRow }) {
  * as from their space.
  */
 function EveryonePeople({ me }: { me: string }) {
-  const [data, setData] = useState<{ orgs: API.SuperOrg[]; people: (User & { org: string })[] } | null>(null);
+  const [data, setData] = useState<{
+    orgs: API.SuperOrg[];
+    /* Every space each person is in, and their suspension in each
+       (memberships); `org` alone from an older server. */
+    people: (User & { org: string; orgs?: string[]; suspendedIn?: Record<string, unknown> })[];
+  } | null>(null);
+  /* Adding an existing person to a space (memberships): who, and where. */
+  const [adding, setAdding] = useState<User | null>(null);
+  const [addTo, setAddTo] = useState("");
   const [q, setQ] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
@@ -9641,6 +9686,9 @@ function EveryonePeople({ me }: { me: string }) {
   }, [load]);
   const needle = q.trim().toLowerCase();
   const match = (u: User) => !needle || `${u.displayName} ${u.handle}`.toLowerCase().includes(needle);
+  /* Suspended in this space, not elsewhere (memberships). */
+  const suspendedHere = (u: { suspended?: unknown; suspendedIn?: Record<string, unknown> }, org: string) =>
+    u.suspendedIn ? !!u.suspendedIn[org] : !!u.suspended;
   return (
     <>
       {confirm && (
@@ -9658,6 +9706,44 @@ function EveryonePeople({ me }: { me: string }) {
             }
           }} />
       )}
+      {adding && data && (() => {
+        const theirs = (data.people.find((p) => p.handle === adding.handle) || {}) as { orgs?: string[]; org?: string };
+        const inNow = theirs.orgs || (theirs.org ? [theirs.org] : []);
+        const open = data.orgs.filter((o) => !o.archived && !inNow.includes(o.id));
+        return (
+          <ConfirmModal
+            title={`Add ${adding.displayName} to a space`}
+            confirmLabel="Add"
+            busy={busy}
+            body={
+              <>
+                <p>Their own key opens it too. No new key is made.</p>
+                <RadioGroup
+                  name="add-to-space"
+                  label="Space"
+                  value={addTo}
+                  options={open.map((o) => ({ value: o.id, label: o.name }))}
+                  onChange={setAddTo}
+                />
+              </>
+            }
+            onCancel={() => setAdding(null)}
+            onConfirm={async () => {
+              if (!addTo) return;
+              setBusy(true);
+              try {
+                await API.addMember(adding.handle, addTo);
+                setAdding(null);
+                await load();
+              } catch (e) {
+                setError(API.explain(e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+        );
+      })()}
       <Notice kind="error">{error}</Notice>
       <input className="at-input" placeholder="Search everyone, in every space" value={q}
         onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 14 }} />
@@ -9675,7 +9761,7 @@ function EveryonePeople({ me }: { me: string }) {
           Progress head theirs (0.552). */}
       <div className="at-ruled">
       {data && data.orgs.map((o) => {
-        const here = data.people.filter((u) => u.org === o.id && match(u));
+        const here = data.people.filter((u) => (u.orgs || [u.org]).includes(o.id) && match(u));
         if (!here.length) return null;
         return (
           <Section head key={o.id} title={o.name} lede={`manytongues.co/${o.slug}`}>
@@ -9683,7 +9769,7 @@ function EveryonePeople({ me }: { me: string }) {
             {here.map((u) => (
               <Tile key={u.handle}
                 title={u.displayName}
-                meta={`${u.handle}${u.admin ? " · App admin" : o.admins.includes(u.handle) ? " · Space admin" : ""}${u.suspended ? " · Suspended" : ""}`}
+                meta={`${u.handle}${u.admin ? " · App admin" : o.admins.includes(u.handle) ? " · Space admin" : ""}${suspendedHere(u, o.id) ? " · Suspended" : ""}`}
                 actions={
                   <>
                     <IconButton icon="key" label="Issue a new sign-in key" onClick={() => setConfirm({
@@ -9695,7 +9781,13 @@ function EveryonePeople({ me }: { me: string }) {
                         setNewKey({ name: u.displayName, key: r.key });
                       },
                     })} />
-                    {u.handle !== me && !u.admin && (u.suspended ? (
+                    {!u.admin && data.orgs.some((x) => !x.archived && !(u.orgs || [u.org]).includes(x.id)) && (
+                      <IconButton icon="add" label="Add to a space" onClick={() => {
+                        setAddTo("");
+                        setAdding(u);
+                      }} />
+                    )}
+                    {u.handle !== me && !u.admin && (suspendedHere(u, o.id) ? (
                       <IconButton icon="unlock" label="Reactivate" onClick={() => setConfirm({
                         title: `Reactivate ${u.displayName}?`,
                         confirmLabel: "Reactivate",

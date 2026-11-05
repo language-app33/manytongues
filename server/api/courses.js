@@ -657,19 +657,76 @@ async function updateJson(store, key, change) {
 const MAIN = "main";
 /** @type {(rec: any) => string} */
 const orgOf = (rec) => (rec && rec.org) || MAIN;
-/** @type {(rec: any, org: string) => boolean} */
-const sameOrg = (rec, org) => orgOf(rec) === org;
-/** @type {AsyncLocalStorage<{ org: string | null, self: string }>} */
+/*
+ * Memberships (docs/PLAN-memberships.md, B1). An account may be in several
+ * spaces: `orgs` lists them, and one written before memberships is in its
+ * one space, `org`. `org` is still written, as the first space, so a reader
+ * this change missed keeps meaning something. Suspension, and the moments
+ * an admin sees, are per space; these are the only readers of them.
+ */
+/** The spaces an account is in. @type {(u: any) => string[]} */
+const memberOf = (u) => (u && Array.isArray(u.orgs) && u.orgs.length ? u.orgs : [orgOf(u)]);
+/** A user record, as opposed to a card, deck, course or flag: only users carry `admin`. @type {(rec: any) => boolean} */
+const isUserRec = (rec) => !!rec && typeof rec.handle === "string" && typeof rec.admin === "boolean";
+/**
+ * This account's suspension in one space, or null. Reads the old one-space
+ * field too, for an account written before memberships.
+ * @type {(u: any, org: string) => any}
+ */
+const suspensionIn = (u, org) => {
+  if (!u) return null;
+  if (u.suspendedIn && u.suspendedIn[org]) return u.suspendedIn[org];
+  if (u.suspended && !Array.isArray(u.orgs) && orgOf(u) === org) return u.suspended;
+  return null;
+};
+/**
+ * When this account last practised in one space: account-wide until a
+ * per-space stamp exists. Undefined for never, as the account's own field
+ * reads, so a screen says "never" rather than a date in 1970.
+ * @type {(u: any, org: string) => number | undefined}
+ */
+const lastLearnedFor = (u, org) => (u.lastLearnedIn ? u.lastLearnedIn[org] || undefined : u.lastLearned || undefined);
+/** @type {(u: any, org: string) => number | undefined} */
+const lastTaughtFor = (u, org) => (u.lastTaughtIn ? u.lastTaughtIn[org] || undefined : u.lastTaught || undefined);
+/**
+ * A user record with its memberships written out: `orgs` always present and
+ * an old `suspended` folded into `suspendedIn`. Every write that changes
+ * memberships goes through this first, so the old field is never read
+ * beside the new one.
+ * @param {any} u
+ */
+function normalisedUser(u) {
+  const { suspended, ...rest } = u;
+  const orgs = memberOf(u);
+  /** @type {Record<string, any>} */
+  const suspendedIn = { ...(u.suspendedIn || {}) };
+  if (suspended && !Array.isArray(u.orgs)) suspendedIn[orgOf(u)] = suspended;
+  return { ...rest, orgs, suspendedIn };
+}
+/** What the server keeps about memberships, taken off anything sent out. @param {any} u */
+const withoutMemberships = (u) => {
+  const { keyHash: _k, orgs: _o, suspendedIn: _s, lastLearnedIn: _l, lastTaughtIn: _t, ...safe } = u;
+  return safe;
+};
+
+/** @type {AsyncLocalStorage<{ org: string | null, self: string, orgs: string[], wide: boolean }>} */
 const orgScope = new AsyncLocalStorage();
-/** Whether a record is in the org this request acts in (always, outside one). */
-/** @type {(rec: any) => boolean} */
+/**
+ * Whether a record is in the org this request acts in (always, outside one).
+ * A learner's own reading actions are `wide`: they act in every space the
+ * caller is in at once, and nothing beyond them. A person is in scope when
+ * one of their spaces is.
+ * @type {(rec: any) => boolean}
+ */
 const inScope = (rec) => {
   const at = orgScope.getStore();
   if (!rec || !at || !at.org) return true;
   /* Someone's My space (0.545): a personal deck or card is its owner's
      alone — not a co-teacher's, a space admin's or an App admin's (48a, 71a). */
   if (rec.personal && at.self && rec.owner !== at.self) return false;
-  return sameOrg(rec, at.org);
+  const orgsHere = at.wide && at.orgs.length ? at.orgs : [at.org];
+  if (isUserRec(rec)) return memberOf(rec).some((o) => orgsHere.includes(o));
+  return orgsHere.includes(orgOf(rec));
 };
 /** @type {<T>(rec: T) => T | null} */
 const scoped = (rec) => (inScope(rec) ? rec : null);
@@ -733,10 +790,23 @@ async function currentUser(req, store) {
  * quiet course from an empty one, and it is as little as will answer that —
  * no counts, no history, and nothing about what was practiced, which lives
  * in a document on the person's own device that this server cannot read.
+ *
+ * Practised and changed material are also kept per space (memberships),
+ * so a space's admin sees only what happened in their space; the
+ * account-wide moment stays for Super admin. A conditional write, because
+ * a stamp and a join can land on one account at once and a spread of the
+ * account as this request read it would drop the other.
  */
-/** @type {(store: Store, user: User, field: string) => Promise<any>} */
-const touch = (store, user, field) =>
-  writeJson(store, K.user(user.handle), { ...user, [field]: Date.now() });
+/** @type {(store: Store, user: User, field: string, orgs?: string[]) => Promise<any>} */
+const touch = (store, user, field, orgs = []) =>
+  updateJson(store, K.user(user.handle), (/** @type {any} */ cur) => {
+    if (!cur) return null;
+    const now = Date.now();
+    const per = `${field}In`;
+    const map = { ...(cur[per] || {}) };
+    for (const o of orgs) map[o] = now;
+    return { ...cur, [field]: now, ...(orgs.length ? { [per]: map } : {}) };
+  });
 
 /** @type {(course: Course | null, h: string) => boolean} */
 const isTeacher = (course, h) => !!course && (course.teachers || []).includes(h);
@@ -1012,9 +1082,39 @@ async function wipeAccount(store, handle, how = {}) {
      of theirs left to remove but their place on the rosters. */
   if (!user) return dropFromRosters(store, handle);
   const org = orgOf(user);
-  const courses = user.suspended && Array.isArray(user.suspended.courses) && user.suspended.courses.length
-    ? user.suspended.courses
-    : await coursesOf(store, handle);
+  const orgs = memberOf(user);
+  const who = how.by || handle;
+
+  /* Off every space they are in (memberships): each one's rosters and
+     admins, and a Former members record in each. The request's scope is
+     moved to each space in turn, and put back after. */
+  const scopeNow = orgScope.getStore();
+  const kept = scopeNow ? { org: scopeNow.org, wide: scopeNow.wide } : null;
+  for (const o of orgs) {
+    if (scopeNow) {
+      scopeNow.org = o;
+      scopeNow.wide = false;
+    }
+    const was = suspensionIn(user, o);
+    const courses = was && Array.isArray(was.courses) && was.courses.length ? was.courses : await coursesOf(store, handle);
+    await dropFromRosters(store, handle);
+    await updateJson(store, K.org(o), (/** @type {any} */ doc) =>
+      doc && (doc.admins || []).includes(handle) ? { ...doc, admins: doc.admins.filter((/** @type {string} */ x) => x !== handle) } : null
+    );
+    await noteFormer(store, o, {
+      handle,
+      displayName: user.displayName,
+      joined: user.created || 0,
+      left: Date.now(),
+      courses,
+      why: who === handle ? "deleted-self" : "deleted-by-admin",
+      by: who,
+    });
+  }
+  if (scopeNow && kept) {
+    scopeNow.org = kept.org;
+    scopeNow.wide = kept.wide;
+  }
 
   /* Their personal cards, taken out of whatever decks hold them, then gone. */
   const listed = (await readJson(store, K.myCards(handle))) || [];
@@ -1050,11 +1150,6 @@ async function wipeAccount(store, handle, how = {}) {
     );
   }
 
-  await dropFromRosters(store, handle);
-  await updateJson(store, K.org(org), (/** @type {any} */ o) =>
-    o && (o.admins || []).includes(handle) ? { ...o, admins: o.admins.filter((/** @type {string} */ x) => x !== handle) } : null
-  );
-
   if (user.keyHash) await store.delete(K.keyOf(user.keyHash)).catch(() => {});
   /* And the practice history, which the key's digest finds (86a). */
   if (user.keyHash) await forgetSyncDoc(user.keyHash).catch(() => {});
@@ -1065,21 +1160,225 @@ async function wipeAccount(store, handle, how = {}) {
 
   /* Their name, kept for the material that stays, and so the handle is
      never given to somebody else. */
-  await writeJson(store, K.gone(handle), { displayName: user.displayName, org, at: Date.now() });
+  await writeJson(store, K.gone(handle), { displayName: user.displayName, org, orgs, at: Date.now() });
   await updateJson(store, K.index("gone"), (/** @type {any} */ cur) =>
     (cur || []).includes(handle) ? null : (cur || []).concat([handle])
   );
-  const who = how.by || handle;
-  await noteFormer(store, org, {
-    handle,
-    displayName: user.displayName,
-    joined: user.created || 0,
-    left: Date.now(),
-    courses,
-    why: who === handle ? "deleted-self" : "deleted-by-admin",
-    by: who,
-  });
   return true;
+}
+
+/**
+ * Taking one space away from an account that has others (memberships):
+ * off that space's rosters and admins, its My space material there
+ * deleted, the membership and its stamps gone, and a Former members record
+ * unless the space itself is being deleted. Nothing about the person's
+ * other spaces is touched.
+ * @param {Store} store
+ * @param {string} handle
+ * @param {string} org
+ * @param {{ why?: string, by?: string, former?: boolean }} [how]
+ */
+async function removeMembership(store, handle, org, how = {}) {
+  const user = await readJson(store, K.user(handle));
+  if (!user) return false;
+  const scopeNow = orgScope.getStore();
+  const kept = scopeNow ? { org: scopeNow.org, wide: scopeNow.wide } : null;
+  if (scopeNow) {
+    scopeNow.org = org;
+    scopeNow.wide = false;
+  }
+  try {
+    const was = suspensionIn(user, org);
+    const courses = was && Array.isArray(was.courses) && was.courses.length ? was.courses : await coursesOf(store, handle);
+    await dropFromRosters(store, handle);
+    await updateJson(store, K.org(org), (/** @type {any} */ o) =>
+      o && (o.admins || []).includes(handle) ? { ...o, admins: o.admins.filter((/** @type {string} */ x) => x !== handle) } : null
+    );
+
+    /* Their My space in this space: personal cards, then personal decks. */
+    const listed = (await readJson(store, K.myCards(handle))) || [];
+    const cards = (await readManyJson(store, listed.map((/** @type {string} */ id) => K.card(id)))).filter(
+      (c) => c && c.personal && orgOf(c) === org
+    );
+    for (const c of cards) {
+      for (const did of c.inDecks || []) {
+        await updateJson(store, K.deck(did), (/** @type {any} */ fresh) => {
+          if (!fresh || !(fresh.cardIds || []).includes(c.id)) return null;
+          const next = fresh.cardIds.filter((/** @type {string} */ x) => x !== c.id);
+          return { ...fresh, cardIds: next, cardCount: next.length, version: (fresh.version || 1) + 1, updated: Date.now() };
+        });
+      }
+      await store.delete(K.card(c.id)).catch(() => {});
+    }
+    if (cards.length) {
+      const gone = new Set(cards.map((c) => c.id));
+      await updateJson(store, K.myCards(handle), (/** @type {any} */ cur) =>
+        (cur || []).filter((/** @type {string} */ x) => !gone.has(x))
+      );
+    }
+    const deckIds = await readIndex(store, "decks");
+    const decks = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(
+      (d) => d && d.owner === handle && d.personal && orgOf(d) === org
+    );
+    for (const d of decks) await store.delete(K.deck(d.id)).catch(() => {});
+    if (decks.length) {
+      const goneDecks = new Set(decks.map((d) => d.id));
+      await updateJson(store, K.index("decks"), (/** @type {any} */ cur) =>
+        (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x))
+      );
+    }
+
+    await updateJson(store, K.user(handle), (/** @type {any} */ cur) => {
+      if (!cur) return null;
+      const u = normalisedUser(cur);
+      const drop = (/** @type {any} */ m) => {
+        const { [org]: _x, ...rest } = m || {};
+        return rest;
+      };
+      return {
+        ...u,
+        orgs: u.orgs.filter((/** @type {string} */ x) => x !== org),
+        suspendedIn: drop(u.suspendedIn),
+        lastLearnedIn: drop(u.lastLearnedIn),
+        lastTaughtIn: drop(u.lastTaughtIn),
+      };
+    });
+    if (how.former !== false) {
+      await noteFormer(store, org, {
+        handle,
+        displayName: user.displayName,
+        joined: user.created || 0,
+        left: Date.now(),
+        courses,
+        why: how.why || "removed",
+        by: how.by || handle,
+      });
+    }
+    return true;
+  } finally {
+    if (scopeNow && kept) {
+      scopeNow.org = kept.org;
+      scopeNow.wide = kept.wide;
+    }
+  }
+}
+
+/**
+ * Putting an account into a space it is not in, or back into one it left
+ * (memberships): the membership written once, and a rejoin treated as a
+ * reactivation (0.544) — back on the courses the suspension kept, off
+ * Former members. The fresh user record, or null when the account is gone.
+ *
+ * The caller has already checked the space exists and is open, and decided
+ * whether someone *removed* from it may come back: a code may not, the App
+ * admin may.
+ * @param {Store} store
+ * @param {string} handle
+ * @param {string} orgId
+ */
+async function addMembership(store, handle, orgId) {
+  const before = await readJson(store, K.user(handle));
+  if (!before) return null;
+  const was = suspensionIn(before, orgId);
+  const fresh = await updateJson(store, K.user(handle), (/** @type {any} */ cur) => {
+    if (!cur) return null;
+    const u = normalisedUser(cur);
+    const orgs = u.orgs.includes(orgId) ? u.orgs : u.orgs.concat([orgId]);
+    if (orgs === u.orgs && !u.suspendedIn[orgId] && Array.isArray(cur.orgs) && !cur.suspended) return null;
+    const { [orgId]: _gone, ...suspendedIn } = u.suspendedIn;
+    return { ...u, orgs, suspendedIn };
+  });
+  const now = fresh || (await readJson(store, K.user(handle)));
+  if (!now) return null;
+  if (was) {
+    const scopeNow = orgScope.getStore();
+    const kept = scopeNow ? { org: scopeNow.org, wide: scopeNow.wide } : null;
+    if (scopeNow) {
+      scopeNow.org = orgId;
+      scopeNow.wide = false;
+    }
+    try {
+      /* Back on the courses they were on, the way admin-reactivate-user does it. */
+      for (const c of was.courses || []) {
+        await updateJson(store, K.course(c.id), (/** @type {Course | null} */ course) => {
+          if (!course || !inScope(course)) return null;
+          const next = { ...course, teachers: course.teachers.slice(), students: course.students.slice() };
+          if ((c.roles || []).includes("teacher") && !next.teachers.includes(handle)) next.teachers.push(handle);
+          if ((c.roles || []).includes("student") && !next.students.includes(handle)) next.students.push(handle);
+          return next;
+        });
+      }
+      await updateJson(store, K.former(orgId), (/** @type {any} */ cur) =>
+        (cur || []).some((/** @type {any} */ r) => r.handle === handle) ? cur.filter((/** @type {any} */ r) => r.handle !== handle) : null
+      );
+    } finally {
+      if (scopeNow && kept) {
+        scopeNow.org = kept.org;
+        scopeNow.wide = kept.wide;
+      }
+    }
+  }
+  return now;
+}
+
+/**
+ * The spaces an account may use right now: each it is in, not suspended
+ * there, and not closed. With the space documents, read once.
+ * @param {Store} store
+ * @param {any} me
+ */
+async function standingOf(store, me) {
+  /** @type {Map<string, any>} */
+  const orgDocs = new Map();
+  for (const id of memberOf(me)) orgDocs.set(id, await readJson(store, K.org(id)));
+  const active = memberOf(me).filter((id) => {
+    const o = orgDocs.get(id);
+    return !!o && !o.archived && !suspensionIn(me, id);
+  });
+  return { orgDocs, active };
+}
+
+/*
+ * Actions that read across every space the caller is in (memberships):
+ * what a learner holds is the union of their spaces. Everything else acts
+ * in one. And the actions a key may use with no space to act in, because
+ * the code it brings decides one.
+ */
+/* Not my-courses: that is Teaching's list, which is of one space. */
+const WIDE = new Set(["my-material", "report-flag", "practiced"]);
+const JOINS = new Set(["join-course", "join-space"]);
+
+/**
+ * Joining by a code (memberships, A2): a space's invitation adds the space;
+ * a course code adds the space and the course. Someone who left a space
+ * rejoins it this way; someone removed from it is refused — its admin
+ * reactivates them. The answer to send, with its status.
+ * @param {Store} store
+ * @param {any} me
+ * @param {string} given
+ * @returns {Promise<{ ok: boolean, status: number, body: Record<string, any> }>}
+ */
+async function joinByCode(store, me, given) {
+  const no = (/** @type {number} */ status, /** @type {Record<string, any>} */ body) => ({ ok: false, status, body });
+  const target = await codeTarget(store, given);
+  if (!target) return no(404, { error: "bad-code" });
+  const orgId = target.kind === "org" ? target.org.id : orgOf(target.course);
+  const org = await readJson(store, K.org(orgId));
+  if (!org) return no(404, { error: "no-space" });
+  if (org.archived) return no(403, { error: "space-closed" });
+  const was = suspensionIn(me, orgId);
+  if (was && was.why === "removed") return no(403, { error: "removed", space: orgCard(org) });
+  /* The App admin acts in any space without being in it (35a). */
+  if (!me.admin && !(await addMembership(store, me.handle, orgId))) return no(401, { error: "bad-key" });
+  if (target.kind === "course") {
+    const as = target.asTeacher ? "teachers" : "students";
+    const joined = await updateJson(store, K.course(target.course.id), (/** @type {Course | null} */ c) =>
+      c && !c[as].includes(me.handle) ? { ...c, [as]: c[as].concat([me.handle]) } : null
+    );
+    const { code: _c, teacherCode: _t, ...safe } = joined || (await readJson(store, K.course(target.course.id))) || target.course;
+    return { ok: true, status: 200, body: { ok: true, space: orgCard(org), course: safe, role: target.asTeacher ? "teacher" : "student" } };
+  }
+  return { ok: true, status: 200, body: { ok: true, space: orgCard(org) } };
 }
 
 /**
@@ -1213,7 +1512,7 @@ function sweepStudentMySpace(store) {
 }
 
 /** @param {Request} req */
-export default (req) => orgScope.run({ org: null, self: "" }, () => handle(req));
+export default (req) => orgScope.run({ org: null, self: "", orgs: [], wide: false }, () => handle(req));
 
 /** @param {Request} req */
 async function handle(req) {
@@ -1276,6 +1575,7 @@ async function handle(req) {
         displayName,
         admin: false,
         org: orgId,
+        orgs: [orgId],
         created: Date.now(),
         lastSeen: Date.now(),
         keySaved: false,
@@ -1291,30 +1591,49 @@ async function handle(req) {
         );
       }
       // The key is shown once and cannot be read back from the digest.
-      return json({ ok: true, user: { ...user, org: orgCard(org) }, key });
+      return json({ ok: true, user: { ...withoutMemberships(user), org: orgCard(org), orgs: [orgCard(org)] }, key });
     }
 
+    /*
+     * Signing in, and asking who you are (memberships). The space answered
+     * is the one asked for (the address open, or the one last used on the
+     * device) when the account is in it and may use it, and otherwise the
+     * first that it may. Signing in at a space you're not in is no longer
+     * refused: you land in your own (A2). An account with no space it may
+     * use gets in only with a code that gives it one — the invitation it
+     * followed. An App admin may open any address (35a), as before.
+     */
     if (action === "signin" || action === "whoami") {
       await ensureMain(store);
-      const me = await currentUser(req, store);
-      if (!me) return json({ error: "bad-key" }, 401);
-      if (me.suspended) return json({ error: "suspended" }, 403);
-      const org = await readJson(store, K.org(orgOf(me)));
-      if (org && org.archived && !me.admin) return json({ error: "space-closed" }, 403);
-      /* Signing in at another space's address (53b): say whose the key is,
-         without signing in. An App admin may open any address (35a). */
-      const at = String(url.searchParams.get("org") || "");
-      if (at && org && at !== org.id && !me.admin) {
-        return json({ error: "other-space", space: orgCard(org) }, 409);
+      const found = await currentUser(req, store);
+      if (!found) return json({ error: "bad-key" }, 401);
+      /** @type {any} */
+      let me = found;
+      let { orgDocs, active } = await standingOf(store, me);
+      const code = String(url.searchParams.get("code") || "").replace(/\s+/g, "").toLowerCase();
+      if (!me.admin && !active.length && code) {
+        const joined = await joinByCode(store, me, code);
+        if (joined.ok) {
+          me = (await readJson(store, K.user(me.handle))) || me;
+          ({ orgDocs, active } = await standingOf(store, me));
+        }
       }
+      if (!me.admin && !active.length) {
+        return json({ error: memberOf(me).some((id) => suspensionIn(me, id)) ? "suspended" : "space-closed" }, 403);
+      }
+      const at = String(url.searchParams.get("org") || "");
+      const landId = me.admin ? orgOf(me) : at && active.includes(at) ? at : active[0];
+      const org = orgDocs.get(landId) || (await readJson(store, K.org(landId)));
       await touch(store, me, "lastSeen");
-      const { keyHash, ...safe } = me;
+      const shown = me.admin ? [landId] : active;
       return json({
         ok: true,
         user: {
-          ...safe,
+          ...withoutMemberships(me),
+          suspended: undefined,
           org: org ? orgCard(org) : { id: MAIN, slug: MAIN, name: "Main", logo: "", colour: "" },
           orgAdmin: !!org && (org.admins || []).includes(me.handle),
+          orgs: shown.map((id) => orgDocs.get(id)).filter(Boolean).map(orgCard),
         },
       });
     }
@@ -1323,36 +1642,44 @@ async function handle(req) {
     if (!me) return json({ error: "bad-key" }, 401);
     const mine = me.handle;
     const iAmAdmin = !!me.admin;
-    /* A suspended account can do nothing until reactivated (64a). */
-    if (me.suspended) return json({ error: "suspended" }, 403);
 
-    /* A closed space's people can't do anything until it reopens (62a). */
-    if (!me.admin) {
-      const own = await readJson(store, K.org(orgOf(me)));
-      if (own && own.archived) return json({ error: "space-closed" }, 403);
+    /*
+     * The spaces this account may act in right now (memberships): in, not
+     * suspended there (64a), and the space not closed (62a). With none, it
+     * can do nothing but join one by a code. App admins act anywhere.
+     */
+    const { active } = await standingOf(store, me);
+    if (!iAmAdmin && !active.length && !JOINS.has(action)) {
+      return json({ error: memberOf(me).some((id) => suspensionIn(me, id)) ? "suspended" : "space-closed" }, 403);
     }
 
-    /* The org this request acts in (B3): the caller's own, or — for an App
-       admin only — the one named by x-org, when it exists. From here on the
-       readers answer null for anything in another org. */
+    /* The org this request acts in (B3): for a member, the one named by
+       x-org when they may act there, else the first they may; for an App
+       admin, the one named by x-org when it exists. From here on the
+       readers answer null for anything in another org — except in the few
+       actions that read across every space the caller is in (WIDE). */
     await ensureMain(store);
     await sweepStudentMySpace(store);
+    const asked = String(req.headers.get("x-org") || "");
     let acting = orgOf(me);
     if (iAmAdmin) {
-      const asked = String(req.headers.get("x-org") || "");
       if (asked && (await readJson(store, K.org(asked)))) acting = asked;
+    } else {
+      acting = asked && active.includes(asked) ? asked : active[0] || orgOf(me);
     }
     const scope = orgScope.getStore();
     if (scope) {
       scope.org = acting;
       scope.self = mine;
+      scope.orgs = iAmAdmin ? [acting] : active;
+      scope.wide = WIDE.has(action);
     }
     /* Who runs the space this request acts in (0.544): its space admins,
        acting in their own space, and App admins anywhere. A space admin is
        never an App admin: everything that was the App admin's alone stays
        so unless it is named for space admins below. */
     const actingOrgDoc = await readJson(store, K.org(acting));
-    const iRunThis = !!actingOrgDoc && orgOf(me) === acting && (actingOrgDoc.admins || []).includes(mine);
+    const iRunThis = !!actingOrgDoc && active.includes(acting) && (actingOrgDoc.admins || []).includes(mine);
     const iManage = iAmAdmin || iRunThis;
     /** Names for handles whose accounts were deleted (0.544): what they made keeps their name. */
     async function nameTheGone(/** @type {Record<string, string>} */ nameOf, /** @type {string[]} */ handles) {
@@ -1371,14 +1698,19 @@ async function handle(req) {
        off a list of action names — the list would be right about what was
        asked for and wrong about what happened. Every action that writes a
        card or a deck ends with it. */
-    const taught = () => touch(store, me, "lastTaught");
+    const taught = () => touch(store, me, "lastTaught", [acting]);
 
     /* The app's word that a session was practiced. Learning happens on the
        device and syncs as an opaque document, so this is the only way the
        server can know it happened at all. Sent at most once every few
-       minutes, so it is one small write however long the session runs. */
+       minutes, so it is one small write however long the session runs.
+       The app says which spaces the session's cards came from; a build
+       older than memberships doesn't, and its practice counts where the
+       request acts. */
     if (action === "practiced") {
-      await touch(store, me, "lastLearned");
+      const said = Array.isArray(body.orgs) ? body.orgs.map(String) : null;
+      const where = said ? said.filter((/** @type {string} */ o) => memberOf(me).includes(o)) : [acting];
+      await touch(store, me, "lastLearned", where);
       return json({ ok: true });
     }
 
@@ -1436,7 +1768,9 @@ async function handle(req) {
 
       const flag = {
         id: randomBytes(8).toString("hex"),
-        org: acting,
+        /* The card's own space: a learner's report reads across all of
+           theirs (memberships), so the space it goes to is the card's. */
+        org: flagged ? orgOf(flagged) : acting,
         kind,
         note,
         handle: mine,
@@ -3672,38 +4006,20 @@ async function handle(req) {
       return json({ ok: true, course: next });
     }
 
-    if (action === "join-course") {
+    /*
+     * Joining by a code, signed in (memberships): a course code, typed in
+     * Learning, or a space's invitation, followed while signed in. Either
+     * one may be another space's, which the account then joins — what used
+     * to be refused as "other-space" and answered with "make a new account".
+     * Which code was used decides what they become; studying is its own
+     * membership, and a teacher may hold it too.
+     */
+    if (action === "join-course" || action === "join-space") {
       /* Codes are made lower-case; a copy can pick up capitals or stray
          spaces on its way from one screen to another. */
       const given = String(body.code || "").replace(/\s+/g, "").toLowerCase();
-      const id = await courseForCode(store, given);
-      if (!id) return json({ error: "bad-code" }, 404);
-      const course = await readCourse(store, id);
-      if (!course) {
-        /* Another space's course (53b): say which, so the app can offer a
-           new account there. */
-        const raw = await readJson(store, K.course(id));
-        const there = raw ? await readJson(store, K.org(orgOf(raw))) : null;
-        if (there) return json({ error: "other-space", space: orgCard(there) }, 409);
-        return json({ error: "not-found" }, 404);
-      }
-
-      /* Which code was used decides what they become. A code that no longer
-         matches the course it points at has been replaced. */
-      const asTeacher = !!course.teacherCode && given === course.teacherCode;
-      const asStudent = given === course.code;
-      if (!asTeacher && !asStudent) return json({ error: "bad-code" }, 404);
-
-      /* Studying is its own membership. A teacher may hold it too — that is
-         how they get the course's cards into their own practice. */
-      const as = asTeacher ? "teachers" : "students";
-      const joined = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ c) =>
-        c && !c[as].includes(mine) ? { ...c, [as]: c[as].concat([mine]) } : null
-      );
-      if (!joined) return json({ error: "not-found" }, 404);
-
-      const { code, teacherCode, ...safe } = joined;
-      return json({ ok: true, course: safe, role: asTeacher ? "teacher" : "student" });
+      const joined = await joinByCode(store, me, given);
+      return json(joined.body, joined.status);
     }
 
     if (action === "my-courses") {
@@ -3717,6 +4033,7 @@ async function handle(req) {
           // Only a teacher hands out invitations, so only a teacher sees them.
           return {
             ...c,
+            org: orgOf(c),
             role,
             teaching,
             studying,
@@ -3910,7 +4227,10 @@ async function handle(req) {
       const courseRows = allCourses.filter((c) => isStudent(c, mine));
       /* Whether the Teaching space exists for this person is answered here
          too, so the app needn't ask a second time on every launch. */
-      const teaches = allCourses.some((c) => isTeacher(c, mine));
+      /* Teaching is of the space this request acts in (memberships): a
+         teacher in one space and a learner in another sees Teaching where
+         they teach. */
+      const teaches = allCourses.filter((c) => orgOf(c) === acting).some((c) => isTeacher(c, mine));
 
       /* My space is no longer practised in Learning (0.550, 8b): nothing of
          it is sent here. */
@@ -3999,6 +4319,8 @@ async function handle(req) {
       const version = materialVersion(courseRows, deckRows, fillsAt, systemsAt);
       const courses = courseRows.map((c) => ({
         ...c,
+        /* Said outright, so the app never needs "absent means Main". */
+        org: orgOf(c),
         code: undefined,
         teacherCode: undefined,
         role: "student",
@@ -4476,15 +4798,20 @@ async function handle(req) {
     }
 
     /**
-     * Suspend an account: off every roster, the courses kept to put back,
-     * and a Former members record.
+     * Suspend an account in the space this request acts in: off that
+     * space's rosters, its courses kept to put back, and a Former members
+     * record there. The person's other spaces are untouched (memberships).
      * @param {any} user @param {"left" | "removed"} why @param {string} by
      */
     async function suspend(user, why, by) {
       const courses = await coursesOf(store, user.handle);
       await dropFromRosters(store, user.handle);
-      await writeJson(store, K.user(user.handle), { ...user, suspended: { at: Date.now(), by, why, courses } });
-      await noteFormer(store, orgOf(user), {
+      await updateJson(store, K.user(user.handle), (/** @type {any} */ cur) => {
+        if (!cur) return null;
+        const u = normalisedUser(cur);
+        return { ...u, suspendedIn: { ...u.suspendedIn, [acting]: { at: Date.now(), by, why, courses } } };
+      });
+      await noteFormer(store, acting, {
         handle: user.handle,
         displayName: user.displayName,
         joined: user.created || 0,
@@ -4525,9 +4852,15 @@ async function handle(req) {
         for (const u of userRows) {
           if (!u) continue;
           const h = u.handle;
-          const { keyHash, ...safe } = u;
+          /* This space's view of them (memberships): suspended here or not,
+             and when they last practised or changed material here. Nothing
+             in the row says they are anywhere else. */
+          const safe = withoutMemberships(u);
           users.push({
             ...safe,
+            suspended: suspensionIn(u, acting) || undefined,
+            lastLearned: lastLearnedFor(u, acting),
+            lastTaught: lastTaughtFor(u, acting),
             /* Title and language together: a course name on its own doesn't
                say what is being taught, and that is the thing that goes wrong
                quietly. */
@@ -5013,28 +5346,17 @@ async function handle(req) {
         if (handle === mine) return json({ error: "not-yourself" }, 400);
         if (target.admin) return json({ error: "admin-only" }, 403);
         if (!iAmAdmin && (actingOrgDoc.admins || []).includes(handle)) return json({ error: "admin-only" }, 403);
+        /* In this space only (memberships): the person's other spaces are
+           untouched either way. */
         if (action === "admin-suspend-user") {
-          if (target.suspended) return json({ ok: true });
+          if (suspensionIn(target, acting)) return json({ ok: true });
           await suspend(target, "removed", mine);
           return json({ ok: true });
         }
-        if (!target.suspended) return json({ ok: true });
-        for (const c of target.suspended.courses || []) {
-          await updateJson(store, K.course(c.id), (/** @type {Course | null} */ fresh) => {
-            if (!fresh || !inScope(fresh)) return null;
-            const next = { ...fresh, teachers: fresh.teachers.slice(), students: fresh.students.slice() };
-            if ((c.roles || []).includes("teacher") && !next.teachers.includes(handle)) next.teachers.push(handle);
-            if ((c.roles || []).includes("student") && !next.students.includes(handle)) next.students.push(handle);
-            return next;
-          });
-        }
-        const { suspended: _was, ...back } = /** @type {any} */ (target);
-        await writeJson(store, K.user(handle), back);
-        await updateJson(store, K.former(orgOf(target)), (/** @type {any} */ cur) =>
-          (cur || []).some((/** @type {any} */ r) => r.handle === handle)
-            ? cur.filter((/** @type {any} */ r) => r.handle !== handle)
-            : null
-        );
+        if (!suspensionIn(target, acting)) return json({ ok: true });
+        /* Back on their courses here, off Former members: the same walk a
+           rejoin takes. */
+        await addMembership(store, handle, acting);
         return json({ ok: true });
       }
 
@@ -5057,7 +5379,7 @@ async function handle(req) {
         const former = (await readJson(store, K.former(acting))) || [];
         if (!former.some((/** @type {any} */ r) => r.handle === from)) return json({ error: "not-former" }, 400);
         const heir = await readUser(store, to);
-        if (!heir || heir.suspended) return json({ error: "not-in-space" }, 400);
+        if (!heir || suspensionIn(heir, acting)) return json({ error: "not-in-space" }, 400);
         const deckIds = await readIndex(store, "decks");
         const decks = here(await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(
           (d) => d && d.owner === from && !d.personal
@@ -5122,9 +5444,20 @@ async function handle(req) {
         for (let i = 0; i < cardIds.length; i += 100) {
           cards += (await deleteCards(cardIds.slice(i, i + 100))).deleted.length;
         }
-        await store.delete(K.myCards(handle)).catch(() => {});
-        /* The account itself, where it is still there (left or removed). */
-        if (await readUser(store, handle)) await wipeAccount(store, handle, { by: mine });
+        /* Their list of cards goes with them, unless they are in another
+           space whose cards it also lists (memberships): deleteCards has
+           already taken this space's out of it. */
+        const listOwner = await readJson(store, K.user(handle));
+        if (!listOwner || memberOf(listOwner).length < 2) await store.delete(K.myCards(handle)).catch(() => {});
+        /* The account itself, where it is still there (left or removed) —
+           or, for someone also in another space, only their place in this
+           one (memberships): the rest of the account is not this space's. */
+        const still = await readUser(store, handle);
+        if (still && memberOf(still).length > 1) {
+          await removeMembership(store, handle, acting, { why: "deleted-by-admin", by: mine, former: false });
+        } else if (still) {
+          await wipeAccount(store, handle, { by: mine });
+        }
         await updateJson(store, K.former(acting), (/** @type {any} */ cur) =>
           (cur || []).filter((/** @type {any} */ r) => r.handle !== handle)
         );
@@ -5175,6 +5508,7 @@ async function handle(req) {
             displayName: adminName,
             admin: false,
             org: id,
+            orgs: [id],
             created: Date.now(),
             lastSeen: 0,
             keySaved: false,
@@ -5218,9 +5552,11 @@ async function handle(req) {
           .map((o) => ({ id: o.id, name: o.name, slug: o.slug, admins: o.admins || [], archived: !!o.archived }));
         if (action === "admin-everyone") {
           const rows = (await readManyJson(store, (await readIndex(store, "users")).map((h) => K.user(h)))).filter(Boolean);
+          /* Every space each person is in, and their account-wide moments
+             (memberships, A2): Super admin sees the whole account. */
           const people = rows.map((u) => {
-            const { keyHash: _k, ...safe } = u;
-            return { ...safe, org: orgOf(u) };
+            const norm = normalisedUser(u);
+            return { ...withoutMemberships(u), suspended: undefined, org: orgOf(u), orgs: norm.orgs, suspendedIn: norm.suspendedIn };
           });
           return json({ ok: true, orgs, people });
         }
@@ -5243,7 +5579,7 @@ async function handle(req) {
           ok: true,
           orgs: orgs.map((o) => ({
             ...o,
-            people: users.filter((u) => orgOf(u) === o.id).map((u) => ({ handle: u.handle, displayName: u.displayName })),
+            people: users.filter((u) => memberOf(u).includes(o.id)).map((u) => ({ handle: u.handle, displayName: u.displayName })),
           })),
         });
       }
@@ -5278,6 +5614,28 @@ async function handle(req) {
         return json({ ok: true, org: next });
       }
 
+      /*
+       * Putting an existing person into a space (memberships, A2): the App
+       * admin's alone. No key changes hands — theirs now opens the space
+       * too. Someone who left it, or was removed from it, is put back as a
+       * reactivation: the App admin outranks whoever removed them. An App
+       * admin's own account is never in a space this way (35a).
+       */
+      if (action === "admin-add-member") {
+        if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+        const handle = String(body.handle || "");
+        const id = String(body.org || "");
+        const org = await readJson(store, K.org(id));
+        if (!org) return json({ error: "no-space" }, 404);
+        if (org.archived) return json({ error: "space-closed" }, 403);
+        /* Unscoped: they may be in no space this request acts in. */
+        const target = await readJson(store, K.user(handle));
+        if (!target || target.admin) return json({ error: "no-user" }, 404);
+        const fresh = await addMembership(store, handle, id);
+        if (!fresh) return json({ error: "no-user" }, 404);
+        return json({ ok: true, orgs: memberOf(fresh) });
+      }
+
       /* Who runs a space (36a): someone in it, not suspended. */
       if (action === "admin-org-admins") {
         if (!iAmAdmin) return json({ error: "admin-only" }, 403);
@@ -5287,7 +5645,7 @@ async function handle(req) {
         const remove = String(body.remove || "");
         if (add) {
           const u = await readJson(store, K.user(add));
-          if (!u || orgOf(u) !== id || u.suspended) return json({ error: "not-in-space" }, 400);
+          if (!u || !memberOf(u).includes(id) || suspensionIn(u, id)) return json({ error: "not-in-space" }, 400);
         }
         const next = await updateJson(store, K.org(id), (/** @type {any} */ o) => {
           if (!o) return null;
@@ -5304,7 +5662,7 @@ async function handle(req) {
       if (action === "admin-archive-org" || action === "admin-reopen-org") {
         if (!iAmAdmin) return json({ error: "admin-only" }, 403);
         const id = String(body.id || "");
-        if (action === "admin-archive-org" && orgOf(me) === id) return json({ error: "own-space" }, 400);
+        if (action === "admin-archive-org" && memberOf(me).includes(id)) return json({ error: "own-space" }, 400);
         const next = await updateJson(store, K.org(id), (/** @type {any} */ o) => {
           if (!o) return null;
           const { archived: _was, ...rest } = o;
@@ -5326,7 +5684,7 @@ async function handle(req) {
       if (action === "admin-delete-org") {
         if (!iAmAdmin) return json({ error: "admin-only" }, 403);
         const id = String(body.id || "");
-        if (orgOf(me) === id) return json({ error: "own-space" }, 400);
+        if (memberOf(me).includes(id)) return json({ error: "own-space" }, 400);
         const org = await readJson(store, K.org(id));
         if (!org) return json({ error: "no-space" }, 404);
         if (String(body.confirm || "") !== org.name) return json({ error: "confirm-name" }, 400);
@@ -5334,7 +5692,7 @@ async function handle(req) {
         if (scopeNow) scopeNow.org = id;
 
         const handles = await readIndex(store, "users");
-        const users = (await readManyJson(store, handles.map((h) => K.user(h)))).filter((u) => u && orgOf(u) === id);
+        const users = (await readManyJson(store, handles.map((h) => K.user(h)))).filter((u) => u && memberOf(u).includes(id));
         /* Every card of this org, gathered before any account goes: from
            its decks, and from everyone's own lists (a card can be in no
            deck, and an App admin's card can be in this org). */
@@ -5343,7 +5701,13 @@ async function handle(req) {
         for (const list of await readManyJson(store, handles.map((h) => K.myCards(h)))) {
           for (const cid of list || []) cardIds.add(cid);
         }
+        /* An account in this space alone goes; one also in another loses
+           only this space, keeping the rest (memberships). */
         for (const u of users) {
+          if (memberOf(u).length > 1) {
+            await removeMembership(store, u.handle, id, { former: false });
+            continue;
+          }
           await wipeAccount(store, u.handle);
           await store.delete(K.myCards(u.handle)).catch(() => {});
         }
@@ -5374,7 +5738,13 @@ async function handle(req) {
         const goneHere = [];
         for (const h of goneHandles) {
           const g = await readJson(store, K.gone(h));
-          if (g && g.org === id) {
+          if (!g) continue;
+          const theirs = Array.isArray(g.orgs) ? g.orgs : [g.org];
+          if (!theirs.includes(id)) continue;
+          const left = theirs.filter((/** @type {string} */ x) => x !== id);
+          if (left.length) {
+            await writeJson(store, K.gone(h), { ...g, org: g.org === id ? left[0] : g.org, orgs: left });
+          } else {
             goneHere.push(h);
             await store.delete(K.gone(h)).catch(() => {});
           }
@@ -5399,6 +5769,7 @@ async function handle(req) {
           displayName,
           admin: false,
           org: acting,
+          orgs: [acting],
           created: Date.now(),
           /* Never seen: they haven't signed in yet. The people list uses
              this to show who still hasn't picked up their key. */
@@ -5440,6 +5811,11 @@ async function handle(req) {
         const handle = String(body.handle || "");
         const target = await readUser(store, handle);
         if (!target) return json({ error: "no-user" }, 404);
+        /* One key opens every space the person is in (memberships), so a
+           space admin gives a new one only to someone in their space alone.
+           A suspended membership counts: the key would open it once
+           reactivated. */
+        if (!iAmAdmin && memberOf(target).length > 1) return json({ error: "many-spaces" }, 403);
         if (!iAmAdmin && (target.admin || (actingOrgDoc.admins || []).includes(handle))) {
           /* A space admin's key, and an App admin's, are the App admin's to
              replace (70a). */
@@ -5465,9 +5841,16 @@ async function handle(req) {
         if ((await readJson(store, K.user(handle))) && !(await readUser(store, handle))) {
           return json({ error: "no-user" }, 404);
         }
+        /* Someone also in another space loses only this one, unless the
+           App admin deletes them, who deletes the account (memberships). */
+        const target = await readUser(store, handle);
+        if (target && !iAmAdmin && memberOf(target).length > 1) {
+          await removeMembership(store, handle, acting, { why: "removed", by: mine });
+          return json({ ok: true, removed: "membership" });
+        }
         const gone = await wipeAccount(store, handle, { by: mine });
         if (!gone) return json({ error: "no-user" }, 404);
-        return json({ ok: true });
+        return json({ ok: true, removed: "account" });
       }
 
       /* Removing a course: the roster goes and the decks are released back

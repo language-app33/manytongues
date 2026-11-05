@@ -8,6 +8,76 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.569 — 5 November 2026
+
+**One account can be in several spaces, and Learning shows them all.**
+
+Joining and moving around:
+
+- **Joining another space** is the same as joining the first: open its
+  invitation link, or type one of its course codes in Learning → Courses.
+  Signed in, another space's invitation now asks "Join {space}?" instead of
+  telling you to make a new account. The account is then in both, with one
+  key.
+- **The You menu lists your spaces** when you are in more than one. Tapping
+  one takes you to its address. Teaching and Admin are of the space you are
+  in, as before.
+- Signing in at a space you're not in no longer stops you: you land in
+  your own. At manytongues.co, you land in the space you were last in on
+  that device.
+- **Leaving is per space.** Settings has a Leave line for each space you
+  are in. Leaving one, or being removed from it, takes its courses out of
+  your Learning and lists you among its former members; your account and
+  your other spaces stay. Someone who left can come back with an
+  invitation link or a course code. Someone removed can't; their space's
+  admin, or the super admin, puts them back.
+- A closed space hides its courses from people who are also in another
+  space, instead of locking them out.
+- Deleting an account removes it from every space it is in, with a former
+  members record in each.
+
+Learning across spaces:
+
+- **Home, Progress, Cards and Courses show every space's material**, and
+  one daily session draws from all of it.
+- **For someone in more than one space**, a row at the top of Learning
+  reads All · and then each space. Choosing a space narrows every tab, and
+  a session started then draws from that space alone. The choice is
+  remembered on the device. With one space, nothing changes.
+- Under All, Courses puts each space's courses under its own heading, and
+  Progress names the space on each deck, so two decks called "Lesson 1"
+  in two spaces are two tiles.
+
+For admins:
+
+- **Lost keys:** one key opens every space its person is in, so a space
+  admin can give a new key only to someone in their space alone. For
+  anyone in more than one, only the super admin can, and the space admin
+  is told so.
+- **Admin → People** shows "Last practised" and "Last changed material" for
+  that space only. Super admin still sees the account's own dates. Until
+  someone practises after this release, the date shown is the one shown
+  before.
+- **Super admin → People** lists someone under every space they are in, and
+  has **Add to a space** on each person: their own key opens it too, and
+  no new key is made. Someone a space admin removed is put back with their
+  courses.
+
+People who already have two accounts keep both. Nothing is merged.
+
+To check by hand, on the deployed app:
+
+- With a learner in one space, type a course code from another space in
+  Learning → Courses. The course appears under that space's heading, the
+  row at the top of Learning appears, and the You menu lists both spaces.
+- Choose each space in the row: Home's number changes, and a session
+  started then asks only that space's cards.
+- In each space's Admin → People, "Last practised" counts only that space.
+- As a space admin, try to give that learner a new key: it is refused with
+  a sentence saying to ask the super admin.
+- In Super admin → People, use Add to a space on someone, then sign in as
+  them and check the You menu lists the new space.
+
 ## 0.568 — 4 November 2026
 
 **Teaching names the space you are in, also for a super admin.**

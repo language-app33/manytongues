@@ -4001,10 +4001,12 @@ const LEARNED_PING_MS = 15 * 60 * 1000;
    answer between tunnels making its own failed request. */
 const LEARNED_RETRY_MS = 60 * 1000;
 let learnedQuietUntil = 0;
-function reportLearning(account: User | null) {
+/* `orgs` are the spaces the session's cards came from (memberships), so
+   each space's admin sees practice in their space alone. */
+function reportLearning(account: User | null, orgs?: string[]) {
   if (!account || now() < learnedQuietUntil) return;
   learnedQuietUntil = now() + LEARNED_PING_MS;
-  API.practiced().catch(() => {
+  API.practiced(orgs).catch(() => {
     learnedQuietUntil = Math.min(learnedQuietUntil, now() + LEARNED_RETRY_MS);
   });
 }
@@ -10034,6 +10036,9 @@ function FeedbackScreen({ onClose, onSend }: {
 /* Whether this person teaches anything, kept across launches so the space
    selector is right the moment the app opens rather than a request later. */
 const TEACHES_KEY = "arabic-trainer-teaches";
+/* Which of your spaces Learning shows (memberships): an org id, or "" for
+   all. Per device. */
+const SPACE_FILTER_KEY = "arabic-trainer:space-filter";
 function loadTeaches() {
   try {
     return localStorage.getItem(TEACHES_KEY) === "1";
@@ -10228,6 +10233,10 @@ export default function ArabicTrainer() {
    * fetched at once, signed in or not: Onboarding shows it, and an App admin
    * works in it (x-org, set through setAddressOrg).
    */
+  /* The account as this render has it, for the address lookup, which
+     answers after the render that started it. */
+  const accountNow = useRef(account);
+  accountNow.current = account;
   const [address] = useState(() => {
     const slug = (window.location.pathname.split("/")[1] || "").toLowerCase();
     const join = new URLSearchParams(window.location.search).get("join") || "";
@@ -10248,7 +10257,11 @@ export default function ArabicTrainer() {
             window.history.replaceState(null, "", `/${r.moved}${window.location.search}`);
             look(r.moved, hops + 1);
           } else if (r.org) {
-            API.setAddressOrg(r.org.id);
+            /* The address decides the space a request acts in for nobody
+               signed in, and for an App admin. A member acts in the space
+               they landed in, set below (memberships). */
+            const who = accountNow.current;
+            if (!who || who.admin) API.setAddressOrg(r.org.id);
             setAddressSpace(r.org);
           }
         },
@@ -10268,15 +10281,70 @@ export default function ArabicTrainer() {
    * admin may open any space and stays where they are; somebody who
    * followed another space's invite link is asked what they meant (82b).
    */
-  const accountOrg = account && (account as any).org;
+  /*
+   * The spaces this account is in (memberships), as whoami last said. At
+   * the address of one of them, that is the space you are in: switching
+   * space in the You menu is going to its address. Anywhere else, the
+   * space whoami landed you in.
+   */
+  const accountOrgs: API.OrgCard[] =
+    account && Array.isArray((account as any).orgs) && (account as any).orgs.length
+      ? (account as any).orgs
+      : account && (account as any).org && typeof (account as any).org === "object"
+        ? [(account as any).org]
+        : [];
+  const atOwnAddress = account && !account.admin ? accountOrgs.find((o) => o.slug === address.slug) || null : null;
+  const accountOrg = account && (atOwnAddress || (account as any).org);
+  const accountOrgId: string = accountOrg && typeof accountOrg === "object" ? accountOrg.id : "";
+  const memberAdmin = !!(account && account.admin);
+  /*
+   * The space chosen at the top of Learning (memberships): one of yours, or
+   * "" for all of them. Remembered on this device, like the languages. Only
+   * offered to someone in more than one space.
+   */
+  const learnSpaces = account && !account.admin ? accountOrgs : [];
+  const [spaceFilter, setSpaceFilterState] = useState(() => {
+    try {
+      return localStorage.getItem(SPACE_FILTER_KEY) || "";
+    } catch (e) {
+      return "";
+    }
+  });
+  const setSpaceFilter = (id: string) => {
+    setSpaceFilterState(id);
+    try {
+      localStorage.setItem(SPACE_FILTER_KEY, id);
+    } catch (e) {
+      /* private browsing: it lasts until the app is closed */
+    }
+  };
+  /* A member's requests act in the space they are in. */
+  useEffect(() => {
+    if (accountOrgId && !memberAdmin) API.setAddressOrg(accountOrgId);
+  }, [accountOrgId, memberAdmin]);
   /* The space on screen: an App admin works in the one at the address,
      everyone else in their own. Named once, so the corner menu and
      Teaching cannot disagree about it. */
   const shownSpace = account && account.admin && addressSpace ? addressSpace : accountOrg || null;
   const [inviteSetAside, setInviteSetAside] = useState(false);
+  /* Joining another space from its invitation (memberships). */
+  const [joinBusy, setJoinBusy] = useState(false);
+  const [joinError, setJoinError] = useState("");
+  /* Another space's invitation, followed while signed in: "Join it?". One
+     of your own spaces' is simply where you are. */
   const strayInvite =
     !inviteSetAside && !!account && !account.admin && !!accountOrg && !!address.join &&
-    !!addressSpace && addressSpace.id !== accountOrg.id;
+    !!addressSpace && !accountOrgs.some((o) => o.id === addressSpace.id);
+  const accountOrgIds = accountOrgs.map((o) => o.id).join(" ");
+  useEffect(() => {
+    /* An invitation to a space you are already in has nothing left to do. */
+    if (!address.join || !addressSpace || !accountOrgIds.split(" ").includes(addressSpace.id)) return;
+    const q = new URLSearchParams(window.location.search);
+    if (!q.has("join")) return;
+    q.delete("join");
+    const rest = q.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+  }, [address.join, addressSpace, accountOrgIds]);
   useEffect(() => {
     if (!account || account.admin || !accountOrg || !accountOrg.slug || strayInvite) return;
     const here = (window.location.pathname.split("/")[1] || "").toLowerCase();
@@ -10460,10 +10528,14 @@ export default function ArabicTrainer() {
   useEffect(() => {
     if (!account) return;
     API.setKey(account.key);
-    API.whoAmI(account.key)
+    /* Where to land (memberships): the space at the address when it is
+       one of yours, else the one last used on this device. The invitation
+       followed, if any, lets an account with no open space back in. */
+    API.whoAmI(account.key, (atOwnAddress && atOwnAddress.id) || API.lastSpace(), address.join)
       .then((r) => {
         const merged = { ...r.user, key: account.key };
         API.saveAccount(merged);
+        if (!r.user.admin && r.user.org) API.rememberSpace(r.user.org.id);
         setAccount(merged);
       })
       .catch((e) => {
@@ -10473,7 +10545,7 @@ export default function ArabicTrainer() {
         if (why === "space-closed" || why === "suspended") {
           API.clearAccount();
           setAccount(null);
-          setSignedOutWhy(why === "suspended" ? "This account is suspended. Ask your space's admin." : "This space is closed.");
+          setSignedOutWhy(API.explain(e));
         }
       });
   /* The key, not the account object: a re-render hands back a new
@@ -11530,17 +11602,66 @@ export default function ArabicTrainer() {
   /* And the cards that leaves. Everything a learner is shown reads this
      rather than the whole document: the card list, progress, what is ready
      to practise, and what a session is dealt from. */
-  const inPlay = useCallback(
-    (it: Item) => !langsOff.includes(langIdOf(it, settings)),
-    [langsOff, settings]
+  /*
+   * And the space chosen at the top of Learning, for someone in more than
+   * one (memberships). A card's space is its course's; a number's is the
+   * space of a deck its system fills; a card the learner wrote is in none,
+   * and is shown whichever space is chosen. Like the languages, this is
+   * what every reader below is given, so a session started while a space
+   * is chosen draws from that space alone (1a).
+   */
+  const orgOfCourse = useMemo(
+    () => new Map(myCourses.map((c) => [c.id, (c as any).org || ""] as [string, string])),
+    [myCourses]
   );
+  const orgOfSystem = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const d of courseDecks as any[]) {
+      const org = orgOfCourse.get(d.courseId) || "";
+      for (const sid of [d.numbersSystemId, d.timeSystemId]) if (sid && org && !m.has(sid)) m.set(sid, org);
+    }
+    return m;
+  }, [courseDecks, orgOfCourse]);
+  const spaceOfItem = useCallback(
+    (it: Item): string | null => {
+      const src: any = (it as any).source;
+      if (!src) return null;
+      if (src.courseId) return orgOfCourse.get(src.courseId) || null;
+      if (src.systemId) return orgOfSystem.get(src.systemId) || null;
+      return null;
+    },
+    [orgOfCourse, orgOfSystem]
+  );
+  const spaceNameOf = useMemo(() => new Map(learnSpaces.map((o) => [o.id, o.name] as [string, string])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [learnSpaces.map((o) => `${o.id}:${o.name}`).join(" ")]);
+  const spaceNow = learnSpaces.length > 1 && learnSpaces.some((o) => o.id === spaceFilter) ? spaceFilter : "";
+  const inPlay = useCallback(
+    (it: Item) => {
+      if (langsOff.includes(langIdOf(it, settings))) return false;
+      if (!spaceNow) return true;
+      const at = spaceOfItem(it);
+      return at === null || at === spaceNow;
+    },
+    [langsOff, settings, spaceNow, spaceOfItem]
+  );
+  const narrowed = langsOff.length > 0 || !!spaceNow;
   const shown = useMemo(
-    () => (langsOff.length ? items.filter(inPlay) : items),
-    [items, langsOff, inPlay]
+    () => (narrowed ? items.filter(inPlay) : items),
+    [items, narrowed, inPlay]
   );
   const drillable = useMemo(
-    () => (langsOff.length ? drillableAll.filter(inPlay) : drillableAll),
-    [drillableAll, langsOff, inPlay]
+    () => (narrowed ? drillableAll.filter(inPlay) : drillableAll),
+    [drillableAll, narrowed, inPlay]
+  );
+  /* The courses and decks Learning shows, under the same choice. */
+  const learnCourses = useMemo(
+    () => (spaceNow ? myCourses.filter((c) => ((c as any).org || "") === spaceNow) : myCourses),
+    [myCourses, spaceNow]
+  );
+  const learnDecks = useMemo(
+    () => (spaceNow ? courseDecks.filter((d: any) => orgOfCourse.get(d.courseId) === spaceNow) : courseDecks),
+    [courseDecks, spaceNow, orgOfCourse]
   );
 
   /* How much is waiting, in the languages that are switched on: the number
@@ -13287,7 +13408,21 @@ export default function ArabicTrainer() {
     }
     /* Before the grading, not after: a question answered is learning done,
        whether it was right or wrong. */
-    reportLearning(account);
+    reportLearning(
+      account,
+      session
+        ? (() => {
+            const want = new Set((session.exercises || []).map((q: Question) => q.id));
+            const orgs = new Set<string>();
+            for (const it of items) {
+              if (!want.has(it.id)) continue;
+              const at = spaceOfItem(it);
+              if (at) orgs.add(at);
+            }
+            return [...orgs];
+          })()
+        : undefined
+    );
     /* This question, and no other: the mark names the question it was
        made on, so a session that ended on it cannot carry it into the
        next one. Put down once read. */
@@ -13744,18 +13879,30 @@ export default function ArabicTrainer() {
       <div className={`at ${settings.theme || "auto"}`}>
         <div className="ob">
           <div className="ob-box">
-            <h2>This link is for {addressSpace.name}</h2>
+            <h2>Join {addressSpace.name}?</h2>
             <Lede>
-              You're signed in to {accountOrg.name}. To join {addressSpace.name}, make a new
-              account. Your current one stays, and its key still signs you in to {accountOrg.name}.
+              You're signed in as {account.displayName}. Joining adds {addressSpace.name} to this
+              account; your other spaces stay.
             </Lede>
-            <Button variant="primary" wide className="at-mt4"
-              onClick={() => {
-                API.clearAccount();
-                setAccount(null);
+            {joinError ? <Notice kind="warn">{joinError}</Notice> : null}
+            <Button variant="primary" wide className="at-mt4" disabled={joinBusy}
+              onClick={async () => {
+                setJoinBusy(true);
+                setJoinError("");
+                try {
+                  await API.joinSpace(address.join);
+                  const r = await API.whoAmI(account.key, addressSpace.id);
+                  API.saveAccount({ ...r.user, key: account.key });
+                  API.rememberSpace(addressSpace.id);
+                  /* Into the space just joined, the way switching space is. */
+                  window.location.assign(`/${addressSpace.slug}`);
+                } catch (e) {
+                  setJoinError(API.explain(e));
+                  setJoinBusy(false);
+                }
               }}
             >
-              Make a new account
+              Join {addressSpace.name}
             </Button>
             <Button variant="ghost" wide className="at-mt3"
               onClick={() => {
@@ -13763,7 +13910,7 @@ export default function ArabicTrainer() {
                 setInviteSetAside(true);
               }}
             >
-              Back to {accountOrg.name}
+              Not now
             </Button>
           </div>
         </div>
@@ -13908,6 +14055,18 @@ export default function ArabicTrainer() {
                 setTab(k);
                 if (k !== "home") setSession(null);
               }}
+            />
+          )}
+          {/* Which of your spaces Learning shows, for someone in more than
+              one (memberships): all of them, or one. Every tab follows it,
+              and so does the session started from it. */}
+          {!inExercise && space === "learn" && !session && learnSpaces.length > 1 && (
+            <Segmented
+              label="Which space"
+              data-el="space-filter"
+              value={spaceNow}
+              options={[{ value: "", label: "All" }, ...learnSpaces.map((o) => ({ value: o.id, label: o.name }))]}
+              onChange={(id) => setSpaceFilter(id)}
             />
           )}
 
@@ -15230,8 +15389,8 @@ export default function ArabicTrainer() {
             allTags={allTags}
             data={data}
             settings={settings}
-            courseDecks={courseDecks}
-            myCourses={myCourses}
+            courseDecks={learnDecks}
+            myCourses={learnCourses}
             deckWanted={deckWanted}
             onDeckWantedUsed={() => setDeckWanted(null)}
             onExportAll={exportEverything}
@@ -15252,7 +15411,9 @@ export default function ArabicTrainer() {
         {tab === "progress" && (
           <ProgressTab
             items={shown}
-            myCourses={myCourses}
+            myCourses={learnCourses}
+            spaceOf={!spaceNow && learnSpaces.length > 1 ? spaceOfItem : undefined}
+            spaceNames={!spaceNow && learnSpaces.length > 1 ? spaceNameOf : undefined}
             settings={settings}
             moves={data.moves}
             perDay={perDay}
@@ -15309,14 +15470,28 @@ export default function ArabicTrainer() {
           <Screen title="Courses" onBack={() => setTab(coursesBack)}>
           <React.Suspense fallback={<ChunkFallback />}>
           <StudentCourses
-            courses={myCourses}
-            decks={courseDecks}
+            courses={learnCourses}
+            decks={learnDecks}
+            spaces={!spaceNow && learnSpaces.length > 1 ? learnSpaces : undefined}
+            mySpaceIds={accountOrgs.map((o) => o.id)}
             languages={LANGUAGES}
             busy={courseBusy}
             error={courseError}
             onJoin={async (code: string) => {
-              await API.joinCourse(code);
+              const r = await API.joinCourse(code);
+              /* A course in another space joins that space too
+                 (memberships): the account learns of it, so the You menu
+                 and Settings list it. */
+              if (account && r && r.space && !accountOrgs.some((o) => o.id === r.space.id)) {
+                const who = await API.whoAmI(account.key, accountOrgId).catch(() => null);
+                if (who) {
+                  const merged = { ...who.user, key: account.key };
+                  API.saveAccount(merged);
+                  setAccount(merged);
+                }
+              }
               await refreshCourses(true);
+              return r;
             }}
             onRefresh={() => refreshCourses(true)}
             onPractise={(deckTitle: string) => {
@@ -15552,6 +15727,13 @@ export default function ArabicTrainer() {
             <div className="at-docksub">
               <CornerMenu
                 spaceShown={shownSpace}
+                mySpaces={account && !account.admin ? accountOrgs : undefined}
+                onMySpace={(to) => {
+                  /* Going to another of your spaces is going to its address:
+                     every screen then agrees about where you are. */
+                  API.rememberSpace(to.id);
+                  window.location.assign(`/${to.slug}`);
+                }}
                 account={account}
                 /* The dot stands for the whole action, so it stays lit until
                    every part of it is done — this device's cards, the courses,
@@ -19278,9 +19460,16 @@ function ProgressTab({
   perDay = 0,
   prep = null,
   onPrep,
+  spaceOf,
+  spaceNames,
 }: {
   items: Item[];
   myCourses?: Course[];
+  /** A card's space, and every space's name, when Learning shows more than
+      one (memberships): two decks of one name in two spaces are then two
+      tiles, each saying its space. Absent: decks by name alone. */
+  spaceOf?: (it: Item) => string | null;
+  spaceNames?: Map<string, string>;
   settings: Settings;
   /** What the ladder did each day — see `moves` on the document. */
   moves?: Record<string, DayMoves>;
@@ -19413,28 +19602,34 @@ function ProgressTab({
    * more cards here than those tiles show.
    */
   const deckRows = useMemo(() => {
-    const held: Map<string, { n: number; learnt: number; got: number }> = new Map();
+    const held: Map<string, { name: string; space: string; n: number; learnt: number; got: number }> = new Map();
     for (const it of counted) {
       const toward = progress.toward.get(it.id);
       /* A card that can never be asked is not progress to be short of. */
       if (!toward) continue;
+      const space = (spaceNames && spaceOf && spaceOf(it)) || "";
       for (const deck of it.tags || []) {
-        const row = held.get(deck) || { n: 0, learnt: 0, got: 0 };
+        const key = `${space}|${deck}`;
+        const row = held.get(key) || { name: deck, space, n: 0, learnt: 0, got: 0 };
         row.n++;
         row.got += toward.share;
         if (toward.at.status === "done") row.learnt++;
-        held.set(deck, row);
+        held.set(key, row);
       }
     }
     return [...held.entries()]
-      .map(([name, { n, learnt, got }]) => ({
+      .map(([key, { name, space, n, learnt, got }]) => ({
+        key,
         name,
+        space,
+        spaceName: (spaceNames && space && spaceNames.get(space)) || "",
         n,
         learnt,
         pct: deckPercent({ n, learnt, got }),
       }))
       .sort((a, b) => b.pct - a.pct || a.name.localeCompare(b.name));
-  }, [counted, progress]);
+  }, [counted, progress, spaceOf, spaceNames]);
+  const deckOpenRow = deckRows.find((d) => d.key === deckOpen) || null;
 
   /* Where the prep stands, for the line beside the button. */
   const prepNow = prep ? prepStatus(prep, items, settings) : null;
@@ -19605,11 +19800,11 @@ function ProgressTab({
               <button
                 type="button"
                 className={`at-deckstat${d.pct === 100 ? " done" : ""}`}
-                key={d.name}
+                key={d.key}
                 aria-haspopup="dialog"
-                onClick={() => setDeckOpen(d.name)}
+                onClick={() => setDeckOpen(d.key)}
               >
-                <span className="at-deckstatname">{d.name}</span>
+                <span className="at-deckstatname">{d.spaceName ? `${d.name} · ${d.spaceName}` : d.name}</span>
                 <b>
                   {d.pct}
                   <i>%</i>
@@ -19676,10 +19871,14 @@ function ProgressTab({
         />
       )}
 
-      {deckOpen && (
+      {deckOpenRow && (
         <DeckScreen
-          name={deckOpen}
-          cards={items.filter((it) => (it.tags || []).includes(deckOpen))}
+          name={deckOpenRow.name}
+          cards={items.filter(
+            (it) =>
+              (it.tags || []).includes(deckOpenRow.name) &&
+              (!deckOpenRow.space || (spaceOf && spaceOf(it)) === deckOpenRow.space)
+          )}
           progressOf={progressOf}
           towardOf={progress.toward}
           settings={settings}
@@ -19876,25 +20075,47 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
 /* Closing an account is irreversible, so it asks for the handle rather
    than a yes/no anyone taps through. */
 /* Leaving one's space (0.544, 52a), asked once more before it happens. */
-function LeaveSpace({ onLeft }: { onLeft: () => void }) {
+/**
+ * Leaving a space. With one space, as it always was: the account can't
+ * sign in until reactivated or invited back. With several (memberships),
+ * one per space, and leaving one keeps the others: the app reloads at the
+ * plain address, which lands in another of them.
+ */
+function LeaveSpace({ onLeft, space, others = 0 }: {
+  onLeft: () => void;
+  space?: { id: string; name: string };
+  /** How many other spaces the account is in. */
+  others?: number;
+}) {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const name = space && others > 0 ? space.name : "this space";
   return (
     <>
       <Notice kind="error">{error}</Notice>
-      <Button variant="danger" size="sm" onClick={() => setAsking(true)}>Leave this space</Button>
+      <Button variant="danger" size="sm" onClick={() => setAsking(true)}>{`Leave ${name}`}</Button>
       {asking && (
         <ConfirmModal
-          title="Leave this space?"
+          title={`Leave ${name}?`}
           confirmLabel="Leave"
           busy={busy}
-          body={<p>You won't be able to sign in until your space's admin reactivates you.</p>}
+          body={
+            others > 0 ? (
+              <p>Its courses leave your Learning, and your other spaces stay. You can come back with an invitation link or a course code.</p>
+            ) : (
+              <p>You won't be able to sign in until your space's admin reactivates you, or you follow an invitation link.</p>
+            )
+          }
           onCancel={() => setAsking(false)}
           onConfirm={async () => {
             setBusy(true);
             try {
-              await API.leaveSpace();
+              await API.leaveSpace(space && space.id);
+              if (others > 0) {
+                window.location.assign("/");
+                return;
+              }
               API.clearAccount();
               onLeft();
             } catch (e) {
@@ -20229,8 +20450,12 @@ function AppVersion() {
   );
 }
 
-function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide, onFeedback, spaceShown }: {
+function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide, onFeedback, spaceShown, mySpaces, onMySpace }: {
   account: User | null;
+  /** Every space this account is in, when it is in more than one
+      (memberships): listed under the space's name, to go to another. */
+  mySpaces?: { id: string; slug: string; name: string }[];
+  onMySpace?: (space: { id: string; slug: string }) => void;
   /** The space you are in, named at the top (0.543): its name, and its
       logo as a data URL or a stored picture's hash. */
   spaceShown?: { name: string; logoData?: string; logo?: string } | null;
@@ -20276,6 +20501,18 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
       {open && (
         <Popover className="at-cmenu">
           {spaceShown ? <SpaceLine space={spaceShown} /> : null}
+          {mySpaces && mySpaces.length > 1 && onMySpace ? (
+            <Segmented
+              label="Your spaces"
+              data-el="my-spaces"
+              value={(spaceShown as any) && (spaceShown as any).id}
+              options={mySpaces.map((o) => ({ value: o.id, label: o.name }))}
+              onChange={(id) => {
+                const to = mySpaces.find((o) => o.id === id);
+                if (to && to.id !== ((spaceShown as any) && (spaceShown as any).id)) onMySpace(to);
+              }}
+            />
+          ) : null}
           <div className="at-cwho">
             <span className="at-cavatar">{initialsOf(account && account.displayName)}</span>
             <span className="at-cwhotext">
@@ -20734,14 +20971,29 @@ function AccountSettings({
             {/* Leaving the space (52a): suspended until its admin reactivates
                 you. Never offered to the App admin, who would be locked out
                 of their own app. */}
-            {!account.admin && (
-              <FormField
-                label="Leave this space"
-                lede="You won't be able to sign in until your space's admin reactivates you. Nothing is deleted, and they can put you back on your courses."
-              >
-                <LeaveSpace onLeft={onCloseAccount} />
-              </FormField>
-            )}
+            {!account.admin && (() => {
+              /* One line per space you are in (memberships). */
+              const theirs: { id: string; name: string }[] = Array.isArray((account as any).orgs) ? (account as any).orgs : [];
+              if (theirs.length > 1) {
+                return theirs.map((o) => (
+                  <FormField
+                    key={o.id}
+                    label={`Leave ${o.name}`}
+                    lede="Its courses leave your Learning and you're listed among its former members. Your account and your other spaces stay."
+                  >
+                    <LeaveSpace onLeft={onCloseAccount} space={o} others={theirs.length - 1} />
+                  </FormField>
+                ));
+              }
+              return (
+                <FormField
+                  label="Leave this space"
+                  lede="You won't be able to sign in until your space's admin reactivates you, or you follow an invitation link. Nothing is deleted, and they can put you back on your courses."
+                >
+                  <LeaveSpace onLeft={onCloseAccount} space={theirs[0]} />
+                </FormField>
+              );
+            })()}
 
             <FormField
               label="Delete your account"
