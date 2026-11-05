@@ -20650,6 +20650,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
           {/* Where you are (0.576): a list under one heading when there is
               a choice, else the space's name as one quiet line. */}
           {mySpaces && mySpaces.length > 1 && onMySpace ? (
+            <div data-el="my-spaces">
             <SpacePlaces
               label={placesLabel || "Your spaces"}
               places={mySpaces}
@@ -20658,6 +20659,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
                 if (to.id !== placeNow) onMySpace(to);
               }}
             />
+            </div>
           ) : spaceShown ? (
             <SpaceLine space={spaceShown} />
           ) : null}
@@ -21403,15 +21405,14 @@ function StrandedPanel({ stranded, onJoined }: {
  * button. One per line, so any number of spaces fits, and a long name is
  * cut short rather than pushing the menu wider.
  */
-function SpacePlaces({ label, places, now, onPick, elName = "my-spaces" }: {
+function SpacePlaces({ label, places, now, onPick }: {
   label: string;
   places: { id: string; label: string; logo?: string; logoData?: string; opened?: boolean; icon?: string }[];
   now: string;
   onPick: (place: any) => void;
-  elName?: string;
 }) {
   return (
-    <div className="at-places" role="radiogroup" aria-label={label} data-el={elName}>
+    <div className="at-places" role="radiogroup" aria-label={label}>
       <p className="at-placeshead">{label}</p>
       {places.map((p) => {
         const on = p.id === now;
@@ -21472,7 +21473,6 @@ function LearnSpaceButton({ spaces, value, onChange }: {
         <Popover className="at-cmenu at-learnspacemenu">
           <SpacePlaces
             label="Which space"
-            elName="space-filter-list"
             places={[{ id: "", label: "All your spaces", icon: "layers" }, ...spaces.map((o) => ({ id: o.id, label: o.name, logo: o.logo }))]}
             now={value}
             onPick={(p) => {
