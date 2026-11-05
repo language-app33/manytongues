@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.577 — 5 November 2026
+
+**The super admin's Learning covers all their spaces, with the space
+button.**
+
+- A super admin in several spaces now sees, at home in Learning, the
+  courses they are on in every one of their spaces, and the space button
+  in the top right corner to narrow it to one. Until now they saw only the
+  space they were in, and no button.
+- Inside a space opened from Super admin, nothing changes: that space's
+  courses as a try-out, and no button.
+- Released without running the tests, at the owner's request. The type
+  check and the build were run.
+
+To check by hand: as the super admin in two spaces, on a course in each,
+Learning shows both courses and the corner button; choosing one space
+narrows it.
+
 ## 0.576 — 5 November 2026
 
 **Spaces are listed one per line, and Learning's space choice moves to a

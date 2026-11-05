@@ -1673,7 +1673,9 @@ async function handle(req) {
     if (scope) {
       scope.org = acting;
       scope.self = mine;
-      scope.orgs = iAmAdmin ? [acting] : active;
+      /* The App admin reads across their own spaces like any member
+         (0.577); in a space they only try, that space alone. */
+      scope.orgs = iAmAdmin ? (memberOf(me).includes(acting) ? active : [acting]) : active;
       scope.wide = WIDE.has(action);
     }
     /* Who runs the space this request acts in (0.544): its space admins,

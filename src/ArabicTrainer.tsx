@@ -10335,7 +10335,9 @@ export default function ArabicTrainer() {
    * "" for all of them. Remembered on this device, like the languages. Only
    * offered to someone in more than one space.
    */
-  const learnSpaces = account && !account.admin ? accountOrgs : [];
+  /* The super admin too, in their own spaces (0.577); not while trying a
+     space, where Learning is that space alone. */
+  const learnSpaces = account && !(account.admin && TRYING) ? accountOrgs : [];
   const [spaceFilter, setSpaceFilterState] = useState(() => {
     try {
       return localStorage.getItem(SPACE_FILTER_KEY) || "";
