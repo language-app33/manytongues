@@ -11394,15 +11394,28 @@ const openPronounTables = async () => {
   rootM.render(React.createElement(App));
   await sleep(2500);
   const ready = () => Number((hostM.querySelector(".at-home[data-ready]") || { getAttribute: () => "-1" }).getAttribute("data-ready"));
+  /* Since 0.576 a button in the top right corner, opening a list. */
   const row = () => hostM.querySelector('[data-el="space-filter"]');
-  const rowButton = (/** @type {RegExp} */ re) =>
-    [...(row() || { querySelectorAll: () => [] }).querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
-  check("an account in two spaces sees which space Learning shows", !!row() && !!rowButton(/^All$/) && !!rowButton(/^Lingua$/) && !!rowButton(/^Main$/),
-    row() ? (row() || { textContent: "" }).textContent || "" : `no row; ${hostM.querySelector(".at-screen") ? "Teaching open" : "Learning open"}`);
+  const listed = () => [...hostM.querySelectorAll(".at-learnspacemenu button")];
+  const openList = async () => {
+    if (!listed().length && row()) {
+      click(row());
+      await sleep(200);
+    }
+  };
+  /* By the name on the line, not its initials badge. */
+  const nameOf = (/** @type {Element} */ b) => ((b.querySelector(".at-place-name") || b).textContent || "").trim();
+  const rowButton = (/** @type {RegExp} */ re) => listed().find((b) => re.test(nameOf(b)));
+  await openList();
+  check("an account in two spaces sees which space Learning shows", !!row() && !!rowButton(/^All your spaces$/) && !!rowButton(/^Lingua$/) && !!rowButton(/^Main$/),
+    row() ? listed().map(nameOf).join(" · ") : `no button; ${hostM.querySelector(".at-screen") ? "Teaching open" : "Learning open"}`);
   const all = ready();
   click(rowButton(/^Lingua$/));
   await sleep(400);
   const inLingua = ready();
+  check("the button then shows the space's initials", (row() && (row() || { textContent: "" }).textContent) === "L",
+    row() ? String((row() || { textContent: "" }).textContent) : "no button");
+  await openList();
   click(rowButton(/^Main$/));
   await sleep(400);
   const inMain = ready();
@@ -11410,15 +11423,16 @@ const openPronounTables = async () => {
     `all ${all}, Lingua ${inLingua}, Main ${inMain}`);
   check("and the choice is remembered on the device", localStorage.getItem("arabic-trainer:space-filter") === "main",
     String(localStorage.getItem("arabic-trainer:space-filter")));
-  click(rowButton(/^All$/));
+  await openList();
+  click(rowButton(/^All your spaces$/));
   await sleep(300);
   check("All shows everything again", ready() === all, `${ready()} of ${all}`);
 
   click(hostM.querySelector(".at-cornerbtn"));
   await sleep(300);
-  const listed = hostM.querySelector('[data-el="my-spaces"]');
-  check("the You menu lists both spaces", !!listed && /Main/.test(listed.textContent || "") && /Lingua/.test(listed.textContent || ""),
-    listed ? (listed.textContent || "") : "not listed");
+  const inMenu = hostM.querySelector('[data-el="my-spaces"]');
+  check("the You menu lists both spaces", !!inMenu && /Main/.test(inMenu.textContent || "") && /Lingua/.test(inMenu.textContent || ""),
+    inMenu ? (inMenu.textContent || "") : "not listed");
   rootM.unmount();
   hostM.remove();
 
