@@ -8,6 +8,15 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.572 — 5 November 2026
+
+**Courses: the first course sits closer to its heading.**
+
+- The space between "My courses" and the first course is now the same as
+  between a heading and what follows it in the card editor. Since 0.570 it
+  was about twice that, left behind by the search box that moved up.
+- Released without running the test suite, at the owner's request.
+
 ## 0.571 — 5 November 2026
 
 **Courses: one clear button, bigger headings.**

@@ -3241,6 +3241,13 @@ button.at-stat { transition: border-color 140ms ease; }
    smaller one beside it would be a second way to do the same thing. */
 .at-headsearchfield::-webkit-search-cancel-button,
 .at-headsearchfield::-webkit-search-decoration { -webkit-appearance:none; appearance:none; display:none; }
+/* Heading to first tile at the editor's 18px (0.572). The row is the
+   44px button's height with the heading centred in it, so 10px under the
+   row puts the heading's own foot about 18px above the first tile. The
+   list's top toolbar has nothing in it here — its search lives in the
+   heading's row — and an empty row still brought its margins along. */
+.at-coursesection .at-toolbar-top:empty { display:none; }
+.at-coursesection > .at-headrow { margin-bottom:10px; }
 /* The courses page's headings at the card editor's heading size (0.571). */
 .at-coursesection .at-sectionhead { font-size:25px; font-weight:800;
   letter-spacing:-.015em; line-height:1.15; }
