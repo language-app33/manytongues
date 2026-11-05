@@ -7438,3 +7438,33 @@ is meant to show what a learner there sees, and leave no trace.
 practice would mix with their own; a document per tried space would grow
 on the server for something meant to be thrown away. Cost: a trial on one
 device is not seen on another, and it is gone when they leave the space.
+
+---
+
+## Space admins suspend and remove; only the super admin deletes
+
+**5 November 2026** · `admin-remove-member`, `admin-suspend-app`, `STRANDED_MAY` in `server/api/courses.js`
+
+The owner's rule: a space admin can never delete an account, and an
+account is deleted only from Super admin → People. Before this, Former
+members' "Delete permanently" let a space admin delete a suspended
+member's whole account, including one also in other spaces' People lists.
+It now refuses while the account exists.
+
+Suspend and remove are kept apart because they answer different
+questions. Suspended is "not now": the person stays on the list and only
+the admin lifts it, so a code they still hold does not undo it. Removed is
+"not here": they leave the list for Former members and may come back the
+way anyone joins, with an invitation or a code. Records written by the old
+Suspend, which already moved people to Former members, read as removed.
+
+Suspending across the app is a flag on the account, not a suspension in
+each space, so no space admin can lift what the super admin decided, and
+lifting it restores the courses it took away in every space.
+
+Someone with no space to use is no longer signed out: an empty sign-out
+told them nothing. They sign in to a page that names the space and why,
+and takes an invitation or a code. They may rename, mark their key saved
+and close their account; nothing else answers them until they are back in
+a space.
+

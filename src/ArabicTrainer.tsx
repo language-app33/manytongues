@@ -10330,6 +10330,11 @@ export default function ArabicTrainer() {
   const accountOrg = account && (atOwnAddress || (account as any).org);
   const accountOrgId: string = accountOrg && typeof accountOrg === "object" ? accountOrg.id : "";
   const memberAdmin = !!(account && account.admin);
+  /* Suspended in, removed from or gone from every space (0.578): signed in,
+     with nothing to use but a way back. */
+  const stranded = account && !account.admin && Array.isArray(account.stranded) && account.stranded.length
+    ? account.stranded
+    : null;
   /*
    * The space chosen at the top of Learning (memberships): one of yours, or
    * "" for all of them. Remembered on this device, like the languages. Only
@@ -10590,7 +10595,7 @@ export default function ArabicTrainer() {
         /* Offline, or the key was replaced: keep working locally. Only a
            closed space or a suspended account signs the device out (B8). */
         const why = String(e && (e as Error).message);
-        if (why === "space-closed" || why === "suspended") {
+        if (why === "space-closed" || why === "suspended" || why === "suspended-app") {
           API.clearAccount();
           setAccount(null);
           setSignedOutWhy(API.explain(e));
@@ -14058,7 +14063,7 @@ export default function ArabicTrainer() {
         !inExercise && space === "learn" && (tab === "progress" || tab === "items") ? " untitled" : ""
       }${inExercise ? " in-exercise" : ""}${kbOpen ? " kb-open" : ""}${
         inExercise && session.pausedAt ? " paused" : ""
-      }`}
+      }${stranded ? " stranded" : ""}`}
       /* Every rule that lays out the language being learnt reads these two.
          Nothing set them, so the fallbacks applied and Vietnamese was laid
          out right-to-left, like Arabic. */
@@ -14113,6 +14118,19 @@ export default function ArabicTrainer() {
         </TopBanner>
       )}
       <div className="at-wrap">
+          {/* No space to use (0.578): what happened, and the way back in.
+              Everything else on the page is hidden; the You menu stays, for
+              Settings and logging out. */}
+          {stranded && account && (
+            <StrandedPanel
+              stranded={stranded}
+              onJoined={async () => {
+                const r = await API.whoAmI(account.key).catch(() => null);
+                if (r) API.saveAccount({ ...r.user, key: account.key });
+                window.location.assign("/");
+              }}
+            />
+          )}
           {/* The same tab strip the teaching and admin spaces use, shown in
               the bar at the foot of the window like theirs. Courses is not
               one of them: it is reached from the corner menu, since it is
@@ -15895,7 +15913,7 @@ export default function ArabicTrainer() {
                 }}
                 /* Only Learning: Teaching and Admin have Courses in their bar. */
                 onCourses={
-                  space === "learn"
+                  space === "learn" && !stranded
                     ? () => {
                         setTrialBack(null);
                         setSession(null);
@@ -20233,7 +20251,7 @@ function LeaveSpace({ onLeft, space, others = 0, admin = false }: {
             ) : others > 0 ? (
               <p>Its courses leave your Learning, and your other spaces stay. You can come back with an invitation link or a course code.</p>
             ) : (
-              <p>You won't be able to sign in until your space's admin reactivates you, or you follow an invitation link.</p>
+              <p>Your account stays. Until you come back with an invitation link or a course code, the app shows only a page saying so.</p>
             )
           }
           onCancel={() => setAsking(false)}
@@ -21133,7 +21151,7 @@ function AccountSettings({
               return (
                 <FormField
                   label="Leave this space"
-                  lede="You won't be able to sign in until your space's admin reactivates you, or you follow an invitation link. Nothing is deleted, and they can put you back on your courses."
+                  lede="Your account stays, with nothing to open until you come back with an invitation link or a course code. Nothing is deleted."
                 >
                   <LeaveSpace onLeft={onCloseAccount} space={theirs[0]} />
                 </FormField>
@@ -21320,6 +21338,63 @@ function SpaceBadge({ space, icon }: { space?: { name: string; logoData?: string
   return src
     ? <img className="at-spacebadge" src={src} alt="" />
     : <span className="at-spacebadge" aria-hidden="true">{initialsOf((space && space.name) || "")}</span>;
+}
+
+/*
+ * Someone with no space they may use (0.578): suspended in, removed from or
+ * gone from each space they were in. Said plainly, with the way back in:
+ * an invitation link or a course code, typed or pasted.
+ */
+function StrandedPanel({ stranded, onJoined }: {
+  stranded: { space: { name: string }; why: string }[];
+  onJoined: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const said = (why: string, name: string) =>
+    why === "removed" ? `You were removed from ${name}.` : why === "left" ? `You left ${name}.` : `You're suspended in ${name}.`;
+  return (
+    <div className="at-strandedbox" data-el="stranded">
+      <h2>No space to open</h2>
+      {stranded.map((s) => (
+        <p key={s.space.name} className="at-strandedline">{said(s.why, s.space.name)}</p>
+      ))}
+      <Help>Ask its admin to let you back in, or use an invitation to another space.</Help>
+      <Notice kind="error">{error}</Notice>
+      <div className="at-toolbar at-mt3">
+        <input
+          className="at-input at-search"
+          placeholder="Invitation link or course code"
+          aria-label="Invitation link or course code"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+        />
+        <Button variant="primary" disabled={!code.trim() || busy}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            /* A pasted invitation link carries its code after join=. */
+            let given = code.trim();
+            try {
+              const asUrl = new URL(given);
+              given = asUrl.searchParams.get("join") || given;
+            } catch (e) {
+              /* not a link: a code */
+            }
+            try {
+              await API.joinCourse(given);
+              onJoined();
+            } catch (e) {
+              setError(API.explain(e));
+              setBusy(false);
+            }
+          }}>
+          Join
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 /*

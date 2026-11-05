@@ -1632,6 +1632,19 @@ Trying a space (since 0.574):
   Teaching and Admin caches use keys ending in `:trying:<slug>`, sync is
   off, and the teaches flag is not saved. `dropTrial` removes those keys
   on every way out of the space, and every trial's keys on log out.
+- Since 0.578, who may do what to a person. A space admin, and the App
+  admin acting in a space, may suspend (`suspendedIn[org].why =
+  "suspended"`: still listed, no Former members record, a code does not
+  lift it) and remove (`why = "removed"`, `admin-remove-member`: under
+  Former members, back with an invitation or a code). Neither deletes an
+  account: `admin-delete-user` is the App admin's alone, and the app offers
+  it only in Super admin → People; `admin-purge-former` refuses while the
+  account exists (`account-exists`). The App admin's `admin-suspend-app`
+  sets `suspendedApp` on the account, with every course it was on, which
+  `admin-lift-app` puts back; while set, every request from that key is
+  refused (`suspended-app`). Someone with no space they may use still gets
+  a `whoami` answer, with `stranded` listing why for each space, and may
+  use only joins and `STRANDED_MAY` (rename, key-saved, delete-account).
 - Since 0.575 the App admin may be a member of a space like anyone else:
   `admin-add-member` accepts their own handle, and `leave-space` removes
   one of their memberships (`removeMembership`, no Former members record),

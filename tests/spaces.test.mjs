@@ -283,6 +283,8 @@ const PLACED = {
     "send-feedback", "admin-delete-feedback", "admin-purge-former",
     /* Memberships: the App admin adds an existing person to a space. */
     "admin-add-member",
+    /* 0.578: removing from a space, and suspending across the app. */
+    "admin-remove-member", "admin-suspend-app", "admin-lift-app",
   ],
   own: [
     "signup", "signin", "whoami", "practiced", "delete-account", "rename", "claim-admin",
@@ -447,27 +449,61 @@ test("a space admin runs their own space, and nothing more", async () => {
   assert.equal((await api("delete-deck", { key: c.lead.key, body: { deckId: c.deck.id } })).status, 200);
 });
 
-test("suspended, listed as a former member, and reactivated with their courses", async () => {
+test("suspended stays listed; removed is a former member; both are put back with their courses (0.578)", async () => {
   const c = await another("suspend-space");
+  const stranded = async (/** @type {string} */ key) => (await api("whoami", { key })).json.user.stranded;
+  /* Suspended: off the course, still on the People list, not a former member. */
   assert.equal((await api("admin-suspend-user", { key: c.lead.key, body: { handle: c.student.handle } })).status, 200);
-  assert.equal((await api("whoami", { key: c.student.key })).json.error, "suspended");
+  assert.deepEqual((await stranded(c.student.key)).map((/** @type {any} */ x) => [x.space.id, x.why]), [[c.id, "suspended"]]);
   assert.equal((await api("my-material", { key: c.student.key })).status, 403);
-  const over = (await api("admin-overview", { key: c.lead.key })).json;
+  let over = (await api("admin-overview", { key: c.lead.key })).json;
+  assert.equal(over.users.find((/** @type {any} */ u) => u.handle === c.student.handle).suspended.why, "suspended");
+  assert.ok(!(over.former || []).some((/** @type {any} */ r) => r.handle === c.student.handle));
+  assert.ok(!over.courses.find((/** @type {any} */ x) => x.id === c.course.id).students.includes(c.student.handle));
+  /* A code does not lift a suspension. */
+  const code = await inviteOf(c.lead);
+  assert.equal((await api("join-space", { key: c.student.key, body: { code } })).json.error, "suspended-here");
+
+  assert.equal((await api("admin-reactivate-user", { key: c.lead.key, body: { handle: c.student.handle } })).status, 200);
+  assert.equal(await stranded(c.student.key), undefined);
+  over = (await api("admin-overview", { key: c.lead.key })).json;
+  assert.ok(over.courses.find((/** @type {any} */ x) => x.id === c.course.id).students.includes(c.student.handle));
+
+  /* Removed: a former member, with the courses to put back; back by invitation. */
+  assert.equal((await api("admin-remove-member", { key: c.lead.key, body: { handle: c.student.handle } })).status, 200);
+  assert.equal((await stranded(c.student.key))[0].why, "removed");
+  over = (await api("admin-overview", { key: c.lead.key })).json;
   const rec = over.former.find((/** @type {any} */ r) => r.handle === c.student.handle);
   assert.equal(rec.why, "removed");
   assert.deepEqual(rec.courses.map((/** @type {any} */ x) => x.id), [c.course.id]);
-  assert.ok(!over.courses.find((/** @type {any} */ x) => x.id === c.course.id).students.includes(c.student.handle));
-
-  assert.equal((await api("admin-reactivate-user", { key: c.lead.key, body: { handle: c.student.handle } })).status, 200);
-  assert.equal((await api("whoami", { key: c.student.key })).status, 200);
+  assert.equal((await api("join-space", { key: c.student.key, body: { code } })).status, 200);
   const back = (await api("admin-overview", { key: c.lead.key })).json;
   assert.ok(back.courses.find((/** @type {any} */ x) => x.id === c.course.id).students.includes(c.student.handle));
   assert.ok(!back.former.some((/** @type {any} */ r) => r.handle === c.student.handle));
 
-  /* Leaving is the same, by the person themselves; never the App admin. */
+  /* Leaving, by the person themselves; never the App admin. */
   assert.equal((await api("leave-space", { key: c.student.key, body: {} })).status, 200);
-  assert.equal((await api("whoami", { key: c.student.key })).json.error, "suspended");
+  assert.equal((await stranded(c.student.key))[0].why, "left");
+  /* With no space, only their own account's few things. */
+  assert.equal((await api("rename", { key: c.student.key, body: { displayName: "Still me" } })).status, 200);
+  assert.equal((await api("my-courses", { key: c.student.key })).status, 403);
   assert.equal((await api("leave-space", { key: admin.key, body: {} })).status, 400);
+});
+
+test("only the super admin suspends across the app, and lifting puts every course back (0.578)", async () => {
+  const c = await another("app-suspend");
+  assert.equal((await api("admin-suspend-app", { key: c.lead.key, body: { handle: c.student.handle } })).status, 403);
+  assert.equal((await api("admin-suspend-app", { key: admin.key, body: { handle: c.student.handle } })).status, 200);
+  assert.equal((await api("whoami", { key: c.student.key })).json.error, "suspended-app");
+  assert.equal((await api("my-material", { key: c.student.key })).json.error, "suspended-app");
+  const over = (await api("admin-overview", { key: c.lead.key })).json;
+  assert.ok(over.users.find((/** @type {any} */ u) => u.handle === c.student.handle).suspendedApp);
+  assert.ok(!over.courses.find((/** @type {any} */ x) => x.id === c.course.id).students.includes(c.student.handle));
+  assert.equal((await api("admin-lift-app", { key: c.lead.key, body: { handle: c.student.handle } })).status, 403);
+  assert.equal((await api("admin-lift-app", { key: admin.key, body: { handle: c.student.handle } })).status, 200);
+  assert.equal((await api("whoami", { key: c.student.key })).status, 200);
+  const back = (await api("admin-overview", { key: c.lead.key })).json;
+  assert.ok(back.courses.find((/** @type {any} */ x) => x.id === c.course.id).students.includes(c.student.handle));
 });
 
 test("feedback about the app reaches the App admin alone, with its space (0.552)", async () => {
@@ -488,21 +524,27 @@ test("feedback about the app reaches the App admin alone, with its space (0.552)
   assert.ok(!(await api("admin-all-reports", { key: admin.key })).json.feedback.some((/** @type {any} */ f) => f.id === sent.json.id));
 });
 
-test("a former member deleted for good takes their account and material with them (0.552)", async () => {
+test("Former members never deletes an account; once the super admin has, it clears what is left (0.578)", async () => {
   const c = await another("purge-space");
   /* Only someone on Former members. */
   assert.equal((await api("admin-purge-former", { key: c.lead.key, body: { handle: c.teacher.handle } })).status, 404);
-  assert.equal((await api("admin-suspend-user", { key: c.lead.key, body: { handle: c.teacher.handle } })).status, 200);
+  assert.equal((await api("admin-remove-member", { key: c.lead.key, body: { handle: c.teacher.handle } })).status, 200);
+  /* Their account is still there: not from here, by anyone. */
+  assert.equal((await api("admin-purge-former", { key: c.lead.key, body: { handle: c.teacher.handle } })).json.error, "account-exists");
+  assert.equal((await api("admin-purge-former", { key: admin.key, org: c.id, body: { handle: c.teacher.handle } })).json.error, "account-exists");
+  assert.equal((await api("whoami", { key: c.teacher.key })).status, 200);
+  /* A space admin can't delete anyone. */
+  assert.equal((await api("admin-delete-user", { key: c.lead.key, body: { handle: c.teacher.handle } })).status, 403);
+  /* The super admin deletes the account; then the entry and their material go. */
+  assert.equal((await api("admin-delete-user", { key: admin.key, org: c.id, body: { handle: c.teacher.handle } })).status, 200);
   const done = await api("admin-purge-former", { key: c.lead.key, body: { handle: c.teacher.handle } });
   assert.equal(done.status, 200, JSON.stringify(done.json));
   assert.equal(done.json.decks, 1);
   assert.equal(done.json.cards, 1);
-  /* Gone: the account, the deck from the course, and the entry. */
   assert.ok((await api("whoami", { key: c.teacher.key })).status >= 400);
   const over = (await api("admin-overview", { key: c.lead.key })).json;
   assert.ok(!over.former.some((/** @type {any} */ r) => r.handle === c.teacher.handle));
   assert.ok(!over.courses.find((/** @type {any} */ x) => x.id === c.course.id).decks.includes(c.deck.id));
-  assert.ok((await api("deck-cards", { key: c.lead.key, params: { deck: c.deck.id } })).status >= 400);
   /* Not someone in another space. */
   assert.equal((await api("admin-purge-former", { key: c.lead.key, body: { handle: b.teacher.handle } })).status, 404);
 });
@@ -714,10 +756,10 @@ test("leaving and suspension are per space, and a rejoin puts you back", async (
   assert.ok(inQ.suspended);
   assert.ok(!inP.suspended);
   assert.equal((await api("whoami", { key: both.key })).status, 200, "still signs in, to P");
-  /* Removed: a code can't bring them back; their admin can. */
+  /* Suspended (0.578): a code can't lift it; their admin can. */
   const refused = await api("join-space", { key: both.key, body: { code: await inviteOf(q.lead) } });
   assert.equal(refused.status, 403);
-  assert.equal(refused.json.error, "removed");
+  assert.equal(refused.json.error, "suspended-here");
   assert.equal((await api("admin-reactivate-user", { key: q.lead.key, body: { handle: both.handle } })).status, 200);
   assert.ok((await api("my-material", { key: both.key })).json.courses.some((/** @type {any} */ c) => c.id === q.course.id));
 });
@@ -773,13 +815,13 @@ test("removing someone in two spaces from one keeps the other; deleting the acco
   const q = await another("gone-q");
   const both = p.student;
   await api("join-course", { key: both.key, body: { code: await codeOf(q.teacher, q.course.id) } });
-  /* Q's admin suspends, then deletes for good from Former members: only Q goes. */
-  await api("admin-suspend-user", { key: q.lead.key, body: { handle: both.handle } });
-  assert.equal((await api("admin-purge-former", { key: q.lead.key, body: { handle: both.handle } })).status, 200);
+  /* Q's admin removes them (0.578): only Q goes, and the account stays. */
+  assert.equal((await api("admin-remove-member", { key: q.lead.key, body: { handle: both.handle } })).status, 200);
   const still = await api("whoami", { key: both.key });
   assert.equal(still.status, 200);
   assert.deepEqual(orgIds(still), [p.id]);
-  assert.ok(!handles((await api("admin-overview", { key: q.lead.key })).json.users).includes(both.handle));
+  const inQ = (await api("admin-overview", { key: q.lead.key })).json.users.find((/** @type {any} */ u) => u.handle === both.handle);
+  assert.equal(inQ.suspended.why, "removed");
   /* They can rejoin by course code. */
   assert.equal((await api("join-course", { key: both.key, body: { code: await codeOf(q.teacher, q.course.id) } })).status, 200);
   /* Deleting the account: a Former members record in each space, and the key refused. */
@@ -812,13 +854,14 @@ test("the App admin adds an existing person to a space; nobody else can", async 
   const rec = JSON.parse(String(await store.get(`user:${p.teacher.handle}`, { type: "text" })));
   assert.deepEqual(rec.orgs, [p.id, q.id], "no duplicate");
   assert.equal((await api("admin-add-member", { key: q.lead.key, body: { handle: p.student.handle, org: q.id } })).status, 403);
-  assert.equal((await api("admin-add-member", { key: admin.key, body: { handle: admin.handle, org: q.id } })).status, 404);
+  /* The App admin may add themselves (0.575). */
+  assert.equal((await api("admin-add-member", { key: admin.key, body: { handle: admin.handle, org: q.id } })).status, 200);
   /* Into a closed space: no. */
   await api("admin-archive-org", { key: admin.key, body: { id: p.id } });
   assert.equal((await api("admin-add-member", { key: admin.key, body: { handle: q.student.handle, org: p.id } })).status, 403);
   await api("admin-reopen-org", { key: admin.key, body: { id: p.id } });
   /* Someone a space admin removed is put back, with their course. */
-  await api("admin-suspend-user", { key: q.lead.key, body: { handle: q.student.handle } });
+  await api("admin-remove-member", { key: q.lead.key, body: { handle: q.student.handle } });
   assert.equal((await api("admin-add-member", { key: admin.key, body: { handle: q.student.handle, org: q.id } })).status, 200);
   assert.ok((await api("my-material", { key: q.student.key })).json.courses.some((/** @type {any} */ c) => c.id === q.course.id));
   assert.ok(!handles((await api("admin-overview", { key: q.lead.key })).json.former).includes(q.student.handle));
@@ -868,4 +911,29 @@ test("the App admin tries a space they are not in as a learner, without joining 
   const who = await api("whoami", { key: admin.key, params: { org: B } });
   assert.ok(!orgIds(who).includes(B));
   assert.ok(orgIds(who).length >= 1);
+});
+
+test("the super admin in several spaces learns across them, and leaves any but the first (0.575–0.577)", async () => {
+  const r = await another("own-r");
+  const t = await another("own-t");
+  const tried = await another("own-tried");
+  for (const sp of [r, t]) {
+    assert.equal((await api("admin-add-member", { key: admin.key, body: { handle: admin.handle, org: sp.id } })).status, 200);
+    assert.equal((await api("assign-student", { key: admin.key, org: sp.id, body: { courseId: sp.course.id, handle: admin.handle } })).status, 200);
+  }
+  /* whoami names every space of theirs. */
+  const mine = orgIds(await api("whoami", { key: admin.key }));
+  assert.ok(mine.includes(r.id) && mine.includes(t.id));
+  /* At one of their own, Learning reads across all of them. */
+  const ids = (/** @type {any} */ x) => x.json.courses.map((/** @type {any} */ c) => c.id);
+  const atR = ids(await api("my-material", { key: admin.key, org: r.id }));
+  assert.ok(atR.includes(r.course.id) && atR.includes(t.course.id));
+  /* In a space only tried, that space alone. */
+  const atTried = ids(await api("my-material", { key: admin.key, org: tried.id }));
+  assert.deepEqual(atTried, [tried.course.id]);
+  /* Leaving one of them: it goes, with no Former members record; never the first. */
+  assert.equal((await api("leave-space", { key: admin.key, org: t.id, body: {} })).status, 200);
+  assert.ok(!orgIds(await api("whoami", { key: admin.key })).includes(t.id));
+  assert.ok(!handles((await api("admin-overview", { key: t.lead.key })).json.former).includes(admin.handle));
+  assert.equal((await api("leave-space", { key: admin.key, body: {} })).status, 400);
 });

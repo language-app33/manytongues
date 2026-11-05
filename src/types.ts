@@ -816,9 +816,17 @@ export interface User {
   suspended?: {
     at: Millis;
     by: string;
-    why: "left" | "removed";
+    why: "left" | "removed" | "suspended";
     courses: { id: string; title: string; roles: string[] }[];
   };
+  /** Suspended across the whole app by the super admin (0.578). */
+  suspendedApp?: { at: Millis; by: string };
+  /**
+   * Whoami's answer for someone with no space they may use (0.578): each
+   * space they are suspended in, were removed from or left. They still sign
+   * in, to a page that says so.
+   */
+  stranded?: { space: { id: string; slug: string; name: string; logo: string; colour: string }; why: string }[];
   /** Signed in or asked who they are. */
   lastSeen?: Millis;
   /** The app said a session was practiced. */

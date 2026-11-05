@@ -8,6 +8,69 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.578 — 5 November 2026
+
+**Suspending, removing and deleting people: who can do what.**
+
+Space admins:
+
+- **A space admin can never delete anyone.** The Delete on a person in
+  Admin → People is gone, and so is the bulk Delete. This is true for the
+  super admin too: an account is now deleted only from Super admin →
+  People.
+- **Suspend** is in that space only, on each person and in bulk. A
+  suspended person comes off the space's courses and can't use it, but
+  stays on its People list marked "Suspended", with Reactivate beside them.
+  An invitation or course code doesn't lift it.
+- **Remove from this space** is new, on each person and in bulk. The
+  person comes off the space's courses and its People list and moves to
+  Former members. Their account and their other spaces stay. They can come
+  back with an invitation link or a course code, or be reactivated from
+  Former members.
+- **Former members no longer deletes accounts.** "Delete permanently" is
+  only offered for someone whose account is already gone, and clears
+  their entry and what of theirs is left in the space.
+
+The super admin:
+
+- **Super admin → People has two tabs: All and By space.** All lists
+  everyone once, with the spaces they are in. By space lists each space's
+  people under it, so someone in several spaces appears under each.
+- **Suspend everywhere:** the person can't sign in anywhere and comes off
+  every course in every space. Each space's People list shows them as
+  "Suspended by the super admin", and no space admin can undo it. Lifting
+  it puts them back on every course they were on.
+- **Remove from a space**, beside "Add to a space": under a space in By
+  space, or choosing one of their spaces in All.
+- **Delete** is here and only here. Its confirmation names every space the
+  person is in.
+
+Someone left with no space:
+
+- Someone suspended in, removed from, or who left their only space can
+  still sign in. They see a page that says so ("You're suspended in …",
+  "You were removed from …", "You left …"), with a box for an invitation
+  link or a course code, and their You menu for Settings and logging out.
+  Until now they were signed out.
+
+Also included:
+
+- Tests for the super admin in several spaces (0.575 to 0.577), which were
+  released without them.
+- People suspended before this release are treated as removed: they are
+  under Former members, not on the People list, and can come back with an
+  invitation or a code.
+
+To check by hand, on the deployed app:
+
+- As a space admin, in Admin → People: no Delete anywhere; Suspend keeps
+  the person listed as suspended; Remove moves them to Former members.
+- Sign in as someone suspended in their only space: the "No space to
+  open" page, and a course code from another space gets them in.
+- As the super admin: the All and By space tabs; Suspend everywhere on
+  someone, then sign in as them (refused), then Lift and check their
+  courses are back.
+
 ## 0.577 — 5 November 2026
 
 **The super admin's Learning covers all their spaces, with the space

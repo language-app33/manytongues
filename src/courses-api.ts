@@ -423,6 +423,12 @@ export const orgUsage = (id: string): Promise<{ ok: true; usage: OrgUsage }> => 
 export const newInvite = (): Promise<{ ok: true; inviteCode: string }> => call("admin-new-invite", { body: {} });
 export const suspendUser = (handle: string, org?: string) => call("admin-suspend-user", { body: { handle }, org });
 export const reactivateUser = (handle: string, org?: string) => call("admin-reactivate-user", { body: { handle }, org });
+/* Off a space's list, under its Former members (0.578): their account and
+   other spaces stay. */
+export const removeFromSpace = (handle: string, org?: string) => call("admin-remove-member", { body: { handle }, org });
+/* Across the whole app, the super admin's alone (0.578). */
+export const suspendApp = (handle: string) => call("admin-suspend-app", { body: { handle } });
+export const liftApp = (handle: string) => call("admin-lift-app", { body: { handle } });
 /* ---- Super admin (0.547) ---- */
 export type SuperOrg = { id: string; name: string; slug: string; admins: string[]; archived: boolean };
 export const everyone = (): Promise<{ ok: true; orgs: SuperOrg[]; people: (User & { org: string; orgs?: string[]; suspendedIn?: Record<string, unknown> })[] }> =>
@@ -517,6 +523,9 @@ export function explain(err: unknown): string {
       "code-required": "You need a code to join: an invitation link, or a course code from your teacher.",
       "other-space": "That belongs to another space.",
       "trying-space": "You're trying this space, not joining it.",
+      "suspended-app": "Your account is suspended. Ask the super admin.",
+      "suspended-here": "You're suspended in that space. Ask its admin to let you back in.",
+      "account-exists": "Only the super admin can delete an account, from Super admin → People.",
       "admin-stays": "The super admin can't leave their first space.",
       "space-closed": "This space is closed.",
       "suspended": "You're not in any space right now. Ask your space's admin, or use an invitation link or a course code.",

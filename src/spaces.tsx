@@ -1856,6 +1856,11 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
   }
 
   const users = (data && data.users) || [];
+  /* Whom this account may suspend or remove here (64a, 70a): never
+     themselves or an App admin, and a space admin only if they are the App
+     admin. */
+  const mayAct = (u: { handle: string; admin?: boolean }) =>
+    !!account && u.handle !== account.handle && !u.admin && (account.admin || !leads.has(u.handle));
   const courses = (data && data.courses) || [];
   const decks = (data && data.decks) || [];
   /* Newest first, as the server sends them. */
@@ -2354,7 +2359,9 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
               <ItemList
                 noun="person"
                 plural="people"
-                items={users}
+                /* Who left or was removed is under Former members, not here
+                   (0.578); someone suspended stays, marked so. */
+                items={users.filter((u) => !u.suspended || (u.suspended as any).why === "suspended")}
                 size="large"
                 busy={busy}
                 empty="Nobody here yet. Add a person, then share their key with them."
@@ -2364,26 +2371,48 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                 onNew={() => setMakingUser({ name: "", courseId: "", roles: ["teacher"] })}
                 selected={selPeople}
                 onSelectedChange={setSelPeople}
+                /* No deleting here, by anyone (0.578): an account is deleted
+                   only from Super admin → People. Suspend and Remove act in
+                   this space alone. */
                 bulkActions={[
                   {
-                    label: "Delete",
-                    danger: true,
+                    label: "Suspend",
                     onClick: (handles) => {
-                      const them = users.filter(
-                        (u) => handles.includes(u.handle) && u.handle !== account.handle
-                      );
+                      const them = users.filter((u) => handles.includes(u.handle) && mayAct(u) && !u.suspended);
                       setConfirm({
-                        title: `Delete ${them.length} ${them.length === 1 ? "person" : "people"}?`,
-                        confirmLabel: "Delete for good",
-                        confirmWord: "delete",
+                        title: `Suspend ${them.length} ${them.length === 1 ? "person" : "people"}?`,
+                        confirmLabel: "Suspend",
                         body: (
                           <p>
-                            Their accounts, their keys and their place in every course go. The
-                            decks and cards they made go with them. There is no undoing this.
+                            In this space only: they come off its courses and can't use it until
+                            you reactivate them. They stay on this list, marked suspended. Their
+                            other spaces are untouched.
                           </p>
                         ),
                         action: async () => {
-                          for (const u of them) await API.deleteUser(u.handle);
+                          for (const u of them) await API.suspendUser(u.handle);
+                          setSelPeople(new Set());
+                        },
+                      });
+                    },
+                  },
+                  {
+                    label: "Remove from this space",
+                    danger: true,
+                    onClick: (handles) => {
+                      const them = users.filter((u) => handles.includes(u.handle) && mayAct(u));
+                      setConfirm({
+                        title: `Remove ${them.length} ${them.length === 1 ? "person" : "people"} from this space?`,
+                        confirmLabel: "Remove",
+                        body: (
+                          <p>
+                            They come off this space's courses and this list, and move to Former
+                            members. Their accounts and their other spaces stay. They can come back
+                            with an invitation link or a course code.
+                          </p>
+                        ),
+                        action: async () => {
+                          for (const u of them) await API.removeFromSpace(u.handle);
                           setSelPeople(new Set());
                         },
                       });
@@ -2428,51 +2457,65 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                             })
                           } />
                         )}
-                        {/* Suspending (64a): never yourself, an App admin, or —
-                            unless you are the App admin — a space admin (70a). */}
-                        {u.handle !== account.handle && !u.admin && (account.admin || !leads.has(u.handle)) && (
+                        {/* Suspending and removing (64a, 0.578): in this space
+                            only; never yourself, an App admin, or — unless you
+                            are the App admin — a space admin (70a). Someone
+                            the super admin suspended everywhere is theirs. */}
+                        {mayAct(u) && !(u as any).suspendedApp && (u.suspended ? (
+                          <IconButton icon="unlock" label="Reactivate" onClick={() =>
+                            setConfirm({
+                              title: `Reactivate ${u.displayName}?`,
+                              confirmLabel: "Reactivate",
+                              body: <p>They can use this space again and are put back on the courses they were in.</p>,
+                              action: () => API.reactivateUser(u.handle),
+                            })
+                          } />
+                        ) : (
                           <IconButton icon="lock" label="Suspend" onClick={() =>
                             setConfirm({
                               title: `Suspend ${u.displayName}?`,
                               confirmLabel: "Suspend them",
                               body: (
                                 <p>
-                                  They can't sign in until they are reactivated, and they come off
-                                  every course. They move to Former members, where you can
-                                  reactivate them and put them back on their courses. Nothing is
-                                  deleted.
+                                  In this space only: they come off its courses and can't use it
+                                  until you reactivate them. They stay on this list, marked
+                                  suspended. Their other spaces are untouched. Nothing is deleted.
                                 </p>
                               ),
                               action: () => API.suspendUser(u.handle),
                             })
                           } />
-                        )}
-                        {account.admin && u.handle !== account.handle && (
-                          <IconButton icon="delete" label="Delete person" danger onClick={() =>
-                              setConfirm({
-                                title: `Delete ${u.displayName}?`,
-                                confirmLabel: "Delete for good",
-                                confirmWord: u.handle,
-                                body: (
-                                  <p>
-                                    Their account, their sign-in key, their My space, their practice
-                                    history and their place in every course go. The decks and cards
-                                    they made for the space stay, under their name, and can be handed
-                                    to someone else. A record stays under Former members. There is
-                                    no undoing this.
-                                  </p>
-                                ),
-                                action: () => API.deleteUser(u.handle),
-                              })
-                            } />
+                        ))}
+                        {mayAct(u) && (
+                          <IconButton icon="close" label="Remove from this space" danger onClick={() =>
+                            setConfirm({
+                              title: `Remove ${u.displayName} from this space?`,
+                              confirmLabel: "Remove",
+                              body: (
+                                <p>
+                                  They come off this space's courses and this list, and move to
+                                  Former members. Their account and their other spaces stay. They
+                                  can come back with an invitation link or a course code.
+                                </p>
+                              ),
+                              action: () => API.removeFromSpace(u.handle),
+                            })
+                          } />
                         )}
                       </div>
                     </div>
                     {/* Admin is a flag on the person, not a course they are
                         in, so it stays a badge and keeps the row to itself. */}
-                    {(u.admin || leads.has(u.handle)) && (
+                    {(u.admin || leads.has(u.handle) || u.suspended || (u as any).suspendedApp) && (
                       <div className="at-flags">
-                        <span className="at-flag flagged">{u.admin ? "Admin" : "Space admin"}</span>
+                        {(u.admin || leads.has(u.handle)) && (
+                          <span className="at-flag flagged">{u.admin ? "Admin" : "Space admin"}</span>
+                        )}
+                        {(u as any).suspendedApp ? (
+                          <span className="at-flag flagged">Suspended by the super admin</span>
+                        ) : u.suspended ? (
+                          <span className="at-flag flagged">Suspended</span>
+                        ) : null}
                       </div>
                     )}
                     {/* "Hasn't signed in yet" was a pill up here. The lines
@@ -9731,33 +9774,24 @@ function FormerMembers({ former, people, busy, ask }: {
                   }}>
                   Hand their material to…
                 </Button>
-                {/* For good (0.552): a space admin's to do as well as the App
-                    admin's. Someone already deleted has nothing left but
-                    this entry, which is all it clears. */}
-                <IconButton icon="delete" label="Delete permanently" danger
-                  onClick={() => ask({
-                    title: `Delete ${r.displayName} permanently?`,
-                    confirmLabel: "Delete permanently",
-                    confirmWord: suspended ? r.handle : undefined,
-                    body: suspended ? (
-                      <>
+                {/* Only for someone whose account is already gone (0.578):
+                    an account is deleted only from Super admin → People,
+                    never from here. This clears the entry and what of
+                    theirs is left in the space. */}
+                {!suspended && (
+                  <IconButton icon="delete" label="Delete permanently" danger
+                    onClick={() => ask({
+                      title: `Delete ${r.displayName} permanently?`,
+                      confirmLabel: "Delete permanently",
+                      body: (
                         <p>
-                          Their account goes, so they can never sign in or be brought back, and so do
-                          every deck and card they made in this space — including any in courses.
+                          Their account is already gone. This takes them off this list, and deletes any
+                          decks and cards of theirs still in this space. There is no undoing this.
                         </p>
-                        <p>
-                          To keep their material, use "Hand their material to…" first. Reports they sent
-                          stay. There is no undoing this.
-                        </p>
-                      </>
-                    ) : (
-                      <p>
-                        Their account is already gone. This takes them off this list, and deletes any
-                        decks and cards of theirs still in this space. There is no undoing this.
-                      </p>
-                    ),
-                    action: () => API.purgeFormer(r.handle),
-                  })} />
+                      ),
+                      action: () => API.purgeFormer(r.handle),
+                    })} />
+                )}
               </>
             }
           />
@@ -9870,12 +9904,14 @@ function SpaceExtras({ org }: { org: API.OrgRow }) {
  * reactivating and deleting work wherever the person is: each call is sent
  * as from their space.
  */
+type Person = User & { org: string; orgs?: string[]; suspendedIn?: Record<string, unknown>; suspendedApp?: unknown };
+
 function EveryonePeople({ me }: { me: string }) {
   const [data, setData] = useState<{
     orgs: API.SuperOrg[];
     /* Every space each person is in, and their suspension in each
        (memberships); `org` alone from an older server. */
-    people: (User & { org: string; orgs?: string[]; suspendedIn?: Record<string, unknown> })[];
+    people: Person[];
   } | null>(null);
   /* Adding an existing person to a space (memberships): who, and where. */
   const [adding, setAdding] = useState<User | null>(null);
@@ -9885,15 +9921,129 @@ function EveryonePeople({ me }: { me: string }) {
   const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState<Pending | null>(null);
   const [newKey, setNewKey] = useState<{ name: string; key: string } | null>(null);
+  /* Everyone once, or under each of their spaces (0.578). */
+  const [view, setView] = useState<"all" | "spaces">("all");
+  /* Taking one space away from someone (0.578): who, and which. */
+  const [removing, setRemoving] = useState<Person | null>(null);
+  const [removeFrom, setRemoveFrom] = useState("");
   const load = useCallback(() => API.everyone().then((r) => setData(r), (e) => setError(API.explain(e))), []);
   useEffect(() => {
     load();
   }, [load]);
   const needle = q.trim().toLowerCase();
   const match = (u: User) => !needle || `${u.displayName} ${u.handle}`.toLowerCase().includes(needle);
-  /* Suspended in this space, not elsewhere (memberships). */
-  const suspendedHere = (u: { suspended?: unknown; suspendedIn?: Record<string, unknown> }, org: string) =>
-    u.suspendedIn ? !!u.suspendedIn[org] : !!u.suspended;
+  /* Why someone is not using a space (memberships, 0.578): "suspended",
+     "removed", "left", or "" when they are. */
+  const whyIn = (u: Person, org: string): string => {
+    const was: any = u.suspendedIn ? u.suspendedIn[org] : u.org === org ? u.suspended : null;
+    return was ? String(was.why || "suspended") : "";
+  };
+  const spacesOf = (u: Person) => u.orgs || (u.org ? [u.org] : []);
+  const gone = (u: Person, org: string) => {
+    const why = whyIn(u, org);
+    return why === "removed" || why === "left";
+  };
+  /* The same actions in both views; `o` is the space a row is under, or
+     null in All. */
+  const actionsFor = (u: Person, o: API.SuperOrg | null) => {
+    const keyOrg = o ? o.id : spacesOf(u)[0];
+    const hereWhy = o ? whyIn(u, o.id) : "";
+    const others = u.handle !== me && !u.admin;
+    const removable = spacesOf(u).filter((id) => !gone(u, id));
+    const theirSpaces = spacesOf(u).map((id) => (data && data.orgs.find((x) => x.id === id)) || null).filter(Boolean) as API.SuperOrg[];
+    return (
+      <>
+        <IconButton icon="key" label="Issue a new sign-in key" onClick={() => setConfirm({
+          title: `New sign-in key for ${u.displayName}?`,
+          confirmLabel: "Issue a new key",
+          body: <p>Their current key stops working at once. You'll see the new one once.</p>,
+          action: async () => {
+            const r = await API.reissueKey(u.handle, keyOrg);
+            setNewKey({ name: u.displayName, key: r.key });
+          },
+        })} />
+        {/* Yourself too, as the super admin (0.575). */}
+        {(!u.admin || u.handle === me) && data && data.orgs.some((x) => !x.archived && !spacesOf(u).includes(x.id)) && (
+          <IconButton icon="add" label="Add to a space" onClick={() => {
+            setAddTo("");
+            setAdding(u);
+          }} />
+        )}
+        {/* Taking a space away (0.578): the one a row is under, or a
+            choice of theirs in All. */}
+        {others && (o ? !gone(u, o.id) : removable.length > 0) && (
+          <IconButton icon="close" label={o ? `Remove from ${o.name}` : "Remove from a space"} onClick={() => {
+            if (o) {
+              setConfirm({
+                title: `Remove ${u.displayName} from ${o.name}?`,
+                confirmLabel: "Remove",
+                body: <p>They come off {o.name}'s courses and People list, and move to its Former members. Their account and their other spaces stay.</p>,
+                action: () => API.removeFromSpace(u.handle, o.id),
+              });
+            } else {
+              setRemoveFrom(removable.length === 1 ? removable[0] : "");
+              setRemoving(u);
+            }
+          }} />
+        )}
+        {/* Suspending in one space, under that space (64a). */}
+        {others && o && !u.suspendedApp && (hereWhy === "suspended" || gone(u, o.id) ? (
+          <IconButton icon="unlock" label={`Reactivate in ${o.name}`} onClick={() => setConfirm({
+            title: `Reactivate ${u.displayName} in ${o.name}?`,
+            confirmLabel: "Reactivate",
+            body: <p>They can use {o.name} again and are put back on its courses they were in.</p>,
+            action: () => API.reactivateUser(u.handle, o.id),
+          })} />
+        ) : (
+          <IconButton icon="lock" label={`Suspend in ${o.name}`} onClick={() => setConfirm({
+            title: `Suspend ${u.displayName} in ${o.name}?`,
+            confirmLabel: "Suspend them",
+            body: <p>In {o.name} only: they come off its courses and can't use it until reactivated. Their other spaces are untouched.</p>,
+            action: () => API.suspendUser(u.handle, o.id),
+          })} />
+        ))}
+        {/* Across the whole app (0.578): yours alone, to lift too. */}
+        {others && (u.suspendedApp ? (
+          <IconButton icon="unlock" label="Lift the suspension everywhere" onClick={() => setConfirm({
+            title: `Lift ${u.displayName}'s suspension?`,
+            confirmLabel: "Lift it",
+            body: <p>They can sign in again and are put back on the courses they were on, in every space.</p>,
+            action: () => API.liftApp(u.handle),
+          })} />
+        ) : (
+          <IconButton icon="block" label="Suspend everywhere" onClick={() => setConfirm({
+            title: `Suspend ${u.displayName} everywhere?`,
+            confirmLabel: "Suspend everywhere",
+            body: (
+              <p>
+                They can't sign in anywhere, and come off every course in every space. Each space
+                shows them as suspended by the super admin, and only you can lift it. Nothing is
+                deleted.
+              </p>
+            ),
+            action: () => API.suspendApp(u.handle),
+          })} />
+        ))}
+        {u.handle !== me && (
+          <IconButton icon="delete" label="Delete person" danger onClick={() => setConfirm({
+            title: `Delete ${u.displayName}?`,
+            confirmLabel: "Delete for good",
+            confirmWord: u.handle,
+            body: (
+              <p>
+                {theirSpaces.length
+                  ? `${u.displayName} is in ${theirSpaces.map((x) => x.name).join(", ")}. Their account goes from ${theirSpaces.length === 1 ? "it" : "all of them"}: `
+                  : "Their account goes: "}
+                key, My space, practice history and course places. What they made for a space stays
+                there, under their name. There is no undoing this.
+              </p>
+            ),
+            action: () => API.deleteUser(u.handle, keyOrg),
+          })} />
+        )}
+      </>
+    );
+  };
   return (
     <>
       {confirm && (
@@ -9960,7 +10110,54 @@ function EveryonePeople({ me }: { me: string }) {
           />
         );
       })()}
+      {removing && data && (() => {
+        const theirs = spacesOf(removing).filter((id) => !gone(removing, id));
+        const open = data.orgs.filter((o) => theirs.includes(o.id));
+        return (
+          <ConfirmModal
+            title={`Remove ${removing.displayName} from a space`}
+            confirmLabel="Remove"
+            busy={busy}
+            body={
+              <>
+                <p>
+                  They come off that space's courses and People list, and move to its Former members.
+                  Their account and their other spaces stay.
+                </p>
+                <RadioGroup
+                  name="remove-from-space"
+                  label="Space"
+                  value={removeFrom}
+                  options={open.map((o) => ({ value: o.id, label: o.name }))}
+                  onChange={setRemoveFrom}
+                />
+              </>
+            }
+            onCancel={() => setRemoving(null)}
+            onConfirm={async () => {
+              if (!removeFrom) return;
+              setBusy(true);
+              try {
+                await API.removeFromSpace(removing.handle, removeFrom);
+                setRemoving(null);
+                await load();
+              } catch (e) {
+                setError(API.explain(e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+        );
+      })()}
       <Notice kind="error">{error}</Notice>
+      {/* Everyone once, or under each space they are in (0.578). */}
+      <Tabs
+        tabs={[["all", "All", "person"], ["spaces", "By space", "layers"]]}
+        value={view}
+        onChange={(v: string) => setView(v === "spaces" ? "spaces" : "all")}
+        label="Everyone or by space"
+      />
       <input className="at-input" placeholder="Search everyone, in every space" value={q}
         onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 14 }} />
       {newKey && (
@@ -9973,75 +10170,55 @@ function EveryonePeople({ me }: { me: string }) {
           </div>
         </div>
       )}
+      {data && view === "all" && (() => {
+        const everyone = data.people.filter(match).slice().sort((a, b) => a.displayName.localeCompare(b.displayName));
+        return (
+          <div className="at-decklist2 at-everyone" data-el="everyone-all">
+            {everyone.map((u) => {
+              const names = spacesOf(u).map((id) => {
+                const o = data.orgs.find((x) => x.id === id);
+                const why = whyIn(u, id);
+                return `${o ? o.name : id}${why === "suspended" ? " (suspended)" : why === "removed" ? " (removed)" : why === "left" ? " (left)" : ""}`;
+              });
+              return (
+                <Tile key={u.handle}
+                  title={u.displayName}
+                  meta={`${u.handle}${u.admin ? " · App admin" : ""}${u.suspendedApp ? " · Suspended everywhere" : ""} · ${names.join(", ") || "In no space"}`}
+                  actions={actionsFor(u, null)}
+                />
+              );
+            })}
+          </div>
+        );
+      })()}
       {/* Each space a part of its own, headed the way Settings and
-          Progress head theirs (0.552). */}
-      <div className="at-ruled">
-      {data && data.orgs.map((o) => {
-        const here = data.people.filter((u) => (u.orgs || [u.org]).includes(o.id) && match(u));
+          Progress head theirs (0.552). Someone in several spaces is under
+          each. */}
+      {data && view === "spaces" && (
+      <div className="at-ruled at-everyone" data-el="everyone-spaces">
+      {data.orgs.map((o) => {
+        const here = data.people.filter((u) => spacesOf(u).includes(o.id) && match(u));
         if (!here.length) return null;
         return (
           <Section head key={o.id} title={o.name} lede={`manytongues.co/${o.slug}`}>
             <div className="at-decklist2">
-            {here.map((u) => (
-              <Tile key={u.handle}
-                title={u.displayName}
-                meta={`${u.handle}${u.admin ? " · App admin" : o.admins.includes(u.handle) ? " · Space admin" : ""}${suspendedHere(u, o.id) ? " · Suspended" : ""}`}
-                actions={
-                  <>
-                    <IconButton icon="key" label="Issue a new sign-in key" onClick={() => setConfirm({
-                      title: `New sign-in key for ${u.displayName}?`,
-                      confirmLabel: "Issue a new key",
-                      body: <p>Their current key stops working at once. You'll see the new one once.</p>,
-                      action: async () => {
-                        const r = await API.reissueKey(u.handle, o.id);
-                        setNewKey({ name: u.displayName, key: r.key });
-                      },
-                    })} />
-                    {/* Yourself too, as the super admin (0.575). */}
-                    {(!u.admin || u.handle === me) && data.orgs.some((x) => !x.archived && !(u.orgs || [u.org]).includes(x.id)) && (
-                      <IconButton icon="add" label="Add to a space" onClick={() => {
-                        setAddTo("");
-                        setAdding(u);
-                      }} />
-                    )}
-                    {u.handle !== me && !u.admin && (suspendedHere(u, o.id) ? (
-                      <IconButton icon="unlock" label="Reactivate" onClick={() => setConfirm({
-                        title: `Reactivate ${u.displayName}?`,
-                        confirmLabel: "Reactivate",
-                        body: <p>They can sign in again and are put back on their courses.</p>,
-                        action: () => API.reactivateUser(u.handle, o.id),
-                      })} />
-                    ) : (
-                      <IconButton icon="lock" label="Suspend" onClick={() => setConfirm({
-                        title: `Suspend ${u.displayName}?`,
-                        confirmLabel: "Suspend them",
-                        body: <p>They can't sign in until reactivated, and come off every course. Nothing is deleted.</p>,
-                        action: () => API.suspendUser(u.handle, o.id),
-                      })} />
-                    ))}
-                    {u.handle !== me && (
-                      <IconButton icon="delete" label="Delete person" danger onClick={() => setConfirm({
-                        title: `Delete ${u.displayName}?`,
-                        confirmLabel: "Delete for good",
-                        confirmWord: u.handle,
-                        body: (
-                          <p>
-                            Their account, key, My space, practice history and course places go. What they made
-                            for {o.name} stays, under their name. There is no undoing this.
-                          </p>
-                        ),
-                        action: () => API.deleteUser(u.handle, o.id),
-                      })} />
-                    )}
-                  </>
-                }
-              />
-            ))}
+            {here.map((u) => {
+              const why = whyIn(u, o.id);
+              return (
+                <Tile key={u.handle}
+                  title={u.displayName}
+                  meta={`${u.handle}${u.admin ? " · App admin" : o.admins.includes(u.handle) ? " · Space admin" : ""}${
+                    u.suspendedApp ? " · Suspended everywhere" : why === "suspended" ? " · Suspended" : why === "removed" ? " · Removed" : why === "left" ? " · Left" : ""}`}
+                  actions={actionsFor(u, o)}
+                />
+              );
+            })}
             </div>
           </Section>
         );
       })}
       </div>
+      )}
     </>
   );
 }

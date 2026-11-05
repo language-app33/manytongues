@@ -279,6 +279,7 @@ const PLACES: Record<string, [string, string]> = {
   SpaceBadge: [LEARN, "A space's logo or initials, in a small square"],
   SpacePlaces: [LEARN, "The You menu · where you are, one place per line"],
   LearnSpaceButton: [LEARN, "Learning · which space, from the top right corner"],
+  StrandedPanel: [LEARN, "Signed in with no space to open: suspended, removed or left"],
   BackupScreen: [ADMIN, "App · backing up and restoring"],
   ClearScreen: [ADMIN, "App · clearing the site"],
 

@@ -1347,6 +1347,9 @@ async function standingOf(store, me) {
 /* Not my-courses: that is Teaching's list, which is of one space. */
 const WIDE = new Set(["my-material", "report-flag", "practiced"]);
 const JOINS = new Set(["join-course", "join-space"]);
+/* What someone with no space they may use can still do (0.578): their own
+   name, their key's reminder, and closing their account. */
+const STRANDED_MAY = new Set(["rename", "key-saved", "delete-account"]);
 
 /**
  * Joining by a code (memberships, A2): a space's invitation adds the space;
@@ -1367,7 +1370,9 @@ async function joinByCode(store, me, given) {
   if (!org) return no(404, { error: "no-space" });
   if (org.archived) return no(403, { error: "space-closed" });
   const was = suspensionIn(me, orgId);
-  if (was && was.why === "removed") return no(403, { error: "removed", space: orgCard(org) });
+  /* Suspended by the space (0.578) is the admin's to lift; someone who
+     left or was removed may come back with an invitation or a code. */
+  if (was && was.why === "suspended") return no(403, { error: "suspended-here", space: orgCard(org) });
   /* The App admin acts in any space without being in it (35a). */
   if (!me.admin && !(await addMembership(store, me.handle, orgId))) return no(401, { error: "bad-key" });
   if (target.kind === "course") {
@@ -1607,6 +1612,8 @@ async function handle(req) {
       await ensureMain(store);
       const found = await currentUser(req, store);
       if (!found) return json({ error: "bad-key" }, 401);
+      /* Suspended across the whole app by the super admin (0.578). */
+      if (!found.admin && found.suspendedApp) return json({ error: "suspended-app" }, 403);
       /** @type {any} */
       let me = found;
       let { orgDocs, active } = await standingOf(store, me);
@@ -1619,7 +1626,26 @@ async function handle(req) {
         }
       }
       if (!me.admin && !active.length) {
-        return json({ error: memberOf(me).some((id) => suspensionIn(me, id)) ? "suspended" : "space-closed" }, 403);
+        /* Suspended in, removed from or gone from every space they are in
+           (0.578): they still sign in, to a page that says so and takes an
+           invitation or a course code. Only every space closed signs out. */
+        const stranded = memberOf(me)
+          .map((id) => ({ id, was: suspensionIn(me, id), doc: orgDocs.get(id) }))
+          .filter((x) => x.was && x.doc && !x.doc.archived)
+          .map((x) => ({ space: orgCard(x.doc), why: String(x.was.why || "suspended") }));
+        if (!stranded.length) return json({ error: "space-closed" }, 403);
+        await touch(store, me, "lastSeen");
+        return json({
+          ok: true,
+          user: {
+            ...withoutMemberships(me),
+            suspended: undefined,
+            org: stranded[0].space,
+            orgAdmin: false,
+            orgs: [],
+            stranded,
+          },
+        });
       }
       const at = String(url.searchParams.get("org") || "");
       const landId = me.admin ? orgOf(me) : at && active.includes(at) ? at : active[0];
@@ -1642,6 +1668,7 @@ async function handle(req) {
 
     const me = await currentUser(req, store);
     if (!me) return json({ error: "bad-key" }, 401);
+    if (!me.admin && me.suspendedApp) return json({ error: "suspended-app" }, 403);
     const mine = me.handle;
     const iAmAdmin = !!me.admin;
 
@@ -1651,7 +1678,7 @@ async function handle(req) {
      * can do nothing but join one by a code. App admins act anywhere.
      */
     const { active } = await standingOf(store, me);
-    if (!iAmAdmin && !active.length && !JOINS.has(action)) {
+    if (!iAmAdmin && !active.length && !JOINS.has(action) && !STRANDED_MAY.has(action)) {
       return json({ error: memberOf(me).some((id) => suspensionIn(me, id)) ? "suspended" : "space-closed" }, 403);
     }
 
@@ -4823,16 +4850,22 @@ async function handle(req) {
      * Suspend an account in the space this request acts in: off that
      * space's rosters, its courses kept to put back, and a Former members
      * record there. The person's other spaces are untouched (memberships).
-     * @param {any} user @param {"left" | "removed"} why @param {string} by
+     * Suspended (0.578) stays on the space's People list and is not a
+     * former member; left and removed are.
+     * @param {any} user @param {"left" | "removed" | "suspended"} why @param {string} by
      */
     async function suspend(user, why, by) {
-      const courses = await coursesOf(store, user.handle);
+      /* Suspended first and removed after: the courses they were on before
+         either, so a return still puts them back. */
+      const was = suspensionIn(user, acting);
+      const courses = was && Array.isArray(was.courses) && was.courses.length ? was.courses : await coursesOf(store, user.handle);
       await dropFromRosters(store, user.handle);
       await updateJson(store, K.user(user.handle), (/** @type {any} */ cur) => {
         if (!cur) return null;
         const u = normalisedUser(cur);
         return { ...u, suspendedIn: { ...u.suspendedIn, [acting]: { at: Date.now(), by, why, courses } } };
       });
+      if (why === "suspended") return;
       await noteFormer(store, acting, {
         handle: user.handle,
         displayName: user.displayName,
@@ -4853,7 +4886,7 @@ async function handle(req) {
         "admin-overview", "admin-create-user", "admin-reissue-key", "admin-rename-course",
         "admin-course-language", "admin-new-code", "admin-card", "admin-delete-flags",
         "admin-suspend-user", "admin-reactivate-user", "admin-new-invite", "admin-hand-over",
-        "admin-purge-former",
+        "admin-purge-former", "admin-remove-member",
       ]);
       if (!iAmAdmin && !(iRunThis && SPACE_ADMIN_MAY.has(action))) return json({ error: "admin-only" }, 403);
 
@@ -5361,7 +5394,7 @@ async function handle(req) {
       /* Suspending someone (64a) and reactivating them (67a): a space
          admin for people in their space, but never another space admin or
          an App admin — those are the App admin's (70a). */
-      if (action === "admin-suspend-user" || action === "admin-reactivate-user") {
+      if (action === "admin-suspend-user" || action === "admin-reactivate-user" || action === "admin-remove-member") {
         const handle = String(body.handle || "");
         const target = await readUser(store, handle);
         if (!target) return json({ error: "no-user" }, 404);
@@ -5370,8 +5403,17 @@ async function handle(req) {
         if (!iAmAdmin && (actingOrgDoc.admins || []).includes(handle)) return json({ error: "admin-only" }, 403);
         /* In this space only (memberships): the person's other spaces are
            untouched either way. */
+        /* Suspended: still listed in the space, the admin's to lift
+           (0.578). Removed: off the list, under Former members, back with an
+           invitation or a code. */
         if (action === "admin-suspend-user") {
           if (suspensionIn(target, acting)) return json({ ok: true });
+          await suspend(target, "suspended", mine);
+          return json({ ok: true });
+        }
+        if (action === "admin-remove-member") {
+          const was = suspensionIn(target, acting);
+          if (was && was.why !== "suspended") return json({ ok: true });
           await suspend(target, "removed", mine);
           return json({ ok: true });
         }
@@ -5445,6 +5487,9 @@ async function handle(req) {
         if (!handle || handle === mine) return json({ error: "no-user" }, 400);
         const list = (await readJson(store, K.former(acting))) || [];
         if (!list.some((/** @type {any} */ r) => r.handle === handle)) return json({ error: "not-former" }, 404);
+        /* An account is deleted only from Super admin → People (0.578):
+           here, only what is left of someone whose account is gone. */
+        if (await readJson(store, K.user(handle))) return json({ error: "account-exists" }, 400);
         /* Their decks first, off every course that holds them. */
         const deckIds = await readIndex(store, "decks");
         const theirDecks = here(await readManyJson(store, deckIds.map((id) => K.deck(id))))
@@ -5857,6 +5902,57 @@ async function handle(req) {
          than the person themselves would. Your own account goes through
          the door marked with your name, which is the one that needs no
          administrator. */
+      /*
+       * Suspended across the whole app (0.578), the App admin's alone: no
+       * sign-in anywhere, off every course in every space, and only the
+       * App admin lifts it — which puts them back on those courses. Each
+       * space's People list shows it; no space admin can undo it.
+       */
+      if (action === "admin-suspend-app" || action === "admin-lift-app") {
+        if (!iAmAdmin) return json({ error: "admin-only" }, 403);
+        const handle = String(body.handle || "");
+        const target = await readJson(store, K.user(handle));
+        if (!target) return json({ error: "no-user" }, 404);
+        if (target.admin || handle === mine) return json({ error: "admin-only" }, 403);
+        const ids = await readIndex(store, "courses");
+        if (action === "admin-suspend-app") {
+          if (target.suspendedApp) return json({ ok: true });
+          /** @type {{ id: string, roles: string[] }[]} */
+          const was = [];
+          for (const id of ids) {
+            await updateJson(store, K.course(id), (/** @type {Course | null} */ c) => {
+              if (!c || !(c.teachers.includes(handle) || c.students.includes(handle))) return null;
+              const roles = [];
+              if (c.teachers.includes(handle)) roles.push("teacher");
+              if (c.students.includes(handle)) roles.push("student");
+              was.push({ id: c.id, roles });
+              return { ...c, teachers: c.teachers.filter((x) => x !== handle), students: c.students.filter((x) => x !== handle) };
+            });
+          }
+          await updateJson(store, K.user(handle), (/** @type {any} */ cur) =>
+            cur ? { ...cur, suspendedApp: { at: Date.now(), by: mine, courses: was } } : null
+          );
+          return json({ ok: true });
+        }
+        const held = target.suspendedApp;
+        if (!held) return json({ ok: true });
+        for (const c of held.courses || []) {
+          await updateJson(store, K.course(c.id), (/** @type {Course | null} */ course) => {
+            if (!course) return null;
+            const next = { ...course, teachers: course.teachers.slice(), students: course.students.slice() };
+            if ((c.roles || []).includes("teacher") && !next.teachers.includes(handle)) next.teachers.push(handle);
+            if ((c.roles || []).includes("student") && !next.students.includes(handle)) next.students.push(handle);
+            return next;
+          });
+        }
+        await updateJson(store, K.user(handle), (/** @type {any} */ cur) => {
+          if (!cur) return null;
+          const { suspendedApp: _gone, ...rest } = cur;
+          return rest;
+        });
+        return json({ ok: true });
+      }
+
       if (action === "admin-delete-user") {
         const handle = String(body.handle || "");
         if (handle === mine) return json({ error: "use-delete-account" }, 400);
