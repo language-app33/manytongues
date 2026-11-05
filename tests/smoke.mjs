@@ -9845,7 +9845,7 @@ const openPronounTables = async () => {
      somebody and the app is the wrong place to be vague about a
      connection. */
   check("and says that setting up needs a connection and the rest does not",
-    /connection/i.test(host5.textContent || ""),
+    /connection|internet/i.test(host5.textContent || ""),
     (host5.textContent || "").slice(0, 200).replace(/\s+/g, " "));
 
   /* The way in for somebody who has been here before. */

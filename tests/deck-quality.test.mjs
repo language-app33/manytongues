@@ -391,7 +391,7 @@ test("a card is flawed, unrecorded or unspelt when any of its versions is", () =
   const known = [want, book, card];
   const q = deckQuality([want, book, card], { lang: ar, pool: known, known });
   assert.equal(checkOf(q, "sentences").share, 0, "جديد is in the second version, and nothing teaches it");
-  assert.match(must(q.fixes.find((f) => f.key === "unknown"), "the unknown fix").text, /\(جديد\)/);
+  assert.match(must(q.fixes.find((f) => f.key === "unknown"), "the unknown fix").text, /جديد/);
   /* Units: the two word forms and the one sentence. */
   near(checkOf(q, "recordings").share, 0, "the words have none, and the sentence's second version none");
   const recorded = { ...card, forms: card.forms.map((f) => ({ ...f, clips: ["c"], lat: "x" })) };

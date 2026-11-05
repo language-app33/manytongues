@@ -8,6 +8,86 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.568 — 4 November 2026
+
+**Teaching names the space you are in, also for a super admin.**
+
+- The line at the top of Material → Decks and Cards ("…'s decks and
+  cards, shared with its teachers.") and the Copy/Move to the space
+  confirmations named the super admin's own space, even while they were
+  working in another one. They now name the space being worked in, as the
+  menu behind your initial already did. Nothing changes for anyone else.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: as super admin, open another space's Teaching →
+Material and read the line above the list; it names that space.
+
+## 0.567 — 4 November 2026
+
+**Teaching → Material → Decks prompts you to make your first deck.**
+
+- With no decks yet, the Decks tab shows the same kind of panel the Cards
+  tab shows with no cards: a short line on what a deck is and a New deck
+  button, in place of an empty list.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: in a space with no decks, open Teaching → Material →
+Decks and see the panel; press New deck and make one.
+
+## 0.566 — 4 November 2026
+
+**Admin → People heads its list "This space's people".**
+
+- The part of People where you add someone and see everyone in the space
+  now has a heading, "This space's people", like Invite people above it
+  and Former members below.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: open Admin → People and see the new heading above the
+list.
+
+## 0.565 — 4 November 2026
+
+**The title bar at the top of each tab spans the whole window.**
+
+- The bar holding a tab's title ("Teaching · Courses", "Progress" and so
+  on) and the line under it now run edge to edge on a wide window, as
+  they already did on a phone. The logo and title stay in line with the
+  page beneath.
+- Checked in a browser on a wide window and at phone size: the bar reaches
+  both edges, and nothing scrolls sideways.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: on a computer, open a tab in Teaching or Admin, and
+Progress or Cards in Learning, and see the white bar reach both sides.
+
+## 0.564 — 4 November 2026
+
+**New wording across Settings, Progress, the welcome screen and Teaching,
+from the owner's review in the wording workshop.**
+
+- Settings: the display name, handle and sign-in key are explained more
+  plainly ("The name your teachers and classmates see.", "This is a
+  permanent username…", "The key you use to sign into the app."). The
+  warning about sharing the key is gone from that line.
+- Settings: "Reset scheduling" is now "Reset progress", in its label,
+  button and confirmation; "Close this account" is now "Delete your
+  account"; "On-screen keys" is now "On-screen keyboard"; the Sounds,
+  Log out, administrator and device-recordings explanations are
+  shorter; "Remove from this device" is now "Remove all from this
+  device".
+- Progress: the ladder and Prep mode explanations are shorter.
+- Welcome screen: "Your language journey starts here. After a quick
+  setup, you can learn anywhere, with or without internet."
+- Teaching: Export and Import explain themselves more simply; deck
+  quality now reads "Decks with higher scores tend to achieve better
+  learning outcomes."
+- Removed: the note under Saved sessions about deleted cards, and the
+  warning under a new course's language choice.
+
+To check by hand: open Settings, Progress, the welcome screen (signed
+out), and a deck's Export screen in Teaching, and read the new lines.
+
 ## 0.563 — 4 November 2026
 
 **Deck quality tips say what to do, and a deck counts number parts as cards.**
