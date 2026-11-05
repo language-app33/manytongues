@@ -1613,6 +1613,26 @@ Memberships (since 0.573; `docs/PLAN-memberships.md`, all three stages in one re
   card's space is its course's (`spaceOfItem`); a learner's own card is in
   none and is shown under every choice.
 
+Trying a space (since 0.574):
+
+- Super admin is a level above spaces, not a mode beside Learning,
+  Teaching and Admin. `placeRows` in `src/places.ts` decides both controls
+  of the You menu: "Where you are" at its top (Super admin, the App
+  admin's own spaces, the opened space) and the toggle of a space's modes
+  at its foot, which is empty at Super admin. `whoami` names all of the
+  App admin's own spaces in `orgs`, so the app can tell them apart.
+- On the server, `trying` is `iAmAdmin && !memberOf(me).includes(acting)`:
+  the App admin in a space they are not in. Then `my-material` and
+  `my-courses` deal every course of that space as a learner's, with no
+  codes, and the join handler refuses with `trying-space`. No roster or
+  membership is written; `practiced` already counts only the caller's own
+  spaces, so practice there counts nowhere.
+- In the app, `tryingSpace()` (courses-api.ts) is read once at start.
+  While it is set, the practice document, the material cache and the
+  Teaching and Admin caches use keys ending in `:trying:<slug>`, sync is
+  off, and the teaches flag is not saved. `dropTrial` removes those keys
+  on every way out of the space, and every trial's keys on log out.
+
 ## How it fits together
 
 ```

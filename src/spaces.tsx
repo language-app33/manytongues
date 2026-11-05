@@ -1200,7 +1200,8 @@ export function CoursesPage({
   joinHint?: Node;
   joinPlaceholder?: string;
   joinNote?: Node;
-  onJoin: (code: string) => any;
+  /** Without it, no join box: the super admin trying a space (0.574). */
+  onJoin?: (code: string) => any;
   renderCourse: (course: Course) => Node;
   footer?: Node;
 }) {
@@ -1259,6 +1260,7 @@ export function CoursesPage({
       )}
 
       {/* The heading names the section; the box holds only the doing. */}
+      {onJoin && (
       <section className="at-section at-coursesection">
         <h3 className="at-sectionhead">{joinTitle}</h3>
         <div className="at-joinbox">
@@ -1291,6 +1293,7 @@ export function CoursesPage({
           )}
         </div>
       </section>
+      )}
 
       {footer}
     </>
@@ -9136,7 +9139,8 @@ export function StudentCourses({
   languages: Record<LangId, Lang>;
   busy?: boolean;
   error?: Node;
-  onJoin: (code: string) => Promise<any>;
+  /** Not given while the super admin tries a space (0.574): no joining. */
+  onJoin?: (code: string) => Promise<any>;
   onRefresh?: () => void;
   onPractise: (deckTitle: string) => void;
 }) {
@@ -9152,12 +9156,12 @@ export function StudentCourses({
       busy={busy}
       error={error}
       lead="Open a course to see its decks."
-      emptyLead="You're not in a course yet. Enter the code your teacher gave you below."
+      emptyLead={onJoin ? "You're not in a course yet. Enter the code your teacher gave you below." : "There are no courses here yet."}
       joinTitle="Join a course"
       joinHint="Enter the code your teacher gave you."
       joinPlaceholder="Course code"
       joinNote={note}
-      onJoin={async (code) => {
+      onJoin={onJoin && (async (code) => {
         try {
           const r = await onJoin(code);
           setNote(
@@ -9170,7 +9174,7 @@ export function StudentCourses({
         } catch (e) {
           setNote(API.explain(e));
         }
-      }}
+      })}
       renderCourse={(c) => {
         const mine = decks.filter((d) => d.courseId === c.id);
         return (

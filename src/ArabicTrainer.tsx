@@ -131,6 +131,7 @@ function ChunkFallback() {
   return slow ? <Help>Loading…</Help> : null;
 }
 import * as API from "./courses-api.ts";
+import { placeRows } from "./places.ts";
 import {
   DEFAULT_LANGUAGE,
   EX,
@@ -867,7 +868,16 @@ import {
    recombined across items.
    ================================================================== */
 
-const KEY = "arabic-trainer-v3";
+/*
+ * The App admin trying a space that is none of theirs (0.574): its slug,
+ * or "". Practice there is kept apart on the device, under keys ending in
+ * TRIAL, never synced, and dropped on leaving. Read once, at start: the
+ * document's key depends on it.
+ */
+const TRYING = API.tryingSpace();
+const TRIAL = API.trialSuffix(TRYING);
+const MAIN_KEY = "arabic-trainer-v3";
+const KEY = MAIN_KEY + TRIAL;
 
 /* What a reported problem is filed under while it waits for a connection.
    See outbox.ts: one queue, and the kind is how two sorts of waiting work
@@ -7472,6 +7482,24 @@ export function merge(parsedIn: Record<string, any> | null | undefined) {
 
 async function loadData() {
   if (!window.storage) return { ...EMPTY };
+  if (TRYING) {
+    /* Trying a space (0.574): its own document, or a fresh one that starts
+       with your own preferences. Never the older keys. */
+    try {
+      const res = await window.storage.get(KEY);
+      if (res && res.value) return merge(JSON.parse(res.value));
+    } catch (e) {
+      /* none yet */
+    }
+    try {
+      const res = await window.storage.get(MAIN_KEY);
+      const own = res && res.value ? JSON.parse(res.value) : null;
+      if (own && own.settings) return merge({ settings: own.settings, items: [] });
+    } catch (e) {
+      /* no preferences of your own to copy */
+    }
+    return { ...EMPTY };
+  }
   for (const key of [KEY, "arabic-trainer-v2", "arabic-trainer-v1"]) {
     try {
       const res = await window.storage.get(key);
@@ -10069,7 +10097,7 @@ function saveTeaches(yes: boolean) {
  * version it already has, and without one every launch pulled every deck
  * and every card in full.
  */
-const MATERIAL_KEY = "arabic-trainer:material";
+const MATERIAL_KEY = "arabic-trainer:material" + TRIAL;
 
 interface HeldMaterial {
   courses: Course[];
@@ -10371,6 +10399,9 @@ export default function ArabicTrainer() {
      asked rather than where they last were. */
   const [space, setSpace] = useState(() => {
     const open = new URLSearchParams(window.location.search).get("open");
+    /* Super admin is only ever shown at one of your own addresses: in a
+       space you are trying, its Admin (0.574). */
+    if (open === "super" && TRYING) return "admin";
     if (open === "admin" || open === "super") return open;
     return loadTeaches() ? "teach" : "learn";
   });
@@ -10731,6 +10762,8 @@ export default function ArabicTrainer() {
     /* Defaulted rather than required: most callers have no token in hand
        and want whatever this device is already signed in with. */
     async (token: string = "") => {
+      /* Trying a space (0.574): its practice stays on this device. */
+      if (TRYING) return;
       const key = token || loadSyncConfig().token;
       if (!key || syncing.current) return;
       /*
@@ -10938,6 +10971,8 @@ export default function ArabicTrainer() {
       }
       return;
     }
+    /* Trying a space (0.574): no sync, so no token. */
+    if (TRYING) return;
     let alive = true;
     tokenFor(account.key).then((token) => {
       if (!alive) return;
@@ -11865,7 +11900,8 @@ export default function ArabicTrainer() {
           dataRef.current.parked || {},
         );
         setTeaches(r.teaches);
-        saveTeaches(r.teaches);
+        /* Trying a space (0.574): its answer is not yours to keep. */
+        if (!TRYING) saveTeaches(r.teaches);
         materialVersion.current = r.version || "";
         answered = true;
         if (r.unchanged) {
@@ -13924,6 +13960,13 @@ export default function ArabicTrainer() {
         <React.Suspense fallback={<ChunkFallback />}>
           <Onboarding
             onDone={(a: any) => {
+              /* The App admin signing in at a space that is none of theirs
+                 tries it (0.574): its practice has its own key on the
+                 device, read at start, so start again. */
+              if (API.tryingSpace() !== TRYING) {
+                window.location.reload();
+                return;
+              }
               setSignedOutWhy("");
               setAccount(a);
             }}
@@ -13970,7 +14013,9 @@ export default function ArabicTrainer() {
    * answer to "am I losing anything?" is no, and that is the question
    * behind the look at the dot.
    */
-  const syncNote = offline
+  const syncNote = TRYING
+    ? "Practice here stays on this device"
+    : offline
     ? `Offline — your work is saved on this device${
         toSend ? ` · ${plural(toSend, "report")} to send` : ""
       }`
@@ -14015,13 +14060,18 @@ export default function ArabicTrainer() {
       {/* A problem reported without a connection is kept and sent later;
           until then the learner is told so in the band, not only in the
           corner menu, where it was easy to never look. */}
-      {/* An App admin inside a space other than their own (0.552): which
-          one, and the way back to the list of spaces it was opened from. */}
-      {account && account.admin && addressSpace && accountOrg && addressSpace.id !== accountOrg.id && (
+      {/* An App admin inside a space that is none of theirs (0.552, 0.574):
+          which one, and the way back to the list of spaces it was opened
+          from, on one line. Leaving drops what trying it kept. */}
+      {account && account.admin && addressSpace && accountOrg && !!TRYING && (
         <TopBanner
+          oneLine
           actions={
             <Button size="sm" variant="ghost" icon="back"
-              onClick={() => window.location.assign(`/${accountOrg.slug || ""}?open=super`)}>
+              onClick={() => {
+                API.dropTrial(TRYING);
+                window.location.assign(`/${accountOrg.slug || ""}?open=super`);
+              }}>
               Back to Spaces
             </Button>
           }
@@ -14073,6 +14123,13 @@ export default function ArabicTrainer() {
         {/* ============ STUDY ============ */}
         {tab === "home" && (
           <>
+            {/* The super admin trying a space (0.574): what this is, and
+                that nothing here is kept. */}
+            {TRYING && !inExercise && (
+              <Help>
+                {`You're trying ${(addressSpace && addressSpace.name) || "this space"} as a learner. Practice here stays on this device and is dropped when you leave.`}
+              </Help>
+            )}
             {/* Where it is most likely to be read by the person it is for:
                 above what they came here to do, once, and gone for good on
                 a tap. See useInstallOffer for why installing is the one
@@ -15477,7 +15534,8 @@ export default function ArabicTrainer() {
             languages={LANGUAGES}
             busy={courseBusy}
             error={courseError}
-            onJoin={async (code: string) => {
+            /* Trying a space is not joining it (0.574). */
+            onJoin={TRYING ? undefined : async (code: string) => {
               const r = await API.joinCourse(code);
               /* A course in another space joins that space too
                  (memberships): the account learns of it, so the You menu
@@ -15602,6 +15660,8 @@ export default function ArabicTrainer() {
               setScreen(null);
             }}
             onLogOut={() => {
+              /* Every space tried on this device goes too (0.574). */
+              API.dropTrial();
               API.clearAccount();
               setAccount(null);
               setSpace("learn");
@@ -15706,16 +15766,24 @@ export default function ArabicTrainer() {
           sections, and beside them what is true wherever you are — which
           space and which languages, and you. */}
       {(() => {
-        /* A space admin sees Teaching, for the space's material (6a), and
-           Admin, for its people and courses (0.544). */
-        const runs = !!(account && (account.admin || account.orgAdmin));
-        /* Somebody with no Teaching gets My space instead (0.545, 58a). */
-        const spaces = ["learn"]
-          /* Students have no My space (0.550). */
-          .concat(teaches || runs ? ["teach"] : [])
-          .concat(runs ? ["admin"] : [])
-          /* The app admin's own tools, whichever space they are in (0.547). */
-          .concat(account && account.admin ? ["super"] : []);
+        /* Where you are, and the space's own modes (0.574). A space admin
+           sees Teaching, for the space's material (6a), and Admin, for its
+           people and courses (0.544). The App admin's Super admin is a
+           level above spaces: a place in "Where you are", not a mode. */
+        const iAmAppAdmin = !!(account && account.admin);
+        const hereId = iAmAppAdmin ? (addressSpace && addressSpace.id) || accountOrgId : accountOrgId;
+        const { places, placeNow, modes } = placeRows({
+          admin: iAmAppAdmin,
+          orgAdmin: !!(account && account.orgAdmin),
+          teaches,
+          trying: !!TRYING,
+          space,
+          mine: accountOrgs,
+          opened: TRYING && addressSpace ? addressSpace : null,
+          hereId,
+        });
+        const spaces: string[] = modes;
+        const homeSlug = (accountOrg && typeof accountOrg === "object" && accountOrg.slug) || "";
         const choices = space === "learn" ? langChoices : space === "teach" || space === "mine" ? teachChoices : [];
         return (
           <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
@@ -15727,8 +15795,38 @@ export default function ArabicTrainer() {
             <div className="at-docksub">
               <CornerMenu
                 spaceShown={shownSpace}
-                mySpaces={account && !account.admin ? accountOrgs : undefined}
+                mySpaces={places}
+                placeNow={placeNow}
+                placesLabel={iAmAppAdmin ? "Where you are" : "Your spaces"}
                 onMySpace={(to) => {
+                  if (to.id === "super") {
+                    /* Super admin is shown only at one of your own
+                       addresses: from a tried space, go home first, and
+                       leave the trial behind. */
+                    if (TRYING) {
+                      API.dropTrial(TRYING);
+                      window.location.assign(`/${homeSlug}?open=super`);
+                      return;
+                    }
+                    setTrialBack(null);
+                    setSpace("super");
+                    return;
+                  }
+                  if (TRYING && addressSpace && to.id === addressSpace.id) {
+                    setSpace("admin");
+                    return;
+                  }
+                  if (TRYING) {
+                    API.dropTrial(TRYING);
+                    window.location.assign(`/${to.slug}`);
+                    return;
+                  }
+                  /* Back from Super admin to the space whose address this is. */
+                  if (to.id === hereId) {
+                    setTrialBack(null);
+                    setSpace("learn");
+                    return;
+                  }
                   /* Going to another of your spaces is going to its address:
                      every screen then agrees about where you are. */
                   API.rememberSpace(to.id);
@@ -15739,7 +15837,8 @@ export default function ArabicTrainer() {
                    every part of it is done — this device's cards, the courses,
                    and the spaces this person belongs to. */
                 syncState={
-                  offline
+                  /* Trying a space (0.574): nothing syncs. */
+                  TRYING || offline
                     ? "off"
                     : spacesBusy || (syncState === "idle" && courseBusy)
                     ? "syncing"
@@ -20253,18 +20352,13 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part
       {spacesToo && (
         <>
           <div className="at-spacepick" role="radiogroup" aria-label="Space"
-            /* Exactly as many columns as the first row holds, so Super admin
-               can span them on a row of its own without crushing the rest
-               (0.548). */
-            style={{ gridTemplateColumns: `repeat(${Math.max(1, spaces.filter((x) => x !== "super").length)}, minmax(0, 1fr))` }}>
+            style={{ gridTemplateColumns: `repeat(${spaces.length}, minmax(0, 1fr))` }}>
             {spaces.map((sp) => (
               <button
                 key={sp}
                 role="radio"
                 aria-checked={space === sp}
                 className={`at-spacebtn${space === sp ? " on" : ""}`}
-                /* Super admin sits on a row of its own, full width (0.547). */
-                style={sp === "super" ? { gridColumn: "1 / -1" } : undefined}
                 onClick={() => onSpace(sp)}
               >
                 <Icon name={SPACE_ICON[sp]} size={18} />
@@ -20450,11 +20544,16 @@ function AppVersion() {
   );
 }
 
-function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide, onFeedback, spaceShown, mySpaces, onMySpace }: {
+function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide, onFeedback, spaceShown, mySpaces, placeNow, placesLabel, onMySpace }: {
   account: User | null;
-  /** Every space this account is in, when it is in more than one
-      (memberships): listed under the space's name, to go to another. */
-  mySpaces?: { id: string; slug: string; name: string }[];
+  /** Where you can be (0.574): every space this account is in, when it is
+      in more than one (memberships); for the App admin, Super admin first,
+      then their spaces, then the space they opened. */
+  mySpaces?: { id: string; slug: string; label: string }[];
+  /** Which of them is current: "super", or a space id. */
+  placeNow?: string;
+  /** "Your spaces", or "Where you are" for the App admin. */
+  placesLabel?: string;
   onMySpace?: (space: { id: string; slug: string }) => void;
   /** The space you are in, named at the top (0.543): its name, and its
       logo as a data URL or a stored picture's hash. */
@@ -20503,13 +20602,13 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
           {spaceShown ? <SpaceLine space={spaceShown} /> : null}
           {mySpaces && mySpaces.length > 1 && onMySpace ? (
             <Segmented
-              label="Your spaces"
+              label={placesLabel || "Your spaces"}
               data-el="my-spaces"
-              value={(spaceShown as any) && (spaceShown as any).id}
-              options={mySpaces.map((o) => ({ value: o.id, label: o.name }))}
+              value={placeNow}
+              options={mySpaces.map((o) => ({ value: o.id, label: o.label }))}
               onChange={(id) => {
                 const to = mySpaces.find((o) => o.id === id);
-                if (to && to.id !== ((spaceShown as any) && (spaceShown as any).id)) onMySpace(to);
+                if (to && to.id !== placeNow) onMySpace(to);
               }}
             />
           ) : null}

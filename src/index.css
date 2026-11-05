@@ -3297,6 +3297,10 @@ button.at-stat { transition: border-color 140ms ease; }
 .at-banner + .at-banner { border-top:1px solid rgba(0,0,0,.18); }
 .at-banner.error { background: var(--rose); color:#FFFFFF; }
 .at-banneracts { display:inline-flex; gap: var(--s2); flex:0 0 auto; }
+/* One line, the words then the button (0.574): the super admin's "You're
+   in {space}." and Back to Spaces. A long name is cut, not wrapped. */
+.at-banner.oneline { flex-wrap: nowrap; justify-content: space-between; text-align: left; }
+.at-banner.oneline .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A word inside a sentence that does something, for the one or two places
    where a full button would be louder than what it offers. It is a real
    button underneath, so it is reachable by keyboard and reads as a control

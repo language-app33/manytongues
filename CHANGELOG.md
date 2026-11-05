@@ -8,6 +8,56 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.574 — 5 November 2026
+
+**Super admin is a level above spaces, and the super admin can try a space
+as a learner.** Only the super admin sees any of this; space admins,
+teachers and learners see everything as in 0.573.
+
+- **"Where you are"** at the top of the You menu lists Super admin, then
+  each of your own spaces, then the space you opened from Super admin →
+  Spaces while you are in it. Choosing Super admin or one of your spaces
+  from an opened space takes you there, reloading the app, as Back to
+  Spaces does.
+- **The toggle at the foot of the You menu keeps only the space's own
+  modes:** Learning, Teaching and Admin. Super admin is no longer one of
+  its buttons, and at Super admin the toggle is not shown.
+- **In an opened space you get Learning as well**, as a try-out: every
+  course there is dealt to you as if you were in it. You are put on no
+  roster and do not become a member. Teaching and Admin are that space's,
+  as before.
+- **Practice there stays on this device** and is dropped when you leave
+  the space, by Back to Spaces or "Where you are", and on logging out. It
+  is not synced and counts nowhere. App preferences start as a copy of
+  yours, and changes made there are dropped with the rest. Learning's Home
+  says so, and the You menu's sync line reads "Practice here stays on this
+  device".
+- **No joining while trying:** the Courses page has no join box there,
+  and the server refuses a course code with "You're trying this space,
+  not joining it."
+- **The band at the top of an opened space is one line:** "You're in
+  {space}." with Back to Spaces beside it. A long name is cut short.
+- Reports flagged while trying land in that space's reports under your
+  name. Recordings and pictures downloaded there stay on the device, as
+  any download does.
+
+To check by hand, on the deployed app, at phone width, as the super admin:
+
+- At home, "Where you are" lists Super admin and your space(s); the toggle
+  shows Learning, Teaching and Admin.
+- At Super admin, the toggle is gone, and the foot bar shows Spaces,
+  People, Reports, App.
+- Open a space from Super admin → Spaces: "Where you are" lists it as well,
+  chosen; Learning lists its courses and deals a session; Courses has no
+  join box; Teaching shows its material and none of your own My space.
+- Back to Spaces, and choosing Super admin or your space, leave your own
+  Learning as it was.
+- The band fits on one line with a long space name.
+- A learner in two spaces sees "Your spaces" as in 0.573, and a teacher's
+  and a space admin's toggle are unchanged.
+- Known edge: typing an *old* address of one of your own spaces gives a
+  try-out of it until you go to its current address.
+
 ## 0.573 — 5 November 2026
 
 **One account can be in several spaces, and Learning shows them all.**

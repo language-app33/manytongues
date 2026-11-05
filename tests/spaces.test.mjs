@@ -833,3 +833,39 @@ test("Teaching's list of courses is of the space acted in, for a teacher in two"
   assert.deepEqual(atP, [p.course.id]);
   assert.deepEqual(atQ, []);
 });
+
+test("the App admin tries a space they are not in as a learner, without joining it (0.574)", async () => {
+  const ids = (/** @type {any[]} */ rows) => (rows || []).map((r) => r.id);
+  const courses = (await api("my-courses", { key: admin.key, org: B })).json.courses;
+  const tried = courses.find((/** @type {any} */ c) => c.id === b.course.id);
+  assert.ok(tried, "every course of the tried space is listed");
+  assert.equal(tried.role, "student");
+  assert.equal(tried.teaching, false);
+  assert.equal(tried.studying, true);
+  assert.equal(tried.code, undefined);
+  assert.equal(tried.teacherCode, undefined);
+  assert.ok(ids((await api("my-material", { key: admin.key, org: B })).json.decks).includes(b.deck.id));
+
+  /* At home, neither. */
+  assert.ok(!ids((await api("my-courses", { key: admin.key })).json.courses).includes(b.course.id));
+  assert.ok(!ids((await api("my-material", { key: admin.key })).json.decks).includes(b.deck.id));
+
+  /* Joining while trying is refused. */
+  const code = await codeOf(b.teacher, b.course.id);
+  const join = await api("join-course", { key: admin.key, org: B, body: { code } });
+  assert.equal(join.status, 403);
+  assert.equal(join.json.error, "trying-space");
+
+  /* No roster, no membership. */
+  const store = getStore("arabic-courses");
+  const course = JSON.parse(String(await store.get(`course:${b.course.id}`, { type: "text" })));
+  assert.ok(!course.students.includes(admin.handle));
+  const me = JSON.parse(String(await store.get(`user:${admin.handle}`, { type: "text" })));
+  const memberOf = Array.isArray(me.orgs) && me.orgs.length ? me.orgs : [me.org || "main"];
+  assert.ok(!memberOf.includes(B));
+
+  /* whoami names the App admin's own spaces, and not the tried one. */
+  const who = await api("whoami", { key: admin.key, params: { org: B } });
+  assert.ok(!orgIds(who).includes(B));
+  assert.ok(orgIds(who).length >= 1);
+});

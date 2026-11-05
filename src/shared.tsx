@@ -3694,9 +3694,11 @@ export function BannerHost() {
 /* `actions`, where there are any, are a button or two at the end of the
    band: a message that needs doing something about, like reloading for a
    new version, carries its buttons with it. */
-export function TopBanner({ kind = "warn", actions, children }: {
+export function TopBanner({ kind = "warn", actions, oneLine, children }: {
   kind?: "warn" | "error";
   actions?: Node;
+  /** The words and the actions on one line, the words cut short (0.574). */
+  oneLine?: boolean;
   children?: Node;
 }) {
   const [host, setHost] = useState<Element | null>(null);
@@ -3705,7 +3707,7 @@ export function TopBanner({ kind = "warn", actions, children }: {
   }, []);
   if (!children || !host) return null;
   return createPortal(
-    <div className={`at-banner ${kind}`} role={kind === "error" ? "alert" : "status"}>
+    <div className={`at-banner ${kind}${oneLine ? " oneline" : ""}`} role={kind === "error" ? "alert" : "status"}>
       <span className="what">{children}</span>
       {actions ? <span className="at-banneracts">{actions}</span> : null}
     </div>,
@@ -4479,7 +4481,10 @@ type SpaceName = "admin" | "teach";
  */
 const spaceHeld: Record<string, { handle: string; shown: any } | null> = { admin: null, teach: null };
 
-const SPACE_KEY = (space: SpaceName) => `arabic-trainer:space:${space}`;
+/* Trying a space (0.574) keeps its Teaching and Admin apart, and drops
+   them on leaving. */
+const SPACE_TRIAL = API.trialSuffix(API.tryingSpace());
+const SPACE_KEY = (space: SpaceName) => `arabic-trainer:space:${space}${SPACE_TRIAL}`;
 
 function rememberOnDevice(space: SpaceName, handle: string, shown: any) {
   try {

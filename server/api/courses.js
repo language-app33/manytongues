@@ -1625,7 +1625,9 @@ async function handle(req) {
       const landId = me.admin ? orgOf(me) : at && active.includes(at) ? at : active[0];
       const org = orgDocs.get(landId) || (await readJson(store, K.org(landId)));
       await touch(store, me, "lastSeen");
-      const shown = me.admin ? [landId] : active;
+      /* The App admin's own spaces too (0.574), so the app can tell them
+         from a space they are only trying. */
+      const shown = me.admin ? memberOf(me).filter((id) => orgDocs.get(id)) : active;
       return json({
         ok: true,
         user: {
@@ -1681,6 +1683,10 @@ async function handle(req) {
     const actingOrgDoc = await readJson(store, K.org(acting));
     const iRunThis = !!actingOrgDoc && active.includes(acting) && (actingOrgDoc.admins || []).includes(mine);
     const iManage = iAmAdmin || iRunThis;
+    /* The App admin in a space their account is not in tries it as a
+       learner (0.574): every course there is dealt to them, and no roster
+       or membership changes. */
+    const trying = iAmAdmin && !memberOf(me).includes(acting);
     /** Names for handles whose accounts were deleted (0.544): what they made keeps their name. */
     async function nameTheGone(/** @type {Record<string, string>} */ nameOf, /** @type {string[]} */ handles) {
       for (const h of [...new Set(handles)]) {
@@ -4015,6 +4021,8 @@ async function handle(req) {
      * membership, and a teacher may hold it too.
      */
     if (action === "join-course" || action === "join-space") {
+      /* Trying a space is not joining it (0.574). */
+      if (trying) return json({ error: "trying-space" }, 403);
       /* Codes are made lower-case; a copy can pick up capitals or stray
          spaces on its way from one screen to another. */
       const given = String(body.code || "").replace(/\s+/g, "").toLowerCase();
@@ -4025,10 +4033,11 @@ async function handle(req) {
     if (action === "my-courses") {
       const ids = await readIndex(store, "courses");
       const out = (await readManyJson(store, ids.map((id) => K.course(id))))
-        .filter((c) => c && inScope(c) && inCourse(c, mine))
+        .filter((c) => c && inScope(c) && (trying || inCourse(c, mine)))
         .map((c) => {
-          const teaching = isTeacher(c, mine);
-          const studying = isStudent(c, mine);
+          /* Trying the space (0.574): every course, as a learner of it. */
+          const teaching = !trying && isTeacher(c, mine);
+          const studying = trying || isStudent(c, mine);
           const role = teaching ? "teacher" : "student";
           // Only a teacher hands out invitations, so only a teacher sees them.
           return {
@@ -4224,7 +4233,9 @@ async function handle(req) {
       const allCourses = (
         await readManyJson(store, courseIds.map((id) => K.course(id)), EVENTUAL)
       ).filter((c) => c && inScope(c));
-      const courseRows = allCourses.filter((c) => isStudent(c, mine));
+      /* Trying a space (0.574): every course of it is dealt, without a
+         roster. For the App admin the scope is the acting space alone. */
+      const courseRows = trying ? allCourses : allCourses.filter((c) => isStudent(c, mine));
       /* Whether the Teaching space exists for this person is answered here
          too, so the app needn't ask a second time on every launch. */
       /* Teaching is of the space this request acts in (memberships): a

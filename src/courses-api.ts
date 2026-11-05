@@ -49,6 +49,40 @@ export function loadAccount(): (User & { key: string }) | null {
   }
 }
 
+/*
+ * The App admin at an address that is none of their spaces (0.574): the
+ * slug of the space they are trying, or "". Read once at start, because
+ * the practice document's key depends on it.
+ */
+export function tryingSpace(): string {
+  const me: any = loadAccount();
+  if (!me || !me.admin || typeof window === "undefined") return "";
+  const mine: { slug?: string }[] =
+    Array.isArray(me.orgs) && me.orgs.length ? me.orgs : me.org && typeof me.org === "object" ? [me.org] : [];
+  const here = (window.location.pathname.split("/")[1] || "").toLowerCase();
+  if (!here || !mine.length) return "";
+  return mine.some((o) => o && o.slug === here) ? "" : here;
+}
+
+/* Everything kept on the device while trying a space (0.574) ends in this,
+   so leaving it can drop the lot. */
+export const trialSuffix = (slug: string) => (slug ? `:trying:${slug}` : "");
+
+/** Drop what trying `slug` kept on the device; every trial when "". */
+export function dropTrial(slug = "") {
+  try {
+    const gone: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (slug ? k.endsWith(trialSuffix(slug)) : k.includes(":trying:")) gone.push(k);
+    }
+    for (const k of gone) localStorage.removeItem(k);
+  } catch (e) {
+    /* private browsing: nothing kept to drop */
+  }
+}
+
 export function saveAccount(account: (User & { key: string }) | null) {
   try {
     localStorage.setItem(KEY_STORE, JSON.stringify(account));
@@ -482,6 +516,7 @@ export function explain(err: unknown): string {
       "bad-code": "Nothing has that code. Check it with whoever gave it to you.",
       "code-required": "You need a code to join: an invitation link, or a course code from your teacher.",
       "other-space": "That belongs to another space.",
+      "trying-space": "You're trying this space, not joining it.",
       "space-closed": "This space is closed.",
       "suspended": "You're not in any space right now. Ask your space's admin, or use an invitation link or a course code.",
       "many-spaces": "This person is in more than one space, so only the super admin can give them a new key.",

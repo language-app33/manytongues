@@ -7417,3 +7417,24 @@ screen, Teaching above all, reads the space it is in from one place.
 The three stages of `docs/PLAN-memberships.md` shipped as one release,
 0.573, because the owner asked for the whole plan at once; the plan's
 stage boundaries are kept in its checklists.
+
+---
+
+## The super admin tries a space on the device, not as a member
+
+**5 November 2026** · `trying` in `server/api/courses.js`, `tryingSpace` and `dropTrial` in `src/courses-api.ts`
+
+Inside a space opened from Super admin, Learning deals every course of
+that space to the super admin, and their practice there is kept apart on
+the device under its own keys, never synced, and dropped on leaving.
+
+**Why not make them a member of every space.** Membership is what puts
+someone on a roster: they would appear in every space's People list and
+head count, every space's courses would mix into their own Learning at
+home, and every space's material would download to their device. Trying
+is meant to show what a learner there sees, and leave no trace.
+
+**Why not sync it.** The synced document is one per account, so trial
+practice would mix with their own; a document per tried space would grow
+on the server for something meant to be thrown away. Cost: a trial on one
+device is not seen on another, and it is gone when they leave the space.
