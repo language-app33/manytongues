@@ -7311,6 +7311,32 @@ each refresh that finds a change, to find the person's own decks; and a
 learner's own cards can't be reported (they are theirs to fix), so a report
 from My space names only the card.
 
+## Word sets
+
+**5 November 2026** · `WordSet` and `wordSetsOf` in `src/spaces.tsx`,
+`src/pronouns-editor.tsx`
+
+Numbers and pronouns were called "built-in", which told teachers the app
+supplied the words; it supplies only the list, and the teacher fills it.
+Months, days of the week and more are coming, so the name had to be for
+the kind rather than the contents: a **word set**. One `WordSet`
+description per set feeds the Word sets screen, a deck's notes and Add
+existing cards, so a new set is one more entry in `wordSetsOf` and a
+screen to write it on.
+
+"Written" for numbers is `rangeChecks` over the teacher's own system — the
+test a student's device applies — counted in ranges, not boxes, because a
+range is what a deck holds. A deck's note about missing number words reads
+the server's `partsWaiting` instead, which also knows when the deck draws
+on another teacher's numbers; then there is no "Write them" button, as the
+words are not this teacher's to write.
+
+Pronouns stay one card each (their deck membership is the cards'), so a
+pronoun saved for the first time takes the decks the rest of the set is
+in. Costs, accepted: a set with no pronoun written cannot be put in a deck
+yet — there is nothing to hold it — and the picker says "None written
+yet" rather than hiding it.
+
 
 ---
 
@@ -7389,5 +7415,5 @@ address, as Super admin's Open does. Cost: a reload. What it buys: every
 screen, Teaching above all, reads the space it is in from one place.
 
 The three stages of `docs/PLAN-memberships.md` shipped as one release,
-0.569, because the owner asked for the whole plan at once; the plan's
+0.573, because the owner asked for the whole plan at once; the plan's
 stage boundaries are kept in its checklists.

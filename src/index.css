@@ -1415,6 +1415,12 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   .at-deckrow2:has(> .at-deckacts > :nth-child(3)) > .at-deckmain { flex-basis:100%; }
 }
 .at-deckacts { display:flex; gap:6px; flex:0 0 auto; margin-left:auto; }
+/* A deck tile that is a button (0.569): the Word sets row and each set on
+   its screen. The button's own look taken off, so it reads as a tile. */
+.at-openrow { display:block; width:100%; text-align:left; font:inherit; color:inherit; }
+.at-openrow .at-deckrow2, .at-openrow .at-deckmain,
+.at-openrow .at-decktitle, .at-openrow .at-deckmeta { display:block; }
+.at-openrow:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 /* A reported problem, under the title of the tile carrying it. The question
    as it was asked and, if there was one, what the person typed about it —
    the two things worth reading before deciding whether to open the card. */
@@ -3214,6 +3220,43 @@ button.at-stat { transition: border-color 140ms ease; }
 .at-screen .at-pagetitle { top:0; }
 .at-pagetitle .at-sectionhead { margin:0; }
 .at-pagetitle .at-brandmark { width:28px; height:28px; }
+
+/* A heading with a search button at the end of its line (Courses, 0.570).
+   The field sits behind the button, as narrow as it, and grows leftwards
+   out of it over the heading when pressed; the heading fades as it is
+   covered. Kept in the page rather than hidden while closed, so the press
+   that opens it can also put the keyboard up on a phone. */
+.at-headrow { position:relative; display:flex; align-items:center;
+  justify-content:space-between; gap:8px; min-height:44px; margin-bottom:10px; }
+.at-headrow > .at-sectionhead { margin:0; transition: opacity .2s ease; }
+.at-headsearch { position:absolute; top:0; right:0; bottom:0; width:44px;
+  display:flex; align-items:center; transition: width .28s cubic-bezier(.2,.8,.2,1); }
+.at-headsearch.open { width:100%; }
+.at-headrow:has(.at-headsearch.open) > .at-sectionhead { opacity:0; }
+.at-headsearchfield { box-sizing:border-box; width:100%; height:44px; margin:0;
+  padding:0 52px 0 12px; border-radius: var(--r-sm); font-size:14px;
+  opacity:0; pointer-events:none; transition: opacity .18s ease; }
+.at-headsearch.open .at-headsearchfield { opacity:1; pointer-events:auto; }
+/* The field's own clear button is the cross at its far end; the browser's
+   smaller one beside it would be a second way to do the same thing. */
+.at-headsearchfield::-webkit-search-cancel-button,
+.at-headsearchfield::-webkit-search-decoration { -webkit-appearance:none; appearance:none; display:none; }
+/* Heading to first tile at the editor's 18px (0.572). The row is the
+   44px button's height with the heading centred in it, so 10px under the
+   row puts the heading's own foot about 18px above the first tile. The
+   list's top toolbar has nothing in it here — its search lives in the
+   heading's row — and an empty row still brought its margins along. */
+.at-coursesection .at-toolbar-top:empty { display:none; }
+.at-coursesection > .at-headrow { margin-bottom:10px; }
+/* The courses page's headings at the card editor's heading size (0.571). */
+.at-coursesection .at-sectionhead { font-size:25px; font-weight:800;
+  letter-spacing:-.015em; line-height:1.15; }
+.at-headsearch .at-headsearchbtn { position:absolute; top:0; right:0; flex:0 0 auto;
+  width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
+.at-headsearch.open .at-headsearchbtn { border-color: transparent; background: transparent; }
+@media (prefers-reduced-motion: reduce) {
+  .at-headsearch, .at-headsearchfield, .at-headrow > .at-sectionhead { transition:none; }
+}
 
 .at-joinbox { border:2px solid var(--line); border-radius: var(--r-lg);
   padding:16px; background: var(--surface); }

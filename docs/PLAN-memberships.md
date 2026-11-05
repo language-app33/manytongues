@@ -1,6 +1,6 @@
 # Plan: one account, several spaces
 
-**Status: built, in 0.569** (all three stages in one release). Written from the owner's answers to the
+**Status: built, in 0.573** (all three stages in one release). Written from the owner's answers to the
 questions in the conversation of 4–5 November 2026 and a reading of the
 repository at 0.563. No questions are open. Anything new that comes up
 while building goes back to the owner, in the way `CLAUDE.md` describes,

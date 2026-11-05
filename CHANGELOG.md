@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.569 — 5 November 2026
+## 0.573 — 5 November 2026
 
 **One account can be in several spaces, and Learning shows them all.**
 
@@ -77,6 +77,70 @@ To check by hand, on the deployed app:
   a sentence saying to ask the super admin.
 - In Super admin → People, use Add to a space on someone, then sign in as
   them and check the You menu lists the new space.
+## 0.572 — 5 November 2026
+
+**Courses: the first course sits closer to its heading.**
+
+- The space between "My courses" and the first course is now the same as
+  between a heading and what follows it in the card editor. Since 0.570 it
+  was about twice that, left behind by the search box that moved up.
+- Released without running the test suite, at the owner's request.
+
+## 0.571 — 5 November 2026
+
+**Courses: one clear button, bigger headings.**
+
+- Typing in the course search no longer shows two crosses at its right
+  end. Only the larger one, which closes the search, is left.
+- "My courses" and the heading over the box for joining a course are now
+  the size of the headings in the card editor.
+- Released without running the test suite, at the owner's request.
+
+## 0.570 — 5 November 2026
+
+**Courses are searched from a button beside "My courses".**
+
+- The search box above the course list is gone. In its place, a search
+  button sits at the end of the "My courses" line.
+- Pressing it opens a search field that grows out of the button to the
+  left, over the heading. Pressing it again (now a cross) closes the
+  field and clears the search; so does leaving the field empty.
+- The courses page is shared by Teaching and Learning, so both change.
+- Released without running the test suite or checking in a browser, at
+  the owner's request.
+
+## 0.569 — 5 November 2026
+
+**"Built-in" cards are now word sets, all found in one place.**
+
+- Numbers and pronouns are called **word sets**: lists every language
+  has, which you write once for the language and add to a deck as a
+  whole. "Built-in" wrongly suggested the app came with the words.
+  Months, days of the week and more will join them later.
+- Teaching → Cards has one **Word sets** row above the list, in place of
+  the two small Numbers and Pronouns icons. It opens a screen listing
+  each set, under its language when more than one is switched on, so
+  there is no "Which language?" step any more.
+- Each set says how much of it is written and how many decks hold it,
+  such as "6 of 9 pronouns written · in 2 decks". Numbers count in
+  ranges, the way a deck holds them.
+- The Pronouns screen has its own Decks line, so the set can be put in a
+  deck from there as well as from the deck. Numbers already could, a
+  range at a time.
+- A deck can take a set that is not finished. The deck then says what is
+  still to write, with a Write them button that opens the set. Students
+  get what is written so far.
+- A pronoun written after the set is in a deck now joins that deck too.
+  Before, it stayed out of every deck and reached no student.
+- In a deck and on Add existing cards, these entries are marked "Word
+  set", and each range and the pronouns say when words are still missing.
+- The trade-off: pronouns can go into a deck only once at least one is
+  written, because until then there is nothing to put in it.
+
+To check by hand: on a phone, open Teaching → Cards → Word sets, open
+Pronouns, write one and save, put the set in a deck, then open that deck
+and check the "still to write" note and its Write them button. With two
+languages switched on, check that each has its own heading.
 
 ## 0.568 — 4 November 2026
 

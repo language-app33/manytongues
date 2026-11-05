@@ -7799,16 +7799,36 @@ const openPronounTables = async () => {
 
 /* ---- a language's pronouns, written once ----
 
-   The Pronouns screen, off the Cards tab beside Numbers: one row per
-   column of the verb table. Filled in and saved, each row goes up as a
-   card of the Pronoun kind that says which column it is. */
+   The Pronouns screen, a word set (0.569): reached from the Word sets row
+   above the Cards tab's list, through the screen that lists every set.
+   One row per column of the verb table. Filled in and saved, each row goes
+   up as a card of the Pronoun kind that says which column it is. */
 {
   takeSaves = true;
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const btn = /** @type {any} */ (frameButtons(frame)
-    .find((b) => b.getAttribute("aria-label") === "Pronouns") || null);
-  check("the Cards tab offers Pronouns beside Numbers", !!btn, btn ? "there" : "(no button)");
-  click(btn);
+  check("the Cards tab no longer has an icon each for Numbers and Pronouns",
+    !frameButtons(frame).some((b) => /^(Numbers|Pronouns)$/.test(b.getAttribute("aria-label") || "")),
+    frameButtons(frame).map((b) => b.getAttribute("aria-label")).filter(Boolean).join(" | "));
+  const setsRow = /** @type {any} */ ([...frame.querySelectorAll("button.at-openrow")]
+    .find((b) => /^Word sets/.test((b.textContent || "").trim())) || null);
+  check("but one Word sets row above the cards, saying what it holds",
+    !!setsRow && /Numbers and pronouns, written once for the language/.test(setsRow.textContent || ""),
+    setsRow ? (setsRow.textContent || "").trim() : "(no row)");
+  click(setsRow);
+  await sleep(400);
+  const setsScreen = () => /** @type {any} */ ([...document.querySelectorAll(".at-screen")]
+    .find((sc) => ((sc.querySelector(".at-screenhead h2") || {}).textContent || "").trim() === "Word sets") || null);
+  const setTile = (/** @type {string} */ name) => /** @type {any} */ (setsScreen()
+    ? [...setsScreen().querySelectorAll("button.at-openrow")].find((b) => ((b.querySelector(".at-decktitle") || {}).textContent || "").trim() === name) || null
+    : null);
+  check("which opens a screen listing each set",
+    !!setTile("Numbers") && !!setTile("Pronouns"),
+    setsScreen() ? (setsScreen().textContent || "").slice(0, 200) : "(no screen)");
+  check("each saying how much of it is written and how many decks hold it",
+    /^0 of 9 pronouns written · in no deck yet$/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || "") &&
+      / ranges? written · in /.test(((setTile("Numbers") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
+    `${((setTile("Pronouns") || {}).textContent || "")} | ${((setTile("Numbers") || {}).textContent || "")}`);
+  click(setTile("Pronouns"));
   await sleep(400);
   const screen = () => /** @type {any} */ ([...document.querySelectorAll(".at-screen")]
     .find((sc) => /^Pronouns · /.test(((sc.querySelector(".at-screenhead h2") || {}).textContent || "").trim())) || null);
@@ -7852,7 +7872,15 @@ const openPronounTables = async () => {
     `${reading("With to be")} | ${reading("As a question")}`);
   check("and a reading left as it came is not stored, so it goes on following the English",
     !sent.enIs && !sent.enAsk, JSON.stringify({ enIs: sent.enIs, enAsk: sent.enAsk }));
+  check("once one is written, the set can be put in a deck from its own screen",
+    !!screen() && [...screen().querySelectorAll("button")].some((b) => /^Add this word set to a deck$/.test((b.textContent || "").trim())),
+    screen() ? [...screen().querySelectorAll("button")].map((b) => (b.textContent || "").trim()).join(" | ") : "(no screen)");
   click([...(screen() || document).querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  await sleep(300);
+  check("closing the set goes back to Word sets, which counts what was written",
+    !!setsScreen() && /^1 of 9 pronouns written/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
+    setsScreen() ? ((setTile("Pronouns") || {}).textContent || "(no tile)") : "(not on Word sets)");
+  click([...(setsScreen() || document).querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
   await sleep(300);
 
   /* And on the Cards tab they are one entry, not a tile each: the set is
@@ -7863,9 +7891,10 @@ const openPronounTables = async () => {
   const faceOf = (/** @type {Element} */ t) => ((t.querySelector(".ar") || {}).textContent || "").trim();
   const nameOf = (/** @type {Element} */ t) => ((t.querySelector(".at-mininame") || {}).textContent || "").trim();
   const entry = () => /** @type {any} */ (tiles().find((t) => nameOf(t) === "Pronouns") || null);
-  check("the pronouns are listed as one Pronouns entry, not a tile each",
+  check("the pronouns are listed as one Pronouns entry, not a tile each, marked as a word set",
     !!entry() && !tiles().some((t) => nameOf(t) !== "Pronouns" && faceOf(t) === "أنا") &&
-      /1 pronoun/.test((entry() || {}).textContent || ""),
+      /1 pronoun/.test((entry() || {}).textContent || "") && /Word set/.test((entry() || {}).textContent || "") &&
+      !/Built-in/.test((entry() || {}).textContent || ""),
     tiles().map((t) => nameOf(t) || faceOf(t)).join(" | "));
   click(entry());
   await sleep(400);
@@ -8813,15 +8842,16 @@ const openPronounTables = async () => {
   /* ---- and what a deck holds besides cards ----
      Numbers are one document per language, so a deck takes them in parts,
      by name, from a screen of their own. */
-  check("read, an open deck offers no way to change its built-in cards",
+  check("read, an open deck offers no way to change its word sets",
     !buttonNamed(/^Choose built-in cards$/), "the button is there before Edit");
   click(document.querySelector('.at-fab[aria-label="Edit"]'));
   await sleep(250);
   check("Edit swaps the back arrow for a cross that cancels",
     !!document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'),
     [...document.querySelectorAll(".at-screenhead .at-back")].map((b) => b.getAttribute("aria-label")).join(" | "));
-  /* Since 0.523 the built-in cards are among the deck's cards, added on
-     Manage cards with the rest and saved there and then. */
+  /* Since 0.523 the word sets (built-in cards before 0.569) are among the
+     deck's cards, added on Manage cards with the rest and saved there and
+     then. */
   click(document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'));
   await sleep(250);
   click(buttonNamed(/^Manage this deck's cards$/));
@@ -8831,6 +8861,10 @@ const openPronounTables = async () => {
     [...document.querySelectorAll(".at-screenhead h2")].map((h) => h.textContent).join(" | "));
   click(buttonNamed(/^Add existing cards$/));
   await sleep(300);
+  check("and adding heads the sets Word sets",
+    [...document.querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Word sets") &&
+      ![...document.querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Built-in"),
+    [...document.querySelectorAll(".at-eyebrow")].map((e) => e.textContent).join(" | "));
   const partRow = (/** @type {RegExp} */ re) =>
     [...document.querySelectorAll(".at-tickrow, label")].find((r) => re.test(r.textContent || ""));
   check("and adding lists the parts of the numbers, with counting inside them rather than parts of its own",
