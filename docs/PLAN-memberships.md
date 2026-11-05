@@ -168,8 +168,8 @@ pitfalls; read it before each stage.
   `CHANGELOG.md` entry in the README's plain terms, add a `DECISIONS.md`
   entry for each choice made), `npm run check` must be green on the exact
   tree pushed, and push to `beta` as `CLAUDE.md` describes. Update the
-  "Spaces" section of `README.md` with a "Memberships (since 0.56x)"
-  paragraph in the style of the paragraphs already there.
+  "Spaces" section of `README.md` with a "Memberships (since <stage 1's
+  release>)" paragraph in the style of the paragraphs already there.
 - **Only existing UI components.** Read `docs/UI-COMPONENTS.md` and run
   `npm run components`. Everything here uses pieces that exist:
   `Segmented`, `Section`, `Tile`, `Button`, `IconButton`, `ConfirmModal`,
@@ -325,7 +325,9 @@ only their side of them.
 
 ## B3. Actions, one by one
 
-Line numbers are those of 0.563's `server/api/courses.js`.
+Line numbers are those of 0.563's `server/api/courses.js`, where this
+plan was read; `beta` has moved since. Find each place by the action name
+or function name given, and treat the number as a hint only.
 
 **`signup` (1256).** Write `orgs: [orgId]` beside `org: orgId`. Nothing
 else changes.
@@ -722,7 +724,10 @@ and `practiced` is sent with `orgs`.
 
 ## B6. Stage checklists
 
-### Stage 1 — memberships underneath (release 0.564)
+Each stage is one release, numbered as whatever is next on `beta` when it
+ships (0.569 or later); "stage 1's release" below means that number.
+
+### Stage 1 — memberships underneath
 
 Server (`server/api/courses.js`):
 - [ ] B1 helpers, `inScope` for users, the `orgScope` shape, `WIDE`, `JOINS`.
@@ -754,11 +759,11 @@ Tests (`tests/spaces.test.mjs`), a new block "memberships (0.564)":
 - [ ] `admin-delete-org` of a third space with a member who is also in Main → that member still signs in.
 - [ ] `PLACED.crossed` gains `join-space`.
 
-Docs: `CHANGELOG.md` 0.564 in A's terms; `README.md` "Memberships (since
-0.564)"; `DECISIONS.md` for the key rule, per-space stamps, and "a course
-code joins the space".
+Docs: `CHANGELOG.md` entry in A's terms; `README.md` "Memberships (since
+stage 1's release)"; `DECISIONS.md` for the key rule, per-space stamps,
+and "a course code joins the space".
 
-### Stage 2 — joining and moving around (release 0.565)
+### Stage 2 — joining and moving around
 
 - [ ] `courses-api.ts`: `joinSpace`, `leaveSpace(org)`, `whoAmI` with `code`, `rememberSpace`/`lastSpace`.
 - [ ] Launch and sign-in pass the address or remembered space; remember on success; drop `otherSpace` on sign-in.
@@ -769,7 +774,7 @@ code joins the space".
 - [ ] Smoke: `join-space`, `leave-space` with `org`, a walk through "Join {space}?".
 - [ ] `npm run components`; docs as for stage 1.
 
-### Stage 3 — Learning across spaces (release 0.566)
+### Stage 3 — Learning across spaces
 
 - [ ] `spaceFilter` state and storage; `spaceOfItem` map; `learnItems`/`learnCourses`/`learnDecks` in every place B4 lists.
 - [ ] The `Segmented` row in the Learning frame, only with more than one space.
