@@ -10272,6 +10272,11 @@ export default function ArabicTrainer() {
   });
   const [addressSpace, setAddressSpace] = useState<OnboardingPlace["org"] | null>(null);
   const [addressUnknown, setAddressUnknown] = useState(false);
+  /* Read by the course refresh, which must not ask before it is known
+     while trying a space (0.574). */
+  const addressSpaceId = (addressSpace && addressSpace.id) || "";
+  const addressIdRef = useRef(addressSpaceId);
+  addressIdRef.current = addressSpaceId;
   /* Why the device was just signed out — a closed space, a suspension. */
   const [signedOutWhy, setSignedOutWhy] = useState("");
   useEffect(() => {
@@ -11880,6 +11885,9 @@ export default function ArabicTrainer() {
        speak either way. */
     async (announce: boolean | "changes") => {
       if (!account) return true;
+      /* Trying a space (0.574): not until the address has said which
+         space, or the answer is the App admin's own. */
+      if (TRYING && !addressIdRef.current) return true;
       /* A focus and a visibility change arrive together when a tab comes
          back; one refresh at a time is enough. */
       if (refreshing.current) return true;
@@ -12069,6 +12077,13 @@ export default function ArabicTrainer() {
   /* A course can be deleted, or its decks changed, by a teacher on another
      device. Without this the home screen keeps showing a course that is gone
      until the app is reloaded. */
+  /* Trying a space (0.574): ask for its material once the address has
+     said which space it is. */
+  useEffect(() => {
+    if (TRYING && ready && account && addressSpaceId) refreshCourses(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, accountHandle, addressSpaceId, refreshCourses]);
+
   const recheckCourses = useCallback(() => {
     if (ready && account) refreshCourses(false);
   /* The handle, not the account object, for the same reason. */
@@ -14187,7 +14202,8 @@ export default function ArabicTrainer() {
                    read wrong. Courses is a tap away either way — the tab
                    strip above does not go anywhere. */
                 action={
-                  coursesKnown && myCourses.length === 0 ? (
+                  /* Not while trying a space: there is no joining there (0.574). */
+                  coursesKnown && myCourses.length === 0 && !TRYING ? (
                     <Button variant="primary" onClick={openCourses} icon="school">
                       Join a course
                     </Button>
