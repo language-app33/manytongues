@@ -1133,12 +1133,22 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   the language's context, a lookup rather than a comparison per word, which
   is what lets every deck in the list be scored at once. Tests:
   `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
+- **Word sets: lists every language has, written once (0.569).** Numbers
+  and pronouns so far, months and days of the week to come. The app knows
+  the list; the teacher writes the words once for the language, and a deck
+  takes the set as a whole (numbers a range at a time). All of them are
+  reached from one **Word sets** row on Teaching → Cards, whose screen
+  lists each set under its language with how much is written and how many
+  decks hold it. A set can go into a deck before it is finished: students
+  get what is written, and a pronoun written later joins the decks that
+  already hold the set. The word was "built-in" before 0.569, which wrongly
+  said the app supplied the words. Why: DECISIONS.md, "Word sets".
 - **A number is built, not memorised, and so is a time.** A learner who
   knows *forty* and *seven* knows *forty-seven*, so numbers are not cards
   one at a time. A language's numbers are **one document** — the words it
   builds them out of, each with the faces it wears — written on one screen
-  and never a card: the teacher reaches it from **Teaching → Cards**, the
-  `#` in the list's toolbar. Its first screen only lists — the parts of
+  and never a card: the teacher reaches it from **Teaching → Cards**,
+  through the **Word sets** row above the list. Its first screen only lists — the parts of
   the numbers (0 to 9, 10 to 19, 20 to 99, 100 to 999, 1,000 to
   999,999,999, and the billions up to eleven digits),
   the clock, and the numbers written out by hand — and each opens on a

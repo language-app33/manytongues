@@ -1415,6 +1415,12 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   .at-deckrow2:has(> .at-deckacts > :nth-child(3)) > .at-deckmain { flex-basis:100%; }
 }
 .at-deckacts { display:flex; gap:6px; flex:0 0 auto; margin-left:auto; }
+/* A deck tile that is a button (0.569): the Word sets row and each set on
+   its screen. The button's own look taken off, so it reads as a tile. */
+.at-openrow { display:block; width:100%; text-align:left; font:inherit; color:inherit; }
+.at-openrow .at-deckrow2, .at-openrow .at-deckmain,
+.at-openrow .at-decktitle, .at-openrow .at-deckmeta { display:block; }
+.at-openrow:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 /* A reported problem, under the title of the tile carrying it. The question
    as it was asked and, if there was one, what the person typed about it —
    the two things worth reading before deciding whether to open the card. */

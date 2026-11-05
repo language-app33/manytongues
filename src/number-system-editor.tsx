@@ -1371,8 +1371,8 @@ function CountedSection({ lang, range, nouns, render, warningsOf, standing }: {
 /**
  * The decks that hold this part.
  *
- * The same thing a deck's own *Numbers and pronouns* screen sets — which
- * parts it holds — reached from the other end, so the two are one setting
+ * The same thing a deck's Add existing cards sets — which parts it holds,
+ * under Word sets (0.569) — reached from the other end, so the two are one setting
  * and not two to keep in step: ticking here is ticking there. It is saved
  * the moment it is ticked, as it is on the deck's screen, and that is why
  * it sits apart from the words above, which wait for Save.
@@ -1386,10 +1386,10 @@ function PartDecks({ range, decks, onDeckPart }: {
   return (
     <PartBlock
       title="Decks"
-      role="Manage what decks this part belongs to. The same as ticking it on a deck's Numbers and pronouns screen, and saved straight away."
+      role="The decks this range of numbers is in. The same as ticking it on a deck's Add existing cards, and saved straight away."
     >
       <DeckSwitch
-        of="part"
+        of="range"
         decks={decks}
         chosen={decks.filter((d) => partsNow(d.parts || []).includes(range.id)).map((d) => d.id)}
         onToggle={(id, wasOn) => onDeckPart(id, range.id, !wasOn)}

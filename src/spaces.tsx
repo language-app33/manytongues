@@ -58,7 +58,8 @@ import {
   answerShape,
   levelOf,
   LEVEL_NAME,
-  scriptVars } from "./languages.ts";
+  scriptVars,
+  verbOf } from "./languages.ts";
 import { isDialog, linesOf, sceneKindOf } from "./dialogs.ts";
 import { asMeaning, cardRef, droppedIn, fillNames, hasSlots, isSentence, MAX_FILLS, refClash, renamedIn, slotName, slotsOf, taggedIn } from "./variables.ts";
 import { fillersFor, groupPronouns, isPronounCard, isPronounGroup, pickedCardIds } from "./card-facts.ts";
@@ -84,6 +85,8 @@ import { ReviewLine, ReviewScreen } from "./review-sheet.tsx";
 import { composerFor, timeComposerFor } from "./numbers/index.ts";
 import { emptyNumberSystem, emptyTimeSystem, readNumberSystem, readTimeSystem } from "./numbers/schema.ts";
 import { fillerCards } from "./numbers/generate.ts";
+import { rangeChecks } from "./numbers/range.ts";
+import { personsOf } from "./verbs.ts";
 import { countedNouns, withNouns } from "./numbers/nouns.ts";
 import { isOffline, watchNet } from "./net.ts";
 import { drainOutbox, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
@@ -3832,10 +3835,55 @@ function unlockedDecks(ds: Deck[]): Deck[] {
 }
 
 /* A range of a language's numbers as it stands in a deck's card list: not
-   a card, but one entry the way the pronouns are one, marked built-in. */
+   a card, but one entry the way the pronouns are one, marked as a word set.
+   (`builtin` is the key's old name, kept: it is only ever read here.) */
 type NumberPart = { id: string; part: string; label: string; builtin: "numbers" };
 function isNumberPart(x: any): x is NumberPart {
   return !!x && typeof x === "object" && x.builtin === "numbers";
+}
+
+/*
+ * A word set (0.569): a list every language has — its numbers and its
+ * pronouns so far, months and days of the week to come — that the app knows
+ * the shape of, the teacher writes once for the language, and a deck takes
+ * as a whole (or, for numbers, a range at a time). Called "built-in" before
+ * 0.569, which said the app supplied the words; it supplies only the list.
+ *
+ * One description of each, so the Word sets screen, a deck and the picker
+ * that adds sets to a deck all say the same thing about it: how much of it
+ * is written, counted in its own unit, and how many decks hold it.
+ */
+type WordSet = {
+  kind: "numbers" | "pronouns";
+  lang: LangId;
+  name: string;
+  written: number;
+  total: number;
+  /** What `written` and `total` count: "range" for numbers, "pronoun". */
+  unit: string;
+  decks: number;
+  open: () => void;
+};
+/** "9 of 12 ranges written · in 2 decks", as a word set's tile says it. */
+function wordSetLine(s: WordSet): string {
+  const done = s.written === s.total
+    ? `All ${plural(s.total, s.unit)} written`
+    : `${s.written} of ${plural(s.total, s.unit)} written`;
+  return `${done} · ${s.decks ? `in ${plural(s.decks, "deck")}` : "in no deck yet"}`;
+}
+/* A row that opens something, drawn as a deck's tile is: a real button, so
+   it answers a keyboard and a screen reader the way a tap does. */
+function OpenRow({ title, meta, onOpen, label }: { title: Node; meta?: Node; onOpen: () => void; label?: string }) {
+  return (
+    <button type="button" className="at-deckcard at-openrow" data-open="" onClick={onOpen} aria-label={label}>
+      <span className="at-deckrow2">
+        <span className="at-deckmain">
+          <span className="at-decktitle">{title}</span>
+          {meta ? <span className="at-deckmeta">{meta}</span> : null}
+        </span>
+      </span>
+    </button>
+  );
 }
 
 /* A padlock ahead of a deck's small print, where the deck is locked. */
@@ -5180,11 +5228,13 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      out of are a fact about the language, not about any one deck, and the
      same eleven words serve every deck written in it. */
   const [numbering, setNumbering] = useState<LangId | null>(null);
-  /* Which language's pronouns are open, and — where the teacher has more
-     than one that has them — which one is being chosen. The Numbers two-
-     step, for the same reason. */
+  /* Which language's pronouns are open. */
   const [pronouning, setPronouning] = useState<LangId | null>(null);
-  const [pronounLang, setPronounLang] = useState<LangId | null>(null);
+  /* The Word sets screen (0.569), off the Cards tab: every set, each
+     language's under its name, which is where Numbers and Pronouns are
+     opened from. It replaced an icon for each and a "Which language?" step
+     before either. */
+  const [wordSets, setWordSets] = useState(false);
   /* The open deck, being edited: null while it is only read. */
   const [deckDraft, setDeckDraft] = useState<DeckDraft | null>(null);
   const [discardingDeck, setDiscardingDeck] = useState(false);
@@ -5192,10 +5242,6 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      cards the teacher already has: what is ticked, held until Done. */
   const [managing, setManaging] = useState(false);
   const [adding, setAdding] = useState<{ ids: string[]; parts: string[]; pronouns: boolean } | null>(null);
-  /* And which language, where the teacher has more than one to choose
-     from. The same two-step the New card button takes, for the same
-     reason and through the same control. */
-  const [numberLang, setNumberLang] = useState<LangId | null>(null);
   /* Already teaching something? Then this is a rare errand, folded away. */
   const [joinNote, setJoinNote] = useState("");
   const [selDecks, setSelDecks] = useState(() => new Set<string>());
@@ -5419,6 +5465,16 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   }, [taught, off]);
   const numberLangsOn = numberLangs.filter((id) => !!taughtOn[id]);
   const pronounLangsOn = pronounLangs.filter((id) => !!taughtOn[id]);
+  /* The languages with any word set to write, in the order they are
+     taught, and what the row that opens them says they hold. */
+  const wordSetLangsOn = Object.keys(taughtOn).filter((id) => numberLangsOn.includes(id) || pronounLangsOn.includes(id));
+  const wordSetNames = (langs: string[]) => {
+    const names = [
+      langs.some((id) => numberLangsOn.includes(id)) ? "numbers" : "",
+      langs.some((id) => pronounLangsOn.includes(id)) ? "pronouns" : "",
+    ].filter(Boolean).join(" and ");
+    return `${names.charAt(0).toUpperCase()}${names.slice(1)}, written once for the language`;
+  };
   /* And for making a card or a deck: with the switch on one language,
      that is the one — see langsToMakeIn. Exactly one is the only case
      where there is nothing to ask. None is not the same as one: it means
@@ -5673,7 +5729,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     <CardTile
       card={group}
       lang={languages[group.lang as LangId]}
-      meta={<><span className="at-statusbadge">Built-in</span>{plural(group.members.length, "pronoun")}</>}
+      meta={<><span className="at-statusbadge">Word set</span>{plural(group.members.length, "pronoun")}</>}
       onClick={() => setPronouning(group.lang as LangId)}
       actions={
         <>
@@ -5745,11 +5801,11 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       if (isNumberPart(c)) {
         return {
           word: c.label,
-          meaning: "Built-in numbers",
-          cells: { word: c.label, kind: "Numbers", subtype: "Built-in" },
+          meaning: "Numbers",
+          cells: { word: c.label, kind: "Numbers", subtype: "Word set" },
           open: () => {},
           actions: actGroup ? actGroup(c) : undefined,
-          lead: <span className="at-statusbadge">Built-in</span>,
+          lead: <span className="at-statusbadge">Word set</span>,
         };
       }
       if (isPronounGroup(c)) {
@@ -5760,7 +5816,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
           cells: { word: said.word, meaning: said.en, kind: cardKindLabel(c), subtype: "Pronouns" },
           open: () => setPronouning(c.lang as LangId),
           actions: actGroup ? actGroup(c) : undefined,
-          lead: <span className="at-statusbadge">Built-in</span>,
+          lead: <span className="at-statusbadge">Word set</span>,
         };
       }
       const said = cardWords(c, langOfCard(c));
@@ -6944,6 +7000,120 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       />
     );
   })() : null;
+  /* ---- what a deck can hold besides cards: parts of the numbers, and
+         pronouns ----
+     Numbers are one document per language and pronouns one screen, so
+     neither is a card a teacher would find in a list to add. This is the
+     one place a deck takes them: the parts of the numbers by name — 0 to
+     9, 20 to 99, telling the hour — each bringing the
+     words it is built of, and the pronouns one person at a time. Nothing
+     of either reaches a student except through a deck. */
+  const numberPartsOf = (langId: LangId | undefined) => [
+    ...((composerFor(langId) || { ranges: () => [] }).ranges()),
+    ...((timeComposerFor(langId) || { ranges: () => [] }).ranges()),
+  ];
+  const pronounCardsOf = (langId: LangId | undefined): Card[] => {
+    const own = cards.filter((c) => isPronounCard(c) && c.lang === langId);
+    const group = groupPronouns(own).find(isPronounGroup);
+    const order = group ? group.members : [];
+    return order.map((id) => own.find((c) => c.id === id)).filter(Boolean) as Card[];
+  };
+  /* Which ranges of a language's numbers this teacher's words can build —
+     the test a student's device applies (see rangeChecks), so "written"
+     here means what it means to them. */
+  const openRanges = (langId: LangId): Set<string> => {
+    const sys = systems ? systems.numbers.find((n) => n.languageId === langId) || null : null;
+    const clock = sys && systems
+      ? systems.times.find((t) => t.languageId === langId && t.numberSystemId === sys.id) || null
+      : null;
+    return new Set(
+      rangeChecks(composerFor(langId), sys, timeComposerFor(langId), clock).filter((c) => c.open).map((c) => c.range.id),
+    );
+  };
+  /* A language's word sets, each with how much is written and how many
+     of the language's decks hold it — see WordSet. */
+  const wordSetsOf = (langId: LangId): WordSet[] => {
+    const lang = languages[langId];
+    const inLang = decks.filter((d) => ((langOfDeck(d) || {}).id || d.lang) === langId);
+    const out: WordSet[] = [];
+    const parts = composerFor(langId) ? numberPartsOf(langId) : [];
+    if (parts.length) {
+      const ready = openRanges(langId);
+      const ids = new Set(parts.map((r) => r.id));
+      out.push({
+        kind: "numbers",
+        lang: langId,
+        name: "Numbers",
+        written: parts.filter((r) => ready.has(r.id)).length,
+        total: parts.length,
+        unit: "range",
+        decks: inLang.filter((d) => partsNow(d.parts || []).some((p) => ids.has(p))).length,
+        open: () => setNumbering(langId),
+      });
+    }
+    if (lang && hasPronouns(lang)) {
+      const own = pronounCardsOf(langId);
+      const holding = new Set(own.flatMap((c) => c.decks || []));
+      out.push({
+        kind: "pronouns",
+        lang: langId,
+        name: "Pronouns",
+        written: own.length,
+        total: personsOf(verbOf(lang)).length,
+        unit: "pronoun",
+        decks: inLang.filter((d) => holding.has(d.id)).length,
+        open: () => setPronouning(langId),
+      });
+    }
+    return out;
+  };
+  /* The pronouns into a deck or out of it, from their own screen (0.569):
+     every pronoun card of the language, as Add existing cards does it. */
+  const pronounsInDeck = (langId: LangId, deckId: string, on: boolean) =>
+    run(async () => {
+      for (const card of pronounCardsOf(langId)) {
+        const inNow = card.decks || [];
+        if (on === inNow.includes(deckId)) continue;
+        absorbSaved(await saveNamed(card, on ? inNow.concat([deckId]) : inNow.filter((x) => x !== deckId)));
+      }
+    }, on ? "Added to the deck" : "Taken out of the deck");
+
+  /* ---- the Word sets screen (0.569) ----
+     Every set the teacher can write, each language's under its name where
+     more than one is switched on, so one tap opens the right one. A set
+     opens over this screen, and closing it comes back here. */
+  const wordSetsScreen = () => {
+    const several = wordSetLangsOn.length > 1;
+    const tiles = (langId: LangId) => (
+      <div className="at-decklist2">
+        {wordSetsOf(langId).map((s) => (
+          <OpenRow
+            key={s.kind}
+            title={s.name}
+            meta={wordSetLine(s)}
+            onOpen={s.open}
+            label={several ? `${s.name}, ${(languages[langId] || { name: langId }).name}` : undefined}
+          />
+        ))}
+      </div>
+    );
+    return (
+      <Screen title="Word sets" onBack={() => setWordSets(false)}>
+        <Help>
+          Lists every language has, such as numbers and pronouns. You write the words once for the
+          language, then add the set to a deck as a whole, or a range of numbers at a time.
+        </Help>
+        <Notice kind="error">{error}</Notice>
+        {several
+          ? wordSetLangsOn.map((id) => (
+            <Section key={id} title={(languages[id] || { name: id }).name}>
+              {tiles(id)}
+            </Section>
+          ))
+          : wordSetLangsOn.length ? tiles(wordSetLangsOn[0]) : null}
+      </Screen>
+    );
+  };
   /* Where nothing below draws a list to sit over, it is the screen. */
   if (cardScreen && (pronouning || numbering || (!openDeck && courseView))) return cardScreen;
 
@@ -6963,6 +7133,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         cards={cards}
         busy={busy}
         onClose={() => setPronouning(null)}
+        decks={decks
+          .filter((d) => ((langOfDeck(d) || {}).id || d.lang) === pronouning)
+          .map((d) => ({ id: d.id, title: String(d.title || ""), locked: !!d.locked, cardCount: d.cardCount || 0 }))}
+        onDeck={(deckId, on) => void pronounsInDeck(pronouning, deckId, on)}
         onSave={async (card, inDecks) => {
           const r = await sendOrKeep(card, inDecks);
           absorbSaved(r);
@@ -7337,24 +7511,6 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     );
   };
 
-  /* ---- what a deck can hold besides cards: parts of the numbers, and
-         pronouns ----
-     Numbers are one document per language and pronouns one screen, so
-     neither is a card a teacher would find in a list to add. This is the
-     one place a deck takes them: the parts of the numbers by name — 0 to
-     9, 20 to 99, telling the hour — each bringing the
-     words it is built of, and the pronouns one person at a time. Nothing
-     of either reaches a student except through a deck. */
-  const numberPartsOf = (langId: LangId | undefined) => [
-    ...((composerFor(langId) || { ranges: () => [] }).ranges()),
-    ...((timeComposerFor(langId) || { ranges: () => [] }).ranges()),
-  ];
-  const pronounCardsOf = (langId: LangId | undefined): Card[] => {
-    const own = cards.filter((c) => isPronounCard(c) && c.lang === langId);
-    const group = groupPronouns(own).find(isPronounGroup);
-    const order = group ? group.members : [];
-    return order.map((id) => own.find((c) => c.id === id)).filter(Boolean) as Card[];
-  };
   /* What a saved deck holds of the things the screen can change, in the
      shape a draft of it takes — so starting to edit is copying this, and
      whether anything has changed is comparing against it. */
@@ -7398,8 +7554,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     );
   };
 
-  /* A deck's built-in cards — its number ranges and the language's
-     pronouns — written straight away from the Manage cards page. A deck
+  /* A deck's word sets — its number ranges and the language's pronouns —
+     written straight away from the Manage cards page. A deck
      being edited has its draft brought along, so saving the edit does not
      put back what was just changed. */
   const saveBuiltins = async (d: Deck, parts: string[], pronounsOn: boolean) => {
@@ -7414,13 +7570,16 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     setDeckDraft((dd) => (dd ? { ...dd, parts, pronouns: pronounsOn ? pron.map((c) => c.id) : [] } : dd));
   };
   /* Add existing cards: the teacher's cards in the deck's language, ticked
-     where they are in it already, with the built-in ones in a group of
-     their own at the top. Nothing changes until Done. */
+     where they are in it already, with the word sets in a group of their
+     own at the top, each saying how much of it is written. Nothing changes
+     until Done. */
   const addingScreen = (d: Deck) => {
     const langId = (langOfDeck(d) || {}).id || d.lang;
     const picked = adding || { ids: [], parts: [], pronouns: false };
     const parts = numberPartsOf(langId);
     const pron = pronounCardsOf(langId);
+    const ready = parts.length ? openRanges(langId) : new Set<string>();
+    const pronSet = wordSetsOf(langId).find((s) => s.kind === "pronouns");
     const own = sortCards(
       filterCards(cards.filter((c) => c.lang === langId && !isPronounCard(c)), cardFilter, waitingIds),
       sortKey,
@@ -7449,11 +7608,24 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         }
       >
         <Notice kind="error">{error}</Notice>
-        {(parts.length > 0 || pron.length > 0) && (
-          <Section title="Built-in" lede="Ready-made with the language. Each range of numbers brings the number words it needs.">
+        {(parts.length > 0 || !!pronSet) && (
+          <Section title="Word sets"
+            lede="Lists every language has, written once for the language. Each range of numbers brings the number words it needs. A set still being written can go in: students get what is written so far.">
             <CheckList
-              options={parts.map((r) => ({ id: r.id, title: r.label }))
-                .concat(pron.length ? [{ id: "builtin:pronouns", title: "Pronouns" }] : [])}
+              options={parts.map((r): { id: string; title: string; note?: string; disabled?: boolean } =>
+                ({ id: r.id, title: r.label, note: ready.has(r.id) ? undefined : "Words still to write" }))
+                .concat(pronSet ? [{
+                  id: "builtin:pronouns",
+                  title: "Pronouns",
+                  /* Nothing to put in a deck until one is written: a deck
+                     holds the pronouns as their cards. */
+                  disabled: !pron.length,
+                  note: !pron.length
+                    ? "None written yet"
+                    : pronSet.written < pronSet.total
+                      ? `${pronSet.written} of ${plural(pronSet.total, "pronoun")} written`
+                      : undefined,
+                }] : [])}
               chosen={picked.parts.concat(picked.pronouns ? ["builtin:pronouns"] : [])}
               onToggle={(id: string) =>
                 setAdding(id === "builtin:pronouns"
@@ -7533,6 +7705,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     );
   };
 
+  if (wordSets && !openDeck) return wordSetsScreen();
+
   /* ---- an open deck takes over the screen, showing its cards the same
          way the Cards tab does ---- */
   if (openDeck) {
@@ -7549,7 +7723,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     const held = deckView ? deckView.held : [];
     const mine = deckView ? deckView.mine : [];
     const langId = (langOfDeck(d) || {}).id || d.lang;
-    /* The deck's built-in numbers, a range to an entry, ahead of its cards
+    /* The deck's number ranges, word sets, a range to an entry, ahead of its cards
        — the pronouns are already one entry among them. */
     const numberEntries: NumberPart[] = numberPartsOf(langId)
       .filter((r) => partsNow(d.parts || []).includes(r.id))
@@ -7562,7 +7736,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       <div className="at-minicard">
         <div className="at-minikind">Numbers</div>
         <div className="ar">{n.label}</div>
-        <div className="at-minimeta"><span className="at-statusbadge">Built-in</span></div>
+        <div className="at-minimeta"><span className="at-statusbadge">Word set</span></div>
         {extra ? <div className="at-miniacts">{extra}</div> : null}
       </div>
     );
@@ -7882,9 +8056,48 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               </Field>
             </div>
 
-            {/* The cards, built-in ones among them, to read: which cards
+            {/* The cards, word sets among them, to read: which cards
                 the deck holds is changed on Manage cards. */}
             <Section title="Cards" lede={deckEmpty ? undefined : "Tap a card to see it."}>
+            {/* A word set the deck holds that is still being written
+                (0.569): what is missing, and the way straight to the set.
+                Students already get what is written, so it says so rather
+                than reading as a fault. Numbers drawn from another
+                teacher's are theirs to write, so no button then. */}
+            {(() => {
+              const notes: { key: string; text: string; open?: () => void }[] = [];
+              const waiting = (d.partsWaiting || []).filter((p) => (d.parts || []).includes(p)).length;
+              if (waiting) {
+                const ours = !d.numbersFrom || d.numbersFrom === account.handle;
+                notes.push({
+                  key: "numbers",
+                  text: `${waiting === 1 ? "A range" : `${waiting} ranges`} of numbers in this deck still ${waiting === 1 ? "needs its" : "need their"} words written. Students get the other ranges, and ${waiting === 1 ? "this one" : "these"} as soon as ${waiting === 1 ? "it is" : "they are"} written.`,
+                  open: ours ? () => setNumbering(langId) : undefined,
+                });
+              }
+              const lang = languages[langId];
+              const pron = pronounCardsOf(langId);
+              const total = lang && hasPronouns(lang) ? personsOf(verbOf(lang)).length : 0;
+              if (total > pron.length && pron.some((c) => (c.decks || []).includes(d.id))) {
+                const left = total - pron.length;
+                notes.push({
+                  key: "pronouns",
+                  text: `${plural(left, "pronoun")} still to write. Students get the ${plural(pron.length, "pronoun")} already written, and the rest as each is written.`,
+                  open: () => setPronouning(langId),
+                });
+              }
+              return notes.map((n) => (
+                <div className="at-mb3" key={n.key}>
+                  <Nudge
+                    icon={n.key === "numbers" ? "hash" : "person"}
+                    tone="attention"
+                    action={n.open ? <Button size="sm" icon="edit" onClick={n.open}>Write them</Button> : undefined}
+                  >
+                    {n.text}
+                  </Nudge>
+                </div>
+              ));
+            })()}
             <ItemList
               noun="card"
               items={listed}
@@ -8275,65 +8488,6 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 </Screen>
               )}
 
-              {/* Which language's numbers, where the teacher has more than
-                  one that builds them. The same two-step the New card
-                  button takes, through the same control: the words are a
-                  fact about one language and nothing on the screen could
-                  work out which. */}
-              {pronounLang !== null && (
-                <Screen title="Pronouns" onBack={() => setPronounLang(null)}>
-                  <LanguageRadio
-                    languages={Object.fromEntries(pronounLangsOn.map((id) => [id, taught[id]]))}
-                    value={pronounLang}
-                    onChange={setPronounLang}
-                    label="Which language's pronouns?"
-                  />
-                  <div className="at-row at-mt5">
-                    <Button variant="ghost" onClick={() => setPronounLang(null)}>
-                      Cancel
-                    </Button>
-                    <Button variant="primary"
-                      disabled={!pronounLang}
-                      onClick={() => {
-                        setPronouning(pronounLang);
-                        setPronounLang(null);
-                      }}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </Screen>
-              )}
-
-              {numberLang !== null && (
-                <Screen title="Numbers" onBack={() => setNumberLang(null)}>
-                  <LanguageRadio
-                    languages={Object.fromEntries(numberLangsOn.map((id) => [id, taught[id]]))}
-                    value={numberLang}
-                    onChange={setNumberLang}
-                    label="Which language's numbers?"
-                  />
-                  <Help>
-                    Each language builds its numbers out of its own words, so they are filled
-                    in one language at a time.
-                  </Help>
-                  <div className="at-row at-mt5">
-                    <Button variant="ghost" onClick={() => setNumberLang(null)}>
-                      Cancel
-                    </Button>
-                    <Button variant="primary"
-                      disabled={!numberLang}
-                      onClick={() => {
-                        setNumbering(numberLang);
-                        setNumberLang(null);
-                      }}
-                    >
-                      Open them
-                    </Button>
-                  </div>
-                </Screen>
-              )}
-
               {confirm && confirm.kind === "cards" && (
                 <ConfirmModal
                   title={`Delete ${plural((confirm.ids || []).length, "card")}?`}
@@ -8418,6 +8572,19 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               <Help>
                 A card is one thing to learn — a word, a phrase, a sentence. Add it to a deck so students get it.
               </Help>
+              {/* Word sets (0.569): one row, however many sets there are,
+                  opening the screen that lists them. Above the cards
+                  because it is where a teacher already looks, and one line
+                  so it never pushes the cards down. */}
+              {wordSetLangsOn.length ? (
+                <div className="at-mb3">
+                  <OpenRow
+                    title="Word sets"
+                    meta={wordSetNames(wordSetLangsOn)}
+                    onOpen={() => setWordSets(true)}
+                  />
+                </div>
+              ) : null}
 
               <ItemList
                 noun="card"
@@ -8427,46 +8594,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                     ? null
                     : `${shownCards.length} of ${plural(onCards.length, "card")}`
                 }
-                /* Numbers are written a set at a time rather than a card
-                   at a time, so they get their own screen off the toolbar
-                   — beside the search rather than in the list, because it
-                   is a different way in to the same cards and not a card
-                   in it. Icon alone: the row is narrow on a phone and the
-                   word is on the screen it opens. */
-                tools={
-                  <>
-                  <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />
-                  {numberLangsOn.length || pronounLangsOn.length ? (
-                    <>
-                      {numberLangsOn.length ? (
-                        <IconButton
-                          icon="hash"
-                          label="Numbers"
-                          onClick={() =>
-                            numberLangsOn.length === 1
-                              ? setNumbering(numberLangsOn[0])
-                              : setNumberLang(numberLangsOn[0])
-                          }
-                        />
-                      ) : null}
-                      {/* Pronouns, beside Numbers and for the same reason:
-                          a fixed set written once per language, rather
-                          than a card at a time. */}
-                      {pronounLangsOn.length ? (
-                        <IconButton
-                          icon="person"
-                          label="Pronouns"
-                          onClick={() =>
-                            pronounLangsOn.length === 1
-                              ? setPronouning(pronounLangsOn[0])
-                              : setPronounLang(pronounLangsOn[0])
-                          }
-                        />
-                      ) : null}
-                    </>
-                  ) : null}
-                  </>
-                }
+                /* Numbers and pronouns used to have an icon each here; they
+                   are word sets now, reached from the row above the list
+                   (0.569). */
+                tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
                 menus={cardMenus}
                 searchBelow
                 size="small"
