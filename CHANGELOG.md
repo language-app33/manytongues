@@ -8,6 +8,37 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.575 — 5 November 2026
+
+**The super admin can add themselves to an existing space.**
+
+- **Super admin → People** now has **Add to a space** on your own row too.
+  The space becomes one of yours, like anyone else's membership: it is
+  listed among your spaces in "Where you are", you appear in its People
+  list and head count, and its admin can make you a space admin.
+- In a space you are in, Learning shows the courses you are on, not every
+  course as when trying it. Put yourself on a course from its Admin, or
+  with a course code. Practice there syncs and counts like your own.
+- If you were trying that space on this device, the app starts again and
+  the trial's practice is dropped.
+- **Settings has a Leave line** for each space you added yourself to.
+  Leaving takes its courses out of your Learning and deletes anything of
+  yours in its My space; you can still open it from Super admin → Spaces.
+  Your first space can't be left.
+- Released without running the tests, at the owner's request. The type
+  check and the build were run.
+
+To check by hand, on the deployed app, as the super admin:
+
+- Super admin → People: on your own row, Add to a space, pick a space.
+  The app reloads; "Where you are" lists it among your spaces, with no
+  "You're in …" band there.
+- Put yourself on one of its courses; Learning there shows it.
+- Settings → Leave that space: you land back home, and the space is only
+  reachable from Super admin → Spaces again.
+- Another device signed in as you picks up the new space on its next
+  start.
+
 ## 0.574 — 5 November 2026
 
 **Super admin is a level above spaces, and the super admin can try a space

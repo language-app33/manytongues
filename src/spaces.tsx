@@ -9938,6 +9938,17 @@ function EveryonePeople({ me }: { me: string }) {
               setBusy(true);
               try {
                 await API.addMember(adding.handle, addTo);
+                /* Yourself (0.575): the app learns of the new space at
+                   once, and starts again if it changes where you are. */
+                if (adding.handle === me) {
+                  const acc = API.loadAccount();
+                  if (acc) {
+                    const r = await API.whoAmI(acc.key).catch(() => null);
+                    if (r) API.saveAccount({ ...r.user, key: acc.key });
+                  }
+                  window.location.reload();
+                  return;
+                }
                 setAdding(null);
                 await load();
               } catch (e) {
@@ -9986,7 +9997,8 @@ function EveryonePeople({ me }: { me: string }) {
                         setNewKey({ name: u.displayName, key: r.key });
                       },
                     })} />
-                    {!u.admin && data.orgs.some((x) => !x.archived && !(u.orgs || [u.org]).includes(x.id)) && (
+                    {/* Yourself too, as the super admin (0.575). */}
+                    {(!u.admin || u.handle === me) && data.orgs.some((x) => !x.archived && !(u.orgs || [u.org]).includes(x.id)) && (
                       <IconButton icon="add" label="Add to a space" onClick={() => {
                         setAddTo("");
                         setAdding(u);

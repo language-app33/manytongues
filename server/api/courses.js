@@ -4803,7 +4803,16 @@ async function handle(req) {
     /* Leaving the space (25a, 52a): suspended, with a record, until a space
        admin or the App admin reactivates. Never an App admin. */
     if (action === "leave-space") {
-      if (iAmAdmin) return json({ error: "admin-stays" }, 400);
+      /* The App admin leaves a space they added themselves to (0.575): the
+         membership goes, with no Former members record. Never their first
+         space, which is where they land. */
+      if (iAmAdmin) {
+        if (!memberOf(me).includes(acting) || acting === orgOf(me) || memberOf(me).length < 2) {
+          return json({ error: "admin-stays" }, 400);
+        }
+        await removeMembership(store, mine, acting, { why: "left", by: mine, former: false });
+        return json({ ok: true });
+      }
       await suspend(me, "left", mine);
       return json({ ok: true });
     }
@@ -5641,7 +5650,9 @@ async function handle(req) {
         if (org.archived) return json({ error: "space-closed" }, 403);
         /* Unscoped: they may be in no space this request acts in. */
         const target = await readJson(store, K.user(handle));
-        if (!target || target.admin) return json({ error: "no-user" }, 404);
+        /* The App admin may add themselves too (0.575): then the space is
+           one of theirs, not one they only try. */
+        if (!target) return json({ error: "no-user" }, 404);
         const fresh = await addMembership(store, handle, id);
         if (!fresh) return json({ error: "no-user" }, 404);
         return json({ ok: true, orgs: memberOf(fresh) });

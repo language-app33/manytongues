@@ -1632,6 +1632,11 @@ Trying a space (since 0.574):
   Teaching and Admin caches use keys ending in `:trying:<slug>`, sync is
   off, and the teaches flag is not saved. `dropTrial` removes those keys
   on every way out of the space, and every trial's keys on log out.
+- Since 0.575 the App admin may be a member of a space like anyone else:
+  `admin-add-member` accepts their own handle, and `leave-space` removes
+  one of their memberships (`removeMembership`, no Former members record),
+  never their first. The app's start-up `whoami` reloads when
+  `tryingSpace()` no longer matches what the page started with.
 
 ## How it fits together
 

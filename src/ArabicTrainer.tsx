@@ -10572,6 +10572,16 @@ export default function ArabicTrainer() {
         const merged = { ...r.user, key: account.key };
         API.saveAccount(merged);
         if (!r.user.admin && r.user.org) API.rememberSpace(r.user.org.id);
+        /* The super admin's spaces changed since this device last knew
+           (0.575): a space tried here is now theirs, or the other way
+           round. The practice document's key depends on it, so start
+           again; a trial that became a membership leaves nothing behind. */
+        const tryingNow = API.tryingSpace();
+        if (tryingNow !== TRYING) {
+          if (TRYING) API.dropTrial(TRYING);
+          window.location.reload();
+          return;
+        }
         setAccount(merged);
       })
       .catch((e) => {
@@ -20196,8 +20206,10 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
  * one per space, and leaving one keeps the others: the app reloads at the
  * plain address, which lands in another of them.
  */
-function LeaveSpace({ onLeft, space, others = 0 }: {
+function LeaveSpace({ onLeft, space, others = 0, admin = false }: {
   onLeft: () => void;
+  /** The super admin, who comes back through Super admin → People (0.575). */
+  admin?: boolean;
   space?: { id: string; name: string };
   /** How many other spaces the account is in. */
   others?: number;
@@ -20216,7 +20228,9 @@ function LeaveSpace({ onLeft, space, others = 0 }: {
           confirmLabel="Leave"
           busy={busy}
           body={
-            others > 0 ? (
+            admin ? (
+              <p>Its courses leave your Learning, and your other spaces stay. You can add yourself back in Super admin → People.</p>
+            ) : others > 0 ? (
               <p>Its courses leave your Learning, and your other spaces stay. You can come back with an invitation link or a course code.</p>
             ) : (
               <p>You won't be able to sign in until your space's admin reactivates you, or you follow an invitation link.</p>
@@ -21086,6 +21100,20 @@ function AccountSettings({
             {/* Leaving the space (52a): suspended until its admin reactivates
                 you. Never offered to the App admin, who would be locked out
                 of their own app. */}
+            {/* The super admin leaves a space they added themselves to
+                (0.575): any but their first, where they land. */}
+            {account.admin && (() => {
+              const theirs: { id: string; name: string }[] = Array.isArray((account as any).orgs) ? (account as any).orgs : [];
+              return theirs.slice(1).map((o) => (
+                <FormField
+                  key={o.id}
+                  label={`Leave ${o.name}`}
+                  lede="Its courses leave your Learning, and anything of yours in its My space is deleted. You can still open it from Super admin → Spaces, or add yourself back in Super admin → People."
+                >
+                  <LeaveSpace onLeft={onCloseAccount} space={o} others={theirs.length - 1} admin />
+                </FormField>
+              ));
+            })()}
             {!account.admin && (() => {
               /* One line per space you are in (memberships). */
               const theirs: { id: string; name: string }[] = Array.isArray((account as any).orgs) ? (account as any).orgs : [];

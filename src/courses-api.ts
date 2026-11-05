@@ -517,6 +517,7 @@ export function explain(err: unknown): string {
       "code-required": "You need a code to join: an invitation link, or a course code from your teacher.",
       "other-space": "That belongs to another space.",
       "trying-space": "You're trying this space, not joining it.",
+      "admin-stays": "The super admin can't leave their first space.",
       "space-closed": "This space is closed.",
       "suspended": "You're not in any space right now. Ask your space's admin, or use an invitation link or a course code.",
       "many-spaces": "This person is in more than one space, so only the super admin can give them a new key.",
