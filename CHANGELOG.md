@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.570 — 5 November 2026
+
+**Courses are searched from a button beside "My courses".**
+
+- The search box above the course list is gone. In its place, a search
+  button sits at the end of the "My courses" line.
+- Pressing it opens a search field that grows out of the button to the
+  left, over the heading. Pressing it again (now a cross) closes the
+  field and clears the search; so does leaving the field empty.
+- The courses page is shared by Teaching and Learning, so both change.
+- Released without running the test suite or checking in a browser, at
+  the owner's request.
+
 ## 0.569 — 5 November 2026
 
 **"Built-in" cards are now word sets, all found in one place.**

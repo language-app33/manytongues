@@ -1110,6 +1110,65 @@ export function verifyBackup(file: any) {
    is passed in rather than the page being written twice.
    ------------------------------------------------------------------ */
 
+/*
+ * Search behind a button at the end of a heading's line. Pressed, the field
+ * grows out of the button leftwards, over the heading, and takes the
+ * typing; the button becomes the way to close it, which also clears what
+ * was typed — a list left narrowed under a heading that no longer says so
+ * would look like courses had gone missing. Leaving the field empty closes
+ * it as well.
+ */
+function HeadSearch({ label, query, onQuery }: {
+  label: string;
+  query: string;
+  onQuery: (q: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const field = useRef<HTMLInputElement | null>(null);
+  const close = () => {
+    onQuery("");
+    setOpen(false);
+  };
+  return (
+    <div className={`at-headsearch${open ? " open" : ""}`}>
+      <input
+        ref={field}
+        className="at-input at-headsearchfield"
+        type="search"
+        dir="auto"
+        placeholder={label}
+        aria-label={label}
+        tabIndex={open ? 0 : -1}
+        aria-hidden={open ? undefined : true}
+        value={query}
+        onChange={(e) => onQuery(e.target.value)}
+        onKeyDown={(e) => { if (e.key === "Escape") close(); }}
+        onBlur={() => { if (!query.trim()) setOpen(false); }}
+      />
+      <button
+        type="button"
+        className="at-icon at-headsearchbtn"
+        title={open ? "Close search" : label}
+        aria-label={open ? "Close search" : label}
+        aria-expanded={open}
+        /* Pressing the button must not first blur the field, which would
+           close it and leave the press to open it again. */
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => {
+          if (open) {
+            close();
+            return;
+          }
+          setOpen(true);
+          field.current?.focus();
+        }}
+      >
+        <Icon name={open ? "close" : "search"} />
+      </button>
+    </div>
+  );
+}
+
 export function CoursesPage({
   courses,
   languages,
@@ -1140,6 +1199,7 @@ export function CoursesPage({
   footer?: Node;
 }) {
   const [code, setCode] = useState("");
+  const [query, setQuery] = useState("");
 
   return (
     <>
@@ -1155,9 +1215,13 @@ export function CoursesPage({
           there is a first course. */}
       {courses.length > 0 && (
         <section className="at-section">
-          <h3 className="at-sectionhead">My courses</h3>
+          <div className="at-headrow">
+            <h3 className="at-sectionhead">My courses</h3>
+            <HeadSearch label="Search courses" query={query} onQuery={setQuery} />
+          </div>
           <ItemList
             noun="course"
+            query={query}
             items={courses}
             size="large"
             busy={busy}

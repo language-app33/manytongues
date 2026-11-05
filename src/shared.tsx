@@ -2287,6 +2287,7 @@ export function ItemList<T>({
   onNew,
   newOff,
   searchBelow,
+  query: outsideQuery,
   renderItem,
   selected,
   onSelectedChange,
@@ -2319,6 +2320,12 @@ export function ItemList<T>({
    * narrow to read what was typed in it on a phone.
    */
   searchBelow?: boolean;
+  /**
+   * The search, typed somewhere else on the screen. Given, the list draws
+   * no search box of its own and narrows by this instead — the Courses tab
+   * searches from a button beside its heading.
+   */
+  query?: string;
   /** An override for the "n of m" line. */ count?: Node;
   items: T[];
   itemKey?: (item: T) => string;
@@ -2357,7 +2364,9 @@ export function ItemList<T>({
   emptyPanel?: Node;
   busy?: boolean;
 }) {
-  const [query, setQuery] = useState("");
+  const [ownQuery, setQuery] = useState("");
+  const outside = outsideQuery !== undefined;
+  const query = outside ? outsideQuery : ownQuery;
   const [selecting, setSelecting] = useState(false);
   const bare = !!emptyPanel && !items.length;
   /* How many tiles are on the page. A long list is shown a page at a time:
@@ -2525,7 +2534,7 @@ export function ItemList<T>({
             New {noun}
           </button>
         )}
-        {items.length > 0 && !searchBelow && searchBox}
+        {items.length > 0 && !searchBelow && !outside && searchBox}
         {/* Beside the search box, because narrowing by hand and narrowing by
             typing are the same job. */}
         {tools}
@@ -2548,7 +2557,7 @@ export function ItemList<T>({
         )}
       </div>
 
-      {searchBelow && items.length > 0 && (
+      {searchBelow && !outside && items.length > 0 && (
         <div className="at-toolbar at-toolbar-search">{searchBox}</div>
       )}
 
