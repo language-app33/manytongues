@@ -17,7 +17,7 @@ import type { ExampleSentence } from "./examples.ts";
 import { MAX_EXAMPLES, blankSentence, exampleCells, examplesRowOf, filledExample, othersOf, readExample, sentenceOf, verbExamplesOf, wishOf } from "./examples.ts";
 import { wordsOffered } from "./context-index.ts";
 import { longSentenceOf, sentenceWords, wordCount } from "./sentence-words.ts";
-import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
+import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf, waitsOnWord } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf, wordOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
 import type { Node } from "./shared.tsx";
@@ -3450,11 +3450,6 @@ export const tableFor = (
   return specOf(lang, table) ? table : "";
 };
 
-/* What a table's cells wait on, where it says nothing: the word — the rule
-   every one-row table has followed since there was one. The same reading
-   the trainer makes. */
-const waitsOnWord = (spec: VerbSpec | null | undefined): boolean =>
-  !!spec && (spec.gate || "word") === "word";
 
 /*
  * The three kinds of card, and what each of them is.
@@ -10525,8 +10520,11 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   );
 }
 
-export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below }: {
+export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below, error = null }: {
   card: Card | null;
+  /** Why the last save failed, said inside this screen, which covers the
+      space it opened from (0.580, audit finding 12). */
+  error?: string | null;
   lang: Lang;
   decks: Deck[];
   inDecks?: string[];
@@ -10856,6 +10854,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             : { icon: "save", label: "Save", off: !canSave || !changed, busy: !!busy, onClick: trySave }
         }
       >
+          {error && <Notice kind="error">{error}</Notice>}
           {about}
           {/* Said before the typing rather than after it.
               A save that cannot be made is now kept on the device and sent

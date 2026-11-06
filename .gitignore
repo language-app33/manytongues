@@ -4,6 +4,7 @@ dev-dist/
 *.local
 .DS_Store
 npm-debug.log*
+tests/.build/
 tests/.smoke-build/
 tests/.cards-build/
 tests/.session-build/

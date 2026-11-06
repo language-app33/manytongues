@@ -89,7 +89,7 @@ import { rangeChecks } from "./numbers/range.ts";
 import { personsOf } from "./verbs.ts";
 import { countedNouns, withNouns } from "./numbers/nouns.ts";
 import { isOffline, watchNet } from "./net.ts";
-import { drainOutbox, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 
 /* What a card that could not be sent is filed under while it waits. See
    outbox.ts: one queue for every kind of waiting work, and the kind is
@@ -5332,6 +5332,9 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   /* How many cards are waiting for a connection, so the space can say so
      rather than leaving a teacher to wonder where their work went. */
   const [kept, setKept] = useState(() => waitingToSend(CARD_OUTBOX));
+  /* Saves the server refused when they were sent from the queue, named
+     until the teacher dismisses them (0.580, audit finding 5). */
+  const [lastDropped, setLastDropped] = useState<{ name: string; msg: string }[] | null>(null);
   /* The teacher's own number systems, one per language they teach. Read
      when the screen that edits them is opened rather than on every visit
      to the card list: it is one request and most visits never want it. */
@@ -5822,7 +5825,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       const want = [...new Set([...had, ...into(m)])];
       /* Its decks alone: a teacher's copy of a published card with changes
          waiting is the changes, and sent whole it would publish them. */
-      if (want.length !== had.length) absorbSaved(await API.saveCard(m.existing, want, { touched: ["decks"] }));
+      if (want.length !== had.length) absorbSaved(await API.saveCard(m.existing, want, { touched: ["decks"], decksWere: had }));
     }
     setImporting(false);
     await refresh();
@@ -6337,7 +6340,11 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       /* What it made, for a caller that has to know whether it did. */
       return out;
     } catch (e) {
-      setError(API.explain(e));
+      const said = API.explain(e);
+      setError(said);
+      /* Said aloud too, so a teacher scrolled deep into the card editor
+         hears it (0.580, audit finding 12). */
+      snack(said, "warn");
       return undefined;
     } finally {
       setBusy(false);
@@ -6475,8 +6482,12 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   };
   /* A save straight to the server, naming what it changed — for the
      screens that do not keep a save for later. */
+  /* With the decks this screen believed the card was in, so the server
+     applies only what was added or taken away (0.580). */
   const saveNamed = (card: Partial<Card>, decks: string[]) =>
-    API.saveCard(card, decks, card.id ? { touched: touchedBy(card, decks) } : { personal: mineSide });
+    API.saveCard(card, decks, card.id
+      ? { touched: touchedBy(card, decks), decksWere: card.decks || [] }
+      : { personal: mineSide });
   const sendOrKeep = useCallback(async (card: Partial<Card>, decks: string[], given: API.SaveExtra = {}) => {
     /* A new card made on the My space side is personal, for good (0.545). */
     const withSide = !card.id && mineSide ? { ...given, personal: true } : given;
@@ -6487,7 +6498,15 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       return await API.saveCard(card, decks, extra);
     } catch (e) {
       if (String((e && (e as Error).message) || e) !== "offline") throw e;
-      keepPending(CARD_OUTBOX, { card, decks, extra });
+      /* A space only being tried is never written to, later or now
+         (README, "Trying a space"). */
+      if (API.tryingSpace()) throw new Error("trying-space-save");
+      /* With the space it was made in, so it is sent there whatever space
+         the app is in when the connection comes back (0.580). */
+      const kept = keepPending(CARD_OUTBOX, { card, decks, extra, org: API.currentOrg() });
+      /* Nowhere to keep it: said, and the editor stays open with what was
+         typed (0.580, audit finding 6). */
+      if (!kept) throw new Error("device-full");
       setKept(waitingToSend(CARD_OUTBOX));
       return { kept: true };
     }
@@ -6499,16 +6518,32 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      because it will be refused again for the same reason. */
   const sendKeptCards = useCallback(async () => {
     if (isOffline()) return;
+    const dropped: { name: string; msg: string }[] = [];
+    const cardName = (c: Partial<Card>) =>
+      (c && (leadOf(c as Card).ar || c.name || leadOf(c as Card).en)) || "A card";
     const { sent } = await drainOutbox(CARD_OUTBOX, async (body) => {
-      const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra };
+      const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra; org?: string };
       try {
-        absorbSaved(await API.saveCard(held.card, held.decks, held.extra || {}));
+        absorbSaved(await API.saveCard(held.card, held.decks, held.extra || {}, held.org));
         return "sent";
       } catch (e) {
-        return String((e && (e as Error).message) || e) === "offline" ? "keep" : "drop";
+        /* Waited through anything that is not the server's own refusal; a
+           refusal drops it, and the teacher is told (0.580, audit finding 5). */
+        const msg = String((e && (e as Error).message) || e);
+        if (isTransient(msg)) return "keep";
+        dropped.push({ name: cardName(held.card), msg });
+        return "drop";
       }
     });
     setKept(waitingToSend(CARD_OUTBOX));
+    if (dropped.length) {
+      const n = dropped.length;
+      snack(
+        `${n} saved card${n === 1 ? "" : "s"} could not be sent and ${n === 1 ? "was" : "were"} discarded: ${API.explain(new Error(dropped[0].msg))}`,
+        "warn",
+      );
+      setLastDropped((was) => (was || []).concat(dropped));
+    }
     if (lockedHits.current.size) {
       snack(lockedNote(lockedHits.current), "warn");
       lockedHits.current.clear();
@@ -6660,8 +6695,20 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     const fresh = cards.find((c) => c.id === reviewing.id) || reviewing;
     const pool = lendable.some((c) => c.id === fresh.id) ? lendable : lendable.concat([fresh]);
     const lang = langOfCard(fresh) || languages[soleLang];
-    const took = (card: Card) => {
-      setEditing((e) => (e && e.card && e.card.id === card.id ? { ...e, card: { ...e.card, ...card }, opened: Date.now() } : e));
+    /*
+     * The editor's card, as the review left it.
+     *
+     * A review changes nothing the editor holds — the server keeps the
+     * review beside the card's words — so the editor stays as it is, with
+     * whatever the teacher had typed (0.580, audit finding 9). Narrowing a
+     * blank does change the card's words, and an editor left holding the
+     * old ones would quietly put them back on Save; that one, and only
+     * that one, draws the editor afresh.
+     */
+    const took = (card: Card, redraw = false) => {
+      setEditing((e) => (e && e.card && e.card.id === card.id
+        ? { ...e, card: { ...e.card, ...card }, ...(redraw ? { opened: Date.now() } : null) }
+        : e));
     };
     return (
       <ReviewScreen
@@ -6693,7 +6740,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               if (r && r.card && r.card.id === fresh.id) frame = r.card;
             }
             if (frame) {
-              took(frame);
+              took(frame, true);
               setReviewing(frame);
             }
             snack(`Narrowed — ${plural(Math.max(0, changed.length - 1), "word")} tagged`, "good");
@@ -6754,6 +6801,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         decks={decksIn(new Set([(editLang || LANGUAGES[DEFAULT_LANGUAGE]).id]), editing.decks)}
         inDecks={editing.decks}
         busy={busy}
+        error={error}
         onClose={() => setEditing(null)}
         allCards={lendable}
         making={editing.making}
@@ -6913,7 +6961,9 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 /* A new card starts as a draft, and a change to a published
                    card waits for publishing — see "A card's status" in
                    save-card. Its decks, ID and tags apply at once. */
-                editing.card && editing.card.id ? { into: "changes" } : { status: "draft" },
+                /* With the decks the editor opened with, so only what the
+                   teacher added or took away is applied (0.580). */
+                editing.card && editing.card.id ? { into: "changes", decksWere: editing.decks } : { status: "draft" },
               );
               absorbSaved(r);
               /*
@@ -8503,6 +8553,14 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               true of the space rather than of whichever list is on screen —
               and a teacher who has just written a card on a train should
               see that it is still coming however far down a list they are. */}
+          {lastDropped && lastDropped.length > 0 && (
+            <TopBanner
+              kind="error"
+              actions={<Button size="sm" variant="ghost" onClick={() => setLastDropped(null)}>Dismiss</Button>}
+            >
+              {`Not sent, and discarded: ${lastDropped.map((d) => `${d.name} (${API.explain(new Error(d.msg))})`).join("; ")}`}
+            </TopBanner>
+          )}
           {kept > 0 && (
             <TopBanner>
               {`${plural(kept, "card")} saved on this device, waiting for a connection. `}
@@ -9956,7 +10014,7 @@ function EveryonePeople({ me }: { me: string }) {
         <IconButton icon="key" label="Issue a new sign-in key" onClick={() => setConfirm({
           title: `New sign-in key for ${u.displayName}?`,
           confirmLabel: "Issue a new key",
-          body: <p>Their current key stops working at once. You'll see the new one once.</p>,
+          body: <p>Their current key stops working the moment you do this, on every device they use. Their handle, courses and progress are untouched. You'll see the new key once.</p>,
           action: async () => {
             const r = await API.reissueKey(u.handle, keyOrg);
             setNewKey({ name: u.displayName, key: r.key });

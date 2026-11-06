@@ -93,3 +93,58 @@ test("and the process it starts stops cleanly when a deploy asks it to", async (
   assert.match(said, /SIGTERM/, "the signal never reached the server");
   await rm(dir, { recursive: true, force: true });
 });
+
+/*
+ * A start-up migration that fails must not keep the site down (0.580,
+ * audit finding 14). The language rename reads every stored document;
+ * here one of them is a directory, which it cannot read, and the server
+ * has to log that and answer anyway.
+ */
+test("a failed start-up migration is logged and the site still answers", async () => {
+  const { mkdir } = await import("node:fs/promises");
+  const dir = await mkdtemp(path.join(tmpdir(), "manytongues-migrate-"));
+  await mkdir(path.join(dir, "arabic-courses", "not-a-document"), { recursive: true });
+  const port = String(40000 + Math.floor(Math.random() * 20000));
+  const child = spawn(process.execPath, ["server/index.js"], {
+    cwd: root,
+    env: { ...process.env, PORT: port, DATA_DIR: dir, ADMIN_KEY: "test" },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  let said = "";
+  child.stdout.on("data", (d) => (said += String(d)));
+  child.stderr.on("data", (d) => (said += String(d)));
+  const ended = new Promise((resolve) => child.on("exit", resolve));
+  try {
+    await new Promise((resolve, reject) => {
+      const giveUp = setTimeout(() => reject(new Error(`never started: ${said}`)), 10000);
+      const look = setInterval(() => {
+        if (/listening on/.test(said)) {
+          clearInterval(look);
+          clearTimeout(giveUp);
+          resolve(undefined);
+        }
+      }, 50);
+    });
+    assert.match(said, /migration failed; serving anyway/, "the failure is said, not swallowed");
+    /* An API call rather than the version page, which needs a build. */
+    const res = await fetch(`http://127.0.0.1:${port}/api/courses?action=whoami`);
+    assert.equal(res.status, 401, "and the site answers");
+    assert.match(res.headers.get("content-type") || "", /json/);
+  } finally {
+    child.kill("SIGTERM");
+    await ended;
+    await rm(dir, { recursive: true, force: true });
+  }
+});
+
+test("migrateOnStart reports a throwing migration rather than throwing", async () => {
+  const { migrateOnStart } = await import("../server/index.js");
+  const quiet = console.error;
+  console.error = () => {};
+  try {
+    assert.equal(await migrateOnStart({ migrate: async () => { throw new Error("boom"); } }), false);
+    assert.equal(await migrateOnStart({ migrate: async () => 0 }), true);
+  } finally {
+    console.error = quiet;
+  }
+});

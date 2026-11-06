@@ -30,6 +30,9 @@ import { readNumberSystem, readTimeSystem } from "./numbers/schema.ts";
 import { setsWithNouns } from "./numbers/nouns.ts";
 import type { SystemSet } from "./numbers/generate.ts";
 import { fileIntoDecks, generate, handOn, handOnCounting, handOnSplit } from "./numbers/generate.ts";
+/* The one reading of which schedules say nothing (0.580: this file had its
+   own, which dropped a skipped-but-never-answered state when set aside). */
+import { compactStates } from "./sync.ts";
 
 /*
  * Anything React will render: an element, a string, a list of them, or
@@ -4488,9 +4491,20 @@ const spaceHeld: Record<string, { handle: string; shown: any } | null> = { admin
 const SPACE_TRIAL = API.trialSuffix(API.tryingSpace());
 const SPACE_KEY = (space: SpaceName) => `arabic-trainer:space:${space}${SPACE_TRIAL}`;
 
+/* What was last written for each space and person, so an identical
+   delivery is not serialised into storage again (0.580, audit finding 17). */
+const lastKept = new Map<string, string>();
+/** For tests: forget what was last written. */
+export const forgetKeptSpaces = () => lastKept.clear();
 function rememberOnDevice(space: SpaceName, handle: string, shown: any) {
   try {
+    /* One slot per space, so the person is part of what is compared. */
+    const text = JSON.stringify([handle, shown]);
+    /* And only while the slot is still there: leaving a trial clears it. */
+    if (lastKept.get(space) === text && localStorage.getItem(SPACE_KEY(space)) !== null) return;
+    lastKept.delete(space);
     localStorage.setItem(SPACE_KEY(space), JSON.stringify({ handle, shown, at: Date.now() }));
+    lastKept.set(space, text);
   } catch (e) {
     /* Storage full, blocked, or the space is simply too big to keep. The
        app works exactly as it did before this existed. */
@@ -4556,7 +4570,15 @@ export function useFreshSpace(space: SpaceName, handle: string, adopt: (shown: a
 
 /* The administrator's whole view of the site, in one request. */
 export async function pullAdmin(handle: string): Promise<import("./types.ts").AdminOverview> {
-  const data = await API.adminOverview();
+  let data = await API.adminOverview();
+  /* Nothing moved since the last ask (0.580): what is held stands. If
+     nothing is held after all, ask again for the whole of it. */
+  if (data && data.unchanged) {
+    const held = recallSpace("admin", handle);
+    if (held) return held;
+    API.forgetEtags();
+    data = await API.adminOverview();
+  }
   deliverSpace("admin", handle, data);
   return data;
 }
@@ -4592,17 +4614,28 @@ export const cardLostRecordings = (card: any): number =>
    and what didn't is reported — and what was already held stands in for
    the part that failed. */
 export async function pullTeaching(handle: string) {
-  const [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
-  const before = recallSpace("teach", handle) || { courses: [], decks: [], cards: [] };
+  let [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
+  const same = (r: PromiseSettledResult<any>) => r.status === "fulfilled" && !!(r.value && r.value.unchanged);
+  const held = recallSpace("teach", handle);
+  /* An "unchanged" answer is only as good as what is held (0.580). With
+     nothing held, ask again for the whole of it. */
+  if (!held && [c, d, k].some(same)) {
+    API.forgetEtags();
+    [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
+  }
+  /* Nothing moved: the space stands as it is, and nobody is told. */
+  if (held && same(c) && same(d) && same(k)) return { ...held, failed: null };
+  const before = held || { courses: [], decks: [], cards: [] };
+  const fresh = (r: PromiseSettledResult<any>) => r.status === "fulfilled" && !same(r);
+  const value = (r: PromiseSettledResult<any>) => (r as PromiseFulfilledResult<any>).value;
   const shown = {
-    courses:
-      c.status === "fulfilled"
-        ? (c.value.courses || []).filter((x: { role: string }) => x.role === "teacher")
-        : before.courses,
-    decks: d.status === "fulfilled" ? d.value.decks || [] : before.decks,
-    cards: k.status === "fulfilled" ? k.value.cards || [] : before.cards,
+    courses: fresh(c)
+      ? (value(c).courses || []).filter((x: { role: string }) => x.role === "teacher")
+      : before.courses,
+    decks: fresh(d) ? value(d).decks || [] : before.decks,
+    cards: fresh(k) ? value(k).cards || [] : before.cards,
     /* Which of those cards' recordings the server does not hold. */
-    missingClips: k.status === "fulfilled" ? k.value.missingClips || [] : before.missingClips || [],
+    missingClips: fresh(k) ? value(k).missingClips || [] : before.missingClips || [],
   };
   deliverSpace("teach", handle, shown);
   const failed = [c, d, k].find((r) => r.status === "rejected");
@@ -5389,15 +5422,6 @@ export function withProgress(item: Item, saved: Parked | undefined): Item {
   };
 }
 
-/* States that have never been answered are not worth setting aside, the
-   same reading the wire and the disk make of them. */
-const compactStates = (s?: Record<string, ExerciseState>): Record<string, ExerciseState> => {
-  const out: Record<string, ExerciseState> = {};
-  for (const [t, st] of Object.entries(s || {})) {
-    if (st && (st.phase !== "new" || st.reps || st.updated)) out[t] = st;
-  }
-  return out;
-};
 
 /* A card the device does not hold yet, with anything handed on to its
    forms taken into their schedules — see handOnCounting — rather than

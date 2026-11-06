@@ -71,6 +71,64 @@ export async function forgetSyncDoc(token) {
   await store.delete(key).catch(() => {});
 }
 
+/**
+ * Carry a learner's practice document, and every recording it names, from
+ * one token to another (0.580, audit finding 1). Called when an admin
+ * issues a new sign-in key: the document lives under a hash of the old
+ * key's token, and without this the new key opens an empty one.
+ *
+ * Never overwrites: if the new token already holds a document, nothing is
+ * moved. A document that cannot be parsed is still moved byte for byte (the
+ * GET above knows how to recover it); only its recordings are left behind,
+ * because only it names them.
+ * @param {string} oldToken
+ * @param {string} newToken
+ * @returns {Promise<{ moved: boolean, clips?: number, reason?: string }>}
+ */
+export async function moveSyncDoc(oldToken, newToken) {
+  const hex = /^[a-f0-9]{64}$/;
+  if (!hex.test(String(oldToken || "")) || !hex.test(String(newToken || ""))) return { moved: false };
+  if (oldToken === newToken) return { moved: false };
+  const store = getStore(STORE);
+  const oldKey = keyFor(oldToken);
+  const newKey = keyFor(newToken);
+  const text = await store.get(oldKey, { type: "text", consistency: "strong" });
+  if (text == null) return { moved: false };
+  const there = await store.get(newKey, { type: "text", consistency: "strong" });
+  if (there != null) return { moved: false, reason: "exists" };
+  const wrote = await store.set(newKey, String(text), { onlyIfNew: true });
+  if (wrote && wrote.modified === false) return { moved: false, reason: "exists" };
+  /** @type {string[]} */
+  let ids = [];
+  try {
+    const doc = JSON.parse(String(text));
+    for (const it of (doc && doc.items) || []) {
+      for (const f of formsOf(it)) for (const r of f.recs || []) ids.push(String(r.id));
+      for (const ln of it.lines || []) for (const r of ln.recs || []) ids.push(String(r.id));
+    }
+  } catch (e) {
+    ids = [];
+  }
+  let clips = 0;
+  /** @type {string[]} */
+  const copied = [];
+  for (const id of new Set(ids)) {
+    if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) continue;
+    try {
+      const clip = await store.get(keyFor(`${oldToken}:audio:${id}`), { type: "text", consistency: "strong" });
+      if (clip == null) continue;
+      await store.set(keyFor(`${newToken}:audio:${id}`), String(clip), { onlyIfNew: true });
+      copied.push(id);
+      clips += 1;
+    } catch (e) {
+      /* Best effort per clip: the document matters more than one recording. */
+    }
+  }
+  for (const id of copied) await store.delete(keyFor(`${oldToken}:audio:${id}`)).catch(() => {});
+  await store.delete(oldKey).catch(() => {});
+  return { moved: true, clips };
+}
+
 /** @param {Request} req */
 export default async (req) => {
   const token = req.headers.get("x-sync-token") || "";
