@@ -7468,3 +7468,171 @@ and takes an invitation or a code. They may rename, mark their key saved
 and close their account; nothing else answers them until they are back in
 a space.
 
+
+---
+
+## Progress follows a reissued key
+
+**6 November 2026** · `moveSyncDoc` in `server/api/sync.js`, `admin-reissue-key`
+
+A person's practice is stored under a fingerprint of their sign-in key, so
+the server never needs the key itself. A new key therefore pointed at an
+empty document. The server now moves the document, and every recording it
+names, to the new key's fingerprint when it issues the key — never over a
+document already there, and the old one is removed once it is copied.
+
+**Why not keep the document under the account instead.** It would mean the
+sync endpoint knowing who a token belongs to, which is the thing it was
+built not to know. A move at the one moment a key changes keeps that.
+
+**What it costs.** A device still holding the old key may push to the old
+fingerprint after the move. Nothing is lost: when that device signs in with
+the new key, the old-key document is drained into the new one as any older
+private key's is (`LEGACY_SYNC_KEYS`).
+
+---
+
+## A device sets the practice aside per person at log out
+
+**6 November 2026** · `parkForLogOut`, `adoptParked`, `PARKED_KEY` in `src/ArabicTrainer.tsx`
+
+The document on a device is always the signed-in person's. At log out it is
+synced once more if it can be, then moved to a slot named by the person's
+handle, and the main copy is emptied; the sync key is cleared first, so
+the empty copy is never pushed. Signing in again merges the slot back
+before the first sync starts, and removes it.
+
+**Why set aside rather than wipe.** A log out offline must not lose answers
+that never reached the server. Wiping would be simpler and is what a shared
+computer wants; setting aside keeps the one promise the app makes about
+practice — it is never lost.
+
+**What it costs.** One document's worth of storage per person who has used
+the device, until they sign in there again. If storage will not take the
+copy, the document is left in place and the person is told; the next person
+then sees it, as before 0.580.
+
+---
+
+## Card saves merge by top-level field on the server
+
+**6 November 2026** · `save-card`, `card-status` in `server/api/courses.js`
+
+A save is worked out from the card as the request read it. If the card
+moved in the meantime — another tab, another teacher, a status change —
+only the top-level fields this request changed are laid over the card as it
+stands when the write lands (`updateJson`), and the revision moves once per
+write. A status change is worked out from the card at that moment too.
+
+**What it costs.** Two people changing *the same* field at the same moment
+still leave the later one's: `forms` is one field, so two edits to a card's
+words at once are not merged word by word. That is rare and visible (the
+second editor's words are what they see); merging inside a field would mean
+knowing what every field means, and a wrong merge is worse than a visible
+last-wins. The card's decks are not a field here: the change this request
+made to them is laid over the decks the card is in now.
+
+---
+
+## Deck membership travels as a change
+
+**6 November 2026** · `decksWere` in `save-card`; `saveNamed` and the editor's Save in `src/spaces.tsx`
+
+Every add or remove sent the card's whole list of decks, rebuilt from what
+the screen believed, so a screen that was out of date put back a deck
+somebody else had removed. Screens now send the decks they believed the
+card was in beside the ones they want; the server applies only what was
+added and what was taken away, over the decks the card is in when the write
+lands.
+
+**What it costs.** Two kinds of request for one action. An older build sends
+no `decksWere`, and its list is taken as the list, as before.
+
+---
+
+## A queued save waits through server errors and is dropped only on refusal
+
+**6 November 2026** · `isTransient` in `src/outbox.ts`; `sendKeptCards` in `src/spaces.tsx`
+
+Work saved without a connection waits on the device. It used to be dropped
+on any answer but "offline", which included a gateway's error page during a
+deploy. Now only the server's own refusal — an answer in its own words, a
+4xx with JSON — drops it, and the teacher is told which card and why; no
+connection, a timeout, a 5xx and a body that is not the server's JSON all
+mean "not answered yet", and the work waits.
+
+**What it costs.** A server that is broken in a way that keeps answering 5xx
+keeps the queue waiting for as long as it is broken (the queue's fortnight
+cap still applies). That is the right side to err on: the alternative is
+losing a teacher's work to an outage.
+
+---
+
+## Pruning uses the server's clock
+
+**6 November 2026** · `mergeData(local, remote, now)` and `serverTimeOf` in `src/sync.ts`
+
+Deletions and set-aside progress are kept a fixed number of days and then
+aged out at the next merge. Aged by the device's clock, a phone set months
+ahead aged out yesterday's. A sync now ages them by the time in the
+server's answer; a merge with no server in it — an imported file, a
+document set aside at log out — still uses the device's.
+
+**What it costs.** Nothing much: one header read. A server whose clock is
+wrong would age things wrongly for everyone, but that is one clock to keep
+right instead of every learner's.
+
+---
+
+## Teaching reads are conditional on an ETag
+
+**6 November 2026** · `jsonTagged` in `server/api/courses.js`; `call` in `src/courses-api.ts`; `pullTeaching`
+
+Teaching and Admin ask for the whole space every 45 seconds while they are
+open, and with nothing changed got the whole space back and wrote it to the
+device again. The three lists and the admin overview now carry an ETag; the
+device sends it back, a match is a bare 304, and a refresh where nothing
+moved changes nothing on screen or on the device.
+
+**What it costs.** The server still reads and serialises the lists to know
+whether they moved — the saving is the transfer, the device's parsing and
+its storage writes, not the server's reads. The ETags are kept in memory, so
+the first ask after a reload is a whole one.
+
+---
+
+## Teacher-only styles ride with the teaching chunk
+
+**6 November 2026** · `src/teaching.css`, `scripts/css-split.mjs`
+
+About a fifth of the stylesheet styled screens only teachers and admins
+open. Those rules now live in `src/teaching.css`, imported by
+`src/spaces.tsx`, so the build serves them with the lazily loaded teaching
+code. A rule moves only when every class it names is used by the teaching
+files alone; a learner's screen keeps everything it uses, and a test checks
+that no learner screen uses a class only the teaching sheet styles.
+
+**What it costs.** The moved rules now come after the learner's sheet
+rather than where they stood in it. Where a teaching-only rule and a
+general rule set the same property on the same element with the same
+weight, the teaching rule now wins where the general one may have won
+before. Every teaching screen is on the release's list to check by hand at
+phone and desktop width for exactly that.
+
+---
+
+## The learner card editor behind OWN_CARDS is removed rather than kept
+
+**6 November 2026** · `src/ArabicTrainer.tsx`, `src/imports.ts`
+
+Learners making their own cards was switched off in 0.404, and its editor,
+bulk-add sheet, recorder and zip backup stayed in the source behind a flag
+so it could be turned back on with one line. It was about a quarter of the
+trainer, read by nobody and kept compiling by everyone.
+
+It is removed. The one piece something else used — the reader for a pasted
+table of words — moved to `src/imports.ts`.
+
+**What it costs.** Turning learners' own cards back on is now a piece of
+work, not a flag: the editor would be built again, most likely from the
+teacher's card editor, which has moved far past the learner's since 0.404.

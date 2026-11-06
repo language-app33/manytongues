@@ -1455,6 +1455,11 @@ One Node process serves both the built app and the API, so it needs a host
 that runs a process rather than static files alone. `npm start` runs it, and
 it listens on `PORT`.
 
+Before it listens, the server rewrites any stored document still naming a
+language by an id the app has since renamed (`server/rename-langs.js`). If
+that fails, it is logged — "language rename migration failed; serving
+anyway" — and the site starts regardless; it runs again at the next start.
+
 Nothing is needed at run time: the server imports only Node built-ins and the
 app's own files, and everything else — React included — is compiled into
 `dist/` by the build. The build itself does need the devDependencies, so
@@ -1581,6 +1586,10 @@ A space's export and storage (since 0.546): `admin-export-org-manifest` is
 the backup manifest limited to one org and without personal records, its
 chunks fetched like a backup's; `admin-org-usage` counts what an org holds
 and the bytes of its media. Both are the App admin's, from Admin → Spaces.
+Since 0.580 a space's export keeps everyone who is a member of it, not only
+those whose first space it is, and both a full backup and an export carry
+former members' card lists, cards, numbers and recordings, which stay live
+for students after the account goes.
 
 Memberships (since 0.573; `docs/PLAN-memberships.md`, all three stages in one release):
 
@@ -1604,7 +1613,9 @@ Memberships (since 0.573; `docs/PLAN-memberships.md`, all three stages in one re
   admin's `admin-add-member` all go through the first, removal from one
   space of several through the second. `wipeAccount` walks every space.
 - A space admin may give a new key only to someone in their space alone
-  (`many-spaces`).
+  (`many-spaces`). A new key carries the person's practice with it: the
+  server moves their sync document and its recordings to the new key's
+  fingerprint (`moveSyncDoc`, 0.580).
 - In the app, the address is the space you are in when it is one of yours
   (`atOwnAddress` in the trainer); a member's requests carry it as `x-org`.
   Going to another of your spaces, from the You menu, reloads at its
@@ -1717,7 +1728,10 @@ src/
                    locale and every name it cannot work out are passed in.
   imports.ts       a teacher's import read against what they already have:
                    which cards are new, already theirs, or the same word as
-                   one of theirs, and which decks they have. Pure.
+                   one of theirs, and which decks they have; and a pasted
+                   table of words read into rows (`parseLines`). Pure.
+  pictures.ts      fetching a stored picture, once a session for every
+                   screen, and the one list of recordings the server lacks
   ArabicTrainer.tsx  the learner's app: scheduler, session builder, screens
   spaces.tsx       the teaching and admin spaces, loaded lazily so a student
                    never downloads them
@@ -1725,7 +1739,10 @@ src/
                    from, apart from the spaces so each reads as itself
   shared.tsx       the component library both sides use
   sync.ts          merging two devices' documents, and clip sync
-  index.css        one stylesheet, with the design tokens at the top
+  index.css        the stylesheet every screen loads, design tokens at the top
+  teaching.css     the teaching screens' own rules, loaded with spaces.tsx;
+                   written by scripts/css-split.mjs, and checked by
+                   tests/css-usage.test.mjs
 server/
   index.js         the process: routes /api, serves dist/, nothing else
   store.js         documents on disk, with the conditional writes sync needs.
@@ -1838,6 +1855,14 @@ sync does not hand it back — and the progress that was on it is set aside
 beside the document rather than destroyed, restored if the card returns and
 aged out on the same schedule as the tombstones. A card can go missing for
 reasons nobody decided, and the device cannot tell those from a withdrawal.
+Since 0.580 a sync ages both by the server's clock (the answer's Date
+header), so a device whose clock is far ahead cannot age them out early.
+
+Logging out sets the document aside on the device under the person's handle
+and empties the main copy, so the next person to sign in there starts
+clean; signing in again merges it back before the first sync (0.580, see
+DECISIONS.md). Recordings and pictures that no card on the device names any
+more are cleared from IndexedDB once a day, after a sync.
 
 A card that fills a variable (`fills: "name"`) belongs to no deck: the server
 sends it with every deck whose phrases leave a hole of that name. It is the

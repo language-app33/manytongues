@@ -8,6 +8,98 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.580 — 6 November 2026
+
+**Nothing a teacher saves or a learner practises goes missing quietly any
+more.** Every fix from the 6 November audit of 0.579
+(`docs/AUDIT-stability-0.579.md`).
+
+For students:
+
+- **A new sign-in key keeps your progress.** When an admin gives you a new
+  key, your practice and recordings move with it, so signing in on a new
+  phone picks up where you were.
+- **Logging out sets your practice aside on that device.** The next person
+  to sign in there starts with nothing of yours, and nothing of yours is
+  sent up under their name. When you sign in there again, it comes back.
+- **A phone with its clock set wrong can no longer bring deleted cards back**
+  or lose progress that was set aside.
+- **The "no space to open" page shows only the way back in**, with nothing
+  from Learning behind it.
+- Recordings and pictures no card of yours uses any more are cleared from
+  your device once a day, so it does not fill up over time.
+
+For teachers:
+
+- **Two people editing one card at once both keep their changes**, and so
+  does one person in two tabs. Changing a card's status at the same moment
+  as someone saves it no longer undoes the save.
+- **Adding a card to a deck, or taking it out, no longer undoes somebody
+  else's change** made from another screen.
+- **A card saved while offline is never silently dropped.** It waits
+  through server errors and deploys, and is discarded only if the server
+  refuses it — and then you are told which card and why, until you dismiss
+  it.
+- **If your device's storage is full, saving says so** and keeps the editor
+  open with what you typed, instead of saying it was saved.
+- **A card saved offline goes to the space you made it in**, even if you
+  have moved to another space by the time it is sent.
+- **Reviewing sentences from inside the card editor keeps what you typed.**
+- **A save that fails says why inside the editor**, and says it aloud.
+- Teaching and Admin no longer download the whole space again every 45
+  seconds when nothing has changed.
+
+For admins:
+
+- **A full backup now really holds everything**, including the cards,
+  recordings and numbers of teachers whose accounts were deleted. **A
+  space's export includes everyone in that space**, including members whose
+  first space is elsewhere.
+- **Super admin uses Admin's own People actions and report list**, so the
+  two say the same things. Super admin's Reports now has search, Copy and
+  Clear for ticked reports, grouped by space.
+- The "new sign-in key" dialogs say the same thing in both places: the
+  person's handle, courses and progress are untouched.
+
+Behind the scenes:
+
+- The learner card editor, switched off since 0.404, is gone.
+- The stylesheet learners download is about 30% smaller: unused rules are
+  gone, repeated ones merged, and teacher-only styles load with the
+  teaching screens.
+- Recordings and pictures are served so a browser may keep them.
+- A failing step at server start-up no longer keeps the site down.
+- The checks share one build of the app and the slowest simulation is
+  smaller, so they run in a fraction of the time.
+
+Trade-offs:
+
+- Two people changing **the same part** of a card at the same moment (its
+  words, say) still leave whichever saved last.
+- A shared device keeps one set-aside copy of practice for each person who
+  has logged out there, until they sign in there again.
+- Teacher-only styles now load after the rest. A screen where the two used
+  to compete may look slightly different — that is what the screen checks
+  below are for.
+
+To check by hand:
+
+- Issue a new key to a student who has practised, sign in with it on
+  another device, and see their progress there.
+- Export a space that has a member whose first space is Main; the export
+  lists them and their cards.
+- Edit one card in two tabs: change its note in one and its name in the
+  other, save both, and both changes are there.
+- Save a card offline, then reconnect while a deploy is happening; it
+  waits, and goes once the site is back.
+- Log out and in on one device as two people: the second sees none of the
+  first's practice, and the first gets theirs back.
+- Open a sentence card, Edit, type something, Review sentences, Save review:
+  what you typed is still there.
+- Every Teaching, Admin and Super admin screen, the card editor, the number
+  editor, the gallery and the review sheet, at phone and desktop width,
+  after the stylesheet split.
+
 ## 0.579 — 6 November 2026
 
 **Learning's space button sits level with the app's name, and its list
