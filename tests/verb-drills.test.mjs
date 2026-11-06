@@ -18,9 +18,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { build } from "esbuild";
 import path from "node:path";
-import { must } from "./helpers.mjs";
+import { must, buildOnce } from "./helpers.mjs";
 
 /* Seeded before the trainer is imported, as numbers-session does. A
    session draws one form of each card at random (since 0.455), and about
@@ -33,26 +32,9 @@ Math.random = () => {
   return rolling / 4294967296;
 };
 
-const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".verb-drills-build");
 
-await build({
-  entryPoints: [path.join(here, "..", "src", "ArabicTrainer.tsx")],
-  outfile: path.join(out, "trainer.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
-const { FOLLOW_GAP, afterItsUse, behindItsTable, buildSession, installIndexes, laddered, marksForAnswer, oneNewTable, withRows } = await import(path.join(out, "trainer.js"));
+const built = await buildOnce(["ArabicTrainer.tsx"]);
+const { FOLLOW_GAP, afterItsUse, behindItsTable, buildSession, installIndexes, laddered, marksForAnswer, oneNewTable, withRows } = await import(path.join(built, "ArabicTrainer.js"));
 const { LANGUAGES, EX, TYPES, verbOf, keysFor } = await import("../src/languages.ts");
 const drills = await import("../src/verb-drills.ts");
 const { drillFits, whoChoices, whoIsRight, rowMarks, shiftCue, tenseOf, drillTable } = drills;

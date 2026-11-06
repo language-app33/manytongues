@@ -3,9 +3,8 @@
    key, my-material with a version, legacy document cleanup, sparse
    storage. Run with: node tests/smoke.mjs */
 import { JSDOM } from "jsdom";
-import { build } from "esbuild";
 import path from "node:path";
-import { must } from "./helpers.mjs";
+import { buildOnce, must } from "./helpers.mjs";
 import { asMeaning, fillNames } from "../src/variables.ts";
 
 /*
@@ -40,16 +39,14 @@ Math.random = () => {
 
 /* Built inside the project so the bundle's bare "react" imports resolve to
    the project's node_modules. */
-import { mkdirSync, rmSync } from "node:fs";
-const out = path.resolve("tests/.smoke-build");
-rmSync(out, { recursive: true, force: true });
-mkdirSync(out, { recursive: true });
-await build({
-  entryPoints: [
-    "src/ArabicTrainer.tsx",
-    "src/storage.ts",
-    "src/gallery.tsx",
-    "src/shared.tsx",
+/* Through the build every test shares (0.580): one per state of the
+   source and set of options — see buildOnce. */
+const out = await buildOnce(
+  [
+    "ArabicTrainer.tsx",
+    "storage.ts",
+    "gallery.tsx",
+    "shared.tsx",
     /*
      * The teaching space is loaded lazily, so its screens arrive through
      * the app's own import rather than from this list — the card editor
@@ -58,30 +55,24 @@ await build({
      * button this walk does not press, so it is named here and driven on
      * its own at the foot of the file.
      */
-    "src/number-system-editor.tsx",
+    "number-system-editor.tsx",
     /* And the review screens, reached from a card's page and a toolbar
        button this walk does not press — driven on their own at the foot. */
-    "src/review-sheet.tsx",
+    "review-sheet.tsx",
   ],
-  bundle: true,
-  format: "esm",
-  splitting: true,
-  outdir: out,
-  jsx: "automatic",
-  platform: "browser",
-  /* One React: the bundle imports the same copy the test renders with. */
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  logLevel: "silent",
-  /* The same three vite freezes into a real build, so the version line is
-     exercised here the way it actually ships rather than through its
-     "no one defined this" fallback. */
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0.1"',
-    __APP_VERSION__: '"abc1234"',
-    __BUILT_AT__: '"2026-09-05T13:00:00.000Z"',
+  {
+    splitting: true,
+    /* The same three vite freezes into a real build, so the version line is
+       exercised here the way it actually ships rather than through its
+       "no one defined this" fallback. */
+    define: {
+      "process.env.NODE_ENV": '"development"',
+      __APP_RELEASE__: '"0.1"',
+      __APP_VERSION__: '"abc1234"',
+      __BUILT_AT__: '"2026-09-05T13:00:00.000Z"',
+    },
   },
-});
+);
 
 const dom = new JSDOM(`<!doctype html><html><body><div id="root"></div></body></html>`, {
   url: "https://manytongues.test/",
@@ -7988,13 +7979,15 @@ const openPronounTables = async () => {
   const save = /** @type {any} */ ((cardOnScreen() || document).querySelector('.at-fab[aria-label="Save"]'));
   check("and Save is still on", !!save && !isOff(save), save ? "off" : "no Save");
   check("and nothing asked to discard it", !buttonNamed(/^Discard changes$/), "a Discard question is up");
-  /* One way out: Cancel, Discard, then Back off the card — see backOut. */
-  backOut();
-  await sleep(300);
-  if (cardOnScreen()) {
+  /* Out: Cancel and Discard, which puts the card back to being read, then
+     Back off it — see backOut. As many times as it takes, and said if it
+     will not go, since every walk after this starts from the card list. */
+  for (let i = 0; i < 3 && cardOnScreen(); i++) {
     backOut();
-    await sleep(300);
+    await sleep(400);
   }
+  check("and the card can be left afterwards", !cardOnScreen(),
+    [...document.querySelectorAll("button.at-back")].map((b) => b.getAttribute("aria-label")).join(", "));
 }
 
 /* ---- a language's pronouns, written once ----

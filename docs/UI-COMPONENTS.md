@@ -382,9 +382,11 @@ its play buttons resolve to "missing" rather than fetching.
   off the specimen. `src/text-styles.ts` is the list behind it, and
   `tests/text-styles.test.mjs` fails if a size there and the stylesheet have
   come apart.
-- Every `at-` class in the stylesheet is currently referenced by something. If
+- Every `at-` and `ob-` class a stylesheet styles is referenced by something,
+  and `tests/css-usage.test.mjs` fails the build when one is not (0.580). If
   you delete markup, delete its CSS — and note that a multi-selector rule is
-  only dead if *every* selector in it is.
+  only dead if *every* selector in it is. A class put together in code
+  (`at-cardtable-${key}`) is listed in the test, with where it is made.
 
 ---
 

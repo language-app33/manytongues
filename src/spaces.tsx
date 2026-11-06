@@ -1,3 +1,6 @@
+/* The teaching screens' own styles, which arrive with them (0.580) — see
+   scripts/css-split.mjs. */
+import "./teaching.css";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
 import type { Card, Course, Deck, Feedback, Flag, Form, Lang, LangId, User } from "./types.ts";

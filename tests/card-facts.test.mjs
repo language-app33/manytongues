@@ -17,9 +17,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { buildOnce } from "./helpers.mjs";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { build } from "esbuild";
 import { CORPUS } from "./card-corpus.mjs";
 import {
   CARD_FACTS,
@@ -37,23 +37,12 @@ import {
   whyStarved,
 } from "../src/card-facts.ts";
 
-const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".facts-build");
 
 /* card-editor.tsx is JSX and imports React, so it is bundled the way the
    other tests bundle it rather than imported raw. Only `writtenCard` is
    used, and only for the keys it emits. */
-await build({
-  entryPoints: [path.join(here, "..", "src", "card-editor.tsx")],
-  outfile: path.join(out, "card-editor.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-});
-const { writtenCard } = await import(path.join(out, "card-editor.js"));
+const built = await buildOnce(["card-editor.tsx"]);
+const { writtenCard } = await import(path.join(built, "card-editor.js"));
 
 /*
  * What the editor writes, asked of the editor.

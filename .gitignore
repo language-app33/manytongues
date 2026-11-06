@@ -5,36 +5,7 @@ dev-dist/
 .DS_Store
 npm-debug.log*
 tests/.build/
-tests/.smoke-build/
-tests/.cards-build/
-tests/.session-build/
-tests/.verb-drills-build/
 
 # Documents written by the server when DATA_DIR isn't set.
 data/
-tests/.offline-build/
-tests/.meanings-build/
-tests/.pace-build/
-tests/.forecast-build/
-tests/.facts-build/
-tests/.readout-build/
 .sweep-tmp/
-tests/.numbers-build/
-tests/.numbers-progress-build/
-tests/.numbers-figures-build/
-tests/.numbers-numerals-build/
-tests/.numbers-follow-build/
-tests/.review-build/
-tests/.blank-pools-build/
-tests/.session-fill-build/
-tests/.backup-build/
-tests/.counted-faces-build/
-tests/.missing-lines-build/
-tests/.look-alike-build/
-tests/.scene-gaps-build/
-tests/.text-sentences-build/
-tests/.import-columns-build/
-tests/.top-level-build/
-tests/.one-i-build/
-tests/.tense-skills-build/
-tests/.several-answers-build/

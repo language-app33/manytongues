@@ -26,9 +26,9 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { buildOnce } from "./helpers.mjs";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { build } from "esbuild";
 
 /* Seeded before the trainer is imported: a session is built with chance in
    it, and an unseeded run would be a different test each time. */
@@ -39,23 +39,8 @@ Math.random = () => {
 };
 
 const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".session-fill-build");
-await build({
-  entryPoints: [path.join(here, "..", "src", "ArabicTrainer.tsx")],
-  outfile: path.join(out, "trainer.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
-const { buildSession, buildManualSession, buildWeakSession, installIndexes } = await import(path.join(out, "trainer.js"));
+const built = await buildOnce(["ArabicTrainer.tsx"]);
+const { buildSession, buildManualSession, buildWeakSession, installIndexes } = await import(path.join(built, "ArabicTrainer.js"));
 const { generate } = await import(path.join(here, "..", "src", "numbers", "generate.ts"));
 const { arComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.ts"));
 const { arTimeComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.time.ts"));

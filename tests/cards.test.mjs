@@ -11,8 +11,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { formsOf, subFormsOf } from "../src/cards.ts";
 import { anotherMeaningOf } from "../src/meanings.ts";
-import { must } from "./helpers.mjs";
-import { build } from "esbuild";
+import { must, buildOnce } from "./helpers.mjs";
 import path from "node:path";
 
 /* spaces.tsx is JSX and imports React, so it is bundled the way the smoke
@@ -22,77 +21,36 @@ import path from "node:path";
    external, and node resolves that from node_modules relative to the file
    doing the importing. */
 const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".cards-build");
-await build({
-  entryPoints: [path.join(here, "..", "src", "spaces.tsx")],
-  outfile: path.join(out, "spaces.js"),
-  bundle: true,
-  format: "esm",
-  external: ["react", "react-dom", "react-dom/client"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-});
+const built1 = await buildOnce(["spaces.tsx"]);
 const { cardHasAudio, cardFormCount, cardAdded, cardChanged, sortCards, filterCards, blanksInUse, CARD_SORTS } =
-  await import(path.join(out, "spaces.js"));
+  await import(path.join(built1, "spaces.js"));
 
 /* The editor's own rules live in card-editor.tsx now, bundled the same way:
    what a card opens as, which table it lays out, what a save carries. */
-await build({
-  entryPoints: [path.join(here, "..", "src", "card-editor.tsx")],
-  outfile: path.join(out, "card-editor.js"),
-  bundle: true,
-  format: "esm",
-  external: ["react", "react-dom", "react-dom/client"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-});
+const built2 = await buildOnce(["card-editor.tsx"]);
 const { shapeOf, shapeChoices, shapeLabel, categoryChoices, categoryOffers, tableFor,
   initialForms, initialCells, initialCategory, initialFrames, storedFormsOf, asideOf, tableCellsOf,
   canSaveWord, canSaveVerb, canSaveScene, writtenCard, writtenLines, ownerLabel, askParts, partAsked,
   partLends, setPartFlags, keptNotAsked,
   nounLayoutOf, nounBoxes, placeNounForms, stampNounForms, leadFirst, formSays, blankLabel } =
-  await import(path.join(out, "card-editor.js"));
+  await import(path.join(built2, "card-editor.js"));
 
 /* The two halves of card identity live in shared.tsx, so it is bundled the
    same way. They are one subject with the sorting above: what a card is
    called, on the device and on the server. */
-await build({
-  entryPoints: [path.join(here, "..", "src", "shared.tsx")],
-  outfile: path.join(out, "shared.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-});
-const { localIdFor, cardToItem, serverCardId, foldCourses, deckSize, notReaching } = await import(path.join(out, "shared.js"));
+const built3 = await buildOnce(["shared.tsx"]);
+const { localIdFor, cardToItem, serverCardId, foldCourses, deckSize, notReaching } = await import(path.join(built3, "shared.js"));
 
 /* And which recording a question leads with, which is a plain function of a
    card's progress and belongs with the rest of them. The trainer is bundled
    the same way; nothing in it touches a browser on the way in. */
-await build({
-  entryPoints: [path.join(here, "..", "src", "ArabicTrainer.tsx")],
-  outfile: path.join(out, "trainer.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
+const built4 = await buildOnce(["ArabicTrainer.tsx"]);
 const { leadSpeed, deckPercent, levelPercent, nextReviewAt, reviewLine, nextPassAt, passLine,
   formIsAmbiguous, formTagsAt, kinTags, twinsOf,
   onePerLevel, quietUnits, easedUnits,
   drillableUnits, askedUnits, agreeTook, laddered, liftStates, merge,
   setValueIndex, valueKey, setMateCounts } =
-  await import(path.join(out, "trainer.js"));
+  await import(path.join(built4, "ArabicTrainer.js"));
 const { TYPES, LANGUAGES, verbOf, attachedOf, specOf, levelOf, askLabel } = await import(path.join(here, "..", "src", "languages.ts"));
 const { leadsOf } = await import(path.join(here, "..", "src", "review.ts"));
 const { fillText } = await import(path.join(here, "..", "src", "variables.ts"));

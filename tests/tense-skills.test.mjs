@@ -26,31 +26,11 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { build } from "esbuild";
 import path from "node:path";
-import { must } from "./helpers.mjs";
+import { buildOnce, must } from "./helpers.mjs";
 
-const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".tense-skills-build");
-const bundle = async (/** @type {string} */ name, /** @type {string} */ file) => {
-  await build({
-    entryPoints: [path.join(here, "..", "src", file)],
-    outfile: path.join(out, `${name}.js`),
-    bundle: true,
-    format: "esm",
-    jsx: "automatic",
-    external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-    loader: { ".jsx": "jsx" },
-    logLevel: "silent",
-    define: {
-      "process.env.NODE_ENV": '"development"',
-      __APP_RELEASE__: '"0"',
-      __APP_VERSION__: '"test"',
-      __BUILT_AT__: '"0"',
-    },
-  });
-  return import(path.join(out, `${name}.js`));
-};
+const bundle = async (/** @type {string} */ name, /** @type {string} */ file) =>
+  import(path.join(await buildOnce([file]), file.replace(/\.tsx?$/, ".js")));
 const T = await bundle("trainer", "ArabicTrainer.tsx");
 const { foldCourses } = await bundle("shared", "shared.tsx");
 const { mergeData } = await import("../src/sync.ts");

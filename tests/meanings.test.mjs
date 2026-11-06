@@ -5,6 +5,7 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { buildOnce } from "./helpers.mjs";
 
 import {
   answersAlike,
@@ -129,7 +130,6 @@ test("the note for giving the other card's answer", () => {
    ------------------------------------------------------------------ */
 
 import path from "node:path";
-import { build } from "esbuild";
 import {
   anotherMeaningOf,
   anotherWordDraft,
@@ -211,18 +211,8 @@ test("a card with two meanings is offered for splitting, and split into one card
 });
 
 test("a learner's device starts a split card where the original stood", async () => {
-  const here = path.dirname(new URL(import.meta.url).pathname);
-  const out = path.join(here, ".meanings-build");
-  await build({
-    entryPoints: [path.join(here, "..", "src", "shared.tsx")],
-    outfile: path.join(out, "shared.js"),
-    bundle: true,
-    format: "esm",
-    jsx: "automatic",
-    external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-    logLevel: "silent",
-  });
-  const { cardToItem, foldCourses } = await import(path.join(out, "shared.js"));
+  const built = await buildOnce(["shared.tsx"]);
+  const { cardToItem, foldCourses } = await import(path.join(built, "shared.js"));
   const original = cardToItem({ id: "orig1", lang: "ar-PS", forms: [{ ar: "صَبِر", en: "cactus" }] }, "Deck", "c", "d", () => ({}));
   const learnt = { phase: "review", step: 0, ease: 2.5, interval: 9, due: 1, reps: 4, lapses: 0, right: 4, wrong: 0, skips: 0, near: 0, hints: 0, hist: [1, 1] };
   original.forms[0].s = { ar2en: learnt };
