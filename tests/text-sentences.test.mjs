@@ -11,29 +11,13 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { build } from "esbuild";
+import { buildOnce } from "./helpers.mjs";
 import path from "node:path";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".text-sentences-build");
 
-await build({
-  entryPoints: [path.join(here, "..", "src", "ArabicTrainer.tsx")],
-  outfile: path.join(out, "trainer.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
-const { buildSession, installIndexes, quietUnits, carryToSentences, laddered, resolveQuestion, withoutQuestionAt } = await import(path.join(out, "trainer.js"));
+const built = await buildOnce(["ArabicTrainer.tsx"]);
+const { buildSession, installIndexes, quietUnits, carryToSentences, laddered, resolveQuestion, withoutQuestionAt } = await import(path.join(built, "ArabicTrainer.js"));
 const { TYPES, LANGUAGES } = await import(path.join(here, "..", "src", "languages.ts"));
 const { sentenceWords, wordCount, longSentenceOf, LONG_SENTENCE } = await import(path.join(here, "..", "src", "sentence-words.ts"));
 

@@ -30,6 +30,10 @@ import { readNumberSystem, readTimeSystem } from "./numbers/schema.ts";
 import { setsWithNouns } from "./numbers/nouns.ts";
 import type { SystemSet } from "./numbers/generate.ts";
 import { fileIntoDecks, generate, handOn, handOnCounting, handOnSplit } from "./numbers/generate.ts";
+/* The one reading of which schedules say nothing (0.580: this file had its
+   own, which dropped a skipped-but-never-answered state when set aside). */
+import { compactStates } from "./sync.ts";
+import { MISSING_CLIPS, pictureData } from "./pictures.ts";
 
 /*
  * Anything React will render: an element, a string, a list of them, or
@@ -2210,12 +2214,6 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
   /* The same close-on-anything-else the corner menu uses. Registered only
      while it is open, and the menu stops the click that opened it from
      closing it again. */
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
 
   if (!options || options.length < 2) return null;
   const on = value !== quiet;
@@ -2239,7 +2237,7 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
       </button>
 
       {open && (
-        <Popover className="at-pickmenu">
+        <Popover className="at-pickmenu" onClose={() => setOpen(false)}>
           {options.map((o) => (
             <button
               key={o.value}
@@ -3848,6 +3846,79 @@ export function SnackbarProvider({ show, children }: {
   return <SnackbarContext.Provider value={show || noSnackbar}>{children}</SnackbarContext.Provider>;
 }
 
+/*
+ * A screen's one way to do something that may fail: busy while it runs,
+ * the error where the screen shows it, and a word when it worked (0.580).
+ * Admin, Teaching and Super admin's Spaces each had their own copy, which
+ * differed in three small ways — kept as options here:
+ *
+ *   refresh      run after it worked, before anything is said
+ *   snackErrors  say a failure aloud as well as on the screen
+ *   quietDone    say "done" plainly rather than as good news
+ *   before       run first (Teaching clears its locked-deck tally)
+ *   instead      what to say in place of "done", when there is something
+ *                more important (a locked deck kept a change from landing)
+ *
+ * `run` answers what the work returned, or undefined if it failed.
+ */
+export function useRun({ refresh, snackErrors = false, quietDone = false, before, instead }: {
+  refresh?: () => unknown;
+  snackErrors?: boolean;
+  quietDone?: boolean;
+  before?: () => void;
+  instead?: () => string | null;
+} = {}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const snack = useSnackbar();
+  const opts = useRef({ refresh, snackErrors, quietDone, before, instead });
+  opts.current = { refresh, snackErrors, quietDone, before, instead };
+  const run = useCallback(async (fn: () => Promise<any>, done?: string | ((out: any) => string)): Promise<any> => {
+    const o = opts.current;
+    setBusy(true);
+    if (o.before) o.before();
+    try {
+      const out = await fn();
+      if (o.refresh) await o.refresh();
+      setError("");
+      const warn = o.instead ? o.instead() : null;
+      if (warn) snack(warn, "warn");
+      else if (done) snack(typeof done === "function" ? done(out) : done, o.quietDone ? undefined : "good");
+      return out;
+    } catch (e) {
+      const said = API.explain(e);
+      setError(said);
+      if (o.snackErrors) snack(said, "warn");
+      return undefined;
+    } finally {
+      setBusy(false);
+    }
+  }, [snack]);
+  const clearError = useCallback(() => setError(""), []);
+  return { run, busy, setBusy, error, setError, clearError };
+}
+
+/**
+ * A stored picture, by its hash: its data URL once it has arrived, and
+ * whether it could not be had. One fetch per picture per session, shared
+ * by every screen — see pictures.ts. An empty hash asks for nothing.
+ */
+export function usePicture(hash: string) {
+  const [got, setGot] = useState<{ hash: string; src: string; lost: boolean }>({ hash: "", src: "", lost: false });
+  useEffect(() => {
+    if (!hash) return undefined;
+    let live = true;
+    pictureData(hash).then(
+      (src) => live && setGot({ hash, src, lost: false }),
+      () => live && setGot({ hash, src: "", lost: true }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [hash]);
+  return got.hash === hash ? { src: got.src, lost: got.lost } : { src: "", lost: false };
+}
+
 export function useSnackbar() {
   return React.useContext(SnackbarContext) || noSnackbar;
 }
@@ -3915,11 +3986,25 @@ export function usePageLock(on = true) {
  * its side left to its own class.
  */
 const POPOVER_GUTTER = 8;
-export function Popover({ className = "", children, ...rest }: {
+export function Popover({ className = "", children, onClose, ...rest }: {
   className?: string;
   children?: Node;
+  /** Called on any click once it is open, its own included — a menu is
+      left by choosing from it or by tapping anywhere else (0.580: five
+      screens wrote this listener out by hand). */
+  onClose?: () => void;
 } & Record<string, any>) {
   const ref: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
+  const closing = useRef(onClose);
+  closing.current = onClose;
+  useEffect(() => {
+    if (!closing.current) return undefined;
+    const close = () => {
+      if (closing.current) closing.current();
+    };
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, []);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el || typeof window === "undefined") return undefined;
@@ -4488,9 +4573,20 @@ const spaceHeld: Record<string, { handle: string; shown: any } | null> = { admin
 const SPACE_TRIAL = API.trialSuffix(API.tryingSpace());
 const SPACE_KEY = (space: SpaceName) => `arabic-trainer:space:${space}${SPACE_TRIAL}`;
 
+/* What was last written for each space and person, so an identical
+   delivery is not serialised into storage again (0.580, audit finding 17). */
+const lastKept = new Map<string, string>();
+/** For tests: forget what was last written. */
+export const forgetKeptSpaces = () => lastKept.clear();
 function rememberOnDevice(space: SpaceName, handle: string, shown: any) {
   try {
+    /* One slot per space, so the person is part of what is compared. */
+    const text = JSON.stringify([handle, shown]);
+    /* And only while the slot is still there: leaving a trial clears it. */
+    if (lastKept.get(space) === text && localStorage.getItem(SPACE_KEY(space)) !== null) return;
+    lastKept.delete(space);
     localStorage.setItem(SPACE_KEY(space), JSON.stringify({ handle, shown, at: Date.now() }));
+    lastKept.set(space, text);
   } catch (e) {
     /* Storage full, blocked, or the space is simply too big to keep. The
        app works exactly as it did before this existed. */
@@ -4556,7 +4652,15 @@ export function useFreshSpace(space: SpaceName, handle: string, adopt: (shown: a
 
 /* The administrator's whole view of the site, in one request. */
 export async function pullAdmin(handle: string): Promise<import("./types.ts").AdminOverview> {
-  const data = await API.adminOverview();
+  let data = await API.adminOverview();
+  /* Nothing moved since the last ask (0.580): what is held stands. If
+     nothing is held after all, ask again for the whole of it. */
+  if (data && data.unchanged) {
+    const held = recallSpace("admin", handle);
+    if (held) return held;
+    API.forgetEtags();
+    data = await API.adminOverview();
+  }
   deliverSpace("admin", handle, data);
   return data;
 }
@@ -4573,6 +4677,11 @@ export async function pullAdmin(handle: string): Promise<import("./types.ts").Ad
 let LOST_RECORDINGS: Set<string> = new Set();
 export function setLostRecordings(ids: Iterable<string>) {
   LOST_RECORDINGS = new Set(ids);
+  /* And into the one list of what the server lacks, so trying a card here
+     does not ask for a recording the server has just said it lacks
+     (0.580) — see pictures.ts. */
+  const at = Date.now();
+  for (const id of LOST_RECORDINGS) MISSING_CLIPS.set(id, at);
 }
 export const isLostRecording = (hash: string) => LOST_RECORDINGS.has(hash);
 /** Every recording a card names: its forms', their answers', its lines'. */
@@ -4592,17 +4701,28 @@ export const cardLostRecordings = (card: any): number =>
    and what didn't is reported — and what was already held stands in for
    the part that failed. */
 export async function pullTeaching(handle: string) {
-  const [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
-  const before = recallSpace("teach", handle) || { courses: [], decks: [], cards: [] };
+  let [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
+  const same = (r: PromiseSettledResult<any>) => r.status === "fulfilled" && !!(r.value && r.value.unchanged);
+  const held = recallSpace("teach", handle);
+  /* An "unchanged" answer is only as good as what is held (0.580). With
+     nothing held, ask again for the whole of it. */
+  if (!held && [c, d, k].some(same)) {
+    API.forgetEtags();
+    [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
+  }
+  /* Nothing moved: the space stands as it is, and nobody is told. */
+  if (held && same(c) && same(d) && same(k)) return { ...held, failed: null };
+  const before = held || { courses: [], decks: [], cards: [] };
+  const fresh = (r: PromiseSettledResult<any>) => r.status === "fulfilled" && !same(r);
+  const value = (r: PromiseSettledResult<any>) => (r as PromiseFulfilledResult<any>).value;
   const shown = {
-    courses:
-      c.status === "fulfilled"
-        ? (c.value.courses || []).filter((x: { role: string }) => x.role === "teacher")
-        : before.courses,
-    decks: d.status === "fulfilled" ? d.value.decks || [] : before.decks,
-    cards: k.status === "fulfilled" ? k.value.cards || [] : before.cards,
+    courses: fresh(c)
+      ? (value(c).courses || []).filter((x: { role: string }) => x.role === "teacher")
+      : before.courses,
+    decks: fresh(d) ? value(d).decks || [] : before.decks,
+    cards: fresh(k) ? value(k).cards || [] : before.cards,
     /* Which of those cards' recordings the server does not hold. */
-    missingClips: k.status === "fulfilled" ? k.value.missingClips || [] : before.missingClips || [],
+    missingClips: fresh(k) ? value(k).missingClips || [] : before.missingClips || [],
   };
   deliverSpace("teach", handle, shown);
   const failed = [c, d, k].find((r) => r.status === "rejected");
@@ -4712,12 +4832,6 @@ export function ModeSelector({ mode, modes, onChange }: {
 }) {
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
 
   if (modes.length < 2) return null;
 
@@ -4732,7 +4846,7 @@ export function ModeSelector({ mode, modes, onChange }: {
         </span>
       </button>
       {open && (
-        <Popover className="at-modemenu">
+        <Popover className="at-modemenu" onClose={() => setOpen(false)}>
           {modes.map((m) => (
             <button
               key={m}
@@ -5389,15 +5503,6 @@ export function withProgress(item: Item, saved: Parked | undefined): Item {
   };
 }
 
-/* States that have never been answered are not worth setting aside, the
-   same reading the wire and the disk make of them. */
-const compactStates = (s?: Record<string, ExerciseState>): Record<string, ExerciseState> => {
-  const out: Record<string, ExerciseState> = {};
-  for (const [t, st] of Object.entries(s || {})) {
-    if (st && (st.phase !== "new" || st.reps || st.updated)) out[t] = st;
-  }
-  return out;
-};
 
 /* A card the device does not hold yet, with anything handed on to its
    forms taken into their schedules — see handOnCounting — rather than

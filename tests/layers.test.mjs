@@ -16,7 +16,10 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 
-const css = readFileSync(new URL("../src/index.css", import.meta.url), "utf8")
+/* Both sheets: the teaching screens' own rules live in teaching.css since
+   0.580, and load after index.css. */
+const css = (readFileSync(new URL("../src/index.css", import.meta.url), "utf8") +
+  "\n" + readFileSync(new URL("../src/teaching.css", import.meta.url), "utf8"))
   .replace(/\/\*[\s\S]*?\*\//g, ""); // comments can hold anything
 
 /* The tokens the layers are named by. Read out of the stylesheet, so what
@@ -498,7 +501,8 @@ test("no two components claim the same class name", () => {
    */
   /** @type {[number, number][]} */
   const skipped = [];
-  for (const m of css.matchAll(/@(?:media|supports)[^{]*\{/g)) {
+  /* @container too: a narrow container's rules are overrides like a media query's. */
+  for (const m of css.matchAll(/@(?:media|supports|container)[^{]*\{/g)) {
     let at = m.index + m[0].length;
     let depth = 1;
     while (at < css.length && depth) {

@@ -651,3 +651,38 @@ test("a session's answers wait for its next sync, and anything else goes soon", 
      moment another device is most likely to be picked up. */
   assert.ok(SESSION_END_SYNC_MS < SYNC_SOON_MS);
 });
+
+/* ---- pruning by the server's clock (0.580, audit finding 10) ---- */
+
+test("a device whose clock is far ahead keeps yesterday's deletions when the server says what day it is", () => {
+  const realNow = Date.now;
+  const today = Date.UTC(2026, 10, 6);
+  const yesterday = today - 86400000;
+  /* The device thinks it is two hundred days later. */
+  Date.now = () => today + 200 * 86400000;
+  try {
+    const remote = doc([], {
+      tombstones: { gone: yesterday },
+      parked: { k1: { at: yesterday, forms: {} } },
+    });
+    const byServer = mergeData(doc([]), remote, today);
+    assert.equal(byServer.tombstones.gone, yesterday, "the deletion survives");
+    assert.ok(byServer.parked && byServer.parked.k1, "and so does the set-aside work");
+
+    /* Without a server time the device's own clock is used, as before —
+       which is the failure this guards against, kept here as a record. */
+    const byDevice = mergeData(doc([]), remote);
+    assert.equal(byDevice.tombstones.gone, undefined);
+  } finally {
+    Date.now = realNow;
+  }
+});
+
+test("the server's clock is read from an answer's Date header", async () => {
+  const { serverTimeOf } = await import("../src/sync.ts");
+  const at = Date.UTC(2026, 10, 6, 12);
+  assert.equal(serverTimeOf({ headers: { get: () => new Date(at).toUTCString() } }), at);
+  assert.equal(serverTimeOf({ headers: { get: () => null } }), null);
+  assert.equal(serverTimeOf({ headers: { get: () => "not a date" } }), null);
+  assert.equal(serverTimeOf(null), null);
+});

@@ -6,30 +6,15 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { build } from "esbuild";
+import { buildOnce } from "./helpers.mjs";
 import path from "node:path";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const root = path.join(here, "..");
-const out = path.join(here, ".meanings-build");
 
-await build({
-  entryPoints: [path.join(root, "src", "ArabicTrainer.tsx")],
-  outfile: path.join(out, "trainer.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
+const built = await buildOnce(["ArabicTrainer.tsx"]);
 
-const { enabledTypes, installIndexes, siblingsAsked } = await import(path.join(out, "trainer.js"));
+const { enabledTypes, installIndexes, siblingsAsked } = await import(path.join(built, "ArabicTrainer.js"));
 const { DEFAULT_LANGUAGE, EX } = await import(path.join(root, "src", "languages.ts"));
 const { clueFor } = await import(path.join(root, "src", "meanings.ts"));
 

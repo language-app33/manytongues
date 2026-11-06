@@ -3160,29 +3160,14 @@ test("a backup holds a teacher's numbers, and a restore puts them back", async (
  * "Cards" ticked put the cards back and left the numbers screen empty.
  */
 test("a backup of the cards made and restored by the app carries the numbers", async () => {
-  const { build } = await import("esbuild");
-  const here = path.dirname(new URL(import.meta.url).pathname);
-  const out = path.join(here, ".backup-build", "app.js");
-  /* One bundle for both, so the key the client is given is the key the
-     backup's requests carry. React is left external and resolved from the
-     project, which is why the bundle is built inside it. */
-  await build({
-    stdin: {
-      contents:
-        'export { BACKUP_PARTS, buildBackup, restoreBackup } from "../src/spaces.tsx";\n' +
-        'export { setKey } from "../src/courses-api.ts";\n',
-      resolveDir: here,
-      loader: "ts",
-    },
-    outfile: out,
-    bundle: true,
-    format: "esm",
-    jsx: "automatic",
-    external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-    loader: { ".jsx": "jsx" },
-    logLevel: "silent",
-  });
-  const app = await import(out);
+  /* One build for both, split so they share one copy of the client, and
+     so the key the client is given is the key the backup's requests
+     carry (see buildOnce). */
+  const { buildOnce } = await import("./helpers.mjs");
+  const built = await buildOnce(["spaces.tsx", "courses-api.ts"], { splitting: true });
+  const spaces = await import(path.join(built, "spaces.js"));
+  const client = await import(path.join(built, "courses-api.js"));
+  const app = { ...spaces, setKey: client.setKey };
 
   const admin = await anAdmin("Rafa");
   const saved = (await api("/api/courses?action=save-system", {

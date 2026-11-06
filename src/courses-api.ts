@@ -106,6 +106,14 @@ export function clearAccount() {
    every call a deadline and treat passing it the same as being offline. */
 const CALL_TIMEOUT_MS = 20000;
 
+/* The ETag each list last came with, per address, key and space (0.580,
+   audit finding 17). Sent back as If-None-Match; a 304 means nothing moved
+   and the call answers `{ unchanged: true }` instead of the list. Only in
+   memory: a reload asks for everything once. */
+const ETAGS = new Map<string, string>();
+/** For tests: forget every remembered ETag. */
+export const forgetEtags = () => ETAGS.clear();
+
 /**
  * One request to the endpoint.
  *
@@ -131,6 +139,9 @@ async function call(
   /* One call can name its own space: Super admin acting on someone
      elsewhere (0.547). */
   if (org || addressOrg) headers["x-org"] = org || addressOrg;
+  const tagAt = body ? "" : `${url.toString()}|${use || ""}|${headers["x-org"] || ""}`;
+  const tag = tagAt ? ETAGS.get(tagAt) : undefined;
+  if (tag) headers["if-none-match"] = tag;
 
   const abort = new AbortController();
   const deadline = setTimeout(() => abort.abort(), CALL_TIMEOUT_MS);
@@ -153,6 +164,7 @@ async function call(
      redirect serving index.html, a platform error page — has a body that
      isn't JSON, and res.json() throwing on it would lose the status code
      along with every clue about what actually happened. */
+  if (res.status === 304 && tag) return { unchanged: true };
   const text = await res.text();
   let data = null;
   try {
@@ -166,6 +178,11 @@ async function call(
   /* With the whole answer attached: some errors say more than their code —
      "other-space" names the space the key belongs to (0.543). */
   if (!res.ok) throw Object.assign(new Error(data.error || `http-${res.status}`), { data });
+  const etag = tagAt && res.headers && res.headers.get ? res.headers.get("etag") : null;
+  if (tagAt) {
+    if (etag) ETAGS.set(tagAt, etag);
+    else ETAGS.delete(tagAt);
+  }
   /* Material written under a language's old id, by a device still on an
      older build, reads as the language it is now. See lang-ids.ts. */
   return renameLangIds(data);
@@ -318,9 +335,16 @@ export type SaveExtra = {
   status?: "draft" | "review";
   /** A new card made in My space (0.545). */
   personal?: boolean;
+  /** The decks the screen believed the card was in before this change
+      (0.580): the server then applies only what was added and removed. */
+  decksWere?: string[];
 };
-export const saveCard = (card: Partial<Card>, decks: string[], extra: SaveExtra = {}) =>
-  call("save-card", { body: { card, decks, ...extra } });
+/* `org` is the space the save was made in, for one queued offline and sent
+   from wherever the app is by then (0.580). */
+export const saveCard = (card: Partial<Card>, decks: string[], extra: SaveExtra = {}, org?: string) =>
+  call("save-card", { body: { card, decks, ...extra }, ...(org ? { org } : {}) });
+/** The space every call is addressed to now. */
+export const currentOrg = () => addressOrg;
 /* A card's status, or its unpublished changes' — see card-status. */
 export const cardStatus = (
   cardId: string,
@@ -523,6 +547,9 @@ export function explain(err: unknown): string {
       "code-required": "You need a code to join: an invitation link, or a course code from your teacher.",
       "other-space": "That belongs to another space.",
       "trying-space": "You're trying this space, not joining it.",
+      /* A save that could not be sent or kept (0.580). */
+      "device-full": "This device's storage is full, so the card could not be kept. Free some space and save again.",
+      "trying-space-save": "You are only trying this space; nothing can be saved here.",
       "suspended-app": "Your account is suspended. Ask the super admin.",
       "suspended-here": "You're suspended in that space. Ask its admin to let you back in.",
       "account-exists": "Only the super admin can delete an account, from Super admin → People.",

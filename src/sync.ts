@@ -194,8 +194,14 @@ const metOf = (
 
 /**
  * @param remote  Whatever came back, which may be from an older build.
+ * @param now     The time old deletions and set-aside work are aged against:
+ *                the server's clock when the merge is a sync, so a device
+ *                whose own clock is far ahead cannot age them out early
+ *                (0.580, audit finding 10). A merge with no server in it —
+ *                an imported file, a document set aside at log out — uses
+ *                this device's.
  */
-export function mergeData(local: Doc, remote: WireDoc | null): Doc {
+export function mergeData(local: Doc, remote: WireDoc | null, now: number = Date.now()): Doc {
   if (!remote || !Array.isArray(remote.items)) return local;
 
   /* --- items --- */
@@ -217,7 +223,7 @@ export function mergeData(local: Doc, remote: WireDoc | null): Doc {
   for (const [id, ts] of Object.entries(local.tombstones || {})) {
     tombstones[id] = Math.max(ts, tombstones[id] || 0);
   }
-  const cutoff = Date.now() - TOMBSTONE_DAYS * 86400000;
+  const cutoff = now - TOMBSTONE_DAYS * 86400000;
   for (const id of Object.keys(tombstones)) {
     if (tombstones[id] < cutoff) delete tombstones[id];
   }
@@ -308,11 +314,18 @@ async function fetchT(url: string, opts: RequestInit = {}) {
   }
 }
 
+/** The server's clock, from an answer's Date header, or null. */
+export function serverTimeOf(res: { headers?: { get?: (h: string) => string | null } } | null): number | null {
+  const said = res && res.headers && typeof res.headers.get === "function" ? res.headers.get("date") : null;
+  const at = said ? Date.parse(said) : NaN;
+  return Number.isFinite(at) ? at : null;
+}
+
 async function pull(token: string) {
   const res = await fetchT(ENDPOINT, { headers: { "x-sync-token": token } });
   if (res.status === 401) throw new Error("bad-passphrase");
   if (!res.ok) throw new Error(`pull-failed-${res.status}`);
-  return res.json();
+  return { ...(await res.json()), serverNow: serverTimeOf(res) };
 }
 
 async function push(token: string, etag: string | null, data: Doc) {
@@ -377,7 +390,7 @@ export function isFreshState(s: ExerciseState | null | undefined) {
   );
 }
 
-function compactStates(s?: Record<string, ExerciseState>): Record<string, ExerciseState> {
+export function compactStates(s?: Record<string, ExerciseState>): Record<string, ExerciseState> {
   const out: Record<string, ExerciseState> = {};
   for (const [t, st] of Object.entries(s || {})) if (!isFreshState(st)) out[t] = st;
   return out;
@@ -480,15 +493,16 @@ export function docSize(data: Doc): {
 }
 
 export async function syncOnce(local: Doc, token: string) {
-  let { etag, data: remote, lost } = await pull(token);
-  let merged = mergeData(local, remote);
+  let { etag, data: remote, lost, serverNow } = await pull(token);
+  let merged = mergeData(local, remote, serverNow ?? Date.now());
 
   let result = await push(token, etag, forWire(merged));
 
   // Someone else wrote between our read and our write — redo it once.
   if (result.conflict) {
     const again = await pull(token);
-    merged = mergeData(merged, again.data);
+    if (again.serverNow != null) serverNow = again.serverNow;
+    merged = mergeData(merged, again.data, serverNow ?? Date.now());
     if (again.lost) lost = again.lost;
     result = await push(token, again.etag, forWire(merged));
     if (result.conflict) throw new Error("conflict");
@@ -502,7 +516,7 @@ export async function syncOnce(local: Doc, token: string) {
    * it. "recovered" is the copy behind it standing in, "unreadable" is
    * nothing left to stand in.
    */
-  return { merged, changed, lost: (lost as string) || "" };
+  return { merged, changed, lost: (lost as string) || "", serverNow: (serverNow as number | null) ?? null };
 }
 
 /* ---------------- when ----------------
@@ -680,8 +694,8 @@ export async function syncClips(
 export async function drainRemote(token: string, local: Doc): Promise<Doc> {
   let merged = local;
   try {
-    const { data } = await pull(token);
-    merged = mergeData(local, data);
+    const { data, serverNow } = await pull(token);
+    merged = mergeData(local, data, serverNow ?? Date.now());
   } catch (e) {
     /* Nothing readable there, which is the ordinary case. */
   }

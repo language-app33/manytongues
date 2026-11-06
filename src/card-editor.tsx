@@ -17,10 +17,11 @@ import type { ExampleSentence } from "./examples.ts";
 import { MAX_EXAMPLES, blankSentence, exampleCells, examplesRowOf, filledExample, othersOf, readExample, sentenceOf, verbExamplesOf, wishOf } from "./examples.ts";
 import { wordsOffered } from "./context-index.ts";
 import { longSentenceOf, sentenceWords, wordCount } from "./sentence-words.ts";
-import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
+import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf, waitsOnWord } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf, wordOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
 import type { Node } from "./shared.tsx";
+import { primePicture } from "./pictures.ts";
 import {
   asksLexical,
   categoriesOf,
@@ -84,6 +85,7 @@ import {
   Segmented,
   plural,
   useOffline,
+  usePicture,
   usePageLock,
   ConfirmModal,
   Overlay,
@@ -1393,33 +1395,11 @@ function blobToDataUrl(blob: Blob) {
    is sharp on any screen this app is read on, and a JPEG of that is a
    few hundred kilobytes. */
 
-/* Every picture this screen has fetched or made, by hash, so the same one
-   is fetched once however many times it is drawn. A picture never changes
-   once written, so nothing here goes stale. */
-const imageCache = new Map<string, Promise<string>>();
-const imageData = (hash: string): Promise<string> => {
-  const held = imageCache.get(hash);
-  if (held) return held;
-  const asked = API.getImage(hash).then((r) => r.data);
-  /* A failure is not kept: the next draw asks again. */
-  asked.catch(() => imageCache.delete(hash));
-  imageCache.set(hash, asked);
-  return asked;
-};
 
 /** One stored picture, drawn once its bytes arrive. */
 function StoredImage({ hash, alt, className = "" }: { hash: string; alt: string; className?: string }) {
-  const [src, setSrc] = useState("");
-  const [lost, setLost] = useState(false);
-  useEffect(() => {
-    let live = true;
-    setLost(false);
-    imageData(hash).then(
-      (d) => live && setSrc(d),
-      () => live && setLost(true),
-    );
-    return () => { live = false; };
-  }, [hash]);
+  /* The one picture fetch — see usePicture. */
+  const { src, lost } = usePicture(hash);
   if (lost) return <span className={`at-imgslot lost ${className}`}>Couldn&rsquo;t load</span>;
   if (!src) return <span className={`at-imgslot ${className}`} aria-busy="true" />;
   return <img className={className} src={src} alt={alt} />;
@@ -1462,7 +1442,8 @@ export function ImageScreen({ title, images, onChange, onClose }: {
       const hash = await hashOf(small);
       const data = await blobToDataUrl(small);
       await API.putImage(hash, data);
-      imageCache.set(hash, Promise.resolve(data));
+      /* Into the one picture cache, so it is drawn without a fetch. */
+      primePicture(hash, data);
       if (!images.includes(hash)) onChange(images.concat([hash]).slice(0, MAX_IMAGES));
     } catch (e) {
       setError(
@@ -3450,11 +3431,6 @@ export const tableFor = (
   return specOf(lang, table) ? table : "";
 };
 
-/* What a table's cells wait on, where it says nothing: the word — the rule
-   every one-row table has followed since there was one. The same reading
-   the trainer makes. */
-const waitsOnWord = (spec: VerbSpec | null | undefined): boolean =>
-  !!spec && (spec.gate || "word") === "word";
 
 /*
  * The three kinds of card, and what each of them is.
@@ -10525,8 +10501,11 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   );
 }
 
-export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below }: {
+export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below, error = null }: {
   card: Card | null;
+  /** Why the last save failed, said inside this screen, which covers the
+      space it opened from (0.580, audit finding 12). */
+  error?: string | null;
   lang: Lang;
   decks: Deck[];
   inDecks?: string[];
@@ -10856,6 +10835,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
             : { icon: "save", label: "Save", off: !canSave || !changed, busy: !!busy, onClick: trySave }
         }
       >
+          {error && <Notice kind="error">{error}</Notice>}
           {about}
           {/* Said before the typing rather than after it.
               A save that cannot be made is now kept on the device and sent

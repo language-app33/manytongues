@@ -12,36 +12,19 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { must } from "./helpers.mjs";
-import { build } from "esbuild";
+import { must, buildOnce } from "./helpers.mjs";
 import path from "node:path";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".session-build");
 
 /* Bundled the way the smoke harness and the card tests do it: the trainer
    is JSX and imports React, and nothing in it touches a browser on the way
    in. React is left external, and node resolves that from node_modules
    relative to the file doing the importing. */
-await build({
-  entryPoints: [path.join(here, "..", "src", "ArabicTrainer.tsx")],
-  outfile: path.join(out, "trainer.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
+const built = await buildOnce(["ArabicTrainer.tsx"]);
 const { lentTags, varyTypes, requeueMissed, isUrgent, buildSession, buildManualSession, installIndexes,
   fillersIn, buildWeakSession, weakness, isWeak, movesAmong, mergeMoves,
-  saidMoves, sumMoves, laddered, castQuestion, mixCardsOf, sessionCount, scoreAnswer, NO_SCORE, homeLine } = await import(path.join(out, "trainer.js"));
+  saidMoves, sumMoves, laddered, castQuestion, mixCardsOf, sessionCount, scoreAnswer, NO_SCORE, homeLine } = await import(path.join(built, "ArabicTrainer.js"));
 const langs = await import(path.join(here, "..", "src", "languages.ts"));
 const { TYPES } = langs;
 const { MAX_IN_LEARNING, inLearningOf } = await import(path.join(here, "..", "src", "session-mix.ts"));

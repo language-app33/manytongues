@@ -67,3 +67,38 @@ test("a good answer is returned parsed", async () => {
   const r = await API.whoAmI("right");
   assert.equal(r.user.handle, "sara-4f2a");
 });
+
+/* ---- a list asked again answers "unchanged" (0.580, audit finding 17) ---- */
+
+test("a list asked again sends its ETag back, and a 304 reads as unchanged", async () => {
+  API.forgetEtags();
+  /** @type {Record<string, string>[]} */
+  const sent = [];
+  /** @param {number} status @param {string} body @param {string | null} etag */
+  const reply = (status, body, etag) => {
+    anyGlobal.fetch = async (/** @type {string} */ _url, /** @type {any} */ init) => {
+      sent.push({ ...(init.headers || {}) });
+      return {
+        ok: status < 300,
+        status,
+        headers: { get: (/** @type {string} */ h) => (h === "etag" ? etag : "application/json") },
+        text: async () => body,
+      };
+    };
+  };
+  reply(200, JSON.stringify({ ok: true, cards: [{ id: "k1" }] }), '"abc"');
+  const first = await API.myCards();
+  assert.equal(first.cards[0].id, "k1");
+  assert.equal(sent[0]["if-none-match"], undefined, "nothing to send the first time");
+
+  reply(304, "", '"abc"');
+  const again = await API.myCards();
+  assert.equal(sent[1]["if-none-match"], '"abc"', "the ETag goes back");
+  assert.deepEqual(again, { unchanged: true });
+
+  /* A save is a POST: never conditional. */
+  reply(200, JSON.stringify({ ok: true, card: { id: "k1" } }), null);
+  await API.saveCard({ id: "k1" }, []);
+  assert.equal(sent[2]["if-none-match"], undefined);
+  API.forgetEtags();
+});

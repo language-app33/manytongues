@@ -20,7 +20,7 @@ import {
   DeckSwitch,
   ChoiceSwitch,
   CheckList,
-  ClipList,
+  usePicture,
   ConfirmModal,
   Empty,
   Field as FormField,
@@ -146,15 +146,12 @@ import {
   answerFields,
   derivedValue,
   dimValues,
-  dimsOf,
   contextTokens,
   EASY_TYPES,
   exOf,
   findWordSpan,
   gluedTo,
-  splitForms,
   guessKind,
-  inScript,
   kindOf,
   isListening,
   isGrid,
@@ -162,17 +159,14 @@ import {
   answerLabel,
   askLabel,
   lentLabel,
-  labelFor,
   langOf,
   quizAttrOf,
   scriptVars,
   setActiveLang,
   verdictText,
   verdictWord,
-  GRAMMAR,
   defaultMarking,
   grammarFields,
-  normDimValue,
   showsOneAnswer,
   keysFor,
   answerOf,
@@ -208,6 +202,7 @@ import {
   subjectSlot,
   tensesOf,
   isFrame,
+  waitsOnWord,
 } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf, withLead } from "./cards.ts";
 import { cardMatches } from "./search.ts";
@@ -294,11 +289,9 @@ import { buildContextIndex } from "./context-index.ts";
 import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
-import { drainOutbox, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { knownMissing as knownMissingAt, MISSING_CLIPS, pictureData } from "./pictures.ts";
+import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 import {
-  DEFAULT_SPEAKERS,
-  DIALOG_KIND,
-  MAX_SPEAKERS,
   ORDER_SEP,
   SELF_ALL,
   SELF_SOME,
@@ -315,7 +308,6 @@ import {
   isText,
   isTwoSided,
   linesOf,
-  namedPart,
   pickedFrom,
   proseOf,
   replyOptions,
@@ -323,7 +315,6 @@ import {
   scrambledLines,
   sideOf,
   speakerName,
-  speakersOf,
 } from "./dialogs.ts";
 import {
   ALT_SEP,
@@ -334,7 +325,6 @@ import {
   firstOfEach,
   meaningForTurn,
   meaningsOf,
-  joinAlternatives,
   packAnswers,
   shownAlternatives,
   splitAlternatives,
@@ -878,6 +868,9 @@ const TRYING = API.tryingSpace();
 const TRIAL = API.trialSuffix(TRYING);
 const MAIN_KEY = "arabic-trainer-v3";
 const KEY = MAIN_KEY + TRIAL;
+/* Somebody's practice, set aside on this device when they log out, until
+   they sign in here again (0.580, audit finding 8). See DECISIONS.md. */
+const PARKED_KEY = (handle: string) => `${MAIN_KEY}:parked:${handle}`;
 
 /* What a reported problem is filed under while it waits for a connection.
    See outbox.ts: one queue, and the kind is how two sorts of waiting work
@@ -888,13 +881,6 @@ const FLAG_OUTBOX = "flag";
    Ordered easiest to hardest: recognition, then decoding, then
    production from sound, then production from meaning.
    ------------------------------------------------------------------ */
-
-
-/* Recording limits. Opus at 24kbps mono is roughly 3KB a second, so a
-   two-second clip lands near 6KB — small enough to sync freely. */
-const MAX_RECORD_MS = 15000;
-const MAX_CLIP_BYTES = 400000;
-const AUDIO_BITRATE = 24000;
 
 
 /* Nobody, for the account screen when nobody is signed in. It renders
@@ -937,10 +923,6 @@ const EMPTY: Doc = {
 };
 
 const now = () => Date.now();
-
-
-
-
 
 
 /* ------------------------------------------------------------------
@@ -1165,124 +1147,6 @@ function studentViews(
 const DIFF_RANK: Record<string, number> = { easy: 0, steady: 1, unrated: 2, hard: 3 };
 
 
-
-
-/* ------------------------------------------------------------------
-   Items
-   ------------------------------------------------------------------ */
-
-function cleanTags(input: unknown) {
-  const raw = Array.isArray(input) ? input : String(input || "").split(",");
-  const out: string[] = [];
-  for (const t of raw) {
-    const tag = String(t).trim().replace(/\s+/g, " ");
-    if (tag && !out.includes(tag)) out.push(tag);
-  }
-  return out;
-}
-
-
-
-/* A sub-item is a form of its parent — a plural, a feminine — carrying the
-   same three fields and its own progress, but no decks of its own. */
-function makeSub(src: Record<string, any> = {}) {
-  const { ar = "", lat = "", en = "", note = "", recs = [] } = src;
-  return {
-    id: `s${now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
-    ar: ar.trim(),
-    lat: lat.trim(),
-    en: en.trim(),
-    ...dimValues(src),
-    note: note.trim(),
-    /* The language it is written in, kept on the form itself — see
-       settingsFor. A card made here is in whatever the app is set to. */
-    lang: activeLang().id,
-    recs: recs || [],
-    created: now(),
-    updated: now(),
-    s: freshStates(),
-  };
-}
-
-/* A line of a dialog. A form in every respect that matters — three
-   fields, its own recordings, its own progress — plus who says it and
-   which word cards it uses. */
-function makeLine(src: Record<string, any> = {}) {
-  const { ar = "", lat = "", en = "", who = 0, uses = [], recs = [] } = src;
-  return {
-    id: src.id || `l${now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
-    who: Math.max(0, Math.min(MAX_SPEAKERS - 1, Number(who) || 0)),
-    ar: ar.trim(),
-    lat: lat.trim(),
-    en: en.trim(),
-    uses: (uses || []).filter(Boolean),
-    lang: src.lang || activeLang().id,
-    recs: recs || [],
-    created: src.created || now(),
-    updated: now(),
-    s: src.s || freshStates(),
-  };
-}
-
-function makeItem(src: Record<string, any> = {}) {
-  const {
-    ar = "",
-    lat = "",
-    en = "",
-    kind = "",
-    note = "",
-    tags = [],
-    subs = [],
-    recs = [],
-    lines = [],
-  } = src;
-  const text = ar || en || lat;
-  const s = freshStates();
-  const scene = (lines || []).filter((l: any) => l && (l.ar || l.en || l.lat));
-  const id = `${now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-  return {
-    id,
-    /* The card's own word first, then whatever other forms it was given —
-       one list, and the word answers to the card's own id. */
-    forms: [
-      {
-        id,
-        ar: ar.trim(),
-        lat: lat.trim(),
-        en: en.trim(),
-        lang: activeLang().id,
-        recs: recs || [],
-        ...dimValues(src),
-        created: now(),
-        updated: now(),
-        s,
-      },
-      ...(subs || []).map((x: Record<string, any>) => (x.id ? x : makeSub(x))),
-    ],
-    /* A card with a conversation on it is a dialog whatever else was
-       said: the kind follows the content rather than a picker somebody
-       has to remember to set. */
-    kind: scene.length ? DIALOG_KIND : kind || guessKind(text, activeLang()),
-    ...(scene.length
-      ? {
-          lines: scene.map((l: any) => (l.id && l.s ? l : makeLine(l))),
-          speakers: speakersOf(src),
-          /* What the card says, including saying nothing: a scene that
-             names no part must not acquire one by being copied. */
-          you: namedPart(src),
-        }
-      : null),
-    lang: activeLang().id,
-    note: note.trim(),
-    tags: cleanTags(tags),
-    locked: false,
-    flags: [],
-    created: now(),
-    updated: now(),
-  };
-}
-
-
 /* ------------------------------------------------------------------
    One app, more than one language
 
@@ -1298,10 +1162,6 @@ function makeItem(src: Record<string, any> = {}) {
    which is why this is two small functions rather than a new argument on
    forty.
    ------------------------------------------------------------------ */
-/* Which of a card's fields belong to a form rather than to the card: the
-   three words, its recordings, and whatever grammar the languages declare.
-   Asked where a patch from the editor is taken apart. */
-const FORM_FIELDS = new Set(["ar", "lat", "en", "recs", ...Object.keys(dimValues({}))]);
 
 /* A card or one of its forms — both carry the language, and both are
    asked. */
@@ -1347,14 +1207,6 @@ export function askedUnits(item: Item) {
    — the one question a screenshot cannot answer. */
 export function drillableUnits(item: Item, settings: Settings) {
   return askedUnits(item).filter(({ unit }) => enabledTypes(unit, settings).length >= 2);
-}
-
-/* Totals for the list indicators: how many forms, how many clips. */
-function familyCounts(it: Item) {
-  const units = unitsOf(it);
-  let clips = 0;
-  for (const { unit } of units) clips += (unit.recs || []).length;
-  return { forms: units.length, subs: units.length - 1, clips };
 }
 
 
@@ -2287,9 +2139,6 @@ function sentencesCleared(card: Item, lang: Lang): boolean {
   });
 }
 
-/* What a table's cells wait on, where it says nothing: the word, which is
-   the rule every one-row table has followed since there was one. */
-const waitsOnWord = (spec: VerbSpec): boolean => (spec.gate || "word") === "word";
 
 /*
  * Working them out, across every card in hand.
@@ -6805,21 +6654,6 @@ function relatedWords(items: Item[], lang: Lang, text: string) {
   return out.slice(0, 6);
 }
 
-/* Making your own cards is switched off while courses settle: material
-   comes from a teacher. Everything it needs is still here, so turning it
-   back on is a one-line change.
-
-   The screens and helpers only that feature reaches — the card editor, the
-   bulk-add sheet with its CSV and Markdown parser, the recorder, the zip
-   backup — are reached through OWN below. With the flag off the bundler
-   sees OWN as null and leaves all of it out of the build, which was about a
-   quarter of this file being parsed on every launch for nothing. */
-const OWN_CARDS = false;
-
-const OWN = OWN_CARDS
-  ? { ItemSheet, BulkAddSheet, parseLines, makeZip, readZip }
-  : null;
-
 /* ------------------------------------------------------------------
    Account
 
@@ -6965,256 +6799,6 @@ function RelatedWords({ pairs, settings }: { pairs: any[]; settings: Settings })
   );
 }
 
-
-/* ------------------------------------------------------------------
-   Import / export
-   ------------------------------------------------------------------ */
-
-/* Open, because the loops below add a name per grammatical field and per
-   language, and a column heading is whatever the file happened to say. */
-const FIELD_ALIASES: Record<string, string> = {
-  ar: "ar", arabic: "ar", script: "ar",
-  lat: "lat", latin: "lat", tr: "lat", translit: "lat", transliteration: "lat", roman: "lat",
-  en: "en", eng: "en", english: "en", meaning: "en", translation: "en",
-  tag: "tags", tags: "tags",
-  note: "note", notes: "note",
-  num: "number", plurality: "number",
-  gen: "gender",
-  reg: "register", addressee: "register",
-  cl: "classifier", clf: "classifier",
-};
-/* Every grammatical field answers to its own name, without that having to be
-   written here each time one is added. */
-for (const f of grammarFields()) FIELD_ALIASES[f] = f;
-/* And every language answers to what it calls its own columns — "Hebrew",
-   "Pronunciation note" — so a table headed in the language's own terms is
-   read as a table. Only "Arabic" was written in above, by hand. */
-const aliasKey: (label: unknown) => string = (label) => String(label || "").toLowerCase().replace(/[^a-z]/g, "");
-for (const L of Object.values(LANGUAGES)) {
-  if (L.scriptLabel) FIELD_ALIASES[aliasKey(L.scriptLabel)] = "ar";
-  /* And to what it called them before 0.213, when the column was named
-     after the script rather than the language — a file exported then is
-     still a file somebody has. */
-  if (L.scriptLabel) FIELD_ALIASES[aliasKey(`${L.scriptLabel} script`)] = "ar";
-  if (L.translitLabel) FIELD_ALIASES[aliasKey(L.translitLabel)] = "lat";
-}
-const FIELD_ORDER = ["en", "ar", "lat", "tags", "note"].concat(grammarFields());
-
-/* The importer's worked example, written in whichever language is being
-   learnt: a markdown table with the language's own column names and two
-   rows from its pack, and the same rows as a bare placeholder. It used to
-   be an Arabic table for everyone. */
-function sampleTable(L: Lang) {
-  const rows = L.sample || [];
-  const head = ["English", L.scriptLabel, L.translitLabel, "Decks"];
-  const decks = ["class 12 june", "numbers"];
-  const line: (cells: string[]) => string = (cells) => `| ${cells.join(" | ")} |`;
-  return [
-    line(head),
-    line(head.map((h) => "-".repeat(h.length))),
-    ...rows.map((r, i) => line([r.en, r.ar, r.lat || "", decks[i] || ""])),
-  ].join("\n");
-}
-function samplePlaceholder(L: Lang) {
-  return (L.sample || [])
-    .map((r, i) => [r.en, r.ar, r.lat, i === 0 ? "class 12 june" : ""].filter(Boolean).join(" | "))
-    .join("\n");
-}
-const MD_SEPARATOR = /^:?-+:?$/;
-const ESC = "\u0000";
-
-function splitRow(line: string) {
-  return (line.includes("\t") ? line.split("\t") : line.split("|")).map((p) => p.trim());
-}
-
-function stripMd(cell: string) {
-  return cell
-    .split(ESC)
-    .join("|")
-    .replace(/`([^`]*)`/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/__([^_]+)__/g, "$1")
-    .replace(/\*([^*]+)\*/g, "$1")
-    .trim();
-}
-
-function mdCells(line: string) {
-  return line
-    .replace(/\\\|/g, ESC)
-    .replace(/^\|/, "")
-    .replace(/\|\s*$/, "")
-    .split("|")
-    .map(stripMd);
-}
-
-function isSeparatorLine(line?: string) {
-  if (!line) return false;
-  const t = line.trim();
-  if (!t.startsWith("|")) return false;
-  const cells = mdCells(t);
-  return cells.length > 0 && cells.every((c) => MD_SEPARATOR.test(c));
-}
-
-/* The three fields a card can accept more than one of. */
-const MANY_FIELDS = new Set(["ar", "lat", "en"]);
-
-/*
- * The field a column heading names: "English", or "English 2" for a second
- * accepted answer, "Arabic 3" for a third. One answer to a cell, as one to
- * a box in the editor — nothing written inside a cell splits it (0.439) —
- * so the extra answers each have a column of their own. A second answer is
- * read as `en#1`, its place in the list, and folded in by foldAnswers.
- */
-function fieldOf(heading: string): string | undefined {
-  const t = heading.toLowerCase().trim();
-  const m = /^(.*?)\s*(\d+)$/.exec(t);
-  const at = m ? Number(m[2]) : 1;
-  const key = FIELD_ALIASES[(m ? m[1] : t).replace(/[^a-z]/g, "")];
-  if (!key || at < 1) return undefined;
-  if (at === 1) return key;
-  return MANY_FIELDS.has(key) ? `${key}#${at - 1}` : undefined;
-}
-
-/* The answers read from numbered columns, into the field they belong to:
-   one answer to a line (see ALT_SEP), in the order the columns number
-   them. A transliteration stays beside the word in the same place. */
-function foldAnswers(row: Record<string, string>) {
-  for (const f of MANY_FIELDS) {
-    const list = [row[f] || ""];
-    for (const [k, v] of Object.entries(row)) {
-      const m = /^(\w+)#(\d+)$/.exec(k);
-      if (m && m[1] === f) list[Number(m[2])] = v || "";
-    }
-    row[f] = joinAlternatives(Array.from(list, (x) => x || ""));
-  }
-}
-
-function readHeader(cells: string[]): string[] | null {
-  if (cells.length < 2) return null;
-  const map = cells.map(fieldOf);
-  return map.every(Boolean) ? (map as string[]) : null;
-}
-
-/**
- * A row read out of a pasted table: the fields every card has, plus
- * whichever grammatical fields the language declares, which is why the
- * type is open.
- */
-type ParsedRow = Record<string, any> & {
-  ar: string;
-  lat: string;
-  en: string;
-  note: string;
-  tags: string[];
-};
-/**
-/**
- * `skipped` rides on the array because the importer wants both the rows
- * and the count of lines that held nothing, and the callers all read the
- * rows first.
- */
-export function parseLines(text: string, knownTags: string[] = []): ParsedRow[] & { skipped?: number } {
-  const out: ParsedRow[] & { skipped?: number } = [];
-  const known = new Set(knownTags.map((t) => t.toLowerCase()));
-  const lines = String(text).split(/\r?\n/);
-  const mdMode = lines.some((l) => l.trim().startsWith("|"));
-  let order: string[] | null = null;
-  let skipped = 0;
-
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li].trim();
-    if (!line || line.startsWith("#")) continue;
-
-    let cells: string[];
-    if (mdMode) {
-      if (!line.startsWith("|")) continue;
-      if (isSeparatorLine(line)) continue;
-      cells = mdCells(line);
-      if (isSeparatorLine(lines[li + 1])) {
-        const header = readHeader(cells);
-        if (header) order = header;
-        continue;
-      }
-    } else {
-      cells = splitRow(line);
-    }
-
-    if (!order && !out.length) {
-      const header = readHeader(cells);
-      if (header) {
-        order = header;
-        continue;
-      }
-    }
-
-    const row: Record<string, string> = { ar: "", lat: "", en: "", tags: "", note: "" };
-    for (const f of grammarFields()) row[f] = "";
-    const loose: { value: string, i: number }[] = [];
-
-    cells.forEach((cell: string, i: number) => {
-      const m = cell.match(/^([A-Za-z]+(?:\s*\d+)?)\s*[:=]\s*([\s\S]*)$/);
-      const key = m && fieldOf(m[1]);
-      if (key) row[key] = m[2].trim();
-      else loose.push({ value: cell, i });
-    });
-
-    if (loose.length) {
-      const usesGaps = loose.some((c) => !c.value);
-      if (order || usesGaps) {
-        for (const { value, i } of loose) {
-          const key = order ? order[i] : FIELD_ORDER[i];
-          if (key && !row[key] && value) row[key] = value;
-        }
-        if (row.ar && !inScript(row.ar)) {
-          const holder = ["en", "lat"].find((k) => row[k] && inScript(row[k]));
-          if (holder) {
-            const tmp = row.ar;
-            row.ar = row[holder];
-            row[holder] = tmp;
-          }
-        }
-      } else {
-        const values = loose.map((c) => c.value);
-        const arIdx = values.findIndex((v) => inScript(v));
-        if (arIdx !== -1 && !row.ar) row.ar = values.splice(arIdx, 1)[0] || "";
-        if (values.length > 1 && known.size && !row.tags) {
-          const parts = cleanTags(values[values.length - 1]);
-          if (parts.length && parts.every((t) => known.has(t.toLowerCase()))) {
-            row.tags = values.pop() || "";
-          }
-        }
-        const slots = FIELD_ORDER.filter((k) => !row[k]);
-        values.forEach((v, i) => {
-          if (slots[i]) row[slots[i]] = v;
-        });
-      }
-    }
-
-    foldAnswers(row);
-    if (!row.ar && !row.lat && !row.en) {
-      skipped += 1;
-      continue;
-    }
-    out.push({
-      ar: row.ar,
-      lat: row.lat,
-      en: row.en,
-      note: row.note,
-      tags: cleanTags(row.tags),
-      ...Object.fromEntries(
-        Object.values(GRAMMAR).map((d) => [d.field, normDimValue(d, row[d.field])])
-      ),
-      ...Object.fromEntries(
-        grammarFields()
-          .filter((f) => !Object.values(GRAMMAR).some((d) => d.field === f))
-          .map((f) => [f, row[f] || ""])
-      ),
-    });
-  }
-
-  out.skipped = skipped;
-  return out;
-}
 
 /* ------------------------------------------------------------------
    Storage
@@ -7843,6 +7427,14 @@ function base64ToBlob(dataUrl: unknown) {
   return new Blob([bytes], { type: mime });
 }
 
+/* A size, said the way a person reads one. */
+function formatBytes(n: number) {
+  if (!n) return "—";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / 1048576).toFixed(1)} MB`;
+}
+
 /* --- the API the rest of the app uses --- */
 
 /*
@@ -7884,21 +7476,9 @@ async function saveClipBlob(id: string, blob: Blob) {
   }
 }
 
-/* Clips the server has already said it doesn't hold, and when it said so.
-   Remembered for a few minutes rather than the whole session: a recording
-   published a moment ago can take up to a minute to reach every edge. */
-const MISSING_CLIPS: Map<string, Millis> = new Map();
-const MISSING_FOR_MS = 5 * 60000;
-
-function knownMissing(id: string) {
-  const at = MISSING_CLIPS.get(id);
-  if (at === undefined) return false;
-  if (now() - at > MISSING_FOR_MS) {
-    MISSING_CLIPS.delete(id);
-    return false;
-  }
-  return true;
-}
+/* Clips the server has already said it doesn't hold: one list, shared with
+   the teaching screens — see pictures.ts. */
+const knownMissing = (id: string) => knownMissingAt(id, now());
 
 /*
  * Recordings the server has said it does not hold, kept across launches.
@@ -8057,15 +7637,6 @@ async function clipUrl(id: string) {
   return blob ? URL.createObjectURL(blob) : null;
 }
 
-async function dropClip(id: string) {
-  await idbRun("readwrite", (st) => st.delete(id));
-  try {
-    await window.storage.delete(AUDIO_KEY(id));
-  } catch (e) {
-    /* already gone */
-  }
-  clipsChanged();
-}
 
 /* The pictures on this device: how many, and how much room they take. */
 async function imageStats() {
@@ -8083,6 +7654,47 @@ async function imageStats() {
  * session needs it, which the confirmation says. The text store a browser
  * without IndexedDB keeps its recordings in is emptied too.
  */
+/*
+ * Recordings and pictures no card on this device names any more, gone
+ * (0.580, audit finding 22).
+ *
+ * Every one fetched was kept for good, so a learner who moved through
+ * three courses carried the sound of all three. Each is a copy of what
+ * the server holds, so what goes here comes back the next time a session
+ * asks for it. Run after a sync settles, at most once a day; "Clear device
+ * media" in Account settings is still the way to clear everything.
+ */
+export async function sweepMedia(referenced: { clips: Set<string>; images: Set<string> }) {
+  let gone = 0;
+  for (const [store, keep] of [[DB_STORE, referenced.clips], [IMAGE_STORE, referenced.images]] as const) {
+    const keys = (await idbRun("readonly", (st) => st.getAllKeys(), store)) || [];
+    for (const k of keys) {
+      if (typeof k !== "string" || keep.has(k)) continue;
+      /* A delete answers undefined whether or not it found anything. */
+      await idbRun("readwrite", (st) => st.delete(k), store);
+      gone += 1;
+      if (store === IMAGE_STORE) IMAGES_HELD.delete(k);
+    }
+  }
+  if (gone) clipsChanged();
+  return gone;
+}
+
+/** What a document's cards name: every recording and every picture. */
+export function mediaOf(items: Item[]) {
+  const clips = new Set<string>();
+  const images = new Set<string>();
+  for (const it of items || []) {
+    for (const { unit } of unitsOf(it)) {
+      for (const r of unit.recs || []) if (r && r.id) clips.add(String(r.id));
+      for (const h of Array.isArray(unit.images) ? unit.images : []) if (typeof h === "string") images.add(h);
+    }
+  }
+  return { clips, images };
+}
+
+const MEDIA_SWEPT = "arabic-trainer:media-swept";
+
 async function clearDeviceMedia() {
   await idbRun("readwrite", (st) => st.clear());
   await idbRun("readwrite", (st) => st.clear(), IMAGE_STORE);
@@ -8174,9 +7786,11 @@ function imageBlob(hash: string): Promise<Blob | null> {
     const here = await idbRun("readonly", (st) => st.get(hash), IMAGE_STORE);
     if (here) return here as Blob;
     try {
-      const r = await API.getImage(hash);
-      if (r && r.data) {
-        const blob = base64ToBlob(r.data);
+      /* Through the one picture fetch, so a picture the editor or the menu
+         already asked for this session is not asked for again. */
+      const data = await pictureData(hash);
+      if (data) {
+        const blob = base64ToBlob(data);
         if ((await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE)) !== undefined) clipsChanged();
         return blob;
       }
@@ -8284,132 +7898,6 @@ async function migrateClips(ids: string[]) {
 }
 
 /* ------------------------------------------------------------------
-   Zip
-
-   Written by hand rather than pulled from a library: a few dozen lines,
-   no dependency, and the files go in uncompressed because audio is
-   already compressed. Reading handles both uncompressed and deflated
-   entries, so a zip edited elsewhere still imports.
-   ------------------------------------------------------------------ */
-
-const CRC_TABLE = (() => {
-  const t = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    t[i] = c >>> 0;
-  }
-  return t;
-})();
-
-function crc32(bytes: Uint8Array) {
-  let c = 0xffffffff;
-  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
-}
-
-function u32(n: number) {
-  return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
-}
-function u16(n: number) {
-  return [n & 255, (n >>> 8) & 255];
-}
-
-interface ZipEntry {
-  name: string;
-  blob: Blob;
-}
-
-async function makeZip(entries: ZipEntry[]): Promise<Blob> {
-  const enc = new TextEncoder();
-  /* Blob parts rather than plain byte arrays: they are only ever handed
-     to the Blob at the end, and a view onto a shared buffer is a part but
-     not a Uint8Array<ArrayBuffer>. */
-  const chunks: BlobPart[] = [];
-  const central: BlobPart[] = [];
-  let offset = 0;
-
-  for (const e of entries) {
-    const nameBytes = enc.encode(e.name);
-    const data = new Uint8Array(await e.blob.arrayBuffer());
-    const crc = crc32(data);
-
-    const local = new Uint8Array([
-      0x50, 0x4b, 0x03, 0x04, ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
-      ...u32(crc), ...u32(data.length), ...u32(data.length),
-      ...u16(nameBytes.length), ...u16(0),
-    ]);
-    chunks.push(local, nameBytes, data);
-
-    central.push(
-      new Uint8Array([
-        0x50, 0x4b, 0x01, 0x02, ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0),
-        ...u16(0), ...u32(crc), ...u32(data.length), ...u32(data.length),
-        ...u16(nameBytes.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
-        ...u32(0), ...u32(offset),
-      ]),
-      nameBytes
-    );
-    offset += local.length + nameBytes.length + data.length;
-  }
-
-  const centralSize = central.reduce((n, c) => n + (c as Uint8Array).length, 0);
-  const end = new Uint8Array([
-    0x50, 0x4b, 0x05, 0x06, ...u16(0), ...u16(0),
-    ...u16(entries.length), ...u16(entries.length),
-    ...u32(centralSize), ...u32(offset), ...u16(0),
-  ]);
-
-  return new Blob([...chunks, ...central, end], { type: "application/zip" });
-}
-
-async function readZip(blob: Blob): Promise<ZipEntry[]> {
-  const buf = new Uint8Array(await blob.arrayBuffer());
-  const view = new DataView(buf.buffer);
-  const dec = new TextDecoder();
-
-  // Find the end-of-directory record, scanning back from the tail.
-  let eocd = -1;
-  for (let i = buf.length - 22; i >= 0 && i > buf.length - 66000; i--) {
-    if (view.getUint32(i, true) === 0x06054b50) {
-      eocd = i;
-      break;
-    }
-  }
-  if (eocd < 0) throw new Error("not-a-zip");
-
-  const count = view.getUint16(eocd + 10, true);
-  let p = view.getUint32(eocd + 16, true);
-  const out: ZipEntry[] = [];
-
-  for (let i = 0; i < count; i++) {
-    if (view.getUint32(p, true) !== 0x02014b50) break;
-    const method = view.getUint16(p + 10, true);
-    const size = view.getUint32(p + 20, true);
-    const nameLen = view.getUint16(p + 28, true);
-    const extraLen = view.getUint16(p + 30, true);
-    const commentLen = view.getUint16(p + 32, true);
-    const local = view.getUint32(p + 42, true);
-    const name = dec.decode(buf.subarray(p + 46, p + 46 + nameLen));
-
-    const lnameLen = view.getUint16(local + 26, true);
-    const lextraLen = view.getUint16(local + 28, true);
-    const start = local + 30 + lnameLen + lextraLen;
-    let data = buf.subarray(start, start + size);
-
-    if (method === 8) {
-      // Deflated, which our own exports never are — but be forgiving.
-      const ds = new DecompressionStream("deflate-raw");
-      const stream = new Blob([data]).stream().pipeThrough(ds);
-      data = new Uint8Array(await new Response(stream).arrayBuffer());
-    }
-    out.push({ name, blob: new Blob([data]) });
-    p += 46 + nameLen + extraLen + commentLen;
-  }
-  return out;
-}
-
-/* ------------------------------------------------------------------
    Audio
 
    Clips are deliberately kept OUT of the synced document. The document
@@ -8421,136 +7909,6 @@ async function readZip(blob: Blob): Promise<ZipEntry[]> {
 
 const AUDIO_KEY = (id: string) => `audio-${id}`;
 
-const RECORD_MIMES = [
-  "audio/webm;codecs=opus",
-  "audio/ogg;codecs=opus",
-  "audio/webm",
-  "audio/mp4",
-];
-
-function pickMime() {
-  if (typeof MediaRecorder === "undefined") return "";
-  for (const m of RECORD_MIMES) {
-    try {
-      if (MediaRecorder.isTypeSupported(m)) return m;
-    } catch (e) {
-      /* older browser */
-    }
-  }
-  return "";
-}
-
-function canRecord() {
-  return !!(
-    typeof MediaRecorder !== "undefined" &&
-    navigator.mediaDevices &&
-    navigator.mediaDevices.getUserMedia
-  );
-}
-
-
-/* Live capture. Mono, and opus where the browser offers it. */
-function startRecorder(onStop: (blob: Blob) => void, onError: (err: unknown) => void) {
-  const mime = pickMime();
-  let stopped = false;
-  let rec: MediaRecorder | null = null;
-  let stream: MediaStream | null = null;
-  const chunks: Blob[] = [];
-
-  navigator.mediaDevices
-    .getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-    })
-    .then((st) => {
-      if (stopped) {
-        st.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      stream = st;
-      rec = new MediaRecorder(st, {
-        ...(mime ? { mimeType: mime } : {}),
-        audioBitsPerSecond: AUDIO_BITRATE,
-      });
-      rec.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
-      rec.onstop = async () => {
-        st.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunks, { type: mime || "audio/webm" });
-        onStop(blob);
-      };
-      rec.start();
-    })
-    .catch((err) => onError(err));
-
-  return {
-    stop() {
-      stopped = true;
-      if (rec && rec.state !== "inactive") rec.stop();
-      else if (stream) stream.getTracks().forEach((t) => t.stop());
-    },
-  };
-}
-
-/*
- * Re-encode an uploaded file to opus by playing it into a MediaRecorder.
- * It runs in real time — a five-second clip takes five seconds — so it's
- * only worth doing for files big enough to matter. Falls back to the
- * original bytes wherever the browser can't oblige.
- */
-async function compressAudio(file: File) {
-  const raw = await file.arrayBuffer();
-  if (raw.byteLength <= 60000 || !canRecord()) return { blob: file, mime: file.type };
-
-  try {
-    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-    const ctx = new Ctx();
-    const buf = await ctx.decodeAudioData(raw.slice(0));
-    if (buf.duration > MAX_RECORD_MS / 1000) {
-      ctx.close();
-      throw new Error("too-long");
-    }
-
-    const dest = ctx.createMediaStreamDestination();
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(dest);
-
-    const mime = pickMime();
-    const rec = new MediaRecorder(dest.stream, {
-      ...(mime ? { mimeType: mime } : {}),
-      audioBitsPerSecond: AUDIO_BITRATE,
-    });
-    const chunks: Blob[] = [];
-    rec.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
-
-    const done: Promise<void> = new Promise((res) => {
-      rec.onstop = () => res();
-    });
-    rec.start();
-    src.start();
-    await new Promise((r) => setTimeout(r, buf.duration * 1000 + 250));
-    rec.stop();
-    await done;
-    ctx.close();
-
-    const out = new Blob(chunks, { type: mime || "audio/webm" });
-    return out.size && out.size < raw.byteLength
-      ? { blob: out, mime: mime || "audio/webm", dur: buf.duration }
-      : { blob: file, mime: file.type, dur: buf.duration };
-  } catch (e) {
-    return { blob: file, mime: file.type };
-  }
-}
-
-function formatBytes(n: number) {
-  if (!n) return "—";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
-  return `${(n / 1048576).toFixed(1)} MB`;
-}
-
-function newRecId() {
-  return `r${now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-}
 
 /* ------------------------------------------------------------------
    Arabic keyboard
@@ -10807,7 +10165,7 @@ export default function ArabicTrainer() {
       owed.current = false;
       let sent = false;
       try {
-        const { merged, changed, lost } = await syncOnce(dataRef.current, key);
+        const { merged, changed, lost, serverNow } = await syncOnce(dataRef.current, key);
         sent = true;
         if (lost) {
           /* The shared copy could not be read and this sync has replaced
@@ -10835,7 +10193,8 @@ export default function ArabicTrainer() {
              without a state for an exercise type that did not exist yet —
              and taking it as-is put an incomplete card into memory that
              crashed the next render. */
-          const adopted = merge(mergeData(dataRef.current, merged));
+          /* By the server's clock, as the merge inside the trip was. */
+          const adopted = merge(mergeData(dataRef.current, merged, serverNow ?? Date.now()));
           fromSync.current = true;
           commit(adopted);
           /* Through the one writer, which cancels the debounced save still
@@ -11010,6 +10369,29 @@ export default function ArabicTrainer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, accountKey, runSync]);
 
+  /* Once a sync has settled, and never while a session is running: the
+     recordings and pictures nothing names any more are cleared from the
+     device, at most once a day (0.580). A device with no cards at all —
+     just logged out, say — keeps what it has. */
+  useEffect(() => {
+    if (syncState !== "ok" || session) return;
+    const items = dataRef.current.items || [];
+    if (!items.length) return;
+    let last = 0;
+    try {
+      last = Number(localStorage.getItem(MEDIA_SWEPT) || 0);
+    } catch (e) {
+      return;
+    }
+    if (Date.now() - last < 86400000) return;
+    try {
+      localStorage.setItem(MEDIA_SWEPT, String(Date.now()));
+    } catch (e) {
+      return;
+    }
+    void sweepMedia(mediaOf(items));
+  }, [syncState, session]);
+
   /* After anything changes: soon, or with the session's next trip while
      questions are being answered. See syncAfterChange in sync.ts. */
   useEffect(() => {
@@ -11094,7 +10476,9 @@ export default function ArabicTrainer() {
         await API.reportFlag(body as API.FlagReport);
         return "sent";
       } catch (e) {
-        return String((e && (e as Error).message) || e) === "offline" ? "keep" : "drop";
+        /* A server error or a gateway's page is the server not having
+           answered yet: wait for it (0.580). */
+        return isTransient(String((e && (e as Error).message) || e)) ? "keep" : "drop";
       }
     });
     setToSend(left);
@@ -11223,6 +10607,66 @@ export default function ArabicTrainer() {
     }
     return false;
   }, []);
+
+  /*
+   * Logging out sets the practice aside, per person (0.580, audit
+   * finding 8).
+   *
+   * The document on this device is always the signed-in person's. At log
+   * out it goes up one more time if it can, then is moved to a slot named
+   * by the person's handle, and the main document is emptied — so the next
+   * person to sign in here neither sees it nor has it pushed under their
+   * key. When the same person signs in here again, it is merged back. Set
+   * aside rather than wiped because a log out offline must not lose
+   * answers that never reached the server.
+   */
+  const parkForLogOut = useCallback(async () => {
+    const who = account && account.handle;
+    if (!who || TRYING || !window.storage) return;
+    if (!isOffline() && loadSyncConfig().token) {
+      await writeNow();
+      /* One more trip, bounded: the document is set aside either way. */
+      await Promise.race([
+        Promise.resolve(runSync()).catch(() => {}),
+        new Promise((r) => setTimeout(r, 20000)),
+      ]);
+    }
+    const doc = dataRef.current;
+    const slim = { ...doc, items: (doc.items || []).map(compactItem) };
+    const kept = await window.storage.set(PARKED_KEY(who), JSON.stringify(slim));
+    if (!kept) {
+      flash("Not enough space on this device to set your progress aside; it stays until you sign in again.", "warn");
+      return;
+    }
+    /* No more trips under this person's key, and none owed. */
+    if (syncTimer.current) {
+      clearTimeout(syncTimer.current);
+      syncTimer.current = null;
+    }
+    owed.current = false;
+    saveSyncConfig({ ...loadSyncConfig(), token: "" });
+    setSyncCfg((c) => ({ ...c, token: "" }));
+    fromSync.current = true;
+    commit({ ...EMPTY });
+    await writeNow();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountKey, runSync, writeNow, commit]);
+
+  /* And taken back when they sign in here again. */
+  const adoptParked = useCallback(async (handle: string) => {
+    if (TRYING || !window.storage) return;
+    let parked: any = null;
+    try {
+      const res = await window.storage.get(PARKED_KEY(handle));
+      parked = res && res.value ? JSON.parse(res.value) : null;
+    } catch (e) {
+      return;
+    }
+    if (!parked) return;
+    fromSync.current = true;
+    commit(merge(mergeData(dataRef.current, parked)));
+    if (await writeNow()) await window.storage.delete(PARKED_KEY(handle));
+  }, [commit, writeNow]);
 
   /* Takes the next document, or a function of the current one. The
      function form is for anything that can run while a sync or a course
@@ -13356,10 +12800,18 @@ export default function ArabicTrainer() {
      * about, while the guide promised that anything done offline is sent
      * when a connection returns.
      */
-    if (isOffline()) {
-      keepPending(FLAG_OUTBOX, report);
+    /* Kept to send later, or said plainly that it could not be: a device
+       whose storage is full keeps nothing (0.580). */
+    const keepReport = () => {
+      if (!keepPending(FLAG_OUTBOX, report)) {
+        flash("This device's storage is full, so the report could not be kept. Free some space and send it again.", "warn");
+        return;
+      }
       setToSend(waitingToSend(FLAG_OUTBOX));
       flash("Saved — it will be sent when you're back online", "good");
+    };
+    if (isOffline()) {
+      keepReport();
       return;
     }
     API.reportFlag(report)
@@ -13369,13 +12821,11 @@ export default function ArabicTrainer() {
            be told the same thing; anything else never arrived, so it
            waits. `offline` is what the client calls a request that could
            not be made at all. */
-        if (String((e && (e as Error).message) || e) !== "offline") {
+        if (!isTransient(String((e && (e as Error).message) || e))) {
           flash("Noted on this device. We couldn't reach the server.", "warn");
           return;
         }
-        keepPending(FLAG_OUTBOX, report);
-        setToSend(waitingToSend(FLAG_OUTBOX));
-        flash("Saved — it will be sent when you're back online", "good");
+        keepReport();
       });
   }
 
@@ -13589,12 +13039,6 @@ export default function ArabicTrainer() {
 
   /* ---------------- items ---------------- */
 
-  function addItems(list: any[]) {
-    const fresh = list.filter((p) => p.ar || p.lat || p.en).map(makeItem);
-    if (!fresh.length) return 0;
-    persist({ ...data, items: items.concat(fresh) });
-    return fresh.length;
-  }
 
   /*
    * The learner asks for a card, or stops asking.
@@ -13622,115 +13066,6 @@ export default function ArabicTrainer() {
     flash(on ? "Marked — it is in your next session" : "No longer high priority");
   }
 
-  /* Editing keeps every existing progress record. Sub-items are matched by
-     id where they already exist, so correcting a plural's spelling doesn't
-     reset what you've learnt about it. */
-  function updateItem(id: string, patch: Record<string, any>) {
-    const target = items.find((i) => i.id === id);
-    if (target && target.locked && !("locked" in patch)) {
-      flash("That card is locked — unlock it first");
-      return;
-    }
-    persist({
-      ...data,
-      items: items.map((i) => {
-        if (i.id !== id) return i;
-        const next: Item = { ...i, updated: now() };
-        /* A patch is a card the editor has handed back, so its words belong
-           to the card's own form and the rest of it to the card. Which is
-           which is asked of the fields a form has — the three words, its
-           recordings and whatever grammar the languages declare. */
-        const lead: Record<string, any> = { ...leadOf(i), updated: now() };
-        for (const [k, v] of Object.entries(patch)) {
-          if (k === "subs" || k === "s" || k === "forms") continue;
-          if (k === "tags") next.tags = cleanTags(v);
-          else if (FORM_FIELDS.has(k)) lead[k] = typeof v === "string" ? v.trim() : v;
-          else (next as Record<string, any>)[k] = typeof v === "string" ? v.trim() : v;
-        }
-        {
-          const old = new Map(subFormsOf(i).map((x) => [x.id, x]));
-          const rest = (patch.subs || subFormsOf(i)).map((draft: Record<string, any>) => {
-            const prev = draft.id && old.get(draft.id);
-            return prev
-              ? {
-                  ...prev,
-                  ar: (draft.ar || "").trim(),
-                  en: (draft.en || "").trim(),
-                  lat: (draft.lat || "").trim(),
-                  /* Every grammatical and lexical value the languages
-                     declare — not a fixed pair of Arabic ones, which
-                     silently dropped a Vietnamese form's classifier. */
-                  ...dimValues(draft),
-                  note: (draft.note || "").trim(),
-                  recs: draft.recs || [],
-                  s: prev.s,
-                  updated: now(),
-                }
-              : makeSub(draft);
-          });
-          /* And the tenses held as skills, which the editor never shows
-             and so never hands back: they are the learner's progress, not
-             the card's wording. */
-          const kept = tenseFormsOf(i).filter((t) => !rest.some((x: Form) => x.id === t.id));
-          next.forms = [lead as Form, ...rest, ...kept];
-        }
-        return withTenses(next, LANGUAGES[String(next.lang || settings.language || DEFAULT_LANGUAGE)] || null);
-      }),
-    });
-  }
-
-  /* Set the same field on many items — used by the bulk bar. */
-  function bulkEdit(ids: string[], patch: Record<string, any>) {
-    updateMany(unlockedOf(ids), (i) => ({ ...i, ...patch }));
-  }
-
-  /* Locked items are left alone by anything that changes them. */
-  function unlockedOf(ids: string[]) {
-    const set = new Set(ids);
-    const targets = items.filter((i) => set.has(i.id));
-    const locked = targets.filter((i) => i.locked).length;
-    if (locked) flash(`${plural(locked, "locked card")} left unchanged`);
-    return targets.filter((i) => !i.locked).map((i) => i.id);
-  }
-
-  function tagMany(ids: string[], tag: string) {
-    const clean = cleanTags(tag)[0];
-    if (!clean) return;
-    updateMany(unlockedOf(ids), (i) =>
-      (i.tags || []).includes(clean) ? i : { ...i, tags: (i.tags || []).concat([clean]) }
-    );
-  }
-
-  function setLockedMany(ids: string[], locked: boolean) {
-    sfx("tick");
-    updateMany(ids, (i) => ({ ...i, locked }));
-    flash(`${plural(ids.length, "item")} ${locked ? "locked" : "unlocked"}`);
-  }
-
-  function removeItems(ids: string[]) {
-    const set = new Set(Array.isArray(ids) ? ids : [ids]);
-    const targets = items.filter((i) => set.has(i.id));
-    const blocked = targets.filter((i) => i.locked).length;
-    const gone = targets.filter((i) => !i.locked);
-    if (blocked) {
-      flash(
-        gone.length
-          ? `${plural(blocked, "locked card")} kept`
-          : `Locked — unlock ${blocked === 1 ? "it" : "them"} first`
-      );
-    }
-    if (!gone.length) return;
-    // Tombstones, so the deletion reaches other devices instead of the
-    // items simply reappearing on the next sync.
-    const goneIds = new Set(gone.map((i) => i.id));
-    const tombstones = { ...(data.tombstones || {}) };
-    for (const it of gone) tombstones[it.id] = now();
-    persist({ ...data, items: items.filter((i) => !goneIds.has(i.id)), tombstones });
-    sfx("warn");
-    setLastDeleted(gone);
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-    undoTimer.current = setTimeout(() => setLastDeleted(null), 15000);
-  }
 
   /* A short message for things quietly refused, so a locked card doesn't
      just silently fail to delete — and for the ones that worked, so a save
@@ -13765,14 +13100,6 @@ export default function ArabicTrainer() {
     if (undoTimer.current) clearTimeout(undoTimer.current);
   }
 
-  /* Apply the same change to many items at once. */
-  function updateMany(ids: string[], fn: (it: Item) => Item) {
-    const set = new Set(ids);
-    persist({
-      ...data,
-      items: items.map((i) => (set.has(i.id) ? { ...fn(i), updated: now() } : i)),
-    });
-  }
 
   /* The one prep, set, changed or cleared from Prep mode — see Prep. */
   const savePrep = (p: Prep | null) => {
@@ -13789,122 +13116,6 @@ export default function ArabicTrainer() {
       },
       settingsUpdated: now(),
     });
-
-  /* Everything, in one file: the cards as JSON plus each recording as a
-     real audio file. Streams into a zip rather than building one huge
-     string, and the clips stay playable outside the app. */
-  async function exportEverything() {
-    if (!OWN) return;
-    flash("Gathering recordings…");
-    const entries = [
-      {
-        name: "cards.json",
-        blob: new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
-      },
-    ];
-    let missing = 0;
-    for (const it of items) {
-      for (const { unit } of unitsOf(it)) {
-        for (const rec of unit.recs || []) {
-          const blob = await clipBlob(rec.id);
-          if (!blob) {
-            missing += 1;
-            continue;
-          }
-          const ext = (rec.mime || "").includes("mp4")
-            ? "m4a"
-            : (rec.mime || "").includes("ogg")
-            ? "ogg"
-            : (rec.mime || "").includes("wav")
-            ? "wav"
-            : "webm";
-          entries.push({ name: `audio/${rec.id}.${ext}`, blob });
-        }
-      }
-    }
-    try {
-      const zip = await OWN.makeZip(entries);
-      const url = URL.createObjectURL(zip);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `arabic-${dayKey()}.zip`;
-      a.click();
-      URL.revokeObjectURL(url);
-      flash(
-        `Exported ${entries.length - 1} recording${entries.length === 2 ? "" : "s"}` +
-          (missing ? ` · ${missing} not on this device` : "")
-      );
-    } catch (e) {
-      flash("Couldn't build the backup");
-    }
-  }
-
-  /* A file is folded in the way another device's copy is: card by card,
-     newer edit wins, deletions honoured. It used to replace the whole
-     document — settings, history and the sync secret included — so an old
-     backup wiped everything added since, and someone else's backup signed
-     you into their sync. */
-  function absorb(parsed: any) {
-    return merge(mergeData(dataRef.current, merge(parsed)));
-  }
-
-  function confirmImport(parsed: any) {
-    const n = (parsed.items || []).length;
-    return window.confirm(
-      `Merge ${plural(n, "card")} from this file into your collection? ` +
-        "Cards you already have keep whichever version was edited last."
-    );
-  }
-
-  async function importZip(file: File) {
-    if (!OWN) return;
-    flash("Reading the backup…");
-    try {
-      const files = await OWN.readZip(file);
-      const doc = files.find((f) => f.name === "cards.json");
-      if (!doc) {
-        flash("No cards.json in that zip");
-        return;
-      }
-      let clips = 0;
-      for (const f of files) {
-        const m = /^audio\/([^.]+)\./.exec(f.name);
-        if (!m) continue;
-        if (await saveClipBlob(m[1], f.blob)) clips += 1;
-      }
-      const parsed = JSON.parse(await doc.blob.text());
-      if (!Array.isArray(parsed.items)) {
-        flash("That backup looks damaged");
-        return;
-      }
-      if (!confirmImport(parsed)) return;
-      persist(absorb(parsed));
-      flash(`Merged ${parsed.items.length} cards and ${clips} recordings`);
-    } catch (e) {
-      flash("Couldn't read that backup");
-    }
-  }
-
-  function importFile(file: File) {
-    if (!OWN) return;
-    if (/\.zip$/i.test(file.name)) return importZip(file);
-    const r = new FileReader();
-    r.onload = () => {
-      const text = String(r.result || "");
-      try {
-        const parsed = JSON.parse(text);
-        if (Array.isArray(parsed.items)) {
-          if (confirmImport(parsed)) persist(absorb(parsed));
-          return;
-        }
-      } catch (e) {
-        /* not JSON */
-      }
-      addItems(OWN.parseLines(text, allTags));
-    };
-    r.readAsText(file);
-  }
-
 
   /* ---------------- render ---------------- */
 
@@ -13991,7 +13202,7 @@ export default function ArabicTrainer() {
       <div className={`at ${settings.theme || "auto"}`}>
         <React.Suspense fallback={<ChunkFallback />}>
           <Onboarding
-            onDone={(a: any) => {
+            onDone={async (a: any) => {
               /* The App admin signing in at a space that is none of theirs
                  tries it (0.574): its practice has its own key on the
                  device, read at start, so start again. */
@@ -13999,6 +13210,9 @@ export default function ArabicTrainer() {
                 window.location.reload();
                 return;
               }
+              /* What this person set aside here at their last log out comes
+                 back before their first sync, which setAccount starts. */
+              if (a && a.handle) await adoptParked(a.handle);
               setSignedOutWhy("");
               setAccount(a);
             }}
@@ -14136,7 +13350,9 @@ export default function ArabicTrainer() {
               one of them: it is reached from the corner menu, since it is
               somewhere you go to join or look something up rather than a
               place you work in every day. */}
-          {!inExercise && space === "learn" && (
+          {/* Not while there is no space to use (0.580, audit finding 15):
+              the panel above is the whole page. */}
+          {!inExercise && space === "learn" && !stranded && (
             <Tabs
               dock
               tabs={[
@@ -14155,7 +13371,7 @@ export default function ArabicTrainer() {
           {/* Which of your spaces Learning shows, for someone in more than
               one (memberships): all of them, or one. Every tab follows it,
               and so does the session started from it. */}
-          {!inExercise && space === "learn" && !session && learnSpaces.length > 1 && (
+          {!inExercise && space === "learn" && !session && !stranded && learnSpaces.length > 1 && (
             <LearnSpaceButton
               spaces={learnSpaces}
               value={spaceNow}
@@ -14164,7 +13380,7 @@ export default function ArabicTrainer() {
           )}
 
         {/* ============ STUDY ============ */}
-        {tab === "home" && (
+        {!stranded && tab === "home" && (
           <>
             {/* The super admin trying a space (0.574): what this is, and
                 that nothing here is kept. */}
@@ -15483,8 +14699,8 @@ export default function ArabicTrainer() {
         )}
 
         {/* ============ ITEMS ============ */}
-        {tab === "items" && !inExercise && <TabTitle>Cards</TabTitle>}
-        {tab === "items" && (
+        {!stranded && tab === "items" && !inExercise && <TabTitle>Cards</TabTitle>}
+        {!stranded && tab === "items" && (
           <ItemsTab
             items={shown}
             allTags={allTags}
@@ -15494,22 +14710,13 @@ export default function ArabicTrainer() {
             myCourses={learnCourses}
             deckWanted={deckWanted}
             onDeckWantedUsed={() => setDeckWanted(null)}
-            onExportAll={exportEverything}
-            onAdd={addItems}
-            onUpdate={updateItem}
             onPriority={setPriority}
-            onRemove={(id) => removeItems([id])}
-            onRemoveMany={removeItems}
-            onBulkEdit={bulkEdit}
-            onSetLocked={setLockedMany}
-            onTagMany={tagMany}
-            onImport={importFile}
           />
         )}
 
         {/* ============ PROGRESS ============ */}
-        {tab === "progress" && !inExercise && <TabTitle>Progress</TabTitle>}
-        {tab === "progress" && (
+        {!stranded && tab === "progress" && !inExercise && <TabTitle>Progress</TabTitle>}
+        {!stranded && tab === "progress" && (
           <ProgressTab
             items={shown}
             myCourses={learnCourses}
@@ -15567,7 +14774,7 @@ export default function ArabicTrainer() {
           />
         )}
 
-        {tab === "courses" && (
+        {!stranded && tab === "courses" && (
           <Screen title="Courses" onBack={() => setTab(coursesBack)}>
           <React.Suspense fallback={<ChunkFallback />}>
           <StudentCourses
@@ -15703,7 +14910,10 @@ export default function ArabicTrainer() {
               setSpace("learn");
               setScreen(null);
             }}
-            onLogOut={() => {
+            onLogOut={async () => {
+              /* This person's practice is set aside first, so the next
+                 person to sign in starts clean (0.580). */
+              await parkForLogOut();
               /* Every space tried on this device goes too (0.574). */
               API.dropTrial();
               API.clearAccount();
@@ -16398,16 +15608,7 @@ function ItemsTab({
   myCourses = [],
   deckWanted,
   onDeckWantedUsed,
-  onExportAll,
-  onAdd,
-  onUpdate,
   onPriority,
-  onRemove,
-  onRemoveMany,
-  onBulkEdit,
-  onSetLocked,
-  onTagMany,
-  onImport,
 }: {
   items: Item[];
   allTags: string[];
@@ -16417,18 +15618,9 @@ function ItemsTab({
   myCourses?: Course[];
   deckWanted?: string | null;
   onDeckWantedUsed: () => void;
-  onExportAll: () => void;
-  onAdd: (items: any[]) => void;
-  onUpdate: (id: string, patch: any) => void;
   onPriority: (id: string, on: boolean) => void;
-  onRemove: (id: string) => void;
-  onRemoveMany: (ids: string[]) => void;
-  onBulkEdit: (ids: string[], patch: any) => void;
-  onSetLocked: (ids: string[], locked: boolean) => void;
-  onTagMany: (ids: string[], tag: string) => void;
-  onImport: (file: any) => void;
 }) {
-  const [sheet, setSheet] = useState<any | null>(null); // null | "single" | "bulk" | {edit:item}
+  const [sheet, setSheet] = useState<any | null>(null); // null | {view:item}
   const [q, setQ] = useState("");
   const [filterTags, setFilterTags] = useState<string[]>([]);
 
@@ -16439,14 +15631,6 @@ function ItemsTab({
     setQ("");
     if (onDeckWantedUsed) onDeckWantedUsed();
   }, [deckWanted, onDeckWantedUsed]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [confirmId, setConfirmId] = useState<any | null>(null);
-
-  useEffect(() => {
-    if (!confirmId) return;
-    const t = setTimeout(() => setConfirmId(null), 6000);
-    return () => clearTimeout(t);
-  }, [confirmId]);
 
   /* Escape and the body-scroll lock belong to Screen, which every sheet
      here now goes through. Doing it again from the tab meant two owners for
@@ -16472,26 +15656,6 @@ function ItemsTab({
       .sort((a, b) => b.created - a.created);
   }, [items, q, filterTags]);
 
-  /* Course cards are not a student's to change, so a selection offers
-     nothing destructive. With OWN_CARDS off there is nothing at all, and the
-     list hides the whole selection mode by itself. */
-  const bulkActions = useMemo(
-    () =>
-      OWN
-        ? [
-            { label: "Lock", onClick: (ids: string[]) => onSetLocked(ids, true) },
-            { label: "Unlock", onClick: (ids: string[]) => onSetLocked(ids, false) },
-            { label: "Add a tag", onClick: (ids: string[]) => setBulk({ kind: "tag", ids, tag: "" }) },
-            { label: "Delete", danger: true, onClick: (ids: string[]) => setBulk({ kind: "delete", ids }) },
-          ]
-        : [],
-    [onSetLocked]
-  );
-
-  /* Both used to be a browser prompt and a browser confirm — the only two
-     places in the app that left it to the browser to ask. */
-  const [bulk, setBulk] = useState<any | null>(null);
-
   return (
     <>
       <Help className="at-mb3">
@@ -16513,22 +15677,6 @@ function ItemsTab({
               level: (it) => standingShort(standing(cardStandings(it, settings, items))),
             })}
             busy={false}
-            onNew={OWN ? () => setSheet("single") : undefined}
-            filters={
-              OWN ? (
-                <div className="at-row at-mt2">
-                  <Button variant="ghost" size="sm" onClick={() => setSheet("dialog")} icon="add">
-                    Add a conversation
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setSheet("bulk")}
-          icon="add"
-        >
-          Add several at once
-        </Button>
-                  <Button variant="ghost" size="sm" onClick={onExportAll} icon="download">Export everything</Button>
-                </div>
-              ) : null
-            }
             empty="No cards match."
             match={cardMatches}
             count={
@@ -16536,9 +15684,8 @@ function ItemsTab({
                 ? `${plural(items.length, "card")}`
                 : `${filtered.length} of ${items.length}`
             }
-            selected={selected}
-            onSelectedChange={setSelected}
-            bulkActions={bulkActions}
+            /* Course cards are not a student's to change, so there is
+               nothing to select them for. */
             /* The library's tile, not a copy of it. This screen had its own
                hand-written version, which is how the student's card and the
                teacher's came to show different things. Tap to see the whole
@@ -16573,17 +15720,6 @@ function ItemsTab({
         </>
       )}
 
-      {OWN && (sheet === "single" || sheet === "dialog") && (
-        <OWN.ItemSheet
-          mode="add"
-          scene={sheet === "dialog"}
-          items={items}
-          allTags={allTags}
-          settings={settings}
-          onSave={(drafts) => onAdd(drafts)}
-          onClose={() => setSheet(null)}
-        />
-      )}
       {sheet && sheet.view && (
         <CardScreen
           card={sheet.view}
@@ -16591,1161 +15727,9 @@ function ItemsTab({
           settings={settings}
           onPriority={onPriority}
           onBack={() => setSheet(null)}
-          action={
-            OWN && !sheet.view.locked ? (
-              <Button size="sm"
-                onClick={() => setSheet({ edit: items.find((i) => i.id === sheet.view.id) || sheet.view })}
-              >
-                Edit
-              </Button>
-            ) : null
-          }
-        />
-      )}
-      {OWN && sheet && sheet.edit && (
-        <OWN.ItemSheet
-          mode="edit"
-          initial={sheet.edit}
-          scene={isDialog(sheet.edit)}
-          items={items}
-          allTags={allTags}
-          settings={settings}
-          onSave={(drafts) => onUpdate(sheet.edit.id, drafts[0])}
-          onClose={() => setSheet(null)}
-        />
-      )}
-      {bulk && bulk.kind === "delete" && (
-        <ConfirmModal
-          title={`Delete ${plural(bulk.ids.length, "card")}?`}
-          confirmLabel="Delete them"
-          body={<p>Locked cards are kept. This can't be undone.</p>}
-          onCancel={() => setBulk(null)}
-          onConfirm={() => {
-            onRemoveMany(bulk.ids);
-            setBulk(null);
-          }}
-        />
-      )}
-
-      {bulk && bulk.kind === "tag" && (
-        <Screen title={`Tag ${plural(bulk.ids.length, "card")}`} onBack={() => setBulk(null)}>
-          <FormField label="Tag to add" hint="Cards can carry several tags.">
-            <input
-              className="at-input"
-              value={bulk.tag}
-              autoFocus
-              onChange={(e) => setBulk({ ...bulk, tag: e.target.value })}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && bulk.tag.trim()) {
-                  onTagMany(bulk.ids, bulk.tag.trim());
-                  setBulk(null);
-                }
-              }}
-            />
-          </FormField>
-          <div className="at-row">
-            <Button
-              variant="primary"
-              disabled={!bulk.tag.trim()}
-              onClick={() => {
-                onTagMany(bulk.ids, bulk.tag.trim());
-                setBulk(null);
-              }}
-            >
-              Add the tag
-            </Button>
-          </div>
-        </Screen>
-      )}
-
-      {OWN && sheet === "bulk" && (
-        <OWN.BulkAddSheet
-          allTags={allTags}
-          onAdd={onAdd}
-          onImport={onImport}
-          onClose={() => setSheet(null)}
         />
       )}
     </>
-  );
-}
-
-/* ------------------------------------------------------------------
-   Bulk action bar
-   ------------------------------------------------------------------ */
-
-
-/* ------------------------------------------------------------------
-   Full-screen: add or edit one item, with its other forms
-   ------------------------------------------------------------------ */
-
-/* Label, RTL input, and an on-screen keyboard that only appears while the
-   field is focused — otherwise it dominates every form it sits in.
-   preventDefault on mousedown keeps focus when a key is tapped. */
-function ArabicField({ label, hint, value, onChange, mode, placeholder, inputRef, lang }: {
-  label?: Node;
-  hint?: Node;
-  value: string;
-  onChange: (value: string) => void;
-  mode?: string;
-  placeholder?: string;
-  inputRef?: React.MutableRefObject<HTMLInputElement | null>;
-  lang?: Lang;
-}) {
-  /* The field already reads the active language for the input's own script
-     and direction. The keyboard needs a pack too, and two of the three call
-     sites pass none — which used to hand `undefined` to a component that
-     reads its rows off it, the moment someone opened the keys. */
-  const L = lang || activeLang();
-  const own: React.MutableRefObject<any | null> = useRef(null);
-  const ref = inputRef || own;
-  const [focused, setFocused] = useState(false);
-  const [keysOpen, setKeysOpen] = useKeysOpen(mode);
-
-  return (
-    <div className="at-field">
-      {label && <label className="at-label">{label}</label>}
-      <div className={`at-inputwrap${activeLang().direction === "rtl" ? " rtl" : ""}`}>
-        <input
-          ref={ref}
-          lang={activeLang().id}
-          dir={activeLang().direction}
-          className="at-input ar"
-          value={value}
-          placeholder={placeholder}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onChange={(e) => onChange(e.target.value)}
-        />
-        <span onMouseDown={(e) => e.preventDefault()}>
-          <KeysButton on={keysOpen} onClick={() => setKeysOpen((v) => !v)} />
-        </span>
-      </div>
-      {focused && keysOpen && (
-        <div onMouseDown={(e) => e.preventDefault()}>
-          <Keyboard
-            onKey={(ch) => caretInsert(ref, value, onChange, ch)}
-            onBack={() => caretBackspace(ref, value, onChange)}
-            onClear={() => onChange("")}
-            onHide={() => setKeysOpen(false)}
-            lang={L}
-          />
-        </div>
-      )}
-      {hint && !focused && <Help>{hint}</Help>}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------
-   Recordings editor — one per unit, several clips each
-   ------------------------------------------------------------------ */
-
-function ClipPlayer({ rec, onPlay }: { rec: any; onPlay: (rec: any) => void | Promise<void> }) {
-  const [busy, setBusy] = useState(false);
-  return (
-    <button
-      className="at-clipplay"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        await onPlay(rec);
-        setBusy(false);
-      }}
-      title="Play"
-    >
-      <Icon name="play" />
-    </button>
-  );
-}
-
-function RecordingsField({ recs, onChange, label = "Recordings" }: {
-  recs?: any[];
-  onChange: (recs: any[]) => void;
-  label?: string;
-}) {
-  const [recording, setRecording] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [error, setError] = useState("");
-  const [working, setWorking] = useState("");
-  const handle: React.MutableRefObject<ReturnType<typeof startRecorder> | null> = useRef(null);
-  const started = useRef(0);
-  const tick: React.MutableRefObject<ReturnType<typeof setInterval> | null> = useRef(null);
-  const audioRef: React.MutableRefObject<HTMLAudioElement | null> = useRef(null);
-
-  useEffect(() => () => {
-    if (handle.current) handle.current.stop();
-  }, []);
-
-  const urlRef = useRef("");
-  useEffect(() => () => {
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-  }, []);
-
-  async function play(rec: { id: string }) {
-    const url = await clipUrl(rec.id);
-    if (!url) {
-      setError("That clip isn't on this device yet");
-      return;
-    }
-    if (!audioRef.current) audioRef.current = new Audio();
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-    urlRef.current = url;
-    audioRef.current.src = url;
-    try {
-      await audioRef.current.play();
-    } catch (e) {
-      setError("Couldn't play that clip");
-    }
-  }
-
-  function begin() {
-    setError("");
-    if (!canRecord()) {
-      setError("This browser won't let the app use the microphone");
-      return;
-    }
-    started.current = now();
-    setElapsed(0);
-    setRecording(true);
-    sfx("record");
-    tick.current = setInterval(() => setElapsed(now() - started.current), 200);
-
-    handle.current = startRecorder(
-      async (blob) => {
-        if (tick.current) clearInterval(tick.current);
-        setRecording(false);
-        const dur = (now() - started.current) / 1000;
-        if (blob.size > MAX_CLIP_BYTES) {
-          setError(`That clip is ${formatBytes(blob.size)} — too big to sync. Keep it shorter.`);
-          return;
-        }
-        const id = newRecId();
-        if (!(await saveClipBlob(id, blob))) {
-          setError("Couldn't save that clip");
-          return;
-        }
-        onChange(
-          (recs || []).concat([
-            { id, label: "", mime: blob.type, size: blob.size, dur: Math.round(dur * 10) / 10, added: now() },
-          ])
-        );
-      },
-      (err) => {
-        if (tick.current) clearInterval(tick.current);
-        setRecording(false);
-        setError(
-          (err instanceof Error ? err.name : "") === "NotAllowedError"
-            ? "Microphone permission was refused"
-            : "Couldn't reach the microphone"
-        );
-      }
-    );
-
-    // Hard stop, so a forgotten recording can't run away.
-    setTimeout(() => {
-      if (handle.current) handle.current.stop();
-    }, MAX_RECORD_MS);
-  }
-
-  function end() {
-    sfx("stop");
-    if (handle.current) handle.current.stop();
-  }
-
-  async function upload(file: File) {
-    setError("");
-    setWorking("Compressing…");
-    try {
-      const { blob, mime, dur } = await compressAudio(file);
-      if (blob.size > MAX_CLIP_BYTES) {
-        setError(
-          `Still ${formatBytes(blob.size)} after compressing — too big to sync. Try a shorter clip.`
-        );
-        return;
-      }
-      const id = newRecId();
-      if (!(await saveClipBlob(id, blob))) {
-        setError("Couldn't save that clip");
-        return;
-      }
-      onChange(
-        (recs || []).concat([
-          {
-            id,
-            label: file.name.replace(/\.[^.]+$/, "").slice(0, 24),
-            mime: mime || blob.type,
-            size: blob.size,
-            dur: dur ? Math.round(dur * 10) / 10 : 0,
-            added: now(),
-          },
-        ])
-      );
-    } catch (e) {
-      setError("Couldn't read that file");
-    } finally {
-      setWorking("");
-    }
-  }
-
-  const list = recs || [];
-
-  return (
-    <FormField label={<>{label} <span className="at-optional">— optional, several allowed</span></>}>
-
-      {list.length > 0 && (
-        <div className="at-cliplist">
-          {list.map((rec, i) => (
-            <div className="at-clip" key={rec.id}>
-              <ClipPlayer rec={rec} onPlay={play} />
-              <input
-                className="at-clipname"
-                value={rec.label}
-                placeholder={`Voice ${i + 1}`}
-                onChange={(e) => {
-                  const next = list.slice();
-                  next[i] = { ...rec, label: e.target.value.slice(0, 24) };
-                  onChange(next);
-                }}
-              />
-              <span className="at-clipmeta">
-                {rec.dur ? `${rec.dur}s` : ""} {formatBytes(rec.size)}
-              </span>
-              <button
-                className="at-x"
-                aria-label="Delete recording"
-                onClick={() => {
-                  dropClip(rec.id);
-                  onChange(list.filter((x) => x.id !== rec.id));
-                }}
-              >
-                <Icon name="close" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="at-chips" style={{ marginTop: list.length ? 10 : 0 }}>
-        {recording ? (
-          <Button variant="danger" size="sm" onClick={end} icon="pause">Stop — {(elapsed / 1000).toFixed(1)}s</Button>
-        ) : (
-          <Button size="sm" onClick={begin} disabled={!!working} icon="mic">Record</Button>
-        )}
-        <label className="at-btn sm ghost">
-          {working || "Upload a file"}
-          <input
-            type="file"
-            accept="audio/*"
-            className="at-hidden"
-            onChange={(e) => {
-              const f = e.target.files && e.target.files[0];
-              if (f) upload(f);
-              e.target.value = "";
-            }}
-          />
-        </label>
-      </div>
-
-      <Notice kind="error">{error}</Notice>
-      {!error && list.length === 0 && (
-        <Help>
-          A recording unlocks two more exercises for this form — hearing it and writing the
-          English, or hearing it and writing the script. Several voices are better than one.
-        </Help>
-      )}
-    </FormField>
-  );
-}
-
-/* An empty form, with whatever values the languages declare, from the one
-   place that knows them. */
-const BLANK_SUB = { ar: "", lat: "", en: "", ...dimValues({}), note: "", recs: [] };
-/* A turn nobody has written yet. No grammar on it: a line of a dialog is
-   a thing somebody says, and whether it is singular or plural is a
-   question about a word. */
-const BLANK_LINE = { ar: "", lat: "", en: "", who: 0, uses: [], recs: [] };
-
-/**
- * @param props  `scene` writes a conversation rather than a word; `items` is what
- *   the learner already has, for finding which of their words a line uses.
- */
-function ItemSheet({ mode, initial, allTags, settings, onSave, onClose, scene = false, items = [] }: {
-  mode?: string;
-  initial?: any;
-  allTags: string[];
-  settings: Settings;
-  onSave: (item: any) => void;
-  onClose: () => void;
-  scene?: boolean;
-  items?: Item[];
-}) {
-  const lang = langOf(settings);
-  /* Held once: only some languages declare a lexical axis, and reading it
-     off the pack at each use makes every one of them a separate question
-     about whether this language has one. */
-  const lexical = lang.lexical;
-  /* Open, because the grammatical fields dimValues() spreads in differ per
-     language and the tags are one editable string here, not a list. */
-  const blank = (): Record<string, any> => ({
-    ar: "",
-    lat: "",
-    en: "",
-    recs: [],
-    ...dimValues({}),
-    kind: "",
-    note: "",
-    tags: "",
-    subs: [],
-    /* A conversation starts as two people and two empty turns: an empty
-       scene with an "add a line" button is a form that has to be
-       assembled before it can be filled in. */
-    ...(scene
-      ? {
-          speakers: DEFAULT_SPEAKERS.slice(),
-          /* Nobody's part, until somebody says so. */
-          you: null,
-          lines: [{ ...BLANK_LINE, who: 0 }, { ...BLANK_LINE, who: 1 }],
-        }
-      : null),
-  });
-
-  const [draft, setDraft] = useState(() =>
-    initial
-      ? {
-          ar: initial.ar,
-          lat: initial.lat,
-          en: initial.en,
-          recs: initial.recs || [],
-          ...dimValues(initial),
-          kind: initial.kind || "",
-          note: initial.note || "",
-          tags: (initial.tags || []).join(", "),
-          subs: subFormsOf(initial).map((x: Record<string, any>) => ({ ...x })),
-          ...(scene
-            ? {
-                speakers: speakersOf(initial),
-                you: namedPart(initial),
-                lines: linesOf(initial).map((x: Record<string, any>) => ({ ...x })),
-              }
-            : null),
-        }
-      : blank()
-  );
-  const [step, setStep] = useState("form");
-  // In add mode you can stack up several items and check them together.
-  const [queue, setQueue] = useState<any[]>([]);
-  // When set, the form is editing that queued item rather than adding a new one.
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const arRef: React.MutableRefObject<HTMLInputElement | null> = useRef(null);
-
-  const set = (k: string, v: any) =>
-    setDraft((d) => ({ ...d, [k]: v }));
-  /* A conversation needs two turns before it is one. One line with a
-     reply missing is a phrase card that has been put in the wrong
-     editor. */
-  const written = scene ? (draft.lines || []).filter((l: any) => l.ar.trim()) : [];
-  const canSave = scene ? written.length >= 2 : [draft.ar, draft.lat, draft.en].some((v) => v.trim());
-
-  /* The words this learner already has, for the links below. Dialogs are
-     left out: a scene is not a word that turns up inside another one. */
-  const wordCards = useMemo(
-    () => items.filter((i: Item) => !isDialog(i) && leadOf(i).ar),
-    [items]
-  );
-  /*
-   * Which of those words a line uses, found rather than ticked.
-   *
-   * The app already knows how to find a word inside a run of words — it is
-   * what puts a phrase behind the gap-fill — so asking somebody writing a
-   * scene to also tick off its vocabulary would be asking them to do by
-   * hand what the matcher does better. What it finds is shown under the
-   * conversation, so it can be seen to be right.
-   */
-  const usesIn = (text: string) =>
-    wordCards.filter((w: Item) => splitForms(leadOf(w).ar).some((word) => !!findWordSpan(text, word, lang)));
-
-  const linked = (lines: any[]) =>
-    lines
-      .filter((l) => l.ar.trim())
-      .map((l) => ({ ...l, uses: usesIn(l.ar).map((w) => w.id) }));
-
-  const previewItem = useMemo(
-    () => makeItem(scene ? { ...draft, lines: linked(draft.lines || []) } : draft),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft, wordCards]
-  );
-  const previewUnits = unitsOf(previewItem);
-  /* What the whole card will be drilled as: the scene's own exercises and
-     every line's, gathered, because a dialog's exercises are spread across
-     its units rather than sitting on the card. */
-  const previewTypes = useMemo(() => {
-    if (!scene) return availableTypes(leadOf(previewItem));
-    const found = new Set(availableTypes(leadOf(previewItem), lang, null));
-    linesOf(previewItem).forEach((ln, at) => {
-      for (const t of availableTypes(ln, lang, { card: previewItem, at })) found.add(t);
-    });
-    return TYPES.filter((t) => found.has(t));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewItem]);
-  // What review will show: everything queued, plus whatever is in the form.
-  const pending = useMemo(
-    () => (canSave ? queue.concat([draft]) : queue).map((d) => makeItem(d)),
-    [queue, draft, canSave]
-  );
-
-  function setSub(i: number, k: string, v: any) {
-    setDraft((d) => {
-      const subs = d.subs.slice();
-      subs[i] = { ...subs[i], [k]: v };
-      return { ...d, subs };
-    });
-  }
-
-  /* The same, for a turn in a conversation. */
-  function setLine(i: number, k: string, v: any) {
-    setDraft((d) => {
-      const lines = (d.lines || []).slice();
-      lines[i] = { ...lines[i], [k]: v };
-      return { ...d, lines };
-    });
-  }
-
-  const tidy = (d: Record<string, any>) => ({
-    ...d,
-    subs: (d.subs || []).filter((x: Record<string, any>) => x.ar || x.en || x.lat),
-    /* Blank turns are dropped and the words each line uses are worked out
-       here, on the way to being stored, so a scene edited a week later
-       picks up whatever vocabulary has been added since. */
-    ...(scene ? { lines: linked(d.lines || []) } : null),
-  });
-
-  /* Stack the current form and start a fresh one, keeping the filing
-     details that usually carry across a batch. */
-  function queueCurrent() {
-    if (!canSave) return;
-    setQueue((q) => q.concat([tidy(draft)]));
-    setDraft((d) => ({ ...blank(), tags: d.tags, kind: d.kind }));
-    requestAnimationFrame(() => arRef.current && arRef.current.focus());
-  }
-
-  function toReview() {
-    if (editingIndex !== null) {
-      if (canSave) {
-        const updated = tidy(draft);
-        setQueue((q) => q.map((x, i) => (i === editingIndex ? updated : x)));
-      }
-      setEditingIndex(null);
-      setDraft(blank());
-    } else if (canSave) {
-      setQueue((q) => q.concat([tidy(draft)]));
-      setDraft((d) => ({ ...blank(), tags: d.tags, kind: d.kind }));
-    }
-    setStep("review");
-  }
-
-  /* Open one of the queued items back up in the form. */
-  function editQueued(i: number) {
-    setDraft(queue[i]);
-    setEditingIndex(i);
-    setStep("form");
-    requestAnimationFrame(() => arRef.current && arRef.current.focus());
-  }
-
-  function cancelQueuedEdit() {
-    setEditingIndex(null);
-    setDraft(blank());
-    setStep("review");
-  }
-
-  function backToForm() {
-    setStep("form");
-    requestAnimationFrame(() => arRef.current && arRef.current.focus());
-  }
-
-  function saveAll() {
-    const list = mode === "edit" ? [tidy(draft)] : queue;
-    if (!list.length) return;
-    onSave(list);
-    onClose();
-  }
-
-  return (
-    <Screen
-      title={step === "review"
-            ? mode === "edit"
-              ? "Check your changes"
-              : `Check ${plural(queue.length, "item")}`
-            : mode === "edit"
-            ? "Edit card"
-            : editingIndex !== null
-            ? `Editing item ${editingIndex + 1}`
-            : queue.length
-            ? `Add another (${queue.length} ready)`
-            : "Add a card"}
-      onBack={() => (step === "review" ? setStep("form") : onClose())}
-      action={
-        mode === "add" && queue.length > 0 && (
-                  <span className="at-sheetnote">{queue.length} ready</span>
-                )
-      }
-      footer={
-        <>
-              {step === "form" ? (
-                <>
-                  <Button variant="ghost"
-                    onClick={editingIndex !== null ? cancelQueuedEdit : onClose}
-                  >
-                    {editingIndex !== null ? "Cancel edit" : "Cancel"}
-                  </Button>
-                  {mode === "add" && editingIndex === null && (
-                    <Button variant="ghost" disabled={!canSave} onClick={queueCurrent}>
-                      Add another
-                    </Button>
-                  )}
-                  <Button variant="primary"
-                    disabled={mode === "edit" ? !canSave : !canSave && !queue.length}
-                    onClick={mode === "edit" ? () => setStep("review") : toReview}
-                  >
-                    {mode === "edit"
-                      ? "Review"
-                      : editingIndex !== null
-                      ? "Save changes"
-                      : `Review ${canSave ? queue.length + 1 : queue.length}`}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="ghost" onClick={backToForm}>
-                    {mode === "edit" ? "Back to edit" : "Add more"}
-                  </Button>
-                  <Button variant="primary" onClick={saveAll}>
-                    {mode === "edit"
-                      ? "Save changes"
-                      : `Save ${plural(pending.length, "card")}`}
-                  </Button>
-                </>
-              )}
-        </>
-      }
-    >
-      {step === "form" ? (
-        <>
-          {scene && (
-            <>
-              {/* ---- 1. the scene ---- */}
-              <div className="at-group">
-                <div className="at-grouphead">
-                  <span>The scene</span>
-                  <span className="req">Two lines or more</span>
-                </div>
-
-                <FormField label="What it is called">
-                  <input
-                    className="at-input"
-                    value={draft.en}
-                    placeholder="At the door"
-                    onChange={(e) => set("en", e.target.value)}
-                  />
-                </FormField>
-
-                <FormField label={<>Where it happens <span className="at-optional">optional</span></>}>
-                  <input
-                    className="at-input"
-                    value={draft.note}
-                    placeholder="Two neighbours meet in the morning"
-                    onChange={(e) => set("note", e.target.value)}
-                  />
-                </FormField>
-
-                <div className="at-field">
-                  <label className="at-label">Who is in it</label>
-                  <div className="at-inline">
-                    {(draft.speakers || []).map((name: string, i: number) => (
-                      <input
-                        key={i}
-                        className="at-input"
-                        value={name}
-                        placeholder={`Speaker ${i + 1}`}
-                        aria-label={`Speaker ${i + 1}`}
-                        onChange={(e) =>
-                          setDraft((d) => ({
-                            ...d,
-                            speakers: (d.speakers || []).map((s: string, j: number) =>
-                              j === i ? e.target.value : s
-                            ),
-                          }))
-                        }
-                      />
-                    ))}
-                  </div>
-                  {(draft.speakers || []).length < MAX_SPEAKERS && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="at-mt2"
-                      onClick={() =>
-                        setDraft((d) => ({ ...d, speakers: (d.speakers || []).concat([""]) }))
-                      }
-                    >
-                      Add someone
-                    </Button>
-                  )}
-                </div>
-
-                <FormField label="You play">
-                  <Segmented
-                    label="You play"
-                    options={[
-                      {
-                        value: (null as number | null),
-                        label: (draft.speakers || []).length > 2 ? "Any of them" : "Either",
-                      },
-                      ...(draft.speakers || []).map((n: string, i: number) => ({
-                        value: (i as number | null),
-                        label: n || `Speaker ${i + 1}`,
-                      })),
-                    ]}
-                    value={draft.you}
-                    onChange={(v: number | null) => set("you", v)}
-                  />
-                  <Help>
-                    Whose turns are yours to produce when the whole scene is
-                    asked. Left open, the question takes the parts in turn, so
-                    a scene met twice has been held up from both ends.
-                  </Help>
-                </FormField>
-              </div>
-
-              {/* ---- 2. the conversation ---- */}
-              <div className="at-group">
-                <div className="at-grouphead">
-                  <span>The conversation</span>
-                  <span className="opt">{plural((draft.lines || []).length, "line")}</span>
-                </div>
-
-                {(draft.lines || []).map((ln: Record<string, any>, i: number) => (
-                  <div className="at-subedit" key={i}>
-                    <div className="at-subedithead">
-                      <Segmented
-                        label={`Who says line ${i + 1}`}
-                        options={(draft.speakers || []).map((n: string, j: number) => ({
-                          value: j,
-                          label: n || `Speaker ${j + 1}`,
-                        }))}
-                        value={ln.who || 0}
-                        onChange={(v: number) => setLine(i, "who", v)}
-                      />
-                      {(draft.lines || []).length > 2 && (
-                        <button
-                          className="at-x"
-                          aria-label={`Remove line ${i + 1}`}
-                          onClick={() =>
-                            setDraft((d) => ({
-                              ...d,
-                              lines: (d.lines || []).filter(
-                                (_: unknown, j: number) => j !== i
-                              ),
-                            }))
-                          }
-                        >
-                          <Icon name="close" />
-                        </button>
-                      )}
-                    </div>
-
-                    <ArabicField
-                      value={ln.ar}
-                      onChange={(v: string) => setLine(i, "ar", v)}
-                      mode={settings.keyboard}
-                      inputRef={i === 0 ? arRef : undefined}
-                      placeholder={lang.scriptLabel}
-                    />
-
-                    <div className="at-inline">
-                      <div className="at-field">
-                        <input
-                          className="at-input"
-                          value={ln.lat}
-                          placeholder="How it sounds"
-                          aria-label={`How line ${i + 1} sounds`}
-                          onChange={(e) => setLine(i, "lat", e.target.value)}
-                        />
-                      </div>
-                      <div className="at-field">
-                        <input
-                          className="at-input"
-                          value={ln.en}
-                          placeholder="What it means"
-                          aria-label={`What line ${i + 1} means`}
-                          onChange={(e) => setLine(i, "en", e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <RecordingsField
-                      recs={ln.recs}
-                      onChange={(v: any) => setLine(i, "recs", v)}
-                      label="Recording for this line"
-                    />
-
-                    {ln.ar.trim() && (
-                      <div className="at-uses">
-                        {usesIn(ln.ar).length ? (
-                          <>
-                            <span className="at-useslabel">Uses</span>
-                            {usesIn(ln.ar).map((w: Item) => (
-                              <span className="at-tag" key={w.id}>
-                                {leadOf(w).ar}
-                              </span>
-                            ))}
-                          </>
-                        ) : (
-                          <span className="at-useslabel">
-                            None of your words yet — it will still be drilled as a line.
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  style={{ margin: "10px 0 8px" }}
-                  onClick={() =>
-                    setDraft((d) => ({
-                      ...d,
-                      lines: (d.lines || []).concat([
-                        /* Whoever did not speak last, which is what a
-                           conversation does on its own. */
-                        {
-                          ...BLANK_LINE,
-                          who:
-                            (d.lines || []).length && (d.speakers || []).length > 1
-                              ? (Number((d.lines || []).at(-1)?.who || 0) + 1) % (d.speakers || []).length
-                              : 0,
-                        },
-                      ]),
-                    }))
-                  }
-                >
-                  Add a line
-                </Button>
-
-                <div className={`at-status${previewTypes.length ? "" : " warn"}`}>
-                  {!canSave
-                    ? "Two lines with something in them, and it can be practised"
-                    : `Will be drilled as ${previewTypes
-                        .map((t) => exOf(t, lang).short)
-                        .join(", ")}`}
-                </div>
-                <Help>
-                  No recordings needed. A scene with none is drilled every way
-                  above; where a line has one, it can be heard as well as read.
-                </Help>
-              </div>
-            </>
-          )}
-
-          {/* ---- 1. the word itself ---- */}
-          {!scene && (
-          <div className="at-group">
-            <div className="at-grouphead">
-              <span>The word</span>
-              <span className="req">Script + one other</span>
-            </div>
-
-            <ArabicField
-              label={langOf(settings).scriptLabel}
-              value={draft.ar}
-              onChange={(v) => set("ar", v)}
-              mode={settings.keyboard}
-              inputRef={arRef}
-            />
-
-            <div className="at-inline">
-              <FormField label="English">
-                <input
-                  className="at-input"
-                  value={draft.en}
-                  placeholder="book"
-                  onChange={(e) => set("en", e.target.value)}
-                />
-              </FormField>
-              <FormField label="Transliteration">
-                <input
-                  className="at-input"
-                  value={draft.lat}
-                  placeholder="kitāb"
-                  onChange={(e) => set("lat", e.target.value)}
-                />
-              </FormField>
-            </div>
-
-            <Help>
-              One answer to a box: whatever is typed here, a slash included, is one answer.
-            </Help>
-
-            <RecordingsField
-              recs={draft.recs}
-              onChange={(v) => set("recs", v)}
-            />
-
-            <div className={`at-status${previewTypes.length >= 2 ? "" : " warn"}`}>
-              {!canSave
-                ? "Fill the script and one other field"
-                : previewTypes.length >= 2
-                ? `Will be drilled as ${previewTypes.map((t) => exOf(t, langOf(settings)).short).join(", ")}`
-                : "Not enough to practice yet — needs script plus English or transliteration"}
-            </div>
-          </div>
-          )}
-
-          {/* ---- 2. grammar ---- */}
-          {!scene && (dimsOf(lang).length > 0 || lang.lexical) && (
-            <div className="at-group">
-              <div className="at-grouphead">
-                <span>Grammar</span>
-              </div>
-              {dimsOf(lang).map((dim) => (
-                <div className="at-field" key={dim.field}>
-                  <label className="at-label">
-                    {dim.label}{" "}
-                    {dim.required ? (
-                      <span className="req">required</span>
-                    ) : (
-                      <span className="at-optional">optional</span>
-                    )}
-                  </label>
-                  <Segmented
-                    label={dim.label}
-                    options={dim.options.map(([value, label]) => ({ value, label }))}
-                    value={draft[dim.field]}
-                    onChange={(v) =>
-                      set(dim.field, !dim.required && draft[dim.field] === v ? "" : v)
-                    }
-                  />
-                </div>
-              ))}
-              {lexical && (
-                <FormField label={<>{lexical.label} <span className="at-optional">optional</span></>}>
-                  <input
-                    className="at-input"
-                    value={draft[lexical.key] || ""}
-                    placeholder={lexical.help || ""}
-                    onChange={(e) => set(lexical.key, e.target.value)}
-                  />
-                </FormField>
-              )}
-            </div>
-          )}
-
-          {/* ---- 3. other forms ---- */}
-          {!scene && (
-          <div className="at-group">
-            <div className="at-grouphead">
-              <span>Other forms</span>
-              <span className="opt">
-                {draft.subs.length
-                  ? `${draft.subs.length} added`
-                  : "optional"}
-              </span>
-            </div>
-
-            {draft.subs.length === 0 ? (
-              <div className="at-emptyforms">
-                <Help>
-                  A plural, a feminine — any form worth learning in its own right. Each keeps
-                  its own progress, and this card won't count as learnt until they all are.
-                </Help>
-                <Button size="sm"
-                  className="at-mt3"
-                  onClick={() =>
-                    setDraft((d) => ({ ...d, subs: d.subs.concat([{ ...BLANK_SUB }]) }))
-                  }
-                >
-                  Add a form
-                </Button>
-              </div>
-            ) : (
-              <>
-                {draft.subs.map((sb: Record<string, any>, i: number) => (
-                  <div className="at-subedit" key={i}>
-                    <div className="at-subedithead">
-                      <span className="at-formtag">{labelFor(sb) || "form"}</span>
-                      <button
-                        className="at-x"
-                        aria-label="Remove form"
-                        onClick={() =>
-                          setDraft((d) => ({
-                            ...d,
-                            subs: d.subs.filter((_: unknown, j: number) => j !== i),
-                          }))
-                        }
-                      >
-                        <Icon name="close" />
-                      </button>
-                    </div>
-
-                    <ArabicField
-                      value={sb.ar}
-                      onChange={(v) => setSub(i, "ar", v)}
-                      mode={settings.keyboard}
-                      placeholder={langOf(settings).scriptNative}
-                    />
-
-                    <div className="at-inline">
-                      <div className="at-field">
-                        <input
-                          className="at-input"
-                          value={sb.en}
-                          placeholder="English"
-                          onChange={(e) => setSub(i, "en", e.target.value)}
-                        />
-                      </div>
-                      <div className="at-field">
-                        <input
-                          className="at-input"
-                          value={sb.lat}
-                          placeholder="Transliteration"
-                          onChange={(e) => setSub(i, "lat", e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <RecordingsField
-                      recs={sb.recs}
-                      onChange={(v) => setSub(i, "recs", v)}
-                      label="Recordings for this form"
-                    />
-
-                    {dimsOf(lang).map((dim) => (
-                      <FormField label={dim.label} key={dim.field}>
-                        <Segmented
-                          label={dim.label}
-                          options={dim.options.map(([value, label]) => ({ value, label }))}
-                          value={sb[dim.field]}
-                          onChange={(v) =>
-                            setSub(i, dim.field, !dim.required && sb[dim.field] === v ? "" : v)
-                          }
-                        />
-                      </FormField>
-                    ))}
-                  </div>
-                ))}
-                <Button variant="ghost" size="sm"
-                  style={{ margin: "10px 0 8px" }}
-                  onClick={() =>
-                    setDraft((d) => ({ ...d, subs: d.subs.concat([{ ...BLANK_SUB }]) }))
-                  }
-                >
-                  Add another form
-                </Button>
-              </>
-            )}
-          </div>
-          )}
-
-          {/* ---- 4. filing ---- */}
-          <div className="at-group">
-            <div className="at-grouphead">
-              <span>Filing</span>
-              <span className="opt">optional</span>
-            </div>
-
-            <FormField label="Decks">
-              <input
-                className="at-input"
-                value={draft.tags}
-                placeholder="class 12 june, numbers"
-                onChange={(e) => set("tags", e.target.value)}
-              />
-              {allTags.length > 0 && (
-                <div className="at-tags at-mt2">
-                  {allTags.slice(0, 10).map((t) => (
-                    <span
-                      key={t}
-                      className={`at-tag pick${cleanTags(draft.tags).includes(t) ? " on" : ""}`}
-                      onClick={() =>
-                        set(
-                          "tags",
-                          cleanTags(draft.tags).includes(t)
-                            ? cleanTags(draft.tags).filter((x) => x !== t).join(", ")
-                            : (draft.tags ? draft.tags + ", " : "") + t
-                        )
-                      }
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </FormField>
-
-            {/* A scene has a length of its own and it is not one of these
-                three. The note above holds its setting, so the one below
-                would be a second note about the same thing. */}
-            {!scene && (
-              <>
-            <div className="at-inline">
-              <FormField label="Length">
-                <Segmented
-                  label="Kind"
-                  options={["", "word", "phrase", "sentence"].map((k) => ({
-                    value: k,
-                    label: k || "auto",
-                  }))}
-                  value={draft.kind}
-                  onChange={(v) => set("kind", v)}
-                />
-              </FormField>
-            </div>
-
-            <FormField label="Note">
-              <input
-                className="at-input"
-                value={draft.note}
-                placeholder="root, irregular plural, where you heard it"
-                onChange={(e) => set("note", e.target.value)}
-              />
-            </FormField>
-              </>
-            )}
-          </div>
-        </>
-      ) : (
-        <>
-          {mode === "edit" ? (
-            <ReviewItem item={previewItem} units={previewUnits} total={1} index={0} />
-          ) : (
-            <>
-              <Help>
-                {pending.length === 1
-                  ? "This is exactly what will be stored."
-                  : `All ${pending.length} items as they will be stored. Remove any that look wrong, or go back and add more.`}
-              </Help>
-              {pending.map((it, i) => (
-                <ReviewItem
-                  key={i}
-                  item={it}
-                  units={unitsOf(it)}
-                  index={i}
-                  total={pending.length}
-                  onEdit={i < queue.length ? () => editQueued(i) : undefined}
-                  onRemove={
-                    pending.length > 1
-                      ? () => setQueue((q) => q.filter((_, j) => j !== i))
-                      : undefined
-                  }
-                />
-              ))}
-            </>
-          )}
-        </>
-      )}
-    </Screen>
   );
 }
 
@@ -18210,285 +16194,6 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
             </FormField>
           )}
         </div>
-      )}
-    </Screen>
-  );
-}
-
-/* ------------------------------------------------------------------
-   Full-screen: view an item without risking a change to it
-   ------------------------------------------------------------------ */
-
-
-
-/* A read-only rendering of what is about to be saved. */
-function ReviewItem({ item, units, index, total, onRemove, onEdit }: {
-  item: Item;
-  units: { unit: Form, isSub: boolean }[];
-  index: number;
-  total: number;
-  onRemove?: () => void;
-  onEdit?: () => void;
-}) {
-  const counts = familyCounts(item);
-  return (
-    <div className="at-reviewgroup">
-      {(total > 1 || onEdit) && (
-        <div className="at-reviewbar">
-          <span className="at-eyebrow">
-            {total > 1 ? `Item ${index + 1} of ${total}` : "This card"}
-          </span>
-          <span className="at-reviewacts">
-            {onEdit && (
-              <Button variant="ghost" size="sm" onClick={onEdit}>
-                Edit
-              </Button>
-            )}
-            {onRemove && (
-              <Button variant="ghost" size="sm" onClick={onRemove}>
-                Remove
-              </Button>
-            )}
-          </span>
-        </div>
-      )}
-
-      {units.map(({ unit, isSub }, i) => {
-        const types = availableTypes(unit);
-        return (
-          <div className="at-reviewcard" key={i}>
-            <div className="at-reviewhead">
-              <span className="at-formtag">{labelFor(unit)}</span>
-              <span className="at-eyebrow">
-                {isSub ? "Other form" : "Main entry"}
-              </span>
-            </div>
-
-            {unit.ar ? (
-              /* A plain paragraph, not a Stat. Stat wraps its value in
-                 .at-statvalue, which sets the UI serif and its own size at
-                 the same specificity as .at-arabic.word and later in the
-                 file — so the preview of the word came out in the interface
-                 face at stat size instead of the script's own. */
-              <p
-                className="at-arabic word"
-                lang={activeLang().id}
-                dir={activeLang().direction}
-              >
-                {unit.ar}
-              </p>
-            ) : (
-              <Notice kind="warn">
-                {`No ${activeLang().scriptLabel} — this form can't be practiced.`}
-              </Notice>
-            )}
-            {unit.en && <p className="at-en" style={{ fontSize: 20 }}>{asMeaning(unit.en)}</p>}
-            {unit.lat && <p className="at-latin" style={{ fontSize: 17 }}>{unit.lat}</p>}
-            {unit.note && <p className="at-note">{unit.note}</p>}
-
-            <ClipList
-                    clips={(unit.recs || []).map((r: any, i: number) => ({
-                      id: r.id,
-                      label: r.label || `Voice ${i + 1}`,
-                    }))}
-                    load={clipUrl}
-                  />
-
-            <Help>
-              {types.length >= 2 ? (
-                <>Exercises: {types.map((t) => exOf(t, activeLang()).label).join(" · ")}</>
-              ) : (
-                <span className="at-warn">
-                  Fewer than two exercise types — add the {activeLang().scriptLabel} plus English
-                  {activeLang().translitDrilled !== false
-                    ? ` or a ${activeLang().translitLabel.toLowerCase()}`
-                    : ""}
-                  .
-                </span>
-              )}
-            </Help>
-          </div>
-        );
-      })}
-
-      <div className="at-reviewcard">
-        <div className="at-reviewhead">
-          <span className="at-eyebrow">
-            Filed as
-          </span>
-        </div>
-        <div className="at-flags" style={{ justifyContent: "center", marginTop: 0 }}>
-          <span className="at-flag">{item.kind}</span>
-          {counts.subs > 0 && <span className="at-flag forms">⌥ {counts.forms} forms</span>}
-          {counts.clips > 0 && <span className="at-flag audio">♪ {counts.clips}</span>}
-        </div>
-        {item.tags.length ? (
-          <div className="at-tags" style={{ justifyContent: "center", marginTop: 10 }}>
-            {item.tags.map((t) => (
-              <span className="at-tag" key={t}>
-                {t}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <Help className="at-mt2">Not in any deck</Help>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------
-   Full-screen: add many, with a review step
-   ------------------------------------------------------------------ */
-
-function BulkAddSheet({ allTags, onAdd, onImport, onClose }: {
-  allTags: string[];
-  onAdd: (items: any[]) => void;
-  onImport: (file: File) => void;
-  onClose: () => void;
-}) {
-  const [bulk, setBulk] = useState("");
-  const [step, setStep] = useState("paste");
-  const parsed = useMemo(() => parseLines(bulk, allTags), [bulk, allTags]);
-  const prepared = useMemo(() => parsed.map((p) => makeItem(p)), [parsed]);
-  const weak = prepared.filter((p) => availableTypes(leadOf(p)).length < 2).length;
-
-  return (
-    <Screen
-      title={step === "review" ? `Check ${plural(parsed.length, "card")}` : "Add in bulk"}
-      onBack={() => (step === "review" ? setStep("paste") : onClose())}
-      action={
-        step === "paste" && (
-                  <label className="at-btn sm ghost" style={{ flex: "none" }}>
-                    Open a file
-                    <input
-                      type="file"
-                      accept=".zip,.json,.md,.csv,.txt"
-                      className="at-hidden"
-                      onChange={(e) => {
-                        const f = e.target.files && e.target.files[0];
-                        if (f) {
-                          onImport(f);
-                          onClose();
-                        }
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                )
-      }
-      footer={
-        <>
-              {step === "paste" ? (
-                <>
-                  <Button variant="ghost" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button variant="primary"
-                    disabled={!parsed.length}
-                    onClick={() => setStep("review")}
-                  >
-                    Review {parsed.length || ""}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="ghost" onClick={() => setStep("paste")}>
-                    Back to edit
-                  </Button>
-                  <Button variant="primary"
-                    onClick={() => {
-                      onAdd(parsed);
-                      onClose();
-                    }}
-                  >
-                    Add {plural(parsed.length, "card")}
-                  </Button>
-                </>
-              )}
-        </>
-      }
-    >
-      {step === "paste" ? (
-        <>
-          <div className="at-syntax">
-            <p className="at-eyebrow" style={{ margin: "0 0 8px" }}>
-              Syntax
-            </p>
-            <p>
-              <strong>A markdown table works as-is.</strong> Paste it below, or open an{" "}
-              <code>.md</code> file. Columns in this order:
-            </p>
-            <pre dir="auto">{sampleTable(activeLang())}</pre>
-            <p>Headings and prose around the table are ignored.</p>
-            <p>
-              Add <code>Number</code> and <code>Gender</code> columns if you want them — or
-              label cells <code>num:</code> and <code>gen:</code>. Anything without a number is
-              filed as singular, and you can change it in bulk afterwards.
-            </p>
-            <p>Without a table, one card per line, cells split by <code>|</code> or a tab:</p>
-            {/* The one place the script's name is lowered on purpose: these
-                are cells to copy, sitting beside "english" and "decks",
-                and a capital here would read as part of what to type. */}
-            <pre>
-              english | {activeLang().scriptLabel.toLowerCase()} |{" "}
-              {activeLang().translitLabel.toLowerCase()} | decks | note
-            </pre>
-            <p>
-              Trailing fields can be left off. Use <code>||</code> only to skip a field in the{" "}
-              <em>middle</em> of a line. Lines starting with <code>#</code> are ignored.
-            </p>
-          </div>
-
-          <textarea
-            className="at-input"
-            value={bulk}
-            dir="auto"
-            style={{ minHeight: 220 }}
-            placeholder={samplePlaceholder(activeLang())}
-            onChange={(e) => setBulk(e.target.value)}
-          />
-          {bulk.trim() && (
-            <Help>
-              {plural(parsed.length, "card")} read
-              {parsed.skipped ? `, ${parsed.skipped} line(s) skipped` : ""}.
-            </Help>
-          )}
-        </>
-      ) : (
-        <>
-          <Help>
-            Every row as it will be stored. {!!parsed.skipped && `${parsed.skipped} line(s) couldn't be read and were dropped. `}
-            {weak > 0 && (
-              <span className="at-warn">
-                {plural(weak, "item")} lack two exercise types and won't be
-                practiced until filled in.
-              </span>
-            )}
-          </Help>
-          <div className="at-preview">
-            <div className="at-previewhead">
-              <span>English</span>
-              <span>{activeLang().scriptLabel}</span>
-              <span>Translit.</span>
-              <span>Decks</span>
-            </div>
-            {prepared.map((p, i) => (
-              <div
-                className={`at-previewrow${availableTypes(leadOf(p)).length < 2 ? " weak" : ""}`}
-                key={i}
-              >
-                <span className="cell en">{asMeaning(leadOf(p).en) || "—"}</span>
-                <span className="cell ar" lang={activeLang().id} dir={activeLang().direction}>
-                  {leadOf(p).ar || "—"}
-                </span>
-                <span className="cell lat">{leadOf(p).lat || "—"}</span>
-                <span className="cell tag">{p.tags.join(", ") || "—"}</span>
-              </div>
-            ))}
-          </div>
-        </>
       )}
     </Screen>
   );
@@ -20420,29 +18125,15 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part
         <>
           <p className="at-eyebrow">Languages</p>
           <Help>{note}</Help>
-          <div className="at-cklist">
-            {choices.map((c) => {
-              const chosen = !off.includes(c.id);
-              return (
-                <button
-                  key={c.id}
-                  className={`at-ck${chosen ? " on" : ""}`}
-                  role="checkbox"
-                  aria-checked={chosen}
-                  /* Not disabled: the last one on is pressable and simply
-                     holds. Just its name, to keep the list short. Ticking
-                     keeps the menu open:
-                     you are usually ticking more than one. */
-                  onClick={() => toggle(c.id)}
-                >
-                  <span className="at-ckbox">{chosen ? "✓" : ""}</span>
-                  <span className="at-cktext">
-                    <b>{c.name}</b>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {/* The library's tick list (0.580). Not disabled: the last one on
+              is pressable and simply holds. Just its name, to keep the list
+              short. Ticking keeps the menu open: you are usually ticking more
+              than one. */}
+          <CheckList
+            options={choices.map((c) => ({ id: c.id, title: c.name }))}
+            chosen={choices.filter((c) => !off.includes(c.id)).map((c) => c.id)}
+            onToggle={(id) => toggle(id)}
+          />
         </>
       )}
     </div>
@@ -20624,12 +18315,6 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
 }) {
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
 
   return (
     <div className="at-corner" onClick={(e) => e.stopPropagation()}>
@@ -20646,7 +18331,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
       </button>
 
       {open && (
-        <Popover className="at-cmenu">
+        <Popover className="at-cmenu" onClose={() => setOpen(false)}>
           {/* Where you are (0.576): a list under one heading when there is
               a choice, else the space's name as one quiet line. */}
           {mySpaces && mySpaces.length > 1 && onMySpace ? (
@@ -21318,18 +19003,9 @@ function SpaceLine({ space }: { space: { name: string; logoData?: string; logo?:
 function SpaceBadge({ space, icon }: { space?: { name: string; logoData?: string; logo?: string }; icon?: string }) {
   const logo = space && space.logo;
   const logoData = space && space.logoData;
-  const [src, setSrc] = useState(logoData || "");
-  useEffect(() => {
-    if (logoData || !logo) return;
-    let live = true;
-    API.getImage(logo).then(
-      (r) => live && setSrc(r.data),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [logo, logoData]);
+  /* Fetched once a session, however often the menu opens (0.580). */
+  const fetched = usePicture(logoData ? "" : logo || "");
+  const src = logoData || fetched.src;
   if (icon) {
     return (
       <span className="at-spacebadge plain" aria-hidden="true">
@@ -21451,12 +19127,6 @@ function LearnSpaceButton({ spaces, value, onChange }: {
   onChange: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = () => setOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
   const chosen = spaces.find((o) => o.id === value) || null;
   return (
     <div className="at-learnspace" onClick={(e) => e.stopPropagation()}>
@@ -21470,7 +19140,7 @@ function LearnSpaceButton({ spaces, value, onChange }: {
         {chosen ? initialsOf(chosen.name) : <Icon name="layers" size={20} />}
       </button>
       {open && (
-        <Popover className="at-cmenu at-learnspacemenu">
+        <Popover className="at-cmenu at-learnspacemenu" onClose={() => setOpen(false)}>
           <SpacePlaces
             label="Which space"
             places={[{ id: "", label: "All your spaces", icon: "layers" }, ...spaces.map((o) => ({ id: o.id, label: o.name, logo: o.logo }))]}

@@ -1,3 +1,6 @@
+/* The teaching screens' own styles, which arrive with them (0.580) — see
+   scripts/css-split.mjs. */
+import "./teaching.css";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
 import type { Card, Course, Deck, Feedback, Flag, Form, Lang, LangId, User } from "./types.ts";
@@ -89,7 +92,7 @@ import { rangeChecks } from "./numbers/range.ts";
 import { personsOf } from "./verbs.ts";
 import { countedNouns, withNouns } from "./numbers/nouns.ts";
 import { isOffline, watchNet } from "./net.ts";
-import { drainOutbox, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 
 /* What a card that could not be sent is filed under while it waits. See
    outbox.ts: one queue for every kind of waiting work, and the kind is
@@ -157,6 +160,7 @@ import {
   useOffline,
   useLiveRefresh,
   useSnackbar,
+  useRun,
   Popover,
   DeckSwitch,
 } from "./shared.tsx";
@@ -456,14 +460,7 @@ export function Onboarding({ onDone, place = {} }: {
               way back into your account. Save it in a password manager, or write it down somewhere
               safe. If you lose it, only your space's admin can give you a new one.
             </Lede>
-            <p className="at-key">{made.key}</p>
-            <div className="at-row at-mt3">
-              <Button variant="ghost"
-                onClick={() => navigator.clipboard && navigator.clipboard.writeText(made.key)}
-              >
-                Copy
-              </Button>
-            </div>
+            <CodeBox label="Your sign-in key" code={made.key} />
             <Help>
               You are <strong>{made.displayName}</strong> · <span className="at-handle">{made.handle}</span>
               . Share the handle freely; never the key.
@@ -594,15 +591,6 @@ function BelongRow({ label, tone, courses, languages }: {
   );
 }
 
-/* A "modal" is now a screen. Kept under this name so nothing that opens one
-   has to change; what it opens is the standard full-screen shell. */
-export function Modal({ title, children, onClose }: { title?: Node; children?: Node; onClose: () => void }) {
-  return (
-    <Screen title={title} onBack={onClose}>
-      {children}
-    </Screen>
-  );
-}
 
 /* Pick the language a new deck or card belongs to. Shown only when the person
    teaches more than one, since otherwise there is nothing to decide. */
@@ -621,6 +609,301 @@ export function Modal({ title, children, onClose }: { title?: Node; children?: N
    ------------------------------------------------------------------ */
 
 
+
+/*
+ * One person's actions on a People list: a new sign-in key, suspending or
+ * reactivating them, and taking them off a space (0.580). Admin's People
+ * and Super admin's Everyone had a copy each, which had drifted apart in
+ * what they said; this is the one, in Admin's words. `org` names the space
+ * where the screen acts in a space other than its own (Super admin);
+ * without it the words say "this space". Anything only one screen offers
+ * comes after, as children.
+ */
+export function PersonActions({ person, org, keyOrg, mayKey, mayAct, suspendable, suspendedHere, removable, onConfirm, onNewKey, children }: {
+  person: { handle: string; displayName: string };
+  org?: { id: string; name: string } | null;
+  /** The space whose say the new key is asked under. */
+  keyOrg?: string;
+  mayKey: boolean;
+  /** Whether suspending, reactivating and removing are offered at all. */
+  mayAct: boolean;
+  /** Suspended by the super admin everywhere: not this space's to lift. */
+  suspendable: boolean;
+  suspendedHere: boolean;
+  removable: boolean;
+  onConfirm: (p: Pending) => void;
+  onNewKey: (made: { name: string; handle: string; key: string }) => void;
+  children?: Node;
+}) {
+  const u = person;
+  const where = org ? org.name : "this space";
+  const inWhere = org ? ` in ${org.name}` : "";
+  return (
+    <>
+      {mayKey && (
+        <IconButton icon="key" label="Issue a new sign-in key" onClick={() => onConfirm({
+          title: `New sign-in key for ${u.displayName}?`,
+          confirmLabel: "Issue a new key",
+          body: (
+            <p>
+              Their current key stops working the moment you do this, on every device they use.
+              Their handle, courses and progress are untouched. You&apos;ll see the new key once.
+            </p>
+          ),
+          action: async () => {
+            const r = await API.reissueKey(u.handle, keyOrg);
+            onNewKey({ name: u.displayName, handle: u.handle, key: r.key });
+          },
+        })} />
+      )}
+      {mayAct && suspendable && (suspendedHere ? (
+        <IconButton icon="unlock" label={`Reactivate${inWhere}`} onClick={() => onConfirm({
+          title: `Reactivate ${u.displayName}${inWhere}?`,
+          confirmLabel: "Reactivate",
+          body: <p>They can use {where} again and are put back on the courses they were in.</p>,
+          action: () => API.reactivateUser(u.handle, org ? org.id : undefined),
+        })} />
+      ) : (
+        <IconButton icon="lock" label={`Suspend${inWhere}`} onClick={() => onConfirm({
+          title: `Suspend ${u.displayName}${inWhere}?`,
+          confirmLabel: "Suspend them",
+          body: (
+            <p>
+              In {where} only: they come off its courses and can&apos;t use it until reactivated.
+              They stay on its People list, marked suspended. Their other spaces are untouched.
+              Nothing is deleted.
+            </p>
+          ),
+          action: () => API.suspendUser(u.handle, org ? org.id : undefined),
+        })} />
+      ))}
+      {mayAct && removable && (
+        <IconButton icon="close" label={`Remove from ${org ? org.name : "this space"}`} danger onClick={() => onConfirm({
+          title: `Remove ${u.displayName} from ${where}?`,
+          confirmLabel: "Remove",
+          body: (
+            <p>
+              They come off {where}&apos;s courses and People list, and move to Former members.
+              Their account and their other spaces stay. They can come back with an invitation link
+              or a course code.
+            </p>
+          ),
+          action: () => API.removeFromSpace(u.handle, org ? org.id : undefined),
+        })} />
+      )}
+      {children}
+    </>
+  );
+}
+
+/*
+ * Reports learners sent about cards, as a list (0.580): search, Copy and
+ * Clear for what is ticked, and Open card, Copy and Clear on each. Admin's
+ * Flags tab and Super admin's Reports drew this twice, the second as plain
+ * tiles with less on them; this is the one, and each screen says what its
+ * buttons do. `onClear` asks before it clears.
+ */
+export function ReportList({ flags, languages, busy, copying = false, copyingSays = "", selected, onSelectedChange, onCopy, onClear, onOpen }: {
+  flags: Flag[];
+  languages: Record<string, any>;
+  busy?: boolean;
+  copying?: boolean;
+  copyingSays?: string;
+  selected: Set<string>;
+  onSelectedChange: (next: Set<string>) => void;
+  onCopy: (flags: Flag[]) => void;
+  onClear: (ids: string[]) => void;
+  onOpen?: (flag: Flag) => void;
+}) {
+  return (
+    <ItemList
+      noun="flag"
+      items={flags}
+      /* In the toolbar rather than at the head of the tab: it
+         acts on the list, and the list is what the toolbar is
+         for. Everything, because that is the ordinary thing to
+         want — the ticked ones are a bulk action below, and one
+         at a time is a button on the tile. */
+      tools={
+        flags.length ? (
+          <Button
+            size="sm"
+            icon="copy"
+            disabled={copying}
+            onClick={() => onCopy(flags)}
+          >
+            {copyingSays || `Copy all ${plural(flags.length, "report")}`}
+          </Button>
+        ) : null
+      }
+      /* Full width, one to a row. A report is three or four lines
+         of somebody's words and a word in a script you may not
+         read quickly; in a grid of narrow tiles every one of them
+         wraps to a column and none of them can be skimmed. */
+      size="large"
+      busy={busy}
+      empty="Nothing reported. Learners flag a question from the answer screen, and what they send lands here."
+      match={(f, q) =>
+        flagTitle(f.kind).toLowerCase().includes(q) ||
+        (f.handleName || "").toLowerCase().includes(q) ||
+        (f.note || "").toLowerCase().includes(q) ||
+        (f.prompt || "").toLowerCase().includes(q) ||
+        (f.meaning || "").toLowerCase().includes(q)
+      }
+      selected={selected}
+      onSelectedChange={onSelectedChange}
+      bulkActions={[
+        {
+          label: "Copy",
+          icon: "copy",
+          /* In the order the list has them, not the order they
+             were ticked: an export read top to bottom should
+             match the screen it was taken from. */
+          onClick: (ids) => onCopy(flags.filter((f: Flag) => ids.includes(f.id))),
+        },
+        {
+          label: "Clear",
+          danger: true,
+          onClick: (ids) => onClear(ids),
+        },
+      ]}
+      renderItem={(f) => {
+        const state = CARD_STATES[f.cardState || ""] || null;
+        const gist = gistOf(f.note);
+        /* The words are in the title now, so the report does not
+           say them twice — unless the title could not hold all of
+           them, which is the only reason to set them out below. */
+        const said = String(f.note || "").trim();
+        const rest = said && said !== gist ? f.note : "";
+        return (
+          <Tile
+            title={
+              <>
+                {flagTitle(f.kind)}
+                {/* Their words, at the weight of an answer rather
+                    than of a heading: what the report is called
+                    is still the first thing read. */}
+                {gist && <span className="at-flagsaid">: {gist}</span>}
+              </>
+            }
+            /* Spelled out rather than left as a name beside a
+               date: on a screen of reports about other people's
+               cards, a bare name reads as easily as whose card it
+               was as who complained about it. */
+            meta={`Submitted by ${f.handleName || f.handle} · ${dateTime(f.at)}`}
+            actions={
+              <>
+                {onOpen && (!state || state.openable) && f.cardId && (
+                  <Button
+                    size="sm"
+                    icon="view"
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      onOpen(f);
+                    }}
+                  >
+                    Open card
+                  </Button>
+                )}
+                <IconButton
+                  icon="copy"
+                  label="Copy this report"
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    onCopy([f]);
+                  }}
+                />
+                <IconButton
+                  icon="delete"
+                  label="Clear this report"
+                  danger
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    onClear([f.id]);
+                  }}
+                />
+              </>
+            }
+            footer={
+              <div className="at-flagreport">
+                {/* The rest of what they wrote, where the title
+                    ran out — so it carries straight on from the
+                    line above rather than turning up between the
+                    question and the small facts under it, which
+                    is where it used to sit and read as a caption
+                    on the wrong thing. */}
+                {rest && <p className="at-flagreport-note">{rest}</p>}
+                {/* The question as it was asked, copied into the
+                    report when it was sent: the card may have been
+                    edited or withdrawn since, and an id on its own
+                    would say nothing. Set in its own script and
+                    direction, like every other place the app shows
+                    a word — a right-to-left word laid out
+                    left-to-right is the thing an administrator
+                    would misread first. */}
+                {f.prompt && (
+                  <p className="at-flagreport-q" lang={f.language} dir={dirOf(languages, f.language)}
+                    style={scriptStyle(languages, f.language)}>
+                    {f.prompt}
+                  </p>
+                )}
+                {f.meaning && <p className="at-flagreport-en">{f.meaning}</p>}
+                <div className="at-flagfoot">
+                  <Help>{exerciseLabel(languages, f.language, f.exercise)}</Help>
+                  {/* What became of the card since. Said on the
+                      tile rather than found on opening it: it is
+                      what decides whether the report is still
+                      worth acting on. */}
+                  {state && (
+                    <span
+                      className={`at-flag${state.tone ? " " + state.tone : ""}`}
+                      title={state.what}
+                    >
+                      {state.label}
+                    </span>
+                  )}
+                </div>
+              </div>
+            }
+          />
+        );
+      }}
+    />
+  );
+}
+
+/*
+ * A question that must be answered before something is done, and the
+ * dialog that asks it (0.580): `ask` puts it up, Yes runs its action
+ * through the screen's `run`, and it closes once that worked. `after` is
+ * anything the screen does next. Admin, Super admin's Spaces and Everyone
+ * each held this by hand; Teaching's dialogs are of several kinds with
+ * their own wording and keep their own.
+ */
+function useConfirm(
+  run: (fn: () => Promise<any>) => Promise<any>,
+  { busy, after }: { busy?: boolean; after?: (p: Pending) => void } = {},
+) {
+  const [confirm, setConfirm] = useState<Pending | null>(null);
+  const modal = confirm ? (
+    <ConfirmModal
+      {...confirm}
+      busy={busy}
+      onCancel={() => setConfirm(null)}
+      onConfirm={async () => {
+        const ok = await run(async () => {
+          await confirm.action();
+          return true;
+        });
+        if (ok) {
+          setConfirm(null);
+          if (after) after(confirm);
+        }
+      }}
+    />
+  ) : null;
+  return { confirm, setConfirm, modal };
+}
 
 export function CodeBox({ label, code, hint, onNew, busy, long = false }: {
   label?: Node;
@@ -655,28 +938,6 @@ export function CodeBox({ label, code, hint, onNew, busy, long = false }: {
 }
 
 
-/* The bar that appears once something is ticked. */
-export function SelectionBar({ count, noun, onClear, children }: {
-  count: number;
-  noun: string;
-  onClear?: () => void;
-  children?: Node;
-}) {
-  if (!count) return null;
-  return (
-    <div className="at-bulkbar at-mb3">
-      <div className="at-bulkhead">
-        <strong>
-          {plural(count, noun)} selected
-        </strong>
-        <Button variant="ghost" size="sm" onClick={onClear}>
-          Clear
-        </Button>
-      </div>
-      <div className="at-chips">{children}</div>
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------
    Backup
@@ -1112,64 +1373,6 @@ export function verifyBackup(file: any) {
    is passed in rather than the page being written twice.
    ------------------------------------------------------------------ */
 
-/*
- * Search behind a button at the end of a heading's line. Pressed, the field
- * grows out of the button leftwards, over the heading, and takes the
- * typing; the button becomes the way to close it, which also clears what
- * was typed — a list left narrowed under a heading that no longer says so
- * would look like courses had gone missing. Leaving the field empty closes
- * it as well.
- */
-function HeadSearch({ label, query, onQuery }: {
-  label: string;
-  query: string;
-  onQuery: (q: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const field = useRef<HTMLInputElement | null>(null);
-  const close = () => {
-    onQuery("");
-    setOpen(false);
-  };
-  return (
-    <div className={`at-headsearch${open ? " open" : ""}`}>
-      <input
-        ref={field}
-        className="at-input at-headsearchfield"
-        type="search"
-        dir="auto"
-        placeholder={label}
-        aria-label={label}
-        tabIndex={open ? 0 : -1}
-        aria-hidden={open ? undefined : true}
-        value={query}
-        onChange={(e) => onQuery(e.target.value)}
-        onKeyDown={(e) => { if (e.key === "Escape") close(); }}
-        onBlur={() => { if (!query.trim()) setOpen(false); }}
-      />
-      <button
-        type="button"
-        className="at-icon at-headsearchbtn"
-        title={open ? "Close search" : label}
-        aria-label={open ? "Close search" : label}
-        aria-expanded={open}
-        /* Pressing the button must not first blur the field, which would
-           close it and leave the press to open it again. */
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => {
-          if (open) {
-            close();
-            return;
-          }
-          setOpen(true);
-          field.current?.focus();
-        }}
-      >
-        <Icon name={open ? "close" : "search"} />
-      </button>
-    </div>
-  );
-}
 
 export function CoursesPage({
   courses,
@@ -1206,8 +1409,6 @@ export function CoursesPage({
   footer?: Node;
 }) {
   const [code, setCode] = useState("");
-  const [query, setQuery] = useState("");
-
   return (
     <>
       <Help>
@@ -1220,40 +1421,20 @@ export function CoursesPage({
           an empty box only asks what went missing. The lead above already
           says what to do, so the join box below is the whole screen until
           there is a first course. */}
-      {/* One section per space for someone in several (memberships); the
-          search sits beside the first heading and narrows every one. */}
-      {courses.length > 0 && groups && groups.filter((g) => g.courses.length > 0).map((g, i) => (
-        <section className="at-section at-coursesection" key={g.key} data-el="courses-of-space">
-          <div className="at-headrow">
-            <h3 className="at-sectionhead">{g.title}</h3>
-            {i === 0 && <HeadSearch label="Search courses" query={query} onQuery={setQuery} />}
-          </div>
+      {/* One list, with its own search (0.580); for someone in several
+          spaces (memberships), headed by space within it. */}
+      {courses.length > 0 && (
+        <section className="at-section at-coursesection" data-el="courses-of-space">
+          <h3 className="at-sectionhead">My courses</h3>
           <ItemList
             noun="course"
-            query={query}
-            items={g.courses}
+            items={groups ? groups.flatMap((g) => g.courses) : courses}
             size="large"
             busy={busy}
-            empty=""
+            empty="No courses match."
             match={(c, q) => c.title.toLowerCase().includes(q)}
-            renderItem={renderCourse}
-          />
-        </section>
-      ))}
-      {courses.length > 0 && !groups && (
-        <section className="at-section at-coursesection">
-          <div className="at-headrow">
-            <h3 className="at-sectionhead">My courses</h3>
-            <HeadSearch label="Search courses" query={query} onQuery={setQuery} />
-          </div>
-          <ItemList
-            noun="course"
-            query={query}
-            items={courses}
-            size="large"
-            busy={busy}
-            empty=""
-            match={(c, q) => c.title.toLowerCase().includes(q)}
+            groups={groups ? groups.map((g) => ({ key: g.key, label: String(g.title) })) : undefined}
+            groupOf={groups ? (c) => (groups.find((g) => g.courses.includes(c)) || { key: "" }).key : undefined}
             renderItem={renderCourse}
           />
         </section>
@@ -1725,8 +1906,8 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
 }) {
   const [tab, setTab] = useState(superMode ? "orgs" : "courses");
   const [data, setData] = useState<import("./types.ts").AdminOverview | null>(recallSpace("admin", account.handle));
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  /* See useRun: what is done here refreshes the overview after it. */
+  const { run, busy, setBusy, error, setError } = useRun({ refresh: () => refresh() });
   const [title, setTitle] = useState("");
   const [lang, setLang] = useState(Object.keys(languages)[0]);
   const [newKey, setNewKey] = useState<Record<string, any> | null>(null);
@@ -1769,7 +1950,12 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
   const [deckOwner, setDeckOwner] = useState("");
   /* One slot for whatever is waiting to be confirmed, so only one of these
      can ever be on screen at a time. */
-  const [confirm, setConfirm] = useState<Pending | null>(null);
+  const { setConfirm, modal: confirmModal } = useConfirm(run, {
+    busy,
+    after: (p) => {
+      if (p.closeAfter) setOpenCourse2(null);
+    },
+  });
   /* The space's admins, from the overview (0.544). */
   const leads = new Set((data && data.invite && data.invite.admins) || []);
 
@@ -1789,7 +1975,7 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
     } finally {
       if (!background) setBusy(false);
     }
-  }, [account.handle]);
+  }, [account.handle, setBusy, setError]);
 
   /* Whether this mount had something to show before it asked. Read once,
      at the first render: what matters is how the space arrived, not what
@@ -1825,18 +2011,6 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
      whatever the call returned when the message wants to name the thing —
      "Beginner Arabic created" rather than "Saved". Said after the refresh,
      so the lists are already showing what it is confirming. */
-  async function run(fn: () => Promise<any>, done?: string | ((out: any) => string)) {
-    setBusy(true);
-    try {
-      const out = await fn();
-      await refresh();
-      setError("");
-      if (done) snack(typeof done === "function" ? done(out) : done, "good");
-    } catch (e) {
-      setError(API.explain(e));
-      setBusy(false);
-    }
-  }
 
   /* The card a report is about, fetched when the report is opened rather
      than carried by the overview: Admin holds decks, not cards, and a site
@@ -1965,20 +2139,7 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
     }
     return (
       <>
-        {confirm && (
-          <ConfirmModal
-            {...confirm}
-            busy={busy}
-            onCancel={() => setConfirm(null)}
-            onConfirm={() =>
-              run(async () => {
-                await confirm.action();
-                if (confirm.closeAfter) setOpenCourse2(null);
-                setConfirm(null);
-              })
-            }
-          />
-        )}
+        {confirmModal}
         <CourseSettings
           course={c}
           users={users}
@@ -2077,26 +2238,12 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
       onTab={setTab}
       error={error}
       busy={busy}
-      dialog={
-        confirm ? (
-          <ConfirmModal
-            {...confirm}
-            busy={busy}
-            onCancel={() => setConfirm(null)}
-            onConfirm={() =>
-              run(async () => {
-                await confirm.action();
-                setConfirm(null);
-              })
-            }
-          />
-        ) : null
-      }
+      dialog={confirmModal}
     >
 
           {superMode && tab === "orgs" && account.admin && <SpacesTab />}
           {superMode && tab === "everyone" && account.admin && <EveryonePeople me={account.handle} />}
-          {superMode && tab === "allflags" && account.admin && <EveryReport />}
+          {superMode && tab === "allflags" && account.admin && <EveryReport languages={languages} />}
 
           {tab === "courses" && (
             <>
@@ -2202,24 +2349,12 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
               <Section head title="This space's people">
               {newKey && (
                 <div className="at-sub">
-                  <p className="at-eyebrow">
-                    {newKey.fresh ? "Sign-in key for" : "New sign-in key for"} {newKey.name}
-                  </p>
-                  <p className="at-key">{newKey.key}</p>
-                  {newKey.handle && (
-                    <Help>
-                      Their handle is <strong>{newKey.handle}</strong>.
-                    </Help>
-                  )}
+                  <CodeBox
+                    label={`${newKey.fresh ? "Sign-in key for" : "New sign-in key for"} ${newKey.name}`}
+                    code={newKey.key}
+                    hint={newKey.handle ? <>Their handle is <strong>{newKey.handle}</strong>.</> : undefined}
+                  />
                   <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
-                    <Button size="sm"
-                      onClick={() =>
-                        navigator.clipboard && navigator.clipboard.writeText(newKey.key)
-                      }
-          icon="copy"
-        >
-          Copy the key
-        </Button>
                     <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>
                       Done
                     </Button>
@@ -2279,33 +2414,13 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
 </Field>
 
                   <Field label={<>Put them in a course <span className="at-optional">optional</span></>}>
-                    <div className="at-cklist">
-                      {courses.map((c) => (
-                        <button
-                          key={c.id}
-                          className={`at-ck${makingUser.courseId === c.id ? " on" : ""}`}
-                          onClick={() =>
-                            setMakingUser((u: any) => ({
-                              ...u,
-                              courseId: u.courseId === c.id ? "" : c.id,
-                            }))
-                          }
-                        >
-                          <span className="at-ckbox">
-                            {makingUser.courseId === c.id ? "✓" : ""}
-                          </span>
-                          <span className="at-cktext">
-                            <b>{c.title}</b>
-                            <i>{languageName(languages, c.language)}</i>
-                          </span>
-                        </button>
-                      ))}
-                      {!courses.length && (
-                        <Help>
-                          No courses yet. You can add them to one later.
-                        </Help>
-                      )}
-                    </div>
+                    <CheckList
+                      options={courses.map((c) => ({ id: c.id, title: c.title, note: languageName(languages, c.language) }))}
+                      chosen={makingUser.courseId ? [makingUser.courseId] : []}
+                      /* One course, or none: ticking another moves them. */
+                      onToggle={(id, wasOn) => setMakingUser((u: any) => ({ ...u, courseId: wasOn ? "" : id }))}
+                      empty="No courses yet. You can add them to one later."
+                    />
                   </Field>
 
                   {makingUser.courseId && (
@@ -2434,74 +2549,20 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                         <div className="at-deckmeta">{u.handle}</div>
                       </div>
                       <div className="at-deckacts">
-                        {(account.admin || !(u.admin || leads.has(u.handle))) && (
-                        <IconButton icon="key" label="Issue a new sign-in key" onClick={() =>
-                            setConfirm({
-                              title: `New sign-in key for ${u.displayName}?`,
-                              confirmLabel: "Issue a new key",
-                              body: (
-                                <p>
-                                  Their current key stops working the moment you do this, on
-                                  every device they use. Their handle, courses and progress are
-                                  untouched. You'll see the new key once.
-                                </p>
-                              ),
-                              action: async () => {
-                                const r = await API.reissueKey(u.handle);
-                                setNewKey({
-                                  name: u.displayName,
-                                  handle: u.handle,
-                                  key: r.key,
-                                });
-                              },
-                            })
-                          } />
-                        )}
                         {/* Suspending and removing (64a, 0.578): in this space
                             only; never yourself, an App admin, or — unless you
                             are the App admin — a space admin (70a). Someone
                             the super admin suspended everywhere is theirs. */}
-                        {mayAct(u) && !(u as any).suspendedApp && (u.suspended ? (
-                          <IconButton icon="unlock" label="Reactivate" onClick={() =>
-                            setConfirm({
-                              title: `Reactivate ${u.displayName}?`,
-                              confirmLabel: "Reactivate",
-                              body: <p>They can use this space again and are put back on the courses they were in.</p>,
-                              action: () => API.reactivateUser(u.handle),
-                            })
-                          } />
-                        ) : (
-                          <IconButton icon="lock" label="Suspend" onClick={() =>
-                            setConfirm({
-                              title: `Suspend ${u.displayName}?`,
-                              confirmLabel: "Suspend them",
-                              body: (
-                                <p>
-                                  In this space only: they come off its courses and can't use it
-                                  until you reactivate them. They stay on this list, marked
-                                  suspended. Their other spaces are untouched. Nothing is deleted.
-                                </p>
-                              ),
-                              action: () => API.suspendUser(u.handle),
-                            })
-                          } />
-                        ))}
-                        {mayAct(u) && (
-                          <IconButton icon="close" label="Remove from this space" danger onClick={() =>
-                            setConfirm({
-                              title: `Remove ${u.displayName} from this space?`,
-                              confirmLabel: "Remove",
-                              body: (
-                                <p>
-                                  They come off this space's courses and this list, and move to
-                                  Former members. Their account and their other spaces stay. They
-                                  can come back with an invitation link or a course code.
-                                </p>
-                              ),
-                              action: () => API.removeFromSpace(u.handle),
-                            })
-                          } />
-                        )}
+                        <PersonActions
+                          person={u}
+                          mayKey={!!(account.admin || !(u.admin || leads.has(u.handle)))}
+                          mayAct={mayAct(u)}
+                          suspendable={!(u as any).suspendedApp}
+                          suspendedHere={!!u.suspended}
+                          removable
+                          onConfirm={setConfirm}
+                          onNewKey={setNewKey}
+                        />
                       </div>
                     </div>
                     {/* Admin is a flag on the person, not a course they are
@@ -2811,179 +2872,40 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                 </Screen>
               )}
 
-              <ItemList
-                noun="flag"
-                items={flags}
-                /* In the toolbar rather than at the head of the tab: it
-                   acts on the list, and the list is what the toolbar is
-                   for. Everything, because that is the ordinary thing to
-                   want — the ticked ones are a bulk action below, and one
-                   at a time is a button on the tile. */
-                tools={
-                  flags.length ? (
-                    <Button
-                      size="sm"
-                      icon="copy"
-                      disabled={!!exporting && !exporting.text}
-                      onClick={() => copyFlags(flags)}
-                    >
-                      {exporting && !exporting.text
-                        ? `Reading the cards… ${exporting.done}/${exporting.total}`
-                        : `Copy all ${plural(flags.length, "report")}`}
-                    </Button>
-                  ) : null
-                }
-                /* Full width, one to a row. A report is three or four lines
-                   of somebody's words and a word in a script you may not
-                   read quickly; in a grid of narrow tiles every one of them
-                   wraps to a column and none of them can be skimmed. */
-                size="large"
+              <ReportList
+                flags={flags}
+                languages={languages}
                 busy={busy}
-                empty="Nothing reported. Learners flag a question from the answer screen, and what they send lands here."
-                match={(f, q) =>
-                  flagTitle(f.kind).toLowerCase().includes(q) ||
-                  (f.handleName || "").toLowerCase().includes(q) ||
-                  (f.note || "").toLowerCase().includes(q) ||
-                  (f.prompt || "").toLowerCase().includes(q) ||
-                  (f.meaning || "").toLowerCase().includes(q)
-                }
+                copying={!!exporting && !exporting.text}
+                copyingSays={exporting && !exporting.text ? `Reading the cards… ${exporting.done}/${exporting.total}` : ""}
                 selected={selFlags}
                 onSelectedChange={setSelFlags}
-                bulkActions={[
-                  {
-                    label: "Copy",
-                    icon: "copy",
-                    /* In the order the list has them, not the order they
-                       were ticked: an export read top to bottom should
-                       match the screen it was taken from. */
-                    onClick: (ids) => copyFlags(flags.filter((f: Flag) => ids.includes(f.id))),
-                  },
-                  {
-                    label: "Clear",
-                    danger: true,
-                    onClick: (ids) =>
-                      setConfirm({
-                        title: `Clear ${plural(ids.length, "flag")}?`,
-                        confirmLabel: "Clear them",
-                        body: (
-                          <p>
-                            They go for good. Nothing about the cards changes — clearing a report
-                            says it has been dealt with, not that it was right.
-                          </p>
-                        ),
-                        action: async () => {
-                          await API.deleteFlags([...ids]);
-                          setSelFlags(new Set());
-                        },
-                      }),
-                  },
-                ]}
-                renderItem={(f) => {
-                  const state = CARD_STATES[f.cardState || ""] || null;
-                  const gist = gistOf(f.note);
-                  /* The words are in the title now, so the report does not
-                     say them twice — unless the title could not hold all of
-                     them, which is the only reason to set them out below. */
-                  const said = String(f.note || "").trim();
-                  const rest = said && said !== gist ? f.note : "";
-                  return (
-                    <Tile
-                      title={
-                        <>
-                          {flagTitle(f.kind)}
-                          {/* Their words, at the weight of an answer rather
-                              than of a heading: what the report is called
-                              is still the first thing read. */}
-                          {gist && <span className="at-flagsaid">: {gist}</span>}
-                        </>
-                      }
-                      /* Spelled out rather than left as a name beside a
-                         date: on a screen of reports about other people's
-                         cards, a bare name reads as easily as whose card it
-                         was as who complained about it. */
-                      meta={`Submitted by ${f.handleName || f.handle} · ${dateTime(f.at)}`}
-                      actions={
-                        <>
-                          {(!state || state.openable) && f.cardId && (
-                            <Button
-                              size="sm"
-                              icon="view"
-                              onClick={(e: React.MouseEvent) => {
-                                e.stopPropagation();
-                                openFlaggedCard(f);
-                              }}
-                            >
-                              Open card
-                            </Button>
-                          )}
-                          <IconButton
-                            icon="copy"
-                            label="Copy this report"
-                            onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation();
-                              copyFlags([f]);
-                            }}
-                          />
-                          <IconButton
-                            icon="delete"
-                            label="Clear this report"
-                            danger
-                            onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation();
-                              setConfirm({
-                                title: "Clear this report?",
-                                confirmLabel: "Clear it",
-                                body: <p>It goes for good. Nothing about the card changes.</p>,
-                                action: () => API.deleteFlags([f.id]),
-                              });
-                            }}
-                          />
-                        </>
-                      }
-                      footer={
-                        <div className="at-flagreport">
-                          {/* The rest of what they wrote, where the title
-                              ran out — so it carries straight on from the
-                              line above rather than turning up between the
-                              question and the small facts under it, which
-                              is where it used to sit and read as a caption
-                              on the wrong thing. */}
-                          {rest && <p className="at-flagreport-note">{rest}</p>}
-                          {/* The question as it was asked, copied into the
-                              report when it was sent: the card may have been
-                              edited or withdrawn since, and an id on its own
-                              would say nothing. Set in its own script and
-                              direction, like every other place the app shows
-                              a word — a right-to-left word laid out
-                              left-to-right is the thing an administrator
-                              would misread first. */}
-                          {f.prompt && (
-                            <p className="at-flagreport-q" lang={f.language} dir={dirOf(languages, f.language)}
-                              style={scriptStyle(languages, f.language)}>
-                              {f.prompt}
-                            </p>
-                          )}
-                          {f.meaning && <p className="at-flagreport-en">{f.meaning}</p>}
-                          <div className="at-flagfoot">
-                            <Help>{exerciseLabel(languages, f.language, f.exercise)}</Help>
-                            {/* What became of the card since. Said on the
-                                tile rather than found on opening it: it is
-                                what decides whether the report is still
-                                worth acting on. */}
-                            {state && (
-                              <span
-                                className={`at-flag${state.tone ? " " + state.tone : ""}`}
-                                title={state.what}
-                              >
-                                {state.label}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      }
-                    />
-                  );
-                }}
+                onCopy={copyFlags}
+                onOpen={openFlaggedCard}
+                onClear={(ids) => setConfirm(ids.length === 1
+                  ? {
+                      title: "Clear this report?",
+                      confirmLabel: "Clear it",
+                      body: <p>It goes for good. Nothing about the card changes.</p>,
+                      action: async () => {
+                        await API.deleteFlags([...ids]);
+                        setSelFlags(new Set());
+                      },
+                    }
+                  : {
+                      title: `Clear ${plural(ids.length, "flag")}?`,
+                      confirmLabel: "Clear them",
+                      body: (
+                        <p>
+                          They go for good. Nothing about the cards changes — clearing a report
+                          says it has been dealt with, not that it was right.
+                        </p>
+                      ),
+                      action: async () => {
+                        await API.deleteFlags([...ids]);
+                        setSelFlags(new Set());
+                      },
+                    })}
               />
             </>
           )}
@@ -4904,12 +4826,6 @@ function StatusMenu({ card, disabled, onStatus }: {
   const [open, setOpen] = useState(false);
   /* The same close-on-anything-else the filter menus use, registered only
      while it is open. */
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
   const now = statusNow(card);
   const choices = statusChoices(card);
   const shown = statusLabel(card);
@@ -4944,7 +4860,7 @@ function StatusMenu({ card, disabled, onStatus }: {
           <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
         </button>
         {open && (
-          <Popover className="at-pickmenu at-statuspick" role="menu">
+          <Popover className="at-pickmenu at-statuspick" role="menu" onClose={() => setOpen(false)}>
             {choices.map((c) => (
               <button
                 key={c.value}
@@ -5256,8 +5172,13 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   /* The space's own name on the toggle (0.549), cut short when long, in full on hover. */
   const spaceName = shownName || (account.org && typeof account.org === "object" && account.org.name) || "Space";
   const decks = useMemo(() => allDecks.filter((d) => !!d.personal === mineSide), [allDecks, mineSide]);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  /* See useRun. A locked deck the server kept as it was outranks "done":
+     the teacher asked for a change that did not all happen. */
+  const { run, busy, setBusy, error, setError } = useRun({
+    snackErrors: true,
+    before: () => lockedHits.current.clear(),
+    instead: () => (lockedHits.current.size ? lockedNote(lockedHits.current) : null),
+  });
 
   const [courseView, setCourseView] = useState<any | null>(null);
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
@@ -5332,6 +5253,9 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   /* How many cards are waiting for a connection, so the space can say so
      rather than leaving a teacher to wonder where their work went. */
   const [kept, setKept] = useState(() => waitingToSend(CARD_OUTBOX));
+  /* Saves the server refused when they were sent from the queue, named
+     until the teacher dismisses them (0.580, audit finding 5). */
+  const [lastDropped, setLastDropped] = useState<{ name: string; msg: string }[] | null>(null);
   /* The teacher's own number systems, one per language they teach. Read
      when the screen that edits them is opened rather than on every visit
      to the card list: it is one request and most visits never want it. */
@@ -5433,7 +5357,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     } finally {
       if (!background) setBusy(false);
     }
-  }, [account.handle]);
+  }, [account.handle, setBusy, setError]);
 
   /* See AdminSpace: how this mount arrived, read once. Arriving with the
      last contents means the check for what has changed runs quietly. */
@@ -5822,7 +5746,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       const want = [...new Set([...had, ...into(m)])];
       /* Its decks alone: a teacher's copy of a published card with changes
          waiting is the changes, and sent whole it would publish them. */
-      if (want.length !== had.length) absorbSaved(await API.saveCard(m.existing, want, { touched: ["decks"] }));
+      if (want.length !== had.length) absorbSaved(await API.saveCard(m.existing, want, { touched: ["decks"], decksWere: had }));
     }
     setImporting(false);
     await refresh();
@@ -6322,28 +6246,6 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     },
   ];
 
-  /* See the note on AdminSpace's run: `done` is the confirmation, and may
-     be a function of what the call returned. */
-  async function run(fn: () => Promise<any>, done?: string | ((out: any) => string)) {
-    setBusy(true);
-    lockedHits.current.clear();
-    try {
-      const out = await fn();
-      setError("");
-      /* A locked deck the server kept as it was outranks "done": the
-         teacher asked for a change that did not all happen. */
-      if (lockedHits.current.size) snack(lockedNote(lockedHits.current), "warn");
-      else if (done) snack(typeof done === "function" ? done(out) : done, "good");
-      /* What it made, for a caller that has to know whether it did. */
-      return out;
-    } catch (e) {
-      setError(API.explain(e));
-      return undefined;
-    } finally {
-      setBusy(false);
-    }
-  }
-
   /**
    * A language's numbers and its clock, fetched when they are wanted.
    *
@@ -6475,8 +6377,12 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   };
   /* A save straight to the server, naming what it changed — for the
      screens that do not keep a save for later. */
+  /* With the decks this screen believed the card was in, so the server
+     applies only what was added or taken away (0.580). */
   const saveNamed = (card: Partial<Card>, decks: string[]) =>
-    API.saveCard(card, decks, card.id ? { touched: touchedBy(card, decks) } : { personal: mineSide });
+    API.saveCard(card, decks, card.id
+      ? { touched: touchedBy(card, decks), decksWere: card.decks || [] }
+      : { personal: mineSide });
   const sendOrKeep = useCallback(async (card: Partial<Card>, decks: string[], given: API.SaveExtra = {}) => {
     /* A new card made on the My space side is personal, for good (0.545). */
     const withSide = !card.id && mineSide ? { ...given, personal: true } : given;
@@ -6487,7 +6393,15 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       return await API.saveCard(card, decks, extra);
     } catch (e) {
       if (String((e && (e as Error).message) || e) !== "offline") throw e;
-      keepPending(CARD_OUTBOX, { card, decks, extra });
+      /* A space only being tried is never written to, later or now
+         (README, "Trying a space"). */
+      if (API.tryingSpace()) throw new Error("trying-space-save");
+      /* With the space it was made in, so it is sent there whatever space
+         the app is in when the connection comes back (0.580). */
+      const kept = keepPending(CARD_OUTBOX, { card, decks, extra, org: API.currentOrg() });
+      /* Nowhere to keep it: said, and the editor stays open with what was
+         typed (0.580, audit finding 6). */
+      if (!kept) throw new Error("device-full");
       setKept(waitingToSend(CARD_OUTBOX));
       return { kept: true };
     }
@@ -6499,16 +6413,32 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      because it will be refused again for the same reason. */
   const sendKeptCards = useCallback(async () => {
     if (isOffline()) return;
+    const dropped: { name: string; msg: string }[] = [];
+    const cardName = (c: Partial<Card>) =>
+      (c && (leadOf(c as Card).ar || c.name || leadOf(c as Card).en)) || "A card";
     const { sent } = await drainOutbox(CARD_OUTBOX, async (body) => {
-      const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra };
+      const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra; org?: string };
       try {
-        absorbSaved(await API.saveCard(held.card, held.decks, held.extra || {}));
+        absorbSaved(await API.saveCard(held.card, held.decks, held.extra || {}, held.org));
         return "sent";
       } catch (e) {
-        return String((e && (e as Error).message) || e) === "offline" ? "keep" : "drop";
+        /* Waited through anything that is not the server's own refusal; a
+           refusal drops it, and the teacher is told (0.580, audit finding 5). */
+        const msg = String((e && (e as Error).message) || e);
+        if (isTransient(msg)) return "keep";
+        dropped.push({ name: cardName(held.card), msg });
+        return "drop";
       }
     });
     setKept(waitingToSend(CARD_OUTBOX));
+    if (dropped.length) {
+      const n = dropped.length;
+      snack(
+        `${n} saved card${n === 1 ? "" : "s"} could not be sent and ${n === 1 ? "was" : "were"} discarded: ${API.explain(new Error(dropped[0].msg))}`,
+        "warn",
+      );
+      setLastDropped((was) => (was || []).concat(dropped));
+    }
     if (lockedHits.current.size) {
       snack(lockedNote(lockedHits.current), "warn");
       lockedHits.current.clear();
@@ -6653,58 +6583,6 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     );
   };
 
-  /* ---- reviewing a card's sentences takes over the screen ----
-     Its sentences are worked out against every card this teacher holds,
-     since what fills a blank is the whole collection. */
-  if (reviewing) {
-    const fresh = cards.find((c) => c.id === reviewing.id) || reviewing;
-    const pool = lendable.some((c) => c.id === fresh.id) ? lendable : lendable.concat([fresh]);
-    const lang = langOfCard(fresh) || languages[soleLang];
-    const took = (card: Card) => {
-      setEditing((e) => (e && e.card && e.card.id === card.id ? { ...e, card: { ...e.card, ...card }, opened: Date.now() } : e));
-    };
-    return (
-      <ReviewScreen
-        key={`${fresh.id}:${fresh.rev || 0}`}
-        card={fresh}
-        cards={pool}
-        lang={lang}
-        busy={busy}
-        onClose={() => setReviewing(null)}
-        onReview={async (change) => {
-          setBusy(true);
-          try {
-            const r = await API.reviewCard(fresh.id, change);
-            absorbSaved(r);
-            took(r.card);
-            setReviewing(null);
-            snack("Review saved", "good");
-          } finally {
-            setBusy(false);
-          }
-        }}
-        onNarrow={async (changed) => {
-          setBusy(true);
-          try {
-            let frame: Card | null = null;
-            for (const one of changed) {
-              const r: any = await sendOrKeep({ ...one, id: one.id, lang: one.lang || "" }, one.decks || []);
-              absorbSaved(r);
-              if (r && r.card && r.card.id === fresh.id) frame = r.card;
-            }
-            if (frame) {
-              took(frame);
-              setReviewing(frame);
-            }
-            snack(`Narrowed — ${plural(Math.max(0, changed.length - 1), "word")} tagged`, "good");
-          } finally {
-            setBusy(false);
-          }
-        }}
-      />
-    );
-  }
-
   /* ---- a new deck takes over the screen, like a new card ----
      Saved, it opens as the deck itself: that is where its courses, its
      lock and its cards are. */
@@ -6737,7 +6615,70 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      where it was left, scrolled where it was scrolled. The screen is
      portalled to the app's root, so where in the tree it sits decides
      nothing else. */
-  const cardScreen = editing ? (() => {
+  /* ---- reviewing a card's sentences takes over the screen ----
+     Its sentences are worked out against every card this teacher holds,
+     since what fills a blank is the whole collection. */
+  const reviewScreen = reviewing ? (() => {
+    const fresh = cards.find((c) => c.id === reviewing.id) || reviewing;
+    const pool = lendable.some((c) => c.id === fresh.id) ? lendable : lendable.concat([fresh]);
+    const lang = langOfCard(fresh) || languages[soleLang];
+    /*
+     * The editor's card, as the review left it.
+     *
+     * A review changes nothing the editor holds — the server keeps the
+     * review beside the card's words — so the editor stays as it is, with
+     * whatever the teacher had typed (0.580, audit finding 9). Narrowing a
+     * blank does change the card's words, and an editor left holding the
+     * old ones would quietly put them back on Save; that one, and only
+     * that one, draws the editor afresh.
+     */
+    const took = (card: Card, redraw = false) => {
+      setEditing((e) => (e && e.card && e.card.id === card.id
+        ? { ...e, card: { ...e.card, ...card }, ...(redraw ? { opened: Date.now() } : null) }
+        : e));
+    };
+    return (
+      <ReviewScreen
+        key={`${fresh.id}:${fresh.rev || 0}`}
+        card={fresh}
+        cards={pool}
+        lang={lang}
+        busy={busy}
+        onClose={() => setReviewing(null)}
+        onReview={async (change) => {
+          setBusy(true);
+          try {
+            const r = await API.reviewCard(fresh.id, change);
+            absorbSaved(r);
+            took(r.card);
+            setReviewing(null);
+            snack("Review saved", "good");
+          } finally {
+            setBusy(false);
+          }
+        }}
+        onNarrow={async (changed) => {
+          setBusy(true);
+          try {
+            let frame: Card | null = null;
+            for (const one of changed) {
+              const r: any = await sendOrKeep({ ...one, id: one.id, lang: one.lang || "" }, one.decks || []);
+              absorbSaved(r);
+              if (r && r.card && r.card.id === fresh.id) frame = r.card;
+            }
+            if (frame) {
+              took(frame, true);
+              setReviewing(frame);
+            }
+            snack(`Narrowed — ${plural(Math.max(0, changed.length - 1), "word")} tagged`, "good");
+          } finally {
+            setBusy(false);
+          }
+        }}
+      />
+    );
+  })() : null;
+  const editorScreen = editing ? (() => {
     const forDeck = editing.decks[0]
       ? decks.find((d) => d.id === editing.decks[0])
       : decks[0] || { courses: [] };
@@ -6754,6 +6695,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         decks={decksIn(new Set([(editLang || LANGUAGES[DEFAULT_LANGUAGE]).id]), editing.decks)}
         inDecks={editing.decks}
         busy={busy}
+        error={error}
         onClose={() => setEditing(null)}
         allCards={lendable}
         making={editing.making}
@@ -6913,7 +6855,9 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 /* A new card starts as a draft, and a change to a published
                    card waits for publishing — see "A card's status" in
                    save-card. Its decks, ID and tags apply at once. */
-                editing.card && editing.card.id ? { into: "changes" } : { status: "draft" },
+                /* With the decks the editor opened with, so only what the
+                   teacher added or took away is applied (0.580). */
+                editing.card && editing.card.id ? { into: "changes", decksWere: editing.decks } : { status: "draft" },
               );
               absorbSaved(r);
               /*
@@ -7136,6 +7080,15 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       />
     );
   })() : null;
+  /* The review is drawn over the card's editor where one is open, in the
+     same place in the tree, never instead of it: taking the editor down
+     took everything typed into it (0.580, audit finding 9). */
+  const cardScreen = editorScreen ? <>{editorScreen}{reviewScreen}</> : null;
+  if (reviewScreen && !editorScreen) return reviewScreen;
+
+
+
+
   /* ---- what a deck can hold besides cards: parts of the numbers, and
          pronouns ----
      Numbers are one document per language and pronouns one screen, so
@@ -8503,6 +8456,14 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               true of the space rather than of whichever list is on screen —
               and a teacher who has just written a card on a train should
               see that it is still coming however far down a list they are. */}
+          {lastDropped && lastDropped.length > 0 && (
+            <TopBanner
+              kind="error"
+              actions={<Button size="sm" variant="ghost" onClick={() => setLastDropped(null)}>Dismiss</Button>}
+            >
+              {`Not sent, and discarded: ${lastDropped.map((d) => `${d.name} (${API.explain(new Error(d.msg))})`).join("; ")}`}
+            </TopBanner>
+          )}
           {kept > 0 && (
             <TopBanner>
               {`${plural(kept, "card")} saved on this device, waiting for a connection. `}
@@ -9323,13 +9284,22 @@ function otherSpace(e: unknown): API.OrgCard | null {
    ------------------------------------------------------------------ */
 function SpacesTab() {
   const [orgs, setOrgs] = useState<API.OrgRow[] | null>(null);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  const { run: runIt, busy, error, setError } = useRun({ refresh: () => load(), quietDone: true });
   const [openId, setOpenId] = useState<string | null>(null);
   const [making, setMaking] = useState<{ name: string; slug: string; adminName: string; self: boolean } | null>(null);
   const [made, setMade] = useState<{ name: string; admin: string; key: string; slug: string } | null>(null);
-  const [confirm, setConfirm] = useState<Pending | null>(null);
-  const snack = useSnackbar();
+  /* Whether it worked, which a dialog waits on before it closes. */
+  const run = async (work: () => Promise<unknown>, said?: string) =>
+    (await runIt(async () => {
+      await work();
+      return true;
+    }, said)) === true;
+  const { setConfirm, modal: dialog } = useConfirm(run, {
+    busy,
+    after: (p) => {
+      if (p.closeAfter) setOpenId(null);
+    },
+  });
 
   const load = useCallback(async () => {
     try {
@@ -9337,42 +9307,13 @@ function SpacesTab() {
     } catch (e) {
       setError(API.explain(e));
     }
-  }, []);
+  }, [setError]);
   useEffect(() => {
     load();
   }, [load]);
 
-  async function run(work: () => Promise<unknown>, said?: string) {
-    setBusy(true);
-    setError("");
-    try {
-      await work();
-      await load();
-      if (said) snack(said);
-      return true;
-    } catch (e) {
-      setError(API.explain(e));
-      return false;
-    } finally {
-      setBusy(false);
-    }
-  }
 
   const open = orgs && openId ? orgs.find((o) => o.id === openId) || null : null;
-  const dialog = confirm ? (
-    <ConfirmModal
-      {...confirm}
-      busy={busy}
-      onCancel={() => setConfirm(null)}
-      onConfirm={async () => {
-        const ok = await run(confirm.action);
-        if (ok) {
-          setConfirm(null);
-          if (confirm.closeAfter) setOpenId(null);
-        }
-      }}
-    />
-  ) : null;
 
   if (making) {
     return (
@@ -9441,12 +9382,8 @@ function SpacesTab() {
       </Button>
       {made && (
         <div className="at-sub">
-          <p className="at-eyebrow">Sign-in key for {made.admin}, space admin of {made.name}</p>
-          <p className="at-key">{made.key}</p>
+          <CodeBox label={`Sign-in key for ${made.admin}, space admin of ${made.name}`} code={made.key} />
           <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
-            <Button size="sm" icon="copy" onClick={() => navigator.clipboard && navigator.clipboard.writeText(made.key)}>
-              Copy the key
-            </Button>
             <Button variant="ghost" size="sm" onClick={() => setMade(null)}>Done</Button>
           </div>
           <Help>
@@ -9455,8 +9392,15 @@ function SpacesTab() {
           </Help>
         </div>
       )}
-      <div className="at-decklist2">
-        {!orgs ? null : orgs.map((o) => (
+      {/* The library's list, with its search (0.580). */}
+      {orgs && (
+        <ItemList
+          noun="space"
+          items={orgs}
+          itemKey={(o) => o.id}
+          match={(o, q) => `${o.name} ${o.slug}`.toLowerCase().includes(q)}
+          empty="No spaces match."
+          renderItem={(o) => (
           <Tile key={o.id}
             title={o.name}
             meta={`manytongues.co/${o.slug} · ${plural(o.people.length, "person")}`}
@@ -9474,8 +9418,9 @@ function SpacesTab() {
             )}
             footer={o.archived ? <TileNote>Closed</TileNote> : null}
           />
-        ))}
-      </div>
+          )}
+        />
+      )}
     </>
   );
 }
@@ -9746,8 +9691,13 @@ function FormerMembers({ former, people, busy, ask }: {
   const [heir, setHeir] = useState("");
   return (
     <Section head title="Former members" lede="People who left, were removed or were deleted.">
-      <div className="at-decklist2">
-      {former.slice().reverse().map((r) => {
+      <ItemList
+        noun="former member"
+        items={former.slice().reverse()}
+        itemKey={(r) => r.handle}
+        match={(r, q) => `${r.displayName} ${r.handle}`.toLowerCase().includes(q)}
+        empty="Nobody matches."
+        renderItem={(r) => {
         const suspended = r.why === "left" || r.why === "removed";
         return (
           <Tile key={r.handle}
@@ -9796,8 +9746,8 @@ function FormerMembers({ former, people, busy, ask }: {
             }
           />
         );
-      })}
-      </div>
+      }}
+      />
       {handingFrom ? (
         <ConfirmModal
           title="Hand their material to…"
@@ -9917,16 +9867,16 @@ function EveryonePeople({ me }: { me: string }) {
   const [adding, setAdding] = useState<User | null>(null);
   const [addTo, setAddTo] = useState("");
   const [q, setQ] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [confirm, setConfirm] = useState<Pending | null>(null);
-  const [newKey, setNewKey] = useState<{ name: string; key: string } | null>(null);
+  /* See useRun and useConfirm: a yes runs, then the list is read again. */
+  const { run, busy, setBusy, error, setError } = useRun({ refresh: () => load() });
+  const { setConfirm, modal: confirmModal } = useConfirm(run, { busy });
+  const [newKey, setNewKey] = useState<{ name: string; handle?: string; key: string } | null>(null);
   /* Everyone once, or under each of their spaces (0.578). */
   const [view, setView] = useState<"all" | "spaces">("all");
   /* Taking one space away from someone (0.578): who, and which. */
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeFrom, setRemoveFrom] = useState("");
-  const load = useCallback(() => API.everyone().then((r) => setData(r), (e) => setError(API.explain(e))), []);
+  const load = useCallback(() => API.everyone().then((r) => setData(r), (e) => setError(API.explain(e))), [setError]);
   useEffect(() => {
     load();
   }, [load]);
@@ -9953,15 +9903,20 @@ function EveryonePeople({ me }: { me: string }) {
     const theirSpaces = spacesOf(u).map((id) => (data && data.orgs.find((x) => x.id === id)) || null).filter(Boolean) as API.SuperOrg[];
     return (
       <>
-        <IconButton icon="key" label="Issue a new sign-in key" onClick={() => setConfirm({
-          title: `New sign-in key for ${u.displayName}?`,
-          confirmLabel: "Issue a new key",
-          body: <p>Their current key stops working at once. You'll see the new one once.</p>,
-          action: async () => {
-            const r = await API.reissueKey(u.handle, keyOrg);
-            setNewKey({ name: u.displayName, key: r.key });
-          },
-        })} />
+        <PersonActions
+          person={u}
+          org={o}
+          keyOrg={keyOrg}
+          mayKey
+          /* Under a space, its own actions; in All, taking a space away
+             asks which, below. */
+          mayAct={others && !!o}
+          suspendable={!u.suspendedApp}
+          suspendedHere={!!o && (hereWhy === "suspended" || gone(u, o.id))}
+          removable={!!o && !gone(u, o.id)}
+          onConfirm={setConfirm}
+          onNewKey={setNewKey}
+        />
         {/* Yourself too, as the super admin (0.575). */}
         {(!u.admin || u.handle === me) && data && data.orgs.some((x) => !x.archived && !spacesOf(u).includes(x.id)) && (
           <IconButton icon="add" label="Add to a space" onClick={() => {
@@ -9969,39 +9924,12 @@ function EveryonePeople({ me }: { me: string }) {
             setAdding(u);
           }} />
         )}
-        {/* Taking a space away (0.578): the one a row is under, or a
-            choice of theirs in All. */}
-        {others && (o ? !gone(u, o.id) : removable.length > 0) && (
-          <IconButton icon="close" label={o ? `Remove from ${o.name}` : "Remove from a space"} onClick={() => {
-            if (o) {
-              setConfirm({
-                title: `Remove ${u.displayName} from ${o.name}?`,
-                confirmLabel: "Remove",
-                body: <p>They come off {o.name}'s courses and People list, and move to its Former members. Their account and their other spaces stay.</p>,
-                action: () => API.removeFromSpace(u.handle, o.id),
-              });
-            } else {
-              setRemoveFrom(removable.length === 1 ? removable[0] : "");
-              setRemoving(u);
-            }
+        {others && !o && removable.length > 0 && (
+          <IconButton icon="close" label="Remove from a space" onClick={() => {
+            setRemoveFrom(removable.length === 1 ? removable[0] : "");
+            setRemoving(u);
           }} />
         )}
-        {/* Suspending in one space, under that space (64a). */}
-        {others && o && !u.suspendedApp && (hereWhy === "suspended" || gone(u, o.id) ? (
-          <IconButton icon="unlock" label={`Reactivate in ${o.name}`} onClick={() => setConfirm({
-            title: `Reactivate ${u.displayName} in ${o.name}?`,
-            confirmLabel: "Reactivate",
-            body: <p>They can use {o.name} again and are put back on its courses they were in.</p>,
-            action: () => API.reactivateUser(u.handle, o.id),
-          })} />
-        ) : (
-          <IconButton icon="lock" label={`Suspend in ${o.name}`} onClick={() => setConfirm({
-            title: `Suspend ${u.displayName} in ${o.name}?`,
-            confirmLabel: "Suspend them",
-            body: <p>In {o.name} only: they come off its courses and can't use it until reactivated. Their other spaces are untouched.</p>,
-            action: () => API.suspendUser(u.handle, o.id),
-          })} />
-        ))}
         {/* Across the whole app (0.578): yours alone, to lift too. */}
         {others && (u.suspendedApp ? (
           <IconButton icon="unlock" label="Lift the suspension everywhere" onClick={() => setConfirm({
@@ -10046,21 +9974,7 @@ function EveryonePeople({ me }: { me: string }) {
   };
   return (
     <>
-      {confirm && (
-        <ConfirmModal {...confirm} busy={busy} onCancel={() => setConfirm(null)}
-          onConfirm={async () => {
-            setBusy(true);
-            try {
-              await confirm.action();
-              setConfirm(null);
-              await load();
-            } catch (e) {
-              setError(API.explain(e));
-            } finally {
-              setBusy(false);
-            }
-          }} />
-      )}
+      {confirmModal}
       {adding && data && (() => {
         const theirs = (data.people.find((p) => p.handle === adding.handle) || {}) as { orgs?: string[]; org?: string };
         const inNow = theirs.orgs || (theirs.org ? [theirs.org] : []);
@@ -10162,10 +10076,8 @@ function EveryonePeople({ me }: { me: string }) {
         onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 14 }} />
       {newKey && (
         <div className="at-sub">
-          <p className="at-eyebrow">New sign-in key for {newKey.name}</p>
-          <p className="at-key">{newKey.key}</p>
+          <CodeBox label={`New sign-in key for ${newKey.name}`} code={newKey.key} />
           <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
-            <Button size="sm" icon="copy" onClick={() => navigator.clipboard && navigator.clipboard.writeText(newKey.key)}>Copy the key</Button>
             <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>Done</Button>
           </div>
         </div>
@@ -10173,8 +10085,16 @@ function EveryonePeople({ me }: { me: string }) {
       {data && view === "all" && (() => {
         const everyone = data.people.filter(match).slice().sort((a, b) => a.displayName.localeCompare(b.displayName));
         return (
-          <div className="at-decklist2 at-everyone" data-el="everyone-all">
-            {everyone.map((u) => {
+          <div className="at-everyone" data-el="everyone-all">
+            <ItemList
+              noun="person"
+              plural="people"
+              items={everyone}
+              itemKey={(u) => u.handle}
+              query={q}
+              match={(u, nq) => `${u.displayName} ${u.handle}`.toLowerCase().includes(nq)}
+              empty="Nobody matches."
+              renderItem={(u) => {
               const names = spacesOf(u).map((id) => {
                 const o = data.orgs.find((x) => x.id === id);
                 const why = whyIn(u, id);
@@ -10187,7 +10107,8 @@ function EveryonePeople({ me }: { me: string }) {
                   actions={actionsFor(u, null)}
                 />
               );
-            })}
+              }}
+            />
           </div>
         );
       })()}
@@ -10201,8 +10122,14 @@ function EveryonePeople({ me }: { me: string }) {
         if (!here.length) return null;
         return (
           <Section head key={o.id} title={o.name} lede={`manytongues.co/${o.slug}`}>
-            <div className="at-decklist2">
-            {here.map((u) => {
+            <ItemList
+              noun="person"
+              plural="people"
+              items={here}
+              itemKey={(u) => u.handle}
+              query={q}
+              match={(u, nq) => `${u.displayName} ${u.handle}`.toLowerCase().includes(nq)}
+              renderItem={(u) => {
               const why = whyIn(u, o.id);
               return (
                 <Tile key={u.handle}
@@ -10212,8 +10139,8 @@ function EveryonePeople({ me }: { me: string }) {
                   actions={actionsFor(u, o)}
                 />
               );
-            })}
-            </div>
+              }}
+            />
           </Section>
         );
       })}
@@ -10228,7 +10155,10 @@ function EveryonePeople({ me }: { me: string }) {
  * space, each with its space, to read and dismiss. A card is fixed from
  * inside its space.
  */
-function EveryReport() {
+function EveryReport({ languages }: { languages: Record<string, any> }) {
+  /* Ticked reports, per space (0.580: the same list Admin's Flags tab is). */
+  const [picked, setPicked] = useState<Record<string, Set<string>>>({});
+  const [clearing, setClearing] = useState<{ ids: string[]; org: string } | null>(null);
   const [data, setData] = useState<{ orgs: API.SuperOrg[]; flags: (Flag & { org: string })[]; feedback?: Feedback[] } | null>(null);
   const [error, setError] = useState("");
   /* Card reports or feedback about the app (0.552), and whichever was
@@ -10280,25 +10210,61 @@ function EveryReport() {
       {kind === "cards" ? (
         <>
           {!flags.length ? <Help>No reports in any space.</Help> : null}
-          <div className="at-decklist2">
-            {flags.map((f) => (
-              <Tile key={f.id}
-                title={`${flagTitle(f.kind)}${f.prompt ? ` · ${f.prompt}` : ""}`}
-                meta={`${nameOf(f.org)} · ${f.handleName || f.handle} · ${shortDate(f.at)}${f.note ? ` · "${f.note}"` : ""}`}
-                actions={
-                  <Button variant="ghost" size="sm" onClick={() => dismiss(() => API.deleteFlagsIn([f.id], f.org))}>
-                    Dismiss
-                  </Button>
-                }
-              />
-            ))}
-          </div>
+          {/* Each space's under its name, in the list Admin uses. */}
+          {[...new Set(flags.map((f) => f.org))].map((org) => {
+            const here = flags.filter((f) => f.org === org);
+            return (
+              <Section key={org} title={nameOf(org)} count={here.length}>
+                <ReportList
+                  flags={here}
+                  languages={languages}
+                  selected={picked[org] || new Set()}
+                  onSelectedChange={(next) => setPicked((was) => ({ ...was, [org]: next }))}
+                  onCopy={(chosen) => {
+                    const text = flagsToText(chosen, {
+                      at: Date.now(),
+                      release: APP_BUILD,
+                      cards: {},
+                      names: {
+                        kind: flagTitle,
+                        exercise: (language, type) => exerciseLabel(languages, language, type),
+                        course: () => "",
+                        deck: () => "",
+                        when: dateTime,
+                      },
+                    });
+                    if (navigator.clipboard) void navigator.clipboard.writeText(text);
+                  }}
+                  onClear={(ids) => setClearing({ ids, org })}
+                />
+              </Section>
+            );
+          })}
+          {clearing && (
+            <ConfirmModal
+              title={`Clear ${plural(clearing.ids.length, "report")}?`}
+              confirmLabel="Clear"
+              body={<p>They go for good. Nothing about the cards changes.</p>}
+              onCancel={() => setClearing(null)}
+              onConfirm={async () => {
+                const { ids, org } = clearing;
+                setClearing(null);
+                setPicked((was) => ({ ...was, [org]: new Set() }));
+                await dismiss(() => API.deleteFlagsIn(ids, org));
+              }}
+            />
+          )}
         </>
       ) : (
         <>
           {!feedback.length ? <Help>No feedback from any space.</Help> : null}
-          <div className="at-decklist2">
-            {feedback.map((f) => (
+          <ItemList
+            noun="report"
+            items={feedback}
+            itemKey={(f) => f.id}
+            match={(f, q) => `${feedbackTitle(f.kind)} ${f.handleName || f.handle} ${f.note || ""}`.toLowerCase().includes(q)}
+            empty="Nothing matches."
+            renderItem={(f) => (
               <Tile key={f.id}
                 title={feedbackTitle(f.kind)}
                 meta={`${nameOf(f.org)} · ${f.handleName || f.handle} · ${shortDate(f.at)}${f.screen ? ` · on ${f.screen}` : ""} · "${f.note}"`}
@@ -10308,8 +10274,8 @@ function EveryReport() {
                   </Button>
                 }
               />
-            ))}
-          </div>
+            )}
+          />
         </>
       )}
     </>

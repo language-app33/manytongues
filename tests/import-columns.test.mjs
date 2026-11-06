@@ -9,30 +9,10 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { build } from "esbuild";
-import path from "node:path";
-
-const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".import-columns-build");
-
-await build({
-  entryPoints: [path.join(here, "..", "src", "ArabicTrainer.tsx")],
-  outfile: path.join(out, "trainer.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
-const { parseLines } = await import(path.join(out, "trainer.js"));
-const { splitAlternatives } = await import(path.join(here, "..", "src", "answers.ts"));
+/* Read straight from the module it lives in (0.580): it used to be built
+   out of the whole trainer for the sake of this one function. */
+import { parseLines } from "../src/imports.ts";
+import { splitAlternatives } from "../src/answers.ts";
 
 test("numbered columns are further accepted answers", () => {
   const [row] = parseLines([

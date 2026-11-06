@@ -5,7 +5,7 @@
  * @typedef {ReturnType<typeof getStore>} Store
  */
 import { getStore } from "../store.js";
-import { forgetSyncDoc } from "./sync.js";
+import { forgetSyncDoc, moveSyncDoc } from "./sync.js";
 import { createHash, randomBytes } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 /* The one list of grammatical fields a card may carry, shared with the app so
@@ -84,11 +84,36 @@ const STORAGE_ERRORS = new Set(["EACCES", "EROFS", "ENOSPC", "ENOTDIR", "EPERM",
 /**
  * @param {unknown} body
  * @param {number} [status]
+ * @param {Record<string, string>} [headers] laid over the defaults
  */
-function json(body, status = 200) {
+function json(body, status = 200, headers = {}) {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { "content-type": "application/json", "cache-control": "no-store" },
+    headers: { "content-type": "application/json", "cache-control": "no-store", ...headers },
+  });
+}
+
+/* A recording or a picture is addressed by the hash of its own bytes, so
+   what one hash answers never changes. Private, because the request is
+   signed in with x-key and a shared cache must not keep it (0.580). */
+const FOREVER = { "cache-control": "private, max-age=31536000, immutable" };
+
+/**
+ * A list a screen asks for again and again (0.580, audit finding 17): the
+ * same answer as json(), with an ETag, and a bare 304 when the device
+ * already holds exactly this.
+ * @param {Request} req
+ * @param {unknown} body
+ */
+function jsonTagged(req, body) {
+  const text = JSON.stringify(body);
+  const etag = `"${sha(text).slice(0, 32)}"`;
+  if (req.headers.get("if-none-match") === etag) {
+    return new Response(null, { status: 304, headers: { etag, "cache-control": "no-store" } });
+  }
+  return new Response(text, {
+    status: 200,
+    headers: { "content-type": "application/json", "cache-control": "no-store", etag },
   });
 }
 
@@ -609,8 +634,13 @@ const writeJson = (store, key, value) => store.set(key, JSON.stringify(value));
  */
 async function updateJson(store, key, change) {
   /* Enough goes at it to outlast any contention a teaching site sees, and
-     few enough that a genuinely stuck key reports rather than spins. */
-  for (let i = 0; i < 8; i++) {
+     few enough that a genuinely stuck key reports rather than spins. Each
+     round only one of the writers racing for a key wins, so since the
+     indexes came through here (0.580) there are as many rounds as a burst
+     of writers needs, with a short random pause so they stop colliding in
+     step. */
+  for (let i = 0; i < 24; i++) {
+    if (i > 1) await new Promise((r) => setTimeout(r, Math.random() * Math.min(50, 2 * i)));
     const held = await store.getWithMetadata(key);
     /* Through the same parse every other read goes through, so a record
        that cannot be read throws here too rather than being quietly
@@ -763,8 +793,9 @@ async function readIndex(store, what) {
  * @param {string} id
  */
 async function indexAdd(store, what, id) {
-  const list = await readIndex(store, what);
-  if (!list.includes(id)) await writeJson(store, K.index(what), list.concat([id]));
+  /* Conditional, so two adds at once both land (0.580). */
+  await updateJson(store, K.index(what), (/** @type {string[] | null} */ cur) =>
+    (cur || []).includes(id) ? null : (cur || []).concat([id]));
 }
 
 /**
@@ -1116,39 +1147,8 @@ async function wipeAccount(store, handle, how = {}) {
     scopeNow.wide = kept.wide;
   }
 
-  /* Their personal cards, taken out of whatever decks hold them, then gone. */
-  const listed = (await readJson(store, K.myCards(handle))) || [];
-  const cards = (await readManyJson(store, listed.map((/** @type {string} */ id) => K.card(id)))).filter(Boolean);
-  const personalCards = new Set(cards.filter((c) => c.personal).map((c) => c.id));
-  for (const c of cards.filter((x) => x.personal)) {
-    for (const did of c.inDecks || []) {
-      await updateJson(store, K.deck(did), (/** @type {any} */ fresh) => {
-        if (!fresh || !(fresh.cardIds || []).includes(c.id)) return null;
-        const next = fresh.cardIds.filter((/** @type {string} */ x) => x !== c.id);
-        return { ...fresh, cardIds: next, cardCount: next.length, version: (fresh.version || 1) + 1, updated: Date.now() };
-      });
-    }
-    await store.delete(K.card(c.id)).catch(() => {});
-  }
-  if (personalCards.size) {
-    await updateJson(store, K.myCards(handle), (/** @type {any} */ cur) =>
-      (cur || []).filter((/** @type {string} */ x) => !personalCards.has(x))
-    );
-  }
-
-  /* Their personal decks. A deck borrowing course cards (66b) goes alone:
-     those cards are the space's. */
-  const deckIds = await readIndex(store, "decks");
-  const decks = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(
-    (d) => d && d.owner === handle && d.personal
-  );
-  for (const d of decks) await store.delete(K.deck(d.id)).catch(() => {});
-  if (decks.length) {
-    const goneDecks = new Set(decks.map((d) => d.id));
-    await updateJson(store, K.index("decks"), (/** @type {any} */ cur) =>
-      (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x))
-    );
-  }
+  /* Their personal cards and decks, in every space. */
+  await clearPersonal(store, handle, "");
 
   if (user.keyHash) await store.delete(K.keyOf(user.keyHash)).catch(() => {});
   /* And the practice history, which the key's digest finds (86a). */
@@ -1165,6 +1165,52 @@ async function wipeAccount(store, handle, how = {}) {
     (cur || []).includes(handle) ? null : (cur || []).concat([handle])
   );
   return true;
+}
+
+/**
+ * A person's My space material — personal cards, taken out of whatever
+ * decks hold them, then personal decks — in one space, or in every space
+ * when `org` is "". Shared by closing an account and by taking one space
+ * away from it (0.580).
+ * @param {Store} store
+ * @param {string} handle
+ * @param {string} org
+ */
+async function clearPersonal(store, handle, org) {
+  const here = (/** @type {any} */ rec) => !org || orgOf(rec) === org;
+  const listed = (await readJson(store, K.myCards(handle))) || [];
+  const cards = (await readManyJson(store, listed.map((/** @type {string} */ id) => K.card(id)))).filter(
+    (c) => c && c.personal && here(c)
+  );
+  for (const c of cards) {
+    for (const did of c.inDecks || []) {
+      await updateJson(store, K.deck(did), (/** @type {any} */ fresh) => {
+        if (!fresh || !(fresh.cardIds || []).includes(c.id)) return null;
+        const next = fresh.cardIds.filter((/** @type {string} */ x) => x !== c.id);
+        return { ...fresh, cardIds: next, cardCount: next.length, version: (fresh.version || 1) + 1, updated: Date.now() };
+      });
+    }
+    await store.delete(K.card(c.id)).catch(() => {});
+  }
+  if (cards.length) {
+    const gone = new Set(cards.map((c) => c.id));
+    await updateJson(store, K.myCards(handle), (/** @type {any} */ cur) =>
+      (cur || []).filter((/** @type {string} */ x) => !gone.has(x))
+    );
+  }
+  /* A deck borrowing course cards (66b) goes alone: those cards are the
+     space's. */
+  const deckIds = await readIndex(store, "decks");
+  const decks = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(
+    (d) => d && d.owner === handle && d.personal && here(d)
+  );
+  for (const d of decks) await store.delete(K.deck(d.id)).catch(() => {});
+  if (decks.length) {
+    const goneDecks = new Set(decks.map((d) => d.id));
+    await updateJson(store, K.index("decks"), (/** @type {any} */ cur) =>
+      (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x))
+    );
+  }
 }
 
 /**
@@ -1196,37 +1242,7 @@ async function removeMembership(store, handle, org, how = {}) {
     );
 
     /* Their My space in this space: personal cards, then personal decks. */
-    const listed = (await readJson(store, K.myCards(handle))) || [];
-    const cards = (await readManyJson(store, listed.map((/** @type {string} */ id) => K.card(id)))).filter(
-      (c) => c && c.personal && orgOf(c) === org
-    );
-    for (const c of cards) {
-      for (const did of c.inDecks || []) {
-        await updateJson(store, K.deck(did), (/** @type {any} */ fresh) => {
-          if (!fresh || !(fresh.cardIds || []).includes(c.id)) return null;
-          const next = fresh.cardIds.filter((/** @type {string} */ x) => x !== c.id);
-          return { ...fresh, cardIds: next, cardCount: next.length, version: (fresh.version || 1) + 1, updated: Date.now() };
-        });
-      }
-      await store.delete(K.card(c.id)).catch(() => {});
-    }
-    if (cards.length) {
-      const gone = new Set(cards.map((c) => c.id));
-      await updateJson(store, K.myCards(handle), (/** @type {any} */ cur) =>
-        (cur || []).filter((/** @type {string} */ x) => !gone.has(x))
-      );
-    }
-    const deckIds = await readIndex(store, "decks");
-    const decks = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(
-      (d) => d && d.owner === handle && d.personal && orgOf(d) === org
-    );
-    for (const d of decks) await store.delete(K.deck(d.id)).catch(() => {});
-    if (decks.length) {
-      const goneDecks = new Set(decks.map((d) => d.id));
-      await updateJson(store, K.index("decks"), (/** @type {any} */ cur) =>
-        (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x))
-      );
-    }
+    await clearPersonal(store, handle, org);
 
     await updateJson(store, K.user(handle), (/** @type {any} */ cur) => {
       if (!cur) return null;
@@ -1762,7 +1778,8 @@ async function handle(req) {
     if (action === "rename") {
       const displayName = String(body.displayName || "").trim().slice(0, 40);
       if (!displayName) return json({ error: "name-required" }, 400);
-      await writeJson(store, K.user(mine), { ...me, displayName });
+      /* Conditional, so a membership written at the same moment is kept (0.580). */
+      await updateJson(store, K.user(mine), (/** @type {any} */ cur) => (cur ? { ...cur, displayName } : null));
       return json({ ok: true, displayName });
     }
 
@@ -1846,10 +1863,14 @@ async function handle(req) {
       /* Newest last, the way every other index here grows. Trimmed on the
          way in rather than on the way out, so the list an administrator
          reads is never one the server would have refused to keep. */
-      const ids = (await readIndex(store, "flags")).concat([flag.id]);
-      const dropped = ids.slice(0, Math.max(0, ids.length - MAX_FLAGS));
+      /** @type {string[]} */
+      let dropped = [];
+      await updateJson(store, K.index("flags"), (/** @type {string[] | null} */ cur) => {
+        const ids = (cur || []).filter((x) => x !== flag.id).concat([flag.id]);
+        dropped = ids.slice(0, Math.max(0, ids.length - MAX_FLAGS));
+        return ids.slice(dropped.length);
+      });
       for (const id of dropped) await store.delete(K.flag(id)).catch(() => {});
-      await writeJson(store, K.index("flags"), ids.slice(dropped.length));
       return json({ ok: true, id: flag.id });
     }
 
@@ -1876,10 +1897,14 @@ async function handle(req) {
         at: Date.now(),
       };
       await writeJson(store, K.feedback(item.id), item);
-      const ids = (await readIndex(store, "feedback")).concat([item.id]);
-      const dropped = ids.slice(0, Math.max(0, ids.length - MAX_FLAGS));
+      /** @type {string[]} */
+      let dropped = [];
+      await updateJson(store, K.index("feedback"), (/** @type {string[] | null} */ cur) => {
+        const ids = (cur || []).filter((x) => x !== item.id).concat([item.id]);
+        dropped = ids.slice(0, Math.max(0, ids.length - MAX_FLAGS));
+        return ids.slice(dropped.length);
+      });
       for (const id of dropped) await store.delete(K.feedback(id)).catch(() => {});
-      await writeJson(store, K.index("feedback"), ids.slice(dropped.length));
       return json({ ok: true, id: item.id });
     }
 
@@ -1888,7 +1913,7 @@ async function handle(req) {
       if (!process.env.ADMIN_KEY || String(body.adminKey || "") !== process.env.ADMIN_KEY) {
         return json({ error: "not-allowed" }, 401);
       }
-      await writeJson(store, K.user(mine), { ...me, admin: true });
+      await updateJson(store, K.user(mine), (/** @type {any} */ cur) => (cur ? { ...cur, admin: true } : null));
       return json({ ok: true });
     }
 
@@ -2358,7 +2383,8 @@ async function handle(req) {
       }
 
       /* Cards I own, plus any card sitting in a deck I look after. */
-      const extraIds = Object.keys(holding).filter((id) => !ids.includes(id));
+      const have = new Set(ids);
+      const extraIds = Object.keys(holding).filter((id) => !have.has(id));
       const extra = await readManyJson(store, extraIds.map((id) => K.card(id)));
       /* A co-teacher's card whose owner's pass has not run yet is shown as
          it will be once it has, so the editor never offers the tag it is
@@ -2372,7 +2398,7 @@ async function handle(req) {
          teacher hears about it — and a device that still has one can send
          it again. */
       const missingClips = await clipsMissing(store, cards.flatMap(clipsOfCard));
-      return json({ ok: true, cards: cards.map((c) => ({ ...teacherView(c), decks: holding[c.id] || [] })), missingClips });
+      return jsonTagged(req, { ok: true, cards: cards.map((c) => ({ ...teacherView(c), decks: holding[c.id] || [] })), missingClips });
     }
 
     if (action === "save-card") {
@@ -2388,6 +2414,15 @@ async function handle(req) {
       let wasFilling = false;
       /** @type {Card | null} */
       let existing = null;
+      /* Asked once per deck per request: each answer reads every course. */
+      /** @type {Map<string, Promise<boolean>>} */
+      const editable = new Map();
+      /** @param {Deck | null} d */
+      const mayEditDeck = (d) => {
+        if (!d) return Promise.resolve(false);
+        if (!editable.has(d.id)) editable.set(d.id, canEditDeck(store, d, mine, iManage));
+        return /** @type {Promise<boolean>} */ (editable.get(d.id));
+      };
       if (id) {
         existing = await loadCard(id);
         if (!existing) return json({ error: "no-card" }, 404);
@@ -2399,7 +2434,7 @@ async function handle(req) {
           let allowed = false;
           for (const did of current) {
             const d = await readDeck(store, did);
-            if (await canEditDeck(store, d, mine, iManage)) {
+            if (await mayEditDeck(d)) {
               allowed = true;
               break;
             }
@@ -3208,14 +3243,39 @@ async function handle(req) {
       /* Only the decks that gain or lose the card are read and written. A
          deck that keeps it is still bumped when the card's content changed,
          so the version a student's device compares against moves too. */
-      const wanted = wantedDecks && !(touched && !touched.includes("decks")) && !walk
-        ? new Set(wantedDecks)
+      /*
+       * Membership as a change, not a list (0.580, audit finding 11).
+       *
+       * A screen that sends `decksWere` — the decks it believed the card
+       * was in — is saying what it added and what it took away. That is
+       * laid over the decks the card is in now, read again here, so a
+       * screen that was out of date does not put back a deck somebody else
+       * removed or take away one they added. Without it, the list sent is
+       * the list, as older builds expect.
+       */
+      const decksWere = Array.isArray(body.decksWere) ? body.decksWere.map(String) : null;
+      const takesDecks = wantedDecks && !(touched && !touched.includes("decks")) && !walk;
+      if (takesDecks && decksWere && id) {
+        const now = await loadCard(id);
+        if (now) current = await decksHolding(now);
+      }
+      const wanted = takesDecks
+        ? decksWere
+          ? (() => {
+              const asked = new Set(wantedDecks.map(String));
+              const were = new Set(decksWere);
+              const add = [...asked].filter((x) => !were.has(x));
+              const remove = new Set([...were].filter((x) => !asked.has(x)));
+              return new Set([...current, ...add].filter((x) => !remove.has(x)));
+            })()
+          : new Set(wantedDecks)
         : new Set(current);
       /* Whether what students have of this card moved, which is what makes
          their devices fetch it again. A change to a draft, or to a
          published card's unpublished changes, moves nothing of theirs. */
       const liveMoved = seenByStudents(existing || { status: "draft" }) !== seenByStudents(saved);
       const reached = new Set([...current, ...wanted]);
+      /** @type {string[]} */
       const final = [];
       const deckRecords = [];
       /** @type {{ id: string, title: string }[]} */
@@ -3225,7 +3285,7 @@ async function handle(req) {
         if (!d) continue;
         const has = current.includes(did);
         const want = wanted.has(did);
-        if (want !== has && !(await canEditDeck(store, d, mine, iManage))) {
+        if (want !== has && !(await mayEditDeck(d))) {
           /* Not this person's deck to change: leave it as it was. */
           if (has) final.push(did);
           continue;
@@ -3263,7 +3323,11 @@ async function handle(req) {
          * write changes.
          */
         const record = await updateJson(store, K.deck(did), (fresh) => {
-          const base = fresh || d;
+          /* A deck deleted while this save ran stays deleted: writing it
+             back from the copy read above would bring it back with no
+             place in the index (0.580). */
+          if (!fresh) return null;
+          const base = fresh;
           const held = Array.isArray(base.cardIds) && base.cardIds.length ? base.cardIds : ids;
           const now = want
             ? held.includes(saved.id) ? held : held.concat([saved.id])
@@ -3277,6 +3341,7 @@ async function handle(req) {
           };
         });
         if (record) deckRecords.push(record);
+        else if (want) final.splice(final.indexOf(did), 1);
       }
       /*
        * A turn picked from a sentence card carries that sentence's words,
@@ -3370,7 +3435,40 @@ async function handle(req) {
         }
       }
       saved.inDecks = final;
-      await writeJson(store, K.card(saved.id), saved);
+      /*
+       * Two saves of one card at once keep both edits (0.580, audit
+       * findings 4 and 11).
+       *
+       * `saved` was worked out from the card as this request read it. If
+       * the card moved since — another tab, another teacher, a status
+       * change — only what this request changed is laid over the card as
+       * it stands now, field by top-level field. Two people changing the
+       * same field at the same moment still leaves the later one's; see
+       * DECISIONS.md. The decks are this request's change to the card's
+       * membership laid over the membership it has now.
+       */
+      const before = existing;
+      const decksAdded = final.filter((x) => !current.includes(x));
+      const decksRemoved = current.filter((x) => !final.includes(x));
+      const wrote = /** @type {Record<string, any>} */ (await updateJson(store, K.card(saved.id), (/** @type {any} */ fresh) => {
+        if (!fresh || !before || (fresh.rev || 1) === (before.rev || 1)) return saved;
+        /** @type {Record<string, any>} */
+        const was = before;
+        const changed = Object.keys({ ...was, ...saved }).filter(
+          (k) => JSON.stringify(was[k]) !== JSON.stringify(saved[k]),
+        );
+        /** @type {Record<string, any>} */
+        const merged = { ...fresh };
+        for (const k of changed) {
+          if (saved[k] === undefined) delete merged[k];
+          else merged[k] = saved[k];
+        }
+        merged.rev = (fresh.rev || 1) + 1;
+        const held = Array.isArray(fresh.inDecks) ? fresh.inDecks : current;
+        merged.inDecks = [...new Set([...held, ...decksAdded])].filter((x) => !decksRemoved.includes(x));
+        return merged;
+      }));
+      saved = wrote;
       /* Through the same answer the bundling uses, so a card that fills a
          blank only by the kind of word it is moves the revision too. */
       /* And a sentence moves it too, because a scene may have picked it:
@@ -3383,7 +3481,7 @@ async function handle(req) {
          and the client has nothing to report. */
       return json({
         ok: true,
-        card: { ...teacherView(saved), decks: final },
+        card: { ...teacherView(saved), decks: saved.inDecks || final },
         /* The screen folds these over the decks it holds, so they say
            which courses hold them the way my-decks does. */
         decks: await withLinks(store, deckRecords),
@@ -3507,34 +3605,64 @@ async function handle(req) {
       if (!card) return json({ error: "no-card" }, 404);
       if (!(await mayEditCard(card))) return json({ error: "not-yours" }, 403);
       if (![...CARD_STATUSES, "discard", "unpublish"].includes(to)) return json({ error: "bad-status" }, 400);
-      /** @type {Record<string, any>} */
-      let next;
-      const { pending, ...live } = card;
-      if (!isPublished(card)) {
-        if (to === "discard" || to === "unpublish") return json({ error: "not-published" }, 400);
-        next = to === "published" ? { ...live, status: undefined } : { ...live, status: to };
-      } else if (to === "unpublish") {
-        next = { ...workingOf(card), status: pending && pending.status === "review" ? "review" : "draft" };
-      } else if (!pending) {
-        if (to !== "published") return json({ error: "no-changes" }, 400);
-        next = card;
-      } else if (to === "discard") {
-        next = live;
-      } else if (to === "published") {
-        next = withVersion(live, pending.card || {});
-      } else {
-        next = { ...card, pending: { ...pending, status: to } };
-      }
-      next = { ...next, rev: (card.rev || 1) + 1, updated: Date.now() };
-      await writeJson(store, K.card(id), next);
-      const holding = await decksHolding(card);
-      if (seenByStudents(card) !== seenByStudents(next)) {
+      /* Worked out from the card as it stands when the write lands, not as
+         it was read above, so a save that landed in between keeps its
+         words (0.580, audit finding 11). */
+      /**
+       * @param {any} c
+       * @returns {{ error: string } | { next: Record<string, any> }}
+       */
+      const statusOf = (c) => {
+        /** @type {Record<string, any>} */
+        let next;
+        const { pending, ...live } = c;
+        if (!isPublished(c)) {
+          if (to === "discard" || to === "unpublish") return { error: "not-published" };
+          next = to === "published" ? { ...live, status: undefined } : { ...live, status: to };
+        } else if (to === "unpublish") {
+          next = { ...workingOf(c), status: pending && pending.status === "review" ? "review" : "draft" };
+        } else if (!pending) {
+          if (to !== "published") return { error: "no-changes" };
+          next = c;
+        } else if (to === "discard") {
+          next = live;
+        } else if (to === "published") {
+          next = withVersion(live, pending.card || {});
+        } else {
+          next = { ...c, pending: { ...pending, status: to } };
+        }
+        return { next: { ...next, rev: (c.rev || 1) + 1, updated: Date.now() } };
+      };
+      const first = statusOf(card);
+      if ("error" in first) return json({ error: first.error }, 400);
+      /** @type {any} */
+      let was = card;
+      /** @type {string | null} */
+      let refused = null;
+      const next = /** @type {Record<string, any>} */ (await updateJson(store, K.card(id), (/** @type {any} */ fresh) => {
+        if (!fresh) {
+          refused = "no-card";
+          return null;
+        }
+        const c = fresh;
+        const r = statusOf(c);
+        was = c;
+        if ("error" in r) {
+          refused = r.error;
+          return null;
+        }
+        refused = null;
+        return r.next;
+      }));
+      if (refused) return json({ error: refused }, refused === "no-card" ? 404 : 400);
+      const holding = await decksHolding(was);
+      if (seenByStudents(was) !== seenByStudents(next)) {
         for (const did of holding) {
           await updateJson(store, K.deck(did), (/** @type {any} */ d) =>
             d ? { ...d, version: (d.version || 1) + 1, updated: Date.now() } : null,
           );
         }
-        if (fillsOf(card).length || fillsOf(next).length || isSentence(card) || isSentence(next)) {
+        if (fillsOf(was).length || fillsOf(next).length || isSentence(was) || isSentence(next)) {
           await bumpFills(next.owner || "");
         }
       }
@@ -3658,7 +3786,7 @@ async function handle(req) {
         mine: d.owner === mine,
         ...(waiting.has(d.id) ? { partsWaiting: waiting.get(d.id) } : null),
       }));
-      return json({ ok: true, decks });
+      return jsonTagged(req, { ok: true, decks });
     }
 
     if (action === "rename-deck") {
@@ -3913,8 +4041,8 @@ async function handle(req) {
       await dropFromCourses(store, deck.id);
       await store.delete(K.deck(deck.id)).catch(() => {});
       await store.delete(K.cards(deck.id)).catch(() => {});
-      const ids = await readIndex(store, "decks");
-      await writeJson(store, K.index("decks"), ids.filter((x) => x !== deck.id));
+      await updateJson(store, K.index("decks"), (/** @type {string[] | null} */ cur) =>
+        (cur || []).includes(deck.id) ? (cur || []).filter((x) => x !== deck.id) : null);
       await taught();
       return json({ ok: true });
     }
@@ -4079,7 +4207,7 @@ async function handle(req) {
             teacherCode: role === "teacher" ? c.teacherCode : undefined,
           };
         });
-      return json({ ok: true, courses: out });
+      return jsonTagged(req, { ok: true, courses: out });
     }
 
     /* Everything a student holds, in one answer: the courses they study,
@@ -4791,7 +4919,7 @@ async function handle(req) {
       // Clips never change once written, so the edge copy is always right.
       const data = await store.get(K.clip(hash), { type: "text", consistency: "eventual" });
       if (!data) return json({ error: "not-found" }, 404);
-      return json({ ok: true, hash, data });
+      return json({ ok: true, hash, data }, 200, FOREVER);
     }
 
     /* ================= images =================
@@ -4818,14 +4946,14 @@ async function handle(req) {
       if (!/^[a-f0-9]{64}$/.test(hash)) return json({ error: "bad-hash" }, 400);
       const data = await store.get(K.image(hash), { type: "text", consistency: "eventual" });
       if (!data) return json({ error: "not-found" }, 404);
-      return json({ ok: true, hash, data });
+      return json({ ok: true, hash, data }, 200, FOREVER);
     }
 
     /* ================= one's own account in a space (0.544) ================= */
 
     /* "I've saved my key somewhere safe" (19b). */
     if (action === "key-saved") {
-      await writeJson(store, K.user(mine), { ...me, keySaved: true });
+      await updateJson(store, K.user(mine), (/** @type {any} */ cur) => (cur ? { ...cur, keySaved: true } : null));
       return json({ ok: true });
     }
 
@@ -5009,7 +5137,7 @@ async function handle(req) {
         const former = (await readJson(store, K.former(acting))) || [];
         /* And the space's invitation, for its admins to share (37a). */
         const invite = actingOrgDoc ? { code: actingOrgDoc.inviteCode, slug: actingOrgDoc.slug, name: actingOrgDoc.name, admins: actingOrgDoc.admins || [] } : null;
-        return json({ ok: true, users, courses, decks, flags, former, invite });
+        return jsonTagged(req, { ok: true, users, courses, decks, flags, former, invite });
       }
 
       /* A lost key: the handle survives, so memberships and progress do too. */
@@ -5045,10 +5173,25 @@ async function handle(req) {
       if (action === "admin-backup-manifest" || action === "admin-export-org-manifest" || action === "admin-org-usage") {
         const only = action === "admin-backup-manifest" ? "" : String(body.id || url.searchParams.get("id") || "");
         if (action !== "admin-backup-manifest" && !(await readJson(store, K.org(only)))) return json({ error: "no-space" }, 404);
-        const keep = (/** @type {any} */ rec) => !only || (rec && orgOf(rec) === only && !rec.personal);
-        const pick = async (/** @type {string[]} */ ids, /** @type {(id: string) => string} */ keyOf) =>
-          only ? (await readManyJson(store, ids.map(keyOf))).map((r, i) => (keep(r) ? ids[i] : null)).filter((x) => x !== null) : ids;
-        const handles = /** @type {string[]} */ (await pick(await readIndex(store, "users"), K.user));
+        const keep = (/** @type {any} */ rec) => !!rec && orgOf(rec) === only && !rec.personal;
+        /* A person belongs to every space they are a member of, not only
+           their first, so a space's export keeps a teacher who joined it
+           from elsewhere (0.580, audit finding 3). */
+        const keepMember = (/** @type {any} */ rec) => !!rec && memberOf(rec).includes(only) && !rec.personal;
+        const pick = async (
+          /** @type {string[]} */ ids,
+          /** @type {(id: string) => string} */ keyOf,
+          /** @type {(rec: any) => boolean} */ test = keep,
+        ) =>
+          only ? (await readManyJson(store, ids.map(keyOf))).map((r, i) => (test(r) ? ids[i] : null)).filter((x) => x !== null) : ids;
+        const handles = /** @type {string[]} */ (await pick(await readIndex(store, "users"), K.user, keepMember));
+        /* Former accounts: their cards stay live for students, so they stay
+           in the backup too, with their list of cards and their numbers
+           (0.580, audit finding 2). For one space, those who left it. */
+        const goneHandles = /** @type {string[]} */ (only
+          ? (await Promise.all((await readIndex(store, "gone")).map(async (h) => ((await readJson(store, K.gone(h))) || {}).org === only ? h : null))).filter((h) => h !== null)
+          : await readIndex(store, "gone"));
+        const owners = [...new Set([...handles, ...goneHandles])];
         const courseIds = /** @type {string[]} */ (await pick(await readIndex(store, "courses"), K.course));
         const deckIds = /** @type {string[]} */ (await pick(await readIndex(store, "decks"), K.deck));
         /* Reports were the one thing on the site a backup did not hold, so
@@ -5064,10 +5207,10 @@ async function handle(req) {
         /* Card ids come from each owner's list rather than a global index,
            which is where they actually live — and, for one space, from its
            decks too, which can hold an App admin's card. */
-        const cardLists = await readManyJson(store, handles.map((h) => K.myCards(h)));
-        const deckCards = only
-          ? (await readManyJson(store, deckIds.map((id) => K.deck(id)))).flatMap((d) => (d && d.cardIds) || [])
-          : [];
+        const cardLists = await readManyJson(store, owners.map((h) => K.myCards(h)));
+        /* Every deck's cards, for the whole site as for one space: a card
+           can be in a deck and on nobody's list. */
+        const deckCards = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).flatMap((d) => (d && d.cardIds) || []);
         const cardIds = /** @type {string[]} */ (await pick([...new Set(cardLists.flatMap((l) => l || []).concat(deckCards))], K.card));
 
         /* Clip hashes are only discoverable from the cards that use them, so
@@ -5081,7 +5224,7 @@ async function handle(req) {
            in the same position as a card's — only the thing that refers to
            them says they exist — so the systems have to be read here for
            the backup to be complete. */
-        const systemKeyLists = await Promise.all(handles.map((h) => systemKeysOf(store, h)));
+        const systemKeyLists = await Promise.all(owners.map((h) => systemKeysOf(store, h)));
         const systemKeys = systemKeyLists.flat();
         const systems = systemKeys.length ? await readManyJson(store, systemKeys) : [];
         const clipHashes = [
@@ -5116,17 +5259,14 @@ async function handle(req) {
         batch("keymap", keyHashes.map(K.keyOf), 60);
         batch("course", courseIds.map(K.course), 40);
         batch("deck", deckIds.map(K.deck), 40);
-        batch("owncards", handles.map(K.myCards), 60);
+        batch("owncards", owners.map(K.myCards), 60);
         batch("card", cardIds.map(K.card), 25);
         batch("system", systemKeys, 10);
-        batch("mysystems", handles.map(K.mySystems), 60);
+        batch("mysystems", owners.map(K.mySystems), 60);
         batch("flag", flagIds.map(K.flag), 60);
         batch("org", orgIds.map(K.org), 60);
         batch("former", orgIds.map(K.former), 60);
-        const goneHandles = only
-          ? (await Promise.all((await readIndex(store, "gone")).map(async (h) => ((await readJson(store, K.gone(h))) || {}).org === only ? h : null))).filter((h) => h !== null)
-          : await readIndex(store, "gone");
-        batch("gone", /** @type {string[]} */ (goneHandles).map(K.gone), 100);
+        batch("gone", goneHandles.map(K.gone), 100);
 
         /* How much a space holds (60a): the counts, and the bytes of the
            recordings and pictures its cards and numbers use. One shared by
@@ -5538,7 +5678,8 @@ async function handle(req) {
         if (!wanted.size) return json({ ok: true, deleted: 0 });
         const ids = await readIndex(store, "feedback");
         for (const id of ids) if (wanted.has(id)) await store.delete(K.feedback(id)).catch(() => {});
-        await writeJson(store, K.index("feedback"), ids.filter((id) => !wanted.has(id)));
+        await updateJson(store, K.index("feedback"), (/** @type {string[] | null} */ cur) =>
+          (cur || []).filter((id) => !wanted.has(id)));
         return json({ ok: true, deleted: ids.filter((id) => wanted.has(id)).length });
       }
 
@@ -5894,6 +6035,9 @@ async function handle(req) {
         if (target.keyHash) await store.delete(K.keyOf(target.keyHash)).catch(() => {});
         await writeJson(store, K.user(handle), { ...target, keyHash: sha(key) });
         await writeJson(store, K.keyOf(sha(key)), handle);
+        /* The practice document is stored under the key's token; carry it
+           over, or the new key opens an empty one (0.580). */
+        if (target.keyHash) await moveSyncDoc(target.keyHash, sha(key)).catch(() => {});
         return json({ ok: true, handle, key });
       }
 
@@ -5990,8 +6134,8 @@ async function handle(req) {
         if (course.code) await store.delete(K.code(course.code)).catch(() => {});
         if (course.teacherCode) await store.delete(K.code(course.teacherCode)).catch(() => {});
         await store.delete(K.course(course.id)).catch(() => {});
-        const ids = await readIndex(store, "courses");
-        await writeJson(store, K.index("courses"), ids.filter((x) => x !== course.id));
+        await updateJson(store, K.index("courses"), (/** @type {string[] | null} */ cur) =>
+          (cur || []).includes(course.id) ? (cur || []).filter((x) => x !== course.id) : null);
         return json({ ok: true });
       }
 
@@ -6067,7 +6211,8 @@ async function handle(req) {
         /* Only this org's reports, whatever was asked for. */
         for (const id of [...wanted]) if (!inScope(await readJson(store, K.flag(id)))) wanted.delete(id);
         for (const id of ids) if (wanted.has(id)) await store.delete(K.flag(id)).catch(() => {});
-        await writeJson(store, K.index("flags"), ids.filter((id) => !wanted.has(id)));
+        await updateJson(store, K.index("flags"), (/** @type {string[] | null} */ cur) =>
+          (cur || []).filter((id) => !wanted.has(id)));
         return json({ ok: true, deleted: ids.filter((id) => wanted.has(id)).length });
       }
     }

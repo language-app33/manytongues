@@ -94,6 +94,18 @@ export function fresh(list: Pending[], now: number, days: number = OUTBOX_DAYS):
  */
 export type Verdict = "sent" | "keep" | "drop";
 
+/*
+ * Whether a failure is worth waiting through (0.580, audit finding 5).
+ *
+ * Only a refusal the server made on purpose — an answer in its own words —
+ * is a reason to drop queued work. No connection, a call that timed out
+ * (which reads as "offline"), a gateway's 502 page during a deploy, or a
+ * body that is not the server's JSON are all the server not having
+ * answered yet, and the work waits for it.
+ */
+export const isTransient = (msg: string) =>
+  msg === "offline" || msg === "bad-response" || /^http-5\d\d$/.test(msg);
+
 /* ---------------- storage ---------------- */
 
 const OUTBOX_KEY = "arabic-trainer:outbox";
@@ -123,19 +135,26 @@ export function loadOutbox(): Pending[] {
   }
 }
 
-export function saveOutbox(list: Pending[]): void {
+/** Write the queue; false when storage refused it (full, or blocked). */
+export function saveOutbox(list: Pending[]): boolean {
   try {
-    store()?.setItem(OUTBOX_KEY, JSON.stringify(list || []));
+    const s = store();
+    if (!s) return false;
+    s.setItem(OUTBOX_KEY, JSON.stringify(list || []));
+    return true;
   } catch (e) {
-    /* Storage full or blocked. The work is still in memory for this
-       session, and the caller has already been told its save failed. */
+    return false;
   }
 }
 
-/** Keep one piece of work, and say what it was filed as. */
-export function keep(kind: string, body: unknown, at: number = Date.now()): Pending {
+/**
+ * Keep one piece of work, and say what it was filed as — or null when the
+ * device could not keep it (0.580, audit finding 6). A caller given null
+ * must tell the person: the work is not saved anywhere.
+ */
+export function keep(kind: string, body: unknown, at: number = Date.now()): Pending | null {
   const id = `${at.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
-  saveOutbox(withKept(fresh(loadOutbox(), at), kind, body, at, id));
+  if (!saveOutbox(withKept(fresh(loadOutbox(), at), kind, body, at, id))) return null;
   return { id, kind, at, body };
 }
 

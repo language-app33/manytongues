@@ -14,28 +14,14 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import { build } from "esbuild";
 
 import { agreedCell, foldJoined, keepsApart, personsFor, personsOf, tableOf } from "../src/verbs.ts";
 import { tenseOf } from "../src/verb-drills.ts";
 import { LANGUAGES, verbOf } from "../src/languages.ts";
-import { must } from "./helpers.mjs";
+import { buildOnce, must } from "./helpers.mjs";
 
-const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".one-i-build");
-const bundled = async (/** @type {string} */ name) => {
-  await build({
-    entryPoints: [path.join(here, "..", "src", `${name}.tsx`)],
-    outfile: path.join(out, `${name}.js`),
-    bundle: true,
-    format: "esm",
-    jsx: "automatic",
-    external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-    loader: { ".jsx": "jsx" },
-    logLevel: "silent",
-  });
-  return import(path.join(out, `${name}.js`));
-};
+const bundled = async (/** @type {string} */ name) =>
+  import(path.join(await buildOnce([`${name}.tsx`]), `${name}.js`));
 const { cardToItem, foldCourses } = await bundled("shared");
 const { initialCells, tableCellsOf } = await bundled("card-editor");
 

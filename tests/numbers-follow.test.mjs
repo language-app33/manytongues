@@ -15,8 +15,7 @@ import { test } from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import path from "node:path";
-import { build } from "esbuild";
-import { must } from "./helpers.mjs";
+import { must, buildOnce } from "./helpers.mjs";
 
 let rolling = 20261009 >>> 0;
 Math.random = () => {
@@ -25,25 +24,9 @@ Math.random = () => {
 };
 
 const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".numbers-follow-build");
-await build({
-  entryPoints: [path.join(here, "..", "src", "ArabicTrainer.tsx")],
-  outfile: path.join(out, "trainer.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
+const built = await buildOnce(["ArabicTrainer.tsx"]);
 const { buildSession, cardStandings, creditNumbers, installIndexes, laddered, skillCapsOf, wordsOfDigit } = await import(
-  path.join(out, "trainer.js")
+  path.join(built, "ArabicTrainer.js")
 );
 const { generate, fileIntoDecks, isRangeSkill, isNumeralCard, numeralId } = await import(
   path.join(here, "..", "src", "numbers", "generate.ts")

@@ -34,36 +34,25 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { build } from "esbuild";
+import { buildOnce, TEST_DEFINES } from "./helpers.mjs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { rowLead } from "../src/verbs.ts";
 import { LANGUAGES, tensedOf } from "../src/languages.ts";
 import { isLent } from "../src/variables.ts";
 
-const here = path.dirname(new URL(import.meta.url).pathname);
 
 /** @param {string} name */
 async function copy(name) {
-  const out = path.join(here, ".blank-pools-build", name);
-  await build({
-    entryPoints: ["ArabicTrainer.tsx", "languages.ts"].map((f) => path.join(here, "..", "src", f)),
-    outdir: out,
-    bundle: true,
+  /* A build of its own per copy — the banner names it, so buildOnce keeps
+     them apart — because each copy must have module state of its own. */
+  const built = await buildOnce(["ArabicTrainer.tsx", "languages.ts"], {
+    define: { ...TEST_DEFINES, "process.env.NODE_ENV": '"production"' },
     splitting: true,
-    format: "esm",
-    jsx: "automatic",
-    external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-    logLevel: "silent",
-    define: {
-      "process.env.NODE_ENV": '"production"',
-      __APP_RELEASE__: '"0"',
-      __APP_VERSION__: '"test"',
-      __BUILT_AT__: '"0"',
-    },
+    banner: { js: `/* copy: ${name} */` },
   });
-  const trainer = await import(pathToFileURL(path.join(out, "ArabicTrainer.js")).href);
-  const langs = await import(pathToFileURL(path.join(out, "languages.js")).href);
+  const trainer = await import(pathToFileURL(path.join(built, "ArabicTrainer.js")).href);
+  const langs = await import(pathToFileURL(path.join(built, "languages.js")).href);
   return { trainer, langs };
 }
 const warm = await copy("warm");
