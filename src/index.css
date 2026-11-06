@@ -1402,11 +1402,25 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-decklist2 { display:flex; flex-direction:column; gap:10px; }
 .at-deckcard { border:2px solid var(--line); border-radius: var(--r-lg);
   padding:14px 16px; background: var(--surface); }
-.at-deckrow2 { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
-.at-deckmain { flex:1 1 180px; min-width:0; }
-.at-decktitle { font-size:17px; font-weight:800; overflow-wrap:anywhere; }
-.at-deckmeta { font-size:12px; color: var(--muted); margin-top:3px; }
+/* Tile (0.558): the title and its line of facts centred on the buttons, and
+   the buttons kept on the right — a long title wraps beside them. Three or
+   more buttons go under the text on a phone, so the title is not squeezed
+   to a word a line. */
+.at-deckrow2 { display:flex; align-items:center; gap:12px; flex-wrap:nowrap; }
+.at-deckmain { flex:1 1 0; min-width:0; }
+.at-decktitle { font-size:18px; font-weight:800; overflow-wrap:anywhere; }
+.at-deckmeta { font-size:13px; color: var(--muted); margin-top:3px; }
+@media (max-width: 480px) {
+  .at-deckrow2:has(> .at-deckacts > :nth-child(3)) { flex-wrap:wrap; }
+  .at-deckrow2:has(> .at-deckacts > :nth-child(3)) > .at-deckmain { flex-basis:100%; }
+}
 .at-deckacts { display:flex; gap:6px; flex:0 0 auto; margin-left:auto; }
+/* A deck tile that is a button (0.569): the Word sets row and each set on
+   its screen. The button's own look taken off, so it reads as a tile. */
+.at-openrow { display:block; width:100%; text-align:left; font:inherit; color:inherit; }
+.at-openrow .at-deckrow2, .at-openrow .at-deckmain,
+.at-openrow .at-decktitle, .at-openrow .at-deckmeta { display:block; }
+.at-openrow:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 /* A reported problem, under the title of the tile carrying it. The question
    as it was asked and, if there was one, what the person typed about it —
    the two things worth reading before deciding whether to open the card. */
@@ -1792,6 +1806,54 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-cline.as-field:hover .at-clinetext { color: var(--text-soft); font-weight:600; }
 .at-cseg { padding:2px 10px 8px 34px; }
 .at-crule { height:2px; background: var(--line); margin:8px 4px; border-radius:2px; }
+/* ---- Spaces as places (0.576) ----
+   A space is drawn as a square badge and a plain name, never like a person
+   (round badge, bold name, handle under it). */
+.at-spacebadge { width:28px; height:28px; border-radius:8px; flex:none; display:inline-flex;
+  align-items:center; justify-content:center; object-fit:cover; background: var(--brass);
+  color: var(--onbrass); font-family: var(--ui); font-size:11px; font-weight:800; }
+.at-spacebadge.plain { background: var(--raised); color: var(--brass); }
+.at-spaceline { display:flex; align-items:center; gap:10px; padding:8px 10px;
+  font-family: var(--ui); font-size:14px; font-weight:700; color: var(--text-soft); min-width:0; }
+.at-spacename { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+/* One place per line: any number fits, a long name is cut short. */
+.at-places { display:flex; flex-direction:column; gap:2px; padding:0 0 2px; }
+.at-placeshead { margin:0; padding:6px 10px 4px; font-family: var(--ui); font-size:11px;
+  font-weight:800; letter-spacing:.06em; text-transform:uppercase; color: var(--muted); }
+.at-place-row { display:flex; align-items:center; gap:10px; width:100%; min-height:44px;
+  padding:6px 8px; border:0; border-radius:12px; background:none; cursor:pointer; text-align:left;
+  font-family: var(--ui); font-size:14px; font-weight:700; color: var(--text-soft); }
+.at-place-row:hover { background: var(--raised); color: var(--text); }
+.at-place-row.on { background: color-mix(in srgb, var(--jade) 14%, transparent); color: var(--text); font-weight:800; }
+.at-place-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.at-place-tag { flex:none; font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
+  color: var(--brass); border:1px solid var(--brass); border-radius:6px; padding:2px 5px; }
+.at-place-tick { flex:none; display:inline-flex; color: var(--jade); }
+/* No space to open (0.578): only the panel and the You menu are left. */
+.at.stranded .at-wrap > :not(.at-strandedbox),
+.at.stranded .at-dockmain,
+.at.stranded .at-brand { display:none !important; }
+.at.stranded { padding-top:24px; }
+.at-strandedbox { padding:24px 4px; }
+.at-strandedbox h2 { margin:0 0 12px; font-family: var(--ui); font-size:24px; font-weight:800; color: var(--text); }
+.at-strandedline { margin:0 0 6px; font-family: var(--ui); font-size:16px; font-weight:700; color: var(--text); }
+/* Super admin → People (0.578): up to six actions a person, so they take
+   the row under the name and wrap there rather than run off the edge. */
+.at-everyone .at-deckrow2 { flex-wrap:wrap; }
+.at-everyone .at-deckacts { flex-wrap:wrap; justify-content:flex-start; flex-basis:100%; }
+/* Learning's space button, in the top right corner (0.576). */
+/* Centred on the line beside it (0.579): the 40px tab title on Progress
+   and Cards, the 64px logo and name on Home. One above the chrome, so its
+   list opens over the logo and name rather than under them. */
+.at-learnspace { position:absolute; top:calc(10px + var(--banner-h, 0px)); right:12px; z-index: calc(var(--z-chrome) + 1); }
+.at.on-home .at-learnspace { top:calc(22px + var(--banner-h, 0px)); }
+.at-learnspacebtn { width:44px; height:44px; border-radius:999px; padding:0; cursor:pointer;
+  display:inline-flex; align-items:center; justify-content:center; border:2px solid var(--line);
+  background: var(--surface); color: var(--text-soft); font-family: var(--ui); font-size:13px; font-weight:800; }
+.at-learnspacebtn:hover { color: var(--text); }
+.at-learnspacebtn.open { border-color: var(--jade); color: var(--jade); }
+.at-learnspacebtn.on { background: var(--jade); border-color: var(--jade); color: var(--onjade); }
+.at-cmenu.at-learnspacemenu { bottom:auto; top:calc(100% + 8px); right:0; width:min(300px, calc(100vw - 24px)); }
 /* The version, at the foot of the menu. Quieter than the rows above it —
    it is a fact to look up, not somewhere to go — until the server turns out
    to be serving a newer build, when it becomes the one thing in the menu
@@ -2074,9 +2136,42 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 .at-qualityscore { margin:0 0 6px; display:flex; align-items:baseline; gap:6px; }
 .at-qualityscore b { font-size: var(--fs-stat); font-weight:800; line-height:1.1; letter-spacing:-.02em; }
 .at-qualityscore span { font-size: var(--fs-sm); color: var(--muted); }
-.at-qualityfixes { list-style:none; margin:10px 0 0; padding:0 0 0 12px; border-left:2px solid var(--line); }
-.at-qualityfixes li { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin-bottom:8px; font-size: var(--fs-md); }
-.at-qualityfixes b { flex:none; font-size: var(--fs-sm); color: var(--jade); }
+/* Deck quality (0.561): a bar for the score, with where the suggestions
+   would take it drawn on after it, faint. */
+.at-qualitybar { position:relative; height:10px; border-radius:999px; background: var(--well);
+  overflow:hidden; margin:4px 0 0; }
+.at-qualitybar > span { position:absolute; top:0; bottom:0; left:0; border-radius:999px; }
+.at-qualitybar > .now.good { background: var(--jade); }
+.at-qualitybar > .now.fair { background: var(--brass); }
+.at-qualitybar > .now.poor { background: var(--rose); }
+.at-qualitybar > .then { background: var(--jade-soft); border-radius:0 999px 999px 0; opacity:.7; }
+.at-qualityreach { margin:12px 0 0; font-size: var(--fs-sm); color: var(--muted); }
+/* Each suggestion a card of its own: what to add, what it is worth, and
+   the words it is about, each one tap from its card. */
+.at-qfixes { list-style:none; margin:10px 0 0; padding:0; display:flex; flex-direction:column; gap:10px; }
+.at-qfix { display:flex; align-items:flex-start; gap:12px; padding:14px; border:2px solid var(--line);
+  border-radius: var(--r-lg); background: var(--surface); }
+.at-qfixico { flex:none; width:38px; height:38px; border-radius:12px; display:grid; place-items:center;
+  background: var(--jade-bg); color: var(--jade); }
+.at-qfixbody { flex:1 1 auto; min-width:0; }
+.at-qfixgain { flex:none; display:flex; flex-direction:column; align-items:center; line-height:1.1;
+  padding:6px 10px; border-radius:12px; background: var(--jade-bg); color: var(--jade); }
+.at-qfixgain b { font-size:18px; font-weight:800; }
+.at-qfixgain small { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+.at-qfixwords { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
+.at-qfixword { display:inline-flex; align-items:center; gap:6px; padding:5px 10px; cursor:pointer;
+  width:auto; flex:none; min-height:0; max-width:100%; line-height:1;
+  border:1px solid var(--line); border-radius:999px; background: var(--well); color: var(--text); font:inherit; }
+.at-qfixword:hover { border-color: var(--jade); }
+/* Centred on the pill's middle rather than on the text's baseline (0.563):
+   the script and the Latin "+2" sit on that line differently, which left
+   some pills lopsided. Each part is its own box of the same line height. */
+.at-qfixword b { font-weight:700; display:block; line-height:1.5;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; }
+.at-qfixword i { font-style:normal; font-size:12px; color: var(--muted); display:block; line-height:1; flex:none; }
+.at-qfixtitle { margin:0; font-size: var(--fs-md); font-weight:800; line-height:1.3; color: var(--ink); }
+.at-qfixtext { margin:4px 0 0; font-size: var(--fs-sm); line-height:1.4; color: var(--text-soft); }
+.at-qfixhint { margin:6px 0 0; font-size:12px; color: var(--muted); }
 .at-ctxbare { display:flex; flex-wrap:wrap; gap:8px; }
 .at-ctxbare span { display:inline-flex; align-items:baseline; gap:6px; padding:6px 10px;
   border:1px solid var(--line); border-radius:999px; background: var(--well); }
@@ -3162,10 +3257,54 @@ button.at-stat { transition: border-color 140ms ease; }
 .at-pagetitle { position:sticky; top: var(--banner-h, 0px); z-index:5;
   display:flex; align-items:center; gap:10px;
   margin:0 -16px 16px; padding:12px 16px;
-  background: var(--surface); border-bottom:1px solid var(--line); }
+  background: var(--surface);
+  /* The bar runs the full width of the window, not only the page's
+     column: on a wide window the white band and its line carry on to
+     both edges, while the logo and title stay in line with the page.
+     Shadows, not a wider box, so nothing can scroll sideways; the clip
+     keeps them to the bar's own height plus the 1px line beneath. */
+  box-shadow: 0 0 0 100vmax var(--surface), 0 1px 0 100vmax var(--line);
+  clip-path: inset(0 -100vmax -1px); }
 .at-screen .at-pagetitle { top:0; }
 .at-pagetitle .at-sectionhead { margin:0; }
 .at-pagetitle .at-brandmark { width:28px; height:28px; }
+
+/* A heading with a search button at the end of its line (Courses, 0.570).
+   The field sits behind the button, as narrow as it, and grows leftwards
+   out of it over the heading when pressed; the heading fades as it is
+   covered. Kept in the page rather than hidden while closed, so the press
+   that opens it can also put the keyboard up on a phone. */
+.at-headrow { position:relative; display:flex; align-items:center;
+  justify-content:space-between; gap:8px; min-height:44px; margin-bottom:10px; }
+.at-headrow > .at-sectionhead { margin:0; transition: opacity .2s ease; }
+.at-headsearch { position:absolute; top:0; right:0; bottom:0; width:44px;
+  display:flex; align-items:center; transition: width .28s cubic-bezier(.2,.8,.2,1); }
+.at-headsearch.open { width:100%; }
+.at-headrow:has(.at-headsearch.open) > .at-sectionhead { opacity:0; }
+.at-headsearchfield { box-sizing:border-box; width:100%; height:44px; margin:0;
+  padding:0 52px 0 12px; border-radius: var(--r-sm); font-size:14px;
+  opacity:0; pointer-events:none; transition: opacity .18s ease; }
+.at-headsearch.open .at-headsearchfield { opacity:1; pointer-events:auto; }
+/* The field's own clear button is the cross at its far end; the browser's
+   smaller one beside it would be a second way to do the same thing. */
+.at-headsearchfield::-webkit-search-cancel-button,
+.at-headsearchfield::-webkit-search-decoration { -webkit-appearance:none; appearance:none; display:none; }
+/* Heading to first tile at the editor's 18px (0.572). The row is the
+   44px button's height with the heading centred in it, so 10px under the
+   row puts the heading's own foot about 18px above the first tile. The
+   list's top toolbar has nothing in it here — its search lives in the
+   heading's row — and an empty row still brought its margins along. */
+.at-coursesection .at-toolbar-top:empty { display:none; }
+.at-coursesection > .at-headrow { margin-bottom:10px; }
+/* The courses page's headings at the card editor's heading size (0.571). */
+.at-coursesection .at-sectionhead { font-size:25px; font-weight:800;
+  letter-spacing:-.015em; line-height:1.15; }
+.at-headsearch .at-headsearchbtn { position:absolute; top:0; right:0; flex:0 0 auto;
+  width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
+.at-headsearch.open .at-headsearchbtn { border-color: transparent; background: transparent; }
+@media (prefers-reduced-motion: reduce) {
+  .at-headsearch, .at-headsearchfield, .at-headrow > .at-sectionhead { transition:none; }
+}
 
 .at-joinbox { border:2px solid var(--line); border-radius: var(--r-lg);
   padding:16px; background: var(--surface); }
@@ -3206,6 +3345,10 @@ button.at-stat { transition: border-color 140ms ease; }
 .at-banner + .at-banner { border-top:1px solid rgba(0,0,0,.18); }
 .at-banner.error { background: var(--rose); color:#FFFFFF; }
 .at-banneracts { display:inline-flex; gap: var(--s2); flex:0 0 auto; }
+/* One line, the words then the button (0.574): the super admin's "You're
+   in {space}." and Back to Spaces. A long name is cut, not wrapped. */
+.at-banner.oneline { flex-wrap: nowrap; justify-content: space-between; text-align: left; }
+.at-banner.oneline .what { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 /* A word inside a sentence that does something, for the one or two places
    where a full button would be louder than what it offers. It is a real
    button underneath, so it is reachable by keyboard and reads as a control
@@ -4341,8 +4484,10 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    other tabs carry their own name in the same place. The content under it
    sits on the page itself rather than in a card: one centred column, its
    parts set apart by space alone. */
-.at-brand.at-brand-home { left:0; right:0; margin:0 auto; width:max-content; height:64px;
-  padding:0 12px; gap:12px; font-size:32px; color: var(--text); }
+/* Left-aligned since 0.576, so the space button can have the top right
+   corner to itself. */
+.at-brand.at-brand-home { left:12px; right:auto; margin:0; width:max-content; height:64px;
+  padding:0 12px 0 6px; gap:12px; font-size:32px; color: var(--text); }
 .at-brand.at-brand-home .at-brandmark { width:48px; height:48px; }
 .at.on-home { padding-top:104px; }
 /* Progress and Cards are headed by their tab title (0.553), which is held
@@ -4527,3 +4672,17 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
 
 .at-readsaid { font-size:21px; font-style:italic; font-weight:500; color: var(--muted); line-height:1.3; overflow-wrap:anywhere; }
 .at-screen.over .at-part.evenfields .at-answerpair > .at-answersaid.at-readsaid { height:auto !important; padding-block:8px; }
+
+/* A space's address as one line (0.560): "manytongues.co/" fixed at the
+   start of the box, the space's own part typed straight after it. The box
+   is the label, so a tap anywhere on it puts the cursor in. */
+.at-input.at-addrinput { display:flex; align-items:center; gap:0; cursor:text; }
+.at-addrinput .at-addrpre { color: var(--muted); white-space:nowrap; flex:none; }
+.at-addrinput input { flex:1 1 auto; min-width:0; border:0; padding:0; margin:0;
+  background:transparent; font:inherit; color:inherit; outline:none; }
+.at-input.at-addrinput:focus-within { border-color: var(--brass); }
+
+/* A deck's facts under "This deck", a line each (0.563), and the note of
+   cards that don't reach students yet, on its screen and its tile. */
+.at-formrole .at-formline { display:block; }
+.at-notreach { color: var(--rose); font-weight:600; }

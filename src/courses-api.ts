@@ -49,6 +49,40 @@ export function loadAccount(): (User & { key: string }) | null {
   }
 }
 
+/*
+ * The App admin at an address that is none of their spaces (0.574): the
+ * slug of the space they are trying, or "". Read once at start, because
+ * the practice document's key depends on it.
+ */
+export function tryingSpace(): string {
+  const me: any = loadAccount();
+  if (!me || !me.admin || typeof window === "undefined") return "";
+  const mine: { slug?: string }[] =
+    Array.isArray(me.orgs) && me.orgs.length ? me.orgs : me.org && typeof me.org === "object" ? [me.org] : [];
+  const here = (window.location.pathname.split("/")[1] || "").toLowerCase();
+  if (!here || !mine.length) return "";
+  return mine.some((o) => o && o.slug === here) ? "" : here;
+}
+
+/* Everything kept on the device while trying a space (0.574) ends in this,
+   so leaving it can drop the lot. */
+export const trialSuffix = (slug: string) => (slug ? `:trying:${slug}` : "");
+
+/** Drop what trying `slug` kept on the device; every trial when "". */
+export function dropTrial(slug = "") {
+  try {
+    const gone: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (!k) continue;
+      if (slug ? k.endsWith(trialSuffix(slug)) : k.includes(":trying:")) gone.push(k);
+    }
+    for (const k of gone) localStorage.removeItem(k);
+  } catch (e) {
+    /* private browsing: nothing kept to drop */
+  }
+}
+
 export function saveAccount(account: (User & { key: string }) | null) {
   try {
     localStorage.setItem(KEY_STORE, JSON.stringify(account));
@@ -142,8 +176,30 @@ async function call(
    space whose address is open, so a code from elsewhere is caught (0.543). */
 export const signUp = (displayName: string, code?: string, org?: string) =>
   call("signup", { body: { displayName, code: code || "", org: org || "" }, key: "" });
-export const whoAmI = (key: string, org?: string) =>
-  call("whoami", { key, params: org ? { org } : {} });
+/* `org` is the space to land in, when the account may use it: the address
+   open, or the one last used on this device. `code` lets an account with
+   no space it may use get back in with the invitation it followed
+   (memberships). */
+export const whoAmI = (key: string, org?: string, code?: string) =>
+  call("whoami", { key, params: { ...(org ? { org } : {}), ...(code ? { code } : {}) } });
+
+/* The space last used on this device, for landing there at the plain
+   address (memberships, 2a). Per device, like the theme. */
+const LAST_SPACE = "arabic-trainer:last-space";
+export function rememberSpace(id?: string | null) {
+  try {
+    if (id) localStorage.setItem(LAST_SPACE, id);
+  } catch (e) {
+    /* private browsing: the plain address lands in the first space */
+  }
+}
+export function lastSpace(): string {
+  try {
+    return localStorage.getItem(LAST_SPACE) || "";
+  } catch (e) {
+    return "";
+  }
+}
 /** What a space's address shows before anyone signs in. */
 export const orgInfo = (slug: string): Promise<
   { ok: true; org?: OrgCard & { logoData: string; closed: boolean }; moved?: string }
@@ -152,7 +208,7 @@ export const rename = (displayName: string) => call("rename", { body: { displayN
 /* "Some learning just happened." The server keeps the moment and nothing
    else — what was practiced and how it went are in the device's own
    document, which never passes through here. */
-export const practiced = () => call("practiced", { body: {} });
+export const practiced = (orgs?: string[]) => call("practiced", { body: orgs ? { orgs } : {} });
 export const claimAdmin = (adminKey: string) => call("claim-admin", { body: { adminKey } });
 
 /* ---- flags ----
@@ -207,6 +263,9 @@ export const assignTeacher = (courseId: string, handle: string) =>
 export const removeMember = (courseId: string, handle: string, role: "teacher" | "student") =>
   call("remove-member", { body: { courseId, handle, role } });
 export const joinCourse = (code: string) => call("join-course", { body: { code } });
+/* A space's invitation, followed while signed in: adds the space to this
+   account (memberships). */
+export const joinSpace = (code: string) => call("join-space", { body: { code } });
 export const courseDecks = (courseId: string) => call("course-decks", { params: { course: courseId } });
 /* Everything a student holds in one request. Pass the version from the last
    answer and the server replies { unchanged: true } when nothing moved. */
@@ -364,9 +423,15 @@ export const orgUsage = (id: string): Promise<{ ok: true; usage: OrgUsage }> => 
 export const newInvite = (): Promise<{ ok: true; inviteCode: string }> => call("admin-new-invite", { body: {} });
 export const suspendUser = (handle: string, org?: string) => call("admin-suspend-user", { body: { handle }, org });
 export const reactivateUser = (handle: string, org?: string) => call("admin-reactivate-user", { body: { handle }, org });
+/* Off a space's list, under its Former members (0.578): their account and
+   other spaces stay. */
+export const removeFromSpace = (handle: string, org?: string) => call("admin-remove-member", { body: { handle }, org });
+/* Across the whole app, the super admin's alone (0.578). */
+export const suspendApp = (handle: string) => call("admin-suspend-app", { body: { handle } });
+export const liftApp = (handle: string) => call("admin-lift-app", { body: { handle } });
 /* ---- Super admin (0.547) ---- */
 export type SuperOrg = { id: string; name: string; slug: string; admins: string[]; archived: boolean };
-export const everyone = (): Promise<{ ok: true; orgs: SuperOrg[]; people: (User & { org: string })[] }> =>
+export const everyone = (): Promise<{ ok: true; orgs: SuperOrg[]; people: (User & { org: string; orgs?: string[]; suspendedIn?: Record<string, unknown> })[] }> =>
   call("admin-everyone");
 export const allReports = (): Promise<{ ok: true; orgs: SuperOrg[]; flags: (Flag & { org: string })[]; feedback?: Feedback[] }> =>
   call("admin-all-reports");
@@ -383,7 +448,8 @@ export const deleteFlagsIn = (flagIds: string[], org: string) =>
 export const handOver = (from: string, to: string) => call("admin-hand-over", { body: { from, to } });
 export const removeFormer = (handle: string) => call("admin-remove-former", { body: { handle } });
 export const keySaved = () => call("key-saved", { body: {} });
-export const leaveSpace = () => call("leave-space", { body: {} });
+/* Which space to leave, when the account is in several. */
+export const leaveSpace = (org?: string) => call("leave-space", { body: {}, org });
 export const backupManifest = () => call("admin-backup-manifest");
 export const backupChunk = (keys: string[]) => call("admin-backup-chunk", { body: { keys } });
 export const restoreChunk = (records: Record<string, unknown>) => call("admin-restore-chunk", { body: { records } });
@@ -400,6 +466,9 @@ export const clearData = (adminKey: string, parts: string[]) => call("admin-clea
 export const createUser = (displayName: string, courseId: string, roles: ("teacher" | "student")[]): Promise<any> =>
   call("admin-create-user", { body: { displayName, courseId, roles } });
 export const reissueKey = (handle: string, org?: string) => call("admin-reissue-key", { body: { handle }, org });
+/* Super admin: an existing person into a space, with no new key. */
+export const addMember = (handle: string, org: string): Promise<{ ok: true; orgs: string[] }> =>
+  call("admin-add-member", { body: { handle, org } });
 export const deleteUser = (handle: string, org?: string) => call("admin-delete-user", { body: { handle }, org });
 export const newCourseCode = (courseId: string, which: "teacher" | "student") =>
   call("admin-new-code", { body: { courseId, which } });
@@ -453,13 +522,20 @@ export function explain(err: unknown): string {
       "bad-code": "Nothing has that code. Check it with whoever gave it to you.",
       "code-required": "You need a code to join: an invitation link, or a course code from your teacher.",
       "other-space": "That belongs to another space.",
+      "trying-space": "You're trying this space, not joining it.",
+      "suspended-app": "Your account is suspended. Ask the super admin.",
+      "suspended-here": "You're suspended in that space. Ask its admin to let you back in.",
+      "account-exists": "Only the super admin can delete an account, from Super admin → People.",
+      "admin-stays": "The super admin can't leave their first space.",
       "space-closed": "This space is closed.",
-      "suspended": "This account is suspended. Ask your space's admin.",
+      "suspended": "You're not in any space right now. Ask your space's admin, or use an invitation link or a course code.",
+      "many-spaces": "This person is in more than one space, so only the super admin can give them a new key.",
+      "removed": "You were removed from that space. Ask its admin to let you back in.",
       "no-space": "There's no space at this address.",
       "slug-taken": "That address is taken. Addresses are never reused.",
       "slug-invalid": "An address is 3 to 40 lower-case letters, digits and dashes, starting with a letter, and some words are kept for the app.",
       "not-in-space": "That person isn't in this space.",
-      "main-stays": "Main can't be closed or deleted.",
+      "own-space": "You can't close or delete a space your own account is in.",
       "not-reportable": "That's your own card. You can change it in My space.",
       "personal-deck": "A deck in My space can't go on a course. Copy it to the space first.",
       "personal-card": "A card in My space can't go in a deck of the space. Copy its deck to the space first.",

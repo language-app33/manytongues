@@ -164,6 +164,7 @@ const PLACES: Record<string, [string, string]> = {
   /* Teaching */
   TeachSpace: [TEACH, "The Teaching space"],
   CoursesPage: [TEACH, "The Courses tab"],
+  HeadSearch: [TEACH, "The Courses tab · searching your courses"],
   CourseSettings: [TEACH, "Course settings"],
   NewDeck: [TEACH, "Making a new deck"],
   NumbersFrom: [TEACH, "A deck's screen · whose numbers it uses"],
@@ -224,7 +225,6 @@ const PLACES: Record<string, [string, string]> = {
   ImageScreen: [TEACH, "Editing a card · adding a picture"],
   FullImage: [TEACH, "Reading a card · a picture full screen"],
   StoredImage: [TEACH, "Editing a card · a picture on a form"],
-  ContextReport: [TEACH, "A deck · how much of it appears in phrases"],
   DeckQuality: [TEACH, "A deck · its quality, and what would raise it"],
   PronounsEditor: [TEACH, "A language's pronouns, written once"],
   NumberSystemEditor: [TEACH, "A language's number system"],
@@ -276,6 +276,10 @@ const PLACES: Record<string, [string, string]> = {
   SpaceScreen: [ADMIN, "The Spaces tab · one space"],
   SpaceExtras: [ADMIN, "The Spaces tab · a space's storage and export"],
   SpaceLine: [LEARN, "The You menu · the space you are in"],
+  SpaceBadge: [LEARN, "A space's logo or initials, in a small square"],
+  SpacePlaces: [LEARN, "The You menu · where you are, one place per line"],
+  LearnSpaceButton: [LEARN, "Learning · which space, from the top right corner"],
+  StrandedPanel: [LEARN, "Signed in with no space to open: suspended, removed or left"],
   BackupScreen: [ADMIN, "App · backing up and restoring"],
   ClearScreen: [ADMIN, "App · clearing the site"],
 

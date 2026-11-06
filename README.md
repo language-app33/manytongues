@@ -1133,12 +1133,22 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   the language's context, a lookup rather than a comparison per word, which
   is what lets every deck in the list be scored at once. Tests:
   `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
+- **Word sets: lists every language has, written once (0.569).** Numbers
+  and pronouns so far, months and days of the week to come. The app knows
+  the list; the teacher writes the words once for the language, and a deck
+  takes the set as a whole (numbers a range at a time). All of them are
+  reached from one **Word sets** row on Teaching → Cards, whose screen
+  lists each set under its language with how much is written and how many
+  decks hold it. A set can go into a deck before it is finished: students
+  get what is written, and a pronoun written later joins the decks that
+  already hold the set. The word was "built-in" before 0.569, which wrongly
+  said the app supplied the words. Why: DECISIONS.md, "Word sets".
 - **A number is built, not memorised, and so is a time.** A learner who
   knows *forty* and *seven* knows *forty-seven*, so numbers are not cards
   one at a time. A language's numbers are **one document** — the words it
   builds them out of, each with the faces it wears — written on one screen
-  and never a card: the teacher reaches it from **Teaching → Cards**, the
-  `#` in the list's toolbar. Its first screen only lists — the parts of
+  and never a card: the teacher reaches it from **Teaching → Cards**,
+  through the **Word sets** row above the list. Its first screen only lists — the parts of
   the numbers (0 to 9, 10 to 19, 20 to 99, 100 to 999, 1,000 to
   999,999,999, and the billions up to eleven digits),
   the clock, and the numbers written out by hand — and each opens on a
@@ -1571,6 +1581,75 @@ A space's export and storage (since 0.546): `admin-export-org-manifest` is
 the backup manifest limited to one org and without personal records, its
 chunks fetched like a backup's; `admin-org-usage` counts what an org holds
 and the bytes of its media. Both are the App admin's, from Admin → Spaces.
+
+Memberships (since 0.573; `docs/PLAN-memberships.md`, all three stages in one release):
+
+- An account may be in several spaces. `orgs` on the user record lists
+  them; one written before has only `org` and is in that one space.
+  `memberOf` is the only reader of either. `org` is still written, as the
+  first space.
+- Suspension is per space (`suspendedIn`, read through `suspensionIn`,
+  which also reads an old `suspended`), and so are "last practised" and
+  "last changed material" (`lastLearnedIn`, `lastTaughtIn`). The
+  account-wide moments stay, for Super admin.
+- A request still acts in one org. For a member it is the one `x-org`
+  names, when they may act there (in it, not suspended, not closed), else
+  the first they may. Three actions read across every space the caller may
+  use, and only those (`WIDE`): `my-material`, `report-flag` and
+  `practiced`. Not `my-courses`, which is Teaching's list and of one space. `inScope` treats a user record as in scope when one of
+  its spaces is.
+- Joining is by code (`joinByCode`): a course code or an invitation, signed
+  in or at sign-in, adds the space. `addMembership` and `removeMembership`
+  are the two writes of a membership; reactivating, rejoining and the App
+  admin's `admin-add-member` all go through the first, removal from one
+  space of several through the second. `wipeAccount` walks every space.
+- A space admin may give a new key only to someone in their space alone
+  (`many-spaces`).
+- In the app, the address is the space you are in when it is one of yours
+  (`atOwnAddress` in the trainer); a member's requests carry it as `x-org`.
+  Going to another of your spaces, from the You menu, reloads at its
+  address. Learning's space row narrows `inPlay`, the same test the
+  languages switch narrows, so every reader of `shown` follows it. A
+  card's space is its course's (`spaceOfItem`); a learner's own card is in
+  none and is shown under every choice.
+
+Trying a space (since 0.574):
+
+- Super admin is a level above spaces, not a mode beside Learning,
+  Teaching and Admin. `placeRows` in `src/places.ts` decides both controls
+  of the You menu: "Where you are" at its top (Super admin, the App
+  admin's own spaces, the opened space) and the toggle of a space's modes
+  at its foot, which is empty at Super admin. `whoami` names all of the
+  App admin's own spaces in `orgs`, so the app can tell them apart.
+- On the server, `trying` is `iAmAdmin && !memberOf(me).includes(acting)`:
+  the App admin in a space they are not in. Then `my-material` and
+  `my-courses` deal every course of that space as a learner's, with no
+  codes, and the join handler refuses with `trying-space`. No roster or
+  membership is written; `practiced` already counts only the caller's own
+  spaces, so practice there counts nowhere.
+- In the app, `tryingSpace()` (courses-api.ts) is read once at start.
+  While it is set, the practice document, the material cache and the
+  Teaching and Admin caches use keys ending in `:trying:<slug>`, sync is
+  off, and the teaches flag is not saved. `dropTrial` removes those keys
+  on every way out of the space, and every trial's keys on log out.
+- Since 0.578, who may do what to a person. A space admin, and the App
+  admin acting in a space, may suspend (`suspendedIn[org].why =
+  "suspended"`: still listed, no Former members record, a code does not
+  lift it) and remove (`why = "removed"`, `admin-remove-member`: under
+  Former members, back with an invitation or a code). Neither deletes an
+  account: `admin-delete-user` is the App admin's alone, and the app offers
+  it only in Super admin → People; `admin-purge-former` refuses while the
+  account exists (`account-exists`). The App admin's `admin-suspend-app`
+  sets `suspendedApp` on the account, with every course it was on, which
+  `admin-lift-app` puts back; while set, every request from that key is
+  refused (`suspended-app`). Someone with no space they may use still gets
+  a `whoami` answer, with `stranded` listing why for each space, and may
+  use only joins and `STRANDED_MAY` (rename, key-saved, delete-account).
+- Since 0.575 the App admin may be a member of a space like anyone else:
+  `admin-add-member` accepts their own handle, and `leave-space` removes
+  one of their memberships (`removeMembership`, no Former members record),
+  never their first. The app's start-up `whoami` reloads when
+  `tryingSpace()` no longer matches what the page started with.
 
 ## How it fits together
 

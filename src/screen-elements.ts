@@ -20,6 +20,7 @@ export const BOTH = "On both screens";
 export const QUESTION = "The question screen";
 export const ANSWER = "The answer screen";
 export const END = "The screen at the end";
+export const SPACES = "Learning, for someone in more than one space";
 
 /* [name, what it is, an example of what it holds] */
 export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
@@ -122,6 +123,11 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
   ]],
   [END, [
     ["what-moved", "The cards this sitting moved up a level, cleared, or learnt — left out altogether when none did.", "airport — learnt · key — up to writing it from a cue"],
+  ]],
+  [SPACES, [
+    ["space-filter", "The round button in Learning's top right corner, for someone in more than one space: All your spaces, or one of them. Home, Progress, Cards, Courses and the session started from them follow it.", "All your spaces · Lingua · Main"],
+    ["my-spaces", "At the top of the menu behind your initial: your spaces, one per line, to go to another. For the super admin, \"Where you are\": Super admin, your spaces, and a space you opened.", "Super admin · Main · Lingua"],
+    ["stranded", "The page someone sees when they have no space to open: suspended in, removed from or gone from each of theirs, with a box for an invitation link or a course code.", "You're suspended in Lingua."],
   ]],
 ];
 

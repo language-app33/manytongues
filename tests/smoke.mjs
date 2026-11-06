@@ -321,6 +321,14 @@ const signedUp = [];
    whatever else is in hand — so for that one the course is emptied and the
    only thing left is the skills. */
 let materialQuiet = false;
+/* Memberships: an account in two spaces, each with a course of its own.
+   Off except in the walk that sets it. */
+let materialTwoSpaces = false;
+/** @type {any[]} */
+const joinedSpaces = [];
+/* Who whoami answers as, where a walk signs somebody else in. */
+/** @type {any} */
+let whoamiAs = null;
 /* Saves the stub takes, where a walk turns them on — see save-card below. */
 let takeSaves = false;
 /** @type {any[]} */
@@ -365,9 +373,31 @@ const fakeFetch = async (input, opts = {}) => {
   }
 
   if (url.pathname === "/api/courses") {
-    if (action === "whoami") return json({ ok: true, user: { ...account, key: undefined } });
+    /* With every space the account may use (memberships): the account's
+       own `orgs` where a test gives it several, else its one space. */
+    if (action === "whoami") {
+      const own = /** @type {any} */ (whoamiAs || account);
+      const orgs = own && Array.isArray(own.orgs) ? own.orgs : own && own.org ? [own.org] : [];
+      return json({ ok: true, user: { ...own, key: undefined, orgs } });
+    }
     if (action === "my-material") {
       materialHits += 1;
+      if (materialTwoSpaces) {
+        const lingua = { ...card, id: "k999999999999", ar: "قلم", en: "pen", lat: "qalam", subs: [], clips: [] };
+        return json({
+          ok: true, version: "v-two", teaches: false,
+          courses: [
+            { id: "c1", org: "main", title: "Arabic 101", language: "ar-PS", decks: ["d1"], role: "student", studying: true, teaching: false },
+            { id: "c9", org: "lingua", title: "Lingua Arabic", language: "ar-PS", decks: ["d9"], role: "student", studying: true, teaching: false },
+          ],
+          decks: [
+            { id: "d1", title: "Lesson 1", owner: "t-1", cardIds: [card.id, phrase.id], cardCount: 2, courseId: "c1", courseTitle: "Arabic 101", courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: 1 }], version: 3 },
+            { id: "d9", title: "Lesson 1", owner: "t-9", cardIds: [lingua.id], cardCount: 1, courseId: "c9", courseTitle: "Lingua Arabic", courseLanguage: "ar-PS", courses: [{ courseId: "c9", addedAt: 1 }], version: 1 },
+          ],
+          cards: [{ deckId: "d1", cards: [card, phrase] }, { deckId: "d9", cards: [lingua] }],
+          systems: [],
+        });
+      }
       if (materialQuiet) {
         return json({
           ok: true, version: "v-quiet", teaches: true,
@@ -508,6 +538,18 @@ const fakeFetch = async (input, opts = {}) => {
       reported.push(JSON.parse(opts.body || "{}"));
       return json({ ok: true, id: "flag-1" });
     }
+    /* Memberships: a space's public face, and joining it signed in. */
+    if (action === "org-info" && materialTwoSpaces) {
+      const slug = url.searchParams.get("slug");
+      if (slug === "lingua") return json({ ok: true, org: { id: "lingua", slug: "lingua", name: "Lingua", logo: "", colour: "", logoData: "", closed: false } });
+      if (slug === "main") return json({ ok: true, org: { id: "main", slug: "main", name: "Main", logo: "", colour: "", logoData: "", closed: false } });
+      return json({ error: "no-space" }, 404);
+    }
+    if (action === "join-space") {
+      joinedSpaces.push(JSON.parse(opts.body || "{}"));
+      return json({ ok: true, space: { id: "lingua", slug: "lingua", name: "Lingua", logo: "", colour: "" } });
+    }
+    if (action === "practiced" || action === "leave-space") return json({ ok: true });
     return json({ error: "unknown-action" }, 400);
   }
   if (url.pathname === "/api/sync") {
@@ -7757,16 +7799,36 @@ const openPronounTables = async () => {
 
 /* ---- a language's pronouns, written once ----
 
-   The Pronouns screen, off the Cards tab beside Numbers: one row per
-   column of the verb table. Filled in and saved, each row goes up as a
-   card of the Pronoun kind that says which column it is. */
+   The Pronouns screen, a word set (0.569): reached from the Word sets row
+   above the Cards tab's list, through the screen that lists every set.
+   One row per column of the verb table. Filled in and saved, each row goes
+   up as a card of the Pronoun kind that says which column it is. */
 {
   takeSaves = true;
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const btn = /** @type {any} */ (frameButtons(frame)
-    .find((b) => b.getAttribute("aria-label") === "Pronouns") || null);
-  check("the Cards tab offers Pronouns beside Numbers", !!btn, btn ? "there" : "(no button)");
-  click(btn);
+  check("the Cards tab no longer has an icon each for Numbers and Pronouns",
+    !frameButtons(frame).some((b) => /^(Numbers|Pronouns)$/.test(b.getAttribute("aria-label") || "")),
+    frameButtons(frame).map((b) => b.getAttribute("aria-label")).filter(Boolean).join(" | "));
+  const setsRow = /** @type {any} */ ([...frame.querySelectorAll("button.at-openrow")]
+    .find((b) => /^Word sets/.test((b.textContent || "").trim())) || null);
+  check("but one Word sets row above the cards, saying what it holds",
+    !!setsRow && /Numbers and pronouns, written once for the language/.test(setsRow.textContent || ""),
+    setsRow ? (setsRow.textContent || "").trim() : "(no row)");
+  click(setsRow);
+  await sleep(400);
+  const setsScreen = () => /** @type {any} */ ([...document.querySelectorAll(".at-screen")]
+    .find((sc) => ((sc.querySelector(".at-screenhead h2") || {}).textContent || "").trim() === "Word sets") || null);
+  const setTile = (/** @type {string} */ name) => /** @type {any} */ (setsScreen()
+    ? [...setsScreen().querySelectorAll("button.at-openrow")].find((b) => ((b.querySelector(".at-decktitle") || {}).textContent || "").trim() === name) || null
+    : null);
+  check("which opens a screen listing each set",
+    !!setTile("Numbers") && !!setTile("Pronouns"),
+    setsScreen() ? (setsScreen().textContent || "").slice(0, 200) : "(no screen)");
+  check("each saying how much of it is written and how many decks hold it",
+    /^0 of 9 pronouns written · in no deck yet$/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || "") &&
+      / ranges? written · in /.test(((setTile("Numbers") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
+    `${((setTile("Pronouns") || {}).textContent || "")} | ${((setTile("Numbers") || {}).textContent || "")}`);
+  click(setTile("Pronouns"));
   await sleep(400);
   const screen = () => /** @type {any} */ ([...document.querySelectorAll(".at-screen")]
     .find((sc) => /^Pronouns · /.test(((sc.querySelector(".at-screenhead h2") || {}).textContent || "").trim())) || null);
@@ -7810,7 +7872,15 @@ const openPronounTables = async () => {
     `${reading("With to be")} | ${reading("As a question")}`);
   check("and a reading left as it came is not stored, so it goes on following the English",
     !sent.enIs && !sent.enAsk, JSON.stringify({ enIs: sent.enIs, enAsk: sent.enAsk }));
+  check("once one is written, the set can be put in a deck from its own screen",
+    !!screen() && [...screen().querySelectorAll("button")].some((b) => /^Add this word set to a deck$/.test((b.textContent || "").trim())),
+    screen() ? [...screen().querySelectorAll("button")].map((b) => (b.textContent || "").trim()).join(" | ") : "(no screen)");
   click([...(screen() || document).querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  await sleep(300);
+  check("closing the set goes back to Word sets, which counts what was written",
+    !!setsScreen() && /^1 of 9 pronouns written/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
+    setsScreen() ? ((setTile("Pronouns") || {}).textContent || "(no tile)") : "(not on Word sets)");
+  click([...(setsScreen() || document).querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
   await sleep(300);
 
   /* And on the Cards tab they are one entry, not a tile each: the set is
@@ -7821,9 +7891,10 @@ const openPronounTables = async () => {
   const faceOf = (/** @type {Element} */ t) => ((t.querySelector(".ar") || {}).textContent || "").trim();
   const nameOf = (/** @type {Element} */ t) => ((t.querySelector(".at-mininame") || {}).textContent || "").trim();
   const entry = () => /** @type {any} */ (tiles().find((t) => nameOf(t) === "Pronouns") || null);
-  check("the pronouns are listed as one Pronouns entry, not a tile each",
+  check("the pronouns are listed as one Pronouns entry, not a tile each, marked as a word set",
     !!entry() && !tiles().some((t) => nameOf(t) !== "Pronouns" && faceOf(t) === "أنا") &&
-      /1 pronoun/.test((entry() || {}).textContent || ""),
+      /1 pronoun/.test((entry() || {}).textContent || "") && /Word set/.test((entry() || {}).textContent || "") &&
+      !/Built-in/.test((entry() || {}).textContent || ""),
     tiles().map((t) => nameOf(t) || faceOf(t)).join(" | "));
   click(entry());
   await sleep(400);
@@ -8771,15 +8842,16 @@ const openPronounTables = async () => {
   /* ---- and what a deck holds besides cards ----
      Numbers are one document per language, so a deck takes them in parts,
      by name, from a screen of their own. */
-  check("read, an open deck offers no way to change its built-in cards",
+  check("read, an open deck offers no way to change its word sets",
     !buttonNamed(/^Choose built-in cards$/), "the button is there before Edit");
   click(document.querySelector('.at-fab[aria-label="Edit"]'));
   await sleep(250);
   check("Edit swaps the back arrow for a cross that cancels",
     !!document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'),
     [...document.querySelectorAll(".at-screenhead .at-back")].map((b) => b.getAttribute("aria-label")).join(" | "));
-  /* Since 0.523 the built-in cards are among the deck's cards, added on
-     Manage cards with the rest and saved there and then. */
+  /* Since 0.523 the word sets (built-in cards before 0.569) are among the
+     deck's cards, added on Manage cards with the rest and saved there and
+     then. */
   click(document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'));
   await sleep(250);
   click(buttonNamed(/^Manage this deck's cards$/));
@@ -8789,6 +8861,10 @@ const openPronounTables = async () => {
     [...document.querySelectorAll(".at-screenhead h2")].map((h) => h.textContent).join(" | "));
   click(buttonNamed(/^Add existing cards$/));
   await sleep(300);
+  check("and adding heads the sets Word sets",
+    [...document.querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Word sets") &&
+      ![...document.querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Built-in"),
+    [...document.querySelectorAll(".at-eyebrow")].map((e) => e.textContent).join(" | "));
   const partRow = (/** @type {RegExp} */ re) =>
     [...document.querySelectorAll(".at-tickrow, label")].find((r) => re.test(r.textContent || ""));
   check("and adding lists the parts of the numbers, with counting inside them rather than parts of its own",
@@ -9845,7 +9921,7 @@ const openPronounTables = async () => {
      somebody and the app is the wrong place to be vague about a
      connection. */
   check("and says that setting up needs a connection and the rest does not",
-    /connection/i.test(host5.textContent || ""),
+    /connection|internet/i.test(host5.textContent || ""),
     (host5.textContent || "").slice(0, 200).replace(/\s+/g, " "));
 
   /* The way in for somebody who has been here before. */
@@ -11282,6 +11358,130 @@ const openPronounTables = async () => {
   root8.unmount();
   host8.remove();
   anyWindow.fetch = anyGlobal.fetch = fetchBefore;
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+}
+
+/* ---- memberships: one account, two spaces ----
+
+   Learning shows both spaces' courses, a row at the top narrows every tab
+   to one, and the You menu lists both. An account in one space sees no
+   row. And another space's invitation, followed signed in, asks to join
+   it rather than to make a new account. */
+{
+  const MAIN = { id: "main", slug: "main", name: "Main", logo: "", colour: "" };
+  const LINGUA = { id: "lingua", slug: "lingua", name: "Lingua", logo: "", colour: "" };
+  const both = { ...account, org: MAIN, orgs: [MAIN, LINGUA] };
+  const fresh = () => {
+    localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, items: [],
+    }));
+    localStorage.removeItem("arabic-trainer:space-filter");
+  };
+  materialTwoSpaces = true;
+  /* A learner: the device opens in Learning. The harness's first app is
+     still mounted and polling, and an answer already on its way when the
+     stub changed can write "teaches" back, so that settles first. */
+  await sleep(1500);
+  localStorage.setItem("arabic-trainer-teaches", "0");
+  localStorage.setItem("arabic-account", JSON.stringify(both));
+  whoamiAs = both;
+  fresh();
+  window.history.replaceState(null, "", "/main");
+
+  const hostM = document.createElement("div");
+  document.body.appendChild(hostM);
+  const rootM = createRoot(hostM);
+  rootM.render(React.createElement(App));
+  await sleep(2500);
+  const ready = () => Number((hostM.querySelector(".at-home[data-ready]") || { getAttribute: () => "-1" }).getAttribute("data-ready"));
+  /* Since 0.576 a button in the top right corner, opening a list. */
+  const row = () => hostM.querySelector('[data-el="space-filter"]');
+  const listed = () => [...hostM.querySelectorAll(".at-learnspacemenu button")];
+  const openList = async () => {
+    if (!listed().length && row()) {
+      click(row());
+      await sleep(200);
+    }
+  };
+  /* By the name on the line, not its initials badge. */
+  const nameOf = (/** @type {Element} */ b) => ((b.querySelector(".at-place-name") || b).textContent || "").trim();
+  const rowButton = (/** @type {RegExp} */ re) => listed().find((b) => re.test(nameOf(b)));
+  await openList();
+  check("an account in two spaces sees which space Learning shows", !!row() && !!rowButton(/^All your spaces$/) && !!rowButton(/^Lingua$/) && !!rowButton(/^Main$/),
+    row() ? listed().map(nameOf).join(" · ") : `no button; ${hostM.querySelector(".at-screen") ? "Teaching open" : "Learning open"}`);
+  const all = ready();
+  click(rowButton(/^Lingua$/));
+  await sleep(400);
+  const inLingua = ready();
+  check("the button then shows the space's initials", (row() && (row() || { textContent: "" }).textContent) === "L",
+    row() ? String((row() || { textContent: "" }).textContent) : "no button");
+  await openList();
+  click(rowButton(/^Main$/));
+  await sleep(400);
+  const inMain = ready();
+  check("choosing a space narrows what is ready to practise", all > 0 && inLingua > 0 && inMain > 0 && inLingua < all && inMain < all,
+    `all ${all}, Lingua ${inLingua}, Main ${inMain}`);
+  check("and the choice is remembered on the device", localStorage.getItem("arabic-trainer:space-filter") === "main",
+    String(localStorage.getItem("arabic-trainer:space-filter")));
+  await openList();
+  click(rowButton(/^All your spaces$/));
+  await sleep(300);
+  check("All shows everything again", ready() === all, `${ready()} of ${all}`);
+
+  click(hostM.querySelector(".at-cornerbtn"));
+  await sleep(300);
+  const inMenu = hostM.querySelector('[data-el="my-spaces"]');
+  check("the You menu lists both spaces", !!inMenu && /Main/.test(inMenu.textContent || "") && /Lingua/.test(inMenu.textContent || ""),
+    inMenu ? (inMenu.textContent || "") : "not listed");
+  rootM.unmount();
+  hostM.remove();
+
+  /* One space: no row, and no list in the menu. */
+  whoamiAs = { ...account, org: MAIN, orgs: [MAIN] };
+  localStorage.setItem("arabic-account", JSON.stringify(whoamiAs));
+  fresh();
+  const hostO = document.createElement("div");
+  document.body.appendChild(hostO);
+  const rootO = createRoot(hostO);
+  rootO.render(React.createElement(App));
+  await sleep(2000);
+  check("an account in one space sees no row of spaces", !hostO.querySelector('[data-el="space-filter"]'));
+
+  /* Another space's invitation, followed signed in. */
+  rootO.unmount();
+  hostO.remove();
+  window.history.replaceState(null, "", "/lingua?join=lingua-code");
+  const hostJ = document.createElement("div");
+  document.body.appendChild(hostJ);
+  const rootJ = createRoot(hostJ);
+  rootJ.render(React.createElement(App));
+  await sleep(2000);
+  const text = hostJ.textContent || "";
+  check("another space's invitation asks to join it", /Join Lingua\?/.test(text) && !/make a new account/i.test(text),
+    text.slice(0, 160));
+  const join = [...hostJ.querySelectorAll("button")].find((b) => /^Join Lingua$/.test((b.textContent || "").trim()));
+  /* jsdom does not navigate: the reload into the space is all that is left. */
+  const assign = window.location.assign;
+  try {
+    Object.defineProperty(window.location, "assign", { value: () => {}, configurable: true });
+  } catch (e) {
+    /* a jsdom that will not let it be replaced: the join call is still checked */
+  }
+  click(join);
+  await sleep(600);
+  check("joining sends the invitation's code", joinedSpaces.length === 1 && joinedSpaces[0].code === "lingua-code",
+    JSON.stringify(joinedSpaces));
+  try {
+    Object.defineProperty(window.location, "assign", { value: assign, configurable: true });
+  } catch (e) {
+    /* as above */
+  }
+  rootJ.unmount();
+  hostJ.remove();
+
+  materialTwoSpaces = false;
+  whoamiAs = null;
+  window.history.replaceState(null, "", "/");
   localStorage.setItem("arabic-account", JSON.stringify(account));
 }
 

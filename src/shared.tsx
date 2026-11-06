@@ -119,6 +119,7 @@ const ICONS: Record<string, string> = {
   viewList: "M3 5h3v3H3V5zm5 0h13v3H8V5zM3 10.5h3v3H3v-3zm5 0h13v3H8v-3zM3 16h3v3H3v-3zm5 0h13v3H8v-3z",
   viewTable: "M3 3v18h18V3H3zm2 6h4v4H5V9zm0 6h4v4H5v-4zm6 4v-4h8v4h-8zm8-6h-8V9h8v4z",
   check: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+  layers: "M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z",
   back: "M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z",
   save:
     "M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z",
@@ -143,6 +144,7 @@ const ICONS: Record<string, string> = {
   slow:
     "M13.05 9.79 10 7.5v9l3.05-2.29L16 12l-2.95-2.21zM11 4.07V2.05c-2.01.2-3.84 1-5.32 2.21L7.1 5.69c1.11-.86 2.44-1.44 3.9-1.62zM5.69 7.1 4.26 5.68C3.05 7.16 2.25 8.99 2.05 11h2.02c.18-1.46.76-2.79 1.62-3.9zM4.07 13H2.05c.2 2.01 1 3.84 2.21 5.32l1.43-1.43c-.86-1.11-1.44-2.44-1.62-3.89zm1.61 6.74C7.16 20.95 9 21.75 11 21.95v-2.02c-1.46-.18-2.79-.76-3.9-1.62l-1.42 1.43zM22 12c0 5.16-3.92 9.42-8.95 9.95v-2.02C16.97 19.41 20 16.05 20 12s-3.03-7.41-6.95-7.93V2.05C18.08 2.58 22 6.84 22 12z",
   pause: "M6 19h4V5H6v14zm8-14v14h4V5h-4z",
+  block: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z",
   view:
     "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z",
   select:
@@ -396,30 +398,42 @@ export function plural(n: number, one: string, many?: string) {
 }
 
 /**
- * How much a deck holds, said on the deck: its cards and its number parts.
- *
- * A part is not a card — it is one skill on the teacher's numbers, held by
- * the deck as an id (Deck.parts) — so counting cardIds alone left a deck
- * of numbers saying "0 cards". The parts are said beside the cards rather
- * than added into them, and a deck of nothing but parts leaves the
- * "0 cards" off.
- *
- * And it says when a part sends students nothing. A part is a promise of
- * numbers that only the teacher's words keep, and "5 number parts" on a
- * deck whose numbers were never written read as a full deck while its
- * students were told there was nothing to practise. Said only where the
- * server has worked it out (`partsWaiting`), so a deck from anywhere else
- * says what it always did.
+ * How much a deck holds, said on the deck: its cards, number parts among
+ * them (0.563) — a part is one skill on the teacher's numbers, held by the
+ * deck as an id (Deck.parts), and counted as the card it is to a student.
  */
-export function deckSize(d: { cardCount?: number; parts?: string[]; partsWaiting?: string[] }, cards = d.cardCount || 0) {
+export function deckSize(d: { cardCount?: number; parts?: string[] }, cards = d.cardCount || 0) {
+  /* A number part is a card like any other (0.563): it is counted with
+     them, and whether it reaches students is notReaching's to say. */
+  return plural(cards + (d.parts || []).length, "card");
+}
+
+/*
+ * How many of a deck's cards don't reach students yet, and why (0.563):
+ * drafts, cards waiting for review, and number parts whose number words
+ * aren't written. Null when every card does. `cards` are the deck's cards
+ * as the teacher holds them, which say their status.
+ */
+export function notReaching(
+  d: { parts?: string[]; partsWaiting?: string[] },
+  cards: { status?: string }[],
+): { n: number; long: string; short: string } | null {
+  const drafts = cards.filter((c) => c.status === "draft").length;
+  const review = cards.filter((c) => c.status === "review").length;
   const held = d.parts || [];
-  const parts = held.length;
-  if (!parts) return plural(cards, "card");
-  const waiting = (d.partsWaiting || []).filter((p) => held.includes(p)).length;
-  const said =
-    plural(parts, "number part") +
-    (waiting === parts ? " · none ready yet" : waiting ? ` · ${waiting} not ready yet` : "");
-  return cards ? `${plural(cards, "card")} · ${said}` : said;
+  const numbers = (d.partsWaiting || []).filter((p) => held.includes(p)).length;
+  const n = drafts + review + numbers;
+  if (!n) return null;
+  const why = [
+    drafts ? plural(drafts, "draft") : "",
+    review ? `${review} waiting for review` : "",
+    numbers ? `${numbers} ${numbers === 1 ? "needs its" : "need their"} number words written` : "",
+  ].filter(Boolean).join(", ");
+  return {
+    n,
+    long: `${n} ${n === 1 ? "doesn't" : "don't"} reach students yet: ${why}`,
+    short: `${n} not reaching students`,
+  };
 }
 
 /* --- Button -------------------------------------------------------
@@ -2275,6 +2289,7 @@ export function ItemList<T>({
   onNew,
   newOff,
   searchBelow,
+  query: outsideQuery,
   renderItem,
   selected,
   onSelectedChange,
@@ -2307,6 +2322,12 @@ export function ItemList<T>({
    * narrow to read what was typed in it on a phone.
    */
   searchBelow?: boolean;
+  /**
+   * The search, typed somewhere else on the screen. Given, the list draws
+   * no search box of its own and narrows by this instead — the Courses tab
+   * searches from a button beside its heading.
+   */
+  query?: string;
   /** An override for the "n of m" line. */ count?: Node;
   items: T[];
   itemKey?: (item: T) => string;
@@ -2345,7 +2366,9 @@ export function ItemList<T>({
   emptyPanel?: Node;
   busy?: boolean;
 }) {
-  const [query, setQuery] = useState("");
+  const [ownQuery, setQuery] = useState("");
+  const outside = outsideQuery !== undefined;
+  const query = outside ? outsideQuery : ownQuery;
   const [selecting, setSelecting] = useState(false);
   const bare = !!emptyPanel && !items.length;
   /* How many tiles are on the page. A long list is shown a page at a time:
@@ -2513,7 +2536,7 @@ export function ItemList<T>({
             New {noun}
           </button>
         )}
-        {items.length > 0 && !searchBelow && searchBox}
+        {items.length > 0 && !searchBelow && !outside && searchBox}
         {/* Beside the search box, because narrowing by hand and narrowing by
             typing are the same job. */}
         {tools}
@@ -2536,7 +2559,7 @@ export function ItemList<T>({
         )}
       </div>
 
-      {searchBelow && items.length > 0 && (
+      {searchBelow && !outside && items.length > 0 && (
         <div className="at-toolbar at-toolbar-search">{searchBox}</div>
       )}
 
@@ -3673,9 +3696,11 @@ export function BannerHost() {
 /* `actions`, where there are any, are a button or two at the end of the
    band: a message that needs doing something about, like reloading for a
    new version, carries its buttons with it. */
-export function TopBanner({ kind = "warn", actions, children }: {
+export function TopBanner({ kind = "warn", actions, oneLine, children }: {
   kind?: "warn" | "error";
   actions?: Node;
+  /** The words and the actions on one line, the words cut short (0.574). */
+  oneLine?: boolean;
   children?: Node;
 }) {
   const [host, setHost] = useState<Element | null>(null);
@@ -3684,7 +3709,7 @@ export function TopBanner({ kind = "warn", actions, children }: {
   }, []);
   if (!children || !host) return null;
   return createPortal(
-    <div className={`at-banner ${kind}`} role={kind === "error" ? "alert" : "status"}>
+    <div className={`at-banner ${kind}${oneLine ? " oneline" : ""}`} role={kind === "error" ? "alert" : "status"}>
       <span className="what">{children}</span>
       {actions ? <span className="at-banneracts">{actions}</span> : null}
     </div>,
@@ -4458,7 +4483,10 @@ type SpaceName = "admin" | "teach";
  */
 const spaceHeld: Record<string, { handle: string; shown: any } | null> = { admin: null, teach: null };
 
-const SPACE_KEY = (space: SpaceName) => `arabic-trainer:space:${space}`;
+/* Trying a space (0.574) keeps its Teaching and Admin apart, and drops
+   them on leaving. */
+const SPACE_TRIAL = API.trialSuffix(API.tryingSpace());
+const SPACE_KEY = (space: SpaceName) => `arabic-trainer:space:${space}${SPACE_TRIAL}`;
 
 function rememberOnDevice(space: SpaceName, handle: string, shown: any) {
   try {
