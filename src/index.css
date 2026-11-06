@@ -1842,7 +1842,11 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-everyone .at-deckrow2 { flex-wrap:wrap; }
 .at-everyone .at-deckacts { flex-wrap:wrap; justify-content:flex-start; flex-basis:100%; }
 /* Learning's space button, in the top right corner (0.576). */
-.at-learnspace { position:absolute; top:calc(12px + var(--banner-h, 0px)); right:12px; z-index: var(--z-chrome); }
+/* Centred on the line beside it (0.579): the 40px tab title on Progress
+   and Cards, the 64px logo and name on Home. One above the chrome, so its
+   list opens over the logo and name rather than under them. */
+.at-learnspace { position:absolute; top:calc(10px + var(--banner-h, 0px)); right:12px; z-index: calc(var(--z-chrome) + 1); }
+.at.on-home .at-learnspace { top:calc(22px + var(--banner-h, 0px)); }
 .at-learnspacebtn { width:44px; height:44px; border-radius:999px; padding:0; cursor:pointer;
   display:inline-flex; align-items:center; justify-content:center; border:2px solid var(--line);
   background: var(--surface); color: var(--text-soft); font-family: var(--ui); font-size:13px; font-weight:800; }

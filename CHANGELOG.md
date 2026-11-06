@@ -8,6 +8,21 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.579 — 6 November 2026
+
+**Learning's space button sits level with the app's name, and its list
+opens on top.**
+
+- The round space button in Learning's top right corner is now centred on
+  the line of the logo and "ManyTongues" on Home, and on the tab's title
+  on Progress and Cards. It sat a little too high.
+- The list it opens now shows over the logo and name. It used to open
+  underneath them.
+
+To check by hand: as a learner in two or more spaces, on a phone, the
+button lines up with the logo and name on Home and with the title on
+Progress and Cards, and its list covers the name when open.
+
 ## 0.578 — 5 November 2026
 
 **Suspending, removing and deleting people: who can do what.**
