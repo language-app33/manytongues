@@ -1055,3 +1055,12 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
 .at-addrinput input { flex:1 1 auto; min-width:0; border:0; padding:0; margin:0;
   background:transparent; font:inherit; color:inherit; outline:none; }
 .at-notreach { color: var(--rose); font-weight:600; }
+@container (max-width: 400px) {
+  .at-dimlong { display:none; }
+  .at-dimbrief { display:inline; }
+  /* The name gives up a little too, so that the longest of them — "person
+     or thing", which has no abbreviation to fall back on — keeps its
+     values beside it on a phone rather than under them. */
+  .at-dimname { font-size:10px; letter-spacing:.03em; }
+  .at-dimpicks { gap:10px; }
+}

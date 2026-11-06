@@ -13,7 +13,7 @@
  * files and in no other file under src/, nor in index.html. Anything else
  * stays: a rule naming no class (an element, :root and its tokens), a rule
  * naming a class a learner's screen uses, @keyframes and @font-face. A rule
- * inside @media or @supports is judged on its own and moved with a copy of
+ * inside @media, @supports or @container is judged on its own and moved with a copy of
  * its wrapper. A class is found by its whole name, so a class that is only
  * ever put together in code (`at-cardtable-${key}`) is never seen as
  * teaching-only and stays where it is.
@@ -156,7 +156,7 @@ export function split(css) {
     if (p.kind === "rule") {
       if (teachingOnly(p.prelude || "")) moved.push({ text: noteOf(i) + p.text, wrapper: null, rule: p.text });
       else kept.push((p.prelude || "").trim());
-    } else if (p.kind === "at" && /^\s*@(media|supports)\b/.test(p.prelude || "")) {
+    } else if (p.kind === "at" && /^\s*@(media|supports|container)\b/.test(p.prelude || "")) {
       for (const q of pieces(p.body || "")) {
         if (q.kind !== "rule") continue;
         if (teachingOnly(q.prelude || "")) moved.push({ text: q.text, wrapper: (p.prelude || "").trim(), rule: q.text });

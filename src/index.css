@@ -3167,15 +3167,6 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
 
 .at-answerabout > .at-btn, .at-answergrammar > .at-btn { font-size:12px; padding:4px 8px; gap:4px; }
 
-@container (max-width: 400px) {
-  .at-dimlong { display:none; }
-  .at-dimbrief { display:inline; }
-  /* The name gives up a little too, so that the longest of them — "person
-     or thing", which has no abbreviation to fall back on — keeps its
-     values beside it on a phone rather than under them. */
-  .at-dimname { font-size:10px; letter-spacing:.03em; }
-  .at-dimpicks { gap:10px; }
-}
 
 /* A screen's head reserves a band at the top for the chrome it has to
    clear. There is no chrome over a specimen, so the band is 46px of
