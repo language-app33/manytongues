@@ -164,7 +164,6 @@ const PLACES: Record<string, [string, string]> = {
   /* Teaching */
   TeachSpace: [TEACH, "The Teaching space"],
   CoursesPage: [TEACH, "The Courses tab"],
-  HeadSearch: [TEACH, "The Courses tab · searching your courses"],
   CourseSettings: [TEACH, "Course settings"],
   NewDeck: [TEACH, "Making a new deck"],
   NumbersFrom: [TEACH, "A deck's screen · whose numbers it uses"],
@@ -261,7 +260,6 @@ const PLACES: Record<string, [string, string]> = {
   InContext: [TEACH, "The In context tab"],
   MeaningSplits: [TEACH, "The Cards tab · cards with more than one meaning, to split or keep"],
   TryExercises: [TEACH, "A card · trying an exercise on it"],
-  SelectionBar: [TEACH, "When several cards are selected"],
   CodeBox: [TEACH, "A code to hand out"],
 
   /* Admin */
@@ -305,7 +303,6 @@ const PLACES: Record<string, [string, string]> = {
   SpaceFrame: [PARTS, "The Teaching and Admin frame"],
   Snackbar: [PARTS, "The message that appears and goes"],
   useSnackbarState: [PARTS, "The message that appears and goes"],
-  Modal: [PARTS, "A box asking you to confirm"],
 };
 
 /* Not in the table: say something readable rather than nothing, and put

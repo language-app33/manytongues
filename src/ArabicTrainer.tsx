@@ -20,6 +20,7 @@ import {
   DeckSwitch,
   ChoiceSwitch,
   CheckList,
+  usePicture,
   ConfirmModal,
   Empty,
   Field as FormField,
@@ -288,6 +289,7 @@ import { buildContextIndex } from "./context-index.ts";
 import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
+import { knownMissing as knownMissingAt, MISSING_CLIPS, pictureData } from "./pictures.ts";
 import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 import {
   ORDER_SEP,
@@ -7474,21 +7476,9 @@ async function saveClipBlob(id: string, blob: Blob) {
   }
 }
 
-/* Clips the server has already said it doesn't hold, and when it said so.
-   Remembered for a few minutes rather than the whole session: a recording
-   published a moment ago can take up to a minute to reach every edge. */
-const MISSING_CLIPS: Map<string, Millis> = new Map();
-const MISSING_FOR_MS = 5 * 60000;
-
-function knownMissing(id: string) {
-  const at = MISSING_CLIPS.get(id);
-  if (at === undefined) return false;
-  if (now() - at > MISSING_FOR_MS) {
-    MISSING_CLIPS.delete(id);
-    return false;
-  }
-  return true;
-}
+/* Clips the server has already said it doesn't hold: one list, shared with
+   the teaching screens — see pictures.ts. */
+const knownMissing = (id: string) => knownMissingAt(id, now());
 
 /*
  * Recordings the server has said it does not hold, kept across launches.
@@ -7680,7 +7670,9 @@ export async function sweepMedia(referenced: { clips: Set<string>; images: Set<s
     const keys = (await idbRun("readonly", (st) => st.getAllKeys(), store)) || [];
     for (const k of keys) {
       if (typeof k !== "string" || keep.has(k)) continue;
-      if ((await idbRun("readwrite", (st) => st.delete(k), store)) !== undefined) gone += 1;
+      /* A delete answers undefined whether or not it found anything. */
+      await idbRun("readwrite", (st) => st.delete(k), store);
+      gone += 1;
       if (store === IMAGE_STORE) IMAGES_HELD.delete(k);
     }
   }
@@ -7794,9 +7786,11 @@ function imageBlob(hash: string): Promise<Blob | null> {
     const here = await idbRun("readonly", (st) => st.get(hash), IMAGE_STORE);
     if (here) return here as Blob;
     try {
-      const r = await API.getImage(hash);
-      if (r && r.data) {
-        const blob = base64ToBlob(r.data);
+      /* Through the one picture fetch, so a picture the editor or the menu
+         already asked for this session is not asked for again. */
+      const data = await pictureData(hash);
+      if (data) {
+        const blob = base64ToBlob(data);
         if ((await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE)) !== undefined) clipsChanged();
         return blob;
       }
@@ -18131,29 +18125,15 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part
         <>
           <p className="at-eyebrow">Languages</p>
           <Help>{note}</Help>
-          <div className="at-cklist">
-            {choices.map((c) => {
-              const chosen = !off.includes(c.id);
-              return (
-                <button
-                  key={c.id}
-                  className={`at-ck${chosen ? " on" : ""}`}
-                  role="checkbox"
-                  aria-checked={chosen}
-                  /* Not disabled: the last one on is pressable and simply
-                     holds. Just its name, to keep the list short. Ticking
-                     keeps the menu open:
-                     you are usually ticking more than one. */
-                  onClick={() => toggle(c.id)}
-                >
-                  <span className="at-ckbox">{chosen ? "✓" : ""}</span>
-                  <span className="at-cktext">
-                    <b>{c.name}</b>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {/* The library's tick list (0.580). Not disabled: the last one on
+              is pressable and simply holds. Just its name, to keep the list
+              short. Ticking keeps the menu open: you are usually ticking more
+              than one. */}
+          <CheckList
+            options={choices.map((c) => ({ id: c.id, title: c.name }))}
+            chosen={choices.filter((c) => !off.includes(c.id)).map((c) => c.id)}
+            onToggle={(id) => toggle(id)}
+          />
         </>
       )}
     </div>
@@ -18335,12 +18315,6 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
 }) {
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
 
   return (
     <div className="at-corner" onClick={(e) => e.stopPropagation()}>
@@ -18357,7 +18331,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
       </button>
 
       {open && (
-        <Popover className="at-cmenu">
+        <Popover className="at-cmenu" onClose={() => setOpen(false)}>
           {/* Where you are (0.576): a list under one heading when there is
               a choice, else the space's name as one quiet line. */}
           {mySpaces && mySpaces.length > 1 && onMySpace ? (
@@ -19029,18 +19003,9 @@ function SpaceLine({ space }: { space: { name: string; logoData?: string; logo?:
 function SpaceBadge({ space, icon }: { space?: { name: string; logoData?: string; logo?: string }; icon?: string }) {
   const logo = space && space.logo;
   const logoData = space && space.logoData;
-  const [src, setSrc] = useState(logoData || "");
-  useEffect(() => {
-    if (logoData || !logo) return;
-    let live = true;
-    API.getImage(logo).then(
-      (r) => live && setSrc(r.data),
-      () => {},
-    );
-    return () => {
-      live = false;
-    };
-  }, [logo, logoData]);
+  /* Fetched once a session, however often the menu opens (0.580). */
+  const fetched = usePicture(logoData ? "" : logo || "");
+  const src = logoData || fetched.src;
   if (icon) {
     return (
       <span className="at-spacebadge plain" aria-hidden="true">
@@ -19162,12 +19127,6 @@ function LearnSpaceButton({ spaces, value, onChange }: {
   onChange: (id: string) => void;
 }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => {
-    if (!open) return undefined;
-    const close = () => setOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
   const chosen = spaces.find((o) => o.id === value) || null;
   return (
     <div className="at-learnspace" onClick={(e) => e.stopPropagation()}>
@@ -19181,7 +19140,7 @@ function LearnSpaceButton({ spaces, value, onChange }: {
         {chosen ? initialsOf(chosen.name) : <Icon name="layers" size={20} />}
       </button>
       {open && (
-        <Popover className="at-cmenu at-learnspacemenu">
+        <Popover className="at-cmenu at-learnspacemenu" onClose={() => setOpen(false)}>
           <SpacePlaces
             label="Which space"
             places={[{ id: "", label: "All your spaces", icon: "layers" }, ...spaces.map((o) => ({ id: o.id, label: o.name, logo: o.logo }))]}
