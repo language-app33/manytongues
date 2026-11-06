@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.581 — 6 November 2026
+
+For teachers:
+
+- **An empty card list no longer shows a table heading with nothing under
+  it.** In the table view, the Cards tab (and an open deck) used to keep the
+  row of column names standing when there were no cards at all, or when a
+  search or filter matched none. Now the table goes, leaving only the
+  "make your first card" panel or the "nothing matches" line.
+
 ## 0.580 — 6 November 2026
 
 **Nothing a teacher saves or a learner practises goes missing quietly any

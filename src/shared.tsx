@@ -2619,8 +2619,11 @@ export function ItemList<T>({
         </div>
       )}
 
+      {/* Nothing to draw, no table: its heading row with no rows under
+          it read as a table with something missing, above the empty
+          panel or the "nothing matches" line. */}
       {views && (drawn === "list" || drawn === "table") ? (
-        <CardLines
+        page.length === 0 ? null : <CardLines
           view={drawn}
           views={views}
           page={page}
