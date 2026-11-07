@@ -9026,6 +9026,24 @@ const openPronounTables = async () => {
     heads.join(" | ") || "(no table)");
   check("and a row per card", document.querySelectorAll(".at-cardtable tbody tr[data-card]").length > 0,
     String(document.querySelectorAll(".at-cardtable tbody tr").length));
+  /* Nothing to show, no table: a heading row with no rows under it was
+     left standing over the "nothing matches" line (0.581). */
+  {
+    const box = /** @type {any} */ (one("input.at-search", null));
+    const put = (/** @type {string} */ v) => {
+      if (!box) return;
+      const setter = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the setter").set;
+      must(setter, "the setter").call(box, v);
+      box.dispatchEvent(new w.Event("input", { bubbles: true }));
+    };
+    put("zzqqxx-no-such-card");
+    await sleep(150);
+    check("a search that finds nothing leaves no empty table behind",
+      !!box && !one(".at-cardtable", null),
+      box ? `${document.querySelectorAll(".at-cardtable thead th").length} headings still drawn` : "(no search box)");
+    put("");
+    await sleep(150);
+  }
   click(sizeBtn());
   await sleep(150);
   check("and it comes back round to where it started rather than running out",
@@ -11573,9 +11591,10 @@ const openPronounTables = async () => {
   materialTwoSpaces = true;
   /* A learner: the device opens in Learning. The harness's first app is
      still mounted and polling, and an answer already on its way when the
-     stub changed can write "teaches" back, so that settles first. */
+     stub changed can write "teaches" back, so that settles first. Kept
+     per space since 0.582: this opens at Main's address. */
   await sleep(1500);
-  localStorage.setItem("arabic-trainer-teaches", "0");
+  localStorage.setItem("arabic-trainer-teaches:main", "0");
   localStorage.setItem("arabic-account", JSON.stringify(both));
   whoamiAs = both;
   fresh();

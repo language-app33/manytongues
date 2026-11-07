@@ -1540,6 +1540,12 @@ Addresses and joining (since 0.543):
   where an old address moved to), shows that space's own sign-in page, and
   once someone is signed in keeps the address on their own space. An App
   admin stays wherever they opened, and works in that space.
+- Every request says which space it acts in (`x-org`), and one function
+  decides it: `actingSpace` in `src/courses-api.ts` (0.582). A member's
+  is known from the account at once; an App admin at another space's
+  address is not known until `org-info` answers, and a request then waits
+  for it rather than leaving without it. What the device keeps of Admin
+  and Teaching is filed under the same space.
 - An account is made with a code: a space's invitation
   (`/<address>?join=<code>`) or a course code, and the code decides the
   space. The only account made without one is the very first on an empty

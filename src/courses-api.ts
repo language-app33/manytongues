@@ -19,15 +19,6 @@ export function setKey(key?: string | null) {
   currentKey = key || "";
 }
 
-/*
- * The space whose address is open (0.543), sent with every request as
- * x-org. The server reads it only from an App admin, who may work in any
- * space; for everybody else their own space decides.
- */
-let addressOrg = "";
-export function setAddressOrg(id?: string | null) {
-  addressOrg = id || "";
-}
 
 /** A space as the app is told of it. */
 export interface OrgCard {
@@ -38,15 +29,87 @@ export interface OrgCard {
   colour: string;
 }
 
+/* The account as stored, parsed once and kept current by loadAccount,
+   saveAccount and clearAccount: call() must not parse it on every
+   request. */
+let accountNow: (User & { key: string }) | null = null;
+
 /* The account lives beside the trainer's own data rather than inside it,
    so signing in on a new device doesn't have to wait for a sync. */
 export function loadAccount(): (User & { key: string }) | null {
   try {
     const raw = localStorage.getItem(KEY_STORE);
-    return raw ? JSON.parse(raw) : null;
+    accountNow = raw ? JSON.parse(raw) : null;
   } catch (e) {
-    return null;
+    accountNow = null;
   }
+  return accountNow;
+}
+loadAccount();
+
+/*
+ * The space every request acts in (0.582), sent as x-org.
+ *
+ * Known at once for a member (the space at the address when it is one of
+ * theirs, else the one whoami landed them in) and for an App admin at one
+ * of their own addresses or at the plain address. Not yet known for an App
+ * admin at another space's address, until org-info has said which space
+ * that is: a request then WAITS rather than leaving without it, because a
+ * request without it acts in the admin's own first space.
+ */
+let addressOrg = ""; // what the address lookup said; "" until it has
+let lookupFailed: Error | null = null;
+let waiters: { ok: (id: string) => void; no: (e: Error) => void }[] = [];
+
+function slugHere(): string {
+  if (typeof window === "undefined" || !window.location || !window.location.pathname) return "";
+  return (window.location.pathname.split("/")[1] || "").toLowerCase();
+}
+function orgsOf(me: any): { id: string; slug: string }[] {
+  return Array.isArray(me.orgs) && me.orgs.length ? me.orgs : me.org && typeof me.org === "object" ? [me.org] : [];
+}
+
+/**
+ * The acting space's id; "" when the server should use its own default
+ * (nobody signed in, or an admin at the plain address); null when it is
+ * not yet known and a request must wait.
+ */
+export function actingSpace(): string | null {
+  if (addressOrg) return addressOrg;
+  const me: any = accountNow;
+  if (!me) return "";
+  const here = slugHere();
+  const own = orgsOf(me).find((o) => o && o.slug === here);
+  if (me.admin) return own ? own.id : here ? null : "";
+  if (own) return own.id;
+  return me.org && typeof me.org === "object" ? me.org.id : "";
+}
+
+/** The acting space, for keying what is kept on the device: "" while unknown. */
+export const currentOrg = () => actingSpace() || "";
+
+/** What the address lookup said the space at the address is. */
+export function setAddressOrg(id?: string | null) {
+  addressOrg = id || "";
+  lookupFailed = null;
+  if (addressOrg) {
+    const w = waiters;
+    waiters = [];
+    for (const x of w) x.ok(addressOrg);
+  }
+}
+/** The address lookup failed: every request waiting on it fails too. The
+    next one waits for the next attempt, unless there is no such space,
+    when every request fails with that. */
+export function spaceLookupFailed(e: Error) {
+  lookupFailed = e && e.message === "no-space" ? e : null;
+  const w = waiters;
+  waiters = [];
+  for (const x of w) x.no(e);
+}
+function awaitSpace(): Promise<string> {
+  if (lookupFailed) return Promise.reject(lookupFailed);
+  return new Promise((ok, no) => waiters.push({ ok, no }));
 }
 
 /*
@@ -57,9 +120,8 @@ export function loadAccount(): (User & { key: string }) | null {
 export function tryingSpace(): string {
   const me: any = loadAccount();
   if (!me || !me.admin || typeof window === "undefined") return "";
-  const mine: { slug?: string }[] =
-    Array.isArray(me.orgs) && me.orgs.length ? me.orgs : me.org && typeof me.org === "object" ? [me.org] : [];
-  const here = (window.location.pathname.split("/")[1] || "").toLowerCase();
+  const mine = orgsOf(me);
+  const here = slugHere();
   if (!here || !mine.length) return "";
   return mine.some((o) => o && o.slug === here) ? "" : here;
 }
@@ -89,6 +151,7 @@ export function saveAccount(account: (User & { key: string }) | null) {
   } catch (e) {
     /* private browsing — the account lasts for the session only */
   }
+  accountNow = account;
   setKey(account && account.key);
 }
 
@@ -98,6 +161,7 @@ export function clearAccount() {
   } catch (e) {
     /* nothing stored */
   }
+  accountNow = null;
   setKey("");
 }
 
@@ -138,7 +202,14 @@ async function call(
   if (use) headers["x-key"] = use;
   /* One call can name its own space: Super admin acting on someone
      elsewhere (0.547). */
-  if (org || addressOrg) headers["x-org"] = org || addressOrg;
+  let space = org || "";
+  /* An anonymous call (key "") is sign-up or the address lookup itself,
+     which cannot wait for the lookup (0.582). */
+  if (!space && key !== "") {
+    const known = actingSpace();
+    space = known === null ? await awaitSpace() : known;
+  }
+  if (space) headers["x-org"] = space;
   const tagAt = body ? "" : `${url.toString()}|${use || ""}|${headers["x-org"] || ""}`;
   const tag = tagAt ? ETAGS.get(tagAt) : undefined;
   if (tag) headers["if-none-match"] = tag;
@@ -343,8 +414,6 @@ export type SaveExtra = {
    from wherever the app is by then (0.580). */
 export const saveCard = (card: Partial<Card>, decks: string[], extra: SaveExtra = {}, org?: string) =>
   call("save-card", { body: { card, decks, ...extra }, ...(org ? { org } : {}) });
-/** The space every call is addressed to now. */
-export const currentOrg = () => addressOrg;
 /* A card's status, or its unpublished changes' — see card-status. */
 export const cardStatus = (
   cardId: string,

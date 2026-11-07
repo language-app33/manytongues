@@ -9420,23 +9420,39 @@ function FeedbackScreen({ onClose, onSend }: {
    ================================================================== */
 
 /* Whether this person teaches anything, kept across launches so the space
-   selector is right the moment the app opens rather than a request later. */
-const TEACHES_KEY = "arabic-trainer-teaches";
+   selector is right the moment the app opens rather than a request later.
+   Per space (0.582): somebody may teach in one of their spaces and only
+   learn in another. A space not yet known reads as "no". */
+const TEACHES_PREFIX = "arabic-trainer-teaches:";
+const teachesKey = () => `${TEACHES_PREFIX}${API.currentOrg()}`;
 /* Which of your spaces Learning shows (memberships): an org id, or "" for
    all. Per device. */
 const SPACE_FILTER_KEY = "arabic-trainer:space-filter";
 function loadTeaches() {
   try {
-    return localStorage.getItem(TEACHES_KEY) === "1";
+    return localStorage.getItem(teachesKey()) === "1";
   } catch (e) {
     return false;
   }
 }
 function saveTeaches(yes: boolean) {
   try {
-    localStorage.setItem(TEACHES_KEY, yes ? "1" : "0");
+    localStorage.setItem(teachesKey(), yes ? "1" : "0");
   } catch (e) {
     /* private browsing; the next launch just asks again */
+  }
+}
+/* Signing out forgets it for every space: the next person is not them. */
+function forgetTeaches() {
+  try {
+    const gone: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith(TEACHES_PREFIX) || k === "arabic-trainer-teaches")) gone.push(k);
+    }
+    for (const k of gone) localStorage.removeItem(k);
+  } catch (e) {
+    /* nothing kept */
   }
 }
 
@@ -9639,6 +9655,9 @@ export default function ArabicTrainer() {
   const [signedOutWhy, setSignedOutWhy] = useState("");
   useEffect(() => {
     let live = true;
+    /* A failed lookup is tried again, further apart each time (0.582):
+       until it answers, an App admin's requests here wait for it. */
+    let delay = 2000;
     const look = (slug: string, hops = 0): void => {
       if (!slug) return;
       API.orgInfo(slug).then(
@@ -9649,15 +9668,28 @@ export default function ArabicTrainer() {
             look(r.moved, hops + 1);
           } else if (r.org) {
             /* The address decides the space a request acts in for nobody
-               signed in, and for an App admin. A member acts in the space
-               they landed in, set below (memberships). */
+               signed in, and for an App admin. A member's is known from
+               the account (API.actingSpace, 0.582). */
             const who = accountNow.current;
             if (!who || who.admin) API.setAddressOrg(r.org.id);
             setAddressSpace(r.org);
           }
         },
         (e) => {
-          if (live && String(e && (e as Error).message) === "no-space") setAddressUnknown(true);
+          if (!live) return;
+          const err = e instanceof Error ? e : new Error(String(e));
+          /* Whatever waits on the lookup fails with it. No such space:
+             the unknown-address screen, and nothing to try again. */
+          API.spaceLookupFailed(err);
+          if (err.message === "no-space") {
+            setAddressUnknown(true);
+            return;
+          }
+          const wait = delay;
+          delay = Math.min(delay * 2, 30000);
+          setTimeout(() => {
+            if (live) look(slug, hops);
+          }, wait);
         },
       );
     };
@@ -9687,7 +9719,6 @@ export default function ArabicTrainer() {
   const atOwnAddress = account && !account.admin ? accountOrgs.find((o) => o.slug === address.slug) || null : null;
   const accountOrg = account && (atOwnAddress || (account as any).org);
   const accountOrgId: string = accountOrg && typeof accountOrg === "object" ? accountOrg.id : "";
-  const memberAdmin = !!(account && account.admin);
   /* Suspended in, removed from or gone from every space (0.578): signed in,
      with nothing to use but a way back. */
   const stranded = account && !account.admin && Array.isArray(account.stranded) && account.stranded.length
@@ -9716,10 +9747,6 @@ export default function ArabicTrainer() {
       /* private browsing: it lasts until the app is closed */
     }
   };
-  /* A member's requests act in the space they are in. */
-  useEffect(() => {
-    if (accountOrgId && !memberAdmin) API.setAddressOrg(accountOrgId);
-  }, [accountOrgId, memberAdmin]);
   /* The space on screen: an App admin works in the one at the address,
      everyone else in their own. Named once, so the corner menu and
      Teaching cannot disagree about it. */
@@ -14924,7 +14951,7 @@ export default function ArabicTrainer() {
               setMyCourses([]);
               setCourseDecks([]);
               setTeaches(false);
-              saveTeaches(false);
+              forgetTeaches();
             }}
             onBecameAdmin={() =>
               account &&

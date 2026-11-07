@@ -2619,8 +2619,11 @@ export function ItemList<T>({
         </div>
       )}
 
+      {/* Nothing to draw, no table: its heading row with no rows under
+          it read as a table with something missing, above the empty
+          panel or the "nothing matches" line. */}
       {views && (drawn === "list" || drawn === "table") ? (
-        <CardLines
+        page.length === 0 ? null : <CardLines
           view={drawn}
           views={views}
           page={page}
@@ -4564,9 +4567,12 @@ type SpaceName = "admin" | "teach";
  * their courses were an hour ago.
  *
  * Keyed by handle on the way in and out, so signing in as somebody else
- * never shows them the last person's material.
+ * never shows them the last person's material; and by the space acted in
+ * (0.582), so one space's Admin or Teaching never stands in for another's.
+ * A space not yet known is shown nothing rather than the wrong one.
  */
-const spaceHeld: Record<string, { handle: string; shown: any } | null> = { admin: null, teach: null };
+type SpaceCopy = { handle: string; org: string; shown: any };
+const spaceHeld: Record<string, SpaceCopy | null> = { admin: null, teach: null };
 
 /* Trying a space (0.574) keeps its Teaching and Admin apart, and drops
    them on leaving. */
@@ -4580,12 +4586,14 @@ const lastKept = new Map<string, string>();
 export const forgetKeptSpaces = () => lastKept.clear();
 function rememberOnDevice(space: SpaceName, handle: string, shown: any) {
   try {
-    /* One slot per space, so the person is part of what is compared. */
-    const text = JSON.stringify([handle, shown]);
+    /* One slot per space, so the person and the space acted in are part
+       of what is compared. */
+    const org = API.currentOrg();
+    const text = JSON.stringify([handle, org, shown]);
     /* And only while the slot is still there: leaving a trial clears it. */
     if (lastKept.get(space) === text && localStorage.getItem(SPACE_KEY(space)) !== null) return;
     lastKept.delete(space);
-    localStorage.setItem(SPACE_KEY(space), JSON.stringify({ handle, shown, at: Date.now() }));
+    localStorage.setItem(SPACE_KEY(space), JSON.stringify({ handle, org, shown, at: Date.now() }));
     lastKept.set(space, text);
   } catch (e) {
     /* Storage full, blocked, or the space is simply too big to keep. The
@@ -4597,20 +4605,24 @@ function recallFromDevice(space: SpaceName, handle: string) {
   try {
     const raw = localStorage.getItem(SPACE_KEY(space));
     const held = raw ? JSON.parse(raw) : null;
-    if (held && held.handle === handle && held.shown) return held.shown;
+    if (held && held.handle === handle && (held.org || "") === API.currentOrg() && held.shown) return held.shown;
   } catch (e) {
     /* Nothing readable. */
   }
   return null;
 }
-type SpaceWatcher = (space: SpaceName, handle: string, shown: any) => void;
+type SpaceWatcher = (space: SpaceName, handle: string, org: string, shown: any) => void;
 const spaceWatchers = new Set<SpaceWatcher>();
 
 /* Quietly: the space itself, keeping the slot level with what it is
    showing. Nothing to tell anyone, since the teller is the only one
    showing it. */
 export function rememberSpace(space: SpaceName, handle: string, shown: any) {
-  spaceHeld[space] = { handle, shown };
+  const org = API.currentOrg();
+  /* Still waiting to learn the space: nothing fetched can arrive here
+     then, so this is only a guard. */
+  if (org === "" && API.actingSpace() === null) return;
+  spaceHeld[space] = { handle, org, shown };
   rememberOnDevice(space, handle, shown);
 }
 
@@ -4618,18 +4630,19 @@ export function rememberSpace(space: SpaceName, handle: string, shown: any) {
    screen should take. */
 function deliverSpace(space: SpaceName, handle: string, shown: any) {
   rememberSpace(space, handle, shown);
-  for (const watcher of [...spaceWatchers]) watcher(space, handle, shown);
+  const org = API.currentOrg();
+  for (const watcher of [...spaceWatchers]) watcher(space, handle, org, shown);
 }
 
 export function recallSpace(space: SpaceName, handle: string) {
   const held = spaceHeld[space];
-  if (held && held.handle === handle) return held.shown;
+  if (held && held.handle === handle && held.org === API.currentOrg()) return held.shown;
   if (held) spaceHeld[space] = null;
   /* Nothing in memory: this is a fresh launch, which is exactly when the
      copy on the device is worth having. Taken into memory as well, so the
      rest of the session reads it without going back to storage. */
   const stored = recallFromDevice(space, handle);
-  if (stored) spaceHeld[space] = { handle, shown: stored };
+  if (stored) spaceHeld[space] = { handle, org: API.currentOrg(), shown: stored };
   return stored;
 }
 
@@ -4640,8 +4653,8 @@ export function useFreshSpace(space: SpaceName, handle: string, adopt: (shown: a
   const latest = useRef(adopt);
   latest.current = adopt;
   useEffect(() => {
-    const watcher: SpaceWatcher = (which, whose, shown) => {
-      if (which === space && whose === handle) latest.current(shown);
+    const watcher: SpaceWatcher = (which, whose, org, shown) => {
+      if (which === space && whose === handle && org === API.currentOrg()) latest.current(shown);
     };
     spaceWatchers.add(watcher);
     return () => {
@@ -4651,8 +4664,21 @@ export function useFreshSpace(space: SpaceName, handle: string, adopt: (shown: a
 }
 
 /* The administrator's whole view of the site, in one request. */
+/*
+ * An answer for a space other than the one acting now is dropped (0.582,
+ * 3a). The space acted in is fixed for the life of the page once known, and
+ * a request waits until it is, so this cannot happen; it is the guard that
+ * keeps it from mattering if it ever does. A space unknown when the
+ * request left is no mismatch: the request waited for it.
+ */
+const movedSince = (at: string | null) => at !== null && at !== API.currentOrg();
+
 export async function pullAdmin(handle: string): Promise<import("./types.ts").AdminOverview> {
+  const at = API.actingSpace();
   let data = await API.adminOverview();
+  if (movedSince(at)) {
+    return recallSpace("admin", handle) || { users: [], courses: [], decks: [], flags: [] };
+  }
   /* Nothing moved since the last ask (0.580): what is held stands. If
      nothing is held after all, ask again for the whole of it. */
   if (data && data.unchanged) {
@@ -4701,7 +4727,14 @@ export const cardLostRecordings = (card: any): number =>
    and what didn't is reported — and what was already held stands in for
    the part that failed. */
 export async function pullTeaching(handle: string) {
+  const at = API.actingSpace();
   let [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
+  if (movedSince(at)) {
+    const kept = recallSpace("teach", handle);
+    return kept
+      ? { ...kept, failed: null }
+      : { courses: [], decks: [], cards: [], missingClips: [], failed: null };
+  }
   const same = (r: PromiseSettledResult<any>) => r.status === "fulfilled" && !!(r.value && r.value.unchanged);
   const held = recallSpace("teach", handle);
   /* An "unchanged" answer is only as good as what is held (0.580). With
