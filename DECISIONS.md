@@ -7636,3 +7636,31 @@ table of words — moved to `src/imports.ts`.
 **What it costs.** Turning learners' own cards back on is now a piece of
 work, not a flag: the editor would be built again, most likely from the
 teacher's card editor, which has moved far past the learner's since 0.404.
+
+---
+
+## One acting space, decided at the request layer
+
+**7 November 2026** · `src/courses-api.ts` (`actingSpace`), `src/shared.tsx`
+
+The server acts in the space a request names (`x-org`), and in the
+caller's own first space when it names none. The app named it only once
+it knew it: for an App admin at another space's address, after the
+address lookup answered; for a member, after a screen effect that ran
+after the screens' own first fetches. Anything sent in between acted in
+the wrong space, and what came back was kept on the device as if it were
+the space on screen.
+
+Now one function answers which space a request acts in, synchronously
+wherever the account says, and "not yet known" for an App admin at another
+space's address. A request then waits for the lookup instead of leaving
+without it; sign-up and the lookup itself, which are anonymous, do not.
+The device keeps Admin, Teaching and the "teaches" flag per space, and an
+answer for a space other than the one now acting is dropped.
+
+The server's fallback is unchanged: the client no longer relies on it.
+
+**What it costs.** An admin at another space's address waits for one
+lookup before anything loads, and a failed lookup fails what was waiting
+on it until the next attempt succeeds. The first visit to a space on a
+device starts blank rather than showing whatever was kept.

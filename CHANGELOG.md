@@ -8,6 +8,30 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.582 — 7 November 2026
+
+**A space shows its own things and nobody else's, from the first moment.**
+
+For teachers and admins:
+
+- **Opening a space from Super Admin, or landing at a space's address, can
+  no longer show another space's decks, cards or people.** Before, the first
+  moment after opening could fetch your own first space's contents instead,
+  and they could stay on screen until a reload.
+- **Nothing you do in that first moment can land in the wrong space.** The
+  app now waits the moment it takes to learn which space it is in, rather
+  than acting before it knows.
+- **The first visit to a space on a device starts blank** while it loads,
+  rather than showing another space's list.
+- **Teaching is offered per space.** Someone who teaches in one of their
+  spaces and only learns in another opens straight into the right one in
+  each.
+
+Trade-off: an App admin opening another space's address on a slow
+connection sees Admin or Teaching load a moment later than before, because
+it no longer guesses. To check by hand: open a space from Super Admin with
+`?open=admin`, and a member of two spaces at each of their addresses.
+
 ## 0.581 — 6 November 2026
 
 For teachers:

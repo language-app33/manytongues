@@ -11591,9 +11591,10 @@ const openPronounTables = async () => {
   materialTwoSpaces = true;
   /* A learner: the device opens in Learning. The harness's first app is
      still mounted and polling, and an answer already on its way when the
-     stub changed can write "teaches" back, so that settles first. */
+     stub changed can write "teaches" back, so that settles first. Kept
+     per space since 0.582: this opens at Main's address. */
   await sleep(1500);
-  localStorage.setItem("arabic-trainer-teaches", "0");
+  localStorage.setItem("arabic-trainer-teaches:main", "0");
   localStorage.setItem("arabic-account", JSON.stringify(both));
   whoamiAs = both;
   fresh();
