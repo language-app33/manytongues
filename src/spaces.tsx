@@ -978,6 +978,10 @@ export const BACKUP_PARTS: {
   index?: string;
   count: string;
   unit: string;
+  /* The same part, said of one space's backup (0.584): "Spaces" over a
+     file holding one space read as though it held them all. */
+  spaceTitle?: string;
+  spaceWhat?: string;
 }[] = [
   {
     key: "spaces",
@@ -987,6 +991,8 @@ export const BACKUP_PARTS: {
     prefixes: ["org:", "slug:", "former:", "gone:"],
     index: "orgs",
     count: "orgs",
+    spaceTitle: "The space itself",
+    spaceWhat: "Its name, address, look and admins, and every address it has had.",
     unit: "space",
   },
   {
@@ -997,6 +1003,8 @@ export const BACKUP_PARTS: {
     prefixes: ["user:", "key:"],
     index: "users",
     count: "users",
+    spaceTitle: "Its people",
+    spaceWhat: "Everyone in the space, with the fingerprint of each sign-in key — never the keys themselves.",
     unit: "account",
   },
   {
@@ -1007,6 +1015,7 @@ export const BACKUP_PARTS: {
     prefixes: ["course:"],
     index: "courses",
     count: "courses",
+    spaceWhat: "Its courses: who teaches each one, who studies it, and which decks it uses.",
     unit: "course",
   },
   {
@@ -1017,6 +1026,7 @@ export const BACKUP_PARTS: {
     prefixes: ["deck:"],
     index: "decks",
     count: "decks",
+    spaceWhat: "Its decks, including its members' My space decks made here.",
     unit: "deck",
   },
   {
@@ -1031,6 +1041,7 @@ export const BACKUP_PARTS: {
     kinds: ["card", "owncards", "system", "mysystems"],
     prefixes: ["card:", "mycards:", "owncards:", "numsys:", "timesys:", "mysystems:"],
     count: "cards",
+    spaceWhat: "Every card in the space, including its members' My space cards made here, and its teachers' numbers and clock. Not the audio.",
     unit: "card",
   },
   {
@@ -1041,6 +1052,7 @@ export const BACKUP_PARTS: {
     prefixes: ["flag:"],
     index: "flags",
     count: "flags",
+    spaceWhat: "What learners flagged in this space, and which question each was about.",
     unit: "report",
   },
   {
@@ -1052,6 +1064,7 @@ export const BACKUP_PARTS: {
     kinds: ["progress", "paudio"],
     prefixes: ["progress:", "paudio:"],
     count: "progress",
+    spaceWhat: "Each member's practice — the whole of it, practice in their other spaces too, since one person has one record of it. Put back by folding into whatever they have practised by then, never over it.",
     unit: "person",
   },
   {
@@ -1063,6 +1076,7 @@ export const BACKUP_PARTS: {
     kinds: ["clip", "image"],
     prefixes: ["clip:", "image:"],
     count: "clips",
+    spaceWhat: "The audio and pictures the space's cards and numbers use, which are nearly all of the size of a backup.",
     unit: "recording",
   },
 ];
@@ -1071,6 +1085,20 @@ export const BACKUP_PARTS: {
 const ALL_PARTS = BACKUP_PARTS.map((p) => p.key);
 
 const partsChosen = (parts: string[]) => BACKUP_PARTS.filter((p) => parts.includes(p.key));
+
+/* A size as a person reads it. */
+export function sizeWords(bytes: number) {
+  if (bytes < 1024) return bytes ? "under 1 KB" : "nothing";
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+/* How much one part adds to a file, from the manifest's bytes per kind. */
+export function partBytes(manifest: any, part: { kinds: string[] }) {
+  const b = (manifest && manifest.bytes) || {};
+  return part.kinds.reduce((n, k) => n + (Number(b[k]) || 0), 0);
+}
 
 /* Which parts a file holds. Files made before a backup could be partial say
    nothing, and a file that says nothing holds everything — which was true
@@ -1102,6 +1130,12 @@ export async function buildBackup(
   source: () => Promise<{ manifest: any }> = API.backupManifest,
 ) {
   const { manifest } = await source();
+  return buildFromManifest(manifest, onProgress, parts);
+}
+
+/* The file, from a manifest already in hand: the backup screen reads one
+   to say how large each part is, and a moment later builds from it. */
+async function buildFromManifest(manifest: any, onProgress: (done: number, total: number) => void, parts: string[]) {
   const chosen = partsChosen(parts);
   const kinds = new Set(chosen.flatMap((p) => p.kinds));
   const plan = (manifest.plan || []).filter((c: any) => kinds.has(c.kind));
@@ -1126,6 +1160,7 @@ export async function buildBackup(
       )
     ),
     chunks: (whole.chunks || []).filter((c: any) => kinds.has(c.kind)),
+    bytes: Object.fromEntries(Object.entries(whole.bytes || {}).filter(([k]) => kinds.has(k))),
   };
   return writeFile(kept, plan, API.backupChunk, parts, onProgress);
 }
@@ -3424,15 +3459,17 @@ function BackupFlow({
           setFile({ parsed, name });
         }}
         onClose={onClose}
-        onDownload={(parts) =>
+        source={source || API.backupManifest}
+        onDownload={(parts, read) =>
           run(async () => {
             setProgress({ done: 0, total: 0 });
             try {
-              const { blob, manifest, problems } = await buildBackup(
-                (done, total) => setProgress({ done, total }),
-                parts,
-                source,
-              );
+              /* The manifest the screen read for its sizes, while it is
+                 still fresh; otherwise a new one, so the file is as of now. */
+              const fresh = read && Date.now() - read.at < 2 * 60 * 1000;
+              const { blob, manifest, problems } = fresh && read
+                ? await buildFromManifest(read.manifest, (done, total) => setProgress({ done, total }), parts)
+                : await buildBackup((done, total) => setProgress({ done, total }), parts, source);
               const url = URL.createObjectURL(blob);
               const a = document.createElement("a");
               const stamp = new Date(manifest.takenAt).toISOString().slice(0, 16).replace(/[:T]/g, "-");
@@ -3511,13 +3548,17 @@ function BackupScreen({
   report,
   busy,
   error,
+  source,
   onClose,
 }: {
   mode: "download" | "restore";
   door: RestoreDoor;
   file?: any;
   fileName?: string;
-  onDownload: (parts: string[]) => void;
+  onDownload: (parts: string[], read: { manifest: any; at: number } | null) => void;
+  /* Where a backup's manifest comes from, read when the screen opens so
+     each part can say how large it is (0.584). */
+  source?: () => Promise<{ manifest: any }>;
   onRestore: (parts: string[], options: API.RestoreOptions, naming: string) => void;
   onPickFile: (file: any, name: string) => void;
   progress?: { done: number, total: number } | null;
@@ -3551,8 +3592,35 @@ function BackupScreen({
     setPreviewErr("");
   }, [file]);
 
-  const counts = (file && file.manifest && file.manifest.counts) || null;
+  /* On a backup, what the site or the space holds now: read once as the
+     screen opens, for each part's count and size. */
+  const [read, setRead] = useState<{ manifest: any; at: number } | null>(null);
+  const [sizing, setSizing] = useState("");
+  /* Once per opening: the caller may hand a new function each time it draws. */
+  const sourceNow = useRef(source);
+  sourceNow.current = source;
+  useEffect(() => {
+    const from = sourceNow.current;
+    if (restoring || !from) return undefined;
+    let live = true;
+    setSizing("Working out how large each part is…");
+    from().then(
+      (r) => {
+        if (!live) return;
+        setRead({ manifest: r.manifest, at: Date.now() });
+        setSizing("");
+      },
+      () => live && setSizing(""),
+    );
+    return () => {
+      live = false;
+    };
+  }, [restoring]);
+  const ofSpace = door.kind === "space" && !!door.name;
+  const shown = restoring ? (file && file.manifest) || null : read ? read.manifest : null;
+  const counts = (shown && shown.counts) || null;
   const chosen = parts.filter((p) => !restoring || held.includes(p));
+  const total = shown && shown.bytes ? partsChosen(chosen).reduce((n, p) => n + partBytes(shown, p), 0) : null;
   const nothing = !chosen.length;
   const refused = restoring && file ? doorRefusal(file, door) : "";
   const problems = restoring && file ? verifyBackup(file) : [];
@@ -3588,7 +3656,11 @@ function BackupScreen({
 
   return (
     <Screen
-      title={restoring ? (door.kind === "space" ? "Restore a space" : "Restore") : "Back up"}
+      title={
+        restoring
+          ? door.kind === "space" ? "Restore a space" : "Restore"
+          : ofSpace ? `Back up ${door.name}` : "Back up the site"
+      }
       onBack={onClose}
       rise
       action={
@@ -3606,7 +3678,7 @@ function BackupScreen({
             {busy ? "Restoring…" : "Restore"}
           </Button>
         ) : (
-          <Button variant="primary" size="sm" disabled={nothing || busy} onClick={() => onDownload(chosen)}>
+          <Button variant="primary" size="sm" disabled={nothing || busy} onClick={() => onDownload(chosen, read)}>
             <Icon name="download" />
             {busy ? "Working…" : "Download"}
           </Button>
@@ -3616,10 +3688,17 @@ function BackupScreen({
       {restoring ? (
         <Notice kind="info">{NEVER_OVERWRITES}</Notice>
       ) : (
-        <Help>
-          Tick what the file should hold. All of it is the backup to keep; less of it is for when you want the
-          wording of every card without a gigabyte of audio behind it.
-        </Help>
+        <>
+          <Help>
+            {ofSpace
+              ? `One file holding the space ${door.name} and nothing from any other space: its people, courses, decks, cards, recordings and pictures, its members' My space made here, and its members' practice.`
+              : "One file holding every space on the site, and everyone in them."}
+          </Help>
+          <Help>
+            Tick what the file should hold. All of it is the backup to keep; less of it is for when you want the
+            wording of every card without a gigabyte of audio behind it.
+          </Help>
+        </>
       )}
 
       {restoring && (
@@ -3671,14 +3750,21 @@ function BackupScreen({
       {(!restoring || (file && !refused)) && !report && (
         <div className="at-field at-mt4">
           <CheckList
-            options={BACKUP_PARTS.filter((p) => !restoring || held.includes(p.key)).map((p) => ({
-              id: p.key,
-              title: p.title,
-              note:
-                counts && counts[p.count] !== undefined
-                  ? `${p.what} ${plural(counts[p.count], p.unit)} in the file.`
-                  : p.what,
-            }))}
+            options={BACKUP_PARTS.filter((p) => !restoring || held.includes(p.key)).map((p) => {
+              const spaceWords = (restoring ? fileScope(file).kind === "space" : ofSpace);
+              const what = spaceWords ? p.spaceWhat || p.what : p.what;
+              const many = counts && counts[p.count] !== undefined
+                ? plural(counts[p.count], p.unit, p.unit === "person" ? "people" : undefined)
+                : "";
+              const b = shown && shown.bytes ? partBytes(shown, p) : null;
+              const size = b === null ? "" : b >= 1024 ? `about ${sizeWords(b)}` : b > 0 ? sizeWords(b) : "";
+              const facts = [many, size].filter(Boolean).join(", ");
+              return {
+                id: p.key,
+                title: spaceWords ? p.spaceTitle || p.title : p.title,
+                note: facts ? `${what} ${facts}${restoring ? " in the file" : ""}.` : what,
+              };
+            })}
             chosen={parts}
             onToggle={(id, on) => {
               setPreview(null);
@@ -3693,6 +3779,10 @@ function BackupScreen({
             </Help>
           )}
           {nothing && <Help>Nothing ticked, so there is nothing to do.</Help>}
+          {!restoring && sizing ? <Help>{sizing}</Help> : null}
+          {!restoring && !nothing && total !== null ? (
+            <Help>The file will be {total >= 1024 ? `about ${sizeWords(total)}` : sizeWords(total)}.</Help>
+          ) : null}
         </div>
       )}
 

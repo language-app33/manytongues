@@ -8,6 +8,29 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.584 — 8 November 2026
+
+For the App admin, in Super admin → Spaces → a space → Back up this space:
+
+- **The screen says which space it is backing up.** It is titled "Back up"
+  and the space's name, says the file holds that space and nothing from any
+  other, and each part is described as that space's ("The space itself",
+  "Its people", "Every card in the space…") rather than in words that read
+  as if every space were going into the file. The site's own backup is now
+  titled "Back up the site".
+- **Each part says how large it will make the file**, beside how many
+  things it holds, and under the list the whole file's size for what is
+  ticked — so you can see at a glance that the recordings are most of it.
+  The same sizes show on the site's backup.
+
+Trade-off: the screen reads what the space holds as it opens, which takes
+a few seconds on a large space before the sizes appear. Downloading within
+two minutes uses that same reading; after that the file is made fresh.
+
+To check by hand: open a space with recordings, Back up this space, and
+see its name in the title and a size on each part; untick Recordings and
+images and see the total drop.
+
 ## 0.583 — 8 November 2026
 
 **A space can be backed up and put back, and putting anything back can no

@@ -6,7 +6,7 @@
  */
 import { getStore } from "../store.js";
 import {
-  forgetSyncDoc, moveSyncDoc, readSyncDoc, readSyncAudio, recordingIdsOf, mergeSyncDoc, writeSyncAudioIfAbsent,
+  forgetSyncDoc, moveSyncDoc, readSyncDoc, readSyncAudio, recordingIdsOf, syncSize, mergeSyncDoc, writeSyncAudioIfAbsent,
   MAX_BYTES as SYNC_MAX_BYTES,
 } from "./sync.js";
 import { createHash, randomBytes } from "node:crypto";
@@ -5795,12 +5795,12 @@ async function handle(req) {
         /* How much a space holds (60a): the counts, and the bytes of the
            recordings and pictures its cards and numbers use. One shared by
            two spaces counts in both. */
+        const sizeOf = async (/** @type {string} */ key) => {
+          if (typeof store.size === "function") return (await store.size(key)) || 0;
+          const v = await store.get(key, { type: "text" }).catch(() => null);
+          return v ? String(v).length : 0;
+        };
         if (action === "admin-org-usage") {
-          const sizeOf = async (/** @type {string} */ key) => {
-            if (typeof store.size === "function") return (await store.size(key)) || 0;
-            const v = await store.get(key, { type: "text" }).catch(() => null);
-            return v ? String(v).length : 0;
-          };
           let bytes = 0;
           for (const h of clipHashes) bytes += await sizeOf(K.clip(h));
           for (const h of imageHashes) bytes += await sizeOf(K.image(h));
@@ -5815,6 +5815,26 @@ async function handle(req) {
         batch("slug", slugNames.map(K.slug), 100);
         batch("clip", clipHashes.map(K.clip), 3);
         batch("image", imageHashes.map(K.image), 2);
+
+        /* How many bytes each kind takes as stored (0.584), so the backup
+           screen can say how large each part will make the file before it
+           is downloaded. Read off the directory entries, not the records;
+           a file holds the same text, give or take its punctuation. */
+        const keyHashOf = new Map(users.filter(Boolean).map((u) => [u.handle, u.keyHash]));
+        /** @type {Record<string, number>} */
+        const bytes = {};
+        for (const c of chunks) {
+          let n = 0;
+          for (const k of c.keys) {
+            if (c.kind === "progress" || c.kind === "paudio") {
+              const [, handle, id] = k.split(":");
+              n += await syncSize(keyHashOf.get(handle) || "", c.kind === "paudio" ? id : undefined).catch(() => 0);
+            } else {
+              n += await sizeOf(k).catch(() => 0);
+            }
+          }
+          bytes[c.kind] = (bytes[c.kind] || 0) + n;
+        }
 
         return json({
           ok: true,
@@ -5841,6 +5861,7 @@ async function handle(req) {
               practiceAudio: practiceAudio.length,
             },
             indexes: { users: handles, courses: courseIds, decks: deckIds, flags: flagIds, orgs: orgIds, gone: goneHandles },
+            bytes,
             chunks: chunks.map((c) => ({ id: c.id, kind: c.kind, keys: c.keys.length })),
             /* Repeated so a chunk can be fetched without the client having to
                reconstruct which keys were in it. */

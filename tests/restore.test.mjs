@@ -232,6 +232,10 @@ test("a space's file says whose it is, and holds its members' My space and pract
   assert.ok(planned.includes(`paudio:${home.teacher.handle}:rec1`), "with its recording");
   assert.equal(JSON.parse(fileB.records[`progress:${home.teacher.handle}`]).items[0].id, "p1");
   assert.equal(fileB.records[`paudio:${home.teacher.handle}:rec1`], "AUDIO-1");
+  /* How large each kind is, so the backup screen can say so (0.584). */
+  assert.ok(fileB.manifest.bytes.card > 0, "the cards' size");
+  assert.equal(fileB.manifest.bytes.paudio, Buffer.byteLength("AUDIO-1"), "a recording's size, from the practice store");
+  assert.equal(fileB.manifest.bytes.progress, Buffer.byteLength(fileB.records[`progress:${home.teacher.handle}`]), "the practice document's");
   const site = await api("admin-backup-manifest", { key: admin.key });
   assert.equal(site.json.manifest.scope.kind, "site");
   assert.ok(site.json.manifest.counts.progress >= 1);

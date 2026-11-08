@@ -1596,6 +1596,8 @@ are the App admin's, from Super admin → Spaces (Back up this space, Restore
 this space from a file, and Restore a space from a file for one that is
 gone).
 
+- Every manifest carries `bytes`, the stored size of each chunk kind
+  (0.584), which the backup screen adds up per part before downloading.
 - Every manifest says what it is in `scope`: `{ kind: "site" }` or
   `{ kind: "space", space, slug, name }`. A file without it is the site's.
 - Both kinds carry people's practice as `progress:<handle>` and the

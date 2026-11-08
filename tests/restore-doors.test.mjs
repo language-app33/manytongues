@@ -12,7 +12,7 @@ import path from "node:path";
 import { buildOnce } from "./helpers.mjs";
 
 const built = await buildOnce(["spaces.tsx"]);
-const { fileScope, doorRefusal, restoreOptionsFor, previewBody, BACKUP_PARTS } = await import(path.join(built, "spaces.js"));
+const { fileScope, doorRefusal, restoreOptionsFor, previewBody, BACKUP_PARTS, sizeWords, partBytes } = await import(path.join(built, "spaces.js"));
 
 const site = { format: "language-app-backup", manifest: { version: 1, scope: { kind: "site" }, indexes: { orgs: ["main", "b1"] } }, records: {} };
 const old = { format: "language-app-backup", manifest: { version: 1, indexes: {} }, records: {} };
@@ -70,4 +70,23 @@ test("Progress is a part of every backup, with its practice recordings", () => {
   const p = BACKUP_PARTS.find((/** @type {any} */ x) => x.key === "progress");
   assert.ok(p);
   assert.deepEqual(p.prefixes, ["progress:", "paudio:"]);
+});
+
+test("each part says how large it makes the file, in words a person reads", () => {
+  const manifest = { bytes: { card: 3000, owncards: 72, system: 0, clip: 5 * 1024 * 1024, image: 1024 * 1024 } };
+  const cards = BACKUP_PARTS.find((/** @type {any} */ x) => x.key === "cards");
+  const media = BACKUP_PARTS.find((/** @type {any} */ x) => x.key === "clips");
+  assert.equal(partBytes(manifest, cards), 3072);
+  assert.equal(sizeWords(partBytes(manifest, cards)), "3 KB");
+  assert.equal(sizeWords(partBytes(manifest, media)), "6.0 MB");
+  assert.equal(sizeWords(0), "nothing");
+  assert.equal(sizeWords(10), "under 1 KB");
+  assert.equal(partBytes({}, cards), 0, "a manifest from before sizes says nothing");
+});
+
+test("one space's backup speaks of that space, not of every space", () => {
+  for (const p of BACKUP_PARTS) assert.ok(p.spaceWhat, `${p.key} has words for one space`);
+  const spaces = BACKUP_PARTS.find((/** @type {any} */ x) => x.key === "spaces");
+  assert.equal(spaces.spaceTitle, "The space itself");
+  assert.doesNotMatch(spaces.spaceWhat, /each space/i);
 });

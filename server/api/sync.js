@@ -85,6 +85,22 @@ export async function readSyncAudio(token, id) {
 }
 
 /**
+ * How many bytes a practice document, or one of its recordings, takes as
+ * stored — for a backup to say how large its Progress part is (0.584).
+ * @param {string} token
+ * @param {string} [id]  A recording's id; the document itself without one.
+ * @returns {Promise<number>}
+ */
+export async function syncSize(token, id) {
+  if (!HEX.test(String(token || "")) || (id !== undefined && !AUDIO_ID.test(String(id)))) return 0;
+  const store = getStore(STORE);
+  const key = keyFor(id === undefined ? token : `${token}:audio:${id}`);
+  if (typeof store.size === "function") return (await store.size(key)) || 0;
+  const text = await store.get(key, { type: "text" });
+  return text == null ? 0 : Buffer.byteLength(String(text), "utf8");
+}
+
+/**
  * A recording put back from a backup, only where there is none: a clip
  * never changes once written, so one already there is the same one.
  * @param {string} token
