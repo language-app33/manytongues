@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.583 — 8 November 2026
+## 0.587 — 8 November 2026
 
 **A new custom session mode, Catch up: only what is due.**
 
@@ -30,6 +30,179 @@ Trade-off: a question that has just opened on a card you know (a new
 level) counts as new, so Catch up leaves it for a regular session. To check
 by hand: build a Catch up over a deck with some reviews due, try 10
 questions and "Everything due", and one over cards with nothing due.
+## 0.586 — 8 November 2026
+
+**Fixes from a learner's 18 reports.** What each question asks is now
+clearer, and some right answers that were marked wrong or nearly right
+now count as right.
+
+For students:
+
+- **"Who is it?" asks you to tick everyone the form could be.** ساكن
+  can be "I", "you" or "he", and بتحكي can be "you" or "she". Before, any
+  one of them counted. Now you tick all the right people and none of the
+  wrong ones. The question says so every time, so it doesn't give away how
+  many there are.
+- **"Who is it?" says what the verb means.** It shows the verb's own
+  meaning ("to keep"), not the form's ("I keep"), which would give away
+  the answer.
+- **"See the pattern" shows the English pronouns clearly.** I, you, she,
+  they and the rest were there in small grey type and went unnoticed. They
+  are now as easy to read as the rest of the row.
+- **"Which word is missing?" in a phrase shows what the phrase means from
+  the start.** It was hidden behind the hint button, so a word like اه
+  ("yes") could not be told from the other choices. The version where you
+  type the word still keeps the meaning behind the hint.
+- **After a gap in a phrase or sentence, "Learn more" shows how the whole
+  of it is pronounced**, not only the missing word. "Where it turned up"
+  shows the phrase's pronunciation too.
+- **A sentence built around a word with several accepted answers takes any
+  of them.** "How do we say how are you??" now takes كيفك as well as كيف
+  حالك.
+- **Writing another form of the card than the one the question names is
+  nearly right, not wrong.** Asked for "Not good" marked *feminine*,
+  writing the masculine says "Nearly — that is the masculine. This one
+  asks for the feminine."
+
+For teachers:
+
+- **Deck quality lists every sentence with words no card teaches**, with
+  those words, so you can add the cards or reword the sentence. Before,
+  it was only one of the suggestions and could be hidden by bigger ones.
+  The app never adds words to practise on its own.
+
+Checked and left alone:
+
+- The wrong choices in "choose the meaning" already come only from cards
+  in the learner's own courses, so a hard word among them is on one of
+  those cards.
+- Where a card has two forms with the same English and nothing saying
+  which is masculine or feminine (or singular or plural), the app can't
+  tell the learner which one it wants, so it still accepts either. The
+  card editor already warns about this. The teacher fixes it by marking
+  each form.
+
+Trade-offs:
+
+- "Who is it?" is harder: leaving out one right person is now a miss.
+- "Which word is missing?" (choosing) is easier, now that the meaning is
+  shown from the start.
+
+To check by hand:
+
+- A "Who is it?" question on a form shared by two persons (بتكتب: you (m)
+  and she): only ticking both is right.
+- A sentence card filled from a value card that accepts two answers: the
+  sentence written with the second answer is marked right.
+- A deck with a sentence using a word that has no card: the warning under
+  Deck quality names the sentence and the word.
+
+## 0.585 — 8 November 2026
+
+**Tapping a card in a matching exercise makes a short, soft sound.**
+
+For learners:
+
+- **Picking up a card, putting it against its pair, or freeing it again now
+  answers with a light tap**, so you know the tap registered without
+  looking back at the tile. It says nothing about whether the pair is
+  right — the grid is still only marked when you check it.
+- It follows your sound setting: louder on Loud, quieter on Soft, and
+  silent on Off. Playing a recording in the listening grid does not make it.
+
+To check by hand: on a phone, tap through a matching grid with sound on,
+then with sound off.
+
+## 0.584 — 8 November 2026
+
+For the App admin, in Super admin → Spaces → a space → Back up this space:
+
+- **The screen says which space it is backing up.** It is titled "Back up"
+  and the space's name, says the file holds that space and nothing from any
+  other, and each part is described as that space's ("The space itself",
+  "Its people", "Every card in the space…") rather than in words that read
+  as if every space were going into the file. The site's own backup is now
+  titled "Back up the site".
+- **Each part says how large it will make the file**, beside how many
+  things it holds, and under the list the whole file's size for what is
+  ticked — so you can see at a glance that the recordings are most of it.
+  The same sizes show on the site's backup.
+
+Trade-off: the screen reads what the space holds as it opens, which takes
+a few seconds on a large space before the sizes appear. Downloading within
+two minutes uses that same reading; after that the file is made fresh.
+
+To check by hand: open a space with recordings, Back up this space, and
+see its name in the title and a size on each part; untick Recordings and
+images and see the total drop.
+
+## 0.583 — 8 November 2026
+
+**A space can be backed up and put back, and putting anything back can no
+longer lose anything.** (`docs/PLAN-space-backup.md`)
+
+For the App admin, in Super admin:
+
+- **Back up this space** replaces Export this space, under each space in
+  Spaces. It offers the same choice of parts as the site's backup, and the
+  file now holds the space's members' My space material made there, and
+  every member's practice.
+- **Restore this space from a file** sits beside it, and **Restore a space
+  from a file** at the top of the list puts back a space that was deleted
+  whole — its people with their old keys, their My space and their practice.
+- **Backups now include people's practice**, both kinds, as a new part
+  called Progress, ticked by default. Putting it back folds it into whatever
+  the person has practised since, the way two of their devices do when they
+  meet, so nothing practised since is lost.
+- **A restore never overwrites and never removes.** It adds what the file
+  holds and the site lacks: a deleted card comes back, a deck gets back a
+  card it lost, but a card edited since keeps its edit, and nobody's
+  account, key, spaces or suspensions are touched.
+- **Before anything is written, Check what this will do** shows, by name,
+  who is left as they are, who will not be put back into the space (left or
+  removed since), who will be re-created with their old key, and who was
+  deleted since and stays deleted unless you tick them back. It names whose
+  names come off restored courses, which spaces will be re-created, and how
+  many cards, decks and courses it adds against how many are already there.
+  Restore waits until that has run for the choices on screen.
+- **When the space still exists**, it keeps its current name, address, look
+  and admins unless you choose the file's (never its address or codes). When
+  its old address has been taken by another space, it asks for a new one.
+- **Afterwards it reports** what it added, what it folded in, and everything
+  it left alone and why, by name where the reason is about a person.
+- **Each door takes its own files.** Super admin → App's Restore a backup
+  refuses a space's file and says whose it is; a space's restore refuses the
+  site's file. Files made before this release are taken as the site's.
+- **Clear data gains Progress too**: the one place on the site that removes
+  people's practice, still behind the deploy's admin key.
+
+Trade-offs: a backup is larger (Progress can be left out when size matters);
+a restore cannot repair a record that exists but is wrong — delete it, or
+the whole space, and restore; and taking a backup reads every member's
+practice, a few seconds on a teaching site. For learners, teachers and space
+admins nothing changes.
+
+To check by hand on the deployed site:
+
+1. Back up a space with a member whose first space is Main and who has
+   practised; Verify the file: complete, with Progress in it.
+2. In that space delete a card, take a card out of a deck and remove a
+   student; restore the file. The preview names the student under "not put
+   back"; afterwards the card and the deck's card are back, the student is
+   still out, and nothing else moved.
+3. Give that member a new key and restore again: the new key works, the old
+   one is refused.
+4. Delete a member's account, restore: they are listed as deleted since,
+   unticked. Tick them and restore: back in this space only, old key working.
+5. Practise on a device, restore an older file: both the newer and the older
+   practice are there.
+6. Delete the whole space and restore it: its people, keys, practice and My
+   space are back.
+7. Restore the same file again: nothing added.
+8. A space's file in Super admin → App is refused with the space's name, and
+   the site's file in Spaces likewise.
+9. Back up the site, Clear data (all parts), restore: everyone, everything
+   and all practice are back, and your own key still works.
 
 ## 0.582 — 7 November 2026
 

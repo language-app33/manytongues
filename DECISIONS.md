@@ -7665,6 +7665,98 @@ lookup before anything loads, and a failed lookup fails what was waiting
 on it until the next attempt succeeds. The first visit to a space on a
 device starts blank rather than showing whatever was kept.
 
+## A restore adds and never overwrites
+
+**8 November 2026** · `server/api/courses.js` (`restoreOne`, `admin-restore-chunk`)
+
+A restore used to write every record in the file over the site's copy. For
+a person in several spaces that set their whole account back to the day of
+the file — spaces joined since gone, a replaced key working again, a
+suspension lifted — and a card edited since lost its edit without a word.
+
+Now a record already on the site is left exactly as it is, a record the
+site lacks is written, and lists that are naturally a union (a deck's cards,
+a course's decks, a person's cards, Former members, a teacher's systems,
+the indexes) gain what they lack. Practice is folded in with the merge two
+devices use. Two writes beyond that, each the owner's choice by name: the
+deletion record of an account ticked to bring back, and a space's name,
+logo, colour and admins when "keep" is unticked. Every record not written
+is reported with why; a prefix the engine does not know is reported, never
+skipped in silence.
+
+Two small departures from the plan, both on the safe side. A deck that
+gains cards has its count and version moved, as on any change to its cards,
+or learners' devices would never fetch them. And a re-created space whose
+address was taken does not list the taken address among its former ones:
+deleting that space later would take the address from the space that has it.
+
+**What it costs.** A restore cannot repair a record that exists but is
+wrong. The way back to the file's copy is to delete the record — a card, or
+the whole space — and restore. Both are deliberate.
+
+## Deleted on purpose means a deletion record exists
+
+**8 November 2026** · `server/api/courses.js` (`restoreVerdicts`)
+
+An account in the file that the site lacks was either deleted since, or
+lost. The `gone:` record that deleting an account writes tells the two
+apart: with one, the account stays deleted unless the owner ticks it in the
+preview; without one, it is re-created with its old key. Deleting a whole
+space drops its `gone:` records, which is why restoring a deleted space
+brings its people back.
+
+The same deletion frees a handle for reuse, so a handle in the file can name
+a different person on the site. `created` is set once when an account is
+made and carried into every backup, so a different `created` means a
+different person, and the preview stops the restore with their names.
+
+## Progress is keyed by handle in a backup
+
+**8 November 2026** · `server/api/sync.js`, the backup manifest
+
+A practice document lives under a hash of the person's key, and a new key
+moves it. A backup that carried it by key would put it back under a key
+that no longer opens anything. So the file names it by handle
+(`progress:<handle>`, `paudio:<handle>:<id>`), and a restore finds the
+person's current key from their account on the site.
+
+---
+
+## "Who is it?" is every right person ticked, and the instruction always says so
+
+**8 November 2026** · `src/verb-drills.ts` (`whoChoices`, `whoAllRight`), `src/languages.ts` (`vwho`, `vwhorec`)
+
+A form spelt the same for several persons — ساكن is *I*, *you (m)* and
+*he* — used to take any one of them as right. A learner reported that this
+taught the form as "I" and nothing else. The owner chose (0.586) that the
+learner ticks every person the form could be, and nobody it could not.
+
+**The instruction says "tick everyone it fits" on every asking**, including
+when only one person fits. Saying it only on the forms with several would
+tell the learner how many to tick, which is half the answer.
+
+**Every right person is always on offer**, however many there are, with at
+least one wrong one beside them, so ticking everything is never right.
+
+**The meaning shown is the verb's, not the form's.** "I keep" over بخلّي
+would be the answer, so the card's own meaning ("to keep") is shown, or,
+where it has none, the form's with its subject taken off the front.
+
+What it costs: a learner who knew one of the persons and not the others is
+now marked wrong, where before they were marked right.
+
+## A sentence's filler accepts what its card accepts
+
+**8 November 2026** · `src/answers.ts` (`fillerVariants`), `src/ArabicTrainer.tsx` (`filledVariantsOf`)
+
+A blank is filled with its value card's first accepted answer, because two
+answers joined by a slash are not a sentence. Written with the value's
+second answer (كيفك for كيف حالك), the sentence was marked nearly right. The
+sentence as filled is still the one shown everywhere. Only the marking also
+tries it with each other answer of each filler, put where the first one
+stands, and only where the first one appears in the sentence word for word.
+A filler the sentence changed on the way in is not guessed at.
+
 ---
 
 ## Catch up: what is due, outside the mix

@@ -164,6 +164,7 @@ import {
   scriptVars,
   setActiveLang,
   verdictText,
+  otherFormNote,
   verdictWord,
   defaultMarking,
   grammarFields,
@@ -329,6 +330,7 @@ import {
   shownAlternatives,
   splitAlternatives,
   withAnswer as oneAnswer,
+  fillerVariants,
 } from "./answers.ts";
 import { asMeaning, cellEnglish, fieldsLost, fillForm, fillsOf, hasSlots, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
 import type { Value } from "./variables.ts";
@@ -338,7 +340,7 @@ import type { Review } from "./review.ts";
 import { liftSubtypeTagsIn } from "./subtype-tags.ts";
 import { tickCapitals } from "./capitals.ts";
 import { spellRuns, typoed } from "./spelling.ts";
-import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, whoChoices, whoIsRight } from "./verb-drills.ts";
+import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, meaningWithoutWho, whoAllRight, whoChoices, whoIsRight, WHO_JOIN } from "./verb-drills.ts";
 import type { Tense } from "./verb-drills.ts";
 import { cappedAt, skillSeed } from "./skills.ts";
 import type { SkillCaps } from "./skills.ts";
@@ -1528,6 +1530,23 @@ export function lentTags(unit: Form | null | undefined, lang: Lang): string[] {
     if (!out.includes(line)) out.push(line);
   }
   return out;
+}
+
+/**
+ * The other ways a filled sentence may be written: each filler's other
+ * accepted answers put where its first stands — see fillerVariants.
+ */
+export function filledVariantsOf(unit: Form | null | undefined): string[] {
+  const filled = unit ? ((unit as Record<string, any>).filled as Record<string, string> | undefined) : undefined;
+  if (!unit || !filled) return [];
+  const fillers: { first: string; others: string[] }[] = [];
+  for (const ref of Object.values(filled)) {
+    const found = ref ? VALUE_OWNER.get(ref) : null;
+    if (!found) continue;
+    const alts = splitAlternatives(String(found.form.ar || "")).map((a) => a.trim()).filter(Boolean);
+    if (alts.length > 1) fillers.push({ first: alts[0], others: alts.slice(1) });
+  }
+  return fillers.length ? fillerVariants(String(unit.ar || ""), fillers) : [];
 }
 
 /*
@@ -6790,12 +6809,13 @@ function AlsoBox({ children }: { children?: Node }) {
     </div>
   );
   const rows: any[] = [];
-  const short = shown.filter((el) => alsoName(el) !== "also-context");
+  const wide = (el: any) => alsoName(el) === "also-context" || alsoName(el) === "also-phrase-said";
+  const short = shown.filter((el) => !wide(el));
   const pair = short.filter((el) => ALSO_PAIR.includes(alsoName(el)));
   const rest = pair.length === 2 ? short.filter((el) => !pair.includes(el)) : short;
   if (pair.length === 2) rows.push(row(pair));
   for (let i = 0; i < rest.length; i += 2) rows.push(row(rest.slice(i, i + 2)));
-  rows.push(...shown.filter((el) => alsoName(el) === "also-context"));
+  rows.push(...shown.filter(wide));
   return (
     <>
       <p className="at-alsomore" data-el="also-heading">
@@ -7291,6 +7311,15 @@ export const SOUNDS: Record<string, (c: AudioContext) => void> = {
   warn: (c) => {
     note(c, { freq: 260, to: 190, dur: 0.16, type: "triangle", peak: 0.07 });
     note(c, { freq: 190, to: 140, at: 0.15, dur: 0.26, type: "triangle", peak: 0.062 });
+  },
+  /* A tile in a matching grid picked up, put against its other half, or
+     freed. The lightest thing here, because a grid of five is ten of
+     these in a row: a soft tap that says the tile heard you, and nothing
+     about whether the pair is right — the grid is only marked once it is
+     checked. Triangle rather than sine so it is not lost the way a lone
+     sine blip was (see tick). */
+  select: (c) => {
+    note(c, { freq: 880, to: 990, dur: 0.07, type: "triangle", peak: 0.055 });
   },
   // A little bubble, for undo and other small reversals.
   pop: (c) => {
@@ -8685,6 +8714,7 @@ function MatchGrid({
      up — or put down again, where it was already held. */
   const tapWord = (id: string) => {
     if (checked) return;
+    sfx("select");
     if (pairedAt(id) !== null) {
       setPairs((p) => {
         const next = { ...p };
@@ -8705,6 +8735,7 @@ function MatchGrid({
 
   const tapMeaning = (at: number) => {
     if (checked) return;
+    sfx("select");
     const owner = takenBy(at);
     /* Tapping a meaning already spoken for frees it, which is the only way
        back from a pairing made by mistake that does not need a third
@@ -8951,7 +8982,7 @@ function MatchGrid({
  *   the meanings up, in the interface font — an English tile set in the
  *   script's size and direction is a sentence pretending to be a word.
  */
-function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase", field = "ar" }: {
+function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase", field = "ar", multi = false }: {
   options: any[];
   lang: Lang;
   value: string;
@@ -8959,22 +8990,31 @@ function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase"
   disabled?: boolean;
   kind?: string;
   field?: string;
+  /** Several may be ticked: the value is their texts, in the tiles' order, joined by WHO_JOIN. */
+  multi?: boolean;
 }) {
   const textOf = (option: any) => String((option && option[field]) || "");
+  const ticked = multi ? value.split(WHO_JOIN).filter(Boolean) : [];
+  const isOn = (text: string) => (multi ? ticked.includes(text) : value === text);
+  const toggle = (text: string) => {
+    if (!multi) return onChange(text);
+    const next = isOn(text) ? ticked.filter((t) => t !== text) : ticked.concat([text]);
+    onChange(options.map(textOf).filter((t) => next.includes(t)).join(WHO_JOIN));
+  };
   return (
-    <div className="at-replies" data-el="answer-choices">
+    <div className={`at-replies${multi ? " multi" : ""}`} data-el="answer-choices" role={multi ? "group" : undefined}>
       {options.map((option) => {
         const text = textOf(option);
         return (
           <button
             type="button"
             key={option.id}
-            className={`at-reply${value === text ? " on" : ""}${kind === "word" ? " word" : ""}${
+            className={`at-reply${isOn(text) ? " on" : ""}${kind === "word" ? " word" : ""}${
               field === "en" ? " en" : ""
             }`}
-            aria-pressed={value === text}
+            aria-pressed={isOn(text)}
             disabled={disabled}
-            onClick={() => onChange(text)}
+            onClick={() => toggle(text)}
           >
             {field === "en" ? asMeaning(text) : <Arabic text={text} kind={kind} lang={lang} />}
           </button>
@@ -11874,6 +11914,14 @@ export default function ArabicTrainer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verbTense, spec, item && item.id]);
   const verbPlace = placeInTense(verbTense, item);
+  /* What the verb means on "who is it?", with nobody in it: the card's
+     own meaning where it has one, else the form's with its person taken
+     off the front. */
+  const whoMeaning =
+    spec && spec.picks === "person" && item
+      ? String((parentItem && parentItem.forms[0] && parentItem.forms[0].id !== item.id && parentItem.forms[0].en) || "").trim() ||
+        meaningWithoutWho(item.en, verbTense ? verbTense.places.map((p) => p.person) : [])
+      : "";
 
   /*
    * Whether the pronunciation or the meaning is beside the question.
@@ -11954,6 +12002,14 @@ export default function ArabicTrainer() {
      it in order, playing a part — has no line of its own, which is what
      `at` being null means. */
   const dialog = isDialog(parentItem) ? parentItem : null;
+  /* How the whole phrase or sentence a gap was in is said, for the answer
+     screen — see also-phrase-said. Empty where it was not written down. */
+  const phraseSaid =
+    spec && spec.promptField === "context" && context
+      ? String(context.lat || "").trim()
+      : spec && spec.promptField === "gap" && dialog && item && item.gap
+        ? String((linesOf(dialog)[item.gap.line] || {}).lat || "").trim()
+        : "";
   const scene = dialog && item ? sceneOf(item.id) : null;
   const at = scene && scene.at !== WHOLE_SCENE ? scene.at : null;
   /* Everything said before this line: the question, in a dialog. What
@@ -12082,6 +12138,26 @@ export default function ArabicTrainer() {
   }, [item, parentItem, spec, qLang.id]);
 
   /*
+   * The card's other forms the prompt reads the same as, where the prompt
+   * does say which one it wants: "Not good" with "feminine" under it, and
+   * the masculine beside it on the card. Written instead, that form is the
+   * right word in the wrong form — nearly right, and the verdict says
+   * which form it was (0.586). Where the prompt says nothing they are
+   * twins, and right.
+   */
+  const namedKin = useMemo(() => {
+    if (!item || !parentItem || !spec || spec.picks || hasSlots(parentItem)) return [] as Form[];
+    if (!askLabel(item, parentItem, qLang) || twins.length) return [] as Form[];
+    return twinsOf({
+      unit: item,
+      kin: unitsOf(parentItem).map((u) => u.unit),
+      promptField: spec.promptField || "",
+      told: false,
+    }) as Form[];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item, parentItem, spec, qLang.id, twins]);
+
+  /*
    * The learner's other cards that this question cannot tell from the one
    * it asks — صَبِر = patience, when صَبِر = cactus is asked for its
    * meaning. See siblingsAsked.
@@ -12104,24 +12180,27 @@ export default function ArabicTrainer() {
   const choices = useMemo(() => {
     if (!spec || !spec.picks) return [];
     /*
-     * Who a verb's form is about: the persons of its own tense, the right
-     * one and those whose forms look most like it. A person whose form is
-     * spelt the same is offered too and is as right — see whoIsRight.
+     * Who a verb's form is about: the persons of its own tense, every one
+     * whose form is spelt the same, and those whose forms look most like
+     * it. All the right ones are always offered and all are to be ticked —
+     * see whoChoices and whoAllRight.
      */
     if (spec.picks === "person") {
       if (!verbTense || !item) return [];
       const { right, wrong } = whoChoices(verbTense, item, qLang, editDistance, PICK_OPTIONS);
       const lead = right.find((p) => p.id === colOf(item)) || right[0];
       if (!lead) return [];
-      const others = right.filter((p) => p !== lead).concat(wrong).slice(0, PICK_OPTIONS - 1);
+      const rightIds = new Set(right.map((p) => `who:${p.id}`));
+      const others = right.filter((p) => p !== lead).concat(wrong);
       const asOption = (p: { id: string; label: string }) => ({ id: `who:${p.id}`, en: p.label || p.id });
       const reps = (statesOf(item)[(exercise && exercise.type) || ""] || {}).reps || 0;
       return optionsFor({
         answer: asOption(lead),
         pool: others.map(asOption),
-        wanted: PICK_OPTIONS,
+        wanted: right.length + wrong.length,
         seed: `${item.id} who ${reps}`,
         textOf: (o) => o.en,
+        near: (o) => rightIds.has(o.id),
       });
     }
     if (spec.picks === "reply") {
@@ -12500,8 +12579,9 @@ export default function ArabicTrainer() {
     if (!spec || !spec.verbDrill || !verbTense || !item) return null;
     const verdict = (ok: boolean) => ({ ok, reason: ok ? "exact" : "wrong" });
     if (spec.picks === "person") {
-      const person = verbTense.places.find((p) => (p.person.label || p.person.id) === typed);
-      return verdict(!!person && whoIsRight(verbTense, item, person.person.id, qLang));
+      const ticked = typed.split(WHO_JOIN).filter(Boolean);
+      const ids = verbTense.places.filter((p) => ticked.includes(p.person.label || p.person.id)).map((p) => p.person.id);
+      return verdict(whoAllRight(verbTense, item, ids, qLang));
     }
     if (spec.answerMode === "vread" || spec.answerMode === "vrow") {
       return verdict(verbMarks(true).every((m) => m.right));
@@ -12564,6 +12644,30 @@ export default function ArabicTrainer() {
           result = also;
           break;
         }
+      }
+    }
+    /* The sentence written with another answer its filler accepts —
+       كيفك where it was filled with كيف حالك. See fillerVariants. */
+    if (!result.ok && !verbOwn && spec && !spec.picks && spec.answerField === "ar") {
+      for (const variant of filledVariantsOf(item)) {
+        const also = checkAnswer(typed, { ...item, ar: variant, answers: undefined, lat: "" }, exercise.type, qSettings);
+        if (also.ok) {
+          result = also;
+          break;
+        }
+      }
+    }
+    /* Another form of this card, where the question named the one it
+       wanted: the word is known and the form is not. */
+    if (!result.ok && !verbOwn && namedKin.length) {
+      const wrote = namedKin.find((k) => checkAnswer(typed, k, exercise.type, qSettings).ok);
+      if (wrote) {
+        result = {
+          ...result,
+          ok: false,
+          reason: "otherForm",
+          note: otherFormNote(askLabel(wrote, parentItem, qLang), askLabel(item, parentItem, qLang)),
+        };
       }
     }
     /*
@@ -14004,6 +14108,16 @@ export default function ArabicTrainer() {
                         {formLabelText}
                       </p>
                     )}
+                    {/* What the verb means, on "who is it?": a learner
+                        reported being asked who a form was about without
+                        anything saying what it meant. The verb's own
+                        meaning ("to keep"), not the form's ("I keep"),
+                        which would be the answer. */}
+                    {spec.picks === "person" && whoMeaning && (
+                      <p className="at-ctxmeaning" data-el="question-verb-meaning">
+                        {asMeaning(whoMeaning)}
+                      </p>
+                    )}
                     {/* Which card it means, where another card the learner
                         has shows the same thing — the teacher's clue, or
                         "not patience". Under the prompt, where "feminine"
@@ -14146,6 +14260,9 @@ export default function ArabicTrainer() {
                         value={typed}
                         disabled={!!checked}
                         onChange={setTyped}
+                        /* Who a form is about: every person it could be is
+                           ticked, so the tiles toggle rather than choose. */
+                        multi={spec.picks === "person"}
                       />
                     ) : spec.answerMode === "choice" ? (
                       <Segmented
@@ -14512,9 +14629,32 @@ export default function ArabicTrainer() {
                               kind="phrase"
                               name="also-context-text"
                             />
+                            {String((context || alsoContext).lat || "").trim() ? (
+                              <Field
+                                value={(context || alsoContext).lat}
+                                field="lat"
+                                kind="phrase"
+                                name="also-context-said"
+                              />
+                            ) : null}
                             <p className="at-ctxmeaning" data-el="also-context-meaning">
                               {asMeaning((context || alsoContext).en)}
                             </p>
+                          </div>
+                        )}
+                        {/* The whole phrase, said, once a gap in it has
+                            been answered: the pronunciation below is the
+                            missing word's alone, and two learners asked
+                            for the sentence's (0.586). The phrase itself
+                            is still up at the top, so only how it is said
+                            comes here. Never before the answer: it holds
+                            the word. */}
+                        {phraseSaid && (
+                          <div className="at-answeralso" data-el="also-phrase-said">
+                            <p className="at-alsolabel" data-el="also-phrase-said-label">
+                              How the whole {spec.promptField === "gap" ? "sentence" : "phrase"} is pronounced
+                            </p>
+                            <Field value={phraseSaid} field="lat" kind="phrase" name="also-phrase-said-text" />
                           </div>
                         )}
                         {spec.promptField === "audio" && spec.answerField !== "ar" && item.ar && (

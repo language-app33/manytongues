@@ -1,6 +1,6 @@
 // @ts-check
 /*
- * Catch up: a custom session of what is due and nothing else (0.583).
+ * Catch up: a custom session of what is due and nothing else (0.587).
  *
  * The owner's four answers, each held here:
  *

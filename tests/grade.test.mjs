@@ -674,3 +674,14 @@ test("with no ladder handed in, nothing counts towards a pass", () => {
     { type: "en2ar", clock });
   assert.equal(keyOf(out[0].forms[0], "en2ar").passes || 0, 0);
 });
+
+test("another form of the card than the one named is nearly right, and says which (0.586)", async () => {
+  const v = verdictOf({ checked: { ok: false, reason: "otherForm" }, toldAnswer: false, overridden: false, skipped: false });
+  assert.equal(v.correct, false);
+  assert.equal(v.near, true);
+  assert.equal(v.rating, "hard");
+  const { otherFormNote, verdictText } = await import("../src/languages.ts");
+  const note = otherFormNote("masculine", "feminine");
+  assert.equal(note, "Nearly — that is the masculine. This one asks for the feminine.");
+  assert.equal(verdictText({ ok: false, reason: "otherForm", note }), note);
+});
