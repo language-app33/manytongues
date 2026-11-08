@@ -7261,6 +7261,15 @@ export const SOUNDS: Record<string, (c: AudioContext) => void> = {
     note(c, { freq: 260, to: 190, dur: 0.16, type: "triangle", peak: 0.07 });
     note(c, { freq: 190, to: 140, at: 0.15, dur: 0.26, type: "triangle", peak: 0.062 });
   },
+  /* A tile in a matching grid picked up, put against its other half, or
+     freed. The lightest thing here, because a grid of five is ten of
+     these in a row: a soft tap that says the tile heard you, and nothing
+     about whether the pair is right — the grid is only marked once it is
+     checked. Triangle rather than sine so it is not lost the way a lone
+     sine blip was (see tick). */
+  select: (c) => {
+    note(c, { freq: 880, to: 990, dur: 0.07, type: "triangle", peak: 0.055 });
+  },
   // A little bubble, for undo and other small reversals.
   pop: (c) => {
     note(c, { freq: 420, to: 900, dur: 0.07, peak: 0.05 });
@@ -8654,6 +8663,7 @@ function MatchGrid({
      up — or put down again, where it was already held. */
   const tapWord = (id: string) => {
     if (checked) return;
+    sfx("select");
     if (pairedAt(id) !== null) {
       setPairs((p) => {
         const next = { ...p };
@@ -8674,6 +8684,7 @@ function MatchGrid({
 
   const tapMeaning = (at: number) => {
     if (checked) return;
+    sfx("select");
     const owner = takenBy(at);
     /* Tapping a meaning already spoken for frees it, which is the only way
        back from a pairing made by mistake that does not need a third
