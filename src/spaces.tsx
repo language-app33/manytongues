@@ -4669,6 +4669,42 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
               </ul>
         </>
       )}
+      {/* Every sentence with words no card teaches, in full (0.583). A
+          learner asked to practise a sentence's words on their own before
+          meeting the sentence; this says which sentences cannot be, and
+          which words they are waiting on. The app adds nothing to
+          practise: the teacher decides whether to add the cards or
+          reword the sentence. */}
+      {quality.untaught.length > 0 && (
+        <div className="at-qwarn" role="note">
+          <p className="at-qfixtitle">
+            <Icon name="search" size={18} />{" "}
+            {plural(quality.untaught.length, "sentence")} {quality.untaught.length === 1 ? "has" : "have"} words
+            students can't practise on their own
+          </p>
+          <p className="at-qfixtext">
+            No card in the course teaches these words, so students meet them for the first time inside the sentence. Add a card
+            for each, or reword the sentence.
+          </p>
+          <ul className="at-qwarnlist">
+            {quality.untaught.map((u, i) => (
+              <li key={`${u.id}-${i}`}>
+                <button type="button" className="at-qfixword" onClick={() => onOpenCard(u.id)} title="Open this card">
+                  <b lang={lang.id} dir={lang.direction} style={script}>
+                    {u.text}
+                  </b>
+                </button>
+                <span className="at-qwarnwords">
+                  {"No card for: "}
+                  <span lang={lang.id} dir={lang.direction} style={script}>
+                    {u.words.join(", ")}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </>
   );
 }

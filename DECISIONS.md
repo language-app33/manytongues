@@ -7664,3 +7664,40 @@ The server's fallback is unchanged: the client no longer relies on it.
 lookup before anything loads, and a failed lookup fails what was waiting
 on it until the next attempt succeeds. The first visit to a space on a
 device starts blank rather than showing whatever was kept.
+
+---
+
+## "Who is it?" is every right person ticked, and the instruction always says so
+
+**8 November 2026** · `src/verb-drills.ts` (`whoChoices`, `whoAllRight`), `src/languages.ts` (`vwho`, `vwhorec`)
+
+A form spelt the same for several persons — ساكن is *I*, *you (m)* and
+*he* — used to take any one of them as right. A learner reported that this
+taught the form as "I" and nothing else. The owner chose (0.583) that the
+learner ticks every person the form could be, and nobody it could not.
+
+**The instruction says "tick everyone it fits" on every asking**, including
+when only one person fits. Saying it only on the forms with several would
+tell the learner how many to tick, which is half the answer.
+
+**Every right person is always on offer**, however many there are, with at
+least one wrong one beside them, so ticking everything is never right.
+
+**The meaning shown is the verb's, not the form's.** "I keep" over بخلّي
+would be the answer, so the card's own meaning ("to keep") is shown, or,
+where it has none, the form's with its subject taken off the front.
+
+What it costs: a learner who knew one of the persons and not the others is
+now marked wrong, where before they were marked right.
+
+## A sentence's filler accepts what its card accepts
+
+**8 November 2026** · `src/answers.ts` (`fillerVariants`), `src/ArabicTrainer.tsx` (`filledVariantsOf`)
+
+A blank is filled with its value card's first accepted answer, because two
+answers joined by a slash are not a sentence. Written with the value's
+second answer (كيفك for كيف حالك), the sentence was marked nearly right. The
+sentence as filled is still the one shown everywhere. Only the marking also
+tries it with each other answer of each filler, put where the first one
+stands, and only where the first one appears in the sentence word for word.
+A filler the sentence changed on the way in is not guessed at.

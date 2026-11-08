@@ -469,13 +469,13 @@ export const EX: Record<string, ExerciseSpec> = {
     answerMode: "choice",
     picks: "word",
     gentle: true,
-    /* What the phrase means, behind the nudge — see hintPhrase. It is the
-       whole of this question's hint, and does not cost the answer its good
-       mark: this is the gentle half, and choosing from four with the
-       meaning up is still reading the Arabic round the gap. */
-    hintPhrase: true,
-    hintLabel: "Show what the phrase means",
-    hintHideLabel: "Hide what the phrase means",
+    /* What the phrase means is on the screen from the start (since 0.583).
+       It was behind the nudge, and a learner reported a gap the rest of
+       the phrase gave no clue to — اه, "yes", out of "اه، بحكي عربي" —
+       where any of the four could have gone. This is the gentle half:
+       choosing from four with the meaning up is still reading the Arabic
+       round the gap. Typing it (ctx2ar) keeps the meaning behind the
+       nudge. */
   },
   /*
    * A verb's example, with one of its subjunctive forms in the gap, and
@@ -940,15 +940,17 @@ export const EX: Record<string, ExerciseSpec> = {
     verbDrill: "row",
   },
   /* One form, and who it is about, chosen from the persons of the same
-     tense — the wrong ones those whose forms look most like it. A person
-     whose form is spelt the same is as right as the answer. */
+     tense — the wrong ones those whose forms look most like it. Every
+     person whose form is spelt the same is to be ticked too (since 0.583),
+     and the instruction says so on every asking, so it gives nothing away
+     about how many there are. */
   vwho: {
     level: 1,
-    instruction: "Who is it about?",
+    instruction: "Who could it be? Tick everyone it fits",
     label: "{Script} → who",
     short: "{S}→Who",
     needs: ["ar"],
-    question: "Who is this form about?",
+    question: "Who could this form be about? Tick everyone it fits.",
     placeholder: "",
     promptField: "ar",
     answerField: "",
@@ -959,11 +961,11 @@ export const EX: Record<string, ExerciseSpec> = {
   },
   vwhorec: {
     level: 1,
-    instruction: "Listen, then choose who it is about",
+    instruction: "Listen, then tick everyone it could be",
     label: "Listen → who",
     short: "L→Who",
     needs: ["recs", "ar"],
-    question: "Who is this form about?",
+    question: "Who could this form be about? Tick everyone it fits.",
     placeholder: "",
     promptField: "audio",
     answerField: "",
@@ -5218,12 +5220,25 @@ export function verdictWord(lang: Lang | null | undefined, key: keyof Verdicts) 
   return own[key] || VERDICT_FALLBACK[key];
 }
 
+/**
+ * What a learner is told who wrote another form of the card than the one
+ * the question named: "Nearly — that is the masculine. This one asks for
+ * the feminine."
+ */
+export function otherFormNote(wrote: string, wanted: string): string {
+  const w = String(wrote || "").trim();
+  const n = String(wanted || "").trim();
+  if (!n) return "Nearly — the right word, in another form.";
+  return w ? `Nearly — that is the ${w}. This one asks for the ${n}.` : `Nearly — the right word, but this one asks for the ${n}.`;
+}
+
 export function verdictText(result: Record<string, any>, lang?: Lang) {
   if (!result) return "";
   if (result.ok) return "Correct";
   if (result.reason === "harakat") return verdictWord(lang, "partial");
   if (result.reason === "missing") return verdictWord(lang, "missing");
   if (result.reason === "near") return verdictWord(lang, "near");
+  if (result.reason === "otherForm") return String(result.note || "Nearly — the right word, in another form.");
   if (result.reason === "ending")
     return "Nearly — but the ending changes the meaning (one or more, I or she), so it is not counted as a typo.";
   return "Not quite";

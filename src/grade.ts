@@ -87,7 +87,9 @@ export interface Verdict {
  */
 /* "ending" is an English answer a plural or a verb ending away from right:
    the word is known, the form is not. See onlyEnding. */
-const NEARLY = ["near", "harakat", "missing", "ending"];
+/* "otherForm" is another form of the card than the one the question named
+   — the masculine where it asked for the feminine. */
+const NEARLY = ["near", "harakat", "missing", "ending", "otherForm"];
 
 /**
  * What the answer counts as.

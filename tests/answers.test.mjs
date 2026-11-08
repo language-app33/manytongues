@@ -660,3 +660,13 @@ test("a card in a list shows one answer of each, the transliteration beside its 
   assert.deepEqual(firstOfEach({ ar: "بيت", en: "house" }), { ar: "بيت", lat: "", en: "house" });
   assert.deepEqual(firstOfEach(null), { ar: "", lat: "", en: "" });
 });
+
+test("a filled sentence takes every answer its filler accepts (0.583)", async () => {
+  const { fillerVariants } = await import("../src/answers.ts");
+  assert.deepEqual(
+    fillerVariants("كيف بنقول كيف حالك؟", [{ first: "كيف حالك", others: ["كيفك"] }]),
+    ["كيف بنقول كيفك؟"],
+  );
+  assert.deepEqual(fillerVariants("أنا تعبان", [{ first: "مبسوط", others: ["فرحان"] }]), [], "a filler not found is left alone");
+  assert.deepEqual(fillerVariants("أنا تعبان", [{ first: "تعبان", others: [] }]), [], "nothing else accepted");
+});

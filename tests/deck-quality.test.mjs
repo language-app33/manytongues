@@ -212,6 +212,16 @@ test("a sentence loses its points for a word no deck of the course teaches, or f
   assert.ok(q.fixes.some((f) => f.key === "unlinked"));
 });
 
+test("every sentence with untaught words is listed for the warning, with its words (0.583)", () => {
+  const door = { id: "door", lang: "ar-PS", category: "noun", forms: [{ ar: "باب", en: "door" }] };
+  const shut = { id: "shut", lang: "ar-PS", category: "verb", forms: [{ ar: "سكّر", en: "close" }] };
+  const good = { id: "g", lang: "ar-PS", uses: ["door"], forms: [{ ar: "سكّر الباب", en: "close the door" }] };
+  const odd = { id: "o", lang: "ar-PS", uses: ["door"], forms: [{ ar: "افتح الباب", en: "open the door" }] };
+  const known = [door, shut];
+  const q = deckQuality([door, good, odd], { lang: ar, pool: known, known });
+  assert.deepEqual(q.untaught, [{ id: "o", text: "افتح الباب", words: ["افتح"] }]);
+});
+
 test("small words that hold a sentence together are never unknown", () => {
   const find = unknownFinder([{ id: "b", category: "noun", forms: [{ ar: "بيت", en: "house" }] }], ar);
   assert.deepEqual(find("في البيت"), [], "في is a preposition, البيت is the house");

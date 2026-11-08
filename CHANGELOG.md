@@ -8,6 +8,73 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.583 — 8 November 2026
+
+**Fixes from a learner's 18 reports.** What each question asks is now
+clearer, and some right answers that were marked wrong or nearly right
+now count as right.
+
+For students:
+
+- **"Who is it?" asks you to tick everyone the form could be.** ساكن
+  can be "I", "you" or "he", and بتحكي can be "you" or "she". Before, any
+  one of them counted. Now you tick all the right people and none of the
+  wrong ones. The question says so every time, so it doesn't give away how
+  many there are.
+- **"Who is it?" says what the verb means.** It shows the verb's own
+  meaning ("to keep"), not the form's ("I keep"), which would give away
+  the answer.
+- **"See the pattern" shows the English pronouns clearly.** I, you, she,
+  they and the rest were there in small grey type and went unnoticed. They
+  are now as easy to read as the rest of the row.
+- **"Which word is missing?" in a phrase shows what the phrase means from
+  the start.** It was hidden behind the hint button, so a word like اه
+  ("yes") could not be told from the other choices. The version where you
+  type the word still keeps the meaning behind the hint.
+- **After a gap in a phrase or sentence, "Learn more" shows how the whole
+  of it is pronounced**, not only the missing word. "Where it turned up"
+  shows the phrase's pronunciation too.
+- **A sentence built around a word with several accepted answers takes any
+  of them.** "How do we say how are you??" now takes كيفك as well as كيف
+  حالك.
+- **Writing another form of the card than the one the question names is
+  nearly right, not wrong.** Asked for "Not good" marked *feminine*,
+  writing the masculine says "Nearly — that is the masculine. This one
+  asks for the feminine."
+
+For teachers:
+
+- **Deck quality lists every sentence with words no card teaches**, with
+  those words, so you can add the cards or reword the sentence. Before,
+  it was only one of the suggestions and could be hidden by bigger ones.
+  The app never adds words to practise on its own.
+
+Checked and left alone:
+
+- The wrong choices in "choose the meaning" already come only from cards
+  in the learner's own courses, so a hard word among them is on one of
+  those cards.
+- Where a card has two forms with the same English and nothing saying
+  which is masculine or feminine (or singular or plural), the app can't
+  tell the learner which one it wants, so it still accepts either. The
+  card editor already warns about this. The teacher fixes it by marking
+  each form.
+
+Trade-offs:
+
+- "Who is it?" is harder: leaving out one right person is now a miss.
+- "Which word is missing?" (choosing) is easier, now that the meaning is
+  shown from the start.
+
+To check by hand:
+
+- A "Who is it?" question on a form shared by two persons (بتكتب: you (m)
+  and she): only ticking both is right.
+- A sentence card filled from a value card that accepts two answers: the
+  sentence written with the second answer is marked right.
+- A deck with a sentence using a word that has no card: the warning under
+  Deck quality names the sentence and the word.
+
 ## 0.582 — 7 November 2026
 
 **A space shows its own things and nobody else's, from the first moment.**

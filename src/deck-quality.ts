@@ -115,6 +115,11 @@ export interface Quality {
   /** For the screen and the tests: each word card and how far its forms
       are met. */
   words: { id: string; share: number; forms: { ar: string; need: number; met: number }[] }[];
+  /** Every sentence that uses words no card in the course teaches, with
+      those words (0.583): a warning shown in full beside the score, not
+      only when it is among the suggestions worth most. A learner asked to
+      practise each word on its own before meeting it in a sentence. */
+  untaught: { id: string; text: string; words: string[] }[];
 }
 
 export interface QualityOptions {
@@ -523,7 +528,7 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
     { key: "scene", weight: SCENE_POINTS, share: scenes.length ? 1 : 0, applies: true },
   ];
 
-  const empty = { score: null, checks, fixes: [], words: wordRows };
+  const empty = { score: null, checks, fixes: [], words: wordRows, untaught: [] };
   if (!words.length && !said.length) return empty;
 
   /* The conversation is worth its 5 whatever else applies; the points of a
@@ -634,7 +639,8 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
     "It practises the deck's words together, the way they're really used.");
   fixes.sort((a, b) => b.gain - a.gain);
 
-  return { score: Math.round(earned), checks, fixes, words: wordRows };
+  const untaught = strange.map((x) => ({ id: String(x.card.id), text: x.texts[0] || "", words: unknownOf(x) }));
+  return { score: Math.round(earned), checks, fixes, words: wordRows, untaught };
 }
 
 /** Which colour a score is shown in. */

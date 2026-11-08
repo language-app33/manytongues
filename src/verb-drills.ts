@@ -135,12 +135,16 @@ export function drillFits(
 }
 
 /**
- * The persons a "who is it?" question offers, the right one first.
+ * The persons a "who is it?" question offers.
  *
  * Every person whose form reads the same as the one asked is right —
- * بتكتب is *you (m)* and *she* — so all of them are offered and any is
- * accepted. The wrong ones are the persons whose forms are nearest in
- * spelling, so what is asked is the difference that is easy to miss.
+ * بتكتب is *you (m)* and *she* — and since 0.583 the learner ticks every
+ * one of them (the owner's call, on a learner's report that ساكن took "I"
+ * alone as the answer). So all of them are always offered, however many
+ * there are, and the wrong ones fill the rest: at least one, so that
+ * ticking everything is never right, and otherwise up to `wanted` in all.
+ * The wrong ones are the persons whose forms are nearest in spelling, so
+ * what is asked is the difference that is easy to miss.
  */
 export function whoChoices(
   tense: Tense,
@@ -156,16 +160,54 @@ export function whoChoices(
     .map((p, i) => ({ p, d: distance(lettersOf(p.form.ar, lang), mine), i }))
     .sort((a, b) => a.d - b.d || a.i - b.i)
     .map((x) => x.p.person);
-  return { right, wrong: wrong.slice(0, Math.max(0, wanted - Math.min(right.length, 1))) };
+  return { right, wrong: wrong.slice(0, Math.max(1, wanted - right.length)) };
 }
 
 /**
- * Whether the person chosen is right for the form asked: their form in
- * this tense reads the same.
+ * Whether the person chosen is one of the right ones for the form asked:
+ * their form in this tense reads the same.
  */
 export function whoIsRight(tense: Tense, asked: Form, personId: string, lang: Lang | null | undefined): boolean {
   const place = tense.places.find((p) => p.person.id === personId);
   return !!place && sameLetters(place.form, asked, lang);
+}
+
+/**
+ * Whether the persons ticked are exactly the right ones: every person the
+ * form could be, and nobody it could not. One right person left unticked
+ * is a miss, as is one wrong person ticked — the question is the whole
+ * set, and the instruction says so.
+ */
+export function whoAllRight(tense: Tense, asked: Form, personIds: string[], lang: Lang | null | undefined): boolean {
+  const chosen = new Set(personIds);
+  if (!chosen.size) return false;
+  return tense.places.every((p) => chosen.has(p.person.id) === sameLetters(p.form, asked, lang));
+}
+
+/** How the persons ticked travel as one answer: their labels, in the tense's order. */
+export const WHO_JOIN = " · ";
+
+/**
+ * What a form means with who it is about taken off the front: "I keep"
+ * is "keep", "She has" is "has". The question asks who; its meaning
+ * with the person still on would be the answer. A meaning that does not
+ * start with one of the persons' English is left as the teacher wrote it.
+ */
+export function meaningWithoutWho(en: unknown, persons: VerbPerson[]): string {
+  const text = String(en || "").trim();
+  if (!text) return "";
+  const subjects = new Set(["i", "you", "he", "she", "it", "we", "they", "y'all", "you all"]);
+  for (const p of persons) {
+    const label = String(p.label || "").replace(/\(.*?\)/g, "").trim().toLowerCase();
+    if (label) subjects.add(label);
+  }
+  const words = text.split(/\s+/);
+  for (const n of [2, 1]) {
+    if (words.length <= n) continue;
+    const head = words.slice(0, n).join(" ").toLowerCase().replace(/[,:]$/, "");
+    if (subjects.has(head)) return words.slice(n).join(" ");
+  }
+  return text;
 }
 
 /**
