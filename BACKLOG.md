@@ -107,3 +107,12 @@ nothing. Either give it a meaning or drop it.
 *My book*, *your book*, *his book* are a table on every noun, and each
 cell is still learnt on its own, the way a verb's persons were until 0.457.
 The owner chose to see how tenses as skills go before doing the same here.
+
+## Moving a space to another site
+
+A space's backup restores into the same site only
+(`docs/PLAN-space-backup.md`, 6a). Putting it into another server would need
+the rule that tells two people with one handle apart (`created` differs)
+applied to every handle, a way to choose a new handle for the person who
+collides, and rewriting every roster, owner and list that names the old
+one. Declined for now: nobody has asked to move a space between servers.

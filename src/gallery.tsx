@@ -282,6 +282,8 @@ const PLACES: Record<string, [string, string]> = {
   LearnSpaceButton: [LEARN, "Learning · which space, from the top right corner"],
   StrandedPanel: [LEARN, "Signed in with no space to open: suspended, removed or left"],
   BackupScreen: [ADMIN, "App · backing up and restoring"],
+  RestoreResult: [ADMIN, "App · what a restore did"],
+  BackupFlow: [ADMIN, "App · backing up and restoring"],
   ClearScreen: [ADMIN, "App · clearing the site"],
 
   /* Before you are signed in */
