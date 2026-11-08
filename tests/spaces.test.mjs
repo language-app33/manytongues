@@ -937,3 +937,59 @@ test("the super admin in several spaces learns across them, and leaves any but t
   assert.ok(!handles((await api("admin-overview", { key: t.lead.key })).json.former).includes(admin.handle));
   assert.equal((await api("leave-space", { key: admin.key, body: {} })).status, 400);
 });
+
+/*
+ * A backup from before spaces, put back after the class moved to one
+ * (0.583). Its records say nothing about which space they are in, and one
+ * that says nothing reads as Main's: written back as they were, the space's
+ * course listed its decks with their counts and not one card reached the
+ * teacher or a student. A restore files such a record in the space its copy
+ * on the site is in, unless that is Main, and otherwise in the space the
+ * restore is run from.
+ */
+test("a backup from before spaces goes back into the space, not Main", async () => {
+  const store = getStore("arabic-courses");
+  /** @param {string} k */
+  const read = async (k) => JSON.parse(String(await store.get(k, { type: "text" })));
+  /** @param {any} rec */
+  const unspaced = (rec) => {
+    const { org: _gone, ...rest } = rec;
+    return rest;
+  };
+  const deckKey = `deck:${b.deck.id}`;
+  const cardKey = `card:${b.card.id}`;
+  const old = { [deckKey]: unspaced(await read(deckKey)), [cardKey]: unspaced(await read(cardKey)) };
+  const cardsOf = async () =>
+    (await api("my-cards", { key: b.teacher.key })).json.cards.map((/** @type {any} */ c) => c.id);
+  const bundled = async () =>
+    (await api("my-material", { key: b.student.key })).json.cards.flatMap((/** @type {any} */ x) =>
+      x.cards.map((/** @type {any} */ c) => c.id),
+    );
+
+  /* What the restore before this one did: written as they were. */
+  for (const [k, v] of Object.entries(old)) await store.set(k, JSON.stringify(v));
+  assert.ok(!(await cardsOf()).includes(b.card.id), "filed under Main, the card is lost to its teacher");
+  assert.ok(!(await bundled()).includes(b.card.id), "and to the course's students");
+
+  /* Put back from the space: into it, which also mends the above. */
+  const put = await api("admin-restore-chunk", { key: admin.key, org: B, body: { records: old } });
+  assert.equal(put.status, 200, JSON.stringify(put.json));
+  assert.equal((await read(cardKey)).org, B);
+  assert.equal((await read(deckKey)).org, B);
+  assert.ok((await cardsOf()).includes(b.card.id), "the teacher has the card again");
+  assert.ok((await bundled()).includes(b.card.id), "and the students get it");
+
+  /* Put back from Main by mistake: what is in a space of its own stays. */
+  await api("admin-restore-chunk", { key: admin.key, body: { records: old } });
+  assert.equal((await read(cardKey)).org, B, "a card in B is not moved to Main");
+
+  /* A card the site has not got goes where the restore is run from; one
+     that names its space keeps it. */
+  const fresh = { ...old[cardKey], id: "kfromthefile1" };
+  const named = { ...old[cardKey], id: "kfromthefile2", org: "main" };
+  await api("admin-restore-chunk", {
+    key: admin.key, org: B, body: { records: { "card:kfromthefile1": fresh, "card:kfromthefile2": named } },
+  });
+  assert.equal((await read("card:kfromthefile1")).org, B);
+  assert.equal((await read("card:kfromthefile2")).org, "main");
+});

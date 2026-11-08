@@ -14877,6 +14877,7 @@ export default function ArabicTrainer() {
           <React.Suspense fallback={<ChunkFallback />}>
             <AdminSpace
               account={account}
+              spaceName={shownSpace && shownSpace.name}
               languages={LANGUAGES}
               onClose={() => setSpace("learn")}
             />
@@ -14888,6 +14889,7 @@ export default function ArabicTrainer() {
             <AdminSpace
               superMode
               account={account}
+              spaceName={shownSpace && shownSpace.name}
               languages={LANGUAGES}
               onClose={() => setSpace("learn")}
             />

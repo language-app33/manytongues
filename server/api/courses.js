@@ -5358,10 +5358,34 @@ async function handle(req) {
            this line in the same release that starts writing one. */
         const allowed =
           /^(user|key|course|deck|owncards|mycards|card|numsys|timesys|mysystems|flag|clip|image|code|index|org|slug|former|gone):/;
+        /* A record from before spaces (0.542) says nothing about which one
+           it is in, and a record that says nothing is read as Main's. Put
+           back like that, a backup of a class that has since moved to a
+           space of its own filed every card under Main: the space's course
+           still listed its decks, each saying how many cards it held, and
+           not one card reached anybody (0.583). So such a record stays in
+           the space its copy on the site is in, when that is a space of its
+           own; one the site has not got, or has in Main — which is where
+           everything from before spaces is, and where a restore run from
+           the wrong space left it — goes into the space the restore is run
+           from. A record that names its space keeps it. */
+        const SPACED = /^(course|deck|card|flag):/;
+        const unspaced = keys.filter((k) => {
+          const v = records[k];
+          return SPACED.test(k) && v && typeof v === "object" && !Array.isArray(v) && !v.org;
+        });
+        const onSite = await readManyJson(store, unspaced);
+        /** @type {Map<string, string>} */
+        const spaceFor = new Map(unspaced.map((k, i) => {
+          const there = onSite[i] ? orgOf(onSite[i]) : MAIN;
+          return [k, there === MAIN ? acting : there];
+        }));
         let written = 0;
         for (const k of keys) {
           if (!allowed.test(k) || k.length > 200) continue;
           let v = records[k];
+          const into = spaceFor.get(k);
+          if (into) v = { ...v, org: into };
           /* An index is the union of what the file says and what is here,
              so restoring an old backup cannot hide accounts, courses or
              decks made since it was taken. */

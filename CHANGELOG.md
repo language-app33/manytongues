@@ -8,6 +8,30 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.583 — 8 November 2026
+
+**A backup from before spaces goes back into your space, cards and all.**
+
+For admins:
+
+- **Restoring an old backup no longer leaves a course's decks empty.**
+  Backups taken before spaces arrived (2 November) don't say which space
+  their courses, decks and cards belong to, and Restore used to file them
+  all under Main. A class that had since moved to a space of its own then
+  showed its decks, each saying how many cards it held, with no cards in
+  them, for the teacher and for the students alike.
+- **Now that material goes into the space you restore from**, and anything
+  already in a space other than Main stays where it is. Restore says so
+  before you press it, and names the space.
+- **If this has already happened to you**, open Admin in the space the
+  class belongs to and restore the same file again: the missing cards move
+  into the space and appear.
+
+Trade-off: a card in Main that a pre-spaces backup also holds moves to the
+space you restore from, so restore an old backup from inside the space it
+belongs to. To check by hand: in a space other than Main, restore a backup
+from before 2 November, then open a deck in Teaching and as a student.
+
 ## 0.582 — 7 November 2026
 
 **A space shows its own things and nobody else's, from the first moment.**

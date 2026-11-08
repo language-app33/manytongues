@@ -1317,6 +1317,16 @@ export async function restoreBackup(file: any, onProgress: (done: number, total:
   return written;
 }
 
+/* How many of a file's courses, decks and cards say nothing about
+   which space they are in: every one in a backup taken before spaces
+   (0.542). The server files them — see admin-restore-chunk. */
+export function unspacedIn(file: any): number {
+  const rec = (file && file.records) || {};
+  return Object.entries<any>(rec).filter(
+    ([k, v]) => /^(course|deck|card):/.test(k) && v && typeof v === "object" && !v.org,
+  ).length;
+}
+
 /* What a finished file says about itself, checked against what it holds. */
 export function verifyBackup(file: any) {
   const problems = [];
@@ -1897,8 +1907,10 @@ function scriptStyle(languages: Record<LangId, Lang>, langId?: LangId) {
   return { ...(lang.fontStack ? { fontFamily: lang.fontStack } : null), ...scriptVars(lang) };
 }
 
-export function AdminSpace({ account, languages, onClose, superMode = false }: {
+export function AdminSpace({ account, spaceName, languages, onClose, superMode = false }: {
   account: User;
+  /** The space this is open in: where a restore files material from before spaces. */
+  spaceName?: string | null;
   /** Super admin (0.547): the App admin's own tools, whichever space they are in. */
   superMode?: boolean;
   languages: Record<LangId, Lang>;
@@ -3133,6 +3145,7 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
               mode={backupMode}
               file={restoreFile ? restoreFile.parsed : null}
               fileName={restoreFile ? restoreFile.name : ""}
+              spaceName={spaceName || (account.org && typeof account.org === "object" && account.org.name) || "this space"}
               busy={!!backup && (backup.state === "running" || backup.state === "restoring")}
               progress={
                 backup && (backup.state === "running" || backup.state === "restoring")
@@ -3345,10 +3358,13 @@ function BackupScreen({
   progress,
   busy,
   onClose,
+  spaceName,
 }: {
   mode: "download" | "restore";
   file?: any;
   fileName?: string;
+  /** Where material from before spaces goes — see admin-restore-chunk. */
+  spaceName: string;
   onDownload: (parts: string[]) => void;
   onRestore: (parts: string[]) => void;
   onPickFile: (file: any, name: string) => void;
@@ -3445,6 +3461,13 @@ function BackupScreen({
             </p>
           ) : (
             <Help>Checked: it holds everything it says it holds.</Help>
+          )}
+          {unspacedIn(file) > 0 && (
+            <Help>
+              {plural(unspacedIn(file), "course, deck or card", "courses, decks or cards")} in it
+              {unspacedIn(file) === 1 ? " is" : " are"} from before spaces. Whatever is already in a
+              space other than Main stays there; the rest goes into {spaceName}, the space you are in.
+            </Help>
           )}
         </div>
       )}
