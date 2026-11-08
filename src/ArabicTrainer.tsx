@@ -8575,11 +8575,16 @@ function MatchGrid({
   /**
    * Whether the words are heard rather than read: a play button on each
    * tile where the word would be. The play button is a target of its own:
-   * tapping it only plays the word, and tapping the rest of the tile picks
-   * it up, pairs it or frees it as a tap on a word does. The owner first
-   * had one tap do both, then asked for them apart — a learner listening
-   * through the column to find the one they want kept picking tiles up and
-   * undoing pairs they had meant to keep.
+   * tapping the rest of the tile picks it up, pairs it or frees it as a tap
+   * on a word does, and tapping the button plays the word and picks the
+   * tile up as well, ready for its other half — but never more than that.
+   * The owner first had one tap do everything, then asked for them apart —
+   * a learner listening through the column to find the one they want kept
+   * picking tiles up and undoing pairs they had meant to keep — and then
+   * asked for playing to pick up again, on these terms: a paired tile only
+   * plays, keeping its pair, and with a meaning held, playing only plays,
+   * so listening for the meaning's recording pairs nothing and the meaning
+   * stays held until the tile itself is tapped.
    */
   heard?: boolean;
 }) {
@@ -8697,6 +8702,15 @@ function MatchGrid({
     setHeld((h) => (h && h.col === "meaning" && h.at === at ? null : { col: "meaning", at }));
   };
 
+  /* What playing a sound tile does to the grid besides playing: it picks
+     the tile up, and nothing else. A paired tile keeps its pair, a meaning
+     already held stays held, and a tile already held stays so — stopping
+     the clip does not put it down. See `heard`. */
+  const pickUpHeard = (id: string) => {
+    if (checked || pairedAt(id) !== null || heldMeaning !== null) return;
+    setHeld({ col: "word", id });
+  };
+
   const numberOf = (id: string) =>
     words.filter((w) => pairedAt(w.id) !== null).findIndex((w) => w.id === id) + 1;
 
@@ -8793,8 +8807,9 @@ function MatchGrid({
               <span className={`at-matchword${heard ? " heard" : lang.direction === "rtl" ? " rtl" : ""}`}>
                 {heard ? (
                   /* The play button drawn wherever a recording is, drawn
-                     long here, and a button of its own: it plays and does
-                     nothing else, the tap never reaching the tile. */
+                     long here, and a button of its own: it plays and picks
+                     the tile up, the tap never reaching the tile — which
+                     would free a pair or complete one. */
                   <button
                     type="button"
                     className={`at-clipplay at-matchplay${sounding === w.id ? " on" : ""}`}
@@ -8802,6 +8817,7 @@ function MatchGrid({
                     aria-label={sounding === w.id ? `Stop recording ${i + 1}` : `Play recording ${i + 1}`}
                     onClick={(e) => {
                       e.stopPropagation();
+                      pickUpHeard(w.id);
                       play(w);
                     }}
                     onKeyDown={(e) => e.stopPropagation()}

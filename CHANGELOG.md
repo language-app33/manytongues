@@ -8,6 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.583 — 8 November 2026
+
+**Playing a recording picks it up, ready to pair.**
+
+- In "Match each recording to its word", and in the grids that match
+  number recordings to their figures, pressing a recording's play button
+  now also selects it, so the next tap on the right pairs it. Before,
+  playing only played, and the card had to be tapped as well.
+- Playing a recording that is already paired only plays it: the pair is
+  kept.
+- With a word on the right already selected, playing recordings only
+  plays them, so listening for the right one pairs nothing and the word
+  stays selected. Tap the card itself to pair it.
+- Tapping a card outside its play button still selects it, deselects it,
+  pairs it or frees it, as before. Stopping a recording does not
+  deselect it.
+
 ## 0.582 — 7 November 2026
 
 **A space shows its own things and nobody else's, from the first moment.**
