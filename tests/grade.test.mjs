@@ -675,7 +675,7 @@ test("with no ladder handed in, nothing counts towards a pass", () => {
   assert.equal(keyOf(out[0].forms[0], "en2ar").passes || 0, 0);
 });
 
-test("another form of the card than the one named is nearly right, and says which (0.583)", async () => {
+test("another form of the card than the one named is nearly right, and says which (0.585)", async () => {
   const v = verdictOf({ checked: { ok: false, reason: "otherForm" }, toldAnswer: false, overridden: false, skipped: false });
   assert.equal(v.correct, false);
   assert.equal(v.near, true);

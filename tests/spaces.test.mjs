@@ -291,7 +291,7 @@ const PLACED = {
     "my-systems", "save-system", "sign-system", "delete-system",
     "clip", "image", "put-clip", "put-image", "media-sizes",
   ],
-  site: ["admin-backup-manifest", "admin-backup-chunk", "admin-restore-chunk", "admin-clear"],
+  site: ["admin-backup-manifest", "admin-backup-chunk", "admin-restore-chunk", "admin-clear", "admin-restore-preview"],
 };
 
 test("every action on the server is placed in this file", async () => {
@@ -655,13 +655,16 @@ test("a space's export holds that space and nothing else, and its usage is count
   assert.ok(keys.includes(`card:${c.card.id}`));
   assert.ok(keys.includes(`course:${c.course.id}`));
   assert.ok(keys.includes(`org:${c.id}`));
-  assert.ok(!keys.includes(`deck:${mine.id}`), "no one's My space");
+  /* Since 0.583 a space's file holds its members' My space made there (2a). */
+  assert.ok(keys.includes(`deck:${mine.id}`), "with its members' My space");
+  assert.equal(manifest.scope.kind, "space");
+  assert.equal(manifest.scope.space, c.id);
   assert.ok(!keys.includes(`deck:${main.deck.id}`), "nothing of another space");
   assert.ok(!keys.includes(`user:${main.teacher.handle}`));
   /* Space admins can't export, or see usage. */
   assert.equal((await api("admin-export-org-manifest", { key: c.lead.key, body: { id: c.id } })).status, 403);
   const usage = (await api("admin-org-usage", { key: admin.key, body: { id: c.id } })).json.usage;
-  assert.equal(usage.decks, 1);
+  assert.equal(usage.decks, 2, "the space's deck and a member's My space deck there (0.583)");
   assert.equal(usage.courses, 1);
   assert.equal(usage.people, 3);
 });

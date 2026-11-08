@@ -116,7 +116,7 @@ export interface Quality {
       are met. */
   words: { id: string; share: number; forms: { ar: string; need: number; met: number }[] }[];
   /** Every sentence that uses words no card in the course teaches, with
-      those words (0.583): a warning shown in full beside the score, not
+      those words (0.585): a warning shown in full beside the score, not
       only when it is among the suggestions worth most. A learner asked to
       practise each word on its own before meeting it in a sentence. */
   untaught: { id: string; text: string; words: string[] }[];

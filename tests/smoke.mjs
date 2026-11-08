@@ -10440,7 +10440,7 @@ const openPronounTables = async () => {
         kind = "who";
         met.who += 1;
         met.whoOptions = options.map((b) => (b.textContent || "").trim());
-        /* Every person the form could be is ticked (since 0.583), one tap
+        /* Every person the form could be is ticked (since 0.585), one tap
            each — the tiles toggle. */
         const right = options.filter((b) => formOf[personOf((b.textContent || "").trim())] === prompt);
         for (const b of right.length ? right : [options[0]]) {

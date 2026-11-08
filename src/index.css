@@ -3022,7 +3022,7 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
   background: var(--surface); }
 /* Who each row is, in English, at reading size: a learner looking at a
    tense asked for the English pronouns, which were there in small grey
-   and went unseen (0.583). */
+   and went unseen (0.585). */
 .at-vperson { color: var(--text); font-size: var(--fs-md); font-weight:600; }
 .at-vform { font-size: calc(var(--ask) * .7); line-height:1.3; text-align:end; }
 .at-vsaid { grid-column: 2; display:flex; flex-wrap:wrap; gap:4px 10px; justify-content:flex-end;

@@ -138,7 +138,7 @@ export function drillFits(
  * The persons a "who is it?" question offers.
  *
  * Every person whose form reads the same as the one asked is right —
- * بتكتب is *you (m)* and *she* — and since 0.583 the learner ticks every
+ * بتكتب is *you (m)* and *she* — and since 0.585 the learner ticks every
  * one of them (the owner's call, on a learner's report that ساكن took "I"
  * alone as the answer). So all of them are always offered, however many
  * there are, and the wrong ones fill the rest: at least one, so that

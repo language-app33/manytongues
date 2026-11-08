@@ -12098,7 +12098,7 @@ export default function ArabicTrainer() {
    * does say which one it wants: "Not good" with "feminine" under it, and
    * the masculine beside it on the card. Written instead, that form is the
    * right word in the wrong form — nearly right, and the verdict says
-   * which form it was (0.583). Where the prompt says nothing they are
+   * which form it was (0.585). Where the prompt says nothing they are
    * twins, and right.
    */
   const namedKin = useMemo(() => {
@@ -14601,7 +14601,7 @@ export default function ArabicTrainer() {
                         {/* The whole phrase, said, once a gap in it has
                             been answered: the pronunciation below is the
                             missing word's alone, and two learners asked
-                            for the sentence's (0.583). The phrase itself
+                            for the sentence's (0.585). The phrase itself
                             is still up at the top, so only how it is said
                             comes here. Never before the answer: it holds
                             the word. */}
