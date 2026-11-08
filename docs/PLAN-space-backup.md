@@ -1,6 +1,6 @@
 # Plan: a space's backup, and a restore that cannot lose anything
 
-**Status: settled, not started.** Written from the owner's answers to
+**Status: built, in 0.583.** Written from the owner's answers to
 questions 1–20 in the conversation of 7 November 2026 and a reading of
 the repository at 0.582. No questions are open. Anything new that comes
 up while building goes back to the owner, in the way `CLAUDE.md`

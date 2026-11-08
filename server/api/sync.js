@@ -1,6 +1,7 @@
 import { getStore } from "../store.js";
 import { createHash } from "node:crypto";
 import { formsOf } from "../../src/cards.ts";
+import { mergeData } from "../../src/sync.ts";
 
 /*
  * Sync endpoint.
@@ -14,7 +15,7 @@ import { formsOf } from "../../src/cards.ts";
  * using the ETag to refuse a write built on a stale read.
  */
 
-const MAX_BYTES = 4 * 1024 * 1024;
+export const MAX_BYTES = 4 * 1024 * 1024;
 const STORE = "arabic-trainer";
 
 /** @param {string} token */
@@ -38,6 +39,144 @@ function json(body, status = 200) {
   });
 }
 
+const HEX = /^[a-f0-9]{64}$/;
+const AUDIO_ID = /^[A-Za-z0-9_-]{1,64}$/;
+
+/**
+ * The recordings a practice document names: every form's and every line's,
+ * valid ids only, each once. The one walk that forgetting, moving and
+ * backing up a document all go by, so none of them can find a different
+ * set from the others.
+ * @param {any} doc
+ * @returns {string[]}
+ */
+export function recordingIdsOf(doc) {
+  /** @type {string[]} */
+  const ids = [];
+  for (const it of (doc && Array.isArray(doc.items) && doc.items) || []) {
+    if (!it || typeof it !== "object") continue;
+    for (const f of formsOf(it)) for (const r of (f && f.recs) || []) ids.push(String(r && r.id));
+    for (const ln of it.lines || []) for (const r of (ln && ln.recs) || []) ids.push(String(r && r.id));
+  }
+  return [...new Set(ids)].filter((id) => AUDIO_ID.test(id));
+}
+
+/**
+ * A learner's practice document as stored, or null (0.583, for a backup).
+ * @param {string} token  The SHA-256 hex of their sign-in key: the keyHash.
+ * @returns {Promise<string | null>}
+ */
+export async function readSyncDoc(token) {
+  if (!HEX.test(String(token || ""))) return null;
+  const text = await getStore(STORE).get(keyFor(token), { type: "text", consistency: "strong" });
+  return text == null ? null : String(text);
+}
+
+/**
+ * One recording a practice document names, or null.
+ * @param {string} token
+ * @param {string} id
+ * @returns {Promise<string | null>}
+ */
+export async function readSyncAudio(token, id) {
+  if (!HEX.test(String(token || "")) || !AUDIO_ID.test(String(id || ""))) return null;
+  const text = await getStore(STORE).get(keyFor(`${token}:audio:${id}`), { type: "text", consistency: "strong" });
+  return text == null ? null : String(text);
+}
+
+/**
+ * A recording put back from a backup, only where there is none: a clip
+ * never changes once written, so one already there is the same one.
+ * @param {string} token
+ * @param {string} id
+ * @param {string} text
+ * @returns {Promise<boolean>}  Whether it wrote.
+ */
+export async function writeSyncAudioIfAbsent(token, id, text) {
+  if (!HEX.test(String(token || "")) || !AUDIO_ID.test(String(id || "")) || !text) return false;
+  const done = await getStore(STORE).set(keyFor(`${token}:audio:${id}`), String(text), { onlyIfNew: true });
+  return !(done && done.modified === false);
+}
+
+/* The same document whatever order its items and keys came in, so a merge
+   that changed nothing is seen to have changed nothing and is not written. */
+/** @param {any} v @returns {any} */
+function canonical(v) {
+  if (Array.isArray(v)) return v.map(canonical);
+  if (!v || typeof v !== "object") return v;
+  /** @type {Record<string, any>} */
+  const out = {};
+  for (const k of Object.keys(v).sort()) out[k] = canonical(v[k]);
+  return out;
+}
+const sameDoc = (/** @type {any} */ a, /** @type {any} */ b) => {
+  const sorted = (/** @type {any} */ d) => ({
+    ...d,
+    items: [...((d && d.items) || [])].sort((x, y) => String(x && x.id).localeCompare(String(y && y.id))),
+  });
+  return JSON.stringify(canonical(sorted(a))) === JSON.stringify(canonical(sorted(b)));
+};
+
+/**
+ * A practice document from a backup, folded into whatever the learner has
+ * now (0.583; docs/PLAN-space-backup.md, 16a), by the same merge two of
+ * their devices use when they meet — so nothing practised since the backup
+ * is lost, and doing it twice changes nothing.
+ *
+ * Never over anything: with no document it writes only if there is still
+ * none; with one it writes only over the version it read (a device may
+ * sync in between: then it reads again, once). A document that cannot be
+ * read is left alone — the GET above has its own recovery for that, and a
+ * restore must not paper over it.
+ * @param {string} token
+ * @param {string} incomingText
+ * @param {number} now
+ * @returns {Promise<{ outcome: "written" | "merged" | "skipped", why?: string }>}
+ */
+export async function mergeSyncDoc(token, incomingText, now) {
+  if (!HEX.test(String(token || ""))) return { outcome: "skipped", why: "no-account" };
+  /** @type {any} */
+  let incoming;
+  try {
+    incoming = JSON.parse(String(incomingText));
+  } catch (e) {
+    return { outcome: "skipped", why: "unreadable" };
+  }
+  if (!incoming || typeof incoming !== "object" || !Array.isArray(incoming.items)) return { outcome: "skipped", why: "unreadable" };
+  const store = getStore(STORE);
+  const key = keyFor(token);
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const held = await store.getWithMetadata(key, { type: "text", consistency: "strong" });
+    if (!held || held.data == null) {
+      const text = JSON.stringify(incoming);
+      if (Buffer.byteLength(text, "utf8") > MAX_BYTES) return { outcome: "skipped", why: "too-large" };
+      const done = await store.set(key, text, { onlyIfNew: true });
+      if (done && done.modified === false) continue;
+      return { outcome: "written" };
+    }
+    /** @type {any} */
+    let current;
+    try {
+      current = JSON.parse(String(held.data));
+    } catch (e) {
+      return { outcome: "skipped", why: "unreadable" };
+    }
+    const merged = mergeData(current, incoming, now);
+    /* Against the document merged with itself, which is what it already
+       says once the merge has filled in what it fills in: a file that adds
+       nothing writes nothing. */
+    if (sameDoc(merged, current) || sameDoc(merged, mergeData(current, current, now))) {
+      return { outcome: "skipped", why: "exists" };
+    }
+    const text = JSON.stringify(merged);
+    if (Buffer.byteLength(text, "utf8") > MAX_BYTES) return { outcome: "skipped", why: "too-large" };
+    const done = await store.set(key, text, { onlyIfMatch: held.etag });
+    if (done && done.modified === false) continue;
+    return { outcome: "merged" };
+  }
+  return { outcome: "skipped", why: "busy" };
+}
+
 /**
  * Erase a learner's practice history: their document and every recording
  * it names (0.543; docs/PLAN-spaces.md, 86a). Called when an account is
@@ -50,24 +189,18 @@ function json(body, status = 200) {
  * @param {string} token
  */
 export async function forgetSyncDoc(token) {
-  if (!/^[a-f0-9]{64}$/.test(String(token || ""))) return;
+  if (!HEX.test(String(token || ""))) return;
   const store = getStore(STORE);
   const key = keyFor(token);
   /** @type {string[]} */
   let ids = [];
   try {
     const held = await store.get(key, { type: "text", consistency: "strong" });
-    const doc = held ? JSON.parse(String(held)) : null;
-    for (const it of (doc && doc.items) || []) {
-      for (const f of formsOf(it)) for (const r of f.recs || []) ids.push(String(r.id));
-      for (const ln of it.lines || []) for (const r of ln.recs || []) ids.push(String(r.id));
-    }
+    ids = held ? recordingIdsOf(JSON.parse(String(held))) : [];
   } catch (e) {
     ids = [];
   }
-  for (const id of new Set(ids)) {
-    if (/^[A-Za-z0-9_-]{1,64}$/.test(id)) await store.delete(keyFor(`${token}:audio:${id}`)).catch(() => {});
-  }
+  for (const id of ids) await store.delete(keyFor(`${token}:audio:${id}`)).catch(() => {});
   await store.delete(key).catch(() => {});
 }
 
@@ -101,19 +234,14 @@ export async function moveSyncDoc(oldToken, newToken) {
   /** @type {string[]} */
   let ids = [];
   try {
-    const doc = JSON.parse(String(text));
-    for (const it of (doc && doc.items) || []) {
-      for (const f of formsOf(it)) for (const r of f.recs || []) ids.push(String(r.id));
-      for (const ln of it.lines || []) for (const r of ln.recs || []) ids.push(String(r.id));
-    }
+    ids = recordingIdsOf(JSON.parse(String(text)));
   } catch (e) {
     ids = [];
   }
   let clips = 0;
   /** @type {string[]} */
   const copied = [];
-  for (const id of new Set(ids)) {
-    if (!/^[A-Za-z0-9_-]{1,64}$/.test(id)) continue;
+  for (const id of ids) {
     try {
       const clip = await store.get(keyFor(`${oldToken}:audio:${id}`), { type: "text", consistency: "strong" });
       if (clip == null) continue;

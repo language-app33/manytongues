@@ -1588,14 +1588,31 @@ My space (since 0.545):
   course. Teaching shows one side at a time (`side` in `TeachSpace`); a
   learner's "My space" is `TeachSpace` with `personalOnly`.
 
-A space's export and storage (since 0.546): `admin-export-org-manifest` is
-the backup manifest limited to one org and without personal records, its
-chunks fetched like a backup's; `admin-org-usage` counts what an org holds
-and the bytes of its media. Both are the App admin's, from Admin → Spaces.
-Since 0.580 a space's export keeps everyone who is a member of it, not only
-those whose first space it is, and both a full backup and an export carry
-former members' card lists, cards, numbers and recordings, which stay live
-for students after the account goes.
+A space's backup and restore (since 0.583; `docs/PLAN-space-backup.md`):
+`admin-export-org-manifest` is the backup manifest limited to one org,
+members' My space made there included, its chunks fetched like a backup's;
+`admin-org-usage` counts what an org holds and the bytes of its media. Both
+are the App admin's, from Super admin → Spaces (Back up this space, Restore
+this space from a file, and Restore a space from a file for one that is
+gone).
+
+- Every manifest says what it is in `scope`: `{ kind: "site" }` or
+  `{ kind: "space", space, slug, name }`. A file without it is the site's.
+- Both kinds carry people's practice as `progress:<handle>` and the
+  recordings it names as `paudio:<handle>:<id>`, read from the sync store by
+  the account's `keyHash`. Keyed by handle so a new key does not strand it.
+- One engine restores both (`admin-restore-chunk`, `restoreOne`), deciding
+  each person once with `restoreVerdicts` — kept, not a member, deleted
+  (a `gone:` record exists), re-create, or another person (`created`
+  differs) — and `admin-restore-preview` asks the same function first.
+- A restore never overwrites and never removes: a record already here is
+  left alone, lists gain what they lack, practice is folded in with the
+  devices' own merge, and every record not written comes back with why.
+
+Since 0.580 a space's backup keeps everyone who is a member of it, not only
+those whose first space it is, and both kinds carry former members' card
+lists, cards, numbers and recordings, which stay live for students after the
+account goes.
 
 Memberships (since 0.573; `docs/PLAN-memberships.md`, all three stages in one release):
 
@@ -1852,7 +1869,9 @@ rationed: once at launch, a few seconds after a change outside a session,
 and during a session only when it stops, when the app is put away, and
 otherwise at most every few minutes — `syncAfterChange` in `src/sync.ts`.
 Recordings live in IndexedDB, keyed by a hash of their contents, and are
-fetched on demand.
+fetched on demand. Since 0.583 a backup holds each person's synced document
+too (the Progress part), and putting it back folds it into whatever is there
+by then with the same merge two devices use, never over it.
 
 Course cards carry a `source` pointing back at the deck they came from. The
 teacher owns their wording; the student owns their progress. When a teacher
