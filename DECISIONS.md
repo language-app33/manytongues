@@ -7756,3 +7756,30 @@ sentence as filled is still the one shown everywhere. Only the marking also
 tries it with each other answer of each filler, put where the first one
 stands, and only where the first one appears in the sentence word for word.
 A filler the sentence changed on the way in is not guessed at.
+
+---
+
+## Catch up: what is due, outside the mix
+
+**8 November 2026** · `buildSession` (`mode: "catchup"`, `dueToCatchUp`) and the Build screen in `src/ArabicTrainer.tsx`
+
+The owner asked for a custom session mode that only reviews due cards, and
+answered four questions about it: everything waiting counts (reviews and
+cards in learning), only the questions due are asked, there is a length or
+"Everything due", and the longest waiting come first.
+
+So Catch up does not go through the session mix. The mix exists to balance
+learning against reviews and to decide when new cards come in; a session of
+nothing but what is due has no new cards and no balance to keep, and the
+owner's "longest waiting first" is a plain sort on the soonest due question.
+A question counts as due when it has been met (not `new`) and its date has
+passed — so a level just opened on a card, which the mix treats as waiting,
+is left for a regular session: it is new material, not backlog.
+
+Every form of a card with something due is taken, not the usual two, and a
+session is never topped up with questions not due, so it may be shorter
+than its length. It is not refused for want of variety either: one kind of
+question due is still what there is to catch up on.
+
+"Everything due" is kept as a count of 999 with no minutes, as Ultimate's
+no-length is, and read back as such for a Catch up.

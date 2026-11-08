@@ -277,6 +277,16 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   limit on cards in learning, and leaves out Cleared and Learnt cards that
   are not yet due.
 
+  **Catch up** is the one mode that steps outside the mix. Its pool is the
+  chosen cards with a question due now — reviews come round and cards in
+  learning waiting for their next question — and it asks only those due
+  questions, longest waiting first. No new card comes in (a question never
+  yet asked is not something to catch up on), and nothing not yet due is
+  brought forward to fill a short session: twenty questions with eight due
+  is eight. Besides a count or minutes it offers "Everything due", which
+  asks the lot. With nothing due it says the learner is caught up rather
+  than starting.
+
   They were six sliders under an Advanced disclosure, under a sentence
   saying the defaults were sensible — and two of the defaults were why the
   same handful of words kept coming round. Three exercises a form made an

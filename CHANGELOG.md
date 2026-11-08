@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.587 — 8 November 2026
+## 0.588 — 8 November 2026
 
 **Playing a recording picks it up, ready to pair.**
 
@@ -31,6 +31,28 @@ To check by hand: in a listening grid, play a recording, then tap a word
 on the right — they should pair. Play a paired recording — it should stay
 paired.
 
+## 0.587 — 8 November 2026
+
+**A new custom session mode, Catch up: only what is due.**
+
+For learners:
+
+- **Catch up practises only the cards waiting for you** among the decks
+  and cards you pick: reviews that have come round, and cards you are
+  still learning whose next question has. It never brings in a new card.
+- **Each card is asked only the questions that are due**, nothing early.
+- **The longest waiting come first** when more is due than fits.
+- **Pick a length as usual, or "Everything due"** to clear the whole pile
+  in one sitting. A length larger than what is due gives a shorter session
+  rather than padding it with things not yet due.
+- **With nothing due, it says you're all caught up** instead of starting.
+- Kept Catch up sessions show "everything due" in Saved sessions when they
+  have no length.
+
+Trade-off: a question that has just opened on a card you know (a new
+level) counts as new, so Catch up leaves it for a regular session. To check
+by hand: build a Catch up over a deck with some reviews due, try 10
+questions and "Everything due", and one over cards with nothing due.
 ## 0.586 — 8 November 2026
 
 **Fixes from a learner's 18 reports.** What each question asks is now
