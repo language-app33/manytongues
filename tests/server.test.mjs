@@ -3144,7 +3144,11 @@ test("a backup holds a teacher's numbers, and a restore puts them back", async (
     },
   });
   assert.equal(put.status, 200, put.text);
-  assert.equal(put.json.written, 2, "a prefix the allowlist has not got is skipped in silence");
+  /* The system comes back; the teacher's map of systems, which is still
+     on the site, gains the entry it lacks (0.583: a list is added to, never
+     written over). Nothing is skipped. */
+  assert.equal(put.json.written + put.json.merged, 2, "a prefix the allowlist has not got is skipped in silence");
+  assert.deepEqual(put.json.skipped, []);
   const back = (await api("/api/courses?action=my-systems", { key })).json.systems;
   assert.equal(back.length, 1);
   assert.equal(back[0].lexemes["unit.1"].forms.standalone, "one");
@@ -4645,7 +4649,7 @@ test("the server says how big recordings and pictures are, and leaves out the on
  * up by, and it holds rosters as they were — naming people who may since
  * have gone.
  */
-test("a restored course's codes open it, and a person it names can be removed", async () => {
+test("a restored course's codes open it, and a person it names without an account is left off", async () => {
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Salma" } });
   const key = made.json.key;
   await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
@@ -4669,10 +4673,9 @@ test("a restored course's codes open it, and a person it names can be removed", 
   assert.equal(joined.status, 200, joined.text);
   assert.equal(joined.json.role, "student");
 
-  const gone = await api("/api/courses?action=admin-delete-user", {
-    method: "POST", key, body: { handle: "gone-person" },
-  });
-  assert.equal(gone.status, 200, gone.text);
+  /* A name with no account behind it never makes it onto the restored
+     roster at all (0.583; docs/PLAN-space-backup.md, 14a), so there is
+     nobody left to remove. */
   const mine = await api("/api/courses?action=my-courses", { key: learner.json.key });
   const after = mine.json.courses.find((/** @type {any} */ c) => c.id === id);
   assert.deepEqual(after.students, [learner.json.user.handle], "the person is off the roster");
