@@ -547,3 +547,41 @@ export function answerRows(
   const rows = answersOf(form, fields).map(({ at: _at, ...rest }) => rest);
   return rows.length ? rows : [{ text: "", lat: "" }];
 }
+
+/**
+ * A filled sentence, written every way its fillers allow.
+ *
+ * A sentence with a blank is filled with the first answer its value card
+ * accepts — "كيف حالك" — because two spellings joined by a slash are not
+ * a sentence. But the value card accepts كيفك too, and a learner writing
+ * the sentence with it was marked a near miss (0.586, on a learner's
+ * report). So each other answer of each filler is put where the first one
+ * stands, and every sentence that makes is right as well.
+ *
+ * Only where the first answer is found in the sentence as it was filled;
+ * a filler the sentence changed on the way in (an article joined on, say)
+ * is left alone rather than guessed at. At most `limit` sentences, the
+ * one as filled not among them.
+ */
+export function fillerVariants(
+  filled: string,
+  fillers: { first: string; others: string[] }[],
+  limit = 16,
+): string[] {
+  let all = [String(filled || "")];
+  for (const { first, others } of fillers) {
+    const from = String(first || "").trim();
+    if (!from || !others.length) continue;
+    const next: string[] = [];
+    for (const s of all) {
+      next.push(s);
+      if (!s.includes(from)) continue;
+      for (const o of others) {
+        const to = String(o || "").trim();
+        if (to && to !== from) next.push(s.split(from).join(to));
+      }
+    }
+    all = Array.from(new Set(next)).slice(0, limit + 1);
+  }
+  return all.filter((s) => s !== filled).slice(0, limit);
+}

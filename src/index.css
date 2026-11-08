@@ -3020,7 +3020,10 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
 .at-vrow { display:grid; grid-template-columns: minmax(64px, auto) 1fr; column-gap:12px; row-gap:2px;
   align-items:center; padding:8px 12px; border:1px solid var(--line); border-radius: var(--r-sm);
   background: var(--surface); }
-.at-vperson { color: var(--muted); font-size: var(--fs-sm); }
+/* Who each row is, in English, at reading size: a learner looking at a
+   tense asked for the English pronouns, which were there in small grey
+   and went unseen (0.586). */
+.at-vperson { color: var(--text); font-size: var(--fs-md); font-weight:600; }
 .at-vform { font-size: calc(var(--ask) * .7); line-height:1.3; text-align:end; }
 .at-vsaid { grid-column: 2; display:flex; flex-wrap:wrap; gap:4px 10px; justify-content:flex-end;
   font-size: var(--fs-sm); color: var(--text-soft); }
@@ -3052,6 +3055,12 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
   color: var(--text); }
 .at-reply.on { border-color: var(--jade-soft); background: var(--jade-bg); }
 .at-reply:disabled { cursor:default; }
+/* Tiles where more than one may be ticked ("who is it?") wear a box, so
+   a tap that leaves the others on reads as ticking, not as a slip. */
+.at-replies.multi .at-reply::before { content:""; display:inline-block; box-sizing:border-box;
+  width:1.1em; height:1.1em; line-height:1; text-align:center; vertical-align:-0.15em;
+  margin-inline-end:10px; border:2px solid var(--muted); border-radius:4px; }
+.at-replies.multi .at-reply.on::before { content:"✓"; border-color: var(--jade-soft); color: var(--text); }
 
 /* A word offered as a choice rather than typed. Sits at the size a word
    is asked at elsewhere; a line of a conversation is longer and takes the
