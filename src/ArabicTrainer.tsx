@@ -164,6 +164,7 @@ import {
   scriptVars,
   setActiveLang,
   verdictText,
+  otherFormNote,
   verdictWord,
   defaultMarking,
   grammarFields,
@@ -329,6 +330,7 @@ import {
   shownAlternatives,
   splitAlternatives,
   withAnswer as oneAnswer,
+  fillerVariants,
 } from "./answers.ts";
 import { asMeaning, cellEnglish, fieldsLost, fillForm, fillsOf, hasSlots, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
 import type { Value } from "./variables.ts";
@@ -338,7 +340,7 @@ import type { Review } from "./review.ts";
 import { liftSubtypeTagsIn } from "./subtype-tags.ts";
 import { tickCapitals } from "./capitals.ts";
 import { spellRuns, typoed } from "./spelling.ts";
-import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, whoChoices, whoIsRight } from "./verb-drills.ts";
+import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, meaningWithoutWho, whoAllRight, whoChoices, whoIsRight, WHO_JOIN } from "./verb-drills.ts";
 import type { Tense } from "./verb-drills.ts";
 import { cappedAt, skillSeed } from "./skills.ts";
 import type { SkillCaps } from "./skills.ts";
@@ -1528,6 +1530,23 @@ export function lentTags(unit: Form | null | undefined, lang: Lang): string[] {
     if (!out.includes(line)) out.push(line);
   }
   return out;
+}
+
+/**
+ * The other ways a filled sentence may be written: each filler's other
+ * accepted answers put where its first stands — see fillerVariants.
+ */
+export function filledVariantsOf(unit: Form | null | undefined): string[] {
+  const filled = unit ? ((unit as Record<string, any>).filled as Record<string, string> | undefined) : undefined;
+  if (!unit || !filled) return [];
+  const fillers: { first: string; others: string[] }[] = [];
+  for (const ref of Object.values(filled)) {
+    const found = ref ? VALUE_OWNER.get(ref) : null;
+    if (!found) continue;
+    const alts = splitAlternatives(String(found.form.ar || "")).map((a) => a.trim()).filter(Boolean);
+    if (alts.length > 1) fillers.push({ first: alts[0], others: alts.slice(1) });
+  }
+  return fillers.length ? fillerVariants(String(unit.ar || ""), fillers) : [];
 }
 
 /*
@@ -4564,6 +4583,10 @@ const MODES = {
     label: "Regular",
     blurb: "A balanced mix, the way a normal review works — a few exercise types per card.",
   },
+  catchup: {
+    label: "Catch up",
+    blurb: "Only what is due — reviews that have come round and cards in learning waiting for their next question, longest waiting first. No new cards, and only the questions that are due.",
+  },
   ultimate: {
     label: "Ultimate",
     blurb: "Every chosen card that is new, still being learnt or due for review, in every exercise type it has — repeating anything you miss until you have it right. Cleared and learnt cards wait until they are due.",
@@ -4964,8 +4987,21 @@ function drawRange(
  *   questions that went wrong.
  * - **Get started:** recognition questions only.
  * - **Ultimate:** every question each card has open.
+ * - **Catch up:** the pool is cards with a question due now, asked those
+ *   questions and no others, longest waiting first. Not the mix: no new
+ *   cards, no shares, nothing brought forward to fill a place.
  */
-export type SessionMode = "regular" | "ultimate" | "started" | "mistakes" | "unseen" | "weak";
+export type SessionMode = "regular" | "ultimate" | "started" | "mistakes" | "unseen" | "weak" | "catchup";
+
+/*
+ * A question Catch up asks: one already met whose time has come round.
+ * A question never asked — a new card, or a level that has just opened on
+ * one — is not waiting to be caught up on, so it stays for a regular
+ * session to bring in.
+ */
+function dueToCatchUp(s: ExerciseState | null | undefined): boolean {
+  return !!s && s.phase !== "new" && !!s.due && s.due <= now();
+}
 
 /* What sort of card this is, for the order of questions: no more than two
    of one kind running. The owner's three — a word, a sentence (a phrase, a
@@ -5029,6 +5065,17 @@ export function buildSession({
     .filter((it) => !isRangeSkill(it) || (systemFor(it, sets) && numbers.ready(it)));
   if (!drillable.length) return { exercises: [], reason: "none-drillable" };
 
+  /* The mode's own questions: recognition alone for Get started, what
+     went wrong for Weak spots, worst first, and what is due for Catch up. */
+  const allowed = (t: string, unit: Form) =>
+    mode !== "started" || (EASY_TYPES.includes(typeOf(t)) && typeAllowedNow(t, unit));
+  const typesOf = (unit: Form): string[] => {
+    const open = askableTypes(unit, settings).filter((t) => allowed(t, unit));
+    if (mode === "catchup") return open.filter((t) => dueToCatchUp(stateOf(unit, t)));
+    if (mode !== "weak") return open;
+    return inOrder(open.filter((t) => weakness(stateOf(unit, t)) > 0), (t) => -weakness(stateOf(unit, t)));
+  };
+
   /* The mode's own pool, narrowed from the cards chosen. */
   const units = (it: Item) => drillableUnits(it, settings);
   const pool = drillable.filter((it) =>
@@ -5038,32 +5085,26 @@ export function buildSession({
       ? units(it).some(({ unit }) => notSeenLately(unit, settings))
       : mode === "weak"
       ? isWeak(it, settings)
+      : mode === "catchup"
+      ? units(it).some(({ unit }) => typesOf(unit).length > 0)
       : true
   );
   if (!pool.length) {
     return {
       exercises: [],
-      reason: mode === "weak" ? "nothing-weak" : mode === "mistakes" ? "no-mistakes" : mode === "unseen" ? "no-unseen" : "none-drillable",
+      reason: mode === "weak" ? "nothing-weak" : mode === "mistakes" ? "no-mistakes" : mode === "unseen" ? "no-unseen" : mode === "catchup" ? "caught-up" : "none-drillable",
     };
   }
-
-  /* And the mode's own questions: recognition alone for Get started, what
-     went wrong for Weak spots, worst first. */
-  const allowed = (t: string, unit: Form) =>
-    mode !== "started" || (EASY_TYPES.includes(typeOf(t)) && typeAllowedNow(t, unit));
-  const typesOf = (unit: Form): string[] => {
-    const open = askableTypes(unit, settings).filter((t) => allowed(t, unit));
-    if (mode !== "weak") return open;
-    return inOrder(open.filter((t) => weakness(stateOf(unit, t)) > 0), (t) => -weakness(stateOf(unit, t)));
-  };
 
   /* Numbers and nothing else — see gridCompany. */
   const onlyNumbers = pool.every((it) => isFromSystem(it));
 
   /* Ultimate has no length of its own: every card the mix lets in, asked
-     every question it has. Any other session is the length it was given,
-     or SESSION_SIZE. */
-  const everyCard = mode === "ultimate" && !budgetIn;
+     every question it has. Catch up given none is everything due. Any
+     other session is the length it was given, or SESSION_SIZE. */
+  const catchUp = mode === "catchup";
+  const asksAll = mode === "ultimate" || catchUp;
+  const everyCard = asksAll && !budgetIn;
   const budget = everyCard ? Number.POSITIVE_INFINITY : Math.max(4, budgetIn || SESSION_SIZE);
 
   /* Every card of the pool, where it stands. Chance first, between cards
@@ -5078,9 +5119,12 @@ export function buildSession({
     : every;
   if (!rows.length) return { exercises: [], reason: every.length ? "none-due" : "nothing-due" };
 
-  /* Which cards: the session mix (session-mix.ts). */
+  /* Which cards: the session mix (session-mix.ts) — or, for Catch up,
+     simply the longest waiting first. Every card in its pool has something
+     due and none is new, so there are no shares to keep and nothing to
+     fill a gap with. */
   const everything = !!(practice || includeAll);
-  const mix = everything
+  const mix = everything || catchUp
     ? null
     : mixSession(rows, {
         places: everyCard ? rows.length : budget / PER_UNIT,
@@ -5088,7 +5132,7 @@ export function buildSession({
         dayCards: (perDay || 0) / PER_UNIT,
         everyNew: mode === "ultimate",
       });
-  const cards = mix ? mix.cards : rows;
+  const cards = mix ? mix.cards : catchUp ? rows.slice().sort((a, b) => a.due - b.due) : rows;
   if (!cards.length) return { exercises: [], reason: "nothing-due" };
 
   /* --- how much of each card: a form is asked two ways, and a card takes
@@ -5111,12 +5155,16 @@ export function buildSession({
        two lines at a time across three evenings is learnt better than one
        swallowed whole in one. The whole-scene exercises come along beside
        them, which is what the card's own unit is. */
-    const take = isDialog(it)
+    /* Catch up takes every form with something due: leaving one out
+       would leave it behind, which is what the session is there to stop. */
+    const take = catchUp
+      ? parent.concat(subs)
+      : isDialog(it)
       ? parent.concat(subs.slice(0, MAX_DIALOG_LINES))
       : formOf().slice(0, MAX_UNITS_PER_FAMILY);
     return take.map(({ unit, isSub }) => {
       const own = typesOf(unit);
-      const offered = (mode === "weak" ? own : pickableTypes(unit, settings).filter((t) => own.includes(t)))
+      const offered = (mode === "weak" || catchUp ? own : pickableTypes(unit, settings).filter((t) => own.includes(t)))
         .filter((t) => !onlyNumbers || !borrowsPhrase(t));
       /* A form on its top is asked the top questions that are due, and
          not the ones that are not: answered early they count for nothing
@@ -5124,7 +5172,7 @@ export function buildSession({
          practice — it is asked them anyway, which is what it is there for. */
       const due = atItsTop(unit, settings) ? offered.filter((t) => stateReady(stateOf(unit, t))) : offered;
       const ordered = due.length ? due : offered;
-      const picked = mode === "ultimate" ? ordered.slice() : ordered.slice(0, Math.min(PER_UNIT, ordered.length));
+      const picked = asksAll ? ordered.slice() : ordered.slice(0, Math.min(PER_UNIT, ordered.length));
       /* Asked in the table's own order, which runs from recognition to
          production: which exercises a unit gets is a matter of chance,
          the order they come in is not. What went wrong is asked worst
@@ -5216,7 +5264,8 @@ export function buildSession({
     rankOf: (c) => (c.askedFor ? -1 : DIFF_RANK[itemDifficulty(c.card.it, settings)]),
     deal,
     finish,
-    topUp: !everyCard,
+    /* Catch up never pads a short session with questions not yet due. */
+    topUp: !everyCard && !catchUp,
   });
 
   /* At least two kinds of question, judged on the material: a session is
@@ -5225,7 +5274,7 @@ export function buildSession({
      Get started draws on two gentle types, one of which needs a recording,
      so it takes a card on one; and Weak spots is the one session where one
      exercise repeated is exactly what is wanted. */
-  const minTypes = mode === "weak" ? 0 : mode === "started" ? 1 : 2;
+  const minTypes = mode === "weak" || catchUp ? 0 : mode === "started" ? 1 : 2;
   const offered = new Set(plans.flatMap((p) => enabledTypes(p.unit, settings).filter((t) => allowed(t, p.unit))));
   if (offered.size < minTypes) return { exercises: [], reason: "no-variety" };
 
@@ -5716,7 +5765,8 @@ export function buildManualSession({ items, settings, ids, mode, count, minutes,
   systems?: SystemSet[];
 }) {
   const chosen = new Set(ids);
-  const budget = count && count < 999 ? count : minutes ? minutes * TIMED_PER_MINUTE : mode === "ultimate" ? undefined : SESSION_SIZE;
+  /* Ultimate, and Catch up's "Everything due", have no length: everything. */
+  const budget = count && count < 999 ? count : minutes ? minutes * TIMED_PER_MINUTE : mode === "ultimate" || mode === "catchup" ? undefined : SESSION_SIZE;
   const built = buildSession({
     items, settings, inDeck: (it) => chosen.has(it.id), budget, perDay, systems, mode: mode as SessionMode,
   });
@@ -6759,12 +6809,13 @@ function AlsoBox({ children }: { children?: Node }) {
     </div>
   );
   const rows: any[] = [];
-  const short = shown.filter((el) => alsoName(el) !== "also-context");
+  const wide = (el: any) => alsoName(el) === "also-context" || alsoName(el) === "also-phrase-said";
+  const short = shown.filter((el) => !wide(el));
   const pair = short.filter((el) => ALSO_PAIR.includes(alsoName(el)));
   const rest = pair.length === 2 ? short.filter((el) => !pair.includes(el)) : short;
   if (pair.length === 2) rows.push(row(pair));
   for (let i = 0; i < rest.length; i += 2) rows.push(row(rest.slice(i, i + 2)));
-  rows.push(...shown.filter((el) => alsoName(el) === "also-context"));
+  rows.push(...shown.filter(wide));
   return (
     <>
       <p className="at-alsomore" data-el="also-heading">
@@ -7260,6 +7311,15 @@ export const SOUNDS: Record<string, (c: AudioContext) => void> = {
   warn: (c) => {
     note(c, { freq: 260, to: 190, dur: 0.16, type: "triangle", peak: 0.07 });
     note(c, { freq: 190, to: 140, at: 0.15, dur: 0.26, type: "triangle", peak: 0.062 });
+  },
+  /* A tile in a matching grid picked up, put against its other half, or
+     freed. The lightest thing here, because a grid of five is ten of
+     these in a row: a soft tap that says the tile heard you, and nothing
+     about whether the pair is right — the grid is only marked once it is
+     checked. Triangle rather than sine so it is not lost the way a lone
+     sine blip was (see tick). */
+  select: (c) => {
+    note(c, { freq: 880, to: 990, dur: 0.07, type: "triangle", peak: 0.055 });
   },
   // A little bubble, for undo and other small reversals.
   pop: (c) => {
@@ -8575,11 +8635,16 @@ function MatchGrid({
   /**
    * Whether the words are heard rather than read: a play button on each
    * tile where the word would be. The play button is a target of its own:
-   * tapping it only plays the word, and tapping the rest of the tile picks
-   * it up, pairs it or frees it as a tap on a word does. The owner first
-   * had one tap do both, then asked for them apart — a learner listening
-   * through the column to find the one they want kept picking tiles up and
-   * undoing pairs they had meant to keep.
+   * tapping the rest of the tile picks it up, pairs it or frees it as a tap
+   * on a word does, and tapping the button plays the word and picks the
+   * tile up as well, ready for its other half — but never more than that.
+   * The owner first had one tap do everything, then asked for them apart —
+   * a learner listening through the column to find the one they want kept
+   * picking tiles up and undoing pairs they had meant to keep — and then
+   * asked for playing to pick up again, on these terms: a paired tile only
+   * plays, keeping its pair, and with a meaning held, playing only plays,
+   * so listening for the meaning's recording pairs nothing and the meaning
+   * stays held until the tile itself is tapped.
    */
   heard?: boolean;
 }) {
@@ -8654,6 +8719,7 @@ function MatchGrid({
      up — or put down again, where it was already held. */
   const tapWord = (id: string) => {
     if (checked) return;
+    sfx("select");
     if (pairedAt(id) !== null) {
       setPairs((p) => {
         const next = { ...p };
@@ -8674,6 +8740,7 @@ function MatchGrid({
 
   const tapMeaning = (at: number) => {
     if (checked) return;
+    sfx("select");
     const owner = takenBy(at);
     /* Tapping a meaning already spoken for frees it, which is the only way
        back from a pairing made by mistake that does not need a third
@@ -8695,6 +8762,15 @@ function MatchGrid({
       return;
     }
     setHeld((h) => (h && h.col === "meaning" && h.at === at ? null : { col: "meaning", at }));
+  };
+
+  /* What playing a sound tile does to the grid besides playing: it picks
+     the tile up, and nothing else. A paired tile keeps its pair, a meaning
+     already held stays held, and a tile already held stays so — stopping
+     the clip does not put it down. See `heard`. */
+  const pickUpHeard = (id: string) => {
+    if (checked || pairedAt(id) !== null || heldMeaning !== null) return;
+    setHeld({ col: "word", id });
   };
 
   const numberOf = (id: string) =>
@@ -8793,8 +8869,9 @@ function MatchGrid({
               <span className={`at-matchword${heard ? " heard" : lang.direction === "rtl" ? " rtl" : ""}`}>
                 {heard ? (
                   /* The play button drawn wherever a recording is, drawn
-                     long here, and a button of its own: it plays and does
-                     nothing else, the tap never reaching the tile. */
+                     long here, and a button of its own: it plays and picks
+                     the tile up, the tap never reaching the tile — which
+                     would free a pair or complete one. */
                   <button
                     type="button"
                     className={`at-clipplay at-matchplay${sounding === w.id ? " on" : ""}`}
@@ -8802,6 +8879,7 @@ function MatchGrid({
                     aria-label={sounding === w.id ? `Stop recording ${i + 1}` : `Play recording ${i + 1}`}
                     onClick={(e) => {
                       e.stopPropagation();
+                      pickUpHeard(w.id);
                       play(w);
                     }}
                     onKeyDown={(e) => e.stopPropagation()}
@@ -8920,7 +8998,7 @@ function MatchGrid({
  *   the meanings up, in the interface font — an English tile set in the
  *   script's size and direction is a sentence pretending to be a word.
  */
-function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase", field = "ar" }: {
+function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase", field = "ar", multi = false }: {
   options: any[];
   lang: Lang;
   value: string;
@@ -8928,22 +9006,31 @@ function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase"
   disabled?: boolean;
   kind?: string;
   field?: string;
+  /** Several may be ticked: the value is their texts, in the tiles' order, joined by WHO_JOIN. */
+  multi?: boolean;
 }) {
   const textOf = (option: any) => String((option && option[field]) || "");
+  const ticked = multi ? value.split(WHO_JOIN).filter(Boolean) : [];
+  const isOn = (text: string) => (multi ? ticked.includes(text) : value === text);
+  const toggle = (text: string) => {
+    if (!multi) return onChange(text);
+    const next = isOn(text) ? ticked.filter((t) => t !== text) : ticked.concat([text]);
+    onChange(options.map(textOf).filter((t) => next.includes(t)).join(WHO_JOIN));
+  };
   return (
-    <div className="at-replies" data-el="answer-choices">
+    <div className={`at-replies${multi ? " multi" : ""}`} data-el="answer-choices" role={multi ? "group" : undefined}>
       {options.map((option) => {
         const text = textOf(option);
         return (
           <button
             type="button"
             key={option.id}
-            className={`at-reply${value === text ? " on" : ""}${kind === "word" ? " word" : ""}${
+            className={`at-reply${isOn(text) ? " on" : ""}${kind === "word" ? " word" : ""}${
               field === "en" ? " en" : ""
             }`}
-            aria-pressed={value === text}
+            aria-pressed={isOn(text)}
             disabled={disabled}
-            onClick={() => onChange(text)}
+            onClick={() => toggle(text)}
           >
             {field === "en" ? asMeaning(text) : <Arabic text={text} kind={kind} lang={lang} />}
           </button>
@@ -11340,6 +11427,8 @@ export default function ArabicTrainer() {
       flash(
         built.reason === "no-mistakes"
           ? "Nothing to fix — none of those have gone wrong recently"
+          : built.reason === "caught-up"
+          ? "You're all caught up — nothing in those cards is due yet"
           : built.reason === "no-unseen"
           ? "You've practised all of those in the last few days, or they're already cleared"
           : built.reason === "none-due"
@@ -11841,6 +11930,14 @@ export default function ArabicTrainer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verbTense, spec, item && item.id]);
   const verbPlace = placeInTense(verbTense, item);
+  /* What the verb means on "who is it?", with nobody in it: the card's
+     own meaning where it has one, else the form's with its person taken
+     off the front. */
+  const whoMeaning =
+    spec && spec.picks === "person" && item
+      ? String((parentItem && parentItem.forms[0] && parentItem.forms[0].id !== item.id && parentItem.forms[0].en) || "").trim() ||
+        meaningWithoutWho(item.en, verbTense ? verbTense.places.map((p) => p.person) : [])
+      : "";
 
   /*
    * Whether the pronunciation or the meaning is beside the question.
@@ -11921,6 +12018,14 @@ export default function ArabicTrainer() {
      it in order, playing a part — has no line of its own, which is what
      `at` being null means. */
   const dialog = isDialog(parentItem) ? parentItem : null;
+  /* How the whole phrase or sentence a gap was in is said, for the answer
+     screen — see also-phrase-said. Empty where it was not written down. */
+  const phraseSaid =
+    spec && spec.promptField === "context" && context
+      ? String(context.lat || "").trim()
+      : spec && spec.promptField === "gap" && dialog && item && item.gap
+        ? String((linesOf(dialog)[item.gap.line] || {}).lat || "").trim()
+        : "";
   const scene = dialog && item ? sceneOf(item.id) : null;
   const at = scene && scene.at !== WHOLE_SCENE ? scene.at : null;
   /* Everything said before this line: the question, in a dialog. What
@@ -12049,6 +12154,26 @@ export default function ArabicTrainer() {
   }, [item, parentItem, spec, qLang.id]);
 
   /*
+   * The card's other forms the prompt reads the same as, where the prompt
+   * does say which one it wants: "Not good" with "feminine" under it, and
+   * the masculine beside it on the card. Written instead, that form is the
+   * right word in the wrong form — nearly right, and the verdict says
+   * which form it was (0.586). Where the prompt says nothing they are
+   * twins, and right.
+   */
+  const namedKin = useMemo(() => {
+    if (!item || !parentItem || !spec || spec.picks || hasSlots(parentItem)) return [] as Form[];
+    if (!askLabel(item, parentItem, qLang) || twins.length) return [] as Form[];
+    return twinsOf({
+      unit: item,
+      kin: unitsOf(parentItem).map((u) => u.unit),
+      promptField: spec.promptField || "",
+      told: false,
+    }) as Form[];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item, parentItem, spec, qLang.id, twins]);
+
+  /*
    * The learner's other cards that this question cannot tell from the one
    * it asks — صَبِر = patience, when صَبِر = cactus is asked for its
    * meaning. See siblingsAsked.
@@ -12071,24 +12196,27 @@ export default function ArabicTrainer() {
   const choices = useMemo(() => {
     if (!spec || !spec.picks) return [];
     /*
-     * Who a verb's form is about: the persons of its own tense, the right
-     * one and those whose forms look most like it. A person whose form is
-     * spelt the same is offered too and is as right — see whoIsRight.
+     * Who a verb's form is about: the persons of its own tense, every one
+     * whose form is spelt the same, and those whose forms look most like
+     * it. All the right ones are always offered and all are to be ticked —
+     * see whoChoices and whoAllRight.
      */
     if (spec.picks === "person") {
       if (!verbTense || !item) return [];
       const { right, wrong } = whoChoices(verbTense, item, qLang, editDistance, PICK_OPTIONS);
       const lead = right.find((p) => p.id === colOf(item)) || right[0];
       if (!lead) return [];
-      const others = right.filter((p) => p !== lead).concat(wrong).slice(0, PICK_OPTIONS - 1);
+      const rightIds = new Set(right.map((p) => `who:${p.id}`));
+      const others = right.filter((p) => p !== lead).concat(wrong);
       const asOption = (p: { id: string; label: string }) => ({ id: `who:${p.id}`, en: p.label || p.id });
       const reps = (statesOf(item)[(exercise && exercise.type) || ""] || {}).reps || 0;
       return optionsFor({
         answer: asOption(lead),
         pool: others.map(asOption),
-        wanted: PICK_OPTIONS,
+        wanted: right.length + wrong.length,
         seed: `${item.id} who ${reps}`,
         textOf: (o) => o.en,
+        near: (o) => rightIds.has(o.id),
       });
     }
     if (spec.picks === "reply") {
@@ -12467,8 +12595,9 @@ export default function ArabicTrainer() {
     if (!spec || !spec.verbDrill || !verbTense || !item) return null;
     const verdict = (ok: boolean) => ({ ok, reason: ok ? "exact" : "wrong" });
     if (spec.picks === "person") {
-      const person = verbTense.places.find((p) => (p.person.label || p.person.id) === typed);
-      return verdict(!!person && whoIsRight(verbTense, item, person.person.id, qLang));
+      const ticked = typed.split(WHO_JOIN).filter(Boolean);
+      const ids = verbTense.places.filter((p) => ticked.includes(p.person.label || p.person.id)).map((p) => p.person.id);
+      return verdict(whoAllRight(verbTense, item, ids, qLang));
     }
     if (spec.answerMode === "vread" || spec.answerMode === "vrow") {
       return verdict(verbMarks(true).every((m) => m.right));
@@ -12531,6 +12660,30 @@ export default function ArabicTrainer() {
           result = also;
           break;
         }
+      }
+    }
+    /* The sentence written with another answer its filler accepts —
+       كيفك where it was filled with كيف حالك. See fillerVariants. */
+    if (!result.ok && !verbOwn && spec && !spec.picks && spec.answerField === "ar") {
+      for (const variant of filledVariantsOf(item)) {
+        const also = checkAnswer(typed, { ...item, ar: variant, answers: undefined, lat: "" }, exercise.type, qSettings);
+        if (also.ok) {
+          result = also;
+          break;
+        }
+      }
+    }
+    /* Another form of this card, where the question named the one it
+       wanted: the word is known and the form is not. */
+    if (!result.ok && !verbOwn && namedKin.length) {
+      const wrote = namedKin.find((k) => checkAnswer(typed, k, exercise.type, qSettings).ok);
+      if (wrote) {
+        result = {
+          ...result,
+          ok: false,
+          reason: "otherForm",
+          note: otherFormNote(askLabel(wrote, parentItem, qLang), askLabel(item, parentItem, qLang)),
+        };
       }
     }
     /*
@@ -13971,6 +14124,16 @@ export default function ArabicTrainer() {
                         {formLabelText}
                       </p>
                     )}
+                    {/* What the verb means, on "who is it?": a learner
+                        reported being asked who a form was about without
+                        anything saying what it meant. The verb's own
+                        meaning ("to keep"), not the form's ("I keep"),
+                        which would be the answer. */}
+                    {spec.picks === "person" && whoMeaning && (
+                      <p className="at-ctxmeaning" data-el="question-verb-meaning">
+                        {asMeaning(whoMeaning)}
+                      </p>
+                    )}
                     {/* Which card it means, where another card the learner
                         has shows the same thing — the teacher's clue, or
                         "not patience". Under the prompt, where "feminine"
@@ -14113,6 +14276,9 @@ export default function ArabicTrainer() {
                         value={typed}
                         disabled={!!checked}
                         onChange={setTyped}
+                        /* Who a form is about: every person it could be is
+                           ticked, so the tiles toggle rather than choose. */
+                        multi={spec.picks === "person"}
                       />
                     ) : spec.answerMode === "choice" ? (
                       <Segmented
@@ -14479,9 +14645,32 @@ export default function ArabicTrainer() {
                               kind="phrase"
                               name="also-context-text"
                             />
+                            {String((context || alsoContext).lat || "").trim() ? (
+                              <Field
+                                value={(context || alsoContext).lat}
+                                field="lat"
+                                kind="phrase"
+                                name="also-context-said"
+                              />
+                            ) : null}
                             <p className="at-ctxmeaning" data-el="also-context-meaning">
                               {asMeaning((context || alsoContext).en)}
                             </p>
+                          </div>
+                        )}
+                        {/* The whole phrase, said, once a gap in it has
+                            been answered: the pronunciation below is the
+                            missing word's alone, and two learners asked
+                            for the sentence's (0.586). The phrase itself
+                            is still up at the top, so only how it is said
+                            comes here. Never before the answer: it holds
+                            the word. */}
+                        {phraseSaid && (
+                          <div className="at-answeralso" data-el="also-phrase-said">
+                            <p className="at-alsolabel" data-el="also-phrase-said-label">
+                              How the whole {spec.promptField === "gap" ? "sentence" : "phrase"} is pronounced
+                            </p>
+                            <Field value={phraseSaid} field="lat" kind="phrase" name="also-phrase-said-text" />
                           </div>
                         )}
                         {spec.promptField === "audio" && spec.answerField !== "ar" && item.ar && (
@@ -15828,6 +16017,8 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
             ? `${s.minutes} min`
             : s.count && s.count < 999
             ? `${s.count} questions`
+            : s.mode === "catchup"
+            ? "everything due"
             : "everything";
           return (
             <div className="at-item at-sessionrow" key={s.id}>
@@ -15903,7 +16094,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
      already given, so the Mode section gets read as "confirm this" rather
      than "pick one" — and Ultimate, which is the longest session on offer,
      is the last one to hand somebody by default. */
-  const [mode, setMode] = useState(editing ? editing.mode : "");
+  const [mode, pickMode] = useState(editing ? editing.mode : "");
   /*
    * What is picked, two ways, as the two pickers show it: whole decks, and
    * single cards. A kept session is read back into the same two — what it
@@ -15931,9 +16122,18 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   });
   /* A new session opens on 20 questions, the owner's choice of default
      (0.499): unlike the mode, a length is something most people take as
-     offered. "" only for a kept session that had none — an Ultimate one. */
-  const [limitKind, setLimitKind] = useState( // "" | count | time
-    !editing ? "count" : editing.minutes ? "time" : editing.count && editing.count < 999 ? "count" : ""
+     offered. "" only for a kept session that had none — an Ultimate one —
+     and "all" for a Catch up kept as everything due. */
+  const [limitKind, setLimitKind] = useState( // "" | count | time | all
+    !editing
+      ? "count"
+      : editing.minutes
+      ? "time"
+      : editing.count && editing.count < 999
+      ? "count"
+      : editing.mode === "catchup"
+      ? "all"
+      : ""
   );
   const [count, setCount] = useState(editing && editing.count && editing.count < 999 ? editing.count : 20);
   const [minutes, setMinutes] = useState(editing && editing.minutes ? editing.minutes : 5);
@@ -15949,6 +16149,16 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   usePageLock();
+
+  /* "Everything due" is Catch up's alone; moving to another mode puts the
+     length back to the usual twenty rather than leaving one it cannot use. */
+  const setMode = (m: string) => {
+    pickMode(m);
+    if (m !== "catchup" && limitKind === "all") {
+      setLimitKind("count");
+      setCount(20);
+    }
+  };
 
   const picked = useMemo(() => {
     const on = new Set(cards);
@@ -16159,12 +16369,29 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
               />
             </FormField>
 
+            {mode === "catchup" && (
+              <>
+                <div className="at-lengthor">or</div>
+                <FormField label="No limit" className="at-lengthgroup">
+                  <Segmented
+                    size={null}
+                    label="Everything due"
+                    options={[{ value: "all", label: "Everything due" }]}
+                    value={limitKind === "all" ? "all" : null}
+                    onChange={() => setLimitKind("all")}
+                  />
+                </FormField>
+              </>
+            )}
+
             {said.length && <p className="at-formneed unmet">{said.length}</p>}
             {limitKind && (
               <Help>
-                {limitKind === "count"
-                  ? `The session ends after ${count} questions.`
-                  : `The session ends after ${minutes} minutes.`}
+                {limitKind === "all"
+                  ? "The session ends when everything due has been answered."
+                  : limitKind === "count"
+                  ? `The session ends after ${count} questions${mode === "catchup" ? ", or sooner if less than that is due" : ""}.`
+                  : `The session ends after ${minutes} minutes${mode === "catchup" ? ", or sooner if less than that is due" : ""}.`}
               </Help>
             )}
           </>

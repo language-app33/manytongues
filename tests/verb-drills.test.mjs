@@ -37,7 +37,7 @@ const built = await buildOnce(["ArabicTrainer.tsx"]);
 const { FOLLOW_GAP, afterItsUse, behindItsTable, buildSession, installIndexes, laddered, marksForAnswer, oneNewTable, withRows } = await import(path.join(built, "ArabicTrainer.js"));
 const { LANGUAGES, EX, TYPES, verbOf, keysFor } = await import("../src/languages.ts");
 const drills = await import("../src/verb-drills.ts");
-const { drillFits, whoChoices, whoIsRight, rowMarks, shiftCue, tenseOf, drillTable } = drills;
+const { drillFits, whoChoices, whoIsRight, whoAllRight, meaningWithoutWho, rowMarks, shiftCue, tenseOf, drillTable } = drills;
 
 const AR = LANGUAGES["ar-PS"];
 const HE = LANGUAGES["he-IL"];
@@ -132,6 +132,28 @@ test("who a form is about: every person spelt the same is right", () => {
   assert.ok(!wrong.some((/** @type {any} */ p) => p.id === "she" || p.id === "you-m"), "neither is offered as wrong");
   assert.ok(whoIsRight(tense, she, "you-m", AR), "you (m) is as right as she");
   assert.equal(whoIsRight(tense, she, "you-f", AR), false, "you (f) is not");
+});
+
+test("who a form is about: every right person is to be ticked, and only they (0.586)", () => {
+  const v = verb();
+  const tense = must(tenseOf(v, verbOf(AR), "present"), "the present");
+  const she = cellOf(v, "p-she");
+  const { right, wrong } = whoChoices(tense, she, AR, (/** @type {string} */ a, /** @type {string} */ b) => Math.abs(a.length - b.length), 4);
+  assert.equal(right.length + wrong.length, 4, "both right persons and two wrong ones");
+  assert.ok(wrong.length >= 1, "never only right ones on offer");
+  assert.equal(whoAllRight(tense, she, ["she", "you-m"], AR), true, "both ticked");
+  assert.equal(whoAllRight(tense, she, ["she"], AR), false, "one of the two left out");
+  assert.equal(whoAllRight(tense, she, ["she", "you-m", "you-f"], AR), false, "a wrong one ticked too");
+  assert.equal(whoAllRight(tense, she, [], AR), false, "nothing ticked");
+});
+
+test("the meaning on 'who is it?' says nothing about who", () => {
+  const persons = [{ id: "i", label: "I" }, { id: "you-m", label: "you (m)" }, { id: "she", label: "she" }];
+  assert.equal(meaningWithoutWho("I keep", persons), "keep");
+  assert.equal(meaningWithoutWho("She has", persons), "has");
+  assert.equal(meaningWithoutWho("you speak", persons), "speak");
+  assert.equal(meaningWithoutWho("live", persons), "live", "nobody on the front: as written");
+  assert.equal(meaningWithoutWho("I", persons), "I", "a meaning that is only the person is left alone");
 });
 
 test("filling the row: a tile spelt like the right one is right in either place", () => {

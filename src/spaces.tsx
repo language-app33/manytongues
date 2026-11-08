@@ -978,6 +978,10 @@ export const BACKUP_PARTS: {
   index?: string;
   count: string;
   unit: string;
+  /* The same part, said of one space's backup (0.584): "Spaces" over a
+     file holding one space read as though it held them all. */
+  spaceTitle?: string;
+  spaceWhat?: string;
 }[] = [
   {
     key: "spaces",
@@ -987,6 +991,8 @@ export const BACKUP_PARTS: {
     prefixes: ["org:", "slug:", "former:", "gone:"],
     index: "orgs",
     count: "orgs",
+    spaceTitle: "The space itself",
+    spaceWhat: "Its name, address, look and admins, and every address it has had.",
     unit: "space",
   },
   {
@@ -997,6 +1003,8 @@ export const BACKUP_PARTS: {
     prefixes: ["user:", "key:"],
     index: "users",
     count: "users",
+    spaceTitle: "Its people",
+    spaceWhat: "Everyone in the space, with the fingerprint of each sign-in key — never the keys themselves.",
     unit: "account",
   },
   {
@@ -1007,6 +1015,7 @@ export const BACKUP_PARTS: {
     prefixes: ["course:"],
     index: "courses",
     count: "courses",
+    spaceWhat: "Its courses: who teaches each one, who studies it, and which decks it uses.",
     unit: "course",
   },
   {
@@ -1017,6 +1026,7 @@ export const BACKUP_PARTS: {
     prefixes: ["deck:"],
     index: "decks",
     count: "decks",
+    spaceWhat: "Its decks, including its members' My space decks made here.",
     unit: "deck",
   },
   {
@@ -1031,6 +1041,7 @@ export const BACKUP_PARTS: {
     kinds: ["card", "owncards", "system", "mysystems"],
     prefixes: ["card:", "mycards:", "owncards:", "numsys:", "timesys:", "mysystems:"],
     count: "cards",
+    spaceWhat: "Every card in the space, including its members' My space cards made here, and its teachers' numbers and clock. Not the audio.",
     unit: "card",
   },
   {
@@ -1041,7 +1052,20 @@ export const BACKUP_PARTS: {
     prefixes: ["flag:"],
     index: "flags",
     count: "flags",
+    spaceWhat: "What learners flagged in this space, and which question each was about.",
     unit: "report",
+  },
+  {
+    key: "progress",
+    title: "Progress",
+    /* Each person's practice document, which lives in the sync store under
+       a hash of their key, and the recordings it names (0.583). */
+    what: "Each person's practice: what they have answered and when it is next due, and any recordings they made on cards of their own. Put back by folding into whatever practice they have by then, never over it.",
+    kinds: ["progress", "paudio"],
+    prefixes: ["progress:", "paudio:"],
+    count: "progress",
+    spaceWhat: "Each member's practice — the whole of it, practice in their other spaces too, since one person has one record of it. Put back by folding into whatever they have practised by then, never over it.",
+    unit: "person",
   },
   {
     key: "clips",
@@ -1052,6 +1076,7 @@ export const BACKUP_PARTS: {
     kinds: ["clip", "image"],
     prefixes: ["clip:", "image:"],
     count: "clips",
+    spaceWhat: "The audio and pictures the space's cards and numbers use, which are nearly all of the size of a backup.",
     unit: "recording",
   },
 ];
@@ -1060,6 +1085,20 @@ export const BACKUP_PARTS: {
 const ALL_PARTS = BACKUP_PARTS.map((p) => p.key);
 
 const partsChosen = (parts: string[]) => BACKUP_PARTS.filter((p) => parts.includes(p.key));
+
+/* A size as a person reads it. */
+export function sizeWords(bytes: number) {
+  if (bytes < 1024) return bytes ? "under 1 KB" : "nothing";
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+/* How much one part adds to a file, from the manifest's bytes per kind. */
+export function partBytes(manifest: any, part: { kinds: string[] }) {
+  const b = (manifest && manifest.bytes) || {};
+  return part.kinds.reduce((n, k) => n + (Number(b[k]) || 0), 0);
+}
 
 /* Which parts a file holds. Files made before a backup could be partial say
    nothing, and a file that says nothing holds everything — which was true
@@ -1091,6 +1130,12 @@ export async function buildBackup(
   source: () => Promise<{ manifest: any }> = API.backupManifest,
 ) {
   const { manifest } = await source();
+  return buildFromManifest(manifest, onProgress, parts);
+}
+
+/* The file, from a manifest already in hand: the backup screen reads one
+   to say how large each part is, and a moment later builds from it. */
+async function buildFromManifest(manifest: any, onProgress: (done: number, total: number) => void, parts: string[]) {
   const chosen = partsChosen(parts);
   const kinds = new Set(chosen.flatMap((p) => p.kinds));
   const plan = (manifest.plan || []).filter((c: any) => kinds.has(c.kind));
@@ -1115,6 +1160,7 @@ export async function buildBackup(
       )
     ),
     chunks: (whole.chunks || []).filter((c: any) => kinds.has(c.kind)),
+    bytes: Object.fromEntries(Object.entries(whole.bytes || {}).filter(([k]) => kinds.has(k))),
   };
   return writeFile(kept, plan, API.backupChunk, parts, onProgress);
 }
@@ -1169,7 +1215,7 @@ async function writeFile(
   const seen = new Set<string>();
   const refs = { decks: new Set<string>(), clips: new Set<string>() };
   const counts: Record<string, number> = {
-    "user:": 0, "course:": 0, "deck:": 0, "card:": 0, "flag:": 0, "clip:": 0,
+    "user:": 0, "course:": 0, "deck:": 0, "card:": 0, "flag:": 0, "clip:": 0, "progress:": 0,
   };
 
   let blob = new Blob(
@@ -1237,6 +1283,7 @@ async function writeFile(
     ["cards", "card:", kept.counts && kept.counts.cards],
     ["reports", "flag:", kept.counts && kept.counts.flags],
     ["clips", "clip:", kept.counts && kept.counts.clips],
+    ["progress", "progress:", kept.counts && kept.counts.progress],
   ];
   for (const [label, prefix, want] of expect) {
     if (want !== undefined && counts[prefix] !== want) {
@@ -1261,17 +1308,22 @@ async function writeFile(
 
 /*
  * Puts a checked file back. Records go up in requests kept under a few
- * megabytes; the three indexes go last, and the server folds them into
- * whatever is there rather than replacing it. Restoring is additive: a
- * record in the file overwrites the one on the site with the same key,
- * and nothing else is touched.
+ * megabytes, in the file's own order — people first — and the indexes
+ * last. Since 0.583 the server adds and never overwrites, deciding each
+ * record from the site as it is; the owner's choices go with every request
+ * in `options`, and what it left alone comes back with why.
  */
 /**
  * @param parts  Which of BACKUP_PARTS to put back. A file may
  *   hold more than is wanted — the recordings when only the wording is
  *   being recovered, everybody's accounts when one course is.
  */
-export async function restoreBackup(file: any, onProgress: (done: number, total: number) => void, parts: string[] = ALL_PARTS) {
+export async function restoreBackup(
+  file: any,
+  onProgress: (done: number, total: number) => void,
+  parts: string[] = ALL_PARTS,
+  options?: API.RestoreOptions,
+) {
   const records = file.records || {};
   const chosen = partsChosen(parts);
   const wanted = (k: string) =>
@@ -1308,24 +1360,141 @@ export async function restoreBackup(file: any, onProgress: (done: number, total:
   }
   if (Object.keys(last).length) batches.push(last);
 
-  let written = 0;
+  const sum: { written: number; merged: number; skipped: { key: string; why: string }[]; skippedMore: number } = {
+    written: 0, merged: 0, skipped: [], skippedMore: 0,
+  };
   for (let i = 0; i < batches.length; i++) {
-    const r = await API.restoreChunk(batches[i]);
-    written += r.written || 0;
+    const r = await API.restoreChunk(batches[i], options || restoreOptionsFor(file, { kind: "site" }));
+    sum.written += r.written || 0;
+    sum.merged += r.merged || 0;
+    sum.skipped.push(...(r.skipped || []));
+    sum.skippedMore += r.skippedMore || 0;
     onProgress(i + 1, batches.length);
   }
-  return written;
+  return sum;
 }
 
-/* How many of a file's courses, decks and cards say nothing about
-   which space they are in: every one in a backup taken before spaces
-   (0.542). The server files them — see admin-restore-chunk. */
+/*
+ * Whose a file is (0.583): the site's, or one space's. A file made before
+ * files said so is the site's — it was made by Back up the site, or by a
+ * space's old export, and either way the site's door takes it safely.
+ */
+export type FileScope = { kind: "site" } | { kind: "space"; space: string; slug: string; name: string };
+export function fileScope(file: any): FileScope {
+  const s = file && file.manifest && file.manifest.scope;
+  if (s && s.kind === "space" && typeof s.space === "string" && s.space) {
+    return { kind: "space", space: s.space, slug: String(s.slug || ""), name: String(s.name || s.slug || s.space) };
+  }
+  return { kind: "site" };
+}
+
+/* Where a restore was opened: the site's door, one space's, or the door for
+   a space that may no longer exist (any space's file). */
+export type RestoreDoor =
+  /* `into`: the name of the space the site's door is open in, where
+     material from before spaces goes (0.589). */
+  | { kind: "site"; into?: string }
+  | { kind: "space"; space?: string; name?: string };
+
+/* How many of a file's courses, decks and cards name no space: every one
+   in a backup taken before spaces (0.542). The server puts them in the
+   space the restore is run from — see restoreOne. */
 export function unspacedIn(file: any): number {
   const rec = (file && file.records) || {};
   return Object.entries<any>(rec).filter(
-    ([k, v]) => /^(course|deck|card):/.test(k) && v && typeof v === "object" && !v.org,
+    ([k, v]) => /^(course|deck|card):/.test(k) && v && typeof v === "object" && !Array.isArray(v) && !v.org,
   ).length;
 }
+
+/** Why a door will not take a file, in words, or "" when it will. */
+export function doorRefusal(file: any, door: RestoreDoor): string {
+  const s = fileScope(file);
+  if (door.kind === "site") {
+    return s.kind === "space"
+      ? `This is a backup of the space ${s.name}. Restore it from Super admin → Spaces.`
+      : "";
+  }
+  if (s.kind === "site") return "This is a backup of the whole site. Restore it from Super admin → App.";
+  if (door.space && s.space !== door.space) {
+    return `This is a backup of the space ${s.name}, not of ${door.name || "this space"}.`;
+  }
+  return "";
+}
+
+/* What every request of one restore carries: the owner's choices, and the
+   file's facts the server needs to tell people apart — never a verdict. */
+export function restoreOptionsFor(
+  file: any,
+  door: RestoreDoor,
+  choices: { bringBack?: string[]; keepSpaceCard?: boolean; newSlugs?: Record<string, string> } = {},
+): API.RestoreOptions {
+  const s = fileScope(file);
+  const records = (file && file.records) || {};
+  const created: Record<string, number> = {};
+  for (const [k, v] of Object.entries<any>(records)) {
+    if (k.startsWith("user:") && v && typeof v.created === "number") created[k.slice(5)] = v.created;
+  }
+  const indexes = (file && file.manifest && file.manifest.indexes) || {};
+  return {
+    scope: s.kind === "space" && door.kind === "space" ? { kind: "space", space: s.space } : { kind: "site" },
+    fileOrgs: Array.isArray(indexes.orgs) ? indexes.orgs : [],
+    created,
+    bringBack: choices.bringBack || [],
+    keepSpaceCard: choices.keepSpaceCard !== false,
+    newSlugs: choices.newSlugs || {},
+  };
+}
+
+/* What the preview is sent: the few fields of the file it needs, never its
+   records whole. Only for the parts being put back. */
+export function previewBody(file: any, options: API.RestoreOptions, parts: string[] = ALL_PARTS) {
+  const records = (file && file.records) || {};
+  const of = (prefix: string) => Object.keys(records).filter((k) => k.startsWith(prefix));
+  const has = (part: string) => parts.includes(part);
+  return {
+    options,
+    fileScope: fileScope(file),
+    users: of("user:").map((k) => {
+      const u = records[k] || {};
+      return { handle: k.slice(5), created: u.created, orgs: u.orgs, org: u.org, displayName: u.displayName };
+    }),
+    courses: has("courses")
+      ? of("course:").map((k) => {
+          const c = records[k] || {};
+          return { id: c.id || k.slice(7), org: c.org, title: c.title, teachers: c.teachers, students: c.students };
+        })
+      : [],
+    orgs: has("spaces") ? of("org:").map((k) => ({ id: k.slice(4), slug: (records[k] || {}).slug, name: (records[k] || {}).name })) : [],
+    keys: {
+      cards: has("cards") ? of("card:").map((k) => k.slice(5)) : [],
+      decks: has("decks") ? of("deck:").map((k) => k.slice(5)) : [],
+      courses: has("courses") ? of("course:").map((k) => k.slice(7)) : [],
+      flags: has("flags") ? of("flag:").map((k) => k.slice(5)) : [],
+    },
+  };
+}
+
+/* Why a record was left alone, in the words the report uses. */
+const LEFT_BECAUSE: Record<string, string> = {
+  exists: "already here",
+  kept: "account already here, left as it is",
+  "key-changed": "key changed since",
+  "not-member": "not in this space",
+  deleted: "deleted since the backup",
+  "other-person": "the name now belongs to someone else",
+  "no-account": "no account to put it under",
+  "account-exists": "the account is here",
+  "slug-taken": "address taken",
+  "code-taken": "code in use by another course",
+  "too-large": "too large",
+  "not-allowed": "not allowed",
+  unreadable: "could not be read",
+  busy: "being changed at the same moment; run it again",
+  empty: "empty in the file",
+  error: "could not be written",
+};
+/* Reasons that are about a person, which the report lists by name. */
+const ABOUT_PEOPLE = new Set(["kept", "key-changed", "not-member", "deleted", "other-person"]);
 
 /* What a finished file says about itself, checked against what it holds. */
 export function verifyBackup(file: any) {
@@ -1343,6 +1512,7 @@ export function verifyBackup(file: any) {
     ["decks", "deck:", m.counts && m.counts.decks],
     ["cards", "card:", m.counts && m.counts.cards],
     ["clips", "clip:", m.counts && m.counts.clips],
+    ["progress", "progress:", m.counts && m.counts.progress],
   ];
   for (const [label, prefix, want] of expect) {
     const got = count(prefix);
@@ -1909,7 +2079,7 @@ function scriptStyle(languages: Record<LangId, Lang>, langId?: LangId) {
 
 export function AdminSpace({ account, spaceName, languages, onClose, superMode = false }: {
   account: User;
-  /** The space this is open in: where a restore files material from before spaces. */
+  /** The space this is open in: where a restore puts material from before spaces. */
   spaceName?: string | null;
   /** Super admin (0.547): the App admin's own tools, whichever space they are in. */
   superMode?: boolean;
@@ -1928,11 +2098,9 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
   const [openCourse2, setOpenCourse2] = useState<string | null>(null); // a course being settled
   const [selPeople, setSelPeople] = useState(() => new Set<string>());
   const [backup, setBackup] = useState<Progress | null>(null); // { state, done, total, note }
-  /* Which of the two backup screens is open, and the file the restore one
-     is working from — held here rather than in the screen so choosing a
-     file survives a re-render of the tab underneath. */
+  /* Which of the two backup screens is open; the file a restore works
+     from is held by the flow itself (0.583). */
   const [backupMode, setBackupMode] = useState<"download" | "restore" | null>(null);
-  const [restoreFile, setRestoreFile] = useState<{ parsed: any, name: string } | null>(null);
   const [clearing, setClearing] = useState(false);
   /* Off until asked for: the gallery renders a specimen of every component,
      which is a lot of markup to carry on a tab that is mostly about backups. */
@@ -2933,8 +3101,13 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 working.
               </Help>
               <Help>
-                Students' own progress isn't in here. It lives on their devices and syncs back by
-                itself.
+                People's practice is in the Progress part. Putting it back folds it into whatever
+                they have practised since; it never replaces it.
+              </Help>
+              <Help>
+                A restore never overwrites or removes anything: it adds what the file holds and
+                the site lacks, after showing you what it will do. A space's own backup is
+                restored from Super admin → Spaces.
               </Help>
 
               <div className="at-row at-mt1">
@@ -2944,10 +3117,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
 
                 <Button
                   variant="ghost"
-                  onClick={() => {
-                    setRestoreFile(null);
-                    setBackupMode("restore");
-                  }}
+                  onClick={() => setBackupMode("restore")}
                   icon="refresh"
                 >
                   Restore a backup
@@ -3141,101 +3311,15 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
           )}
 
           {backupMode && (
-            <BackupScreen
+            <BackupFlow
               mode={backupMode}
-              file={restoreFile ? restoreFile.parsed : null}
-              fileName={restoreFile ? restoreFile.name : ""}
-              spaceName={spaceName || (account.org && typeof account.org === "object" && account.org.name) || "this space"}
-              busy={!!backup && (backup.state === "running" || backup.state === "restoring")}
-              progress={
-                backup && (backup.state === "running" || backup.state === "restoring")
-                  ? { done: backup.done || 0, total: backup.total || 0 }
-                  : null
-              }
-              onPickFile={(parsed, name) => setRestoreFile({ parsed, name })}
+              door={{
+                kind: "site",
+                into: spaceName || (account.org && typeof account.org === "object" ? account.org.name : "") || "this space",
+              }}
+              stem="backup"
               onClose={() => setBackupMode(null)}
-              onDownload={async (parts) => {
-                setBackup({ state: "running", done: 0, total: 0, note: "" });
-                try {
-                  const { blob, manifest, problems } = await buildBackup(
-                    (done, total) => setBackup({ state: "running", done, total, note: "" }),
-                    parts
-                  );
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  const stamp = new Date(manifest.takenAt)
-                    .toISOString()
-                    .slice(0, 16)
-                    .replace(/[:T]/g, "-");
-                  a.href = url;
-                  /* Named for what is in it, so a folder of these can be
-                     read without opening any of them. */
-                  a.download = `backup-${stamp}${
-                    parts.length === ALL_PARTS.length ? "" : `-${parts.join("-")}`
-                  }.json`;
-                  a.click();
-                  /* Revoking straight away can cancel the download in
-                     some browsers; a moment later is soon enough. */
-                  setTimeout(() => URL.revokeObjectURL(url), 60000);
-                  setBackup({
-                    state: "done",
-                    counts: manifest.counts,
-                    takenAt: manifest.takenAt,
-                    note: problems.join(" "),
-                  });
-                  setBackupMode(null);
-                } catch (e) {
-                  setBackup({ state: "failed", note: API.explain(e) });
-                }
-              }}
-              onRestore={(parts) => {
-                const parsed = restoreFile && restoreFile.parsed;
-                if (!parsed) return;
-                const problems = verifyBackup(parsed);
-                const counts = (parsed.manifest && parsed.manifest.counts) || {};
-                const naming = partsChosen(parts).map((p) => p.title.toLowerCase()).join(", ");
-                setConfirm({
-                  title: "Restore this backup?",
-                  confirmLabel: "Restore",
-                  confirmWord: "restore",
-                  body: (
-                    <>
-                      <p>
-                        Putting back {naming}, taken{" "}
-                        {parsed.manifest && parsed.manifest.takenAt
-                          ? new Date(parsed.manifest.takenAt).toLocaleString()
-                          : "at an unknown time"}
-                        .
-                      </p>
-                      <p>
-                        Everything in the file is written back over whatever has the same
-                        name on the site. Anything made since the backup is left alone.
-                      </p>
-                      {problems.length ? (
-                        <p style={{ marginBottom: 0, color: "var(--rose)" }}>
-                          {problems.join(" ")}
-                        </p>
-                      ) : null}
-                    </>
-                  ),
-                  action: async () => {
-                    setBackup({ state: "restoring", done: 0, total: 0, note: "" });
-                    const written = await restoreBackup(
-                      parsed,
-                      (done, total) => setBackup({ state: "restoring", done, total, note: "" }),
-                      parts
-                    );
-                    setBackup({
-                      state: "restored",
-                      counts,
-                      takenAt: parsed.manifest && parsed.manifest.takenAt,
-                      note: `${written} records written.`,
-                    });
-                    setBackupMode(null);
-                    setRestoreFile(null);
-                  },
-                });
-              }}
+              onFinished={setBackup}
             />
           )}
 
@@ -3348,28 +3432,158 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
    three screens name the same things in the same words.
    ------------------------------------------------------------------ */
 
+/* What a restore did, as the report shows it. */
+type RestoreReport = { written: number; merged: number; skipped: { key: string; why: string }[]; skippedMore: number };
+
+/*
+ * The whole of one backup or restore, wherever it was opened (0.583): Super
+ * admin → App for the site, Super admin → Spaces for a space. One
+ * implementation, so the two doors cannot drift apart. `source` is where a
+ * backup's manifest comes from; `door` is which files a restore takes.
+ */
+function BackupFlow({
+  mode,
+  door,
+  source,
+  stem,
+  onClose,
+  onFinished,
+}: {
+  mode: "download" | "restore";
+  door: RestoreDoor;
+  source?: () => Promise<{ manifest: any }>;
+  stem: string;
+  onClose: () => void;
+  onFinished?: (p: Progress) => void;
+}) {
+  const [file, setFile] = useState<{ parsed: any; name: string } | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [report, setReport] = useState<RestoreReport | null>(null);
+  const { run, busy, error } = useRun({ quietDone: true });
+  const { setConfirm, modal } = useConfirm(run, { busy });
+
+  return (
+    <>
+      <BackupScreen
+        mode={mode}
+        door={door}
+        file={file ? file.parsed : null}
+        fileName={file ? file.name : ""}
+        busy={busy}
+        error={error}
+        progress={progress}
+        report={report}
+        onPickFile={(parsed, name) => {
+          setReport(null);
+          setFile({ parsed, name });
+        }}
+        onClose={onClose}
+        source={source || API.backupManifest}
+        onDownload={(parts, read) =>
+          run(async () => {
+            setProgress({ done: 0, total: 0 });
+            try {
+              /* The manifest the screen read for its sizes, while it is
+                 still fresh; otherwise a new one, so the file is as of now. */
+              const fresh = read && Date.now() - read.at < 2 * 60 * 1000;
+              const { blob, manifest, problems } = fresh && read
+                ? await buildFromManifest(read.manifest, (done, total) => setProgress({ done, total }), parts)
+                : await buildBackup((done, total) => setProgress({ done, total }), parts, source);
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              const stamp = new Date(manifest.takenAt).toISOString().slice(0, 16).replace(/[:T]/g, "-");
+              a.href = url;
+              /* Named for what is in it, so a folder of these can be read
+                 without opening any of them. */
+              a.download = `${stem}-${stamp}${parts.length === ALL_PARTS.length ? "" : `-${parts.join("-")}`}.json`;
+              a.click();
+              /* Revoking straight away can cancel the download in some
+                 browsers; a moment later is soon enough. */
+              setTimeout(() => URL.revokeObjectURL(url), 60000);
+              if (onFinished) onFinished({ state: "done", counts: manifest.counts, takenAt: manifest.takenAt, note: problems.join(" ") });
+              onClose();
+            } finally {
+              setProgress(null);
+            }
+          })
+        }
+        onRestore={(parts, options, naming) => {
+          const parsed = file && file.parsed;
+          if (!parsed) return;
+          setConfirm({
+            title: fileScope(parsed).kind === "space" ? "Restore this space?" : "Restore this backup?",
+            confirmLabel: "Restore",
+            confirmWord: "restore",
+            body: (
+              <>
+                <p>
+                  Putting back {naming}, taken{" "}
+                  {parsed.manifest && parsed.manifest.takenAt
+                    ? new Date(parsed.manifest.takenAt).toLocaleString()
+                    : "at an unknown time"}
+                  .
+                </p>
+                <p style={{ marginBottom: 0 }}>{NEVER_OVERWRITES}</p>
+              </>
+            ),
+            action: async () => {
+              setProgress({ done: 0, total: 0 });
+              try {
+                const done = await restoreBackup(parsed, (d, total) => setProgress({ done: d, total }), parts, options);
+                setReport(done);
+                if (onFinished) {
+                  onFinished({
+                    state: "restored",
+                    counts: (parsed.manifest && parsed.manifest.counts) || {},
+                    takenAt: parsed.manifest && parsed.manifest.takenAt,
+                    note: `Added ${done.written}, folded in ${done.merged}, left alone ${done.skipped.length + done.skippedMore}.`,
+                  });
+                }
+              } finally {
+                setProgress(null);
+              }
+            },
+          });
+        }}
+      />
+      {modal}
+    </>
+  );
+}
+
+/* The standing sentence over every restore (0.583). */
+const NEVER_OVERWRITES =
+  "Nothing on the site is overwritten or removed. This adds what the file holds and the site lacks.";
+
 function BackupScreen({
   mode,
+  door,
   file,
   fileName,
   onDownload,
   onRestore,
   onPickFile,
   progress,
+  report,
   busy,
+  error,
+  source,
   onClose,
-  spaceName,
 }: {
   mode: "download" | "restore";
+  door: RestoreDoor;
   file?: any;
   fileName?: string;
-  /** Where material from before spaces goes — see admin-restore-chunk. */
-  spaceName: string;
-  onDownload: (parts: string[]) => void;
-  onRestore: (parts: string[]) => void;
+  onDownload: (parts: string[], read: { manifest: any; at: number } | null) => void;
+  /* Where a backup's manifest comes from, read when the screen opens so
+     each part can say how large it is (0.584). */
+  source?: () => Promise<{ manifest: any }>;
+  onRestore: (parts: string[], options: API.RestoreOptions, naming: string) => void;
   onPickFile: (file: any, name: string) => void;
   progress?: { done: number, total: number } | null;
+  report?: RestoreReport | null;
   busy?: boolean;
+  error?: string;
   onClose: () => void;
 }) {
   const restoring = mode === "restore";
@@ -3380,17 +3594,92 @@ function BackupScreen({
   const held = file ? includedIn(file) : ALL_PARTS;
   const [parts, setParts] = useState(ALL_PARTS);
   const [readErr, setReadErr] = useState("");
+  /* The owner's choices for the preview and the restore. Any change clears
+     the preview, so Restore only ever runs what was last checked. */
+  const [bringBack, setBringBack] = useState<string[]>([]);
+  const [keepSpaceCard, setKeepSpaceCard] = useState(true);
+  const [newSlugs, setNewSlugs] = useState<Record<string, string>>({});
+  const [preview, setPreview] = useState<API.RestorePreview | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [previewErr, setPreviewErr] = useState("");
   useEffect(() => {
     if (file) setParts(includedIn(file));
+    setBringBack([]);
+    setKeepSpaceCard(true);
+    setNewSlugs({});
+    setPreview(null);
+    setPreviewErr("");
   }, [file]);
 
-  const counts = (file && file.manifest && file.manifest.counts) || null;
+  /* On a backup, what the site or the space holds now: read once as the
+     screen opens, for each part's count and size. */
+  const [read, setRead] = useState<{ manifest: any; at: number } | null>(null);
+  const [sizing, setSizing] = useState("");
+  /* Once per opening: the caller may hand a new function each time it draws. */
+  const sourceNow = useRef(source);
+  sourceNow.current = source;
+  useEffect(() => {
+    const from = sourceNow.current;
+    if (restoring || !from) return undefined;
+    let live = true;
+    setSizing("Working out how large each part is…");
+    from().then(
+      (r) => {
+        if (!live) return;
+        setRead({ manifest: r.manifest, at: Date.now() });
+        setSizing("");
+      },
+      () => live && setSizing(""),
+    );
+    return () => {
+      live = false;
+    };
+  }, [restoring]);
+  const ofSpace = door.kind === "space" && !!door.name;
+  const shown = restoring ? (file && file.manifest) || null : read ? read.manifest : null;
+  const counts = (shown && shown.counts) || null;
   const chosen = parts.filter((p) => !restoring || held.includes(p));
+  const total = shown && shown.bytes ? partsChosen(chosen).reduce((n, p) => n + partBytes(shown, p), 0) : null;
   const nothing = !chosen.length;
+  const refused = restoring && file ? doorRefusal(file, door) : "";
+  const problems = restoring && file ? verifyBackup(file) : [];
+  const options = file ? restoreOptionsFor(file, door, { bringBack, keepSpaceCard, newSlugs }) : null;
+
+  const check = async (choices: { bringBack?: string[]; keepSpaceCard?: boolean; newSlugs?: Record<string, string> } = {}) => {
+    if (!file) return;
+    setChecking(true);
+    setPreviewErr("");
+    try {
+      const o = restoreOptionsFor(file, door, { bringBack, keepSpaceCard, newSlugs, ...choices });
+      setPreview(await API.restorePreview(previewBody(file, o, chosen)));
+    } catch (e) {
+      setPreview(null);
+      setPreviewErr(API.explain(e));
+    } finally {
+      setChecking(false);
+    }
+  };
+  const ready = !!(file && preview && !preview.blockers.length && !refused && !nothing && !report);
+
+  const names = (list: API.PreviewPerson[]) => list.map((p) => p.displayName || p.handle).join(", ");
+  const group = (title: string, list: API.PreviewPerson[], note?: Node) =>
+    list.length ? (
+      <div className="at-mt3">
+        <p className="at-eyebrow">
+          {title} · {list.length}
+        </p>
+        <Help>{names(list)}</Help>
+        {note ? <Help>{note}</Help> : null}
+      </div>
+    ) : null;
 
   return (
     <Screen
-      title={restoring ? "Restore" : "Back up"}
+      title={
+        restoring
+          ? door.kind === "space" ? "Restore a space" : "Restore"
+          : ofSpace ? `Back up ${door.name}` : "Back up the site"
+      }
       onBack={onClose}
       rise
       action={
@@ -3398,25 +3687,38 @@ function BackupScreen({
           <Button
             variant="danger"
             size="sm"
-            disabled={!file || nothing || busy}
-            onClick={() => onRestore(chosen)}
+            disabled={!ready || busy || !options}
+            onClick={() =>
+              options &&
+              onRestore(chosen, options, partsChosen(chosen).map((p) => p.title.toLowerCase()).join(", "))
+            }
           >
             <Icon name="refresh" />
             {busy ? "Restoring…" : "Restore"}
           </Button>
         ) : (
-          <Button variant="primary" size="sm" disabled={nothing || busy} onClick={() => onDownload(chosen)}>
+          <Button variant="primary" size="sm" disabled={nothing || busy} onClick={() => onDownload(chosen, read)}>
             <Icon name="download" />
             {busy ? "Working…" : "Download"}
           </Button>
         )
       }
     >
-      <Help>
-        {restoring
-          ? "Everything you tick is written back over whatever has the same name on the site. Anything made since the backup is left alone, and anything you leave unticked is left in the file."
-          : "Tick what the file should hold. All of it is the backup to keep; less of it is for when you want the wording of every card without a gigabyte of audio behind it."}
-      </Help>
+      {restoring ? (
+        <Notice kind="info">{NEVER_OVERWRITES}</Notice>
+      ) : (
+        <>
+          <Help>
+            {ofSpace
+              ? `One file holding the space ${door.name} and nothing from any other space: its people, courses, decks, cards, recordings and pictures, its members' My space made here, and its members' practice.`
+              : "One file holding every space on the site, and everyone in them."}
+          </Help>
+          <Help>
+            Tick what the file should hold. All of it is the backup to keep; less of it is for when you want the
+            wording of every card without a gigabyte of audio behind it.
+          </Help>
+        </>
+      )}
 
       {restoring && (
         <div className="at-row at-mt3">
@@ -3443,50 +3745,59 @@ function BackupScreen({
         </div>
       )}
 
-      <Notice kind="error">{readErr}</Notice>
+      <Notice kind="error">{readErr || error || previewErr}</Notice>
 
       {restoring && file && (
         <div className="at-sub at-mt3">
           <p className="at-eyebrow">{fileName || "The file"}</p>
           <Help>
-            Taken{" "}
-            {file.manifest && file.manifest.takenAt
-              ? new Date(file.manifest.takenAt).toLocaleString()
-              : "at an unknown time"}
-            .
+            {fileScope(file).kind === "space" ? `A backup of the space ${(fileScope(file) as any).name}, taken ` : "A backup of the site, taken "}
+            {file.manifest && file.manifest.takenAt ? new Date(file.manifest.takenAt).toLocaleString() : "at an unknown time"}.
           </Help>
-          {verifyBackup(file).length ? (
+          {problems.length ? (
             <p className="at-hint" style={{ marginBottom: 0, color: "var(--rose)" }}>
-              {verifyBackup(file).join(" ")}
+              {problems.join(" ")}
             </p>
           ) : (
             <Help>Checked: it holds everything it says it holds.</Help>
           )}
-          {unspacedIn(file) > 0 && (
+          {restoring && door.kind === "site" && unspacedIn(file) > 0 && (
             <Help>
               {plural(unspacedIn(file), "course, deck or card", "courses, decks or cards")} in it
-              {unspacedIn(file) === 1 ? " is" : " are"} from before spaces. Whatever is already in a
-              space other than Main stays there; the rest goes into {spaceName}, the space you are in.
+              {unspacedIn(file) === 1 ? " is" : " are"} from before spaces, so
+              {unspacedIn(file) === 1 ? " it goes" : " they go"} into {door.into || "this space"}, the space you
+              are in — and any of them already on the site with no space are moved there too. To put them in
+              another space, switch to it first.
             </Help>
           )}
         </div>
       )}
 
-      {(!restoring || file) && (
+      {refused ? <Notice kind="error">{refused}</Notice> : null}
+
+      {(!restoring || (file && !refused)) && !report && (
         <div className="at-field at-mt4">
           <CheckList
-            options={BACKUP_PARTS.filter((p) => !restoring || held.includes(p.key)).map((p) => ({
-              id: p.key,
-              title: p.title,
-              note:
-                counts && counts[p.count] !== undefined
-                  ? `${p.what} ${plural(counts[p.count], p.unit)} in the file.`
-                  : p.what,
-            }))}
+            options={BACKUP_PARTS.filter((p) => !restoring || held.includes(p.key)).map((p) => {
+              const spaceWords = (restoring ? fileScope(file).kind === "space" : ofSpace);
+              const what = spaceWords ? p.spaceWhat || p.what : p.what;
+              const many = counts && counts[p.count] !== undefined
+                ? plural(counts[p.count], p.unit, p.unit === "person" ? "people" : undefined)
+                : "";
+              const b = shown && shown.bytes ? partBytes(shown, p) : null;
+              const size = b === null ? "" : b >= 1024 ? `about ${sizeWords(b)}` : b > 0 ? sizeWords(b) : "";
+              const facts = [many, size].filter(Boolean).join(", ");
+              return {
+                id: p.key,
+                title: spaceWords ? p.spaceTitle || p.title : p.title,
+                note: facts ? `${what} ${facts}${restoring ? " in the file" : ""}.` : what,
+              };
+            })}
             chosen={parts}
-            onToggle={(id, on) =>
-              setParts((x) => (on ? x.filter((k) => k !== id) : x.concat([id])))
-            }
+            onToggle={(id, on) => {
+              setPreview(null);
+              setParts((x) => (on ? x.filter((k) => k !== id) : x.concat([id])));
+            }}
           />
           {restoring && held.length < ALL_PARTS.length && (
             <Help>
@@ -3496,8 +3807,150 @@ function BackupScreen({
             </Help>
           )}
           {nothing && <Help>Nothing ticked, so there is nothing to do.</Help>}
+          {!restoring && sizing ? <Help>{sizing}</Help> : null}
+          {!restoring && !nothing && total !== null ? (
+            <Help>The file will be {total >= 1024 ? `about ${sizeWords(total)}` : sizeWords(total)}.</Help>
+          ) : null}
         </div>
       )}
+
+      {restoring && file && !refused && !nothing && !report && (
+        <div className="at-row at-mt3">
+          <Button variant="primary" icon="verify" disabled={checking || busy} onClick={() => check()}>
+            {checking ? "Checking…" : "Check what this will do"}
+          </Button>
+        </div>
+      )}
+
+      {restoring && preview && !report && (
+        <div className="at-sub at-mt4">
+          {preview.blockers.map((b) => (
+            <Notice kind="error" key={b}>
+              {b}
+            </Notice>
+          ))}
+          <p className="at-eyebrow">People</p>
+          {group("Left as they are", preview.people.kept)}
+          {door.kind === "space" &&
+            group("Not put back into this space", preview.people.notMember, "Add them from People if you mean to.")}
+          {group("Re-created, with their old key", preview.people.recreate)}
+          {preview.people.deleted.length ? (
+            <div className="at-mt3">
+              <p className="at-eyebrow">Deleted since the backup — stays deleted · {preview.people.deleted.length}</p>
+              <Help>Tick anyone to bring back, with their old key.</Help>
+              <CheckList
+                options={preview.people.deleted.map((p) => ({
+                  id: p.handle,
+                  title: `Bring back ${p.displayName || p.handle}`,
+                  note: p.at ? `Deleted ${new Date(p.at).toLocaleDateString()}.` : undefined,
+                }))}
+                chosen={bringBack}
+                onToggle={(id, on) => {
+                  const next = on ? bringBack.filter((h) => h !== id) : bringBack.concat([id]);
+                  setBringBack(next);
+                  check({ bringBack: next });
+                }}
+              />
+            </div>
+          ) : null}
+          {bringBack.length && !preview.people.deleted.length ? (
+            <Help>
+              Bringing back {plural(bringBack.length, "person", "people")}.{" "}
+              <button type="button" className="at-linkbtn" onClick={() => {
+                setBringBack([]);
+                check({ bringBack: [] });
+              }}>
+                Undo
+              </button>
+            </Help>
+          ) : null}
+          {preview.people.otherPerson.length ? (
+            <p className="at-hint" style={{ color: "var(--rose)" }}>
+              Belongs to someone else now: {names(preview.people.otherPerson)}
+            </p>
+          ) : null}
+
+          {preview.rosters.length ? (
+            <div className="at-mt3">
+              <p className="at-eyebrow">Rosters</p>
+              {preview.rosters.map((r) => (
+                <Help key={r.course}>
+                  These names come off {r.title || "a restored course"} because they are not in the space:{" "}
+                  {r.dropped.join(", ")}.
+                </Help>
+              ))}
+            </div>
+          ) : null}
+
+          {preview.spaces.length ? (
+            <div className="at-mt3">
+              <p className="at-eyebrow">Spaces</p>
+              {preview.spaces.map((sp) => (
+                <div key={sp.id} className="at-mt1">
+                  <Help>
+                    {sp.name || sp.id}: {sp.exists ? "exists" : "will be re-created"}.
+                  </Help>
+                  {sp.exists ? (
+                    <RadioGroup
+                      name={`card-${sp.id}`}
+                      label="Its name, address, look and admins"
+                      quiet
+                      value={keepSpaceCard ? "keep" : "file"}
+                      onChange={(v) => {
+                        setKeepSpaceCard(v === "keep");
+                        setPreview(null);
+                      }}
+                      options={[
+                        { value: "keep", label: "Keep the space's current name, address, look and admins" },
+                        {
+                          value: "file",
+                          label: "Take the file's name, logo, colour and admins",
+                          note: "Its address and codes stay as they are now.",
+                        },
+                      ]}
+                    />
+                  ) : null}
+                  {sp.slugTaken ? (
+                    <Field label="New address for it" lede={`Its address ${sp.slug} now belongs to ${sp.takenBy}.`}>
+                      <input
+                        className="at-input"
+                        placeholder="new-address"
+                        value={newSlugs[sp.id] || ""}
+                        onChange={(e) => {
+                          setNewSlugs((m) => ({ ...m, [sp.id]: e.target.value.trim().toLowerCase() }));
+                          setPreview(null);
+                        }}
+                        onBlur={() => check()}
+                      />
+                    </Field>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="at-mt3">
+            <p className="at-eyebrow">Material</p>
+            <Help>
+              {(["cards", "decks", "courses", "flags"] as const)
+                .map((k) => {
+                  const m = preview.material[k];
+                  const unit = { cards: "card", decks: "deck", courses: "course", flags: "report" }[k];
+                  return `adds ${plural(m.add, unit)} (${m.have} already here)`;
+                })
+                .join(", ")
+                .replace(/^a/, "A")}
+              .
+            </Help>
+          </div>
+        </div>
+      )}
+
+      {restoring && file && !preview && !report && !refused && !nothing && (
+        <Help>Restore waits until you have checked what it will do with the choices above.</Help>
+      )}
+
+      {report && <RestoreResult report={report} />}
 
       {progress && progress.total > 0 && (
         <Help>
@@ -3505,6 +3958,40 @@ function BackupScreen({
         </Help>
       )}
     </Screen>
+  );
+}
+
+/* What a restore did: what it added, what it folded in, and everything it
+   left alone and why — by name where the reason is about a person. */
+function RestoreResult({ report }: { report: RestoreReport }) {
+  const byWhy = new Map<string, string[]>();
+  for (const s of report.skipped) {
+    const list = byWhy.get(s.why) || [];
+    list.push(s.key);
+    byWhy.set(s.why, list);
+  }
+  const left = report.skipped.length + report.skippedMore;
+  return (
+    <div className="at-sub at-mt4">
+      <p className="at-eyebrow">Restored</p>
+      <Help>
+        Added {report.written}, folded in {report.merged}, left alone {left}.
+      </Help>
+      {[...byWhy.entries()].map(([why, keys]) => {
+        /* By handle, from whichever records name one: an account's, a
+           person's list of cards, their practice. */
+        const people = ABOUT_PEOPLE.has(why) || why === "no-account"
+          ? [...new Set(keys.filter((k) => /^(user|mycards|owncards|mysystems|progress|paudio):/.test(k)).map((k) => k.split(":")[1]))]
+          : [];
+        return (
+          <Help key={why}>
+            {LEFT_BECAUSE[why] || why}: {plural(keys.length, "record")}
+            {people.length ? ` — ${people.join(", ")}` : ""}.
+          </Help>
+        );
+      })}
+      {report.skippedMore ? <Help>And {report.skippedMore} more not listed.</Help> : null}
+    </div>
   );
 }
 
@@ -4691,6 +5178,42 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
                 })}
               </ul>
         </>
+      )}
+      {/* Every sentence with words no card teaches, in full (0.586). A
+          learner asked to practise a sentence's words on their own before
+          meeting the sentence; this says which sentences cannot be, and
+          which words they are waiting on. The app adds nothing to
+          practise: the teacher decides whether to add the cards or
+          reword the sentence. */}
+      {quality.untaught.length > 0 && (
+        <div className="at-qwarn" role="note">
+          <p className="at-qfixtitle">
+            <Icon name="search" size={18} />{" "}
+            {plural(quality.untaught.length, "sentence")} {quality.untaught.length === 1 ? "has" : "have"} words
+            students can't practise on their own
+          </p>
+          <p className="at-qfixtext">
+            No card in the course teaches these words, so students meet them for the first time inside the sentence. Add a card
+            for each, or reword the sentence.
+          </p>
+          <ul className="at-qwarnlist">
+            {quality.untaught.map((u, i) => (
+              <li key={`${u.id}-${i}`}>
+                <button type="button" className="at-qfixword" onClick={() => onOpenCard(u.id)} title="Open this card">
+                  <b lang={lang.id} dir={lang.direction} style={script}>
+                    {u.text}
+                  </b>
+                </button>
+                <span className="at-qwarnwords">
+                  {"No card for: "}
+                  <span lang={lang.id} dir={lang.direction} style={script}>
+                    {u.words.join(", ")}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </>
   );
@@ -9311,6 +9834,7 @@ function SpacesTab() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [making, setMaking] = useState<{ name: string; slug: string; adminName: string; self: boolean } | null>(null);
   const [made, setMade] = useState<{ name: string; admin: string; key: string; slug: string } | null>(null);
+  const [restoringAny, setRestoringAny] = useState(false);
   /* Whether it worked, which a dialog waits on before it closes. */
   const run = async (work: () => Promise<unknown>, said?: string) =>
     (await runIt(async () => {
@@ -9337,6 +9861,22 @@ function SpacesTab() {
 
 
   const open = orgs && openId ? orgs.find((o) => o.id === openId) || null : null;
+
+  /* A space's file, for a space that may no longer exist (0.583): the
+     file says which space it is. */
+  if (restoringAny) {
+    return (
+      <BackupFlow
+        mode="restore"
+        door={{ kind: "space" }}
+        stem="space"
+        onClose={() => {
+          setRestoringAny(false);
+          load();
+        }}
+      />
+    );
+  }
 
   if (making) {
     return (
@@ -9399,10 +9939,15 @@ function SpacesTab() {
     <>
       {dialog}
       <Notice kind="error">{error}</Notice>
-      <Button variant="primary" icon="add" style={{ marginBottom: 14 }}
-        onClick={() => setMaking({ name: "", slug: "", adminName: "", self: true })}>
-        New space
-      </Button>
+      <div className="at-row" style={{ marginBottom: 14 }}>
+        <Button variant="primary" icon="add"
+          onClick={() => setMaking({ name: "", slug: "", adminName: "", self: true })}>
+          New space
+        </Button>
+        <Button variant="ghost" icon="refresh" onClick={() => setRestoringAny(true)}>
+          Restore a space from a file
+        </Button>
+      </div>
       {made && (
         <div className="at-sub">
           <CodeBox label={`Sign-in key for ${made.admin}, space admin of ${made.name}`} code={made.key} />
@@ -9816,14 +10361,17 @@ function OthersWork({ name, what }: { name?: string; what: "deck" | "card" }) {
 
 
 /*
- * A space's storage figures and its export (0.546; 60a, 63a): how much it
- * holds, and the whole of it in one file — its people, courses, decks,
- * cards, recordings and pictures, without anyone's My space.
+ * A space's storage figures, its backup and its restore (0.546; 60a, 63a;
+ * 0.583, docs/PLAN-space-backup.md): how much it holds, and the whole of it
+ * in one file — its people, courses, decks, cards, recordings and pictures,
+ * its members' My space here, and every member's practice — with the same
+ * choice of parts as the site's backup. Put back through the same engine as
+ * the site's, which never overwrites.
  */
 function SpaceExtras({ org }: { org: API.OrgRow }) {
   const [usage, setUsage] = useState<API.OrgUsage | null>(null);
-  const [progress, setProgress] = useState("");
-  const [error, setError] = useState("");
+  const [flow, setFlow] = useState<"download" | "restore" | null>(null);
+  const [said, setSaid] = useState("");
   useEffect(() => {
     let live = true;
     API.orgUsage(org.id).then((r) => live && setUsage(r.usage), () => {});
@@ -9833,40 +10381,35 @@ function SpaceExtras({ org }: { org: API.OrgRow }) {
   }, [org.id]);
   const megabytes = usage ? (usage.bytes / (1024 * 1024)).toFixed(1) : "";
   return (
-    <Section title="Storage and export">
-      <Notice kind="error">{error}</Notice>
+    <Section title="Storage and backup">
       {usage ? (
         <Help>
           {plural(usage.people, "person")}, {plural(usage.courses, "course")}, {plural(usage.decks, "deck")},{" "}
-          {plural(usage.cards, "card")}; {plural(usage.recordings, "recording")} and {plural(usage.pictures, "picture")},{" "}
-          about {megabytes} MB. A recording used by two spaces counts in both.
+          {plural(usage.cards, "card")}, including everyone's My space here; {plural(usage.recordings, "recording")} and{" "}
+          {plural(usage.pictures, "picture")}, about {megabytes} MB. A recording used by two spaces counts in both.
         </Help>
       ) : null}
-      <Button size="sm" icon="download" disabled={!!progress}
-        onClick={async () => {
-          setError("");
-          setProgress("Starting…");
-          try {
-            const { blob, manifest } = await buildBackup(
-              (done, total) => setProgress(`${done} of ${total}`),
-              ALL_PARTS,
-              () => API.exportOrgManifest(org.id),
-            );
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            const stamp = new Date(manifest.takenAt).toISOString().slice(0, 16).replace(/[:T]/g, "-");
-            a.href = url;
-            a.download = `space-${org.slug}-${stamp}.json`;
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 60000);
-          } catch (e) {
-            setError(API.explain(e));
-          } finally {
-            setProgress("");
+      <div className="at-row">
+        <Button size="sm" icon="download" onClick={() => setFlow("download")}>
+          Back up this space
+        </Button>
+        <Button size="sm" variant="ghost" icon="refresh" onClick={() => setFlow("restore")}>
+          Restore this space from a file
+        </Button>
+      </div>
+      {said ? <Help>{said}</Help> : null}
+      {flow && (
+        <BackupFlow
+          mode={flow}
+          door={{ kind: "space", space: org.id, name: org.name }}
+          source={() => API.exportOrgManifest(org.id)}
+          stem={`space-${org.slug}`}
+          onClose={() => setFlow(null)}
+          onFinished={(p) =>
+            setSaid(p.state === "done" ? `Saved a backup of ${org.name}. ${p.note || ""}` : p.note || "")
           }
-        }}>
-        {progress ? `Exporting · ${progress}` : "Export this space"}
-      </Button>
+        />
+      )}
     </Section>
   );
 }

@@ -5,7 +5,10 @@
  * @typedef {ReturnType<typeof getStore>} Store
  */
 import { getStore } from "../store.js";
-import { forgetSyncDoc, moveSyncDoc } from "./sync.js";
+import {
+  forgetSyncDoc, moveSyncDoc, readSyncDoc, readSyncAudio, recordingIdsOf, syncSize, mergeSyncDoc, writeSyncAudioIfAbsent,
+  MAX_BYTES as SYNC_MAX_BYTES,
+} from "./sync.js";
 import { createHash, randomBytes } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 /* The one list of grammatical fields a card may carry, shared with the app so
@@ -1530,6 +1533,524 @@ function sweepStudentMySpace(store) {
     });
   }
   return sweptStudents;
+}
+
+/* ================= restoring (0.583) =================
+
+   docs/PLAN-space-backup.md, Part B4–B6. One engine for a whole-site file
+   and for one space's, deciding each record from the site as it stands at
+   the moment it is written. The rule above every other: a restore adds what
+   the file holds and the site lacks, and changes nothing already here —
+   except the deletion record of an account the owner ticked to bring back,
+   and a space's name, logo, colour and admins when the owner asked for the
+   file's. Every record not written is reported, with why. */
+
+/**
+ * @typedef {{ handle: string, created?: number, keyHash?: string, orgs?: string[], org?: string, displayName?: string }} FileUser
+ * @typedef {{ kind: "site" } | { kind: "space", space: string }} RestoreScope
+ * @typedef {{ scope: RestoreScope, bringBack: string[], fileOrgs: string[], keepSpaceCard: boolean,
+ *   newSlugs: Record<string, string>, created: Record<string, number> }} RestoreOptions
+ * @typedef {{ kind: "other-person" } | { kind: "kept" } | { kind: "not-member" }
+ *   | { kind: "deleted", at: number } | { kind: "recreate", orgs: string[] }} Verdict
+ * @typedef {{ outcome: "written" | "merged" | "skipped", why?: string, also?: { key: string, why: string }[] }} Outcome
+ */
+
+/**
+ * The owner's choices, as a request carries them, made safe to read. Only
+ * choices and facts about the file: never a verdict, which the server
+ * always works out for itself.
+ * @param {any} o
+ * @returns {RestoreOptions}
+ */
+function restoreOptions(o) {
+  const raw = o && typeof o === "object" ? o : {};
+  const s = raw.scope && typeof raw.scope === "object" ? raw.scope : {};
+  /** @type {RestoreScope} */
+  const scope = s.kind === "space" && typeof s.space === "string" && s.space ? { kind: "space", space: s.space } : { kind: "site" };
+  const strings = (/** @type {any} */ v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x) : []);
+  /** @type {Record<string, string>} */
+  const newSlugs = {};
+  if (raw.newSlugs && typeof raw.newSlugs === "object") {
+    for (const [id, slug] of Object.entries(raw.newSlugs)) if (typeof slug === "string" && slug) newSlugs[id] = slug.trim().toLowerCase();
+  }
+  if (typeof raw.newSlug === "string" && raw.newSlug.trim() && scope.kind === "space") newSlugs[scope.space] = raw.newSlug.trim().toLowerCase();
+  /** @type {Record<string, number>} */
+  const created = {};
+  if (raw.created && typeof raw.created === "object") {
+    for (const [h, at] of Object.entries(raw.created)) if (typeof at === "number" && at) created[h] = at;
+  }
+  return {
+    scope,
+    bringBack: strings(raw.bringBack),
+    fileOrgs: strings(raw.fileOrgs),
+    keepSpaceCard: raw.keepSpaceCard !== false,
+    newSlugs,
+    created,
+  };
+}
+
+/**
+ * What a restore will do about each person in the file (B4). Read from the
+ * site once per handle; the preview and the restore both ask this, with
+ * the same options, so the one cannot promise what the other does not do.
+ *
+ * `created` is what tells two people apart: set once when an account is
+ * made and carried unchanged into every backup and every re-creation. Not
+ * the key's hash, which changes with every new key.
+ * @param {Store} store
+ * @param {FileUser[]} fileUsers
+ * @param {RestoreOptions} options
+ * @returns {Promise<Map<string, Verdict>>}
+ */
+async function restoreVerdicts(store, fileUsers, options) {
+  const bringBack = new Set(options.bringBack);
+  /** @type {Map<string, Verdict>} */
+  const verdicts = new Map();
+  /** @type {Map<string, boolean>} */
+  const orgHere = new Map();
+  const exists = async (/** @type {string} */ id) => {
+    if (!orgHere.has(id)) orgHere.set(id, !!(await readJson(store, K.org(id))));
+    return orgHere.get(id);
+  };
+  for (const fu of fileUsers) {
+    const h = String((fu && fu.handle) || "");
+    if (!h || verdicts.has(h)) continue;
+    const site = await readJson(store, K.user(h));
+    if (site) {
+      if (site.created && fu.created && site.created !== fu.created) verdicts.set(h, { kind: "other-person" });
+      else if (options.scope.kind === "space" && !memberHere(site, options.scope.space)) verdicts.set(h, { kind: "not-member" });
+      else verdicts.set(h, { kind: "kept" });
+      continue;
+    }
+    const gone = await readJson(store, K.gone(h));
+    if (gone && !bringBack.has(h)) {
+      verdicts.set(h, { kind: "deleted", at: Number(gone.at) || 0 });
+      continue;
+    }
+    /** @type {string[]} */
+    let orgs;
+    if (options.scope.kind === "space") {
+      orgs = [options.scope.space];
+    } else {
+      orgs = [];
+      for (const o of memberOf(fu)) if (options.fileOrgs.includes(o) || (await exists(o))) orgs.push(o);
+      /* An account in no space can sign in nowhere. */
+      if (!orgs.length && options.fileOrgs.length) orgs = [options.fileOrgs[0]];
+      if (!orgs.length) orgs = [MAIN];
+    }
+    verdicts.set(h, { kind: "recreate", orgs });
+  }
+  return verdicts;
+}
+
+/**
+ * Whether an account counts as in a space for a restore: a member, and not
+ * removed from it (a removal keeps the membership, marked; 0.578). Someone
+ * merely suspended there is still a member.
+ * @type {(u: any, org: string) => boolean}
+ */
+const memberHere = (u, org) => {
+  if (!u || !memberOf(u).includes(org)) return false;
+  const was = suspensionIn(u, org);
+  return !(was && was.why === "removed");
+};
+
+/** Which record an index names. @type {Record<string, (id: string) => string>} */
+const INDEXED = {
+  users: K.user, courses: K.course, decks: K.deck, flags: K.flag, orgs: K.org, gone: K.gone,
+};
+
+/* What a restore may write, and nothing else: a prefix missing from here is
+   reported as not allowed, never skipped in silence. A new kind of record is
+   added to this line in the same release that starts writing one. */
+const RESTORABLE =
+  /^(user|key|course|deck|owncards|mycards|card|numsys|timesys|mysystems|flag|clip|image|code|index|org|slug|former|gone|progress|paudio):/;
+
+/**
+ * Whether the account a record is about is a different person from the
+ * file's, by what this request knows of the file.
+ * @param {Map<string, Verdict>} verdicts
+ * @param {RestoreOptions} options
+ * @param {string} handle
+ * @param {any} siteUser  The site's record, already read, or undefined.
+ */
+function anotherPerson(verdicts, options, handle, siteUser) {
+  const v = verdicts.get(handle);
+  if (v && v.kind === "other-person") return true;
+  const was = options.created[handle];
+  return !!(siteUser && siteUser.created && was && siteUser.created !== was);
+}
+
+/**
+ * Write a record only when nothing is stored under its key.
+ * @param {Store} store
+ * @param {string} key
+ * @param {string} payload
+ * @returns {Promise<Outcome>}
+ */
+async function createOnly(store, key, payload) {
+  const done = await store.set(key, payload, { onlyIfNew: true });
+  return done && done.modified === false ? { outcome: "skipped", why: "exists" } : { outcome: "written" };
+}
+
+/**
+ * A list on the site, with whatever the file's has that it lacks added at
+ * the end. Nothing is taken out.
+ * @param {Store} store
+ * @param {string} key
+ * @param {(cur: any) => any} grow  Returns the grown record, or null for no change.
+ * @param {any} whole  The file's record, written as it is when the site has none.
+ * @returns {Promise<Outcome>}
+ */
+async function growOnly(store, key, grow, whole) {
+  /** @type {Outcome} */
+  let outcome = { outcome: "skipped", why: "exists" };
+  await updateJson(store, key, (/** @type {any} */ cur) => {
+    if (!cur) {
+      outcome = { outcome: "written" };
+      return whole;
+    }
+    const next = grow(cur);
+    outcome = next ? { outcome: "merged" } : { outcome: "skipped", why: "exists" };
+    return next;
+  });
+  return outcome;
+}
+
+/** The ids `extra` has and `have` lacks, in `extra`'s order. @type {(have: any, extra: any) => string[]} */
+const missingFrom = (have, extra) => {
+  const held = new Set(Array.isArray(have) ? have : []);
+  return [...new Set(Array.isArray(extra) ? extra : [])].filter((x) => typeof x === "string" && !held.has(x));
+};
+
+/**
+ * One record of a restore (B5), decided from the site as it is now.
+ * @param {Store} store
+ * @param {string} key
+ * @param {any} value
+ * @param {{ options: RestoreOptions, verdicts: Map<string, Verdict>, into?: string }} ctx
+ *   `into`: the space the restore is run from, which is where material
+ *   from before spaces goes — see placed.
+ * @returns {Promise<Outcome>}
+ */
+async function restoreOne(store, key, value, ctx) {
+  const { options, verdicts } = ctx;
+  /*
+   * Material from before spaces (0.589). A backup taken before 0.542 names
+   * no space on its courses, decks, cards and reports, and a record that
+   * names none reads as Main's: put back as it was, a class that had since
+   * moved to a space of its own showed its decks there, each saying how
+   * many cards it held, and not one card reached its teacher or students.
+   *
+   * So such a record goes into the space the restore is run from, and one
+   * already on the site that names no space — from before spaces, or put
+   * back that way by an earlier restore — is placed there too. Placing is
+   * the one change a restore makes to a record it finds (the owner's
+   * answer, 2a): nothing else about it moves, a record that names its
+   * space keeps it, and run from Main this changes nothing at all.
+   */
+  const into = ctx.into && ctx.into !== MAIN ? ctx.into : "";
+  const SPACED_KINDS = ["course", "deck", "card", "flag"];
+  /** The file's record, with the space it goes into. @param {any} v */
+  const placed = (v) => (into && v && typeof v === "object" && !Array.isArray(v) && !v.org ? { ...v, org: into } : v);
+  /** The site's record, placed, or null when it has a space. @param {any} cur */
+  const placeHere = (cur) => (into && cur && typeof cur === "object" && !cur.org ? { ...cur, org: into } : null);
+  const fromBefore =
+    !!into && SPACED_KINDS.includes(key.slice(0, key.indexOf(":"))) &&
+    !!value && typeof value === "object" && !Array.isArray(value) && !value.org;
+  if (fromBefore) value = placed(value);
+  if (!RESTORABLE.test(key) || key.length > 200) return { outcome: "skipped", why: "not-allowed" };
+  const cut = key.indexOf(":");
+  const kind = key.slice(0, cut);
+  const rest = key.slice(cut + 1);
+  const isText = kind === "clip" || kind === "image" || kind === "progress" || kind === "paudio";
+  const payload = isText ? String(value == null ? "" : value) : JSON.stringify(value);
+  if (!payload || payload === "null" || payload === "undefined") return { outcome: "skipped", why: "empty" };
+  const cap = kind === "progress" || kind === "paudio" ? SYNC_MAX_BYTES : 4 * 1024 * 1024;
+  if (Buffer.byteLength(payload, "utf8") > cap) return { outcome: "skipped", why: "too-large" };
+  const obj = !isText && value && typeof value === "object" && !Array.isArray(value) ? value : null;
+
+  switch (kind) {
+    /* ---- people and keys ---- */
+    case "user": {
+      const v = verdicts.get(rest);
+      if (!v || !obj) return { outcome: "skipped", why: "not-allowed" };
+      if (v.kind !== "recreate") return { outcome: "skipped", why: v.kind };
+      const u = normalisedUser({ ...obj, handle: rest });
+      const only = (/** @type {any} */ m) =>
+        Object.fromEntries(Object.entries(m && typeof m === "object" ? m : {}).filter(([o]) => v.orgs.includes(o)));
+      const record = {
+        ...u,
+        orgs: v.orgs,
+        org: v.orgs[0],
+        suspendedIn: only(u.suspendedIn),
+        ...(u.lastLearnedIn ? { lastLearnedIn: only(u.lastLearnedIn) } : {}),
+        ...(u.lastTaughtIn ? { lastTaughtIn: only(u.lastTaughtIn) } : {}),
+      };
+      const done = await createOnly(store, key, JSON.stringify(record));
+      if (done.outcome !== "written") return done;
+      /* Brought back on purpose: its deletion record goes, and with it the
+         Former members entries it left (as addMembership does on a
+         reactivation). The one deletion a restore makes (B0.1). */
+      if (options.bringBack.includes(rest) && (await readJson(store, K.gone(rest)))) {
+        await store.delete(K.gone(rest)).catch(() => {});
+        await updateJson(store, K.index("gone"), (/** @type {any} */ cur) =>
+          (cur || []).includes(rest) ? cur.filter((/** @type {string} */ x) => x !== rest) : null);
+        for (const o of v.orgs) {
+          await updateJson(store, K.former(o), (/** @type {any} */ cur) =>
+            (cur || []).some((/** @type {any} */ r) => r && r.handle === rest) ? cur.filter((/** @type {any} */ r) => r && r.handle !== rest) : null);
+        }
+      }
+      return done;
+    }
+    case "key": {
+      const handle = typeof value === "string" ? value : "";
+      if (!handle) return { outcome: "skipped", why: "not-allowed" };
+      const site = await readJson(store, K.user(handle));
+      if (!site) return { outcome: "skipped", why: "no-account" };
+      if (anotherPerson(verdicts, options, handle, site)) return { outcome: "skipped", why: "other-person" };
+      /* A replaced key must never work again. */
+      if (site.keyHash !== rest) return { outcome: "skipped", why: "key-changed" };
+      return createOnly(store, key, payload);
+    }
+
+    /* ---- spaces ---- */
+    case "org": {
+      if (!obj) return { outcome: "skipped", why: "not-allowed" };
+      const id = rest;
+      const here = await readJson(store, K.org(id));
+      if (!here) {
+        let slug = String(obj.slug || "");
+        const owner = slug ? await readJson(store, K.slug(slug)) : null;
+        if (owner && owner !== id) {
+          const wanted = options.newSlugs[id] || "";
+          if (!wanted || slugProblem(wanted) || (await readJson(store, K.slug(wanted)))) return { outcome: "skipped", why: "slug-taken" };
+          slug = wanted;
+        }
+        /* Only the addresses still its own: an address another space has
+           since taken stays that space's, and listing it here would have
+           this space's deletion take it away. */
+        /** @type {string[]} */
+        const formerSlugs = [];
+        for (const f of Array.isArray(obj.formerSlugs) ? obj.formerSlugs : []) {
+          const who = await readJson(store, K.slug(f));
+          if ((!who || who === id) && f !== slug) formerSlugs.push(f);
+        }
+        const done = await createOnly(store, key, JSON.stringify({ ...obj, id, slug, formerSlugs }));
+        if (done.outcome !== "written") return done;
+        if (slug) await store.set(K.slug(slug), JSON.stringify(id), { onlyIfNew: true });
+        /* Its invitation code, which a backup does not carry: back if free. */
+        if (typeof obj.inviteCode === "string" && obj.inviteCode) {
+          await store.set(K.code(obj.inviteCode), JSON.stringify(`org:${id}`), { onlyIfNew: true });
+        }
+        return done;
+      }
+      if (options.keepSpaceCard) return { outcome: "skipped", why: "exists" };
+      /* The file's card, asked for by name: its name, logo, colour and
+         admins — never its address, its codes or anything else. */
+      /** @type {string[]} */
+      const admins = [];
+      for (const h of Array.isArray(obj.admins) ? obj.admins : []) {
+        const u = await readJson(store, K.user(String(h)));
+        if (memberHere(u, id) && !anotherPerson(verdicts, options, String(h), u)) admins.push(String(h));
+      }
+      /** @type {Outcome} */
+      let outcome = { outcome: "skipped", why: "exists" };
+      await updateJson(store, key, (/** @type {any} */ cur) => {
+        if (!cur) return null;
+        const next = {
+          ...cur,
+          name: typeof obj.name === "string" && obj.name ? obj.name : cur.name,
+          logo: typeof obj.logo === "string" ? obj.logo : cur.logo,
+          colour: typeof obj.colour === "string" ? obj.colour : cur.colour,
+          admins,
+        };
+        if (JSON.stringify(next) === JSON.stringify(cur)) return null;
+        outcome = { outcome: "merged" };
+        return next;
+      });
+      return outcome;
+    }
+    case "slug": {
+      const owner = await readJson(store, key);
+      if (owner === null) return createOnly(store, key, payload);
+      return owner === value ? { outcome: "skipped", why: "exists" } : { outcome: "skipped", why: "slug-taken" };
+    }
+    case "former": {
+      if (!Array.isArray(value)) return { outcome: "skipped", why: "not-allowed" };
+      const org = rest;
+      /** @type {Set<string>} */
+      const members = new Set();
+      for (const r of value) {
+        const h = r && typeof r.handle === "string" ? r.handle : "";
+        const u = h ? await readJson(store, K.user(h)) : null;
+        if (memberHere(u, org)) members.add(h);
+      }
+      const add = value.filter((r) => r && typeof r.handle === "string" && !members.has(r.handle));
+      return growOnly(store, key, (cur) => {
+        const held = new Set((Array.isArray(cur) ? cur : []).map((/** @type {any} */ r) => r && r.handle));
+        const more = add.filter((r) => !held.has(r.handle));
+        return more.length ? (Array.isArray(cur) ? cur : []).concat(more) : null;
+      }, add);
+    }
+    case "gone": {
+      if (await readJson(store, K.user(rest))) return { outcome: "skipped", why: "account-exists" };
+      const done = await createOnly(store, key, payload);
+      if (done.outcome === "written") await indexAdd(store, "gone", rest);
+      return done;
+    }
+
+    /* ---- material ---- */
+    case "card":
+    case "flag": {
+      /* Present means kept as it is, but for being placed (see above). */
+      if (!fromBefore || !obj) return createOnly(store, key, payload);
+      return growOnly(store, key, placeHere, obj);
+    }
+    case "numsys":
+    case "timesys":
+    case "clip":
+    case "image":
+      /* Present means kept as it is: a card edited since the backup keeps
+         its edit. The way back to the file's copy is to delete it first. */
+      return createOnly(store, key, payload);
+    case "deck": {
+      if (!obj) return { outcome: "skipped", why: "not-allowed" };
+      return growOnly(store, key, (cur) => {
+        const more = missingFrom(cur.cardIds, obj.cardIds);
+        const here = (fromBefore && placeHere(cur)) || null;
+        if (!more.length && !here) return null;
+        const base = here || cur;
+        const cardIds = (base.cardIds || []).concat(more);
+        /* Its count and version move with its cards, as on any change to
+           them, so a learner's device fetches the cards that came back. */
+        return { ...base, cardIds, cardCount: cardIds.length, version: (base.version || 1) + 1 };
+      }, obj);
+    }
+    case "course": {
+      if (!obj) return { outcome: "skipped", why: "not-allowed" };
+      const here = await readJson(store, key);
+      if (here) {
+        /* Its roster as it is now: only decks it lacks are added. */
+        return growOnly(store, key, (cur) => {
+          const more = missingFrom(cur.decks, obj.decks);
+          const base = (fromBefore && placeHere(cur)) || cur;
+          return more.length || base !== cur ? { ...base, decks: (base.decks || []).concat(more) } : null;
+        }, obj);
+      }
+      const org = orgOf(obj);
+      const member = async (/** @type {string} */ h) => {
+        const u = await readJson(store, K.user(h));
+        return memberHere(u, org) && !anotherPerson(verdicts, options, h, u);
+      };
+      /** @type {string[]} */
+      const teachers = [];
+      for (const h of Array.isArray(obj.teachers) ? obj.teachers : []) if (await member(h)) teachers.push(h);
+      /** @type {string[]} */
+      const students = [];
+      for (const h of Array.isArray(obj.students) ? obj.students : []) if (await member(h)) students.push(h);
+      const done = await createOnly(store, key, JSON.stringify({ ...obj, teachers, students }));
+      if (done.outcome !== "written") return done;
+      /* A code another course has taken since stays that course's; this
+         one keeps the field, and its teacher makes a new code from the
+         course page. Reported under the code's own key. */
+      const taken = await restoreCodes(store, { ...obj, id: rest });
+      return taken.length ? { ...done, also: taken.map((c) => ({ key: K.code(c), why: "code-taken" })) } : done;
+    }
+    case "mycards":
+    case "owncards": {
+      if (!Array.isArray(value)) return { outcome: "skipped", why: "not-allowed" };
+      const site = await readJson(store, K.user(rest));
+      if (anotherPerson(verdicts, options, rest, site)) return { outcome: "skipped", why: "other-person" };
+      return growOnly(store, key, (cur) => {
+        const more = missingFrom(cur, value);
+        return more.length ? (Array.isArray(cur) ? cur : []).concat(more) : null;
+      }, [...new Set(value)]);
+    }
+    case "mysystems": {
+      if (!obj) return { outcome: "skipped", why: "not-allowed" };
+      const site = await readJson(store, K.user(rest));
+      if (anotherPerson(verdicts, options, rest, site)) return { outcome: "skipped", why: "other-person" };
+      return growOnly(store, key, (cur) => {
+        let grew = false;
+        const next = { ...cur };
+        for (const part of ["numbers", "times"]) {
+          const have = cur[part] && typeof cur[part] === "object" ? cur[part] : {};
+          const theirs = obj[part] && typeof obj[part] === "object" ? obj[part] : {};
+          const merged = { ...have };
+          for (const [lang, id] of Object.entries(theirs)) {
+            if (!(lang in merged)) {
+              merged[lang] = id;
+              grew = true;
+            }
+          }
+          next[part] = merged;
+        }
+        return grew ? next : null;
+      }, obj);
+    }
+    case "code": {
+      const owner = await readJson(store, key);
+      if (owner === null) return createOnly(store, key, payload);
+      return owner === value ? { outcome: "skipped", why: "exists" } : { outcome: "skipped", why: "code-taken" };
+    }
+
+    /* ---- practice, in the sync store, found by the site's account ---- */
+    case "progress":
+    case "paudio": {
+      const [handle, id] = rest.split(":");
+      const site = await readJson(store, K.user(handle || ""));
+      if (!site || !site.keyHash) return { outcome: "skipped", why: "no-account" };
+      if (anotherPerson(verdicts, options, handle, site)) return { outcome: "skipped", why: "other-person" };
+      if (kind === "progress") {
+        const r = await mergeSyncDoc(site.keyHash, payload, Date.now());
+        return r.outcome === "skipped" ? { outcome: "skipped", why: r.why || "exists" } : { outcome: r.outcome };
+      }
+      return (await writeSyncAudioIfAbsent(site.keyHash, id || "", payload))
+        ? { outcome: "written" }
+        : { outcome: "skipped", why: "exists" };
+    }
+
+    /* ---- indexes: only what is on the site now ---- */
+    case "index": {
+      const recordOf = INDEXED[rest];
+      if (!recordOf || !Array.isArray(value)) return { outcome: "skipped", why: "not-allowed" };
+      /** @type {string[]} */
+      const there = [];
+      for (const id of new Set(value)) {
+        if (typeof id === "string" && id && (await store.has(recordOf(id)))) there.push(id);
+      }
+      /** @type {Outcome} */
+      let outcome = { outcome: "skipped", why: "exists" };
+      await updateJson(store, key, (/** @type {any} */ cur) => {
+        const more = missingFrom(cur, there);
+        if (!more.length) return null;
+        outcome = cur ? { outcome: "merged" } : { outcome: "written" };
+        return (Array.isArray(cur) ? cur : []).concat(more);
+      });
+      return outcome;
+    }
+  }
+  return { outcome: "skipped", why: "not-allowed" };
+}
+
+/**
+ * A course's join codes, after the course was written from a file: a code
+ * goes back where it is free or already this course's.
+ * @param {Store} store
+ * @param {any} course
+ * @returns {Promise<string[]>}  Codes now in use by another course.
+ */
+async function restoreCodes(store, course) {
+  /** @type {string[]} */
+  const taken = [];
+  for (const c of [course.code, course.teacherCode]) {
+    if (typeof c !== "string" || !c) continue;
+    const owner = await readJson(store, K.code(c));
+    if (owner === null) await store.set(K.code(c), JSON.stringify(course.id), { onlyIfNew: true });
+    else if (owner !== course.id) taken.push(c);
+  }
+  return taken;
 }
 
 /** @param {Request} req */
@@ -5165,19 +5686,25 @@ async function handle(req) {
          without a restore and without trusting that the download finished. */
 
       /*
-       * A backup of the whole site, or (0.546; 63a, 72a) an export of one
-       * space: the same manifest, with everything outside that space left
-       * out, and everyone's My space too. Its chunks are fetched with
+       * A backup of the whole site, or (0.546; 63a) a backup of one space:
+       * the same manifest, with everything outside that space left out. A
+       * space's file holds its members' My space material made in that
+       * space (0.583; docs/PLAN-space-backup.md, 2a — reversing 72a, since
+       * a space put back without it would lose people's own work). The
+       * manifest says which it is in `scope`, so a restore can tell a
+       * space's file from the site's. Its chunks are fetched with
        * admin-backup-chunk like a backup's.
        */
       if (action === "admin-backup-manifest" || action === "admin-export-org-manifest" || action === "admin-org-usage") {
         const only = action === "admin-backup-manifest" ? "" : String(body.id || url.searchParams.get("id") || "");
         if (action !== "admin-backup-manifest" && !(await readJson(store, K.org(only)))) return json({ error: "no-space" }, 404);
-        const keep = (/** @type {any} */ rec) => !!rec && orgOf(rec) === only && !rec.personal;
+        /* Personal decks and cards carry the space they were made in, so the
+           space test alone keeps My space to this space. */
+        const keep = (/** @type {any} */ rec) => !!rec && orgOf(rec) === only;
         /* A person belongs to every space they are a member of, not only
            their first, so a space's export keeps a teacher who joined it
            from elsewhere (0.580, audit finding 3). */
-        const keepMember = (/** @type {any} */ rec) => !!rec && memberOf(rec).includes(only) && !rec.personal;
+        const keepMember = (/** @type {any} */ rec) => !!rec && memberOf(rec).includes(only);
         const pick = async (
           /** @type {string[]} */ ids,
           /** @type {(id: string) => string} */ keyOf,
@@ -5244,6 +5771,34 @@ async function handle(req) {
         const users = await readManyJson(store, handles.map((h) => K.user(h)));
         const keyHashes = users.filter(Boolean).map((u) => u.keyHash).filter(Boolean);
 
+        /* Each person's practice (0.583; docs/PLAN-space-backup.md, 3), and
+           the recordings it names. Keyed by handle rather than by key, on
+           purpose: a new key moves the document, and a restore has to find
+           the person's current one. For a space's file, every member's
+           whole document (17a): one person has one across all their spaces.
+           A former account has none — deleting it removes it. Not read for
+           a space's usage, which is about the space's own material. */
+        /** @type {string[]} */
+        const progressHandles = [];
+        /** @type {{ handle: string, id: string }[]} */
+        const practiceAudio = [];
+        if (action !== "admin-org-usage") {
+          for (const u of users) {
+            if (!u || !u.keyHash) continue;
+            const text = await readSyncDoc(u.keyHash).catch(() => null);
+            if (text == null) continue;
+            progressHandles.push(u.handle);
+            /** @type {any} */
+            let doc = null;
+            try {
+              doc = JSON.parse(text);
+            } catch (e) {
+              doc = null;
+            }
+            for (const id of recordingIdsOf(doc)) practiceAudio.push({ handle: u.handle, id });
+          }
+        }
+
         /* Records are small and clips are not, so they are batched
            differently. These sizes keep a chunk well under the response
            limit even for long cards or a minute of audio. */
@@ -5267,16 +5822,18 @@ async function handle(req) {
         batch("org", orgIds.map(K.org), 60);
         batch("former", orgIds.map(K.former), 60);
         batch("gone", goneHandles.map(K.gone), 100);
+        batch("progress", progressHandles.map((h) => `progress:${h}`), 1);
+        batch("paudio", practiceAudio.map((a) => `paudio:${a.handle}:${a.id}`), 3);
 
         /* How much a space holds (60a): the counts, and the bytes of the
            recordings and pictures its cards and numbers use. One shared by
            two spaces counts in both. */
+        const sizeOf = async (/** @type {string} */ key) => {
+          if (typeof store.size === "function") return (await store.size(key)) || 0;
+          const v = await store.get(key, { type: "text" }).catch(() => null);
+          return v ? String(v).length : 0;
+        };
         if (action === "admin-org-usage") {
-          const sizeOf = async (/** @type {string} */ key) => {
-            if (typeof store.size === "function") return (await store.size(key)) || 0;
-            const v = await store.get(key, { type: "text" }).catch(() => null);
-            return v ? String(v).length : 0;
-          };
           let bytes = 0;
           for (const h of clipHashes) bytes += await sizeOf(K.clip(h));
           for (const h of imageHashes) bytes += await sizeOf(K.image(h));
@@ -5292,11 +5849,36 @@ async function handle(req) {
         batch("clip", clipHashes.map(K.clip), 3);
         batch("image", imageHashes.map(K.image), 2);
 
+        /* How many bytes each kind takes as stored (0.584), so the backup
+           screen can say how large each part will make the file before it
+           is downloaded. Read off the directory entries, not the records;
+           a file holds the same text, give or take its punctuation. */
+        const keyHashOf = new Map(users.filter(Boolean).map((u) => [u.handle, u.keyHash]));
+        /** @type {Record<string, number>} */
+        const bytes = {};
+        for (const c of chunks) {
+          let n = 0;
+          for (const k of c.keys) {
+            if (c.kind === "progress" || c.kind === "paudio") {
+              const [, handle, id] = k.split(":");
+              n += await syncSize(keyHashOf.get(handle) || "", c.kind === "paudio" ? id : undefined).catch(() => 0);
+            } else {
+              n += await sizeOf(k).catch(() => 0);
+            }
+          }
+          bytes[c.kind] = (bytes[c.kind] || 0) + n;
+        }
+
         return json({
           ok: true,
           manifest: {
             version: 1,
             takenAt: Date.now(),
+            /* What the file is a backup of (0.583). A file without this was
+               made before it existed and is taken as the site's. */
+            scope: only
+              ? { kind: "space", space: only, slug: (orgDocs[0] && orgDocs[0].slug) || "", name: (orgDocs[0] && orgDocs[0].name) || "" }
+              : { kind: "site" },
             counts: {
               users: handles.length,
               courses: courseIds.length,
@@ -5308,8 +5890,11 @@ async function handle(req) {
               images: imageHashes.length,
               keys: keyHashes.length,
               orgs: orgIds.length,
+              progress: progressHandles.length,
+              practiceAudio: practiceAudio.length,
             },
             indexes: { users: handles, courses: courseIds, decks: deckIds, flags: flagIds, orgs: orgIds, gone: goneHandles },
+            bytes,
             chunks: chunks.map((c) => ({ id: c.id, kind: c.kind, keys: c.keys.length })),
             /* Repeated so a chunk can be fetched without the client having to
                reconstruct which keys were in it. */
@@ -5323,9 +5908,19 @@ async function handle(req) {
         if (!keys.length) return json({ error: "no-keys" }, 400);
         /* Clips are stored as plain text, not JSON. Parsing them as JSON
            silently dropped every recording from every backup. */
+        /* Practice lives in the sync store, under a hash of the person's
+           key: found here from their handle (0.583). Text, like a clip. */
+        const fromSync = async (/** @type {string} */ k) => {
+          const [kind, handle, id] = k.split(":");
+          const u = await readJson(store, K.user(handle || ""));
+          if (!u || !u.keyHash) return null;
+          return kind === "progress" ? readSyncDoc(u.keyHash) : readSyncAudio(u.keyHash, id || "");
+        };
         const values = await Promise.all(
           keys.map((/** @type {string} */ k) =>
-            k.startsWith("clip:") || k.startsWith("image:")
+            k.startsWith("progress:") || k.startsWith("paudio:")
+              ? fromSync(k)
+              : k.startsWith("clip:") || k.startsWith("image:")
               ? store.get(k, { type: "text" }).catch(() => null)
               : readJson(store, k)
           )
@@ -5341,10 +5936,14 @@ async function handle(req) {
         return json({ ok: true, records, digest, found: Object.keys(records).length });
       }
 
-      /* Putting a backup back. Records are written as they were; anything on
-         the site that the file does not mention is left alone, so restoring
-         is additive and can be repeated. The app sends the file in the same
-         chunks it was taken in, and the three indexes last. */
+      /* Putting a backup back (0.583; docs/PLAN-space-backup.md, B5): the
+         whole site's file or one space's, through one engine. Each record
+         is decided from the site as it is when it is written — never from
+         what a preview said a moment before — and only ever added: a
+         record already here is left exactly as it is, and a list gains
+         what it lacks. Every record not written comes back with why. The
+         app sends the file in its own order, people first, and the
+         indexes last. */
       if (action === "admin-restore-chunk") {
         const records =
           body.records && typeof body.records === "object" && !Array.isArray(body.records)
@@ -5352,64 +5951,132 @@ async function handle(req) {
             : {};
         const keys = Object.keys(records).slice(0, 200);
         if (!keys.length) return json({ error: "no-keys" }, 400);
-        /* A prefix missing from here is not an error anybody sees: the
-           record is skipped, `written` quietly under-reports, and the
-           restore says it worked. So a new kind of record is added to
-           this line in the same release that starts writing one. */
-        const allowed =
-          /^(user|key|course|deck|owncards|mycards|card|numsys|timesys|mysystems|flag|clip|image|code|index|org|slug|former|gone):/;
-        /* A record from before spaces (0.542) says nothing about which one
-           it is in, and a record that says nothing is read as Main's. Put
-           back like that, a backup of a class that has since moved to a
-           space of its own filed every card under Main: the space's course
-           still listed its decks, each saying how many cards it held, and
-           not one card reached anybody (0.583). So such a record stays in
-           the space its copy on the site is in, when that is a space of its
-           own; one the site has not got, or has in Main — which is where
-           everything from before spaces is, and where a restore run from
-           the wrong space left it — goes into the space the restore is run
-           from. A record that names its space keeps it. */
-        const SPACED = /^(course|deck|card|flag):/;
-        const unspaced = keys.filter((k) => {
-          const v = records[k];
-          return SPACED.test(k) && v && typeof v === "object" && !Array.isArray(v) && !v.org;
-        });
-        const onSite = await readManyJson(store, unspaced);
-        /** @type {Map<string, string>} */
-        const spaceFor = new Map(unspaced.map((k, i) => {
-          const there = onSite[i] ? orgOf(onSite[i]) : MAIN;
-          return [k, there === MAIN ? acting : there];
-        }));
+        const options = restoreOptions(body.options);
+        const fileUsers = keys
+          .filter((k) => k.startsWith("user:") && records[k] && typeof records[k] === "object")
+          .map((k) => ({ ...records[k], handle: k.slice(5) }));
+        const verdicts = await restoreVerdicts(store, fileUsers, options);
         let written = 0;
+        let merged = 0;
+        /** @type {{ key: string, why: string }[]} */
+        const skipped = [];
+        let skippedMore = 0;
+        const skip = (/** @type {string} */ key, /** @type {string} */ why) => {
+          if (skipped.length < 500) skipped.push({ key, why });
+          else skippedMore += 1;
+        };
         for (const k of keys) {
-          if (!allowed.test(k) || k.length > 200) continue;
-          let v = records[k];
-          const into = spaceFor.get(k);
-          if (into) v = { ...v, org: into };
-          /* An index is the union of what the file says and what is here,
-             so restoring an old backup cannot hide accounts, courses or
-             decks made since it was taken. */
-          /* And so is a person's list of their cards. A teacher's export
-             carries only the ids of the cards in it, and written over the
-             list it would take every other card of theirs off it. */
-          if ((k.startsWith("index:") || k.startsWith("mycards:")) && Array.isArray(v)) {
-            const have = (await readJson(store, k)) || [];
-            v = [...new Set(have.concat(v))];
+          /** @type {Outcome} */
+          let r;
+          try {
+            r = await restoreOne(store, k, records[k], { options, verdicts, into: acting });
+          } catch (e) {
+            console.error(`restore: ${k}: ${String((e && /** @type {any} */ (e).message) || e)}`);
+            r = { outcome: "skipped", why: "error" };
           }
-          const payload = k.startsWith("clip:") || k.startsWith("image:") ? String(v || "") : JSON.stringify(v);
-          if (!payload || payload.length > 4 * 1024 * 1024) continue;
-          await store.set(k, payload);
-          written += 1;
-          /* A course's join codes are records of their own that a backup
-             does not carry; without them the codes the teacher sees open
-             nothing. */
-          if (k.startsWith("course:") && v && typeof v === "object") {
-            for (const c of [v.code, v.teacherCode]) {
-              if (typeof c === "string" && c) await writeJson(store, K.code(c), v.id);
+          if (r.outcome === "written") written += 1;
+          else if (r.outcome === "merged") merged += 1;
+          else skip(k, r.why || "exists");
+          for (const a of r.also || []) skip(a.key, a.why);
+        }
+        return json({ ok: true, written, merged, skipped, skippedMore });
+      }
+
+      /* What a restore would do, before anything is written (B6): who it
+         leaves alone, who it re-creates, whose names come off restored
+         courses, which spaces it makes, and how much material it adds. It
+         writes nothing. The app sends only the fields named here, never
+         the file's records whole. */
+      if (action === "admin-restore-preview") {
+        const options = restoreOptions(body.options);
+        const list = (/** @type {any} */ v) => (Array.isArray(v) ? v.filter((x) => x && typeof x === "object") : []);
+        const fileUsers = list(body.users).filter((u) => typeof u.handle === "string" && u.handle);
+        const verdicts = await restoreVerdicts(store, fileUsers, options);
+        const nameOf = new Map(fileUsers.map((u) => [u.handle, String(u.displayName || u.handle)]));
+        /** @type {Record<string, any[]>} */
+        const people = { kept: [], notMember: [], deleted: [], recreate: [], otherPerson: [] };
+        for (const [handle, v] of verdicts) {
+          const who = { handle, displayName: nameOf.get(handle) || handle };
+          if (v.kind === "kept") people.kept.push(who);
+          else if (v.kind === "not-member") people.notMember.push(who);
+          else if (v.kind === "deleted") people.deleted.push({ ...who, at: v.at });
+          else if (v.kind === "recreate") people.recreate.push({ ...who, orgs: v.orgs });
+          else people.otherPerson.push(who);
+        }
+        /* Rosters a restored course would lose names from: anyone who will
+           not be a member of the course's space, counting the people this
+           restore re-creates as members-to-be. */
+        /** @type {Map<string, any>} */
+        const usersNow = new Map();
+        const staysOn = async (/** @type {string} */ h, /** @type {string} */ org) => {
+          const v = verdicts.get(h);
+          if (v && v.kind === "recreate") return v.orgs.includes(org);
+          if (v && v.kind === "other-person") return false;
+          if (!usersNow.has(h)) usersNow.set(h, await readJson(store, K.user(h)));
+          return memberHere(usersNow.get(h), org);
+        };
+        /** @type {{ course: string, title: string, dropped: string[] }[]} */
+        const rosters = [];
+        for (const c of list(body.courses)) {
+          const id = String(c.id || "");
+          if (!id || (await store.has(K.course(id)))) continue;
+          const org = orgOf(c);
+          /** @type {string[]} */
+          const dropped = [];
+          for (const h of [].concat(Array.isArray(c.teachers) ? c.teachers : [], Array.isArray(c.students) ? c.students : [])) {
+            if (!(await staysOn(String(h), org)) && !dropped.includes(String(h))) dropped.push(String(h));
+          }
+          if (dropped.length) rosters.push({ course: id, title: String(c.title || ""), dropped });
+        }
+        /** @type {any[]} */
+        const spaces = [];
+        /** @type {string[]} */
+        const blockers = [];
+        for (const o of list(body.orgs)) {
+          const id = String(o.id || "");
+          if (!id) continue;
+          const here = await readJson(store, K.org(id));
+          const slug = String(o.slug || "");
+          const owner = slug ? await readJson(store, K.slug(slug)) : null;
+          const slugTaken = !here && !!owner && owner !== id;
+          const takenBy = slugTaken ? ((await readJson(store, K.org(String(owner)))) || {}).name || String(owner) : "";
+          let newSlugProblem = "";
+          if (slugTaken) {
+            const wanted = options.newSlugs[id] || "";
+            if (!wanted) newSlugProblem = "missing";
+            else if (slugProblem(wanted)) newSlugProblem = "invalid";
+            else if (await readJson(store, K.slug(wanted))) newSlugProblem = "taken";
+            if (newSlugProblem) {
+              blockers.push(`The address “${slug}” of ${String(o.name || id)} now belongs to ${takenBy}. Give it a new address to go on.`);
             }
           }
+          spaces.push({
+            id, name: here ? here.name : String(o.name || ""), slug: here ? here.slug : slug,
+            exists: !!here, slugTaken, takenBy, newSlugProblem,
+          });
         }
-        return json({ ok: true, written });
+        const keysOf = (/** @type {any} */ v) => (Array.isArray(v) ? v.filter((x) => typeof x === "string" && x) : []);
+        const k = body.keys && typeof body.keys === "object" ? body.keys : {};
+        /** @type {Record<string, { add: number, have: number }>} */
+        const material = {};
+        for (const [what, recordOf] of /** @type {[string, (id: string) => string][]} */ ([
+          ["cards", K.card], ["decks", K.deck], ["courses", K.course], ["flags", K.flag],
+        ])) {
+          let have = 0;
+          const ids = [...new Set(keysOf(k[what]))];
+          for (const id of ids) if (await store.has(recordOf(id))) have += 1;
+          material[what] = { add: ids.length - have, have };
+        }
+        if (people.otherPerson.length) {
+          blockers.unshift(
+            `${people.otherPerson.map((p) => p.displayName).join(", ")}: the name now belongs to someone else on the site, so nothing of theirs can be put back.`
+          );
+        }
+        const scope = options.scope;
+        if (scope.kind === "space" && body.fileScope && typeof body.fileScope === "object" && body.fileScope.space && body.fileScope.space !== scope.space) {
+          blockers.push("This file is a backup of a different space.");
+        }
+        return json({ ok: true, people, rosters, spaces, material, blockers });
       }
 
       /* ================= clearing =================
@@ -5445,7 +6112,7 @@ async function handle(req) {
         const cardIds = [...new Set(cardLists.flatMap((l) => l || []))];
 
         /** @type {Record<string, number>} */
-        const removed = { users: 0, courses: 0, decks: 0, cards: 0, systems: 0, flags: 0, clips: 0 };
+        const removed = { users: 0, courses: 0, decks: 0, cards: 0, systems: 0, flags: 0, clips: 0, progress: 0 };
 
         /* Read before anything is deleted, for the same reason the cards
            are: a system's recordings are only reachable through it. */
@@ -5538,6 +6205,17 @@ async function handle(req) {
             removed.courses += 1;
           }
           await writeJson(store, K.index("courses"), []);
+        }
+
+        /* People's practice (0.583): the one place on the site that removes
+           it, behind the same two locks. Before people, whose key hashes
+           are what finds it. */
+        if (want.has("progress")) {
+          for (const u of await readManyJson(store, handles.map((h) => K.user(h)))) {
+            if (!u || !u.keyHash || (await readSyncDoc(u.keyHash).catch(() => null)) == null) continue;
+            await forgetSyncDoc(u.keyHash);
+            removed.progress += 1;
+          }
         }
 
         if (want.has("people")) {
