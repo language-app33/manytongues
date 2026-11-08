@@ -212,7 +212,7 @@ test("a sentence loses its points for a word no deck of the course teaches, or f
   assert.ok(q.fixes.some((f) => f.key === "unlinked"));
 });
 
-test("every sentence with untaught words is listed for the warning, with its words (0.585)", () => {
+test("every sentence with untaught words is listed for the warning, with its words (0.586)", () => {
   const door = { id: "door", lang: "ar-PS", category: "noun", forms: [{ ar: "باب", en: "door" }] };
   const shut = { id: "shut", lang: "ar-PS", category: "verb", forms: [{ ar: "سكّر", en: "close" }] };
   const good = { id: "g", lang: "ar-PS", uses: ["door"], forms: [{ ar: "سكّر الباب", en: "close the door" }] };

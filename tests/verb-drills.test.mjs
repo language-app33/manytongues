@@ -134,7 +134,7 @@ test("who a form is about: every person spelt the same is right", () => {
   assert.equal(whoIsRight(tense, she, "you-f", AR), false, "you (f) is not");
 });
 
-test("who a form is about: every right person is to be ticked, and only they (0.585)", () => {
+test("who a form is about: every right person is to be ticked, and only they (0.586)", () => {
   const v = verb();
   const tense = must(tenseOf(v, verbOf(AR), "present"), "the present");
   const she = cellOf(v, "p-she");

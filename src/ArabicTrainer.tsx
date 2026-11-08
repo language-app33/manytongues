@@ -7281,6 +7281,15 @@ export const SOUNDS: Record<string, (c: AudioContext) => void> = {
     note(c, { freq: 260, to: 190, dur: 0.16, type: "triangle", peak: 0.07 });
     note(c, { freq: 190, to: 140, at: 0.15, dur: 0.26, type: "triangle", peak: 0.062 });
   },
+  /* A tile in a matching grid picked up, put against its other half, or
+     freed. The lightest thing here, because a grid of five is ten of
+     these in a row: a soft tap that says the tile heard you, and nothing
+     about whether the pair is right — the grid is only marked once it is
+     checked. Triangle rather than sine so it is not lost the way a lone
+     sine blip was (see tick). */
+  select: (c) => {
+    note(c, { freq: 880, to: 990, dur: 0.07, type: "triangle", peak: 0.055 });
+  },
   // A little bubble, for undo and other small reversals.
   pop: (c) => {
     note(c, { freq: 420, to: 900, dur: 0.07, peak: 0.05 });
@@ -8674,6 +8683,7 @@ function MatchGrid({
      up — or put down again, where it was already held. */
   const tapWord = (id: string) => {
     if (checked) return;
+    sfx("select");
     if (pairedAt(id) !== null) {
       setPairs((p) => {
         const next = { ...p };
@@ -8694,6 +8704,7 @@ function MatchGrid({
 
   const tapMeaning = (at: number) => {
     if (checked) return;
+    sfx("select");
     const owner = takenBy(at);
     /* Tapping a meaning already spoken for frees it, which is the only way
        back from a pairing made by mistake that does not need a third
@@ -12098,7 +12109,7 @@ export default function ArabicTrainer() {
    * does say which one it wants: "Not good" with "feminine" under it, and
    * the masculine beside it on the card. Written instead, that form is the
    * right word in the wrong form — nearly right, and the verdict says
-   * which form it was (0.585). Where the prompt says nothing they are
+   * which form it was (0.586). Where the prompt says nothing they are
    * twins, and right.
    */
   const namedKin = useMemo(() => {
@@ -14601,7 +14612,7 @@ export default function ArabicTrainer() {
                         {/* The whole phrase, said, once a gap in it has
                             been answered: the pronunciation below is the
                             missing word's alone, and two learners asked
-                            for the sentence's (0.585). The phrase itself
+                            for the sentence's (0.586). The phrase itself
                             is still up at the top, so only how it is said
                             comes here. Never before the answer: it holds
                             the word. */}

@@ -554,7 +554,7 @@ export function answerRows(
  * A sentence with a blank is filled with the first answer its value card
  * accepts — "كيف حالك" — because two spellings joined by a slash are not
  * a sentence. But the value card accepts كيفك too, and a learner writing
- * the sentence with it was marked a near miss (0.585, on a learner's
+ * the sentence with it was marked a near miss (0.586, on a learner's
  * report). So each other answer of each filler is put where the first one
  * stands, and every sentence that makes is right as well.
  *

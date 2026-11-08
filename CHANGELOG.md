@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.585 — 8 November 2026
+## 0.586 — 8 November 2026
 
 **Fixes from a learner's 18 reports.** What each question asks is now
 clearer, and some right answers that were marked wrong or nearly right
@@ -74,6 +74,23 @@ To check by hand:
   sentence written with the second answer is marked right.
 - A deck with a sentence using a word that has no card: the warning under
   Deck quality names the sentence and the word.
+
+## 0.585 — 8 November 2026
+
+**Tapping a card in a matching exercise makes a short, soft sound.**
+
+For learners:
+
+- **Picking up a card, putting it against its pair, or freeing it again now
+  answers with a light tap**, so you know the tap registered without
+  looking back at the tile. It says nothing about whether the pair is
+  right — the grid is still only marked when you check it.
+- It follows your sound setting: louder on Loud, quieter on Soft, and
+  silent on Off. Playing a recording in the listening grid does not make it.
+
+To check by hand: on a phone, tap through a matching grid with sound on,
+then with sound off.
+
 ## 0.584 — 8 November 2026
 
 For the App admin, in Super admin → Spaces → a space → Back up this space:

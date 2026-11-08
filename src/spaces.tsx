@@ -5151,7 +5151,7 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
               </ul>
         </>
       )}
-      {/* Every sentence with words no card teaches, in full (0.585). A
+      {/* Every sentence with words no card teaches, in full (0.586). A
           learner asked to practise a sentence's words on their own before
           meeting the sentence; this says which sentences cannot be, and
           which words they are waiting on. The app adds nothing to

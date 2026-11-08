@@ -469,7 +469,7 @@ export const EX: Record<string, ExerciseSpec> = {
     answerMode: "choice",
     picks: "word",
     gentle: true,
-    /* What the phrase means is on the screen from the start (since 0.585).
+    /* What the phrase means is on the screen from the start (since 0.586).
        It was behind the nudge, and a learner reported a gap the rest of
        the phrase gave no clue to — اه, "yes", out of "اه، بحكي عربي" —
        where any of the four could have gone. This is the gentle half:
@@ -941,7 +941,7 @@ export const EX: Record<string, ExerciseSpec> = {
   },
   /* One form, and who it is about, chosen from the persons of the same
      tense — the wrong ones those whose forms look most like it. Every
-     person whose form is spelt the same is to be ticked too (since 0.585),
+     person whose form is spelt the same is to be ticked too (since 0.586),
      and the instruction says so on every asking, so it gives nothing away
      about how many there are. */
   vwho: {

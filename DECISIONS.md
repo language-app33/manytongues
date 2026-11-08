@@ -7728,7 +7728,7 @@ person's current key from their account on the site.
 
 A form spelt the same for several persons — ساكن is *I*, *you (m)* and
 *he* — used to take any one of them as right. A learner reported that this
-taught the form as "I" and nothing else. The owner chose (0.585) that the
+taught the form as "I" and nothing else. The owner chose (0.586) that the
 learner ticks every person the form could be, and nobody it could not.
 
 **The instruction says "tick everyone it fits" on every asking**, including
