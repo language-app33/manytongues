@@ -3295,6 +3295,12 @@ check("no console errors during the session", errors.length === 0, errors.slice(
     check(`${kind} lasts long enough to be noticed`, len >= least,
       `${len.toFixed(2)}s, wanted ${least}s`);
   }
+  /* A tap on a matching tile is heard ten times in a grid of five, so it
+     has to be over before the next tap. */
+  {
+    const len = runs(played("select"));
+    check("a matching tile's tap is short", len <= 0.12, `${len.toFixed(2)}s`);
+  }
   setSounds("off");
   check("off schedules nothing at all", played("correct").length === 0);
   setSounds("loud");

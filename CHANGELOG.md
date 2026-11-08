@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.585 — 8 November 2026
+## 0.586 — 8 November 2026
 
 **Playing a recording picks it up, ready to pair.**
 
@@ -24,6 +24,28 @@ and moves once per batch of work you would notice, not once per commit.
 - Tapping a card outside its play button still selects it, deselects it,
   pairs it or frees it, as before. Stopping a recording does not
   deselect it.
+- Selecting a recording by playing it does not make the soft tap from
+  0.585: the recording is already sounding.
+
+To check by hand: in a listening grid, play a recording, then tap a word
+on the right — they should pair. Play a paired recording — it should stay
+paired.
+
+## 0.585 — 8 November 2026
+
+**Tapping a card in a matching exercise makes a short, soft sound.**
+
+For learners:
+
+- **Picking up a card, putting it against its pair, or freeing it again now
+  answers with a light tap**, so you know the tap registered without
+  looking back at the tile. It says nothing about whether the pair is
+  right — the grid is still only marked when you check it.
+- It follows your sound setting: louder on Loud, quieter on Soft, and
+  silent on Off. Playing a recording in the listening grid does not make it.
+
+To check by hand: on a phone, tap through a matching grid with sound on,
+then with sound off.
 
 ## 0.584 — 8 November 2026
 
