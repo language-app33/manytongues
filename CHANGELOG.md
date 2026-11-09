@@ -8,6 +8,20 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.541 — 9 November 2026
+
+**A copied picture can be pasted onto a card.**
+
+- On the screen for adding a picture, a picture you have copied — a
+  screenshot, or an image copied from a web page — can be pasted with
+  Ctrl+V (⌘+V on a Mac), or with the new Paste button beside Take a photo.
+- The first time the Paste button is used, the browser may ask to allow
+  it; on a phone it may show its own Paste bubble to tap. Where a browser
+  can't offer the button at all, it isn't shown, and Ctrl+V still works.
+- If what was copied is text rather than a picture, the screen says so.
+- Checked in a browser: Ctrl+V and the button each added a picture, and
+  copied text gave the message. Still to try by hand on a phone.
+
 ## 0.540 — 31 October 2026
 
 **Everything since 0.521 checked, and two bugs it found fixed.**

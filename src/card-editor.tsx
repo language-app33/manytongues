@@ -1436,6 +1436,11 @@ const picturesOf = (made: number): string => (made ? plural(made, "image") : "Ad
  * phone — to take one with the camera. Choosing opens the device's own
  * picker, which on a phone offers the camera anyway; the second button is
  * the shortcut for the teacher standing in front of the thing.
+ *
+ * A picture copied elsewhere — a screenshot, an image copied from a web
+ * page — can be pasted straight in: Ctrl/⌘+V anywhere on the screen, or
+ * the Paste button where the browser lets a page read the clipboard
+ * (it asks the first time, or offers its own Paste bubble on a phone).
  */
 export function ImageScreen({ title, images, onChange, onClose }: {
   title: string;
@@ -1475,6 +1480,48 @@ export function ImageScreen({ title, images, onChange, onClose }: {
     }
   }
 
+  /* The newest of add, for the paste listener set once below. */
+  const addRef = useRef(add);
+  addRef.current = add;
+  const canPaste = !locked && !busy && !full;
+  useEffect(() => {
+    if (!canPaste) return;
+    const onPaste = (e: ClipboardEvent) => {
+      /* A paste into a box of text is that box's, not a picture. */
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA)$/.test(t.tagName))) return;
+      const items = Array.from((e.clipboardData && e.clipboardData.items) || []);
+      const pic = items.find((it) => it.kind === "file" && /^image\//.test(it.type));
+      if (pic) {
+        e.preventDefault();
+        addRef.current(pic.getAsFile());
+      } else if (items.length) {
+        setError("There's no picture on the clipboard. Copy an image first, then paste.");
+      }
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [canPaste]);
+
+  /* The button's way: asks the browser for what was copied. */
+  const readable = typeof navigator !== "undefined" && !!(navigator.clipboard && navigator.clipboard.read);
+  async function pasteFromClipboard() {
+    setError("");
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((t) => /^image\//.test(t));
+        if (type) {
+          const blob = await item.getType(type);
+          await add(new File([blob], `pasted.${type.split("/")[1] || "png"}`, { type }));
+          return;
+        }
+      }
+      setError("There's no picture on the clipboard. Copy an image first, then paste.");
+    } catch {
+      setError("The browser didn't let the app read the clipboard. Try Ctrl+V (⌘+V on a Mac) instead.");
+    }
+  }
+
   const picker = (label: string, icon: string, camera: boolean) => (
     <label className={`at-btn sm${camera ? " ghost" : ""}${busy || full ? " off" : ""}`}>
       <Icon name={icon} />
@@ -1498,7 +1545,7 @@ export function ImageScreen({ title, images, onChange, onClose }: {
     <Screen title={title} onBack={onClose} rise backLabel="Back to the card">
       <Help>
         A picture of what this form means, shown with it. Up to {MAX_IMAGES}. A card with no
-        picture is still a card.
+        picture is still a card. A picture you have copied can be pasted here too.
       </Help>
       <Notice kind="error">{error}</Notice>
       <section className="at-panel">
@@ -1525,6 +1572,17 @@ export function ImageScreen({ title, images, onChange, onClose }: {
           <div className="at-chips" style={{ marginTop: 12 }}>
             {picker("Choose an image", "image", false)}
             {picker("Take a photo", "camera", true)}
+            {readable && (
+              <button
+                type="button"
+                className={`at-btn sm ghost${busy || full ? " off" : ""}`}
+                disabled={busy || full}
+                onClick={pasteFromClipboard}
+              >
+                <Icon name="paste" />
+                Paste
+              </button>
+            )}
           </div>
         )}
         {!locked && full && <Help>That is as many as one form may have. Remove one to add another.</Help>}
