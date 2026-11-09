@@ -62,6 +62,7 @@ import {
   useSlowWait,
   useSnackbar,
   useSnackbarState,
+  WorkingNote,
   TabTitle,
 } from "./shared.tsx";
 import { renameLangIds } from "./lang-ids.ts";
@@ -15360,6 +15361,7 @@ export default function ArabicTrainer() {
       })()}
 
       {snack.node}
+      <WorkingNote />
       </DockContext.Provider>
       </SnackbarProvider>
     </div>

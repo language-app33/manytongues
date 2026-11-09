@@ -188,7 +188,7 @@ export interface EditorProps {
   decks?: PartDeck[];
   /** Put a part in a deck or take it out — saved at once, as a deck's own
       screen saves it. */
-  onDeckPart?: (deckId: string, rangeId: string, on: boolean) => void;
+  onDeckPart?: (deckId: string, rangeId: string, on: boolean) => unknown;
 }
 
 export function NumberSystemEditor({
@@ -972,7 +972,7 @@ function PartScreen({
   note?: React.ReactNode;
   onRecord: (slot: string, key: FormKey) => void;
   onWrite: (key: string) => void;
-  onDeckPart?: (deckId: string, rangeId: string, on: boolean) => void;
+  onDeckPart?: (deckId: string, rangeId: string, on: boolean) => unknown;
   onClose: () => void;
 }) {
   const range = check.range;
@@ -1380,8 +1380,11 @@ function CountedSection({ lang, range, nouns, render, warningsOf, standing }: {
 function PartDecks({ range, decks, onDeckPart }: {
   range: Range;
   decks: PartDeck[];
-  onDeckPart?: (deckId: string, rangeId: string, on: boolean) => void;
+  onDeckPart?: (deckId: string, rangeId: string, on: boolean) => unknown;
 }) {
+  /* The decks still being saved, each saying "Adding…" or "Removing…"
+     until the server answers — see DeckSwitch's saving. */
+  const [saving, setSaving] = useState<Record<string, "add" | "drop">>({});
   if (!onDeckPart) return null;
   return (
     <PartBlock
@@ -1392,7 +1395,18 @@ function PartDecks({ range, decks, onDeckPart }: {
         of="range"
         decks={decks}
         chosen={decks.filter((d) => partsNow(d.parts || []).includes(range.id)).map((d) => d.id)}
-        onToggle={(id, wasOn) => onDeckPart(id, range.id, !wasOn)}
+        saving={saving}
+        onToggle={(id, wasOn) => {
+          if (saving[id]) return;
+          setSaving((now) => ({ ...now, [id]: wasOn ? "drop" : "add" }));
+          Promise.resolve(onDeckPart(id, range.id, !wasOn)).finally(() =>
+            setSaving((now) => {
+              const next = { ...now };
+              delete next[id];
+              return next;
+            }),
+          );
+        }}
       />
     </PartBlock>
   );
