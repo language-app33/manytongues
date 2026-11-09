@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.599 — 9 November 2026
+
+**Every search box now has a cross to clear it.** As soon as something is
+typed, a small cross appears at the right end of the box; tapping it
+empties the search and leaves the cursor there for the next one. It is on
+every box that searches or narrows a list: the card, deck and course lists,
+choosing decks or single cards for a course or a session, the people list
+in Admin, and finding a blank, a tag or a sentence while editing a card.
+Some browsers drew their own clear button on a few of these boxes and not
+others; that one is gone, so there is one cross, in the same place,
+everywhere.
+
 ## 0.598 — 9 November 2026
 
 **Five places where what the app said about a card's progress disagreed

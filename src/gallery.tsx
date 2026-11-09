@@ -49,6 +49,7 @@ import {
   ModeSelector,
   Notice,
   PlayButton,
+  SearchBox,
   Section,
   Segmented,
   Stat,
@@ -747,6 +748,15 @@ export function ComponentGallery() {
       </Row>
 
       <Row
+        name="SearchBox"
+        what="A search field. Once something is typed, a cross at its right end empties it."
+        note="Every box that narrows a list is one of these, ItemList's included, so they all clear the same way. The cursor stays in the box after clearing. className goes on the input, boxClassName on the wrapper, for its place in a row."
+      >
+        <V label="empty"><SearchDemo start="" /></V>
+        <V label="typed in"><SearchDemo start="kitab" /></V>
+      </Row>
+
+      <Row
         name="FilterBar"
         what="The panel a list's Sort or Filter button opens onto: how to order it, or what to leave out."
         note="Goes in one of ItemList's menus, as its content — ItemList owns the button and keeps one panel open at a time. Give a group a `quiet` value to say which setting counts as not narrowing, and pass the groups through narrowing() to get the count the button carries. A group with `custom` draws that instead of the buttons, for a choice a few buttons cannot say; `wide` gives it a line of its own."
@@ -1177,4 +1187,10 @@ export function ComponentGallery() {
     </div>
     </GalleryCount.Provider>
   );
+}
+
+/* SearchBox holds no text of its own, so the gallery holds it. */
+function SearchDemo({ start }: { start: string }) {
+  const [q, setQ] = useState(start);
+  return <SearchBox placeholder="Search cards" aria-label="Search cards" value={q} onChange={setQ} />;
 }

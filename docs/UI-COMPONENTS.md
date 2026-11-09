@@ -106,6 +106,15 @@ An icon-only button. `label` is **required** and becomes the accessible name.
 when the icon stands in a row beside ghost `Button`s — the hint button next
 to "I don't know" — so the two read as the same weight.
 
+### `SearchBox` — 6 uses
+A search field. Once something is typed, a cross at its right end empties it
+and leaves the cursor in the box. Every box that narrows a list is one of
+these — ItemList's search included — so they all clear the same way. The
+browser's own clear button is hidden so there is only ever one cross.
+
+`value, onChange(next), className` (on the input), `boxClassName` (on the
+wrapper), `style`, plus anything an `<input>` takes.
+
 ### `Segmented` — 17 uses
 Pick one from a few. Reports `aria-pressed`.
 

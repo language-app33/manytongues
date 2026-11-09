@@ -721,7 +721,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-screen.blanks .at-screeninner > .at-hint { margin:4px 0 12px; }
 .at-screen.blanks .at-screeninner > .at-input { width:100%; }
 
-.at-blanknew .at-input { flex:1 1 auto; min-width:0; }
+.at-blanknew .at-searchbox { flex:1 1 auto; min-width:0; }
 .at-blanknew .at-btn { flex:0 0 auto; }
 
 .at-idrow .at-input { flex:1 1 auto; min-width:0; }
@@ -1023,6 +1023,18 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-toolbar .at-btn { flex:0 0 auto; padding:0 16px; white-space:nowrap; font-weight:700; }
 .at-toolbar .at-btn:active:not(:disabled) { transform:none; }
 .at-toolbar .at-search { flex:1 1 0; min-width:0; padding:0 12px; }
+/* SearchBox: the field and, once something is typed, a cross at its right
+   end that empties it. The field keeps its own look; the wrapper only holds
+   the cross over it and takes the field's place in a row. */
+.at-searchbox { position:relative; display:block; }
+.at-toolbar .at-searchbox { flex:1 1 0; min-width:0; }
+.at-searchbox > .at-input::-webkit-search-cancel-button,
+.at-searchbox > .at-input::-webkit-search-decoration { -webkit-appearance:none; appearance:none; }
+.at-searchbox.has > .at-input { padding-right:44px; }
+.at-searchclear { position:absolute; right:6px; top:50%; transform:translateY(-50%);
+  display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;
+  padding:0; border:0; border-radius: var(--r-sm); background:transparent; color: var(--faint); cursor:pointer; }
+.at-searchclear:hover, .at-searchclear:focus-visible { color: var(--ink); background: var(--raised); }
 /* The second row: Select, then the menus. Three named buttons is more than a
    narrow phone has room for on one line, so this row wraps where the row
    above it must not — a search field that wrapped under its own New button

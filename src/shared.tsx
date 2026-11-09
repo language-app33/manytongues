@@ -590,6 +590,55 @@ export function IconButton({ icon, label, danger, ghost, className = "", ...rest
   );
 }
 
+/*
+ * A search field (0.599). Once anything is typed, a cross at its right end
+ * empties it, and the cursor stays in the box for the next search. Every
+ * box that narrows a list is one of these, so they all clear the same way.
+ *
+ * The browser's own clear button, which type="search" draws in some
+ * browsers only, is hidden: one cross, in the same place everywhere. It
+ * sits on the right whatever language is typed, as asked.
+ */
+export function SearchBox({ value, onChange, className = "", boxClassName = "", style, ...rest }: {
+  value: string;
+  onChange: (next: string) => void;
+  /** On the input itself, beside at-input. */
+  className?: string;
+  /** On the wrapper, where the box's place in a row or its margin is set. */
+  boxClassName?: string;
+  style?: React.CSSProperties;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "className" | "style">) {
+  const box = useRef<HTMLInputElement>(null);
+  return (
+    <div className={`at-searchbox${value ? " has" : ""}${boxClassName ? " " + boxClassName : ""}`} style={style}>
+      <input
+        ref={box}
+        type="search"
+        className={`at-input${className ? " " + className : ""}`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        {...rest}
+      />
+      {value && (
+        <button
+          type="button"
+          className="at-searchclear"
+          aria-label="Clear the search"
+          title="Clear the search"
+          /* Kept from taking focus, so the keyboard on a phone stays up. */
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            onChange("");
+            box.current?.focus();
+          }}
+        >
+          <Icon name="close" size={18} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* --- Text ---------------------------------------------------------
    at-hint used to do eight jobs at once, so the helper text under a
    control could not be restyled without also restyling every empty
@@ -2507,15 +2556,14 @@ export function ItemList<T>({
   }, []);
 
   const searchBox = (
-    <input
-      className="at-input at-search"
-      type="search"
+    <SearchBox
+      className="at-search"
       /* Cards are searched by typing the language they are written in,
          so the box has to lay itself out by what is in it. */
       dir="auto"
       placeholder={`Search ${plural || `${noun}s`}`}
       value={query}
-      onChange={(e) => setQuery(e.target.value)}
+      onChange={setQuery}
     />
   );
 
@@ -6061,13 +6109,13 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
           onClose={() => setOpen(false)}
         >
           {find && (
-            <input
-              className="at-input at-mb3"
+            <SearchBox
+              boxClassName="at-mb3"
               placeholder={find.placeholder}
               aria-label={find.placeholder}
               value={q}
               dir="auto"
-              onChange={(e) => setQ(e.target.value)}
+              onChange={setQ}
             />
           )}
           <div className="at-deckpicks">
