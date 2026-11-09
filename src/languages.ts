@@ -2401,6 +2401,13 @@ export const GRAMMAR: Record<string, GrammarDim> = {
        it is not a word anybody is asked on its own. See ar-PS's options
        and CountedNoun.plCounted. */
     optionRules: {
+      /* A pair's English says it is two. Written bare — "hours" — the
+         dual and the plural ask the same question in English and a
+         learner cannot tell which form is wanted. Still asked on its own,
+         so no `unasked`. */
+      dual: {
+        help: "Write the English with “two”, like “two hours”.",
+      },
       counted: {
         onlyOn: ["noun"],
         help: "Only for the few nouns whose plural changes after three to ten, like days or months. Leave it empty for every other noun: three to ten take the plural, and eleven up the singular.",

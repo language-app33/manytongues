@@ -9723,7 +9723,11 @@ function NounEditor({ word, lang, allCards, selfId }: {
               index={i}
               form={f}
               title={box.title}
-              role={box.help ? box.help : i < 0 ? "Empty — never asked." : ""}
+              /* What to write, then — where the box is asked and nothing is
+                 in it yet — that it is not asked until it is. A box that is
+                 never asked on its own (the plural after three to ten) says
+                 so in its own line, so only that line. */
+              role={[box.help || "", i < 0 && !box.unasked ? "Empty — never asked." : ""].filter(Boolean).join(" ")}
               of={box.title.toLowerCase()}
               canCopy={false}
               /* Already marked: the box says what it is. A card whose answers

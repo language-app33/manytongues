@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.593 — 9 November 2026
+## 0.594 — 9 November 2026
 
 **More places say they are working, and two of them are quicker.**
 
@@ -29,6 +29,16 @@ For teachers:
   only their main tabs: a course, a deck, Manage cards and the rest say it too
   when something takes more than half a second. Like the confirmation
   message, it sits near the bottom and can briefly cover what is there.
+
+## 0.593 — 9 November 2026
+
+**A noun's dual box says how to write its English.**
+
+- On the Advanced tab of an Arabic or Hebrew noun, the Dual box now says
+  to write the English with "two", like "two hours", so it doesn't read
+  the same as the plural. It shows on both sides of a person or an animal.
+- While the Dual box is empty it still says it is never asked, after that
+  line.
 
 ## 0.592 — 9 November 2026
 
