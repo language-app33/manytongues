@@ -8,6 +8,54 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.598 — 9 November 2026
+
+**Five places where what the app said about a card's progress disagreed
+with what it did.** Found by going through the progress, scheduling and
+review-date code after 0.597.
+
+- **"This was too easy" on a Cleared card now counts as one of its two
+  reviews.** It used to say "counted as learnt" while leaving the card
+  Cleared with two reviews to go — and, because flagging a question also
+  takes it out of the grading, it threw away the very answer that would
+  have been a review had the question come round. Now the message says
+  "Counted as a review. One more, when it comes round, and it's learnt" —
+  or "Counted as a review — learnt" on the second. A review that had
+  genuinely come round is moved on so the card isn't dealt again next
+  session for a second one; one flagged early keeps its date, as every
+  early answer does. It counts on each of the card's top questions, so a
+  word with a picture moves too.
+- **Fix mistakes no longer keeps dealing a card for a slip on a question
+  it will never ask again.** A card at the top of its ladder is asked its
+  hardest question only, so a slip on an easier one (reading the script,
+  say) before the climb stayed in the record for good, and the card was in
+  every Fix mistakes session — dealt the one question it had never got
+  wrong. It now looks only at the questions a session can ask, as Weak
+  spots already did, so the two modes agree.
+- **The home screen no longer promises new words the session can't bring
+  in.** A sentence with a gap counted as ready to learn while none of the
+  words that could fill the gap were cleared yet, though the session
+  rightly left it out — so it could say "ready to learn 12 new words" and
+  bring 2. The count now uses the same test as the session.
+- **"2 reviews to go" says when it means on each of several questions.**
+  A word with a picture is written from its meaning and from the picture,
+  and each makes its own reviews; the card reports the fewer. So a card
+  could say "First review due now", have its review, and still say "First
+  review due now" — the other question hadn't had its turn. The card now
+  reads "Cleared · 2 reviews to go on each of 2 questions", and the line
+  above the Cleared list says the same. Nothing about how Learnt is
+  earned changes.
+- **A Cleared card you've just slipped on says so, instead of "First
+  review due now".** Miss its hardest question and leave the session
+  before the retry, and the card stayed Cleared with "First review due
+  now" — but that review couldn't count until the retry was got right,
+  so the count stood still after it. It now reads "Slipped · retry due
+  now, then the first review" (or "retry in 8m").
+- Each is covered by a test, except the home-screen count, whose change
+  is one word that makes it read the same list as the session; still to
+  be looked at by hand: a Cleared card's tile after Too easy, and the
+  Cleared list's wording on a card with a picture.
+
 ## 0.597 — 9 November 2026
 
 **A learnt card no longer says "Review due now" when nothing on it is due.**

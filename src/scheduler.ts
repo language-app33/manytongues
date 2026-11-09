@@ -577,6 +577,54 @@ export function liftLevel(
 export const hasLevelAbove = (keys: string[], key: string): boolean =>
   keys.some((k) => levelOf(k) > levelOf(key));
 
+/**
+ * The states to write so that "this was too easy" on a form already at
+ * the top of its ladder counts as one of the reviews that make it learnt
+ * (0.598) — the owner's choice, over the message merely saying "cleared".
+ *
+ * Until then the lift at the top wrote nothing a cleared form did not
+ * have, told the learner the card was "counted as learnt", and — because
+ * the lift takes the question out of the grading — threw away the very
+ * answer that would have been the pass had the question come round. The
+ * learner was set back a review for pressing the button.
+ *
+ * So each top-level key gains a pass, as `markedState` would give it for a
+ * right answer that came round, capped at PASSES_TO_LEARN as there. Every
+ * top key and not only the one asked, because a card's passes are read as
+ * the weakest of its top keys (`passesMade`) and a lift that moved one of
+ * three would move nothing the learner can see. A key whose review had
+ * come round is rescheduled as an easy answer, so the card is not dealt
+ * again next session and handed a second pass for the same sitting; one
+ * answered early keeps its gap, as every early answer does (`reschedule`).
+ * A key not yet in review is put there at a day, as `liftLevel` puts the
+ * keys below.
+ */
+export function liftPass(
+  keys: string[],
+  stateOf: (key: string) => ExerciseState | null | undefined,
+  clock: Clock = REAL_CLOCK,
+): Record<string, ExerciseState> {
+  const at = timeOf(clock);
+  const top = topLevelOf(keys);
+  const out: Record<string, ExerciseState> = {};
+  for (const k of keys) {
+    if (levelOf(k) !== top) continue;
+    const had = stateOf(k) || freshState();
+    let s: ExerciseState;
+    if (had.phase === "review") {
+      s = had.due && had.due <= at ? reschedule(had, "easy", clock) : { ...had };
+    } else {
+      const interval = Math.max(had.interval || 0, GRADUATE_DAYS);
+      s = { ...had, phase: "review", step: 0, interval, due: at + interval * DAY };
+    }
+    s.hist = (had.hist || []).concat([1]).slice(-6);
+    s.passes = Math.min(PASSES_TO_LEARN, (had.passes || 0) + 1);
+    s.updated = at;
+    out[k] = s;
+  }
+  return out;
+}
+
 /* ------------------------------------------------------------------
    The ladder
 
@@ -1006,6 +1054,16 @@ export interface Standing {
    */
   passes: number;
   /**
+   * How many top-level questions those passes are made on, over every
+   * form of the card — on the top row only, and nought everywhere else.
+   *
+   * A word with a picture has two (write it from the meaning, and from the
+   * picture); each makes its own passes, and the card reports the fewest.
+   * So "2 reviews to go" on such a card is two on each of them, and the
+   * line that says so needs the count (0.598).
+   */
+  questions: number;
+  /**
    * How many words a number part is still waiting on, where it is one and
    * its words are not all learnt — on the top row only, and set by the
    * app, which holds the collection this is read against. A part that is
@@ -1050,9 +1108,15 @@ export function standings(it: Item, typesOf: (unit: Form) => string[]): Standing
      reading `passesMade` makes, and a family is as far along as its
      weakest form, the way the rest of this function has it. */
   let passes = PASSES_TO_LEARN;
+  /* And how many top-level questions make them, over every form. */
+  let questions = 0;
   for (const { unit } of unitsOf(it)) {
     const keys = typesOf(unit);
-    if (keys.length) passes = Math.min(passes, passesMade(keys, (k) => unit.s && unit.s[k]));
+    if (keys.length) {
+      passes = Math.min(passes, passesMade(keys, (k) => unit.s && unit.s[k]));
+      const top = topLevelOf(keys);
+      questions += keys.filter((k) => levelOf(k) === top).length;
+    }
     for (const t of keys) {
       const level = levelOf(t);
       at.set(level, (at.get(level) || []).concat([unit.s && unit.s[t]]));
@@ -1102,6 +1166,7 @@ export function standings(it: Item, typesOf: (unit: Form) => string[]): Standing
       done,
       of: under.length,
       passes: top ? passes : 0,
+      questions: top ? questions : 0,
     });
     open = finished;
     allMetBelow = allMetBelow && here.every(answered);

@@ -2361,7 +2361,7 @@ if (/Build a session/.test(document.body.textContent)) {
       const ledeText = lede ? (lede.textContent || "").replace(/\s+/g, " ").trim() : "";
       check(`${name}: ${isCleared ? "says how many reviews make a card learnt" : "and no count of reviews to go"}`,
         isCleared
-          ? ledeText === "It takes 2 reviews to move a card from Cleared to Learnt."
+          ? /^It takes 2 reviews to move a card from Cleared to Learnt — on each of its questions/.test(ledeText)
           : !/reviews? to move a card/.test(ledeText),
         ledeText || "(no line)");
       /* And no bar, which is the whole reason there is a line here at all. */

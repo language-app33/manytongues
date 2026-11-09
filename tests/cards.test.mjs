@@ -45,7 +45,7 @@ const { localIdFor, cardToItem, serverCardId, foldCourses, deckSize, notReaching
    card's progress and belongs with the rest of them. The trainer is bundled
    the same way; nothing in it touches a browser on the way in. */
 const built4 = await buildOnce(["ArabicTrainer.tsx"]);
-const { leadSpeed, deckPercent, levelPercent, nextReviewAt, reviewLine, nextPassAt, passLine,
+const { leadSpeed, deckPercent, levelPercent, nextReviewAt, reviewLine, nextPassAt, nextPass, passLine,
   formIsAmbiguous, formTagsAt, kinTags, twinsOf,
   onePerLevel, quietUnits, easedUnits,
   drillableUnits, askedUnits, agreeTook, laddered, liftStates, merge,
@@ -701,6 +701,55 @@ test("what a card at the top of the ladder puts on its tile", () => {
   assert.equal(reviewLine(7 * day, 7 * day), "Review due now");
   assert.equal(reviewLine(6 * day, 7 * day), "Review due now");
   assert.equal(reviewLine(0, 7 * day), "No review scheduled");
+});
+
+/*
+ * A top question missed is put back for a retry and the card stays
+ * Cleared, one miss being forgiven. Its date was then read as a review's —
+ * "First review due now" — and the review it named could not count: a
+ * pass wants a question that came round in review, and this one is
+ * relearning. The learner got it right next session and the count stood
+ * still. The line now says a retry is what is waiting (0.598).
+ */
+test("a cleared card slipped on says its retry is due, not a review that cannot count", () => {
+  const settings = { language: "ar-PS" };
+  const day = 24 * 60 * 60 * 1000;
+  const min = 60 * 1000;
+  const word = { id: "k", lang: "ar-PS", ar: "كِتاب", en: "book", lat: "kitaab", s: {} };
+  /** @type {string[]} */
+  const keys = laddered(/** @type {any} */ (word), settings);
+  const topLevel = Math.max(...keys.map(levelOf));
+  const top = keys.filter((k) => levelOf(k) === topLevel);
+  const below = keys.filter((k) => levelOf(k) < topLevel);
+  const at = 9 * day;
+
+  /* Missed ten minutes ago: the retry has come round. */
+  word.s = {
+    ...Object.fromEntries(below.map((k) => [k, { phase: "review", due: 40 * day }])),
+    ...Object.fromEntries(top.map((k) => [k, { phase: "relearning", due: at - min, passes: 0 }])),
+  };
+  let next = nextPass(/** @type {any} */ (word), settings);
+  assert.equal(next.retry, true);
+  assert.equal(passLine(next.at, 0, at, next.retry), "Slipped · retry due now, then the first review");
+
+  /* Missed a minute ago: the retry is nine minutes off. */
+  word.s = {
+    ...Object.fromEntries(below.map((k) => [k, { phase: "review", due: 40 * day }])),
+    ...Object.fromEntries(top.map((k) => [k, { phase: "relearning", due: at + 9 * min, passes: 1 }])),
+  };
+  next = nextPass(/** @type {any} */ (word), settings);
+  assert.equal(passLine(next.at, 1, at, next.retry), "Slipped · retry in 9m, then the second review");
+
+  /* Back in review, the line is a review's again — and nextPassAt still
+     answers the moment alone, for the forecast that reads it. */
+  word.s = {
+    ...Object.fromEntries(below.map((k) => [k, { phase: "review", due: 40 * day }])),
+    ...Object.fromEntries(top.map((k) => [k, { phase: "review", due: at + 5 * day, passes: 1 }])),
+  };
+  next = nextPass(/** @type {any} */ (word), settings);
+  assert.equal(next.retry, false);
+  assert.equal(passLine(next.at, 1, at, next.retry), "Second review in 5d");
+  assert.equal(nextPassAt(/** @type {any} */ (word), settings), at + 5 * day);
 });
 
 /*

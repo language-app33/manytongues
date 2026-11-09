@@ -236,6 +236,7 @@ import {
   hasLevelAbove,
   learnt,
   liftLevel,
+  liftPass,
   topLevelOf,
   PASSES_TO_LEARN,
   freshStates,
@@ -1086,9 +1087,13 @@ function standingLabel(at: Standing | null): string {
     return `Cleared · ${heldWhat(at)} to learn`;
   }
   if (at.status === "cleared") {
-    return `Cleared · ${PASSES_TO_LEARN - at.passes} ${
-      PASSES_TO_LEARN - at.passes === 1 ? "review" : "reviews"
-    } to go`;
+    /* On each of its top questions, where there are several: a word with
+       a picture is written from the meaning and from the picture, and
+       each makes its own passes. "2 reviews to go" over that card was
+       answered by a review session that moved one of them and left the
+       line as it was (0.598). */
+    const each = at.questions > 1 ? ` on each of ${at.questions} questions` : "";
+    return `Cleared · ${plural(PASSES_TO_LEARN - at.passes, "review")} to go${each}`;
   }
   return `Level ${at.level} · ${STATUS_LABEL[at.status] || at.status}`;
 }
@@ -4630,9 +4635,16 @@ function notSeenLately(unit: Form, settings: Settings) {
 
 /* Did this form go wrong in either of its last two outings? Read in the
    card's own language, and through stateOf, which answers for a key that
-   has never been written. */
+   has never been written.
+
+   Over the questions a session can put to the form, as Weak spots reads
+   it (isWeak) — not over everything the card supports. A form at the top
+   of its ladder is asked its top alone, so a slip on a reading question
+   before the climb stayed in that question's last two answers for good:
+   the card was in every Fix mistakes session, dealt the one question it
+   had never got wrong, and answering that right changed nothing (0.598). */
 function hasRecentMistake(unit: Form, settings: Settings) {
-  const types = supportedTypes(unit, settings);
+  const types = askableTypes(unit, settings);
   let sawHistory = false;
   for (const t of types) {
     const h = stateOf(unit, t).hist || [];
@@ -11128,7 +11140,12 @@ export default function ArabicTrainer() {
            isUrgent. */
         isUrgent(it, settings) ||
         drillableUnits(it, settings).some(({ unit }) =>
-          openTypes(unit, settings).some((t) => {
+          /* What a session can *deal*, not merely what the ladder has
+             open: a sentence whose blank has no cleared word to fill it
+             yet has an open level and nothing to ask (fillableAt), and
+             the mix leaves it out. Counted here it was a new word the
+             home screen promised and the session never brought (0.598). */
+          askableTypes(unit, settings).some((t) => {
             const st = stateOf(unit, t);
             return includeNew ? stateReady(st) : st.phase !== "new" && stateReady(st);
           })
@@ -13016,7 +13033,8 @@ export default function ArabicTrainer() {
    * Every exercise on the level it stands on — and any below that the next
    * level asks more of — is counted as learnt, so the next level opens from
    * the next session; the next level itself is not touched. A form already
-   * on the top level is counted as mastered instead. The rule is
+   * on the top level has its whole ladder made solid and gains one of the
+   * two reviews that make it learnt (liftPass, 0.598). The rule is
    * liftLevel's; what this adds is which form, which keys, and the write.
    * The keys are the form's own ladder (laddered), not the ones open right
    * now: a listening exercise silenced for a quarter of an hour is still a
@@ -13050,6 +13068,10 @@ export default function ArabicTrainer() {
     if (!stored) return;
     const keys = laddered(stored.unit, settings);
     const above = hasLevelAbove(keys, exercise.type);
+    /* Where the passes stand after the lift, for the message: nought where
+       there was a level to open instead. Read inside the write, which
+       `persist` runs there and then. */
+    let passes = 0;
     setEasedFor(exercise);
     persist((cur) => {
       const next = { ...cur, items: cur.items.slice() };
@@ -13061,7 +13083,13 @@ export default function ArabicTrainer() {
         ? formsOf(it).find((x) => x.id === subId) || linesOf(it).find((x) => x.id === subId)
         : leadOf(it);
       if (!target) return cur;
-      const lifted = liftLevel(keys, (k) => statesOf(target)[k], exercise.type);
+      const was = (k: string) => statesOf(target)[k];
+      /* At the top, the whole ladder is made solid as before — and the top
+         keys gain one of the reviews that make the form learnt, which is
+         what the owner chose "too easy" to mean there (0.598). See
+         liftPass for what it used to do instead. */
+      const lifted = above ? liftLevel(keys, was, exercise.type) : { ...liftLevel(keys, was, exercise.type), ...liftPass(keys, was) };
+      if (!above) passes = passesMade(keys, (k) => lifted[k] || was(k));
       if (!Object.keys(lifted).length) return cur;
       const grown = (x: Form) => ({ ...x, s: { ...x.s, ...lifted }, updated: now() });
       if (subId && linesOf(it).some((x) => x.id === subId)) {
@@ -13077,7 +13105,9 @@ export default function ArabicTrainer() {
     flash(
       above
         ? "Moved up a level. It comes back at the next one."
-        : "Already at the top — counted as learnt.",
+        : passes >= PASSES_TO_LEARN
+        ? "Counted as a review — learnt."
+        : "Counted as a review. One more, when it comes round, and it's learnt.",
       "good",
     );
   }
@@ -16859,14 +16889,30 @@ export function reviewLine(due: Millis, at: Millis = now()): string {
  * Nought where none of them has a date, as `nextReviewAt`.
  */
 export function nextPassAt(it: Item, settings: Settings): Millis {
+  return nextPass(it, settings).at;
+}
+
+/**
+ * The same moment, and whether it is a review at all.
+ *
+ * A top question missed is put back ten minutes for a retry, and the card
+ * stays Cleared — one miss is forgiven. Its date is then the retry's, and
+ * a line reading "First review due now" over it named a review that could
+ * not count: a pass is made on a question that came round in review
+ * (`cameRound`), and this one is relearning. The learner got it right in
+ * the next session and the count stood still (0.598). So the line says
+ * what is actually waiting — a retry — and the review after it.
+ */
+export function nextPass(it: Item, settings: Settings): { at: Millis; retry: boolean } {
   const forms = unitsOf(it)
     .map(({ unit }) => ({ unit, keys: laddered(unit, settings) }))
     .filter(({ keys }) => keys.length);
-  if (!forms.length) return 0;
+  if (!forms.length) return { at: 0, retry: false };
   const made = Math.min(
     ...forms.map(({ unit, keys }) => passesMade(keys, (k) => stateOf(unit, k))),
   );
   let soonest = 0;
+  let retry = false;
   for (const { unit, keys } of forms) {
     const top = topLevelOf(keys);
     for (const key of keys) {
@@ -16875,10 +16921,13 @@ export function nextPassAt(it: Item, settings: Settings): Millis {
       if (((s && s.passes) || 0) > made) continue;
       const due = (s && s.due) || 0;
       if (!due) continue;
-      if (!soonest || due < soonest) soonest = due;
+      if (!soonest || due < soonest) {
+        soonest = due;
+        retry = !!s && s.phase !== "review";
+      }
     }
   }
-  return soonest;
+  return { at: soonest, retry };
 }
 
 /* The small print on a number part held at Cleared by its words, once its
@@ -16911,9 +16960,12 @@ const ORDINALS = ["First", "Second", "Third", "Fourth", "Fifth"];
  * The count is what tells two cleared cards apart as much as the date is,
  * and the line at the top of the screen says how many there are in all.
  */
-export function passLine(due: Millis, passes: number, at: Millis = now()): string {
+export function passLine(due: Millis, passes: number, at: Millis = now(), retry = false): string {
   if (!due) return "No review scheduled";
   const said = ORDINALS[passes] ? `${ORDINALS[passes]} review` : `Review ${passes + 1}`;
+  /* Slipped on, and waiting to be got right again before the review
+     counts — see nextPass. */
+  if (retry) return due <= at ? `Slipped · retry due now, then the ${said.toLowerCase()}` : `Slipped · retry in ${formatGap(due - at)}, then the ${said.toLowerCase()}`;
   if (due <= at) return `${said} due now`;
   return `${said} in ${formatGap(due - at)}`;
 }
@@ -17631,6 +17683,9 @@ function ProgressTab({
        is waiting on the review that counts towards learnt — see
        `nextPassAt` — and its line names that review. */
     const next: Map<string, Millis> = new Map();
+    /* Cleared cards whose next date is a retry of a slipped question, not a
+       review — see nextPass. */
+    const retry: Set<string> = new Set();
     for (const it of counted) {
       /* A tense still waiting on the one before it is a card not started,
          as a number waiting on its stretch is — see towardsLearnt. */
@@ -17648,10 +17703,13 @@ function ProgressTab({
         it.id,
         one ? { at: one, share: rows.filter((r) => r.status === "done").length / rows.length } : towardsLearnt(it, settings, items),
       );
-      if (one && one.status === "cleared") next.set(it.id, nextPassAt(it, settings));
-      else if (one && one.status === "done") next.set(it.id, nextReviewAt(it, settings));
+      if (one && one.status === "cleared") {
+        const pass = nextPass(it, settings);
+        next.set(it.id, pass.at);
+        if (pass.retry) retry.add(it.id);
+      } else if (one && one.status === "done") next.set(it.id, nextReviewAt(it, settings));
     }
-    return { at, toward, next };
+    return { at, toward, next, retry };
   }, [items, counted, settings]);
   const progressOf = progress.at;
 
@@ -17828,7 +17886,8 @@ function ProgressTab({
             knows how many there are. */}
         {showing === "cleared" && (
           <Lede>
-            It takes {plural(PASSES_TO_LEARN, "review")} to move a card from Cleared to Learnt.
+            It takes {plural(PASSES_TO_LEARN, "review")} to move a card from Cleared to Learnt — on each of its
+            questions, where a card is asked more than one at the top.
           </Lede>
         )}
         <ItemList
@@ -17872,7 +17931,7 @@ function ProgressTab({
                   ? standingShort(progressOf.get(it.id) || null)
                   : showing === "cleared"
                   ? heldLine(progressOf.get(it.id) || null) ||
-                    passLine(progress.next.get(it.id) || 0, progressOf.get(it.id)?.passes || 0)
+                    passLine(progress.next.get(it.id) || 0, progressOf.get(it.id)?.passes || 0, now(), progress.retry.has(it.id))
                   : onTop
                   ? reviewLine(progress.next.get(it.id) || 0)
                   : undefined
