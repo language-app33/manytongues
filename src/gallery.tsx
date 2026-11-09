@@ -302,6 +302,7 @@ const PLACES: Record<string, [string, string]> = {
   ReadSound: [PARTS, "A card's details · how it sounds"],
   ReadBlanks: [PARTS, "A card's details · the blanks it leaves"],
   ItemList: [PARTS, "A searchable list"],
+  SearchBox: [PARTS, "A search field, with a cross to clear it"],
   FilterBar: [PARTS, "What Sort or Filter opens onto"],
   FilterMenu: [PARTS, "One filter, in the toolbar"],
   ModeSelector: [PARTS, "Choosing a mode · drawn nowhere yet"],

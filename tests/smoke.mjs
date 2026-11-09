@@ -6685,12 +6685,23 @@ const openPronounTables = async () => {
         /* And none of them can be typed in as a group, because each is
            already a name on this list. */
         const newInput = () => /** @type {any} */ (inSheet(".at-blanknew input")[0] || null);
-        const addBtn = () => /** @type {any} */ (inSheet(".at-blanknew button")[0] || null);
+        const addBtn = () => /** @type {any} */ (inSheet(".at-blanknew > .at-btn")[0] || null);
         typeInto(newInput(), "noun");
         await sleep(200);
         check("and a group cannot be named after one of them",
           !!addBtn() && addBtn().disabled,
           addBtn() ? (addBtn().disabled ? "refused" : "offered") : "(no button)");
+        /* A search box with something in it has a cross that empties it
+           (0.599), and only then. */
+        const cross = () => inSheet(".at-blanknew .at-searchclear")[0] || null;
+        check("a search box with something typed has a cross to clear it",
+          !!cross() && cross()?.getAttribute("aria-label") === "Clear the search",
+          cross() ? "there" : "(no cross)");
+        click(cross());
+        await sleep(150);
+        check("and the cross empties it, and goes",
+          newInput()?.value === "" && !cross(),
+          `"${newInput()?.value}" ${cross() ? "cross still there" : ""}`);
         typeInto(newInput(), "");
         await sleep(150);
       }
@@ -6710,7 +6721,7 @@ const openPronounTables = async () => {
          second one like it is made. */
       {
         const findBox = () => /** @type {any} */ (inSheet(".at-blanknew input")[0] || null);
-        const addNew = () => /** @type {any} */ (inSheet(".at-blanknew button")[0] || null);
+        const addNew = () => /** @type {any} */ (inSheet(".at-blanknew > .at-btn")[0] || null);
         const all = fillNames();
         typeInto(findBox(), "fri");
         await sleep(200);
