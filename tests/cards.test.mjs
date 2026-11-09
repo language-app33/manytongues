@@ -618,28 +618,75 @@ test("a card at the top of the ladder says when it next comes round", () => {
   const settings = { language: "ar-PS" };
   const day = 24 * 60 * 60 * 1000;
   const word = { id: "k", lang: "ar-PS", ar: "كِتاب", en: "book", lat: "kitaab", s: {} };
+  /** @type {string[]} */
   const keys = laddered(/** @type {any} */ (word), settings);
-  assert.ok(keys.length >= 2, "the word is asked more than one thing, or there is nothing to choose between");
+  const topLevel = Math.max(...keys.map(levelOf));
+  const top = keys.filter((k) => levelOf(k) === topLevel);
+  const below = keys.filter((k) => levelOf(k) < topLevel);
+  assert.ok(top.length && below.length, "the word has a top level and something under it");
 
-  /* The soonest of them, not the last and not whichever happens to be
-     first in the list: the next review is the next time the learner sees
-     the card, whichever question it turns out to be. */
+  /* The top question's date: the next review is the next time the learner
+     sees the card, and a card at its top is seen through its top question.
+     The test after this one says why the lower one's date does not count. */
   word.s = {
-    [keys[0]]: { phase: "review", due: 9 * day },
-    [keys[1]]: { phase: "review", due: 3 * day },
+    [top[0]]: { phase: "review", due: 9 * day },
+    [below[0]]: { phase: "review", due: 3 * day },
   };
-  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 3 * day);
+  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 9 * day);
 
   /* A key with no schedule behind it is not a review due at the epoch.
      Every card carries keys that have never been answered — a second
      accepted spelling is the usual one — and reading those as nought
      would put "due now" on every card on the screen. */
-  word.s = { [keys[0]]: { phase: "review", due: 6 * day } };
+  word.s = { [top[0]]: { phase: "review", due: 6 * day } };
   assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 6 * day);
 
   /* And a card with nothing scheduled at all reads as nothing, rather
      than as a date the line below would then do arithmetic on. */
   word.s = {};
+  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 0);
+});
+
+/*
+ * A learnt card is asked its top question and nothing else (atItsTop), so
+ * the questions below it are never answered again and their dates pass
+ * unasked. Reading them in put "Review due now" on every learnt card for
+ * good once a reading question fell due: no session dealt that question,
+ * the top one was not due, and a right answer on it moved nothing — most
+ * visibly in a custom session built on the card, where it was dealt, met
+ * several times over, and still said due (0.597).
+ */
+test("a learnt card's next review is its top question's, whatever fell due below it", () => {
+  const settings = { language: "ar-PS" };
+  const day = 24 * 60 * 60 * 1000;
+  const word = { id: "k", lang: "ar-PS", ar: "كِتاب", en: "book", lat: "kitaab", s: {} };
+  /** @type {string[]} */
+  const keys = laddered(/** @type {any} */ (word), settings);
+  const topLevel = Math.max(...keys.map(levelOf));
+  const top = keys.filter((k) => levelOf(k) === topLevel);
+  const below = keys.filter((k) => levelOf(k) < topLevel);
+  assert.ok(top.length && below.length, "the word has a top level and something under it");
+
+  /* Every lower question long overdue, the top one three weeks off: the
+     card is next seen in three weeks. */
+  word.s = {
+    ...Object.fromEntries(below.map((k) => [k, { phase: "review", due: 1 * day }])),
+    ...Object.fromEntries(top.map((k) => [k, { phase: "review", due: 30 * day }])),
+  };
+  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 30 * day);
+  assert.equal(reviewLine(nextReviewAt(/** @type {any} */ (word), settings), 9 * day), "Next review in 21d");
+
+  /* And the top one due is the card due, as before. */
+  word.s = {
+    ...Object.fromEntries(below.map((k) => [k, { phase: "review", due: 40 * day }])),
+    ...Object.fromEntries(top.map((k) => [k, { phase: "review", due: 8 * day }])),
+  };
+  assert.equal(reviewLine(nextReviewAt(/** @type {any} */ (word), settings), 9 * day), "Review due now");
+
+  /* Only the lower ones scheduled — a card whose top has never been
+     answered is not at its top, and nothing here should invent a date
+     for it. */
+  word.s = Object.fromEntries(below.map((k) => [k, { phase: "review", due: 1 * day }]));
   assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 0);
 });
 
@@ -674,13 +721,14 @@ test("a cleared card's date is the review that counts towards learnt", () => {
   const below = keys.filter((k) => levelOf(k) < topLevel);
   assert.ok(top.length && below.length, "the word has a top level and something under it");
 
-  /* A lower question falling due sooner is when the card is next *seen*,
-     which is what Learnt says — but it is not a pass, so Cleared skips it. */
+  /* A lower question falling due sooner is not a pass, and — since 0.597 —
+     not when the card is next seen either, a card at its top being asked
+     its top alone. Both readings land on the top question's date. */
   word.s = {
     [below[0]]: { phase: "review", due: 1 * day, passes: 0 },
     ...Object.fromEntries(top.map((k) => [k, { phase: "review", due: 5 * day, passes: 0 }])),
   };
-  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 1 * day);
+  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 5 * day);
   assert.equal(nextPassAt(/** @type {any} */ (word), settings), 5 * day);
 
   /* One pass made, and the top question is still the one it waits on. */

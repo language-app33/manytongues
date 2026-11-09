@@ -16786,13 +16786,20 @@ export function levelPercent(at: { done: number; of: number } | null | undefined
  * session might deal, so this and the standing beside it are the one
  * answer said twice — see `laddered`, and the note on `cardStandings`.
  *
- * **The soonest of any of them**, which is when the learner next sees the
- * card. That is the reading under Learnt, where there is nothing left to
- * count towards and the only question is when the card is next asked.
- * Under Cleared it is `nextPassAt` instead: those cards are waiting on
- * one review in particular, and the line there names it — "Second review
- * in 4d" — so the date beside it has to be that review's, not a lower
- * level's question that happens to come round on Tuesday.
+ * **The soonest of the top-level ones**, which is when the learner next
+ * sees the card. That is the reading under Learnt, where there is nothing
+ * left to count towards and the only question is when the card is next
+ * asked — and a card at the top of its ladder is asked its top questions
+ * and nothing else (see `atItsTop`). The questions below keep their
+ * schedules for the day a slip would need them, but those dates pass
+ * unasked, so a reading that took them in (0.596 and before) had every
+ * learnt card saying "Review due now" for good once a reading question
+ * fell due: no session would deal that question, the top one was not due,
+ * and a right answer on it moved nothing — most visibly in a custom
+ * session built on the card, where it was dealt, met, and still said due.
+ * Under Cleared it is `nextPassAt`, which reads the same level for its
+ * own reason: those cards are waiting on one review in particular, and
+ * the line there names it — "Second review in 4d".
  *
  * Nought where nothing is scheduled, which a card at the top of the
  * ladder should never be — it is the reading for a card whose schedule
@@ -16802,7 +16809,10 @@ export function levelPercent(at: { done: number; of: number } | null | undefined
 export function nextReviewAt(it: Item, settings: Settings): Millis {
   let soonest = 0;
   for (const { unit } of unitsOf(it)) {
-    for (const key of laddered(unit, settings)) {
+    const keys = laddered(unit, settings);
+    const top = topLevelOf(keys);
+    for (const key of keys) {
+      if (levelOf(key) !== top) continue;
       const due = stateOf(unit, key).due || 0;
       if (!due) continue;
       if (!soonest || due < soonest) soonest = due;

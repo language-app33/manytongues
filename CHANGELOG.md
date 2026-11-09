@@ -8,6 +8,26 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.597 — 9 November 2026
+
+**A learnt card no longer says "Review due now" when nothing on it is due.**
+
+- A card you have learnt is only ever asked its hardest question — writing
+  the word from its meaning. The easier questions below it stay on the
+  card but are never asked again, so their review dates quietly passed
+  and the card then read "Review due now" on the Progress tab for good:
+  no session would deal those questions, the hardest one wasn't due yet,
+  and a right answer on it moved nothing. It was most visible in a custom
+  session built on such a card, which was met several times over and
+  still said due.
+- The date on a learnt card is now the hardest question's — "Next review
+  in 20d" — the same question the home screen counts and a session asks.
+  Cards whose hardest question really is due still say "Review due now",
+  and answering it still moves the card as before. Cleared cards already
+  read this way and are unchanged.
+- Nothing about scheduling changes: no card's dates move, only what the
+  tile says. Covered by a test.
+
 ## 0.596 — 9 November 2026
 
 **A copied picture can be pasted onto a card.**
