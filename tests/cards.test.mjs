@@ -2789,6 +2789,20 @@ test("a noun is laid out in boxes, with two sides for a person or an animal", ()
   assert.deepEqual(nounBoxes(LANGUAGES["he-IL"], "single").map((/** @type {any} */ b) => b.title), ["Singular", "Dual", "Plural"]);
 });
 
+test("a dual box says its English is written with “two”, and is still asked", () => {
+  /* Bare, "hours" would read the same as the plural box's English. */
+  const duals = [
+    ...nounBoxes(arPS(), "single"),
+    ...nounBoxes(arPS(), "paired"),
+    ...nounBoxes(LANGUAGES["he-IL"], "single"),
+  ].filter((/** @type {any} */ b) => b.number === "dual");
+  assert.equal(duals.length, 4);
+  for (const b of duals) {
+    assert.match(String(b.help), /“two”/, b.title);
+    assert.equal(b.unasked, undefined, b.title);
+  }
+});
+
 test("Arabic's plural after three to ten says which nouns want it, and is not asked on its own", () => {
   /* Days and months take a t after three to ten that they have nowhere
      else. The box says so under it, and a form written into it is said
@@ -2801,7 +2815,7 @@ test("Arabic's plural after three to ten says which nouns want it, and is not as
   assert.match(String(counted.help), /eleven up the singular/);
   assert.equal(counted.unasked, true);
   for (const b of boxes.filter((/** @type {any} */ b) => b.number !== "counted")) {
-    assert.equal(b.help, undefined, b.title);
+    if (b.number !== "dual") assert.equal(b.help, undefined, b.title);
     assert.equal(b.unasked, undefined, b.title);
   }
   /* And a form already in it sits in it. */
