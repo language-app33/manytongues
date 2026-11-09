@@ -7805,3 +7805,39 @@ that names its space, in the file or on the site, keeps it. Run from Main,
 **What it costs.** Genuine Main material from before spaces, restored from
 inside another space, moves into that space. The Restore screen counts such
 records and names the space before anything is written.
+
+---
+
+## Save and publish, one request (0.591)
+
+**9 November 2026** · `publish` in save-card (`server/api/courses.js`);
+`ScreenFab` and `Screen` in `src/shared.tsx`; `trySave`, `save` in
+`src/card-editor.tsx`; the editor's `onSave` in `src/spaces.tsx`
+
+**What was wanted.** A second floating button beside Save while a card is
+edited: Save and publish. Until now publishing an edit was Save, then the
+status menu, then Publish.
+
+**What changed.** save-card takes `publish: true`, and after writing the
+card publishes what it wrote exactly as card-status "published" would: a
+draft loses its status, and a published card's `pending` is laid over it
+and dropped. It is one request rather than a save followed by
+`cardStatus`, so a save kept in the outbox offline carries the flag and is
+published when it goes up, and a dropped connection cannot leave a card
+saved but not out. A `walk` publishes nothing. Decks are bumped by the
+existing `liveMoved` comparison, which sees the change.
+
+`Screen`'s `fab` takes a list; the editor passes Save and publish (marked
+`second`, the quieter style) then Save, so Save keeps the corner. Each
+says it is busy only when it sent the save in flight.
+
+**Choices the owner made.** Offline, kept and published later (rather than
+off). After publishing, back to reading the card, as Save does. Off
+whenever Save is: waiting changes with nothing new are published from the
+status menu. Shown on every card, Ready for review included, since anyone
+who may edit a card may already publish it.
+
+**What it costs.** Publishing is one tap from the middle of an edit; the
+quieter style and the position away from the corner are the guard, and
+Unpublish is the way back. On phones under 360px the buttons lose a
+little padding so both names fit.

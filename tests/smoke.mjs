@@ -334,6 +334,9 @@ const saveOrgs = [];
 const reviewsSent = [];
 /** @type {any[]} */
 const savedCards = [];
+/** Whether each save asked to be published too, in the order they came. */
+/** @type {boolean[]} */
+const savedPublish = [];
 
 /**
  * The whole server, as far as the app is concerned.
@@ -537,6 +540,7 @@ const fakeFetch = async (input, opts = {}) => {
       const body = JSON.parse(opts.body || "{}");
       const card = { ...(body.card || {}), id: (body.card && body.card.id) || `k-saved-${savedCards.length + 1}` };
       savedCards.push(card);
+      savedPublish.push(body.publish === true);
       return json({ ok: true, card: { ...card, decks: body.decks || [] }, decks: [] });
     }
     if (action === "image") {
@@ -4657,6 +4661,12 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   const saveOff = () => isOff(buttonNamed(/^Save$/));
   check("Save is off until something changes", !!saveOff(),
     `Save ${isOff(buttonNamed(/^Save$/)) ? "off" : "on"}`);
+  /* And beside it, Save and publish: before Save in the row, so Save keeps
+     the corner, and off whenever Save is. */
+  const fabNames = () => [...document.querySelectorAll(".at-screen.cardform button.at-fab")].map(spokenName);
+  check("Save and publish floats beside Save, off with it",
+    fabNames().join(" | ") === "Save and publish | Save" && isOff(buttonNamed(/^Save and publish$/)),
+    fabNames().join(" | "));
   /* And a tap on it says so, rather than nothing happening. */
   clickNamed(/^Save$/);
   await sleep(150);
@@ -4708,6 +4718,19 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("and with it saved the card is read again, Edit in the corner",
     !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save$/),
     [...document.querySelectorAll(".at-fab")].map(spokenName).join(" | "));
+  /* Save and publish: the same save, asking to be published, and back to
+     reading the card as Save is. A plain Save never asks. */
+  click(cardEdit());
+  await sleep(400);
+  typeOn(noteBox(), `${(noteBox() || { value: "" }).value}z`);
+  await sleep(150);
+  clickNamed(/^Save and publish$/);
+  await sleep(500);
+  const asks = savedPublish.slice(savesBefore);
+  check("Save and publish saves the card asking for it to be published, and goes back to reading it",
+    asks.length === 3 && !asks[0] && !asks[1] && asks[2] && savedCards[savedCards.length - 1].id === both[0].id &&
+      !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save and publish$/),
+    `${asks.join(", ")} · ${buttonNamed(/^Edit$/) ? "reading" : "still editing"}`);
   clickNamed(/^Back$/);
   await sleep(400);
   takeSaves = false;

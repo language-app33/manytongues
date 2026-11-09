@@ -3386,7 +3386,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    foot so it never sits over the last thing on the page. See ScreenFab. */
 .at-screen.hasfab .at-screenbody { padding-bottom: calc(104px + env(safe-area-inset-bottom)); }
 .at-fabrow { position:absolute; left:0; right:0; bottom: calc(16px + env(safe-area-inset-bottom));
-  max-width:640px; margin:0 auto; padding:0 16px; display:flex; justify-content:flex-end;
+  max-width:640px; margin:0 auto; padding:0 16px; display:flex; justify-content:flex-end; gap:12px;
   pointer-events:none; z-index:4; transition: bottom 160ms ease-out; }
 /* A message at the foot of the window lifts the button over it. */
 .at:has(.at-snack) .at-fabrow { bottom: calc(148px + env(safe-area-inset-bottom)); }
@@ -3396,11 +3396,22 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
   font-family: var(--ui); font-size:15px; font-weight:700; cursor:pointer;
   box-shadow: 0 6px 18px rgba(0,0,0,.35); }
 .at-fab > svg { width:24px; height:24px; flex:none; }
-.at-fab .at-fablabel { white-space:nowrap; overflow:hidden; max-width:120px;
+.at-fab .at-fablabel { white-space:nowrap; overflow:hidden; max-width:150px;
   transition: max-width 160ms ease-out, opacity 120ms ease-out; }
 .at-fab:not(.named) .at-fablabel { max-width:0; opacity:0; }
 .at-fab:not(.named) { gap:0; padding:0; justify-content:center; width:56px; }
 .at-fab.off { background: var(--raised); color: var(--muted); box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+/* The quieter of two — Save and publish beside Save: the surface, in the
+   accent's colour, so the corner's own button stays the one that stands
+   out and publishing is never the tap a thumb lands on by habit. */
+.at-fab.second:not(.off) { background: var(--raised); color: var(--jade); box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 2px var(--jade); }
+/* Two side by side on the narrowest phones: a little less air, so both
+   keep their names whole rather than both being cut. */
+.at-fab { flex:none; }
+@media (max-width: 359px) {
+  .at-fabrow { gap:8px; }
+  .at-fab.named { padding:0 12px; }
+}
 
 /* The tabs start at the top of the sheet and stay there: no gap above
    them that the sticking would take up on the first scroll. */

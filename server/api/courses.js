@@ -3751,6 +3751,18 @@ async function handle(req) {
            and in nobody's collection. */
         await updateJson(store, K.myCards(mine), (list) => (list || []).concat([newId]));
       }
+      /* Save and publish: what was just written goes out to students in
+         the same step, as card-status "published" would put it — a draft
+         loses its status, and changes waiting on a published card become
+         the card. One request rather than a save and then a status, so a
+         save kept on a device offline is published when it goes up, and a
+         dropped connection cannot leave it saved but not out. A walk is
+         another card's rename reaching this one, and publishes nothing. */
+      if (body.publish === true && !walk) {
+        const { pending: waiting, ...out } = saved;
+        saved = waiting ? withVersion(out, waiting.card || {}) : out;
+        delete saved.status;
+      }
 
       /* Which decks it belongs to travels with the card. Older clients sent
          this as deckIds, so both names are honoured rather than silently

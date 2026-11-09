@@ -10510,7 +10510,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   decks: Deck[];
   inDecks?: string[];
   allCards: Card[];
-  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean }) => void;
+  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean, publish: boolean }) => void;
   /** Open another of the teacher's cards in place of this one — the
       cards the Meanings block names. */
   onOpenCard?: (card: Card) => void;
@@ -10644,7 +10644,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     !(card && SPEAKER_COLUMNS.has(String(card.person || "")));
   /* The question a change to a shared word asks, while it is being asked:
      what would be saved, and which cards it would be offered to. */
-  const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null, exit: boolean } | null>(null);
+  const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null, exit: boolean, publish: boolean } | null>(null);
   const meanings = advanced && shape === "word";
   /* The card as a save would write it — a basic card cut down to its word. */
   const written = () => {
@@ -10704,11 +10704,16 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   /* A tap on a field of a card being read. */
   /* Read fields are plain words now, so a tap on one needs no answer. */
   const viewOnly = () => {};
-  /* The floating Save: saves where it can, and otherwise says why not. */
-  const trySave = () => {
+  /* Which of the two floating buttons sent the save under way, so only
+     that one says it is busy. */
+  const [publishing, setPublishing] = useState(false);
+  /* The floating Save, and Save and publish beside it: saves where it can,
+     and otherwise says why not. */
+  const trySave = (publish = false) => {
     if (busy) return;
     if (canSave && changed) {
-      save();
+      setPublishing(publish);
+      save(null, false, publish);
       return;
     }
     setNameAsked(true);
@@ -10722,7 +10727,9 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   const leave = () => (changed ? setDiscarding(true) : quit());
   /* `exit` is Save and exit: the card is saved and the editor closes.
      Save alone keeps it open on the card as saved. */
-  const save = (next: "meaning" | "word" | null = null, exit = false) => {
+  /* `publish` is Save and publish: the same save, sent out to students in
+     the same request. */
+  const save = (next: "meaning" | "word" | null = null, exit = false, publish = false) => {
     sending.current = snapshot;
     const out = written();
     const extra = {
@@ -10733,10 +10740,10 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     const changes = stored && shape === "word" ? wordChanges(card, out.forms as any) : [];
     const others = cardsSharingChange(allCards, { id: selfId, lang: lang.id }, changes);
     if (others.length) {
-      setCarrying({ written: out, cards: others, changes, next: extra.next, exit });
+      setCarrying({ written: out, cards: others, changes, next: extra.next, exit, publish });
       return;
     }
-    onSave({ ...out, ...extra, carry: null, exit });
+    onSave({ ...out, ...extra, carry: null, exit, publish });
   };
   /* Whether there is a connection, for the line above the first field. */
   const offline = useOffline();
@@ -10832,7 +10839,14 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         fab={
           locked
             ? onUnlock ? { icon: "edit", label: "Edit", onClick: onUnlock } : null
-            : { icon: "save", label: "Save", off: !canSave || !changed, busy: !!busy, onClick: trySave }
+            : [
+                /* Beside Save, and quieter than it: what a Save would
+                   write, published in the same step. Off whenever Save is
+                   — changes already waiting are published from the status
+                   menu. */
+                { icon: "verify", label: "Save and publish", busyLabel: "Publishing…", second: true, off: !canSave || !changed || (!!busy && !publishing), busy: !!busy && publishing, onClick: () => trySave(true) },
+                { icon: "save", label: "Save", off: !canSave || !changed || (!!busy && publishing), busy: !!busy && !publishing, onClick: () => trySave(false) },
+              ]
         }
       >
           {error && <Notice kind="error">{error}</Notice>}
@@ -10990,7 +11004,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
           cards={carrying.cards}
           onCancel={() => setCarrying(null)}
           onAnswer={(carry) => {
-            const { written, cards, changes, next, exit } = carrying;
+            const { written, cards, changes, next, exit, publish } = carrying;
             setCarrying(null);
             onSave({
               ...written,
@@ -10998,6 +11012,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               capitals: asksCapitals ? capitals : undefined,
               next,
               exit,
+              publish,
               carry: carry ? { ids: cards.map((c) => c.id), changes } : null,
             });
           }}
