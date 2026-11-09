@@ -5885,7 +5885,7 @@ export interface DeckWords {
   another: string;
 }
 
-export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize, saving }: {
+export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize, saving, onAdd }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
@@ -5915,6 +5915,12 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
       says "Adding…" or "Removing…" and cannot be tapped until it is done,
       where a save takes long enough for a teacher to wonder. */
   saving?: Record<string, "add" | "drop">;
+  /** Where the decks are chosen somewhere else than this sheet — a card's
+      editor opens DeckPickScreen, the screen selected cards are put in
+      decks from, so a deck can be made on the way (0.594). Given, the add
+      button calls it, and is there even with no decks yet: making the
+      first one is what that screen is for. */
+  onAdd?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -5979,18 +5985,18 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
             yet: what it makes is what stands beside it. Its words are the
             whole invitation while the card is in nothing, and shorten to
             the bare offer once the row can speak for itself. */}
-        {all.length > 0 && (
+        {(all.length > 0 || onAdd) && (
           <button
             className="at-deckadd"
-            aria-expanded={open}
-            onClick={() => setOpen(true)}
+            aria-expanded={onAdd ? undefined : open}
+            onClick={() => (onAdd ? onAdd() : setOpen(true))}
           >
             <Icon name="add" size={17} />
             {inThese.length ? say.another : say.first}
           </button>
         )}
 
-        {!all.length && (
+        {!all.length && !onAdd && (
           <Help>{say.none}</Help>
         )}
       </div>
@@ -6053,6 +6059,133 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
         </PickSheet>
       )}
     </div>
+  );
+}
+
+/*
+ * Putting cards in decks, on a screen of its own: a New deck button at the
+ * top, the decks to tick, and Cancel or the confirming button at the foot.
+ *
+ * One screen for both ways cards go into decks — selected cards, and the
+ * card being written (0.594). The card's editor used to open a small sheet
+ * that could only choose among decks that already existed, so a teacher
+ * writing a card for a deck not yet made had to leave the card to make it.
+ * Selected cards already had New deck here; now the one card has it too,
+ * and the two cannot drift apart.
+ *
+ * The name being typed is this screen's own; making the deck is the
+ * caller's, which ticks it, since the deck just named is the one about to
+ * be chosen. `onCreate` resolving to something truthy means it was made
+ * and the name box closes; nothing, and it stays open with the name in it.
+ * Left out — taking cards out of decks — there is no New deck.
+ */
+export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHint, busy = false, error, confirm, confirmOff = false, onConfirm, onCancel, empty = "You have no decks yet." }: {
+  title: Node;
+  decks: Pick<Deck, "id" | "title" | "locked" | "cardCount">[];
+  chosen: string[];
+  onToggle: (id: string, wasOn: boolean) => void;
+  onCreate?: (title: string) => Promise<unknown>;
+  /** Under the new deck's name: which language it will be. */
+  newHint?: string;
+  busy?: boolean;
+  /** Why the last attempt failed, where this screen covers the place that
+      would otherwise say. */
+  error?: string | null;
+  confirm: string;
+  confirmOff?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  empty?: Node;
+}) {
+  const [name, setName] = useState<string | null>(null);
+  /* Its own, as well as the caller's: a second Enter while the first deck
+     is still being made would make two. */
+  const [making, setMaking] = useState(false);
+  const make = async () => {
+    const t = String(name || "").trim();
+    if (!t || busy || making || !onCreate) return;
+    setMaking(true);
+    try {
+      if (await onCreate(t)) setName(null);
+    } finally {
+      setMaking(false);
+    }
+  };
+  return (
+    <Screen title={title} onBack={onCancel}>
+      {/* Somewhere to put them that does not exist yet.
+          Before this, a teacher who had selected thirty cards and then
+          found no deck for them had to leave, make the deck, and select
+          the thirty again — so the way out of the screen was to lose the
+          work that got you there. */}
+      {onCreate &&
+        (name === null ? (
+          <div className="at-row at-mb3">
+            <Button variant="ghost" size="sm" icon="add" onClick={() => setName("")}>
+              New deck
+            </Button>
+          </div>
+        ) : (
+          <div className="at-formblock at-mb3">
+            <Field label="New deck" hint={newHint || ""}>
+              <input
+                className="at-input"
+                placeholder="e.g. Week 3 · Verbs"
+                value={name}
+                autoFocus
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && make()}
+              />
+            </Field>
+            <div className="at-row at-mt3">
+              <Button variant="ghost" size="sm" icon="close" onClick={() => setName(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                icon="check"
+                disabled={!name.trim() || busy || making}
+                onClick={make}
+              >
+                Create
+              </Button>
+            </div>
+          </div>
+        ))}
+
+      <CheckList
+        options={decks.map((d) => ({
+          id: d.id,
+          title: d.title,
+          /* A locked deck is shown, and cannot be ticked: its cards stay
+             as they are until someone unlocks it. */
+          note: d.locked ? (
+            <>
+              <span className="at-lockmark" title="Locked" aria-label="Locked" role="img">
+                <Icon name="lock" size={12} />{" "}
+              </span>
+              {deckSize(d)}
+            </>
+          ) : (
+            deckSize(d)
+          ),
+          disabled: !!d.locked,
+        }))}
+        chosen={chosen}
+        onToggle={onToggle}
+        empty={empty}
+      />
+      {error ? <p className="at-formneed unmet at-mt3" role="alert">{error}</p> : null}
+      <div className="at-row at-mt5">
+        <Button variant="ghost" onClick={onCancel} icon="close">
+          Cancel
+        </Button>
+        <Button variant="primary" disabled={confirmOff || busy} onClick={onConfirm} icon="check">
+          {confirm}
+        </Button>
+      </div>
+    </Screen>
   );
 }
 

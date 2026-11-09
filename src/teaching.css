@@ -273,7 +273,6 @@
    list, set as the lines of help around it are. */
 .at-examplekeys { margin:0 0 12px; padding-inline-start:20px; }
 .at-examplekeys > li { margin:2px 0; }
-.at-lockmark { white-space:nowrap; }
 /* The other cards that share this one's word or meaning, at the top of the
    Meanings block: a line each, the names tappable. */
 .at-sharedline { margin:0 0 10px; font-size:14px; color: var(--text); }

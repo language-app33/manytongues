@@ -7841,3 +7841,27 @@ who may edit a card may already publish it.
 quieter style and the position away from the corner are the guard, and
 Unpublish is the way back. On phones under 360px the buttons lose a
 little padding so both names fit.
+
+---
+
+## One screen for putting cards in decks
+
+**9 November 2026** · `src/shared.tsx` (`DeckPickScreen`, `DeckSwitch`'s `onAdd`), `src/card-editor.tsx`, `src/spaces.tsx`
+
+A card being written chose its decks in a small sheet, which could pick
+only among decks that already existed. Selected cards chose theirs on a
+full screen, which had New deck at the top. The owner asked for the card
+to work the same way, so a card written for a deck not yet made need not
+be left to make it.
+
+Both now open `DeckPickScreen`. The card's ticks are a draft, applied by
+Done and thrown away by Cancel. The old sheet took each tap at once, and
+that immediacy is what this gives up. The draft is needed because a deck
+made on the screen is ticked in it before the card has said yes to
+anything. The deck is made in the card's language, read off the card as
+selected cards' decks read theirs off the selection.
+
+The other callers of `DeckSwitch` keep the sheet: a course's decks, Prep
+mode's and Build a session's. In those places, making a deck isn't
+something being chosen, and a course's deck list saves each tap as it
+goes.

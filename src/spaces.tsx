@@ -163,6 +163,7 @@ import {
   useRun,
   Popover,
   DeckSwitch,
+  DeckPickScreen,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
 export { LanguageTag, languageName } from "./shared.tsx";
@@ -5868,7 +5869,6 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   /* The name of a deck being made from the add-to-a-deck screen, or null
      when nothing is being made. "" is a form that is open and empty, which
      is not the same as no form at all. */
-  const [newDeckName, setNewDeckName] = useState<string | null>(null);
   const [pickedCourses, setPickedCourses] = useState<string[]>([]);
   /* The card whose sentences are being reviewed — it takes over the
      screen, like the editor. Reports from students are not here at all:
@@ -7119,9 +7119,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   /* Made, then ticked: the deck a teacher just named is the one they were
      about to choose, so choosing it again by hand is a step that says
      nothing. */
-  const createDeckHere = () => {
-    const title = String(newDeckName || "").trim();
-    if (!title) return;
+  const createDeckHere = (title: string) =>
     run(
       async () => {
         const r = await API.createDeck(title, "", newDeckLang, mineSide);
@@ -7130,12 +7128,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
           setDecks((prev) => prev.concat([made]));
           setPickedDecks((prev) => prev.concat([made.id]));
         }
-        setNewDeckName(null);
         return made;
       },
       (made) => `${(made && made.title) || title} created`
     );
-  };
 
   /* ---- a new deck takes over the screen, like a new card ----
      Saved, it opens as the deck itself: that is where its courses, its
@@ -7248,6 +7244,20 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         lang={editLang || LANGUAGES[DEFAULT_LANGUAGE]}
         decks={decksIn(new Set([(editLang || LANGUAGES[DEFAULT_LANGUAGE]).id]), editing.decks)}
         inDecks={editing.decks}
+        /* A deck made from the card's decks screen, in the card's language;
+           the editor ticks it (0.594). */
+        onCreateDeck={(title) => {
+          const langId = (editLang || LANGUAGES[DEFAULT_LANGUAGE]).id;
+          return run(
+            async () => {
+              const r = await API.createDeck(title, "", langId, mineSide);
+              const made = r && r.deck;
+              if (made) setDecks((prev) => prev.concat([made]));
+              return made;
+            },
+            (made) => `${(made && made.title) || title} created`
+          );
+        }}
         busy={busy}
         error={error}
         onClose={() => setEditing(null)}
@@ -7872,147 +7882,66 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      One screen for both places cards are selected: the Cards tab, and
      inside a deck — where the deck already open is left off the list,
      there being nothing to add a card to that it is already in. ---- */
-  const cardActionScreen = (inDeck?: string) => (
-    <Screen
-      title={
-        cardAction === "add"
-          ? "Add the selected cards to…"
-          : "Take the selected cards out of…"
-      }
-      onBack={() => {
-        setCardAction(null);
-        setNewDeckName(null);
-      }}
-    >
-      {/* Somewhere to put them that does not exist yet.
-          Before this, a teacher who had selected thirty cards
-          and then found no deck for them had to leave, make
-          the deck, and select the thirty again — so the way
-          out of the screen was to lose the work that got you
-          there. Only when adding: there is nothing to take a
-          card out of that was made a moment ago. */}
-      {cardAction === "add" &&
-        (newDeckName === null ? (
-          <div className="at-row at-mb3">
-            <Button variant="ghost" size="sm" icon="add" onClick={() => setNewDeckName("")}>
-              New deck
-            </Button>
-          </div>
-        ) : (
-          <div className="at-formblock at-mb3">
-            <Field
-              label="New deck"
-              hint={
-                /* The cards decide, so say which language it
-                   will be — silently making a deck in the
-                   wrong one is a thing nothing here shows
-                   until a student opens it. */
-                newDeckLang
-                  ? `It will be a ${languageName(languages, newDeckLang)} deck.`
-                  : ""
-              }
-            >
-              <input
-                className="at-input"
-                placeholder="e.g. Week 3 · Verbs"
-                value={newDeckName}
-                autoFocus
-                onChange={(e) => setNewDeckName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && createDeckHere()}
-              />
-            </Field>
-            <div className="at-row at-mt3">
-              <Button variant="ghost" size="sm" icon="close" onClick={() => setNewDeckName(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                icon="check"
-                disabled={!newDeckName.trim() || busy}
-                onClick={createDeckHere}
-              >
-                Create
-              </Button>
-            </div>
-          </div>
-        ))}
-
-      <CheckList
-        options={(cardAction === "add" ? decksIn(new Set([...pickedLangs, newDeckLang])) : decks).filter((d) => d.id !== inDeck).map((d) => ({
-          id: d.id,
-          title: d.title,
-          /* A locked deck is shown, and cannot be ticked: its cards stay
-             as they are until someone unlocks it. */
-          note: d.locked ? (
-            <>
-              <span className="at-lockmark" title="Locked" aria-label="Locked" role="img">
-                <Icon name="lock" size={12} />{" "}
-              </span>
-              {deckSize(d)}
-            </>
-          ) : (
-            deckSize(d)
-          ),
-          disabled: !!d.locked,
-        }))}
+  const cardActionScreen = (inDeck?: string) => {
+    const close = () => {
+      setCardAction(null);
+      setPickedDecks([]);
+    };
+    return (
+      <DeckPickScreen
+        title={
+          cardAction === "add"
+            ? "Add the selected cards to…"
+            : "Take the selected cards out of…"
+        }
+        decks={(cardAction === "add" ? decksIn(new Set([...pickedLangs, newDeckLang])) : decks).filter((d) => d.id !== inDeck)}
         chosen={pickedDecks}
         onToggle={(id, on) =>
           setPickedDecks((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
         }
-        empty="You have no decks yet."
+        /* Only when adding: there is nothing to take a card out of that
+           was made a moment ago. */
+        onCreate={cardAction === "add" ? createDeckHere : undefined}
+        /* The cards decide, so say which language it will be — silently
+           making a deck in the wrong one is a thing nothing here shows
+           until a student opens it. */
+        newHint={newDeckLang ? `It will be a ${languageName(languages, newDeckLang)} deck.` : ""}
+        busy={busy}
+        confirm={cardAction === "add" ? "Add" : "Remove"}
+        confirmOff={!pickedDecks.length}
+        onCancel={close}
+        onConfirm={() =>
+          run(
+            async () => {
+              /* Counted rather than assumed: a card already in
+                 the deck is skipped, so the number selected is
+                 not the number changed. */
+              let changed = 0;
+              for (const id of pickedIds(selCards)) {
+                const card = cards.find((c) => c.id === id);
+                if (!card) continue;
+                const inNow = card.decks || [];
+                const next =
+                  cardAction === "add"
+                    ? [...new Set(inNow.concat(pickedDecks))]
+                    : inNow.filter((x) => !pickedDecks.includes(x));
+                if (next.length === inNow.length) continue;
+                absorbSaved(await saveNamed(card, next));
+                changed += 1;
+              }
+              close();
+              setSelCards(new Set());
+              return changed;
+            },
+            (changed) =>
+              changed
+                ? `${plural(changed, "card")} ${cardAction === "add" ? "added" : "removed"}`
+                : "Nothing to change — they were already like that"
+          )
+        }
       />
-      <div className="at-row at-mt5">
-        <Button variant="ghost"
-          onClick={() => {
-            setCardAction(null);
-            setPickedDecks([]);
-            setNewDeckName(null);
-          }}
-          icon="close"
-        >
-          Cancel
-        </Button>
-        <Button variant="primary"
-          disabled={!pickedDecks.length || busy}
-          onClick={() =>
-            run(
-              async () => {
-                /* Counted rather than assumed: a card already in
-                   the deck is skipped, so the number selected is
-                   not the number changed. */
-                let changed = 0;
-                for (const id of pickedIds(selCards)) {
-                  const card = cards.find((c) => c.id === id);
-                  if (!card) continue;
-                  const inNow = card.decks || [];
-                  const next =
-                    cardAction === "add"
-                      ? [...new Set(inNow.concat(pickedDecks))]
-                      : inNow.filter((x) => !pickedDecks.includes(x));
-                  if (next.length === inNow.length) continue;
-                  absorbSaved(await saveNamed(card, next));
-                  changed += 1;
-                }
-                setCardAction(null);
-                setPickedDecks([]);
-                setNewDeckName(null);
-                setSelCards(new Set());
-                return changed;
-              },
-              (changed) =>
-                changed
-                  ? `${plural(changed, "card")} ${cardAction === "add" ? "added" : "removed"}`
-                  : "Nothing to change — they were already like that"
-            )
-          }
-          icon="check"
-        >
-          {cardAction === "add" ? "Add" : "Remove"}
-        </Button>
-      </div>
-    </Screen>
-  );
+    );
+  };
 
   /* ---- putting a group tag on the selected cards, or taking one off ----
      What the tag sheet in the editor does to one card, done to every card
