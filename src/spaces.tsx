@@ -5831,6 +5831,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      selected cards or take off them, and the name of one being made on the
      spot. See tagActionScreen. */
   const [tagAction, setTagAction] = useState<"add" | "remove" | null>(null);
+  /* Changing the status of the selected cards: the screen is open while
+     this is set, holding the status chosen on it, if any yet. See
+     statusActionScreen. */
+  const [statusAction, setStatusAction] = useState<null | { to: "draft" | "review" | "published" | null; asking?: boolean }>(null);
   const [pickedTags, setPickedTags] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [newCardLang, setNewCardLang] = useState<LangId | null>(null);
@@ -7241,7 +7245,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         decks={decksIn(new Set([(editLang || LANGUAGES[DEFAULT_LANGUAGE]).id]), editing.decks)}
         inDecks={editing.decks}
         /* A deck made from the card's decks screen, in the card's language;
-           the editor ticks it (0.592). */
+           the editor ticks it (0.594). */
         onCreateDeck={(title) => {
           const langId = (editLang || LANGUAGES[DEFAULT_LANGUAGE]).id;
           return run(
@@ -8089,6 +8093,124 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     );
   };
 
+  /* The status of every selected card at once — the card screen's status
+     menu, for many. Publish sends out drafts and cards waiting for review,
+     and the changes on published cards that have any. Draft and Ready for
+     review take published cards away from students, so they ask first and
+     say how many (the owner's call, 0.592): the card is unpublished, which
+     brings its unpublished changes with it, then given the status asked
+     for. One request per card, as tagging is; a card that is someone
+     else's is counted and left, not the end of the batch. */
+  const statusActionScreen = () => {
+    if (!statusAction) return null;
+    const picked = pickedIds(selCards)
+      .map((id) => cards.find((c) => c.id === id))
+      .filter(Boolean) as Card[];
+    const live = (c: Card) => !c.status || c.status === "published";
+    const published = picked.filter(live);
+    const drafts = picked.filter((c) => !live(c));
+    const wouldChange = (to: "draft" | "review" | "published") =>
+      to === "published"
+        ? drafts.length + published.filter((c) => c.changes).length
+        : drafts.filter((c) => c.status !== to).length + published.length;
+    const to = statusAction.to;
+    const close = () => setStatusAction(null);
+    const go = () => {
+      if (!to) return;
+      run(
+        async () => {
+          let changed = 0;
+          let refused = 0;
+          for (const card of picked) {
+            try {
+              if (to === "published") {
+                if (live(card) && !card.changes) continue;
+                absorbSaved(await API.cardStatus(card.id, "published"));
+              } else if (live(card)) {
+                const r = await API.cardStatus(card.id, "unpublish");
+                absorbSaved(r.card.status === to ? r : await API.cardStatus(card.id, to));
+              } else {
+                if (card.status === to) continue;
+                absorbSaved(await API.cardStatus(card.id, to));
+              }
+              changed += 1;
+            } catch (e) {
+              if ((e as Error).message === "not-yours") refused += 1;
+              else throw e;
+            }
+          }
+          close();
+          setSelCards(new Set());
+          return { changed, refused };
+        },
+        ({ changed, refused }: { changed: number; refused: number }) =>
+          [
+            changed
+              ? to === "published"
+                ? `${plural(changed, "card")} published — students get them now`
+                : `${plural(changed, "card")} marked ${to === "review" ? "ready for review" : "as drafts"}`
+              : "Nothing to change — they were already like that",
+            refused ? `${plural(refused, "card")} belong to someone else and stayed` : "",
+          ]
+            .filter(Boolean)
+            .join(". "),
+      );
+    };
+    const choices: { id: "draft" | "review" | "published"; title: string }[] = [
+      { id: "draft", title: "Draft" },
+      { id: "review", title: "Ready for review" },
+      { id: "published", title: "Publish" },
+    ];
+    return (
+      <Screen title="Change the status of the selected cards" onBack={close}>
+        <Help>
+          Publish sends drafts and cards waiting for review out to students, and publishes any changes on cards
+          they already have. Draft and Ready for review take published cards away from students until they are
+          published again.
+        </Help>
+        <CheckList
+          options={choices.map((c) => ({
+            id: c.id,
+            title: c.title,
+            note: `changes ${wouldChange(c.id)} of the ${plural(picked.length, "selected card")}`,
+          }))}
+          chosen={to ? [to] : []}
+          onToggle={(id, on) => setStatusAction({ to: on ? null : (id as "draft" | "review" | "published") })}
+        />
+        <div className="at-row at-mt5">
+          <Button variant="ghost" onClick={close} icon="close">
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            icon="check"
+            disabled={!to || busy}
+            onClick={() => (to !== "published" && published.length ? setStatusAction({ to, asking: true }) : go())}
+          >
+            Change status
+          </Button>
+        </div>
+        {statusAction.asking && (
+          <ConfirmModal
+            title={`Unpublish ${plural(published.length, "card")}?`}
+            confirmLabel="Unpublish them"
+            busy={busy}
+            body={
+              <p>
+                {published.length === 1 ? "One of the selected cards is" : `${published.length} of the selected cards are`}{" "}
+                published. Students will stop seeing {published.length === 1 ? "it" : "them"} until{" "}
+                {published.length === 1 ? "it is" : "they are"} published again. Any changes waiting on{" "}
+                {published.length === 1 ? "it" : "them"} stay, and become the card.
+              </p>
+            }
+            onCancel={() => setStatusAction({ to })}
+            onConfirm={go}
+          />
+        )}
+      </Screen>
+    );
+  };
+
   /* What a saved deck holds of the things the screen can change, in the
      shape a draft of it takes — so starting to edit is copying this, and
      whether anything has changed is comparing against it. */
@@ -8435,6 +8557,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               { label: "Add to another deck", onClick: () => setCardAction("add") },
               { label: "Add tags", onClick: () => setTagAction("add") },
               { label: "Remove tags", onClick: () => setTagAction("remove") },
+              { label: "Change status", onClick: () => setStatusAction({ to: null }) },
               { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(realIds(picked)) },
               {
                 label: "Delete",
@@ -8455,6 +8578,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
           {exportScreen}
           {importScreen}
           {tagAction && tagActionScreen()}
+          {statusAction && statusActionScreen()}
           {cardsConfirm}
         </Screen>
       );
@@ -8723,6 +8847,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         {cardAction === "add" && cardActionScreen(d.id)}
         {exportScreen}
         {tagAction && tagActionScreen()}
+        {statusAction && statusActionScreen()}
 
         {discardingDeck && (
           <ConfirmModal
@@ -9115,6 +9240,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
 
               {cardAction && cardActionScreen()}
               {tagAction && tagActionScreen()}
+              {statusAction && statusActionScreen()}
 
 
               {/* What is waiting on the teacher: sentences nobody has read
@@ -9239,6 +9365,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   { label: "Remove from a deck", onClick: () => setCardAction("remove") },
                   { label: "Add tags", onClick: () => setTagAction("add") },
                   { label: "Remove tags", onClick: () => setTagAction("remove") },
+                  { label: "Change status", onClick: () => setStatusAction({ to: null }) },
                   { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(pickedIds(picked)) },
                   {
                     label: "Delete",

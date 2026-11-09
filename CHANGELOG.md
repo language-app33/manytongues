@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.592 — 9 November 2026
+## 0.594 — 9 November 2026
 
 **Make a deck while writing a card.**
 
@@ -26,6 +26,32 @@ and moves once per batch of work you would notice, not once per commit.
   press, where it was a small window that took each tap at once.
 - Unchanged: the selected-cards screen, and choosing a course's decks,
   Prep mode's decks and Build a session's decks.
+## 0.593 — 9 November 2026
+
+**A noun's dual box says how to write its English.**
+
+- On the Advanced tab of an Arabic or Hebrew noun, the Dual box now says
+  to write the English with "two", like "two hours", so it doesn't read
+  the same as the plural. It shows on both sides of a person or an animal.
+- While the Dual box is empty it still says it is never asked, after that
+  line.
+
+## 0.592 — 9 November 2026
+
+**Change the status of several cards at once.**
+
+- Tick cards in the Cards tab, or in a deck's Manage cards, and the bulk
+  actions now have Change status: Draft, Ready for review or Publish, each
+  saying how many of the ticked cards it would change.
+- Publish sends drafts and cards waiting for review out to students, and
+  publishes the changes waiting on cards they already have. Published cards
+  with nothing waiting are left as they are.
+- Draft and Ready for review take published cards away from students. When
+  any of the ticked cards are published, the app says how many and asks
+  before unpublishing them; any changes waiting on them become the card.
+- Cards that belong to someone else are left and counted in the message.
+- To check by hand: a mix of draft, waiting, published and changed cards
+  through each choice, on both lists.
 
 ## 0.591 — 9 November 2026
 

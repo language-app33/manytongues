@@ -5914,7 +5914,7 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
   saving?: Record<string, "add" | "drop">;
   /** Where the decks are chosen somewhere else than this sheet — a card's
       editor opens DeckPickScreen, the screen selected cards are put in
-      decks from, so a deck can be made on the way (0.592). Given, the add
+      decks from, so a deck can be made on the way (0.594). Given, the add
       button calls it, and is there even with no decks yet: making the
       first one is what that screen is for. */
   onAdd?: () => void;
@@ -6064,7 +6064,7 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
  * top, the decks to tick, and Cancel or the confirming button at the foot.
  *
  * One screen for both ways cards go into decks — selected cards, and the
- * card being written (0.592). The card's editor used to open a small sheet
+ * card being written (0.594). The card's editor used to open a small sheet
  * that could only choose among decks that already existed, so a teacher
  * writing a card for a deck not yet made had to leave the card to make it.
  * Selected cards already had New deck here; now the one card has it too,

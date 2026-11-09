@@ -6666,7 +6666,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   const locked = useContext(Locked);
   /* The decks ticked on the decks screen while it is open, and null while
      it is shut. A draft, so Cancel leaves the card's decks as they were
-     (0.592). */
+     (0.594). */
   const [picking, setPicking] = useState<string[] | null>(null);
   return (
     <>
@@ -9760,7 +9760,11 @@ function NounEditor({ word, lang, allCards, selfId }: {
               index={i}
               form={f}
               title={box.title}
-              role={box.help ? box.help : i < 0 ? "Empty — never asked." : ""}
+              /* What to write, then — where the box is asked and nothing is
+                 in it yet — that it is not asked until it is. A box that is
+                 never asked on its own (the plural after three to ten) says
+                 so in its own line, so only that line. */
+              role={[box.help || "", i < 0 && !box.unasked ? "Empty — never asked." : ""].filter(Boolean).join(" ")}
               of={box.title.toLowerCase()}
               canCopy={false}
               /* Already marked: the box says what it is. A card whose answers
@@ -10547,7 +10551,7 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
   decks: Deck[];
   inDecks?: string[];
   /** Make a deck in this card's language from its decks screen, so a card
-      written for a deck not yet made need not be left to make it (0.592).
+      written for a deck not yet made need not be left to make it (0.594).
       Resolves to the deck made, or nothing where it could not be. */
   onCreateDeck?: (title: string) => Promise<Deck | null | undefined>;
   allCards: Card[];

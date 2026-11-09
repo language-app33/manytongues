@@ -5522,7 +5522,7 @@ const openPronounTables = async () => {
     check("and says it is in none yet, as the offer to put it in one",
       !pills().length && /add this card to a deck/i.test(addBtn() ? addBtn().textContent || "" : ""),
       `${pills().length} pills · ${addBtn() ? (addBtn().textContent || "").trim() : "no button"}`);
-    /* The same screen selected cards are put in decks from (0.592): the
+    /* The same screen selected cards are put in decks from (0.594): the
        decks to tick, with New deck at the top, so a card written for a
        deck not yet made need not be left to make it. */
     const pickScreen = () => [...document.querySelectorAll(".at-screen.over")]
