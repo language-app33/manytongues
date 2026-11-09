@@ -5727,6 +5727,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   });
 
   const [courseView, setCourseView] = useState<any | null>(null);
+  /* The decks a course is still saving, and which way: shown on the
+     deck's row as "Adding…" or "Removing…" until the server answers, and
+     not tappable meanwhile, so a second tap cannot undo the first. */
+  const [deckSaving, setDeckSaving] = useState<Record<string, "add" | "drop">>({});
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
   const [allCards, setCards] = useState<Card[]>(last ? last.cards : []);
   const cards = useMemo(() => allCards.filter((c) => !!c.personal === mineSide), [allCards, mineSide]);
@@ -8842,6 +8846,34 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         )}
       </Field>
     );
+    /* A deck put in or taken out of this course. What the server saved
+       comes back with the answer — the deck's courses and the course's
+       decks — and is put on screen as it is, rather than fetching every
+       course, deck and card again: that fetch is what made each tap take
+       seconds. */
+    const toggleDeck = (id: string, on: boolean) => {
+      if (deckSaving[id]) return;
+      const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
+      setDeckSaving((now) => ({ ...now, [id]: on ? "drop" : "add" }));
+      run(
+        async () => {
+          const r: any = on ? await API.detachDeck(id, c.id) : await API.attachDeck(id, c.id);
+          const saved = r && r.deck;
+          if (saved && Array.isArray(saved.courses))
+            setDecks((prev) => prev.map((d) => (d.id === id ? { ...d, courses: saved.courses } : d)));
+          else await refresh(true);
+          if (r && r.course && Array.isArray(r.course.decks))
+            setCourses((prev) => prev.map((x) => (x.id === c.id ? { ...x, decks: r.course.decks } : x)));
+        },
+        on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
+      ).finally(() =>
+        setDeckSaving((now) => {
+          const next = { ...now };
+          delete next[id];
+          return next;
+        }),
+      );
+    };
     return (
       /* Laid out like a deck's screen — see .at-screen.cardform: one sheet
          ruled into sections, each headed at the editor's size with what it
@@ -8906,17 +8938,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
                   chosen={mine.map((d) => d.id)}
                   onOpen={(id) => setOpenDeck(id)}
-                  onToggle={(id, on) => {
-                    const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
-                    run(
-                      async () => {
-                        if (on) await API.detachDeck(id, c.id);
-                        else await API.attachDeck(id, c.id);
-                        await refresh();
-                      },
-                      on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
-                    );
-                  }}
+                  onToggle={toggleDeck}
+                  saving={deckSaving}
                   find={{
                     placeholder: "Search decks",
                     match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
@@ -8939,17 +8962,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                       decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
                       chosen={mine.map((d) => d.id)}
                       onOpen={(id) => setOpenDeck(id)}
-                      onToggle={(id, on) => {
-                        const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
-                        run(
-                          async () => {
-                            if (on) await API.detachDeck(id, c.id);
-                            else await API.attachDeck(id, c.id);
-                            await refresh();
-                          },
-                          on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
-                        );
-                      }}
+                      onToggle={toggleDeck}
+                      saving={deckSaving}
                       find={{
                         placeholder: "Search decks",
                         match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),

@@ -5874,7 +5874,7 @@ export interface DeckWords {
   another: string;
 }
 
-export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize }: {
+export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize, saving }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
@@ -5900,9 +5900,14 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
   /** The small line under each row's name, or nothing. A deck says how
       big it is; a single card has nothing to add. */
   size?: ((d: Pick<Deck, "cardCount">) => Node) | null;
+  /** Decks whose change is still being saved, and which way. Such a row
+      says "Adding…" or "Removing…" and cannot be tapped until it is done,
+      where a save takes long enough for a teacher to wonder. */
+  saving?: Record<string, "add" | "drop">;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const pending = saving || {};
 
   const all = decks || [];
   const wanted = q.trim().toLowerCase();
@@ -5942,13 +5947,19 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
                 <Icon name="lock" size={14} />
               </span>
             ) : (
-              <button
-                className="at-deckdrop"
-                aria-label={say.drop(d.title)}
-                onClick={() => onToggle(d.id, true)}
-              >
-                <Icon name="close" size={16} />
-              </button>
+              pending[d.id] ? (
+                <span className="at-deckdrop" role="status" aria-label={`Taking ${d.title} out…`}>
+                  <span className="at-deckspin" aria-hidden="true" />
+                </span>
+              ) : (
+                <button
+                  className="at-deckdrop"
+                  aria-label={say.drop(d.title)}
+                  onClick={() => onToggle(d.id, true)}
+                >
+                  <Icon name="close" size={16} />
+                </button>
+              )
             )}
           </span>
         ))}
@@ -5996,13 +6007,15 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
             {find && wanted && !listed.length && <Help>Nothing matches that.</Help>}
             {listed.map((d) => {
               const on = chosen.includes(d.id);
+              const going = pending[d.id];
               return (
                 <button
-                  className={`at-deckpick${on ? " on" : ""}${d.locked ? " locked" : ""}`}
+                  className={`at-deckpick${on ? " on" : ""}${d.locked ? " locked" : ""}${going ? " saving" : ""}`}
                   key={d.id}
                   aria-pressed={on}
-                  disabled={!!d.locked}
-                  onClick={() => !d.locked && onToggle(d.id, on)}
+                  aria-busy={going ? true : undefined}
+                  disabled={!!d.locked || !!going}
+                  onClick={() => !d.locked && !going && onToggle(d.id, on)}
                 >
                   <span className="at-tickbody">
                     <b>{d.title}</b>
@@ -6014,6 +6027,11 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
                   <span className="at-deckmark">
                     {d.locked ? (
                       <span title="Locked" aria-label="Locked" role="img"><Icon name="lock" size={14} /></span>
+                    ) : going ? (
+                      <span className="at-decksaving" role="status">
+                        <span className="at-deckspin" aria-hidden="true" />
+                        {going === "add" ? "Adding…" : "Removing…"}
+                      </span>
                     ) : on ? "Added" : "Add"}
                   </span>
                 </button>

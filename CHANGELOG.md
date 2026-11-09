@@ -8,6 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.590 — 9 November 2026
+
+**Adding a deck to a course is quicker, and says it is working.**
+
+For teachers:
+
+- **A deck you tap in a course's deck list says "Adding…"** (or
+  "Removing…") with a small turning ring until it is saved, then switches
+  to "Added". It can't be tapped again while it is saving, so a second
+  tap no longer undoes the first. Taking a deck out with the × on its
+  name shows the same ring.
+- **And the wait is much shorter.** Each tap used to reload all your
+  courses, decks and cards before anything on screen changed; now only
+  the one change is saved and shown.
+- The "added to the course" message still appears where it did, and can
+  still cover "Another deck" on some screens; that is left for later.
+
 ## 0.589 — 8 November 2026
 
 **A backup from before spaces goes back into your space, cards and all.**

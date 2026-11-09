@@ -603,6 +603,16 @@ button {
   font-weight:800; letter-spacing:.05em; text-transform:uppercase;
   color: var(--muted); }
 .at-deckpick.on .at-deckmark { color: var(--accent); }
+/* A deck still being saved: the row says so in place of Add or Added,
+   with a turning ring, and is not tappable until the answer comes. Not
+   greyed like a locked deck — it is busy, not refused. */
+.at-deckpick.saving { cursor:progress; }
+.at-decksaving { display:inline-flex; align-items:center; gap:6px; color: var(--text); }
+.at-deckspin { display:inline-block; width:14px; height:14px; flex:none;
+  border:2px solid var(--line); border-top-color: var(--accent); border-radius:50%;
+  animation: at-deckspin 700ms linear infinite; }
+@keyframes at-deckspin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .at-deckspin { animation-duration: 2s; } }
 /* The deck and subtype sheets: the list a step under the line saying what
    it is for, and the note under the decks a step under them. */
 .at-decksheet .at-deckpicks { margin-top:4px; }
