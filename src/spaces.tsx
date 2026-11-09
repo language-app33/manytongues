@@ -7291,7 +7291,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
              card opened from a list is, or to edit where this one was. */
           setEditing({ card: other, decks: other.decks || [], lang: other.lang || (editLang || {}).id || "", opened: Date.now(), locked: !!editing.locked })
         }
-        onSave={({ forms, note, name, examples, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next, exit }) =>
+        onSave={({ forms, note, name, examples, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next, exit, publish }) =>
           run(
             async () => {
               const [main, ...subs] = forms;
@@ -7405,9 +7405,14 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 /* A new card starts as a draft, and a change to a published
                    card waits for publishing — see "A card's status" in
                    save-card. Its decks, ID and tags apply at once. */
-                /* With the decks the editor opened with, so only what the
-                   teacher added or took away is applied (0.580). */
-                editing.card && editing.card.id ? { into: "changes", decksWere: editing.decks } : { status: "draft" },
+                {
+                  /* With the decks the editor opened with, so only what the
+                     teacher added or took away is applied (0.580). */
+                  ...(editing.card && editing.card.id ? { into: "changes" as const, decksWere: editing.decks } : { status: "draft" as const }),
+                  /* Save and publish: the same save, out to students in
+                     the same request — kept on the device with it, too. */
+                  ...(publish ? { publish: true } : {}),
+                },
               );
               absorbSaved(r);
               /*
@@ -7510,6 +7515,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 /* Kept for later rather than saved, which is a different
                    promise and has to read as one. */
                 kept: !!(r && r.kept),
+                published: !!publish,
                 waiting,
                 /* And how many other cards a rename followed the name
                    into, which is the one thing about this save that
@@ -7540,9 +7546,13 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                already written, say so — that is the moment the link is
                worth making, and the alternative is a deck whose coverage
                quietly falls as it grows. */
-            (done: { name: string, kept: boolean, waiting: number, trimmed: string[], moved: number, waits: string }) =>
+            (done: { name: string, kept: boolean, published: boolean, waiting: number, trimmed: string[], moved: number, waits: string }) =>
               done.kept
-                ? `${done.name} saved on this device — it goes up when you're back online`
+                ? done.published
+                  ? `${done.name} saved on this device — it's published when you're back online`
+                  : `${done.name} saved on this device — it goes up when you're back online`
+                : done.published && !done.moved && !done.trimmed.length && !done.waiting
+                ? `${done.name} saved and published — students get it now`
                 : done.moved
                 ? `${done.name} saved · the new name went into ${plural(done.moved, "other card")}`
                 : done.trimmed.length

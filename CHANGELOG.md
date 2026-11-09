@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.591 — 9 November 2026
+
+**Save and publish, beside Save, when editing a card.**
+
+- Editing a card now has two floating buttons: Save, in the corner as
+  before, and Save and publish beside it. Save and publish saves the card
+  and sends it to students in one go — a new card, a draft, or changes to
+  a card that is already out. Afterwards the card is shown as read, with
+  "Published" at the top.
+- It is off whenever Save is off. Changes already waiting from an earlier
+  Save are still published from the status menu.
+- Offline, the card is kept on the device as Save does, and published
+  when the connection comes back.
+- It is offered on every card, "Ready for review" included: anyone who can
+  edit a card could already publish it from the status menu.
+- Save and publish is the quieter of the two, so the corner keeps the
+  button a thumb is used to. Checked at phone widths down to 320px: both
+  names fit.
+
 ## 0.590 — 9 November 2026
 
 **Adding a deck to a course is quicker, and says it is working.**

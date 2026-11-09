@@ -5,6 +5,8 @@ dev-dist/
 .DS_Store
 npm-debug.log*
 tests/.build/
+# And the per-test builds the unit tests write beside it.
+tests/.*-build/
 
 # Documents written by the server when DATA_DIR isn't set.
 data/

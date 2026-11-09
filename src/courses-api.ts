@@ -409,6 +409,8 @@ export type SaveExtra = {
   /** The decks the screen believed the card was in before this change
       (0.580): the server then applies only what was added and removed. */
   decksWere?: string[];
+  /* Save and publish: what this save writes goes out to students too. */
+  publish?: boolean;
 };
 /* `org` is the space the save was made in, for one queued offline and sent
    from wherever the app is by then (0.580). */

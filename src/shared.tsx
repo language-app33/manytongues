@@ -4126,7 +4126,11 @@ export function useScrollTop(key: unknown) {
  * nothing happened: a grey button that says nothing leaves a teacher
  * guessing.
  */
-export type ScreenFab = { icon: string; label: string; onClick: () => void; off?: boolean; busy?: boolean };
+/* A floating button. Most screens have one; the card editor has two —
+   Save and publish beside Save — and the first of a pair is the quieter
+   (`second`), so the corner keeps the button it always had. `busyLabel` is
+   what it reads while its own request is out. */
+export type ScreenFab = { icon: string; label: string; onClick: () => void; off?: boolean; busy?: boolean; busyLabel?: string; second?: boolean };
 
 export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", backIcon = "back", rise, className = "", fab, scrollKey }: {
   title?: Node;
@@ -4154,7 +4158,7 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
       being edited — rather than going back. */
   backIcon?: string;
   className?: string;
-  fab?: ScreenFab | null;
+  fab?: ScreenFab | ScreenFab[] | null;
 }) {
   const self: React.MutableRefObject<{ el: Element | null, close?: () => void }> = useRef({ el: null });
   /* The screen's own element, so the stack can be checked against the
@@ -4180,6 +4184,7 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
      scrolling up, no while scrolling down. A few pixels either way are
      ignored, so a finger resting on the glass does not flicker it. */
   const [fabNamed, setFabNamed] = useState(true);
+  const fabs = !fab ? [] : Array.isArray(fab) ? fab : [fab];
   const lastTop = useRef(0);
   const onBodyScroll = () => {
     const el = bodyRef.current;
@@ -4254,18 +4259,21 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
           {footer ? <div className="at-screenfoot">{footer}</div> : null}
         </div>
       </div>
-      {fab ? (
+      {fabs.length ? (
         <div className="at-fabrow">
-          <button
-            type="button"
-            className={`at-fab${fabNamed ? " named" : ""}${fab.off || fab.busy ? " off" : ""}`}
-            aria-label={fab.busy ? "Saving…" : fab.label}
-            aria-disabled={fab.off || fab.busy ? "true" : undefined}
-            onClick={() => { if (!fab.busy) fab.onClick(); }}
-          >
-            <Icon name={fab.icon} />
-            <span className="at-fablabel">{fab.busy ? "Saving…" : fab.label}</span>
-          </button>
+          {fabs.map((one) => (
+            <button
+              key={one.label}
+              type="button"
+              className={`at-fab${fabNamed ? " named" : ""}${one.second ? " second" : ""}${one.off || one.busy ? " off" : ""}`}
+              aria-label={one.busy ? one.busyLabel || "Saving…" : one.label}
+              aria-disabled={one.off || one.busy ? "true" : undefined}
+              onClick={() => { if (!one.busy) one.onClick(); }}
+            >
+              <Icon name={one.icon} />
+              <span className="at-fablabel">{one.busy ? one.busyLabel || "Saving…" : one.label}</span>
+            </button>
+          ))}
         </div>
       ) : null}
     </div>
