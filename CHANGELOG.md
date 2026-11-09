@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.592 — 9 November 2026
+
+**Make a deck while writing a card.**
+
+- In a card's Decks section, "Add this card to a deck" (and "Another
+  deck") now opens the same screen used to add selected cards to decks:
+  **New deck** at the top, the decks to tick below, and Cancel or Done at
+  the foot.
+- New deck asks only for a name and says which language the deck will be
+  — the card's. Create makes it and ticks it, so Done puts the card in it.
+- The card's decks start ticked. Nothing changes until Done; Cancel leaves
+  them as they were. The card itself is still saved with Save.
+- A card with no decks yet offers the same button, where it used to say
+  to go and make one under Decks.
+- Trade-off: choosing a card's decks is now a full screen with a Done
+  press, where it was a small window that took each tap at once.
+- Unchanged: the selected-cards screen, and choosing a course's decks,
+  Prep mode's decks and Build a session's decks.
+
 ## 0.591 — 9 November 2026
 
 **Save and publish, beside Save, when editing a card.**

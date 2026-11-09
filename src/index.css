@@ -976,6 +976,9 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   padding-bottom:0; border-bottom:0; }
 /* Ticking decks: a real checkbox, so it looks and behaves like one. */
 .at-ticklist { display:flex; flex-direction:column; gap:6px; }
+/* A locked deck's padlock, kept beside its size on the decks screen
+   (DeckPickScreen, shared since 0.592). */
+.at-lockmark { white-space:nowrap; }
 .at-tickrow { display:flex; align-items:center; gap:10px; cursor:pointer;
   border:2px solid var(--line); border-radius: var(--r-sm); background: var(--raised);
   padding:10px 12px; }

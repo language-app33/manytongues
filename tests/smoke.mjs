@@ -499,7 +499,7 @@ const fakeFetch = async (input, opts = {}) => {
       return json({
         ok: true,
         deck: {
-          id: `d${madeDecks.length + 1}`,
+          id: `made${madeDecks.length}`,
           title: body.title,
           owner: account.handle,
           lang: body.lang || "ar-PS",
@@ -5522,42 +5522,83 @@ const openPronounTables = async () => {
     check("and says it is in none yet, as the offer to put it in one",
       !pills().length && /add this card to a deck/i.test(addBtn() ? addBtn().textContent || "" : ""),
       `${pills().length} pills · ${addBtn() ? (addBtn().textContent || "").trim() : "no button"}`);
-    check("the decks are put away until asked for", !document.querySelector(".at-decksheet"));
+    /* The same screen selected cards are put in decks from (0.592): the
+       decks to tick, with New deck at the top, so a card written for a
+       deck not yet made need not be left to make it. */
+    const pickScreen = () => [...document.querySelectorAll(".at-screen.over")]
+      .find((x) => x.getAttribute("aria-label") === "Add this card to…") || null;
+    const tickRows = () => [...((pickScreen() || document.createElement("div")).querySelectorAll(".at-tickrow"))];
+    const inScreen = (/** @type {RegExp} */ re) => [...((pickScreen() || document.createElement("div")).querySelectorAll("button"))]
+      .find((x) => re.test((x.textContent || "").trim()));
+    const setValue = must(
+      Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"),
+      "the input's value descriptor"
+    ).set;
+    check("the decks are put away until asked for", !pickScreen());
 
     click(addBtn());
+    await sleep(250);
+    check("pressing it opens the screen selected cards are put in decks from",
+      !!pickScreen() && tickRows().length > 0 && !!inScreen(/^New deck$/),
+      `${tickRows().length} decks · ${pickScreen() ? "screen" : "no screen"}`);
+    const firstDeck = ((tickRows()[0] && tickRows()[0].querySelector("b")) || {}).textContent || "";
+    click(tickRows()[0] && tickRows()[0].querySelector("input"));
+    await sleep(150);
+    /* Ticks are a draft until Done: Cancel leaves the card as it was. */
+    click(inScreen(/^Cancel$/));
     await sleep(200);
-    /* In a sheet of their own since 0.241, as a blank and a custom tag
-       are chosen: a list hanging off the button ran off a phone. */
-    const menu = document.querySelector('.at-decksheet[role="dialog"]');
-    const rows = menu ? [...menu.querySelectorAll(".at-deckpick")] : [];
-    check("pressing it opens the decks as a list to pick from, in a sheet", rows.length > 0 &&
-      /^Decks$/.test(((menu && menu.querySelector(".at-modaltitle")) || {}).textContent || ""),
-      `${rows.length} decks offered`);
-    const firstDeck = ((rows[0] && rows[0].querySelector("b")) || {}).textContent || "";
-    click(rows[0]);
+    check("Cancel shuts it and leaves the card's decks as they were",
+      !pickScreen() && !pills().length, pills().join(" | ") || "(none)");
+
+    click(addBtn());
+    await sleep(250);
+    click(tickRows()[0] && tickRows()[0].querySelector("input"));
+    await sleep(150);
+    click(inScreen(/^Done$/));
     await sleep(200);
-    /* And what picking one leaves is the deck itself, standing in the
-       section — the count that used to be on the button said how many and
-       never which. */
-    check("picking one stands it in the section as a deck of its own",
-      pills().length === 1 && pills()[0] === firstDeck.trim(),
+    check("Done stands the ticked deck in the section as a deck of its own",
+      !pickScreen() && pills().length === 1 && pills()[0] === firstDeck.trim(),
       pills().join(" | ") || "(no decks named)");
-    check("and the row now says it is added rather than offering to add it",
-      /added/i.test(((rows[0].querySelector(".at-deckmark") || {}).textContent || "")),
-      ((rows[0].querySelector(".at-deckmark") || {}).textContent || "").trim() || "(no mark)");
-    check("and the list stays open, because you are usually picking more than one",
-      !!document.querySelector(".at-decksheet"));
-    /* A tap outside the sheet puts it away, as it does every sheet. */
-    click(/** @type {any} */ (document.querySelector(".at-decksheet")).closest(".at-modalback"));
+
+    /* ---- a deck made on the spot, from the card ---- */
+    click(addBtn());
+    await sleep(250);
+    check("and it opens with the card's decks already ticked",
+      tickRows().some((r) => (r.textContent || "").includes(firstDeck.trim()) && !!r.querySelector("input:checked")));
+    const madeBefore = madeDecks.length;
+    click(inScreen(/^New deck$/));
+    await sleep(150);
+    const nameBox = /** @type {any} */ ((pickScreen() || document.createElement("div")).querySelector(".at-formblock input"));
+    check("New deck asks for a name, saying which language the deck will be",
+      !!nameBox && /It will be a .+ deck\./.test((pickScreen() || {}).textContent || ""),
+      ((pickScreen() || {}).textContent || "").slice(0, 120));
+    if (nameBox) {
+      must(setValue, "the input's value setter").call(nameBox, "Week 4 · Food");
+      nameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
+      await sleep(80);
+      click(inScreen(/^Create$/));
+      await sleep(400);
+    }
+    check("Create makes the deck in the card's language",
+      madeDecks.length === madeBefore + 1 && madeDecks[madeDecks.length - 1].title === "Week 4 · Food" &&
+        madeDecks[madeDecks.length - 1].lang === "ar-PS",
+      JSON.stringify(madeDecks[madeDecks.length - 1] || null));
+    const madeRow = tickRows().find((r) => /Week 4/.test(r.textContent || ""));
+    check("and it joins the list already ticked, which is why it was made",
+      !!madeRow && !!madeRow.querySelector("input:checked"),
+      tickRows().map((r) => (r.textContent || "").slice(0, 14)).join(" | ") || "no decks listed");
+    click(inScreen(/^Done$/));
     await sleep(200);
-    check("a tap outside puts it away", !document.querySelector(".at-decksheet"));
-    check("and the deck it was put in is still named",
-      pills().length === 1 && pills()[0] === firstDeck.trim(),
+    check("and after Done the card is in it",
+      pills().length === 2 && pills().includes("Week 4 · Food"),
       pills().join(" | ") || "(no decks named)");
+
     /* Out again from the pill itself, which is where a teacher looking at
        the deck they want rid of already is. */
     const drop = () => /** @type {any} */ (document.querySelector(".at-deckdrop"));
     check("the deck carries the cross that takes the card out of it", !!drop());
+    click(drop());
+    await sleep(200);
     click(drop());
     await sleep(200);
     check("and pressing it leaves the card in no deck, offering one again",
