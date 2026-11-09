@@ -10,29 +10,12 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { build } from "esbuild";
+import { buildOnce, TEST_DEFINES } from "./helpers.mjs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".missing-lines-build");
-await build({
-  entryPoints: [path.join(here, "..", "src", "ArabicTrainer.tsx")],
-  outdir: out,
-  bundle: true,
-  splitting: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"production"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
-const trainer = await import(pathToFileURL(path.join(out, "ArabicTrainer.js")).href);
+const built = await buildOnce(["ArabicTrainer.tsx"], { define: { ...TEST_DEFINES, "process.env.NODE_ENV": '"production"' }, splitting: true });
+const trainer = await import(pathToFileURL(path.join(built, "ArabicTrainer.js")).href);
 
 /** @returns {any} */
 const name = (/** @type {string} */ id, /** @type {string} */ en, /** @type {string} */ lat, /** @type {number} */ created) => ({

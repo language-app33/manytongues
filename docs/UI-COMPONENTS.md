@@ -249,6 +249,21 @@ card itself, without which decks carry it or which of its forms are lent.
 
 ## Dialogs
 
+### `PersonActions` — spaces.tsx
+One person's actions on a People list (0.580): a new sign-in key,
+suspending or reactivating, and removing from a space, in Admin's words.
+`org` names the space where Super admin acts in one; anything only one screen
+offers goes in as children.
+
+### `ReportList` — spaces.tsx
+Learners' reports about cards (0.580): `ItemList` with search, Copy and Clear
+for what is ticked, and Open card, Copy and Clear on each. Admin's Flags tab
+and Super admin's Reports, a list per space.
+
+### `usePicture(hash)` — the hook
+A stored picture's data URL, fetched once a session for every screen — see
+`src/pictures.ts`. The card editor's pictures and the space's badge use it.
+
 ### `ConfirmModal` — 10 uses
 `title, body, confirmLabel, confirmWord, busy, danger=true, onCancel, onConfirm`
 
@@ -258,6 +273,21 @@ things that can't be undone.
 Prefer this over `window.confirm`. The one remaining `window.confirm` is the
 import gate, which genuinely wants a blocking browser dialog.
 
+### `useRun(options)` — the hook
+A screen's one way to do something that may fail (0.580): `{ run, busy,
+setBusy, error, setError, clearError }`. `run(work, done)` sets busy, runs
+the work, says `done` (a string, or a function of what the work returned)
+and puts any failure in `error`. Options: `refresh` after it worked,
+`snackErrors` to say a failure aloud too, `quietDone`, and `before` /
+`instead` for Teaching's locked-deck note. Admin, Teaching, Super admin's
+Spaces and Everyone use it.
+
+### `useConfirm(run, { busy, after })` — spaces.tsx
+The question asked before something is done, and its dialog: `{ setConfirm,
+modal }`. Yes runs the action through `run` and closes once that worked.
+Teaching's dialogs are of several kinds with their own wording and keep their
+own.
+
 ### `usePageLock(on = true)` — the hook
 Holds the page under a layer still while the layer is up. `Screen`,
 `ConfirmModal` and `PickSheet` already hold it; anything else drawn over
@@ -266,7 +296,12 @@ layers can stack. Without it the page behind goes on scrolling, and its
 scroll bar is the one in view.
 
 ### `Popover` — the menu that drops from a button
-`className, children`, plus anything a `<div>` takes.
+`className, children, onClose`, plus anything a `<div>` takes.
+
+`onClose` is how it is left: any click once it is open, its own included,
+calls it. Five menus wrote that listener out by hand until 0.580; a menu that
+must stay open while it is ticked (the corner menu) stops its clicks from
+reaching the page, as before.
 
 Every menu that hangs off a button is one: the filter menus, a card's
 status, the corner menu, the space and language menu, a blank's values. Its class
@@ -347,9 +382,11 @@ its play buttons resolve to "missing" rather than fetching.
   off the specimen. `src/text-styles.ts` is the list behind it, and
   `tests/text-styles.test.mjs` fails if a size there and the stylesheet have
   come apart.
-- Every `at-` class in the stylesheet is currently referenced by something. If
+- Every `at-` and `ob-` class a stylesheet styles is referenced by something,
+  and `tests/css-usage.test.mjs` fails the build when one is not (0.580). If
   you delete markup, delete its CSS — and note that a multi-selector rule is
-  only dead if *every* selector in it is.
+  only dead if *every* selector in it is. A class put together in code
+  (`at-cardtable-${key}`) is listed in the test, with where it is made.
 
 ---
 

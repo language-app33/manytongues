@@ -26,6 +26,8 @@
 
 import type { Card, Deck } from "./types.ts";
 import { leadOf, wordOf } from "./cards.ts";
+import { GRAMMAR, grammarFields, inScript, LANGUAGES, normDimValue } from "./languages.ts";
+import { joinAlternatives } from "./answers.ts";
 
 export type ImportFile = {
   cards: Card[];
@@ -161,4 +163,249 @@ export function mediaOf(cards: Card[], file: ImportFile) {
   };
   cards.forEach(walk);
   return { clips: [...clips], images: [...images] };
+}
+
+/* ------------------------------------------------------------------
+   A pasted table of words (moved here from the trainer in 0.580)
+
+   Tab-separated, pipe-separated or a Markdown table, with or without a
+   header row naming the columns: each line one card's words. Pure, so the
+   tests read it without building the app.
+   ------------------------------------------------------------------ */
+
+/** Tags as typed: split on commas, trimmed, each once. */
+export function cleanTags(input: unknown) {
+  const raw = Array.isArray(input) ? input : String(input || "").split(",");
+  const out: string[] = [];
+  for (const t of raw) {
+    const tag = String(t).trim().replace(/\s+/g, " ");
+    if (tag && !out.includes(tag)) out.push(tag);
+  }
+  return out;
+}
+
+/* Open, because the loops below add a name per grammatical field and per
+   language, and a column heading is whatever the file happened to say. */
+const FIELD_ALIASES: Record<string, string> = {
+  ar: "ar", arabic: "ar", script: "ar",
+  lat: "lat", latin: "lat", tr: "lat", translit: "lat", transliteration: "lat", roman: "lat",
+  en: "en", eng: "en", english: "en", meaning: "en", translation: "en",
+  tag: "tags", tags: "tags",
+  note: "note", notes: "note",
+  num: "number", plurality: "number",
+  gen: "gender",
+  reg: "register", addressee: "register",
+  cl: "classifier", clf: "classifier",
+};
+/* Every grammatical field answers to its own name, without that having to be
+   written here each time one is added. */
+for (const f of grammarFields()) FIELD_ALIASES[f] = f;
+/* And every language answers to what it calls its own columns — "Hebrew",
+   "Pronunciation note" — so a table headed in the language's own terms is
+   read as a table. Only "Arabic" was written in above, by hand. */
+const aliasKey: (label: unknown) => string = (label) => String(label || "").toLowerCase().replace(/[^a-z]/g, "");
+for (const L of Object.values(LANGUAGES)) {
+  if (L.scriptLabel) FIELD_ALIASES[aliasKey(L.scriptLabel)] = "ar";
+  /* And to what it called them before 0.213, when the column was named
+     after the script rather than the language — a file exported then is
+     still a file somebody has. */
+  if (L.scriptLabel) FIELD_ALIASES[aliasKey(`${L.scriptLabel} script`)] = "ar";
+  if (L.translitLabel) FIELD_ALIASES[aliasKey(L.translitLabel)] = "lat";
+}
+const FIELD_ORDER = ["en", "ar", "lat", "tags", "note"].concat(grammarFields());
+
+const MD_SEPARATOR = /^:?-+:?$/;
+const ESC = "\u0000";
+
+function splitRow(line: string) {
+  return (line.includes("\t") ? line.split("\t") : line.split("|")).map((p) => p.trim());
+}
+
+function stripMd(cell: string) {
+  return cell
+    .split(ESC)
+    .join("|")
+    .replace(/`([^`]*)`/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/__([^_]+)__/g, "$1")
+    .replace(/\*([^*]+)\*/g, "$1")
+    .trim();
+}
+
+function mdCells(line: string) {
+  return line
+    .replace(/\\\|/g, ESC)
+    .replace(/^\|/, "")
+    .replace(/\|\s*$/, "")
+    .split("|")
+    .map(stripMd);
+}
+
+function isSeparatorLine(line?: string) {
+  if (!line) return false;
+  const t = line.trim();
+  if (!t.startsWith("|")) return false;
+  const cells = mdCells(t);
+  return cells.length > 0 && cells.every((c) => MD_SEPARATOR.test(c));
+}
+
+/* The three fields a card can accept more than one of. */
+const MANY_FIELDS = new Set(["ar", "lat", "en"]);
+
+/*
+ * The field a column heading names: "English", or "English 2" for a second
+ * accepted answer, "Arabic 3" for a third. One answer to a cell, as one to
+ * a box in the editor — nothing written inside a cell splits it (0.439) —
+ * so the extra answers each have a column of their own. A second answer is
+ * read as `en#1`, its place in the list, and folded in by foldAnswers.
+ */
+function fieldOf(heading: string): string | undefined {
+  const t = heading.toLowerCase().trim();
+  const m = /^(.*?)\s*(\d+)$/.exec(t);
+  const at = m ? Number(m[2]) : 1;
+  const key = FIELD_ALIASES[(m ? m[1] : t).replace(/[^a-z]/g, "")];
+  if (!key || at < 1) return undefined;
+  if (at === 1) return key;
+  return MANY_FIELDS.has(key) ? `${key}#${at - 1}` : undefined;
+}
+
+/* The answers read from numbered columns, into the field they belong to:
+   one answer to a line (see ALT_SEP), in the order the columns number
+   them. A transliteration stays beside the word in the same place. */
+function foldAnswers(row: Record<string, string>) {
+  for (const f of MANY_FIELDS) {
+    const list = [row[f] || ""];
+    for (const [k, v] of Object.entries(row)) {
+      const m = /^(\w+)#(\d+)$/.exec(k);
+      if (m && m[1] === f) list[Number(m[2])] = v || "";
+    }
+    row[f] = joinAlternatives(Array.from(list, (x) => x || ""));
+  }
+}
+
+function readHeader(cells: string[]): string[] | null {
+  if (cells.length < 2) return null;
+  const map = cells.map(fieldOf);
+  return map.every(Boolean) ? (map as string[]) : null;
+}
+
+/**
+ * A row read out of a pasted table: the fields every card has, plus
+ * whichever grammatical fields the language declares, which is why the
+ * type is open.
+ */
+type ParsedRow = Record<string, any> & {
+  ar: string;
+  lat: string;
+  en: string;
+  note: string;
+  tags: string[];
+};
+/**
+/**
+ * `skipped` rides on the array because the importer wants both the rows
+ * and the count of lines that held nothing, and the callers all read the
+ * rows first.
+ */
+export function parseLines(text: string, knownTags: string[] = []): ParsedRow[] & { skipped?: number } {
+  const out: ParsedRow[] & { skipped?: number } = [];
+  const known = new Set(knownTags.map((t) => t.toLowerCase()));
+  const lines = String(text).split(/\r?\n/);
+  const mdMode = lines.some((l) => l.trim().startsWith("|"));
+  let order: string[] | null = null;
+  let skipped = 0;
+
+  for (let li = 0; li < lines.length; li++) {
+    const line = lines[li].trim();
+    if (!line || line.startsWith("#")) continue;
+
+    let cells: string[];
+    if (mdMode) {
+      if (!line.startsWith("|")) continue;
+      if (isSeparatorLine(line)) continue;
+      cells = mdCells(line);
+      if (isSeparatorLine(lines[li + 1])) {
+        const header = readHeader(cells);
+        if (header) order = header;
+        continue;
+      }
+    } else {
+      cells = splitRow(line);
+    }
+
+    if (!order && !out.length) {
+      const header = readHeader(cells);
+      if (header) {
+        order = header;
+        continue;
+      }
+    }
+
+    const row: Record<string, string> = { ar: "", lat: "", en: "", tags: "", note: "" };
+    for (const f of grammarFields()) row[f] = "";
+    const loose: { value: string, i: number }[] = [];
+
+    cells.forEach((cell: string, i: number) => {
+      const m = cell.match(/^([A-Za-z]+(?:\s*\d+)?)\s*[:=]\s*([\s\S]*)$/);
+      const key = m && fieldOf(m[1]);
+      if (key) row[key] = m[2].trim();
+      else loose.push({ value: cell, i });
+    });
+
+    if (loose.length) {
+      const usesGaps = loose.some((c) => !c.value);
+      if (order || usesGaps) {
+        for (const { value, i } of loose) {
+          const key = order ? order[i] : FIELD_ORDER[i];
+          if (key && !row[key] && value) row[key] = value;
+        }
+        if (row.ar && !inScript(row.ar)) {
+          const holder = ["en", "lat"].find((k) => row[k] && inScript(row[k]));
+          if (holder) {
+            const tmp = row.ar;
+            row.ar = row[holder];
+            row[holder] = tmp;
+          }
+        }
+      } else {
+        const values = loose.map((c) => c.value);
+        const arIdx = values.findIndex((v) => inScript(v));
+        if (arIdx !== -1 && !row.ar) row.ar = values.splice(arIdx, 1)[0] || "";
+        if (values.length > 1 && known.size && !row.tags) {
+          const parts = cleanTags(values[values.length - 1]);
+          if (parts.length && parts.every((t) => known.has(t.toLowerCase()))) {
+            row.tags = values.pop() || "";
+          }
+        }
+        const slots = FIELD_ORDER.filter((k) => !row[k]);
+        values.forEach((v, i) => {
+          if (slots[i]) row[slots[i]] = v;
+        });
+      }
+    }
+
+    foldAnswers(row);
+    if (!row.ar && !row.lat && !row.en) {
+      skipped += 1;
+      continue;
+    }
+    out.push({
+      ar: row.ar,
+      lat: row.lat,
+      en: row.en,
+      note: row.note,
+      tags: cleanTags(row.tags),
+      ...Object.fromEntries(
+        Object.values(GRAMMAR).map((d) => [d.field, normDimValue(d, row[d.field])])
+      ),
+      ...Object.fromEntries(
+        grammarFields()
+          .filter((f) => !Object.values(GRAMMAR).some((d) => d.field === f))
+          .map((f) => [f, row[f] || ""])
+      ),
+    });
+  }
+
+  out.skipped = skipped;
+  return out;
 }

@@ -74,7 +74,7 @@ test("a small deck, scored by hand", () => {
   assert.equal(checkOf(q, "scene").share, 0);
   assert.equal(q.score, Math.round((57.5 * 100) / 90));
   assert.equal(q.fixes[0].key, "words", "the change worth most comes first");
-  assert.match(q.fixes[0].text, /1 word needs more sentences/);
+  assert.match(q.fixes[0].title, /^Use 1 word in more sentences/);
   assert.ok(q.fixes.some((f) => f.key === "scene"));
 });
 
@@ -108,7 +108,7 @@ test("a confirmed link counts, for the form the sentence holds; an unconfirmed o
   assert.equal(rowOf(q, "book").share, 0.75);
   const confirm = q.fixes.find((f) => f.key === "confirm");
   assert.ok(confirm, "the link nobody has confirmed is offered");
-  assert.match(confirm.text, /1 link between a word and a sentence in this deck is waiting/);
+  assert.match(confirm.title, /^Confirm 1 word found in a sentence/);
   /* Confirming it takes the card from 0.75 to 1: a quarter of 55, scaled
      to the 95 points the checks besides the conversation share. */
   const total = q.checks.filter((c) => c.applies && c.key !== "scene").reduce((t, c) => t + c.weight, 0);
@@ -207,8 +207,19 @@ test("a sentence loses its points for a word no deck of the course teaches, or f
   near(checkOf(q, "sentences").share, 1 / 3, "only the first is linked and knows all its words");
   const unknown = q.fixes.find((f) => f.key === "unknown");
   assert.ok(unknown);
-  assert.match(unknown.text, /1 sentence uses a word no deck in the course teaches \(افتح\)/);
+  assert.match(unknown.title, /^1 sentence uses words nobody teaches/);
+  assert.match(unknown.text, /No deck in the course has a card for: افتح\./);
   assert.ok(q.fixes.some((f) => f.key === "unlinked"));
+});
+
+test("every sentence with untaught words is listed for the warning, with its words (0.586)", () => {
+  const door = { id: "door", lang: "ar-PS", category: "noun", forms: [{ ar: "باب", en: "door" }] };
+  const shut = { id: "shut", lang: "ar-PS", category: "verb", forms: [{ ar: "سكّر", en: "close" }] };
+  const good = { id: "g", lang: "ar-PS", uses: ["door"], forms: [{ ar: "سكّر الباب", en: "close the door" }] };
+  const odd = { id: "o", lang: "ar-PS", uses: ["door"], forms: [{ ar: "افتح الباب", en: "open the door" }] };
+  const known = [door, shut];
+  const q = deckQuality([door, good, odd], { lang: ar, pool: known, known });
+  assert.deepEqual(q.untaught, [{ id: "o", text: "افتح الباب", words: ["افتح"] }]);
 });
 
 test("small words that hold a sentence together are never unknown", () => {
@@ -365,7 +376,7 @@ test("a card is too long when any of its answers is", () => {
   const card = sentenceCard("s", [short, long].join(ALT_SEP), ["door"]);
   const q = deckQuality([door, card], { lang: ar, pool: [door, card] });
   assert.equal(checkOf(q, "long").share, 0, "one sentence, and it is too long");
-  assert.match(must(q.fixes.find((f) => f.key === "long"), "the long fix").text, /^1 sentence is longer/);
+  assert.match(must(q.fixes.find((f) => f.key === "long"), "the long fix").title, /^Shorten 1 long sentence/);
 });
 
 /* ---- every version of a sentence card ---- */
@@ -390,7 +401,7 @@ test("a card is flawed, unrecorded or unspelt when any of its versions is", () =
   const known = [want, book, card];
   const q = deckQuality([want, book, card], { lang: ar, pool: known, known });
   assert.equal(checkOf(q, "sentences").share, 0, "جديد is in the second version, and nothing teaches it");
-  assert.match(must(q.fixes.find((f) => f.key === "unknown"), "the unknown fix").text, /\(جديد\)/);
+  assert.match(must(q.fixes.find((f) => f.key === "unknown"), "the unknown fix").text, /جديد/);
   /* Units: the two word forms and the one sentence. */
   near(checkOf(q, "recordings").share, 0, "the words have none, and the sentence's second version none");
   const recorded = { ...card, forms: card.forms.map((f) => ({ ...f, clips: ["c"], lat: "x" })) };
@@ -421,7 +432,8 @@ test("sentences with two flaws are a fix of their own, and neither single fix cl
   assert.ok(!q.fixes.some((f) => f.key === "unlinked"), "linking alone mends nothing");
   assert.ok(!q.fixes.some((f) => f.key === "unknown"), "teaching the words alone mends nothing");
   const both = must(q.fixes.find((f) => f.key === "both"), "the fix for both");
-  assert.match(both.text, /^2 sentences need both a link to a word card and their words taught \(ăn, phở, cơm\)/);
+  assert.match(both.title, /^Link 2 sentences and teach their new words/);
+  assert.match(both.text, /add cards for: ăn, phở, cơm\./);
 
   const linked = deck.map((c) => (c.id === "b1" || c.id === "b2" ? { ...c, uses: ["w1"] } : c));
   assert.equal(score(linked).score, q.score, "linking them alone leaves the score where it was");

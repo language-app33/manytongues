@@ -15,9 +15,8 @@
  */
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { build } from "esbuild";
 import path from "node:path";
-import { must } from "./helpers.mjs";
+import { must, buildOnce } from "./helpers.mjs";
 import {
   cardSentences,
   holedParts,
@@ -363,25 +362,8 @@ test("narrowing renames the blank everywhere it is written and tags the words pi
 
 /* ---- the gate, on a student's device ---- */
 
-const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".review-build");
-await build({
-  entryPoints: [path.join(here, "..", "src", "ArabicTrainer.tsx")],
-  outfile: path.join(out, "trainer.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
-const { installIndexes, castQuestion, lentTags, resolveQuestion } = await import(path.join(out, "trainer.js"));
+const built1 = await buildOnce(["ArabicTrainer.tsx"]);
+const { installIndexes, castQuestion, lentTags, resolveQuestion } = await import(path.join(built1, "ArabicTrainer.js"));
 
 const settings = { language: "ar-PS" };
 const nameCard = (/** @type {string} */ id, /** @type {string} */ word, /** @type {string} */ en, /** @type {number} */ created) => ({
@@ -443,17 +425,8 @@ test("a teacher trying their own card out sees it whatever its review", () => {
  * carried through the same conversion course material takes, and asked on
  * the device: the agreeing form and all.
  */
-await build({
-  entryPoints: [path.join(here, "..", "src", "shared.tsx")],
-  outfile: path.join(out, "shared.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-});
-const { cardToItem } = await import(path.join(out, "shared.js"));
+const built2 = await buildOnce(["shared.tsx"]);
+const { cardToItem } = await import(path.join(built2, "shared.js"));
 
 test("a sentence approved on the teacher's list is the sentence a student's device asks", () => {
   const pool = [

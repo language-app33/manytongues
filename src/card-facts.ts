@@ -1215,6 +1215,8 @@ export const NOT_SHOWN: [string, string][] = [
   ["card.created", "When the card was made. Shown beside it in the card list, where a date belongs."],
   ["card.updated", "And when it was last saved — the same."],
   ["card.inDecks", "Which decks the server says carry it, which is what `decks` says in words."],
+  ["card.org", "Which space it belongs to (0.542): where it lives, not something about the card a reader needs."],
+  ["card.personal", "Made in its owner's My space (0.545): who may see it, which the screen it is on already says."],
   ["card.status", "Whether students get it — a draft, ready for review, or published. The card screen says it, beside Edit, and a student's copy is always published."],
   ["card.changes", "The status of a published card's unpublished changes, on a teacher's copy. Said beside the status, not as a fact about the word."],
   ["card.changed", "When those changes were last saved. A fact about the changes, not about the word."],

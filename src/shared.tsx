@@ -5,6 +5,7 @@
  * being parsed by every student on every launch.
  */
 
+import { decksForSystem } from "./number-decks.ts";
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
 import type { Card, Course, Deck, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
 import { formsOf, leadOf, wordOf } from "./cards.ts";
@@ -29,6 +30,10 @@ import { readNumberSystem, readTimeSystem } from "./numbers/schema.ts";
 import { setsWithNouns } from "./numbers/nouns.ts";
 import type { SystemSet } from "./numbers/generate.ts";
 import { fileIntoDecks, generate, handOn, handOnCounting, handOnSplit } from "./numbers/generate.ts";
+/* The one reading of which schedules say nothing (0.580: this file had its
+   own, which dropped a skipped-but-never-answered state when set aside). */
+import { compactStates } from "./sync.ts";
+import { MISSING_CLIPS, pictureData } from "./pictures.ts";
 
 /*
  * Anything React will render: an element, a string, a list of them, or
@@ -118,6 +123,7 @@ const ICONS: Record<string, string> = {
   viewList: "M3 5h3v3H3V5zm5 0h13v3H8V5zM3 10.5h3v3H3v-3zm5 0h13v3H8v-3zM3 16h3v3H3v-3zm5 0h13v3H8v-3z",
   viewTable: "M3 3v18h18V3H3zm2 6h4v4H5V9zm0 6h4v4H5v-4zm6 4v-4h8v4h-8zm8-6h-8V9h8v4z",
   check: "M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z",
+  layers: "M11.99 18.54l-7.37-5.73L3 14.07l9 7 9-7-1.63-1.27-7.38 5.74zM12 16l7.36-5.73L21 9l-9-7-9 7 1.63 1.27L12 16z",
   back: "M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z",
   save:
     "M17 3H5c-1.11 0-2 .9-2 2v14c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V7l-4-4zm-5 16c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3zm3-10H5V5h10v4z",
@@ -142,6 +148,7 @@ const ICONS: Record<string, string> = {
   slow:
     "M13.05 9.79 10 7.5v9l3.05-2.29L16 12l-2.95-2.21zM11 4.07V2.05c-2.01.2-3.84 1-5.32 2.21L7.1 5.69c1.11-.86 2.44-1.44 3.9-1.62zM5.69 7.1 4.26 5.68C3.05 7.16 2.25 8.99 2.05 11h2.02c.18-1.46.76-2.79 1.62-3.9zM4.07 13H2.05c.2 2.01 1 3.84 2.21 5.32l1.43-1.43c-.86-1.11-1.44-2.44-1.62-3.89zm1.61 6.74C7.16 20.95 9 21.75 11 21.95v-2.02c-1.46-.18-2.79-.76-3.9-1.62l-1.42 1.43zM22 12c0 5.16-3.92 9.42-8.95 9.95v-2.02C16.97 19.41 20 16.05 20 12s-3.03-7.41-6.95-7.93V2.05C18.08 2.58 22 6.84 22 12z",
   pause: "M6 19h4V5H6v14zm8-14v14h4V5h-4z",
+  block: "M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z",
   view:
     "M12 4.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5zM12 17c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3z",
   select:
@@ -174,6 +181,7 @@ const ICONS: Record<string, string> = {
      from the type around them. */
   soundOff:
     "M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z",
+  feedback: "M20 2H4c-1.1 0-1.99.9-1.99 2L2 22l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 12h-2v-2h2zm0-4h-2V6h2z",
   flag: "M14.4 6 14 4H5v17h2v-7h5.6l.4 2h7V6z",
   menu: "M3 18h18v-2H3v2zm0-5h18v-2H3v2zm0-7v2h18V6H3z",
   help:
@@ -397,30 +405,42 @@ export function plural(n: number, one: string, many?: string) {
 }
 
 /**
- * How much a deck holds, said on the deck: its cards and its number parts.
- *
- * A part is not a card — it is one skill on the teacher's numbers, held by
- * the deck as an id (Deck.parts) — so counting cardIds alone left a deck
- * of numbers saying "0 cards". The parts are said beside the cards rather
- * than added into them, and a deck of nothing but parts leaves the
- * "0 cards" off.
- *
- * And it says when a part sends students nothing. A part is a promise of
- * numbers that only the teacher's words keep, and "5 number parts" on a
- * deck whose numbers were never written read as a full deck while its
- * students were told there was nothing to practise. Said only where the
- * server has worked it out (`partsWaiting`), so a deck from anywhere else
- * says what it always did.
+ * How much a deck holds, said on the deck: its cards, number parts among
+ * them (0.563) — a part is one skill on the teacher's numbers, held by the
+ * deck as an id (Deck.parts), and counted as the card it is to a student.
  */
-export function deckSize(d: { cardCount?: number; parts?: string[]; partsWaiting?: string[] }, cards = d.cardCount || 0) {
+export function deckSize(d: { cardCount?: number; parts?: string[] }, cards = d.cardCount || 0) {
+  /* A number part is a card like any other (0.563): it is counted with
+     them, and whether it reaches students is notReaching's to say. */
+  return plural(cards + (d.parts || []).length, "card");
+}
+
+/*
+ * How many of a deck's cards don't reach students yet, and why (0.563):
+ * drafts, cards waiting for review, and number parts whose number words
+ * aren't written. Null when every card does. `cards` are the deck's cards
+ * as the teacher holds them, which say their status.
+ */
+export function notReaching(
+  d: { parts?: string[]; partsWaiting?: string[] },
+  cards: { status?: string }[],
+): { n: number; long: string; short: string } | null {
+  const drafts = cards.filter((c) => c.status === "draft").length;
+  const review = cards.filter((c) => c.status === "review").length;
   const held = d.parts || [];
-  const parts = held.length;
-  if (!parts) return plural(cards, "card");
-  const waiting = (d.partsWaiting || []).filter((p) => held.includes(p)).length;
-  const said =
-    plural(parts, "number part") +
-    (waiting === parts ? " · none ready yet" : waiting ? ` · ${waiting} not ready yet` : "");
-  return cards ? `${plural(cards, "card")} · ${said}` : said;
+  const numbers = (d.partsWaiting || []).filter((p) => held.includes(p)).length;
+  const n = drafts + review + numbers;
+  if (!n) return null;
+  const why = [
+    drafts ? plural(drafts, "draft") : "",
+    review ? `${review} waiting for review` : "",
+    numbers ? `${numbers} ${numbers === 1 ? "needs its" : "need their"} number words written` : "",
+  ].filter(Boolean).join(", ");
+  return {
+    n,
+    long: `${n} ${n === 1 ? "doesn't" : "don't"} reach students yet: ${why}`,
+    short: `${n} not reaching students`,
+  };
 }
 
 /* --- Button -------------------------------------------------------
@@ -1007,8 +1027,24 @@ export function Field({ label, lede, hint, optional, htmlFor, children, classNam
    whatever is waiting to be confirmed, the error and busy lines, then a
    tab strip and the tab's contents. Both built that by hand, which is how
    one of them came to show the busy line and the other not. */
-export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, children }: {
+/* --- TabTitle -----------------------------------------------------
+   The name of the tab a page is, at its top (0.553): the heading size
+   used inside Progress, held in place as the page scrolls (0.555). */
+export function TabTitle({ children }: { children?: Node }) {
+  /* Held at the top while the page scrolls under it (0.555), with the
+     app's mark beside it and a rule beneath. */
+  return (
+    <div className="at-pagetitle">
+      <img className="at-brandmark" src="/logo.svg" alt="" width={28} height={28} />
+      <h2 className="at-sectionhead">{children}</h2>
+    </div>
+  );
+}
+
+export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, children }: {
   tabs: [string, string, string?][];
+  /** The space's name, heading each tab as "{space} · {tab}" (0.553). */
+  space?: string;
   tab?: string;
   onTab: (key: string) => void;
   error?: Node;
@@ -1040,15 +1076,15 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
       {dialog}
       <div className="at-screenbody" ref={bodyRef}>
         <div className="at-screeninner">
-          {/* The app's name heads the space and scrolls away with it, as it
-              does in Learning. The space's sections are in the bar at the
-              foot of the window. */}
-          <div className="at-brand">
-            <img className="at-brandmark" src="/logo.svg" alt="" width={24} height={24} />
-            ManyTongues
-          </div>
+          {/* No app name here (0.554): each tab is headed with its own name
+              below. The space's sections are in the bar at the foot. */}
           <Notice kind="error">{error}</Notice>
           <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} dock />
+          {/* The tab's own name at the top (0.553), in the words of the bar.
+              A screen opened over the tab covers it, with its own title. */}
+          {space && tabs.find((t) => t[0] === tab) ? (
+            <TabTitle>{`${space} · ${(tabs.find((t) => t[0] === tab) as [string, string])[1]}`}</TabTitle>
+          ) : null}
           {children}
         </div>
       </div>
@@ -1321,6 +1357,33 @@ export const FLAG_NOTE_MAX = 500;
 export function flagTitle(kind: string) {
   const found = FLAG_KINDS.find((k) => k.key === kind);
   return found ? found.title : String(kind || "Something else");
+}
+
+/*
+ * Feedback about the app itself (0.552), sent from the You menu. The same
+ * screen as flagging a question, with these two options in place of the
+ * four about a card. Read by the App admin alone, in Super admin → Reports.
+ * Both take the person's own words: the option alone says nothing anybody
+ * could act on.
+ */
+export type FeedbackKind = "broken" | "idea";
+export const FEEDBACK_KINDS: { key: FeedbackKind; title: string; what: string; asks: true }[] = [
+  {
+    key: "broken",
+    title: "Something isn't working properly",
+    what: "Something went wrong, looks broken, or didn't do what you expected.",
+    asks: true,
+  },
+  {
+    key: "idea",
+    title: "I have an idea of something to improve",
+    what: "Something new the app could do, or a way to make it easier to use.",
+    asks: true,
+  },
+];
+export function feedbackTitle(kind: string) {
+  const found = FEEDBACK_KINDS.find((k) => k.key === kind);
+  return found ? found.title : String(kind || "Feedback");
 }
 
 /* --- the two speeds a word is recorded at -------------------------
@@ -2154,12 +2217,6 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
   /* The same close-on-anything-else the corner menu uses. Registered only
      while it is open, and the menu stops the click that opened it from
      closing it again. */
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
 
   if (!options || options.length < 2) return null;
   const on = value !== quiet;
@@ -2183,7 +2240,7 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
       </button>
 
       {open && (
-        <Popover className="at-pickmenu">
+        <Popover className="at-pickmenu" onClose={() => setOpen(false)}>
           {options.map((o) => (
             <button
               key={o.value}
@@ -2233,6 +2290,7 @@ export function ItemList<T>({
   onNew,
   newOff,
   searchBelow,
+  query: outsideQuery,
   renderItem,
   selected,
   onSelectedChange,
@@ -2265,6 +2323,12 @@ export function ItemList<T>({
    * narrow to read what was typed in it on a phone.
    */
   searchBelow?: boolean;
+  /**
+   * The search, typed somewhere else on the screen. Given, the list draws
+   * no search box of its own and narrows by this instead — the Courses tab
+   * searches from a button beside its heading.
+   */
+  query?: string;
   /** An override for the "n of m" line. */ count?: Node;
   items: T[];
   itemKey?: (item: T) => string;
@@ -2303,7 +2367,9 @@ export function ItemList<T>({
   emptyPanel?: Node;
   busy?: boolean;
 }) {
-  const [query, setQuery] = useState("");
+  const [ownQuery, setQuery] = useState("");
+  const outside = outsideQuery !== undefined;
+  const query = outside ? outsideQuery : ownQuery;
   const [selecting, setSelecting] = useState(false);
   const bare = !!emptyPanel && !items.length;
   /* How many tiles are on the page. A long list is shown a page at a time:
@@ -2471,7 +2537,7 @@ export function ItemList<T>({
             New {noun}
           </button>
         )}
-        {items.length > 0 && !searchBelow && searchBox}
+        {items.length > 0 && !searchBelow && !outside && searchBox}
         {/* Beside the search box, because narrowing by hand and narrowing by
             typing are the same job. */}
         {tools}
@@ -2494,7 +2560,7 @@ export function ItemList<T>({
         )}
       </div>
 
-      {searchBelow && items.length > 0 && (
+      {searchBelow && !outside && items.length > 0 && (
         <div className="at-toolbar at-toolbar-search">{searchBox}</div>
       )}
 
@@ -2556,8 +2622,11 @@ export function ItemList<T>({
         </div>
       )}
 
+      {/* Nothing to draw, no table: its heading row with no rows under
+          it read as a table with something missing, above the empty
+          panel or the "nothing matches" line. */}
       {views && (drawn === "list" || drawn === "table") ? (
-        <CardLines
+        page.length === 0 ? null : <CardLines
           view={drawn}
           views={views}
           page={page}
@@ -3631,9 +3700,11 @@ export function BannerHost() {
 /* `actions`, where there are any, are a button or two at the end of the
    band: a message that needs doing something about, like reloading for a
    new version, carries its buttons with it. */
-export function TopBanner({ kind = "warn", actions, children }: {
+export function TopBanner({ kind = "warn", actions, oneLine, children }: {
   kind?: "warn" | "error";
   actions?: Node;
+  /** The words and the actions on one line, the words cut short (0.574). */
+  oneLine?: boolean;
   children?: Node;
 }) {
   const [host, setHost] = useState<Element | null>(null);
@@ -3642,7 +3713,7 @@ export function TopBanner({ kind = "warn", actions, children }: {
   }, []);
   if (!children || !host) return null;
   return createPortal(
-    <div className={`at-banner ${kind}`} role={kind === "error" ? "alert" : "status"}>
+    <div className={`at-banner ${kind}${oneLine ? " oneline" : ""}`} role={kind === "error" ? "alert" : "status"}>
       <span className="what">{children}</span>
       {actions ? <span className="at-banneracts">{actions}</span> : null}
     </div>,
@@ -3781,6 +3852,79 @@ export function SnackbarProvider({ show, children }: {
   return <SnackbarContext.Provider value={show || noSnackbar}>{children}</SnackbarContext.Provider>;
 }
 
+/*
+ * A screen's one way to do something that may fail: busy while it runs,
+ * the error where the screen shows it, and a word when it worked (0.580).
+ * Admin, Teaching and Super admin's Spaces each had their own copy, which
+ * differed in three small ways — kept as options here:
+ *
+ *   refresh      run after it worked, before anything is said
+ *   snackErrors  say a failure aloud as well as on the screen
+ *   quietDone    say "done" plainly rather than as good news
+ *   before       run first (Teaching clears its locked-deck tally)
+ *   instead      what to say in place of "done", when there is something
+ *                more important (a locked deck kept a change from landing)
+ *
+ * `run` answers what the work returned, or undefined if it failed.
+ */
+export function useRun({ refresh, snackErrors = false, quietDone = false, before, instead }: {
+  refresh?: () => unknown;
+  snackErrors?: boolean;
+  quietDone?: boolean;
+  before?: () => void;
+  instead?: () => string | null;
+} = {}) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const snack = useSnackbar();
+  const opts = useRef({ refresh, snackErrors, quietDone, before, instead });
+  opts.current = { refresh, snackErrors, quietDone, before, instead };
+  const run = useCallback(async (fn: () => Promise<any>, done?: string | ((out: any) => string)): Promise<any> => {
+    const o = opts.current;
+    setBusy(true);
+    if (o.before) o.before();
+    try {
+      const out = await fn();
+      if (o.refresh) await o.refresh();
+      setError("");
+      const warn = o.instead ? o.instead() : null;
+      if (warn) snack(warn, "warn");
+      else if (done) snack(typeof done === "function" ? done(out) : done, o.quietDone ? undefined : "good");
+      return out;
+    } catch (e) {
+      const said = API.explain(e);
+      setError(said);
+      if (o.snackErrors) snack(said, "warn");
+      return undefined;
+    } finally {
+      setBusy(false);
+    }
+  }, [snack]);
+  const clearError = useCallback(() => setError(""), []);
+  return { run, busy, setBusy, error, setError, clearError };
+}
+
+/**
+ * A stored picture, by its hash: its data URL once it has arrived, and
+ * whether it could not be had. One fetch per picture per session, shared
+ * by every screen — see pictures.ts. An empty hash asks for nothing.
+ */
+export function usePicture(hash: string) {
+  const [got, setGot] = useState<{ hash: string; src: string; lost: boolean }>({ hash: "", src: "", lost: false });
+  useEffect(() => {
+    if (!hash) return undefined;
+    let live = true;
+    pictureData(hash).then(
+      (src) => live && setGot({ hash, src, lost: false }),
+      () => live && setGot({ hash, src: "", lost: true }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [hash]);
+  return got.hash === hash ? { src: got.src, lost: got.lost } : { src: "", lost: false };
+}
+
 export function useSnackbar() {
   return React.useContext(SnackbarContext) || noSnackbar;
 }
@@ -3848,11 +3992,25 @@ export function usePageLock(on = true) {
  * its side left to its own class.
  */
 const POPOVER_GUTTER = 8;
-export function Popover({ className = "", children, ...rest }: {
+export function Popover({ className = "", children, onClose, ...rest }: {
   className?: string;
   children?: Node;
+  /** Called on any click once it is open, its own included — a menu is
+      left by choosing from it or by tapping anywhere else (0.580: five
+      screens wrote this listener out by hand). */
+  onClose?: () => void;
 } & Record<string, any>) {
   const ref: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
+  const closing = useRef(onClose);
+  closing.current = onClose;
+  useEffect(() => {
+    if (!closing.current) return undefined;
+    const close = () => {
+      if (closing.current) closing.current();
+    };
+    window.addEventListener("click", close);
+    return () => window.removeEventListener("click", close);
+  }, []);
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el || typeof window === "undefined") return undefined;
@@ -3971,7 +4129,11 @@ export function useScrollTop(key: unknown) {
  * nothing happened: a grey button that says nothing leaves a teacher
  * guessing.
  */
-export type ScreenFab = { icon: string; label: string; onClick: () => void; off?: boolean; busy?: boolean };
+/* A floating button. Most screens have one; the card editor has two —
+   Save and publish beside Save — and the first of a pair is the quieter
+   (`second`), so the corner keeps the button it always had. `busyLabel` is
+   what it reads while its own request is out. */
+export type ScreenFab = { icon: string; label: string; onClick: () => void; off?: boolean; busy?: boolean; busyLabel?: string; second?: boolean };
 
 export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", backIcon = "back", rise, className = "", fab, scrollKey }: {
   title?: Node;
@@ -3999,7 +4161,7 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
       being edited — rather than going back. */
   backIcon?: string;
   className?: string;
-  fab?: ScreenFab | null;
+  fab?: ScreenFab | ScreenFab[] | null;
 }) {
   const self: React.MutableRefObject<{ el: Element | null, close?: () => void }> = useRef({ el: null });
   /* The screen's own element, so the stack can be checked against the
@@ -4025,6 +4187,7 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
      scrolling up, no while scrolling down. A few pixels either way are
      ignored, so a finger resting on the glass does not flicker it. */
   const [fabNamed, setFabNamed] = useState(true);
+  const fabs = !fab ? [] : Array.isArray(fab) ? fab : [fab];
   const lastTop = useRef(0);
   const onBodyScroll = () => {
     const el = bodyRef.current;
@@ -4099,18 +4262,21 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
           {footer ? <div className="at-screenfoot">{footer}</div> : null}
         </div>
       </div>
-      {fab ? (
+      {fabs.length ? (
         <div className="at-fabrow">
-          <button
-            type="button"
-            className={`at-fab${fabNamed ? " named" : ""}${fab.off || fab.busy ? " off" : ""}`}
-            aria-label={fab.busy ? "Saving…" : fab.label}
-            aria-disabled={fab.off || fab.busy ? "true" : undefined}
-            onClick={() => { if (!fab.busy) fab.onClick(); }}
-          >
-            <Icon name={fab.icon} />
-            <span className="at-fablabel">{fab.busy ? "Saving…" : fab.label}</span>
-          </button>
+          {fabs.map((one) => (
+            <button
+              key={one.label}
+              type="button"
+              className={`at-fab${fabNamed ? " named" : ""}${one.second ? " second" : ""}${one.off || one.busy ? " off" : ""}`}
+              aria-label={one.busy ? one.busyLabel || "Saving…" : one.label}
+              aria-disabled={one.off || one.busy ? "true" : undefined}
+              onClick={() => { if (!one.busy) one.onClick(); }}
+            >
+              <Icon name={one.icon} />
+              <span className="at-fablabel">{one.busy ? one.busyLabel || "Saving…" : one.label}</span>
+            </button>
+          ))}
         </div>
       ) : null}
     </div>
@@ -4412,15 +4578,34 @@ type SpaceName = "admin" | "teach";
  * their courses were an hour ago.
  *
  * Keyed by handle on the way in and out, so signing in as somebody else
- * never shows them the last person's material.
+ * never shows them the last person's material; and by the space acted in
+ * (0.582), so one space's Admin or Teaching never stands in for another's.
+ * A space not yet known is shown nothing rather than the wrong one.
  */
-const spaceHeld: Record<string, { handle: string; shown: any } | null> = { admin: null, teach: null };
+type SpaceCopy = { handle: string; org: string; shown: any };
+const spaceHeld: Record<string, SpaceCopy | null> = { admin: null, teach: null };
 
-const SPACE_KEY = (space: SpaceName) => `arabic-trainer:space:${space}`;
+/* Trying a space (0.574) keeps its Teaching and Admin apart, and drops
+   them on leaving. */
+const SPACE_TRIAL = API.trialSuffix(API.tryingSpace());
+const SPACE_KEY = (space: SpaceName) => `arabic-trainer:space:${space}${SPACE_TRIAL}`;
 
+/* What was last written for each space and person, so an identical
+   delivery is not serialised into storage again (0.580, audit finding 17). */
+const lastKept = new Map<string, string>();
+/** For tests: forget what was last written. */
+export const forgetKeptSpaces = () => lastKept.clear();
 function rememberOnDevice(space: SpaceName, handle: string, shown: any) {
   try {
-    localStorage.setItem(SPACE_KEY(space), JSON.stringify({ handle, shown, at: Date.now() }));
+    /* One slot per space, so the person and the space acted in are part
+       of what is compared. */
+    const org = API.currentOrg();
+    const text = JSON.stringify([handle, org, shown]);
+    /* And only while the slot is still there: leaving a trial clears it. */
+    if (lastKept.get(space) === text && localStorage.getItem(SPACE_KEY(space)) !== null) return;
+    lastKept.delete(space);
+    localStorage.setItem(SPACE_KEY(space), JSON.stringify({ handle, org, shown, at: Date.now() }));
+    lastKept.set(space, text);
   } catch (e) {
     /* Storage full, blocked, or the space is simply too big to keep. The
        app works exactly as it did before this existed. */
@@ -4431,20 +4616,24 @@ function recallFromDevice(space: SpaceName, handle: string) {
   try {
     const raw = localStorage.getItem(SPACE_KEY(space));
     const held = raw ? JSON.parse(raw) : null;
-    if (held && held.handle === handle && held.shown) return held.shown;
+    if (held && held.handle === handle && (held.org || "") === API.currentOrg() && held.shown) return held.shown;
   } catch (e) {
     /* Nothing readable. */
   }
   return null;
 }
-type SpaceWatcher = (space: SpaceName, handle: string, shown: any) => void;
+type SpaceWatcher = (space: SpaceName, handle: string, org: string, shown: any) => void;
 const spaceWatchers = new Set<SpaceWatcher>();
 
 /* Quietly: the space itself, keeping the slot level with what it is
    showing. Nothing to tell anyone, since the teller is the only one
    showing it. */
 export function rememberSpace(space: SpaceName, handle: string, shown: any) {
-  spaceHeld[space] = { handle, shown };
+  const org = API.currentOrg();
+  /* Still waiting to learn the space: nothing fetched can arrive here
+     then, so this is only a guard. */
+  if (org === "" && API.actingSpace() === null) return;
+  spaceHeld[space] = { handle, org, shown };
   rememberOnDevice(space, handle, shown);
 }
 
@@ -4452,18 +4641,19 @@ export function rememberSpace(space: SpaceName, handle: string, shown: any) {
    screen should take. */
 function deliverSpace(space: SpaceName, handle: string, shown: any) {
   rememberSpace(space, handle, shown);
-  for (const watcher of [...spaceWatchers]) watcher(space, handle, shown);
+  const org = API.currentOrg();
+  for (const watcher of [...spaceWatchers]) watcher(space, handle, org, shown);
 }
 
 export function recallSpace(space: SpaceName, handle: string) {
   const held = spaceHeld[space];
-  if (held && held.handle === handle) return held.shown;
+  if (held && held.handle === handle && held.org === API.currentOrg()) return held.shown;
   if (held) spaceHeld[space] = null;
   /* Nothing in memory: this is a fresh launch, which is exactly when the
      copy on the device is worth having. Taken into memory as well, so the
      rest of the session reads it without going back to storage. */
   const stored = recallFromDevice(space, handle);
-  if (stored) spaceHeld[space] = { handle, shown: stored };
+  if (stored) spaceHeld[space] = { handle, org: API.currentOrg(), shown: stored };
   return stored;
 }
 
@@ -4474,8 +4664,8 @@ export function useFreshSpace(space: SpaceName, handle: string, adopt: (shown: a
   const latest = useRef(adopt);
   latest.current = adopt;
   useEffect(() => {
-    const watcher: SpaceWatcher = (which, whose, shown) => {
-      if (which === space && whose === handle) latest.current(shown);
+    const watcher: SpaceWatcher = (which, whose, org, shown) => {
+      if (which === space && whose === handle && org === API.currentOrg()) latest.current(shown);
     };
     spaceWatchers.add(watcher);
     return () => {
@@ -4485,8 +4675,29 @@ export function useFreshSpace(space: SpaceName, handle: string, adopt: (shown: a
 }
 
 /* The administrator's whole view of the site, in one request. */
+/*
+ * An answer for a space other than the one acting now is dropped (0.582,
+ * 3a). The space acted in is fixed for the life of the page once known, and
+ * a request waits until it is, so this cannot happen; it is the guard that
+ * keeps it from mattering if it ever does. A space unknown when the
+ * request left is no mismatch: the request waited for it.
+ */
+const movedSince = (at: string | null) => at !== null && at !== API.currentOrg();
+
 export async function pullAdmin(handle: string): Promise<import("./types.ts").AdminOverview> {
-  const data = await API.adminOverview();
+  const at = API.actingSpace();
+  let data = await API.adminOverview();
+  if (movedSince(at)) {
+    return recallSpace("admin", handle) || { users: [], courses: [], decks: [], flags: [] };
+  }
+  /* Nothing moved since the last ask (0.580): what is held stands. If
+     nothing is held after all, ask again for the whole of it. */
+  if (data && data.unchanged) {
+    const held = recallSpace("admin", handle);
+    if (held) return held;
+    API.forgetEtags();
+    data = await API.adminOverview();
+  }
   deliverSpace("admin", handle, data);
   return data;
 }
@@ -4503,6 +4714,11 @@ export async function pullAdmin(handle: string): Promise<import("./types.ts").Ad
 let LOST_RECORDINGS: Set<string> = new Set();
 export function setLostRecordings(ids: Iterable<string>) {
   LOST_RECORDINGS = new Set(ids);
+  /* And into the one list of what the server lacks, so trying a card here
+     does not ask for a recording the server has just said it lacks
+     (0.580) — see pictures.ts. */
+  const at = Date.now();
+  for (const id of LOST_RECORDINGS) MISSING_CLIPS.set(id, at);
 }
 export const isLostRecording = (hash: string) => LOST_RECORDINGS.has(hash);
 /** Every recording a card names: its forms', their answers', its lines'. */
@@ -4522,17 +4738,35 @@ export const cardLostRecordings = (card: any): number =>
    and what didn't is reported — and what was already held stands in for
    the part that failed. */
 export async function pullTeaching(handle: string) {
-  const [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
-  const before = recallSpace("teach", handle) || { courses: [], decks: [], cards: [] };
+  const at = API.actingSpace();
+  let [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
+  if (movedSince(at)) {
+    const kept = recallSpace("teach", handle);
+    return kept
+      ? { ...kept, failed: null }
+      : { courses: [], decks: [], cards: [], missingClips: [], failed: null };
+  }
+  const same = (r: PromiseSettledResult<any>) => r.status === "fulfilled" && !!(r.value && r.value.unchanged);
+  const held = recallSpace("teach", handle);
+  /* An "unchanged" answer is only as good as what is held (0.580). With
+     nothing held, ask again for the whole of it. */
+  if (!held && [c, d, k].some(same)) {
+    API.forgetEtags();
+    [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
+  }
+  /* Nothing moved: the space stands as it is, and nobody is told. */
+  if (held && same(c) && same(d) && same(k)) return { ...held, failed: null };
+  const before = held || { courses: [], decks: [], cards: [] };
+  const fresh = (r: PromiseSettledResult<any>) => r.status === "fulfilled" && !same(r);
+  const value = (r: PromiseSettledResult<any>) => (r as PromiseFulfilledResult<any>).value;
   const shown = {
-    courses:
-      c.status === "fulfilled"
-        ? (c.value.courses || []).filter((x: { role: string }) => x.role === "teacher")
-        : before.courses,
-    decks: d.status === "fulfilled" ? d.value.decks || [] : before.decks,
-    cards: k.status === "fulfilled" ? k.value.cards || [] : before.cards,
+    courses: fresh(c)
+      ? (value(c).courses || []).filter((x: { role: string }) => x.role === "teacher")
+      : before.courses,
+    decks: fresh(d) ? value(d).decks || [] : before.decks,
+    cards: fresh(k) ? value(k).cards || [] : before.cards,
     /* Which of those cards' recordings the server does not hold. */
-    missingClips: k.status === "fulfilled" ? k.value.missingClips || [] : before.missingClips || [],
+    missingClips: fresh(k) ? value(k).missingClips || [] : before.missingClips || [],
   };
   deliverSpace("teach", handle, shown);
   const failed = [c, d, k].find((r) => r.status === "rejected");
@@ -4642,12 +4876,6 @@ export function ModeSelector({ mode, modes, onChange }: {
 }) {
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
 
   if (modes.length < 2) return null;
 
@@ -4662,7 +4890,7 @@ export function ModeSelector({ mode, modes, onChange }: {
         </span>
       </button>
       {open && (
-        <Popover className="at-modemenu">
+        <Popover className="at-modemenu" onClose={() => setOpen(false)}>
           {modes.map((m) => (
             <button
               key={m}
@@ -5153,8 +5381,7 @@ export async function pullCourses(
     /* And only the parts a deck holds, filed under that deck: numbers
        arrive the way every other card does — see fileIntoDecks. A deck in
        another language holds none of this system's. */
-    const holding = decks
-      .filter((d: Deck & { courseLanguage?: string }) => (d.lang || d.courseLanguage) === set.numbers.languageId)
+    const holding = decksForSystem(decks, set.numbers.languageId, set.numbers.id)
       .map((d: Deck) => ({ title: String(d.title || ""), parts: d.parts || [] }));
     const filed = fileIntoDecks(handed, { composer, sys: set.numbers, timeComposer, timeSys: set.times }, holding);
     for (const item of filed) {
@@ -5320,15 +5547,6 @@ export function withProgress(item: Item, saved: Parked | undefined): Item {
   };
 }
 
-/* States that have never been answered are not worth setting aside, the
-   same reading the wire and the disk make of them. */
-const compactStates = (s?: Record<string, ExerciseState>): Record<string, ExerciseState> => {
-  const out: Record<string, ExerciseState> = {};
-  for (const [t, st] of Object.entries(s || {})) {
-    if (st && (st.phase !== "new" || st.reps || st.updated)) out[t] = st;
-  }
-  return out;
-};
 
 /* A card the device does not hold yet, with anything handed on to its
    forms taken into their schedules — see handOnCounting — rather than
@@ -5667,7 +5885,7 @@ export interface DeckWords {
   another: string;
 }
 
-export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize }: {
+export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize, saving }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
@@ -5693,9 +5911,14 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
   /** The small line under each row's name, or nothing. A deck says how
       big it is; a single card has nothing to add. */
   size?: ((d: Pick<Deck, "cardCount">) => Node) | null;
+  /** Decks whose change is still being saved, and which way. Such a row
+      says "Adding…" or "Removing…" and cannot be tapped until it is done,
+      where a save takes long enough for a teacher to wonder. */
+  saving?: Record<string, "add" | "drop">;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const pending = saving || {};
 
   const all = decks || [];
   const wanted = q.trim().toLowerCase();
@@ -5735,13 +5958,19 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
                 <Icon name="lock" size={14} />
               </span>
             ) : (
-              <button
-                className="at-deckdrop"
-                aria-label={say.drop(d.title)}
-                onClick={() => onToggle(d.id, true)}
-              >
-                <Icon name="close" size={16} />
-              </button>
+              pending[d.id] ? (
+                <span className="at-deckdrop" role="status" aria-label={`Taking ${d.title} out…`}>
+                  <span className="at-deckspin" aria-hidden="true" />
+                </span>
+              ) : (
+                <button
+                  className="at-deckdrop"
+                  aria-label={say.drop(d.title)}
+                  onClick={() => onToggle(d.id, true)}
+                >
+                  <Icon name="close" size={16} />
+                </button>
+              )
             )}
           </span>
         ))}
@@ -5789,13 +6018,15 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
             {find && wanted && !listed.length && <Help>Nothing matches that.</Help>}
             {listed.map((d) => {
               const on = chosen.includes(d.id);
+              const going = pending[d.id];
               return (
                 <button
-                  className={`at-deckpick${on ? " on" : ""}${d.locked ? " locked" : ""}`}
+                  className={`at-deckpick${on ? " on" : ""}${d.locked ? " locked" : ""}${going ? " saving" : ""}`}
                   key={d.id}
                   aria-pressed={on}
-                  disabled={!!d.locked}
-                  onClick={() => !d.locked && onToggle(d.id, on)}
+                  aria-busy={going ? true : undefined}
+                  disabled={!!d.locked || !!going}
+                  onClick={() => !d.locked && !going && onToggle(d.id, on)}
                 >
                   <span className="at-tickbody">
                     <b>{d.title}</b>
@@ -5807,6 +6038,11 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
                   <span className="at-deckmark">
                     {d.locked ? (
                       <span title="Locked" aria-label="Locked" role="img"><Icon name="lock" size={14} /></span>
+                    ) : going ? (
+                      <span className="at-decksaving" role="status">
+                        <span className="at-deckspin" aria-hidden="true" />
+                        {going === "add" ? "Adding…" : "Removing…"}
+                      </span>
                     ) : on ? "Added" : "Add"}
                   </span>
                 </button>
@@ -5898,3 +6134,4 @@ export function ChoiceSwitch<T extends string>({ ask, label, lede, icon, name, o
     </div>
   );
 }
+

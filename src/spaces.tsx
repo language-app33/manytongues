@@ -1,8 +1,12 @@
+/* The teaching screens' own styles, which arrive with them (0.580) — see
+   scripts/css-split.mjs. */
+import "./teaching.css";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
-import type { Card, Course, Deck, Flag, Form, Lang, LangId, User } from "./types.ts";
+import type { Card, Course, Deck, Feedback, Flag, Form, Lang, LangId, User } from "./types.ts";
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
-import { CardEditor } from "./card-editor.tsx";
+import { CardEditor, ImageScreen } from "./card-editor.tsx";
+import { usableAccent } from "./contrast.ts";
 import type { CardShape } from "./card-editor.tsx";
 import { formsOf, leadOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
@@ -49,17 +53,16 @@ const TextStyles = React.lazy(() =>
   import("./gallery.tsx").then((m) => ({ default: m.TextStyles })),
 );
 import {
-  contextCoverage,
   dimValues,
   exOf,
-  supportsContext,
   LANGUAGES,
   DEFAULT_LANGUAGE,
   categoriesOf,
   answerShape,
   levelOf,
   LEVEL_NAME,
-  scriptVars } from "./languages.ts";
+  scriptVars,
+  verbOf } from "./languages.ts";
 import { isDialog, linesOf, sceneKindOf } from "./dialogs.ts";
 import { asMeaning, cardRef, droppedIn, fillNames, hasSlots, isSentence, MAX_FILLS, refClash, renamedIn, slotName, slotsOf, taggedIn } from "./variables.ts";
 import { fillersFor, groupPronouns, isPronounCard, isPronounGroup, pickedCardIds } from "./card-facts.ts";
@@ -85,9 +88,11 @@ import { ReviewLine, ReviewScreen } from "./review-sheet.tsx";
 import { composerFor, timeComposerFor } from "./numbers/index.ts";
 import { emptyNumberSystem, emptyTimeSystem, readNumberSystem, readTimeSystem } from "./numbers/schema.ts";
 import { fillerCards } from "./numbers/generate.ts";
+import { rangeChecks } from "./numbers/range.ts";
+import { personsOf } from "./verbs.ts";
 import { countedNouns, withNouns } from "./numbers/nouns.ts";
 import { isOffline, watchNet } from "./net.ts";
-import { drainOutbox, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 
 /* What a card that could not be sent is filed under while it waits. See
    outbox.ts: one queue for every kind of waiting work, and the kind is
@@ -112,11 +117,13 @@ import {
   ClipList,
   clipHashes,
   ConfirmModal,
+  RadioGroup,
   Field,
   FilterBar,
   formHasAudio,
   FilterMenu,
   flagTitle,
+  feedbackTitle,
   Help,
   Icon,
   IconButton,
@@ -129,6 +136,7 @@ import {
   Section,
   Segmented,
   SpaceFrame,
+  Tabs,
   Tile,
   TileNote,
   TopBanner,
@@ -139,6 +147,7 @@ import {
   narrowing,
   plural,
   deckSize,
+  notReaching,
   shortDate,
   pullAdmin,
   pullTeaching,
@@ -151,6 +160,7 @@ import {
   useOffline,
   useLiveRefresh,
   useSnackbar,
+  useRun,
   Popover,
   DeckSwitch,
 } from "./shared.tsx";
@@ -170,18 +180,41 @@ export { ConfirmModal, useLiveRefresh, cardToItem, localIdFor };
    First run
    ------------------------------------------------------------------ */
 
-export function Onboarding({ onDone }: { onDone: (account?: User & { key: string }) => void }) {
-  const [step, setStep] = useState("choose"); // choose | new | existing | key
+/*
+ * Where Onboarding is shown (0.543): the space whose address is open, if
+ * any, what that address turned out to be, a code an invite link brought,
+ * and why the device was just signed out.
+ */
+export interface OnboardingPlace {
+  org?: API.OrgCard & { logoData: string; closed: boolean };
+  /** The address names no space. */
+  unknown?: boolean;
+  /** From an invite link, `?join=`. */
+  joinCode?: string;
+  /** Said once at the top: a closed space, a suspended account. */
+  notice?: string;
+}
+
+export function Onboarding({ onDone, place = {} }: {
+  onDone: (account?: User & { key: string }) => void;
+  place?: OnboardingPlace;
+}) {
+  const org = place.org;
+  const [step, setStep] = useState(place.joinCode && !(org && org.closed) ? "new" : "choose"); // choose | new | existing | key
   const [name, setName] = useState("");
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [made, setMade] = useState<User & { key: string } | null>(null);
   const [showKey, setShowKey] = useState(false);
-  /* Asked for only once the server has said it wants one, so a site that
-     lets anyone sign up never shows the field. */
-  const [codeNeeded, setCodeNeeded] = useState(false);
-  const [signupCode, setSignupCode] = useState("");
+  /* "I've saved my key somewhere safe", ticked before carrying on (19b). */
+  const [keyTicked, setKeyTicked] = useState(false);
+  /* An invitation or a course code: what decides which space a new account
+     is in (24b). Pre-filled from an invite link. */
+  const [signupCode, setSignupCode] = useState(place.joinCode || "");
+  /* The space a key or code turned out to belong to, when it isn't this
+     address's (53b): said, with the way there. */
+  const [elsewhere, setElsewhere] = useState<API.OrgCard | null>(null);
 
   /*
    * The app's general wording for a request that could not be made is
@@ -199,18 +232,15 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
     setBusy(true);
     setError("");
     try {
-      const r = await API.signUp(name.trim(), signupCode.trim());
+      const r = await API.signUp(name.trim(), signupCode.trim(), org ? org.id : "");
       const account = { ...r.user, key: r.key };
       API.saveAccount(account);
       setMade(account);
       setStep("key");
     } catch (e) {
-      if (String(e && (e as any).message) === "signup-code-required") {
-        setCodeNeeded(true);
-        setError(signupCode.trim() ? "That invitation code isn't right." : "");
-      } else {
-        setError(explainHere(e));
-      }
+      const there = otherSpace(e);
+      if (there) setElsewhere(there);
+      else setError(explainHere(e));
     } finally {
       setBusy(false);
     }
@@ -220,9 +250,22 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
     setBusy(true);
     setError("");
     try {
-      const r = await API.whoAmI(key.trim());
+      /* At a space's address, land there if the account is in it; anywhere
+         else, in the space last used on this device. A key from a space
+         this address isn't is no longer refused: it lands in its own
+         (memberships). The invitation followed lets an account with no
+         open space back in. */
+      const r = await API.whoAmI(key.trim(), org ? org.id : API.lastSpace(), place.joinCode || "");
       const account = { ...r.user, key: key.trim() };
       API.saveAccount(account);
+      if (!r.user.admin && r.user.org) API.rememberSpace(r.user.org.id);
+      /* An account someone else made, signed in to for the first time, is
+         asked to save its key before anything else (18a). */
+      if (r.user && r.user.keySaved === false) {
+        setMade(account);
+        setStep("key");
+        return;
+      }
       onDone(account);
     } catch (e) {
       setError(explainHere(e));
@@ -231,13 +274,51 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
     }
   }
 
+  /* The space's colour, as the accent on this page only, if it can be seen
+     on both themes (29a; src/contrast.ts). */
+  const accent = org && org.colour && usableAccent(org.colour) ? org.colour : "";
+  const closed = !!(org && org.closed);
+
   return (
-    <div className="ob">
+    <div className="ob" style={accent ? ({ "--accent": accent } as React.CSSProperties) : undefined}>
       <div className="ob-box">
-        {step === "choose" && (
+        {place.notice ? <Notice kind="warn">{place.notice}</Notice> : null}
+        {elsewhere ? (
+          /* A key or code from another space (53b): whose it is, and the two
+             ways forward. */
           <>
-            <img className="ob-logo" src="/logo.svg" alt="" width={72} height={72} />
-            <h1>ManyTongues</h1>
+            <Notice kind="warn">
+              {`This code belongs to the space ${elsewhere.name}.`}
+            </Notice>
+            <Button variant="primary" wide className="at-mt3"
+              onClick={() => {
+                const join = step === "new" && signupCode.trim() ? `?join=${encodeURIComponent(signupCode.trim())}` : "";
+                window.location.assign(`/${elsewhere.slug}${join}`);
+              }}
+            >
+              Go to {elsewhere.name}
+            </Button>
+            <Button variant="ghost" wide className="at-mt3"
+              onClick={() => {
+                setElsewhere(null);
+                setSignupCode("");
+                setStep("new");
+              }}
+            >
+              Make a new account here
+            </Button>
+          </>
+        ) : null}
+        {!elsewhere && step === "choose" && (
+          <>
+            <img className="ob-logo" src={org && org.logoData ? org.logoData : "/logo.svg"} alt="" width={72} height={72} />
+            <h1>{org ? org.name : "ManyTongues"}</h1>
+            {place.unknown ? (
+              <Notice kind="warn">
+                There's no space at this address. <a href="/">Go to the home page</a>.
+              </Notice>
+            ) : null}
+            {closed ? <Notice kind="warn">This space is closed.</Notice> : null}
             {/* What it used to say: "an account only matters if you join a
                 course or use more than one device". Both exits from this
                 screen are requests to the server, so an account is not
@@ -245,12 +326,13 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
                 where there is no signal was being told, by the one screen
                 standing in their way, that it should not have been. */}
             <Lede>
-              Learn a language a card at a time. Setting up takes a moment and a connection; after
-              that your cards and your progress live on this device, and the app works without one.
+              Your language journey starts here. After a quick setup, you can learn anywhere, with or without internet.
             </Lede>
-            <Button variant="primary" wide onClick={() => setStep("new")}>
-              Set up
-            </Button>
+            {!closed && !place.unknown ? (
+              <Button variant="primary" wide onClick={() => setStep("new")}>
+                Set up
+              </Button>
+            ) : null}
             <Button variant="ghost" wide
               className="at-mt3"
               onClick={() => setStep("existing")}
@@ -260,7 +342,7 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
           </>
         )}
 
-        {step === "new" && (
+        {!elsewhere && step === "new" && (
           <>
             <h2>What should people call you?</h2>
             <Lede>
@@ -274,30 +356,23 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === "Enter" && name.trim() && create()}
             />
-            {codeNeeded && (
-              <>
-                <Help className="at-mb2">
-                  This site asks for an invitation code from your teacher.
-                </Help>
-                <input
-                  className="at-input"
-                  placeholder="Invitation code"
-                  value={signupCode}
-                  autoFocus
-                  onChange={(e) => {
-                    setSignupCode(e.target.value);
-                    setError("");
-                  }}
-                  onKeyDown={(e) =>
-                    e.key === "Enter" && name.trim() && signupCode.trim() && create()
-                  }
-                />
-              </>
-            )}
+            <Help className="at-mt3 at-mb2">
+              Your invitation code, or a course code from your teacher.
+            </Help>
+            <input
+              className="at-input"
+              placeholder="Invitation or course code"
+              value={signupCode}
+              onChange={(e) => {
+                setSignupCode(e.target.value);
+                setError("");
+              }}
+              onKeyDown={(e) => e.key === "Enter" && name.trim() && create()}
+            />
             <Notice kind="error">{error}</Notice>
             <Button variant="primary" wide
               className="at-mt4"
-              disabled={!name.trim() || busy || (codeNeeded && !signupCode.trim())}
+              disabled={!name.trim() || busy}
               onClick={create}
             >
               {busy ? "Setting up…" : "Continue"}
@@ -308,7 +383,7 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
           </>
         )}
 
-        {step === "existing" && (
+        {!elsewhere && step === "existing" && (
           <>
             <h2>Your sign-in key</h2>
             <Lede>
@@ -367,27 +442,25 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
                 {busy ? "Checking…" : "Sign in"}
               </Button>
             </form>
+            <Help className="at-mt3">
+              Lost your key? Ask your space's admin for a new one. Everyone else:
+              contact@manytongues.co
+            </Help>
             <Button variant="ghost" wide className="at-mt3" onClick={() => setStep("choose")}>
               Back
             </Button>
           </>
         )}
 
-        {step === "key" && made && (
+        {!elsewhere && step === "key" && made && (
           <>
             <h2>Keep this somewhere safe</h2>
             <Lede>
               This is your sign-in key. It brings your cards to another device, and it is the only
-              way back into your account. Nobody can recover it for you except your administrator.
+              way back into your account. Save it in a password manager, or write it down somewhere
+              safe. If you lose it, only your space's admin can give you a new one.
             </Lede>
-            <p className="at-key">{made.key}</p>
-            <div className="at-row at-mt3">
-              <Button variant="ghost"
-                onClick={() => navigator.clipboard && navigator.clipboard.writeText(made.key)}
-              >
-                Copy
-              </Button>
-            </div>
+            <CodeBox label="Your sign-in key" code={made.key} />
             <Help>
               You are <strong>{made.displayName}</strong> · <span className="at-handle">{made.handle}</span>
               . Share the handle freely; never the key.
@@ -398,7 +471,11 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                onDone(made);
+                if (!keyTicked) return;
+                /* Recorded, so the reminder isn't shown again; carrying on
+                   doesn't wait for it. */
+                API.keySaved().catch(() => {});
+                onDone({ ...made, keySaved: true });
               }}
             >
               <input
@@ -421,8 +498,12 @@ export function Onboarding({ onDone }: { onDone: (account?: User & { key: string
                 aria-hidden="true"
                 className="at-hiddenuser"
               />
-              <Button variant="primary" wide className="at-mt4" type="submit">
-                I've saved it
+              <label className="at-tickrow at-mt4">
+                <input type="checkbox" checked={keyTicked} onChange={(e) => setKeyTicked(e.target.checked)} />
+                <span>I've saved my key somewhere safe</span>
+              </label>
+              <Button variant="primary" wide className="at-mt4" type="submit" disabled={!keyTicked}>
+                Carry on
               </Button>
             </form>
           </>
@@ -510,15 +591,6 @@ function BelongRow({ label, tone, courses, languages }: {
   );
 }
 
-/* A "modal" is now a screen. Kept under this name so nothing that opens one
-   has to change; what it opens is the standard full-screen shell. */
-export function Modal({ title, children, onClose }: { title?: Node; children?: Node; onClose: () => void }) {
-  return (
-    <Screen title={title} onBack={onClose}>
-      {children}
-    </Screen>
-  );
-}
 
 /* Pick the language a new deck or card belongs to. Shown only when the person
    teaches more than one, since otherwise there is nothing to decide. */
@@ -538,12 +610,309 @@ export function Modal({ title, children, onClose }: { title?: Node; children?: N
 
 
 
-export function CodeBox({ label, code, hint, onNew, busy }: {
+/*
+ * One person's actions on a People list: a new sign-in key, suspending or
+ * reactivating them, and taking them off a space (0.580). Admin's People
+ * and Super admin's Everyone had a copy each, which had drifted apart in
+ * what they said; this is the one, in Admin's words. `org` names the space
+ * where the screen acts in a space other than its own (Super admin);
+ * without it the words say "this space". Anything only one screen offers
+ * comes after, as children.
+ */
+export function PersonActions({ person, org, keyOrg, mayKey, mayAct, suspendable, suspendedHere, removable, onConfirm, onNewKey, children }: {
+  person: { handle: string; displayName: string };
+  org?: { id: string; name: string } | null;
+  /** The space whose say the new key is asked under. */
+  keyOrg?: string;
+  mayKey: boolean;
+  /** Whether suspending, reactivating and removing are offered at all. */
+  mayAct: boolean;
+  /** Suspended by the super admin everywhere: not this space's to lift. */
+  suspendable: boolean;
+  suspendedHere: boolean;
+  removable: boolean;
+  onConfirm: (p: Pending) => void;
+  onNewKey: (made: { name: string; handle: string; key: string }) => void;
+  children?: Node;
+}) {
+  const u = person;
+  const where = org ? org.name : "this space";
+  const inWhere = org ? ` in ${org.name}` : "";
+  return (
+    <>
+      {mayKey && (
+        <IconButton icon="key" label="Issue a new sign-in key" onClick={() => onConfirm({
+          title: `New sign-in key for ${u.displayName}?`,
+          confirmLabel: "Issue a new key",
+          body: (
+            <p>
+              Their current key stops working the moment you do this, on every device they use.
+              Their handle, courses and progress are untouched. You&apos;ll see the new key once.
+            </p>
+          ),
+          action: async () => {
+            const r = await API.reissueKey(u.handle, keyOrg);
+            onNewKey({ name: u.displayName, handle: u.handle, key: r.key });
+          },
+        })} />
+      )}
+      {mayAct && suspendable && (suspendedHere ? (
+        <IconButton icon="unlock" label={`Reactivate${inWhere}`} onClick={() => onConfirm({
+          title: `Reactivate ${u.displayName}${inWhere}?`,
+          confirmLabel: "Reactivate",
+          body: <p>They can use {where} again and are put back on the courses they were in.</p>,
+          action: () => API.reactivateUser(u.handle, org ? org.id : undefined),
+        })} />
+      ) : (
+        <IconButton icon="lock" label={`Suspend${inWhere}`} onClick={() => onConfirm({
+          title: `Suspend ${u.displayName}${inWhere}?`,
+          confirmLabel: "Suspend them",
+          body: (
+            <p>
+              In {where} only: they come off its courses and can&apos;t use it until reactivated.
+              They stay on its People list, marked suspended. Their other spaces are untouched.
+              Nothing is deleted.
+            </p>
+          ),
+          action: () => API.suspendUser(u.handle, org ? org.id : undefined),
+        })} />
+      ))}
+      {mayAct && removable && (
+        <IconButton icon="close" label={`Remove from ${org ? org.name : "this space"}`} danger onClick={() => onConfirm({
+          title: `Remove ${u.displayName} from ${where}?`,
+          confirmLabel: "Remove",
+          body: (
+            <p>
+              They come off {where}&apos;s courses and People list, and move to Former members.
+              Their account and their other spaces stay. They can come back with an invitation link
+              or a course code.
+            </p>
+          ),
+          action: () => API.removeFromSpace(u.handle, org ? org.id : undefined),
+        })} />
+      )}
+      {children}
+    </>
+  );
+}
+
+/*
+ * Reports learners sent about cards, as a list (0.580): search, Copy and
+ * Clear for what is ticked, and Open card, Copy and Clear on each. Admin's
+ * Flags tab and Super admin's Reports drew this twice, the second as plain
+ * tiles with less on them; this is the one, and each screen says what its
+ * buttons do. `onClear` asks before it clears.
+ */
+export function ReportList({ flags, languages, busy, copying = false, copyingSays = "", selected, onSelectedChange, onCopy, onClear, onOpen }: {
+  flags: Flag[];
+  languages: Record<string, any>;
+  busy?: boolean;
+  copying?: boolean;
+  copyingSays?: string;
+  selected: Set<string>;
+  onSelectedChange: (next: Set<string>) => void;
+  onCopy: (flags: Flag[]) => void;
+  onClear: (ids: string[]) => void;
+  onOpen?: (flag: Flag) => void;
+}) {
+  return (
+    <ItemList
+      noun="flag"
+      items={flags}
+      /* In the toolbar rather than at the head of the tab: it
+         acts on the list, and the list is what the toolbar is
+         for. Everything, because that is the ordinary thing to
+         want — the ticked ones are a bulk action below, and one
+         at a time is a button on the tile. */
+      tools={
+        flags.length ? (
+          <Button
+            size="sm"
+            icon="copy"
+            disabled={copying}
+            onClick={() => onCopy(flags)}
+          >
+            {copyingSays || `Copy all ${plural(flags.length, "report")}`}
+          </Button>
+        ) : null
+      }
+      /* Full width, one to a row. A report is three or four lines
+         of somebody's words and a word in a script you may not
+         read quickly; in a grid of narrow tiles every one of them
+         wraps to a column and none of them can be skimmed. */
+      size="large"
+      busy={busy}
+      empty="Nothing reported. Learners flag a question from the answer screen, and what they send lands here."
+      match={(f, q) =>
+        flagTitle(f.kind).toLowerCase().includes(q) ||
+        (f.handleName || "").toLowerCase().includes(q) ||
+        (f.note || "").toLowerCase().includes(q) ||
+        (f.prompt || "").toLowerCase().includes(q) ||
+        (f.meaning || "").toLowerCase().includes(q)
+      }
+      selected={selected}
+      onSelectedChange={onSelectedChange}
+      bulkActions={[
+        {
+          label: "Copy",
+          icon: "copy",
+          /* In the order the list has them, not the order they
+             were ticked: an export read top to bottom should
+             match the screen it was taken from. */
+          onClick: (ids) => onCopy(flags.filter((f: Flag) => ids.includes(f.id))),
+        },
+        {
+          label: "Clear",
+          danger: true,
+          onClick: (ids) => onClear(ids),
+        },
+      ]}
+      renderItem={(f) => {
+        const state = CARD_STATES[f.cardState || ""] || null;
+        const gist = gistOf(f.note);
+        /* The words are in the title now, so the report does not
+           say them twice — unless the title could not hold all of
+           them, which is the only reason to set them out below. */
+        const said = String(f.note || "").trim();
+        const rest = said && said !== gist ? f.note : "";
+        return (
+          <Tile
+            title={
+              <>
+                {flagTitle(f.kind)}
+                {/* Their words, at the weight of an answer rather
+                    than of a heading: what the report is called
+                    is still the first thing read. */}
+                {gist && <span className="at-flagsaid">: {gist}</span>}
+              </>
+            }
+            /* Spelled out rather than left as a name beside a
+               date: on a screen of reports about other people's
+               cards, a bare name reads as easily as whose card it
+               was as who complained about it. */
+            meta={`Submitted by ${f.handleName || f.handle} · ${dateTime(f.at)}`}
+            actions={
+              <>
+                {onOpen && (!state || state.openable) && f.cardId && (
+                  <Button
+                    size="sm"
+                    icon="view"
+                    onClick={(e: React.MouseEvent) => {
+                      e.stopPropagation();
+                      onOpen(f);
+                    }}
+                  >
+                    Open card
+                  </Button>
+                )}
+                <IconButton
+                  icon="copy"
+                  label="Copy this report"
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    onCopy([f]);
+                  }}
+                />
+                <IconButton
+                  icon="delete"
+                  label="Clear this report"
+                  danger
+                  onClick={(e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    onClear([f.id]);
+                  }}
+                />
+              </>
+            }
+            footer={
+              <div className="at-flagreport">
+                {/* The rest of what they wrote, where the title
+                    ran out — so it carries straight on from the
+                    line above rather than turning up between the
+                    question and the small facts under it, which
+                    is where it used to sit and read as a caption
+                    on the wrong thing. */}
+                {rest && <p className="at-flagreport-note">{rest}</p>}
+                {/* The question as it was asked, copied into the
+                    report when it was sent: the card may have been
+                    edited or withdrawn since, and an id on its own
+                    would say nothing. Set in its own script and
+                    direction, like every other place the app shows
+                    a word — a right-to-left word laid out
+                    left-to-right is the thing an administrator
+                    would misread first. */}
+                {f.prompt && (
+                  <p className="at-flagreport-q" lang={f.language} dir={dirOf(languages, f.language)}
+                    style={scriptStyle(languages, f.language)}>
+                    {f.prompt}
+                  </p>
+                )}
+                {f.meaning && <p className="at-flagreport-en">{f.meaning}</p>}
+                <div className="at-flagfoot">
+                  <Help>{exerciseLabel(languages, f.language, f.exercise)}</Help>
+                  {/* What became of the card since. Said on the
+                      tile rather than found on opening it: it is
+                      what decides whether the report is still
+                      worth acting on. */}
+                  {state && (
+                    <span
+                      className={`at-flag${state.tone ? " " + state.tone : ""}`}
+                      title={state.what}
+                    >
+                      {state.label}
+                    </span>
+                  )}
+                </div>
+              </div>
+            }
+          />
+        );
+      }}
+    />
+  );
+}
+
+/*
+ * A question that must be answered before something is done, and the
+ * dialog that asks it (0.580): `ask` puts it up, Yes runs its action
+ * through the screen's `run`, and it closes once that worked. `after` is
+ * anything the screen does next. Admin, Super admin's Spaces and Everyone
+ * each held this by hand; Teaching's dialogs are of several kinds with
+ * their own wording and keep their own.
+ */
+function useConfirm(
+  run: (fn: () => Promise<any>) => Promise<any>,
+  { busy, after }: { busy?: boolean; after?: (p: Pending) => void } = {},
+) {
+  const [confirm, setConfirm] = useState<Pending | null>(null);
+  const modal = confirm ? (
+    <ConfirmModal
+      {...confirm}
+      busy={busy}
+      onCancel={() => setConfirm(null)}
+      onConfirm={async () => {
+        const ok = await run(async () => {
+          await confirm.action();
+          return true;
+        });
+        if (ok) {
+          setConfirm(null);
+          if (after) after(confirm);
+        }
+      }}
+    />
+  ) : null;
+  return { confirm, setConfirm, modal };
+}
+
+export function CodeBox({ label, code, hint, onNew, busy, long = false }: {
   label?: Node;
   code?: string;
   hint?: Node;
   onNew?: () => void;
   busy?: boolean;
+  /** A link rather than a code (0.549): the whole width, its buttons on a line underneath. */
+  long?: boolean;
 }) {
   return (
     <div className="at-codeblock">
@@ -551,7 +920,7 @@ export function CodeBox({ label, code, hint, onNew, busy }: {
       {/* What the code is for, under its name and before the code itself,
           the way a field is explained in the card editor. */}
       {hint && <p className="at-fieldlede">{hint}</p>}
-      <div className="at-codebox">
+      <div className={`at-codebox${long ? " long" : ""}`}>
         <b>{code || "—"}</b>
         <Button variant="ghost" size="sm"
           disabled={!code}
@@ -569,28 +938,6 @@ export function CodeBox({ label, code, hint, onNew, busy }: {
 }
 
 
-/* The bar that appears once something is ticked. */
-export function SelectionBar({ count, noun, onClear, children }: {
-  count: number;
-  noun: string;
-  onClear?: () => void;
-  children?: Node;
-}) {
-  if (!count) return null;
-  return (
-    <div className="at-bulkbar at-mb3">
-      <div className="at-bulkhead">
-        <strong>
-          {plural(count, noun)} selected
-        </strong>
-        <Button variant="ghost" size="sm" onClick={onClear}>
-          Clear
-        </Button>
-      </div>
-      <div className="at-chips">{children}</div>
-    </div>
-  );
-}
 
 /* ------------------------------------------------------------------
    Backup
@@ -631,7 +978,23 @@ export const BACKUP_PARTS: {
   index?: string;
   count: string;
   unit: string;
+  /* The same part, said of one space's backup (0.584): "Spaces" over a
+     file holding one space read as though it held them all. */
+  spaceTitle?: string;
+  spaceWhat?: string;
 }[] = [
+  {
+    key: "spaces",
+    title: "Spaces",
+    what: "Each space's name, address, look and admins, and every address it has had.",
+    kinds: ["org", "slug", "former", "gone"],
+    prefixes: ["org:", "slug:", "former:", "gone:"],
+    index: "orgs",
+    count: "orgs",
+    spaceTitle: "The space itself",
+    spaceWhat: "Its name, address, look and admins, and every address it has had.",
+    unit: "space",
+  },
   {
     key: "people",
     title: "People",
@@ -640,6 +1003,8 @@ export const BACKUP_PARTS: {
     prefixes: ["user:", "key:"],
     index: "users",
     count: "users",
+    spaceTitle: "Its people",
+    spaceWhat: "Everyone in the space, with the fingerprint of each sign-in key — never the keys themselves.",
     unit: "account",
   },
   {
@@ -650,6 +1015,7 @@ export const BACKUP_PARTS: {
     prefixes: ["course:"],
     index: "courses",
     count: "courses",
+    spaceWhat: "Its courses: who teaches each one, who studies it, and which decks it uses.",
     unit: "course",
   },
   {
@@ -660,6 +1026,7 @@ export const BACKUP_PARTS: {
     prefixes: ["deck:"],
     index: "decks",
     count: "decks",
+    spaceWhat: "Its decks, including its members' My space decks made here.",
     unit: "deck",
   },
   {
@@ -674,6 +1041,7 @@ export const BACKUP_PARTS: {
     kinds: ["card", "owncards", "system", "mysystems"],
     prefixes: ["card:", "mycards:", "owncards:", "numsys:", "timesys:", "mysystems:"],
     count: "cards",
+    spaceWhat: "Every card in the space, including its members' My space cards made here, and its teachers' numbers and clock. Not the audio.",
     unit: "card",
   },
   {
@@ -684,7 +1052,20 @@ export const BACKUP_PARTS: {
     prefixes: ["flag:"],
     index: "flags",
     count: "flags",
+    spaceWhat: "What learners flagged in this space, and which question each was about.",
     unit: "report",
+  },
+  {
+    key: "progress",
+    title: "Progress",
+    /* Each person's practice document, which lives in the sync store under
+       a hash of their key, and the recordings it names (0.583). */
+    what: "Each person's practice: what they have answered and when it is next due, and any recordings they made on cards of their own. Put back by folding into whatever practice they have by then, never over it.",
+    kinds: ["progress", "paudio"],
+    prefixes: ["progress:", "paudio:"],
+    count: "progress",
+    spaceWhat: "Each member's practice — the whole of it, practice in their other spaces too, since one person has one record of it. Put back by folding into whatever they have practised by then, never over it.",
+    unit: "person",
   },
   {
     key: "clips",
@@ -695,6 +1076,7 @@ export const BACKUP_PARTS: {
     kinds: ["clip", "image"],
     prefixes: ["clip:", "image:"],
     count: "clips",
+    spaceWhat: "The audio and pictures the space's cards and numbers use, which are nearly all of the size of a backup.",
     unit: "recording",
   },
 ];
@@ -703,6 +1085,20 @@ export const BACKUP_PARTS: {
 const ALL_PARTS = BACKUP_PARTS.map((p) => p.key);
 
 const partsChosen = (parts: string[]) => BACKUP_PARTS.filter((p) => parts.includes(p.key));
+
+/* A size as a person reads it. */
+export function sizeWords(bytes: number) {
+  if (bytes < 1024) return bytes ? "under 1 KB" : "nothing";
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+/* How much one part adds to a file, from the manifest's bytes per kind. */
+export function partBytes(manifest: any, part: { kinds: string[] }) {
+  const b = (manifest && manifest.bytes) || {};
+  return part.kinds.reduce((n, k) => n + (Number(b[k]) || 0), 0);
+}
 
 /* Which parts a file holds. Files made before a backup could be partial say
    nothing, and a file that says nothing holds everything — which was true
@@ -727,8 +1123,19 @@ function includedIn(file: any) {
  * @param parts  Which of BACKUP_PARTS to put in. Everything by
  *   default, which is what a backup meant before it could be less.
  */
-export async function buildBackup(onProgress: (done: number, total: number) => void, parts: string[] = ALL_PARTS) {
-  const { manifest } = await API.backupManifest();
+export async function buildBackup(
+  onProgress: (done: number, total: number) => void,
+  parts: string[] = ALL_PARTS,
+  /* Where the manifest comes from: the whole site, or one space (0.546). */
+  source: () => Promise<{ manifest: any }> = API.backupManifest,
+) {
+  const { manifest } = await source();
+  return buildFromManifest(manifest, onProgress, parts);
+}
+
+/* The file, from a manifest already in hand: the backup screen reads one
+   to say how large each part is, and a moment later builds from it. */
+async function buildFromManifest(manifest: any, onProgress: (done: number, total: number) => void, parts: string[]) {
   const chosen = partsChosen(parts);
   const kinds = new Set(chosen.flatMap((p) => p.kinds));
   const plan = (manifest.plan || []).filter((c: any) => kinds.has(c.kind));
@@ -753,6 +1160,7 @@ export async function buildBackup(onProgress: (done: number, total: number) => v
       )
     ),
     chunks: (whole.chunks || []).filter((c: any) => kinds.has(c.kind)),
+    bytes: Object.fromEntries(Object.entries(whole.bytes || {}).filter(([k]) => kinds.has(k))),
   };
   return writeFile(kept, plan, API.backupChunk, parts, onProgress);
 }
@@ -807,7 +1215,7 @@ async function writeFile(
   const seen = new Set<string>();
   const refs = { decks: new Set<string>(), clips: new Set<string>() };
   const counts: Record<string, number> = {
-    "user:": 0, "course:": 0, "deck:": 0, "card:": 0, "flag:": 0, "clip:": 0,
+    "user:": 0, "course:": 0, "deck:": 0, "card:": 0, "flag:": 0, "clip:": 0, "progress:": 0,
   };
 
   let blob = new Blob(
@@ -875,6 +1283,7 @@ async function writeFile(
     ["cards", "card:", kept.counts && kept.counts.cards],
     ["reports", "flag:", kept.counts && kept.counts.flags],
     ["clips", "clip:", kept.counts && kept.counts.clips],
+    ["progress", "progress:", kept.counts && kept.counts.progress],
   ];
   for (const [label, prefix, want] of expect) {
     if (want !== undefined && counts[prefix] !== want) {
@@ -899,17 +1308,22 @@ async function writeFile(
 
 /*
  * Puts a checked file back. Records go up in requests kept under a few
- * megabytes; the three indexes go last, and the server folds them into
- * whatever is there rather than replacing it. Restoring is additive: a
- * record in the file overwrites the one on the site with the same key,
- * and nothing else is touched.
+ * megabytes, in the file's own order — people first — and the indexes
+ * last. Since 0.583 the server adds and never overwrites, deciding each
+ * record from the site as it is; the owner's choices go with every request
+ * in `options`, and what it left alone comes back with why.
  */
 /**
  * @param parts  Which of BACKUP_PARTS to put back. A file may
  *   hold more than is wanted — the recordings when only the wording is
  *   being recovered, everybody's accounts when one course is.
  */
-export async function restoreBackup(file: any, onProgress: (done: number, total: number) => void, parts: string[] = ALL_PARTS) {
+export async function restoreBackup(
+  file: any,
+  onProgress: (done: number, total: number) => void,
+  parts: string[] = ALL_PARTS,
+  options?: API.RestoreOptions,
+) {
   const records = file.records || {};
   const chosen = partsChosen(parts);
   const wanted = (k: string) =>
@@ -946,14 +1360,141 @@ export async function restoreBackup(file: any, onProgress: (done: number, total:
   }
   if (Object.keys(last).length) batches.push(last);
 
-  let written = 0;
+  const sum: { written: number; merged: number; skipped: { key: string; why: string }[]; skippedMore: number } = {
+    written: 0, merged: 0, skipped: [], skippedMore: 0,
+  };
   for (let i = 0; i < batches.length; i++) {
-    const r = await API.restoreChunk(batches[i]);
-    written += r.written || 0;
+    const r = await API.restoreChunk(batches[i], options || restoreOptionsFor(file, { kind: "site" }));
+    sum.written += r.written || 0;
+    sum.merged += r.merged || 0;
+    sum.skipped.push(...(r.skipped || []));
+    sum.skippedMore += r.skippedMore || 0;
     onProgress(i + 1, batches.length);
   }
-  return written;
+  return sum;
 }
+
+/*
+ * Whose a file is (0.583): the site's, or one space's. A file made before
+ * files said so is the site's — it was made by Back up the site, or by a
+ * space's old export, and either way the site's door takes it safely.
+ */
+export type FileScope = { kind: "site" } | { kind: "space"; space: string; slug: string; name: string };
+export function fileScope(file: any): FileScope {
+  const s = file && file.manifest && file.manifest.scope;
+  if (s && s.kind === "space" && typeof s.space === "string" && s.space) {
+    return { kind: "space", space: s.space, slug: String(s.slug || ""), name: String(s.name || s.slug || s.space) };
+  }
+  return { kind: "site" };
+}
+
+/* Where a restore was opened: the site's door, one space's, or the door for
+   a space that may no longer exist (any space's file). */
+export type RestoreDoor =
+  /* `into`: the name of the space the site's door is open in, where
+     material from before spaces goes (0.589). */
+  | { kind: "site"; into?: string }
+  | { kind: "space"; space?: string; name?: string };
+
+/* How many of a file's courses, decks and cards name no space: every one
+   in a backup taken before spaces (0.542). The server puts them in the
+   space the restore is run from — see restoreOne. */
+export function unspacedIn(file: any): number {
+  const rec = (file && file.records) || {};
+  return Object.entries<any>(rec).filter(
+    ([k, v]) => /^(course|deck|card):/.test(k) && v && typeof v === "object" && !Array.isArray(v) && !v.org,
+  ).length;
+}
+
+/** Why a door will not take a file, in words, or "" when it will. */
+export function doorRefusal(file: any, door: RestoreDoor): string {
+  const s = fileScope(file);
+  if (door.kind === "site") {
+    return s.kind === "space"
+      ? `This is a backup of the space ${s.name}. Restore it from Super admin → Spaces.`
+      : "";
+  }
+  if (s.kind === "site") return "This is a backup of the whole site. Restore it from Super admin → App.";
+  if (door.space && s.space !== door.space) {
+    return `This is a backup of the space ${s.name}, not of ${door.name || "this space"}.`;
+  }
+  return "";
+}
+
+/* What every request of one restore carries: the owner's choices, and the
+   file's facts the server needs to tell people apart — never a verdict. */
+export function restoreOptionsFor(
+  file: any,
+  door: RestoreDoor,
+  choices: { bringBack?: string[]; keepSpaceCard?: boolean; newSlugs?: Record<string, string> } = {},
+): API.RestoreOptions {
+  const s = fileScope(file);
+  const records = (file && file.records) || {};
+  const created: Record<string, number> = {};
+  for (const [k, v] of Object.entries<any>(records)) {
+    if (k.startsWith("user:") && v && typeof v.created === "number") created[k.slice(5)] = v.created;
+  }
+  const indexes = (file && file.manifest && file.manifest.indexes) || {};
+  return {
+    scope: s.kind === "space" && door.kind === "space" ? { kind: "space", space: s.space } : { kind: "site" },
+    fileOrgs: Array.isArray(indexes.orgs) ? indexes.orgs : [],
+    created,
+    bringBack: choices.bringBack || [],
+    keepSpaceCard: choices.keepSpaceCard !== false,
+    newSlugs: choices.newSlugs || {},
+  };
+}
+
+/* What the preview is sent: the few fields of the file it needs, never its
+   records whole. Only for the parts being put back. */
+export function previewBody(file: any, options: API.RestoreOptions, parts: string[] = ALL_PARTS) {
+  const records = (file && file.records) || {};
+  const of = (prefix: string) => Object.keys(records).filter((k) => k.startsWith(prefix));
+  const has = (part: string) => parts.includes(part);
+  return {
+    options,
+    fileScope: fileScope(file),
+    users: of("user:").map((k) => {
+      const u = records[k] || {};
+      return { handle: k.slice(5), created: u.created, orgs: u.orgs, org: u.org, displayName: u.displayName };
+    }),
+    courses: has("courses")
+      ? of("course:").map((k) => {
+          const c = records[k] || {};
+          return { id: c.id || k.slice(7), org: c.org, title: c.title, teachers: c.teachers, students: c.students };
+        })
+      : [],
+    orgs: has("spaces") ? of("org:").map((k) => ({ id: k.slice(4), slug: (records[k] || {}).slug, name: (records[k] || {}).name })) : [],
+    keys: {
+      cards: has("cards") ? of("card:").map((k) => k.slice(5)) : [],
+      decks: has("decks") ? of("deck:").map((k) => k.slice(5)) : [],
+      courses: has("courses") ? of("course:").map((k) => k.slice(7)) : [],
+      flags: has("flags") ? of("flag:").map((k) => k.slice(5)) : [],
+    },
+  };
+}
+
+/* Why a record was left alone, in the words the report uses. */
+const LEFT_BECAUSE: Record<string, string> = {
+  exists: "already here",
+  kept: "account already here, left as it is",
+  "key-changed": "key changed since",
+  "not-member": "not in this space",
+  deleted: "deleted since the backup",
+  "other-person": "the name now belongs to someone else",
+  "no-account": "no account to put it under",
+  "account-exists": "the account is here",
+  "slug-taken": "address taken",
+  "code-taken": "code in use by another course",
+  "too-large": "too large",
+  "not-allowed": "not allowed",
+  unreadable: "could not be read",
+  busy: "being changed at the same moment; run it again",
+  empty: "empty in the file",
+  error: "could not be written",
+};
+/* Reasons that are about a person, which the report lists by name. */
+const ABOUT_PEOPLE = new Set(["kept", "key-changed", "not-member", "deleted", "other-person"]);
 
 /* What a finished file says about itself, checked against what it holds. */
 export function verifyBackup(file: any) {
@@ -971,6 +1512,7 @@ export function verifyBackup(file: any) {
     ["decks", "deck:", m.counts && m.counts.decks],
     ["cards", "card:", m.counts && m.counts.cards],
     ["clips", "clip:", m.counts && m.counts.clips],
+    ["progress", "progress:", m.counts && m.counts.progress],
   ];
   for (const [label, prefix, want] of expect) {
     const got = count(prefix);
@@ -1011,6 +1553,7 @@ export function verifyBackup(file: any) {
    is passed in rather than the page being written twice.
    ------------------------------------------------------------------ */
 
+
 export function CoursesPage({
   courses,
   languages,
@@ -1025,8 +1568,12 @@ export function CoursesPage({
   onJoin,
   renderCourse,
   footer,
+  groups,
 }: {
   courses: Course[];
+  /** The courses under a heading each, in place of one "My courses" list:
+      a learner's spaces, when they are in more than one (memberships). */
+  groups?: { key: string; title: string; courses: Course[] }[];
   languages: Record<LangId, Lang>;
   busy?: boolean;
   error?: Node;
@@ -1036,12 +1583,12 @@ export function CoursesPage({
   joinHint?: Node;
   joinPlaceholder?: string;
   joinNote?: Node;
-  onJoin: (code: string) => any;
+  /** Without it, no join box: the super admin trying a space (0.574). */
+  onJoin?: (code: string) => any;
   renderCourse: (course: Course) => Node;
   footer?: Node;
 }) {
   const [code, setCode] = useState("");
-
   return (
     <>
       <Help>
@@ -1054,23 +1601,28 @@ export function CoursesPage({
           an empty box only asks what went missing. The lead above already
           says what to do, so the join box below is the whole screen until
           there is a first course. */}
+      {/* One list, with its own search (0.580); for someone in several
+          spaces (memberships), headed by space within it. */}
       {courses.length > 0 && (
-        <section className="at-section">
+        <section className="at-section at-coursesection" data-el="courses-of-space">
           <h3 className="at-sectionhead">My courses</h3>
           <ItemList
             noun="course"
-            items={courses}
+            items={groups ? groups.flatMap((g) => g.courses) : courses}
             size="large"
             busy={busy}
-            empty=""
+            empty="No courses match."
             match={(c, q) => c.title.toLowerCase().includes(q)}
+            groups={groups ? groups.map((g) => ({ key: g.key, label: String(g.title) })) : undefined}
+            groupOf={groups ? (c) => (groups.find((g) => g.courses.includes(c)) || { key: "" }).key : undefined}
             renderItem={renderCourse}
           />
         </section>
       )}
 
       {/* The heading names the section; the box holds only the doing. */}
-      <section className="at-section">
+      {onJoin && (
+      <section className="at-section at-coursesection">
         <h3 className="at-sectionhead">{joinTitle}</h3>
         <div className="at-joinbox">
           <Help>
@@ -1102,6 +1654,7 @@ export function CoursesPage({
           )}
         </div>
       </section>
+      )}
 
       {footer}
     </>
@@ -1188,7 +1741,8 @@ function CourseSettings({
   onSetLanguage: (id: LangId) => void;
   onNewCode: (which: "teacher" | "student") => void;
   onSetRole: (handle: string, name: string, role: "teacher" | "student", on: boolean) => void;
-  onDelete: () => void;
+  /** Absent for a space admin: deleting a course is the App admin's (4b). */
+  onDelete?: () => void;
   onClose: () => void;
 }) {
   const [adding, setAdding] = useState(false);
@@ -1413,6 +1967,7 @@ function CourseSettings({
 
       {/* At the foot, away from everyday taps, as on a card and a deck.
           It still asks first. */}
+      {onDelete ? (
       <div className="at-formblock at-mt5">
         <div className="at-formhead">
           <span className="at-formnum">Delete course</span>
@@ -1420,6 +1975,7 @@ function CourseSettings({
         <p className="at-dangerline">Deleting a course is permanent and cannot be undone.</p>
         <Button variant="danger" icon="delete" onClick={onDelete}>Delete course</Button>
       </div>
+      ) : null}
     </Screen>
   );
 }
@@ -1521,15 +2077,19 @@ function scriptStyle(languages: Record<LangId, Lang>, langId?: LangId) {
   return { ...(lang.fontStack ? { fontFamily: lang.fontStack } : null), ...scriptVars(lang) };
 }
 
-export function AdminSpace({ account, languages, onClose }: {
+export function AdminSpace({ account, spaceName, languages, onClose, superMode = false }: {
   account: User;
+  /** The space this is open in: where a restore puts material from before spaces. */
+  spaceName?: string | null;
+  /** Super admin (0.547): the App admin's own tools, whichever space they are in. */
+  superMode?: boolean;
   languages: Record<LangId, Lang>;
   onClose: () => void;
 }) {
-  const [tab, setTab] = useState("courses");
+  const [tab, setTab] = useState(superMode ? "orgs" : "courses");
   const [data, setData] = useState<import("./types.ts").AdminOverview | null>(recallSpace("admin", account.handle));
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  /* See useRun: what is done here refreshes the overview after it. */
+  const { run, busy, setBusy, error, setError } = useRun({ refresh: () => refresh() });
   const [title, setTitle] = useState("");
   const [lang, setLang] = useState(Object.keys(languages)[0]);
   const [newKey, setNewKey] = useState<Record<string, any> | null>(null);
@@ -1538,11 +2098,9 @@ export function AdminSpace({ account, languages, onClose }: {
   const [openCourse2, setOpenCourse2] = useState<string | null>(null); // a course being settled
   const [selPeople, setSelPeople] = useState(() => new Set<string>());
   const [backup, setBackup] = useState<Progress | null>(null); // { state, done, total, note }
-  /* Which of the two backup screens is open, and the file the restore one
-     is working from — held here rather than in the screen so choosing a
-     file survives a re-render of the tab underneath. */
+  /* Which of the two backup screens is open; the file a restore works
+     from is held by the flow itself (0.583). */
   const [backupMode, setBackupMode] = useState<"download" | "restore" | null>(null);
-  const [restoreFile, setRestoreFile] = useState<{ parsed: any, name: string } | null>(null);
   const [clearing, setClearing] = useState(false);
   /* Off until asked for: the gallery renders a specimen of every component,
      which is a lot of markup to carry on a tab that is mostly about backups. */
@@ -1572,7 +2130,14 @@ export function AdminSpace({ account, languages, onClose }: {
   const [deckOwner, setDeckOwner] = useState("");
   /* One slot for whatever is waiting to be confirmed, so only one of these
      can ever be on screen at a time. */
-  const [confirm, setConfirm] = useState<Pending | null>(null);
+  const { setConfirm, modal: confirmModal } = useConfirm(run, {
+    busy,
+    after: (p) => {
+      if (p.closeAfter) setOpenCourse2(null);
+    },
+  });
+  /* The space's admins, from the overview (0.544). */
+  const leads = new Set((data && data.invite && data.invite.admins) || []);
 
   /* Answers whether it worked, which is what the background poll reads to
      know whether to back off — see useLiveRefresh. */
@@ -1590,7 +2155,7 @@ export function AdminSpace({ account, languages, onClose }: {
     } finally {
       if (!background) setBusy(false);
     }
-  }, [account.handle]);
+  }, [account.handle, setBusy, setError]);
 
   /* Whether this mount had something to show before it asked. Read once,
      at the first render: what matters is how the space arrived, not what
@@ -1626,18 +2191,6 @@ export function AdminSpace({ account, languages, onClose }: {
      whatever the call returned when the message wants to name the thing —
      "Beginner Arabic created" rather than "Saved". Said after the refresh,
      so the lists are already showing what it is confirming. */
-  async function run(fn: () => Promise<any>, done?: string | ((out: any) => string)) {
-    setBusy(true);
-    try {
-      const out = await fn();
-      await refresh();
-      setError("");
-      if (done) snack(typeof done === "function" ? done(out) : done, "good");
-    } catch (e) {
-      setError(API.explain(e));
-      setBusy(false);
-    }
-  }
 
   /* The card a report is about, fetched when the report is opened rather
      than carried by the overview: Admin holds decks, not cards, and a site
@@ -1657,6 +2210,11 @@ export function AdminSpace({ account, languages, onClose }: {
   }
 
   const users = (data && data.users) || [];
+  /* Whom this account may suspend or remove here (64a, 70a): never
+     themselves or an App admin, and a space admin only if they are the App
+     admin. */
+  const mayAct = (u: { handle: string; admin?: boolean }) =>
+    !!account && u.handle !== account.handle && !u.admin && (account.admin || !leads.has(u.handle));
   const courses = (data && data.courses) || [];
   const decks = (data && data.decks) || [];
   /* Newest first, as the server sends them. */
@@ -1761,20 +2319,7 @@ export function AdminSpace({ account, languages, onClose }: {
     }
     return (
       <>
-        {confirm && (
-          <ConfirmModal
-            {...confirm}
-            busy={busy}
-            onCancel={() => setConfirm(null)}
-            onConfirm={() =>
-              run(async () => {
-                await confirm.action();
-                if (confirm.closeAfter) setOpenCourse2(null);
-                setConfirm(null);
-              })
-            }
-          />
-        )}
+        {confirmModal}
         <CourseSettings
           course={c}
           users={users}
@@ -1820,7 +2365,7 @@ export function AdminSpace({ account, languages, onClose }: {
               action: () => API.removeMember(c.id, h, role),
             });
           }}
-          onDelete={() =>
+          onDelete={!account.admin ? undefined : () =>
             setConfirm({
               title: `Delete ${c.title}?`,
               confirmLabel: "Delete the course",
@@ -1853,33 +2398,32 @@ export function AdminSpace({ account, languages, onClose }: {
 
   return (
     <SpaceFrame
-      tabs={[
-        ["courses", "Courses", "school"],
-        ["people", "People", "group"],
-        ["decks", "Decks", "folder"],
-        ["flags", "Flags", "flag"],
-        ["app", "App", "tune"],
-      ]}
+      space={superMode ? "Super admin" : "Admin"}
+      tabs={superMode
+        ? [
+            /* Super admin (0.547): what is the whole app's, not one space's. */
+            ["orgs", "Spaces", "hash"],
+            ["everyone", "People", "group"],
+            ["allflags", "Reports", "flag"],
+            ["app", "App", "tune"],
+          ]
+        : [
+            /* Admin is the space you are in, for everyone who runs it. */
+            ["courses", "Courses", "school"],
+            ["people", "People", "group"],
+            ["decks", "Decks", "folder"],
+            ["flags", "Flags", "flag"],
+          ]}
       tab={tab}
       onTab={setTab}
       error={error}
       busy={busy}
-      dialog={
-        confirm ? (
-          <ConfirmModal
-            {...confirm}
-            busy={busy}
-            onCancel={() => setConfirm(null)}
-            onConfirm={() =>
-              run(async () => {
-                await confirm.action();
-                setConfirm(null);
-              })
-            }
-          />
-        ) : null
-      }
+      dialog={confirmModal}
     >
+
+          {superMode && tab === "orgs" && account.admin && <SpacesTab />}
+          {superMode && tab === "everyone" && account.admin && <EveryonePeople me={account.handle} />}
+          {superMode && tab === "allflags" && account.admin && <EveryReport languages={languages} />}
 
           {tab === "courses" && (
             <>
@@ -1931,11 +2475,6 @@ export function AdminSpace({ account, languages, onClose }: {
                     onChange={setLang}
                     label="Language taught"
                   />
-                  <Help>
-                    Pick carefully — this sets the script, the keyboard and how answers are marked
-                    for everything in the course, and changing it later doesn't convert what's
-                    already written.
-                  </Help>
                 </Screen>
               )}
 
@@ -1973,27 +2512,29 @@ export function AdminSpace({ account, languages, onClose }: {
           )}
 
           {tab === "people" && (
-            <>
+            /* Three parts, headed the way Settings and Progress head theirs
+               (0.552): the way in, who is here, and who was. */
+            <div className="at-ruled">
+              {data && data.invite ? (
+                <Section head title="Invite people">
+                <InviteLink invite={data.invite} busy={busy}
+                  onReplace={() => setConfirm({
+                    title: "Replace the invitation link?",
+                    confirmLabel: "Replace the link",
+                    body: <p>The old link will stop working. Anyone who already joined stays.</p>,
+                    action: () => API.newInvite(),
+                  })} />
+                </Section>
+              ) : null}
+              <Section head title="This space's people">
               {newKey && (
                 <div className="at-sub">
-                  <p className="at-eyebrow">
-                    {newKey.fresh ? "Sign-in key for" : "New sign-in key for"} {newKey.name}
-                  </p>
-                  <p className="at-key">{newKey.key}</p>
-                  {newKey.handle && (
-                    <Help>
-                      Their handle is <strong>{newKey.handle}</strong>.
-                    </Help>
-                  )}
+                  <CodeBox
+                    label={`${newKey.fresh ? "Sign-in key for" : "New sign-in key for"} ${newKey.name}`}
+                    code={newKey.key}
+                    hint={newKey.handle ? <>Their handle is <strong>{newKey.handle}</strong>.</> : undefined}
+                  />
                   <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
-                    <Button size="sm"
-                      onClick={() =>
-                        navigator.clipboard && navigator.clipboard.writeText(newKey.key)
-                      }
-          icon="copy"
-        >
-          Copy the key
-        </Button>
                     <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>
                       Done
                     </Button>
@@ -2053,33 +2594,13 @@ export function AdminSpace({ account, languages, onClose }: {
 </Field>
 
                   <Field label={<>Put them in a course <span className="at-optional">optional</span></>}>
-                    <div className="at-cklist">
-                      {courses.map((c) => (
-                        <button
-                          key={c.id}
-                          className={`at-ck${makingUser.courseId === c.id ? " on" : ""}`}
-                          onClick={() =>
-                            setMakingUser((u: any) => ({
-                              ...u,
-                              courseId: u.courseId === c.id ? "" : c.id,
-                            }))
-                          }
-                        >
-                          <span className="at-ckbox">
-                            {makingUser.courseId === c.id ? "✓" : ""}
-                          </span>
-                          <span className="at-cktext">
-                            <b>{c.title}</b>
-                            <i>{languageName(languages, c.language)}</i>
-                          </span>
-                        </button>
-                      ))}
-                      {!courses.length && (
-                        <Help>
-                          No courses yet. You can add them to one later.
-                        </Help>
-                      )}
-                    </div>
+                    <CheckList
+                      options={courses.map((c) => ({ id: c.id, title: c.title, note: languageName(languages, c.language) }))}
+                      chosen={makingUser.courseId ? [makingUser.courseId] : []}
+                      /* One course, or none: ticking another moves them. */
+                      onToggle={(id, wasOn) => setMakingUser((u: any) => ({ ...u, courseId: wasOn ? "" : id }))}
+                      empty="No courses yet. You can add them to one later."
+                    />
                   </Field>
 
                   {makingUser.courseId && (
@@ -2133,7 +2654,9 @@ export function AdminSpace({ account, languages, onClose }: {
               <ItemList
                 noun="person"
                 plural="people"
-                items={users}
+                /* Who left or was removed is under Former members, not here
+                   (0.578); someone suspended stays, marked so. */
+                items={users.filter((u) => !u.suspended || (u.suspended as any).why === "suspended")}
                 size="large"
                 busy={busy}
                 empty="Nobody here yet. Add a person, then share their key with them."
@@ -2143,26 +2666,48 @@ export function AdminSpace({ account, languages, onClose }: {
                 onNew={() => setMakingUser({ name: "", courseId: "", roles: ["teacher"] })}
                 selected={selPeople}
                 onSelectedChange={setSelPeople}
+                /* No deleting here, by anyone (0.578): an account is deleted
+                   only from Super admin → People. Suspend and Remove act in
+                   this space alone. */
                 bulkActions={[
                   {
-                    label: "Delete",
-                    danger: true,
+                    label: "Suspend",
                     onClick: (handles) => {
-                      const them = users.filter(
-                        (u) => handles.includes(u.handle) && u.handle !== account.handle
-                      );
+                      const them = users.filter((u) => handles.includes(u.handle) && mayAct(u) && !u.suspended);
                       setConfirm({
-                        title: `Delete ${them.length} ${them.length === 1 ? "person" : "people"}?`,
-                        confirmLabel: "Delete for good",
-                        confirmWord: "delete",
+                        title: `Suspend ${them.length} ${them.length === 1 ? "person" : "people"}?`,
+                        confirmLabel: "Suspend",
                         body: (
                           <p>
-                            Their accounts, their keys and their place in every course go. The
-                            decks and cards they made go with them. There is no undoing this.
+                            In this space only: they come off its courses and can't use it until
+                            you reactivate them. They stay on this list, marked suspended. Their
+                            other spaces are untouched.
                           </p>
                         ),
                         action: async () => {
-                          for (const u of them) await API.deleteUser(u.handle);
+                          for (const u of them) await API.suspendUser(u.handle);
+                          setSelPeople(new Set());
+                        },
+                      });
+                    },
+                  },
+                  {
+                    label: "Remove from this space",
+                    danger: true,
+                    onClick: (handles) => {
+                      const them = users.filter((u) => handles.includes(u.handle) && mayAct(u));
+                      setConfirm({
+                        title: `Remove ${them.length} ${them.length === 1 ? "person" : "people"} from this space?`,
+                        confirmLabel: "Remove",
+                        body: (
+                          <p>
+                            They come off this space's courses and this list, and move to Former
+                            members. Their accounts and their other spaces stay. They can come back
+                            with an invitation link or a course code.
+                          </p>
+                        ),
+                        action: async () => {
+                          for (const u of them) await API.removeFromSpace(u.handle);
                           setSelPeople(new Set());
                         },
                       });
@@ -2184,51 +2729,34 @@ export function AdminSpace({ account, languages, onClose }: {
                         <div className="at-deckmeta">{u.handle}</div>
                       </div>
                       <div className="at-deckacts">
-                        <IconButton icon="key" label="Issue a new sign-in key" onClick={() =>
-                            setConfirm({
-                              title: `New sign-in key for ${u.displayName}?`,
-                              confirmLabel: "Issue a new key",
-                              body: (
-                                <p>
-                                  Their current key stops working the moment you do this, on
-                                  every device they use. Their handle, courses and progress are
-                                  untouched. You'll see the new key once.
-                                </p>
-                              ),
-                              action: async () => {
-                                const r = await API.reissueKey(u.handle);
-                                setNewKey({
-                                  name: u.displayName,
-                                  handle: u.handle,
-                                  key: r.key,
-                                });
-                              },
-                            })
-                          } />
-                        {u.handle !== account.handle && (
-                          <IconButton icon="delete" label="Delete person" danger onClick={() =>
-                              setConfirm({
-                                title: `Delete ${u.displayName}?`,
-                                confirmLabel: "Delete for good",
-                                confirmWord: u.handle,
-                                body: (
-                                  <p>
-                                    Their account, their sign-in key and their place in every
-                                    course go. The decks and cards they made go with them. There
-                                    is no undoing this and no way to get the handle back.
-                                  </p>
-                                ),
-                                action: () => API.deleteUser(u.handle),
-                              })
-                            } />
-                        )}
+                        {/* Suspending and removing (64a, 0.578): in this space
+                            only; never yourself, an App admin, or — unless you
+                            are the App admin — a space admin (70a). Someone
+                            the super admin suspended everywhere is theirs. */}
+                        <PersonActions
+                          person={u}
+                          mayKey={!!(account.admin || !(u.admin || leads.has(u.handle)))}
+                          mayAct={mayAct(u)}
+                          suspendable={!(u as any).suspendedApp}
+                          suspendedHere={!!u.suspended}
+                          removable
+                          onConfirm={setConfirm}
+                          onNewKey={setNewKey}
+                        />
                       </div>
                     </div>
                     {/* Admin is a flag on the person, not a course they are
                         in, so it stays a badge and keeps the row to itself. */}
-                    {u.admin && (
+                    {(u.admin || leads.has(u.handle) || u.suspended || (u as any).suspendedApp) && (
                       <div className="at-flags">
-                        <span className="at-flag flagged">Admin</span>
+                        {(u.admin || leads.has(u.handle)) && (
+                          <span className="at-flag flagged">{u.admin ? "Admin" : "Space admin"}</span>
+                        )}
+                        {(u as any).suspendedApp ? (
+                          <span className="at-flag flagged">Suspended by the super admin</span>
+                        ) : u.suspended ? (
+                          <span className="at-flag flagged">Suspended</span>
+                        ) : null}
                       </div>
                     )}
                     {/* "Hasn't signed in yet" was a pill up here. The lines
@@ -2275,7 +2803,16 @@ export function AdminSpace({ account, languages, onClose }: {
                   </div>
                 )}
               />
-            </>
+              </Section>
+              {data && data.former && data.former.length ? (
+                <FormerMembers
+                  former={data.former}
+                  people={(data.users || []).filter((u) => !u.suspended)}
+                  busy={busy}
+                  ask={setConfirm}
+                />
+              ) : null}
+            </div>
           )}
 
           {tab === "decks" && (
@@ -2418,11 +2955,14 @@ export function AdminSpace({ account, languages, onClose }: {
                               confirmLabel: "Delete the deck",
                               confirmWord: d.title,
                               body: (
-                                <p>
-                                  Its {plural(d.cardCount || 0, "card")} go with it,
-                                  out of every course it is in and out of the apps of everyone
-                                  studying it. {d.ownerName} loses the work.
-                                </p>
+                                <>
+                                  {d.owner !== account.handle ? <OthersWork name={d.ownerName} what="deck" /> : null}
+                                  <p>
+                                    Its {plural(d.cardCount || 0, "card")} go with it,
+                                    out of every course it is in and out of the apps of everyone
+                                    studying it. {d.ownerName} loses the work.
+                                  </p>
+                                </>
                               ),
                               action: () => API.deleteDeck(d.id),
                             });
@@ -2512,188 +3052,48 @@ export function AdminSpace({ account, languages, onClose }: {
                 </Screen>
               )}
 
-              <ItemList
-                noun="flag"
-                items={flags}
-                /* In the toolbar rather than at the head of the tab: it
-                   acts on the list, and the list is what the toolbar is
-                   for. Everything, because that is the ordinary thing to
-                   want — the ticked ones are a bulk action below, and one
-                   at a time is a button on the tile. */
-                tools={
-                  flags.length ? (
-                    <Button
-                      size="sm"
-                      icon="copy"
-                      disabled={!!exporting && !exporting.text}
-                      onClick={() => copyFlags(flags)}
-                    >
-                      {exporting && !exporting.text
-                        ? `Reading the cards… ${exporting.done}/${exporting.total}`
-                        : `Copy all ${plural(flags.length, "report")}`}
-                    </Button>
-                  ) : null
-                }
-                /* Full width, one to a row. A report is three or four lines
-                   of somebody's words and a word in a script you may not
-                   read quickly; in a grid of narrow tiles every one of them
-                   wraps to a column and none of them can be skimmed. */
-                size="large"
+              <ReportList
+                flags={flags}
+                languages={languages}
                 busy={busy}
-                empty="Nothing reported. Learners flag a question from the answer screen, and what they send lands here."
-                match={(f, q) =>
-                  flagTitle(f.kind).toLowerCase().includes(q) ||
-                  (f.handleName || "").toLowerCase().includes(q) ||
-                  (f.note || "").toLowerCase().includes(q) ||
-                  (f.prompt || "").toLowerCase().includes(q) ||
-                  (f.meaning || "").toLowerCase().includes(q)
-                }
+                copying={!!exporting && !exporting.text}
+                copyingSays={exporting && !exporting.text ? `Reading the cards… ${exporting.done}/${exporting.total}` : ""}
                 selected={selFlags}
                 onSelectedChange={setSelFlags}
-                bulkActions={[
-                  {
-                    label: "Copy",
-                    icon: "copy",
-                    /* In the order the list has them, not the order they
-                       were ticked: an export read top to bottom should
-                       match the screen it was taken from. */
-                    onClick: (ids) => copyFlags(flags.filter((f: Flag) => ids.includes(f.id))),
-                  },
-                  {
-                    label: "Clear",
-                    danger: true,
-                    onClick: (ids) =>
-                      setConfirm({
-                        title: `Clear ${plural(ids.length, "flag")}?`,
-                        confirmLabel: "Clear them",
-                        body: (
-                          <p>
-                            They go for good. Nothing about the cards changes — clearing a report
-                            says it has been dealt with, not that it was right.
-                          </p>
-                        ),
-                        action: async () => {
-                          await API.deleteFlags([...ids]);
-                          setSelFlags(new Set());
-                        },
-                      }),
-                  },
-                ]}
-                renderItem={(f) => {
-                  const state = CARD_STATES[f.cardState || ""] || null;
-                  const gist = gistOf(f.note);
-                  /* The words are in the title now, so the report does not
-                     say them twice — unless the title could not hold all of
-                     them, which is the only reason to set them out below. */
-                  const said = String(f.note || "").trim();
-                  const rest = said && said !== gist ? f.note : "";
-                  return (
-                    <Tile
-                      title={
-                        <>
-                          {flagTitle(f.kind)}
-                          {/* Their words, at the weight of an answer rather
-                              than of a heading: what the report is called
-                              is still the first thing read. */}
-                          {gist && <span className="at-flagsaid">: {gist}</span>}
-                        </>
-                      }
-                      /* Spelled out rather than left as a name beside a
-                         date: on a screen of reports about other people's
-                         cards, a bare name reads as easily as whose card it
-                         was as who complained about it. */
-                      meta={`Submitted by ${f.handleName || f.handle} · ${dateTime(f.at)}`}
-                      actions={
-                        <>
-                          {(!state || state.openable) && f.cardId && (
-                            <Button
-                              size="sm"
-                              icon="view"
-                              onClick={(e: React.MouseEvent) => {
-                                e.stopPropagation();
-                                openFlaggedCard(f);
-                              }}
-                            >
-                              Open card
-                            </Button>
-                          )}
-                          <IconButton
-                            icon="copy"
-                            label="Copy this report"
-                            onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation();
-                              copyFlags([f]);
-                            }}
-                          />
-                          <IconButton
-                            icon="delete"
-                            label="Clear this report"
-                            danger
-                            onClick={(e: React.MouseEvent) => {
-                              e.stopPropagation();
-                              setConfirm({
-                                title: "Clear this report?",
-                                confirmLabel: "Clear it",
-                                body: <p>It goes for good. Nothing about the card changes.</p>,
-                                action: () => API.deleteFlags([f.id]),
-                              });
-                            }}
-                          />
-                        </>
-                      }
-                      footer={
-                        <div className="at-flagreport">
-                          {/* The rest of what they wrote, where the title
-                              ran out — so it carries straight on from the
-                              line above rather than turning up between the
-                              question and the small facts under it, which
-                              is where it used to sit and read as a caption
-                              on the wrong thing. */}
-                          {rest && <p className="at-flagreport-note">{rest}</p>}
-                          {/* The question as it was asked, copied into the
-                              report when it was sent: the card may have been
-                              edited or withdrawn since, and an id on its own
-                              would say nothing. Set in its own script and
-                              direction, like every other place the app shows
-                              a word — a right-to-left word laid out
-                              left-to-right is the thing an administrator
-                              would misread first. */}
-                          {f.prompt && (
-                            <p className="at-flagreport-q" lang={f.language} dir={dirOf(languages, f.language)}
-                              style={scriptStyle(languages, f.language)}>
-                              {f.prompt}
-                            </p>
-                          )}
-                          {f.meaning && <p className="at-flagreport-en">{f.meaning}</p>}
-                          <div className="at-flagfoot">
-                            <Help>{exerciseLabel(languages, f.language, f.exercise)}</Help>
-                            {/* What became of the card since. Said on the
-                                tile rather than found on opening it: it is
-                                what decides whether the report is still
-                                worth acting on. */}
-                            {state && (
-                              <span
-                                className={`at-flag${state.tone ? " " + state.tone : ""}`}
-                                title={state.what}
-                              >
-                                {state.label}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      }
-                    />
-                  );
-                }}
+                onCopy={copyFlags}
+                onOpen={openFlaggedCard}
+                onClear={(ids) => setConfirm(ids.length === 1
+                  ? {
+                      title: "Clear this report?",
+                      confirmLabel: "Clear it",
+                      body: <p>It goes for good. Nothing about the card changes.</p>,
+                      action: async () => {
+                        await API.deleteFlags([...ids]);
+                        setSelFlags(new Set());
+                      },
+                    }
+                  : {
+                      title: `Clear ${plural(ids.length, "flag")}?`,
+                      confirmLabel: "Clear them",
+                      body: (
+                        <p>
+                          They go for good. Nothing about the cards changes — clearing a report
+                          says it has been dealt with, not that it was right.
+                        </p>
+                      ),
+                      action: async () => {
+                        await API.deleteFlags([...ids]);
+                        setSelFlags(new Set());
+                      },
+                    })}
               />
             </>
           )}
 
-          {tab === "app" && (
-            <>
-              <p className="at-eyebrow">
-                Backup
-              </p>
+          {superMode && tab === "app" && account.admin && (
+            /* Headed the way Settings and Progress head their parts (0.552). */
+            <div className="at-ruled">
+            <Section head title="Backup">
               <Help>
                 Everything on the site in one file: people and their courses, the decks, the
                 cards and their recordings. Sign-in keys are held only as fingerprints, so the
@@ -2701,8 +3101,13 @@ export function AdminSpace({ account, languages, onClose }: {
                 working.
               </Help>
               <Help>
-                Students' own progress isn't in here. It lives on their devices and syncs back by
-                itself.
+                People's practice is in the Progress part. Putting it back folds it into whatever
+                they have practised since; it never replaces it.
+              </Help>
+              <Help>
+                A restore never overwrites or removes anything: it adds what the file holds and
+                the site lacks, after showing you what it will do. A space's own backup is
+                restored from Super admin → Spaces.
               </Help>
 
               <div className="at-row at-mt1">
@@ -2712,10 +3117,7 @@ export function AdminSpace({ account, languages, onClose }: {
 
                 <Button
                   variant="ghost"
-                  onClick={() => {
-                    setRestoreFile(null);
-                    setBackupMode("restore");
-                  }}
+                  onClick={() => setBackupMode("restore")}
                   icon="refresh"
                 >
                   Restore a backup
@@ -2725,7 +3127,8 @@ export function AdminSpace({ account, languages, onClose }: {
               {/* Verifying needs no options and no screen: it is one file in,
                   one answer out, and the answer is wanted where the question
                   was asked. */}
-              <p className="at-eyebrow at-mt5">Verify a backup</p>
+            </Section>
+            <Section head title="Verify a backup">
               <Help>
                 Reads a file you already have and checks it against what it says
                 about itself: that every part it lists actually arrived, and that
@@ -2823,10 +3226,9 @@ export function AdminSpace({ account, languages, onClose }: {
                 anyone able to restore it can change who has access.
               </Help>
 
-              {/* Last on the tab, under everything it could undo. */}
-              <p className="at-eyebrow at-mt6" style={{ color: "var(--rose)" }}>
-                Danger zone
-              </p>
+            </Section>
+            {/* Last of the site's own parts, under everything it could undo. */}
+            <Section head title={<span style={{ color: "var(--rose)" }}>Danger zone</span>}>
               <Help>
                 Removes what a backup would have held — the same parts, chosen
                 the same way — from the site, for everyone. There is no undo and
@@ -2839,7 +3241,8 @@ export function AdminSpace({ account, languages, onClose }: {
                 </Button>
               </div>
 
-              <p className="at-eyebrow at-mt6">Components</p>
+            </Section>
+            <Section head title="Components">
               <Help>
                 Every reusable component, rendered live with its variants. Worth a look before
                 building anything new: if something here fits, use it rather than raw markup —
@@ -2862,7 +3265,8 @@ export function AdminSpace({ account, languages, onClose }: {
                 </React.Suspense>
               )}
 
-              <p className="at-eyebrow at-mt6">Text styles</p>
+            </Section>
+            <Section head title="Text styles">
               <Help>
                 Every size a person actually reads, drawn at the size it is drawn at in the
                 app and labelled with what that size comes out as. The same reason the
@@ -2882,7 +3286,8 @@ export function AdminSpace({ account, languages, onClose }: {
                 </React.Suspense>
               )}
 
-              <p className="at-eyebrow at-mt6">A question and an answer</p>
+            </Section>
+            <Section head title="A question and an answer">
               <Help>
                 Every named piece of the two practice screens, with an example of
                 what it holds. Worth opening before asking for a change to either:
@@ -2901,104 +3306,20 @@ export function AdminSpace({ account, languages, onClose }: {
                   <ScreenElements />
                 </React.Suspense>
               )}
-            </>
+            </Section>
+            </div>
           )}
 
           {backupMode && (
-            <BackupScreen
+            <BackupFlow
               mode={backupMode}
-              file={restoreFile ? restoreFile.parsed : null}
-              fileName={restoreFile ? restoreFile.name : ""}
-              busy={!!backup && (backup.state === "running" || backup.state === "restoring")}
-              progress={
-                backup && (backup.state === "running" || backup.state === "restoring")
-                  ? { done: backup.done || 0, total: backup.total || 0 }
-                  : null
-              }
-              onPickFile={(parsed, name) => setRestoreFile({ parsed, name })}
+              door={{
+                kind: "site",
+                into: spaceName || (account.org && typeof account.org === "object" ? account.org.name : "") || "this space",
+              }}
+              stem="backup"
               onClose={() => setBackupMode(null)}
-              onDownload={async (parts) => {
-                setBackup({ state: "running", done: 0, total: 0, note: "" });
-                try {
-                  const { blob, manifest, problems } = await buildBackup(
-                    (done, total) => setBackup({ state: "running", done, total, note: "" }),
-                    parts
-                  );
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  const stamp = new Date(manifest.takenAt)
-                    .toISOString()
-                    .slice(0, 16)
-                    .replace(/[:T]/g, "-");
-                  a.href = url;
-                  /* Named for what is in it, so a folder of these can be
-                     read without opening any of them. */
-                  a.download = `backup-${stamp}${
-                    parts.length === ALL_PARTS.length ? "" : `-${parts.join("-")}`
-                  }.json`;
-                  a.click();
-                  /* Revoking straight away can cancel the download in
-                     some browsers; a moment later is soon enough. */
-                  setTimeout(() => URL.revokeObjectURL(url), 60000);
-                  setBackup({
-                    state: "done",
-                    counts: manifest.counts,
-                    takenAt: manifest.takenAt,
-                    note: problems.join(" "),
-                  });
-                  setBackupMode(null);
-                } catch (e) {
-                  setBackup({ state: "failed", note: API.explain(e) });
-                }
-              }}
-              onRestore={(parts) => {
-                const parsed = restoreFile && restoreFile.parsed;
-                if (!parsed) return;
-                const problems = verifyBackup(parsed);
-                const counts = (parsed.manifest && parsed.manifest.counts) || {};
-                const naming = partsChosen(parts).map((p) => p.title.toLowerCase()).join(", ");
-                setConfirm({
-                  title: "Restore this backup?",
-                  confirmLabel: "Restore",
-                  confirmWord: "restore",
-                  body: (
-                    <>
-                      <p>
-                        Putting back {naming}, taken{" "}
-                        {parsed.manifest && parsed.manifest.takenAt
-                          ? new Date(parsed.manifest.takenAt).toLocaleString()
-                          : "at an unknown time"}
-                        .
-                      </p>
-                      <p>
-                        Everything in the file is written back over whatever has the same
-                        name on the site. Anything made since the backup is left alone.
-                      </p>
-                      {problems.length ? (
-                        <p style={{ marginBottom: 0, color: "var(--rose)" }}>
-                          {problems.join(" ")}
-                        </p>
-                      ) : null}
-                    </>
-                  ),
-                  action: async () => {
-                    setBackup({ state: "restoring", done: 0, total: 0, note: "" });
-                    const written = await restoreBackup(
-                      parsed,
-                      (done, total) => setBackup({ state: "restoring", done, total, note: "" }),
-                      parts
-                    );
-                    setBackup({
-                      state: "restored",
-                      counts,
-                      takenAt: parsed.manifest && parsed.manifest.takenAt,
-                      note: `${written} records written.`,
-                    });
-                    setBackupMode(null);
-                    setRestoreFile(null);
-                  },
-                });
-              }}
+              onFinished={setBackup}
             />
           )}
 
@@ -3111,25 +3432,158 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
    three screens name the same things in the same words.
    ------------------------------------------------------------------ */
 
+/* What a restore did, as the report shows it. */
+type RestoreReport = { written: number; merged: number; skipped: { key: string; why: string }[]; skippedMore: number };
+
+/*
+ * The whole of one backup or restore, wherever it was opened (0.583): Super
+ * admin → App for the site, Super admin → Spaces for a space. One
+ * implementation, so the two doors cannot drift apart. `source` is where a
+ * backup's manifest comes from; `door` is which files a restore takes.
+ */
+function BackupFlow({
+  mode,
+  door,
+  source,
+  stem,
+  onClose,
+  onFinished,
+}: {
+  mode: "download" | "restore";
+  door: RestoreDoor;
+  source?: () => Promise<{ manifest: any }>;
+  stem: string;
+  onClose: () => void;
+  onFinished?: (p: Progress) => void;
+}) {
+  const [file, setFile] = useState<{ parsed: any; name: string } | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [report, setReport] = useState<RestoreReport | null>(null);
+  const { run, busy, error } = useRun({ quietDone: true });
+  const { setConfirm, modal } = useConfirm(run, { busy });
+
+  return (
+    <>
+      <BackupScreen
+        mode={mode}
+        door={door}
+        file={file ? file.parsed : null}
+        fileName={file ? file.name : ""}
+        busy={busy}
+        error={error}
+        progress={progress}
+        report={report}
+        onPickFile={(parsed, name) => {
+          setReport(null);
+          setFile({ parsed, name });
+        }}
+        onClose={onClose}
+        source={source || API.backupManifest}
+        onDownload={(parts, read) =>
+          run(async () => {
+            setProgress({ done: 0, total: 0 });
+            try {
+              /* The manifest the screen read for its sizes, while it is
+                 still fresh; otherwise a new one, so the file is as of now. */
+              const fresh = read && Date.now() - read.at < 2 * 60 * 1000;
+              const { blob, manifest, problems } = fresh && read
+                ? await buildFromManifest(read.manifest, (done, total) => setProgress({ done, total }), parts)
+                : await buildBackup((done, total) => setProgress({ done, total }), parts, source);
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              const stamp = new Date(manifest.takenAt).toISOString().slice(0, 16).replace(/[:T]/g, "-");
+              a.href = url;
+              /* Named for what is in it, so a folder of these can be read
+                 without opening any of them. */
+              a.download = `${stem}-${stamp}${parts.length === ALL_PARTS.length ? "" : `-${parts.join("-")}`}.json`;
+              a.click();
+              /* Revoking straight away can cancel the download in some
+                 browsers; a moment later is soon enough. */
+              setTimeout(() => URL.revokeObjectURL(url), 60000);
+              if (onFinished) onFinished({ state: "done", counts: manifest.counts, takenAt: manifest.takenAt, note: problems.join(" ") });
+              onClose();
+            } finally {
+              setProgress(null);
+            }
+          })
+        }
+        onRestore={(parts, options, naming) => {
+          const parsed = file && file.parsed;
+          if (!parsed) return;
+          setConfirm({
+            title: fileScope(parsed).kind === "space" ? "Restore this space?" : "Restore this backup?",
+            confirmLabel: "Restore",
+            confirmWord: "restore",
+            body: (
+              <>
+                <p>
+                  Putting back {naming}, taken{" "}
+                  {parsed.manifest && parsed.manifest.takenAt
+                    ? new Date(parsed.manifest.takenAt).toLocaleString()
+                    : "at an unknown time"}
+                  .
+                </p>
+                <p style={{ marginBottom: 0 }}>{NEVER_OVERWRITES}</p>
+              </>
+            ),
+            action: async () => {
+              setProgress({ done: 0, total: 0 });
+              try {
+                const done = await restoreBackup(parsed, (d, total) => setProgress({ done: d, total }), parts, options);
+                setReport(done);
+                if (onFinished) {
+                  onFinished({
+                    state: "restored",
+                    counts: (parsed.manifest && parsed.manifest.counts) || {},
+                    takenAt: parsed.manifest && parsed.manifest.takenAt,
+                    note: `Added ${done.written}, folded in ${done.merged}, left alone ${done.skipped.length + done.skippedMore}.`,
+                  });
+                }
+              } finally {
+                setProgress(null);
+              }
+            },
+          });
+        }}
+      />
+      {modal}
+    </>
+  );
+}
+
+/* The standing sentence over every restore (0.583). */
+const NEVER_OVERWRITES =
+  "Nothing on the site is overwritten or removed. This adds what the file holds and the site lacks.";
+
 function BackupScreen({
   mode,
+  door,
   file,
   fileName,
   onDownload,
   onRestore,
   onPickFile,
   progress,
+  report,
   busy,
+  error,
+  source,
   onClose,
 }: {
   mode: "download" | "restore";
+  door: RestoreDoor;
   file?: any;
   fileName?: string;
-  onDownload: (parts: string[]) => void;
-  onRestore: (parts: string[]) => void;
+  onDownload: (parts: string[], read: { manifest: any; at: number } | null) => void;
+  /* Where a backup's manifest comes from, read when the screen opens so
+     each part can say how large it is (0.584). */
+  source?: () => Promise<{ manifest: any }>;
+  onRestore: (parts: string[], options: API.RestoreOptions, naming: string) => void;
   onPickFile: (file: any, name: string) => void;
   progress?: { done: number, total: number } | null;
+  report?: RestoreReport | null;
   busy?: boolean;
+  error?: string;
   onClose: () => void;
 }) {
   const restoring = mode === "restore";
@@ -3140,17 +3594,92 @@ function BackupScreen({
   const held = file ? includedIn(file) : ALL_PARTS;
   const [parts, setParts] = useState(ALL_PARTS);
   const [readErr, setReadErr] = useState("");
+  /* The owner's choices for the preview and the restore. Any change clears
+     the preview, so Restore only ever runs what was last checked. */
+  const [bringBack, setBringBack] = useState<string[]>([]);
+  const [keepSpaceCard, setKeepSpaceCard] = useState(true);
+  const [newSlugs, setNewSlugs] = useState<Record<string, string>>({});
+  const [preview, setPreview] = useState<API.RestorePreview | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [previewErr, setPreviewErr] = useState("");
   useEffect(() => {
     if (file) setParts(includedIn(file));
+    setBringBack([]);
+    setKeepSpaceCard(true);
+    setNewSlugs({});
+    setPreview(null);
+    setPreviewErr("");
   }, [file]);
 
-  const counts = (file && file.manifest && file.manifest.counts) || null;
+  /* On a backup, what the site or the space holds now: read once as the
+     screen opens, for each part's count and size. */
+  const [read, setRead] = useState<{ manifest: any; at: number } | null>(null);
+  const [sizing, setSizing] = useState("");
+  /* Once per opening: the caller may hand a new function each time it draws. */
+  const sourceNow = useRef(source);
+  sourceNow.current = source;
+  useEffect(() => {
+    const from = sourceNow.current;
+    if (restoring || !from) return undefined;
+    let live = true;
+    setSizing("Working out how large each part is…");
+    from().then(
+      (r) => {
+        if (!live) return;
+        setRead({ manifest: r.manifest, at: Date.now() });
+        setSizing("");
+      },
+      () => live && setSizing(""),
+    );
+    return () => {
+      live = false;
+    };
+  }, [restoring]);
+  const ofSpace = door.kind === "space" && !!door.name;
+  const shown = restoring ? (file && file.manifest) || null : read ? read.manifest : null;
+  const counts = (shown && shown.counts) || null;
   const chosen = parts.filter((p) => !restoring || held.includes(p));
+  const total = shown && shown.bytes ? partsChosen(chosen).reduce((n, p) => n + partBytes(shown, p), 0) : null;
   const nothing = !chosen.length;
+  const refused = restoring && file ? doorRefusal(file, door) : "";
+  const problems = restoring && file ? verifyBackup(file) : [];
+  const options = file ? restoreOptionsFor(file, door, { bringBack, keepSpaceCard, newSlugs }) : null;
+
+  const check = async (choices: { bringBack?: string[]; keepSpaceCard?: boolean; newSlugs?: Record<string, string> } = {}) => {
+    if (!file) return;
+    setChecking(true);
+    setPreviewErr("");
+    try {
+      const o = restoreOptionsFor(file, door, { bringBack, keepSpaceCard, newSlugs, ...choices });
+      setPreview(await API.restorePreview(previewBody(file, o, chosen)));
+    } catch (e) {
+      setPreview(null);
+      setPreviewErr(API.explain(e));
+    } finally {
+      setChecking(false);
+    }
+  };
+  const ready = !!(file && preview && !preview.blockers.length && !refused && !nothing && !report);
+
+  const names = (list: API.PreviewPerson[]) => list.map((p) => p.displayName || p.handle).join(", ");
+  const group = (title: string, list: API.PreviewPerson[], note?: Node) =>
+    list.length ? (
+      <div className="at-mt3">
+        <p className="at-eyebrow">
+          {title} · {list.length}
+        </p>
+        <Help>{names(list)}</Help>
+        {note ? <Help>{note}</Help> : null}
+      </div>
+    ) : null;
 
   return (
     <Screen
-      title={restoring ? "Restore" : "Back up"}
+      title={
+        restoring
+          ? door.kind === "space" ? "Restore a space" : "Restore"
+          : ofSpace ? `Back up ${door.name}` : "Back up the site"
+      }
       onBack={onClose}
       rise
       action={
@@ -3158,25 +3687,38 @@ function BackupScreen({
           <Button
             variant="danger"
             size="sm"
-            disabled={!file || nothing || busy}
-            onClick={() => onRestore(chosen)}
+            disabled={!ready || busy || !options}
+            onClick={() =>
+              options &&
+              onRestore(chosen, options, partsChosen(chosen).map((p) => p.title.toLowerCase()).join(", "))
+            }
           >
             <Icon name="refresh" />
             {busy ? "Restoring…" : "Restore"}
           </Button>
         ) : (
-          <Button variant="primary" size="sm" disabled={nothing || busy} onClick={() => onDownload(chosen)}>
+          <Button variant="primary" size="sm" disabled={nothing || busy} onClick={() => onDownload(chosen, read)}>
             <Icon name="download" />
             {busy ? "Working…" : "Download"}
           </Button>
         )
       }
     >
-      <Help>
-        {restoring
-          ? "Everything you tick is written back over whatever has the same name on the site. Anything made since the backup is left alone, and anything you leave unticked is left in the file."
-          : "Tick what the file should hold. All of it is the backup to keep; less of it is for when you want the wording of every card without a gigabyte of audio behind it."}
-      </Help>
+      {restoring ? (
+        <Notice kind="info">{NEVER_OVERWRITES}</Notice>
+      ) : (
+        <>
+          <Help>
+            {ofSpace
+              ? `One file holding the space ${door.name} and nothing from any other space: its people, courses, decks, cards, recordings and pictures, its members' My space made here, and its members' practice.`
+              : "One file holding every space on the site, and everyone in them."}
+          </Help>
+          <Help>
+            Tick what the file should hold. All of it is the backup to keep; less of it is for when you want the
+            wording of every card without a gigabyte of audio behind it.
+          </Help>
+        </>
+      )}
 
       {restoring && (
         <div className="at-row at-mt3">
@@ -3203,43 +3745,59 @@ function BackupScreen({
         </div>
       )}
 
-      <Notice kind="error">{readErr}</Notice>
+      <Notice kind="error">{readErr || error || previewErr}</Notice>
 
       {restoring && file && (
         <div className="at-sub at-mt3">
           <p className="at-eyebrow">{fileName || "The file"}</p>
           <Help>
-            Taken{" "}
-            {file.manifest && file.manifest.takenAt
-              ? new Date(file.manifest.takenAt).toLocaleString()
-              : "at an unknown time"}
-            .
+            {fileScope(file).kind === "space" ? `A backup of the space ${(fileScope(file) as any).name}, taken ` : "A backup of the site, taken "}
+            {file.manifest && file.manifest.takenAt ? new Date(file.manifest.takenAt).toLocaleString() : "at an unknown time"}.
           </Help>
-          {verifyBackup(file).length ? (
+          {problems.length ? (
             <p className="at-hint" style={{ marginBottom: 0, color: "var(--rose)" }}>
-              {verifyBackup(file).join(" ")}
+              {problems.join(" ")}
             </p>
           ) : (
             <Help>Checked: it holds everything it says it holds.</Help>
           )}
+          {restoring && door.kind === "site" && unspacedIn(file) > 0 && (
+            <Help>
+              {plural(unspacedIn(file), "course, deck or card", "courses, decks or cards")} in it
+              {unspacedIn(file) === 1 ? " is" : " are"} from before spaces, so
+              {unspacedIn(file) === 1 ? " it goes" : " they go"} into {door.into || "this space"}, the space you
+              are in — and any of them already on the site with no space are moved there too. To put them in
+              another space, switch to it first.
+            </Help>
+          )}
         </div>
       )}
 
-      {(!restoring || file) && (
+      {refused ? <Notice kind="error">{refused}</Notice> : null}
+
+      {(!restoring || (file && !refused)) && !report && (
         <div className="at-field at-mt4">
           <CheckList
-            options={BACKUP_PARTS.filter((p) => !restoring || held.includes(p.key)).map((p) => ({
-              id: p.key,
-              title: p.title,
-              note:
-                counts && counts[p.count] !== undefined
-                  ? `${p.what} ${plural(counts[p.count], p.unit)} in the file.`
-                  : p.what,
-            }))}
+            options={BACKUP_PARTS.filter((p) => !restoring || held.includes(p.key)).map((p) => {
+              const spaceWords = (restoring ? fileScope(file).kind === "space" : ofSpace);
+              const what = spaceWords ? p.spaceWhat || p.what : p.what;
+              const many = counts && counts[p.count] !== undefined
+                ? plural(counts[p.count], p.unit, p.unit === "person" ? "people" : undefined)
+                : "";
+              const b = shown && shown.bytes ? partBytes(shown, p) : null;
+              const size = b === null ? "" : b >= 1024 ? `about ${sizeWords(b)}` : b > 0 ? sizeWords(b) : "";
+              const facts = [many, size].filter(Boolean).join(", ");
+              return {
+                id: p.key,
+                title: spaceWords ? p.spaceTitle || p.title : p.title,
+                note: facts ? `${what} ${facts}${restoring ? " in the file" : ""}.` : what,
+              };
+            })}
             chosen={parts}
-            onToggle={(id, on) =>
-              setParts((x) => (on ? x.filter((k) => k !== id) : x.concat([id])))
-            }
+            onToggle={(id, on) => {
+              setPreview(null);
+              setParts((x) => (on ? x.filter((k) => k !== id) : x.concat([id])));
+            }}
           />
           {restoring && held.length < ALL_PARTS.length && (
             <Help>
@@ -3249,8 +3807,150 @@ function BackupScreen({
             </Help>
           )}
           {nothing && <Help>Nothing ticked, so there is nothing to do.</Help>}
+          {!restoring && sizing ? <Help>{sizing}</Help> : null}
+          {!restoring && !nothing && total !== null ? (
+            <Help>The file will be {total >= 1024 ? `about ${sizeWords(total)}` : sizeWords(total)}.</Help>
+          ) : null}
         </div>
       )}
+
+      {restoring && file && !refused && !nothing && !report && (
+        <div className="at-row at-mt3">
+          <Button variant="primary" icon="verify" disabled={checking || busy} onClick={() => check()}>
+            {checking ? "Checking…" : "Check what this will do"}
+          </Button>
+        </div>
+      )}
+
+      {restoring && preview && !report && (
+        <div className="at-sub at-mt4">
+          {preview.blockers.map((b) => (
+            <Notice kind="error" key={b}>
+              {b}
+            </Notice>
+          ))}
+          <p className="at-eyebrow">People</p>
+          {group("Left as they are", preview.people.kept)}
+          {door.kind === "space" &&
+            group("Not put back into this space", preview.people.notMember, "Add them from People if you mean to.")}
+          {group("Re-created, with their old key", preview.people.recreate)}
+          {preview.people.deleted.length ? (
+            <div className="at-mt3">
+              <p className="at-eyebrow">Deleted since the backup — stays deleted · {preview.people.deleted.length}</p>
+              <Help>Tick anyone to bring back, with their old key.</Help>
+              <CheckList
+                options={preview.people.deleted.map((p) => ({
+                  id: p.handle,
+                  title: `Bring back ${p.displayName || p.handle}`,
+                  note: p.at ? `Deleted ${new Date(p.at).toLocaleDateString()}.` : undefined,
+                }))}
+                chosen={bringBack}
+                onToggle={(id, on) => {
+                  const next = on ? bringBack.filter((h) => h !== id) : bringBack.concat([id]);
+                  setBringBack(next);
+                  check({ bringBack: next });
+                }}
+              />
+            </div>
+          ) : null}
+          {bringBack.length && !preview.people.deleted.length ? (
+            <Help>
+              Bringing back {plural(bringBack.length, "person", "people")}.{" "}
+              <button type="button" className="at-linkbtn" onClick={() => {
+                setBringBack([]);
+                check({ bringBack: [] });
+              }}>
+                Undo
+              </button>
+            </Help>
+          ) : null}
+          {preview.people.otherPerson.length ? (
+            <p className="at-hint" style={{ color: "var(--rose)" }}>
+              Belongs to someone else now: {names(preview.people.otherPerson)}
+            </p>
+          ) : null}
+
+          {preview.rosters.length ? (
+            <div className="at-mt3">
+              <p className="at-eyebrow">Rosters</p>
+              {preview.rosters.map((r) => (
+                <Help key={r.course}>
+                  These names come off {r.title || "a restored course"} because they are not in the space:{" "}
+                  {r.dropped.join(", ")}.
+                </Help>
+              ))}
+            </div>
+          ) : null}
+
+          {preview.spaces.length ? (
+            <div className="at-mt3">
+              <p className="at-eyebrow">Spaces</p>
+              {preview.spaces.map((sp) => (
+                <div key={sp.id} className="at-mt1">
+                  <Help>
+                    {sp.name || sp.id}: {sp.exists ? "exists" : "will be re-created"}.
+                  </Help>
+                  {sp.exists ? (
+                    <RadioGroup
+                      name={`card-${sp.id}`}
+                      label="Its name, address, look and admins"
+                      quiet
+                      value={keepSpaceCard ? "keep" : "file"}
+                      onChange={(v) => {
+                        setKeepSpaceCard(v === "keep");
+                        setPreview(null);
+                      }}
+                      options={[
+                        { value: "keep", label: "Keep the space's current name, address, look and admins" },
+                        {
+                          value: "file",
+                          label: "Take the file's name, logo, colour and admins",
+                          note: "Its address and codes stay as they are now.",
+                        },
+                      ]}
+                    />
+                  ) : null}
+                  {sp.slugTaken ? (
+                    <Field label="New address for it" lede={`Its address ${sp.slug} now belongs to ${sp.takenBy}.`}>
+                      <input
+                        className="at-input"
+                        placeholder="new-address"
+                        value={newSlugs[sp.id] || ""}
+                        onChange={(e) => {
+                          setNewSlugs((m) => ({ ...m, [sp.id]: e.target.value.trim().toLowerCase() }));
+                          setPreview(null);
+                        }}
+                        onBlur={() => check()}
+                      />
+                    </Field>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="at-mt3">
+            <p className="at-eyebrow">Material</p>
+            <Help>
+              {(["cards", "decks", "courses", "flags"] as const)
+                .map((k) => {
+                  const m = preview.material[k];
+                  const unit = { cards: "card", decks: "deck", courses: "course", flags: "report" }[k];
+                  return `adds ${plural(m.add, unit)} (${m.have} already here)`;
+                })
+                .join(", ")
+                .replace(/^a/, "A")}
+              .
+            </Help>
+          </div>
+        </div>
+      )}
+
+      {restoring && file && !preview && !report && !refused && !nothing && (
+        <Help>Restore waits until you have checked what it will do with the choices above.</Help>
+      )}
+
+      {report && <RestoreResult report={report} />}
 
       {progress && progress.total > 0 && (
         <Help>
@@ -3258,6 +3958,40 @@ function BackupScreen({
         </Help>
       )}
     </Screen>
+  );
+}
+
+/* What a restore did: what it added, what it folded in, and everything it
+   left alone and why — by name where the reason is about a person. */
+function RestoreResult({ report }: { report: RestoreReport }) {
+  const byWhy = new Map<string, string[]>();
+  for (const s of report.skipped) {
+    const list = byWhy.get(s.why) || [];
+    list.push(s.key);
+    byWhy.set(s.why, list);
+  }
+  const left = report.skipped.length + report.skippedMore;
+  return (
+    <div className="at-sub at-mt4">
+      <p className="at-eyebrow">Restored</p>
+      <Help>
+        Added {report.written}, folded in {report.merged}, left alone {left}.
+      </Help>
+      {[...byWhy.entries()].map(([why, keys]) => {
+        /* By handle, from whichever records name one: an account's, a
+           person's list of cards, their practice. */
+        const people = ABOUT_PEOPLE.has(why) || why === "no-account"
+          ? [...new Set(keys.filter((k) => /^(user|mycards|owncards|mysystems|progress|paudio):/.test(k)).map((k) => k.split(":")[1]))]
+          : [];
+        return (
+          <Help key={why}>
+            {LEFT_BECAUSE[why] || why}: {plural(keys.length, "record")}
+            {people.length ? ` — ${people.join(", ")}` : ""}.
+          </Help>
+        );
+      })}
+      {report.skippedMore ? <Help>And {report.skippedMore} more not listed.</Help> : null}
+    </div>
   );
 }
 
@@ -3330,8 +4064,7 @@ function ExportScreen({ ask, onDone, onClose }: {
       }
     >
       <Help>
-        {ask.what} as one file. An administrator can put it back with Restore, and without the
-        recordings it is small enough to give to an AI and ask what cards to make next.
+        {ask.what} will be exported as one file. An administrator can import it back with Restore. Exporting without recordings and images makes the file much smaller.
       </Help>
       <Notice kind="error">{err}</Notice>
       <div className="at-field at-mt4">
@@ -3446,8 +4179,7 @@ function ImportScreen({ cards, decks, langName, busy, failed, onImport, onClose 
       }
     >
       <Help>
-        A file made with Export, here or by another teacher, or a backup of the whole site. Every
-        card is checked against yours first, and nothing is changed until you tap Import.
+        Select a backup of a deck or of the whole app. You will be able to review every card before it is actually imported.
       </Help>
       <div className="at-row at-mt3">
         <label className="at-btn ghost" style={{ cursor: "pointer" }}>
@@ -3671,10 +4403,55 @@ function unlockedDecks(ds: Deck[]): Deck[] {
 }
 
 /* A range of a language's numbers as it stands in a deck's card list: not
-   a card, but one entry the way the pronouns are one, marked built-in. */
+   a card, but one entry the way the pronouns are one, marked as a word set.
+   (`builtin` is the key's old name, kept: it is only ever read here.) */
 type NumberPart = { id: string; part: string; label: string; builtin: "numbers" };
 function isNumberPart(x: any): x is NumberPart {
   return !!x && typeof x === "object" && x.builtin === "numbers";
+}
+
+/*
+ * A word set (0.569): a list every language has — its numbers and its
+ * pronouns so far, months and days of the week to come — that the app knows
+ * the shape of, the teacher writes once for the language, and a deck takes
+ * as a whole (or, for numbers, a range at a time). Called "built-in" before
+ * 0.569, which said the app supplied the words; it supplies only the list.
+ *
+ * One description of each, so the Word sets screen, a deck and the picker
+ * that adds sets to a deck all say the same thing about it: how much of it
+ * is written, counted in its own unit, and how many decks hold it.
+ */
+type WordSet = {
+  kind: "numbers" | "pronouns";
+  lang: LangId;
+  name: string;
+  written: number;
+  total: number;
+  /** What `written` and `total` count: "range" for numbers, "pronoun". */
+  unit: string;
+  decks: number;
+  open: () => void;
+};
+/** "9 of 12 ranges written · in 2 decks", as a word set's tile says it. */
+function wordSetLine(s: WordSet): string {
+  const done = s.written === s.total
+    ? `All ${plural(s.total, s.unit)} written`
+    : `${s.written} of ${plural(s.total, s.unit)} written`;
+  return `${done} · ${s.decks ? `in ${plural(s.decks, "deck")}` : "in no deck yet"}`;
+}
+/* A row that opens something, drawn as a deck's tile is: a real button, so
+   it answers a keyboard and a screen reader the way a tap does. */
+function OpenRow({ title, meta, onOpen, label }: { title: Node; meta?: Node; onOpen: () => void; label?: string }) {
+  return (
+    <button type="button" className="at-deckcard at-openrow" data-open="" onClick={onOpen} aria-label={label}>
+      <span className="at-deckrow2">
+        <span className="at-deckmain">
+          <span className="at-decktitle">{title}</span>
+          {meta ? <span className="at-deckmeta">{meta}</span> : null}
+        </span>
+      </span>
+    </button>
+  );
 }
 
 /* A padlock ahead of a deck's small print, where the deck is locked. */
@@ -4316,142 +5093,127 @@ function QualityMark({ quality }: { quality?: Quality | null }) {
 /* What the score is made of, said under the Deck quality heading before
    the score rather than after it, as the card editor explains a section. */
 const QUALITY_LEDE =
-  "Most of it is whether every word, and every form of it, is practised inside sentences in " +
-  "this deck. The rest is recordings, pictures, pronunciation, reviewed sentences, no repeated " +
-  "words, sentences that aren't too long, and a conversation or text.";
+  "Decks with higher scores tend to achieve better learning outcomes.";
 
-function DeckQuality({ quality }: { quality: Quality }) {
-  const [open, setOpen] = useState(false);
+/* The picture beside each suggestion: what it asks you to go and add. */
+const FIX_ICON: Record<string, string> = {
+  words: "cards", sentences: "add", confirm: "check", unlinked: "edit", unknown: "search", both: "edit",
+  recordings: "mic", pictures: "image", pronunciation: "language", reviewed: "verify",
+  repeats: "copy", long: "sort", scene: "group",
+};
+
+/*
+ * A deck's quality (0.561): the score with a bar and where the top
+ * suggestions would take it; the suggestions as cards, each with what to do,
+ * why, what it is worth and, where it is about particular cards, those
+ * cards to tap (0.563).
+ */
+function DeckQuality({ quality, cards, lang, onOpenCard }: {
+  quality: Quality;
+  cards: Card[];
+  lang: Partial<Lang>;
+  onOpenCard: (id: string) => void;
+}) {
   if (quality.score === null) {
     return <Help>Nothing to score yet: add words and sentences that use them.</Help>;
   }
   const fixes = quality.fixes.slice(0, FIXES_SHOWN);
+  const gainOf = (g: number) => Math.max(1, Math.round(g));
+  const reach = Math.min(100, quality.score + fixes.reduce((t, f) => t + gainOf(f.gain), 0));
+  const tone = qualityTone(quality.score);
+  const byId = new Map(cards.map((c) => [String(c.id), c]));
+  const rowOf = new Map(quality.words.map((w) => [w.id, w]));
+  const script = { fontFamily: lang.fontStack, ...scriptVars(lang as Lang) };
   return (
     <>
-      <p className={`at-qualityscore ${qualityTone(quality.score)}`}>
+      <p className={`at-qualityscore ${tone}`}>
         <b>{quality.score}</b> <span>out of 100</span>
       </p>
+      <div className="at-qualitybar" aria-hidden="true">
+        <span className={`now ${tone}`} style={{ width: `${quality.score}%` }} />
+        {fixes.length ? <span className="then" style={{ left: `${quality.score}%`, width: `${reach - quality.score}%` }} /> : null}
+      </div>
+      {/* Always shown (0.562): there are at most three, and they are the
+          most useful thing here. */}
       {fixes.length > 0 && (
         <>
-          <Button
-            className="at-mt3"
-            size="sm"
-            icon={open ? "chevronUp" : "chevronDown"}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? "Hide what would raise it" : "What would raise it"}
-          </Button>
-          {open && (
-            <ul className="at-qualityfixes">
-              {fixes.map((f) => (
-                <li key={f.key}>
-                  <span>{f.text}</span>
-                  <b>{`+${Math.max(1, Math.round(f.gain))}`}</b>
-                </li>
-              ))}
-            </ul>
-          )}
+              <p className="at-qualityreach">
+                {reach >= 100 ? "These would take it to 100." : `These would take it to about ${reach}.`}
+              </p>
+              <ul className="at-qfixes">
+                {fixes.map((f) => {
+                  const ids = (f.cards || []).filter((id) => byId.has(id));
+                  return (
+                    <li className="at-qfix" key={f.key}>
+                      <span className="at-qfixico"><Icon name={FIX_ICON[f.key] || "star"} size={20} /></span>
+                      <div className="at-qfixbody">
+                        <p className="at-qfixtitle">{f.title}</p>
+                        <p className="at-qfixtext">{f.text}</p>
+                        {ids.length ? (
+                          <div className="at-qfixwords">
+                            {ids.map((id) => {
+                              const row = f.key === "words" ? rowOf.get(id) : null;
+                              const owed = row ? row.forms.reduce((t, x) => t + Math.max(0, x.need - x.met), 0) : 0;
+                              return (
+                                <button type="button" className="at-qfixword" key={id} onClick={() => onOpenCard(id)}
+                                  title={owed ? `Needs ${plural(owed, "more sentence")} · open this card` : "Open this card"}>
+                                  <b lang={lang.id} dir={lang.direction} style={script}>
+                                    {cardWords(byId.get(id) as Card, lang as Lang).word}
+                                  </b>
+                                  {owed ? <i aria-label={`needs ${plural(owed, "more sentence")}`}>{`+${owed}`}</i> : null}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        ) : null}
+                        {ids.length ? (
+                          <p className="at-qfixhint">
+                            {f.key === "words" ? "Tap a word to open it. The number is how many more sentences it needs." : "Tap one to open it."}
+                          </p>
+                        ) : null}
+                      </div>
+                      <span className="at-qfixgain"><b>{`+${gainOf(f.gain)}`}</b><small>points</small></span>
+                    </li>
+                  );
+                })}
+              </ul>
         </>
       )}
-    </>
-  );
-}
-
-function ContextReport({ cards, lang }: { cards: Card[]; lang: Partial<Lang> }) {
-  const [open, setOpen] = useState(false);
-  const report = useMemo(() => contextCoverage(cards, lang), [cards, lang]);
-
-  if (!supportsContext(lang)) {
-    return (
-      <Help>
-        {(lang || {}).name || "This language"} does not describe how to find a word inside a
-        phrase, so nothing here can be measured yet.
-      </Help>
-    );
-  }
-
-  const { counts, covered, links, words } = report;
-  const total = words.length;
-  const withContext = words.filter((w) => w.contexts.length > 0);
-  const bare = words.filter((w) => w.contexts.length === 0);
-
-  return (
-    <>
-      <Lede>
-        {total === 0
-          ? "No single-word cards in this deck yet."
-          : `${covered} of ${plural(total, "word")} appear in at least one phrase you have recorded.`}
-      </Lede>
-      <Help>
-        {plural(counts.word, "word")} · {plural(counts.phrase, "phrase")} ·{" "}
-        {plural(counts.sentence, "sentence")}
-        {/* Conversations are counted as the cards they are and matched as
-            the turns they hold, so this is the deck a teacher wrote rather
-            than the number of lines in it. */}
-        {counts.dialog ? ` · ${plural(counts.dialog, "conversation")}` : ""}
-        {links ? ` · ${plural(links, "pairing")} in all` : ""}
-      </Help>
-
-      {total > 0 && (
-        <>
-          <Button
-            className="at-mt3"
-            size="sm"
-            icon={open ? "chevronUp" : "chevronDown"}
-            onClick={() => setOpen((v) => !v)}
-          >
-            {open ? "Hide the pairings" : "Show the pairings"}
-          </Button>
-          {open && (
-            <div className="at-mt3">
-              {withContext.map((w) => (
-                <div className="at-ctxrow" key={w.id}>
-                  <p className="at-ctxword">
-                    <b lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack, ...scriptVars(lang) }}>
-                      {w.ar}
-                    </b>
-                    <i>{asMeaning(w.en)}</i>
-                  </p>
-                  <ul className="at-ctxlist">
-                    {w.contexts.map((c) => (
-                      <li key={c.id}>
-                        <span lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack, ...scriptVars(lang) }}>
-                          {c.ar}
-                        </span>
-                        <em>{asMeaning(c.en)}</em>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              ))}
-            </div>
-          )}
-        </>
-      )}
-
-      {open && bare.length > 0 && (
-        /* The actionable half. "3 of 4" says how rich the deck is; this says
-           which word to record a phrase for next. */
-        <div className="at-mt4">
-          <p className="at-label">Not in any phrase yet</p>
-          <div className="at-ctxbare">
-            {bare.map((w) => (
-              <span key={w.id}>
-                <b lang={lang.id} dir={lang.direction} style={{ fontFamily: lang.fontStack, ...scriptVars(lang) }}>
-                  {w.ar}
-                </b>
-                <i>{asMeaning(w.en)}</i>
-              </span>
+      {/* Every sentence with words no card teaches, in full (0.586). A
+          learner asked to practise a sentence's words on their own before
+          meeting the sentence; this says which sentences cannot be, and
+          which words they are waiting on. The app adds nothing to
+          practise: the teacher decides whether to add the cards or
+          reword the sentence. */}
+      {quality.untaught.length > 0 && (
+        <div className="at-qwarn" role="note">
+          <p className="at-qfixtitle">
+            <Icon name="search" size={18} />{" "}
+            {plural(quality.untaught.length, "sentence")} {quality.untaught.length === 1 ? "has" : "have"} words
+            students can't practise on their own
+          </p>
+          <p className="at-qfixtext">
+            No card in the course teaches these words, so students meet them for the first time inside the sentence. Add a card
+            for each, or reword the sentence.
+          </p>
+          <ul className="at-qwarnlist">
+            {quality.untaught.map((u, i) => (
+              <li key={`${u.id}-${i}`}>
+                <button type="button" className="at-qfixword" onClick={() => onOpenCard(u.id)} title="Open this card">
+                  <b lang={lang.id} dir={lang.direction} style={script}>
+                    {u.text}
+                  </b>
+                </button>
+                <span className="at-qwarnwords">
+                  {"No card for: "}
+                  <span lang={lang.id} dir={lang.direction} style={script}>
+                    {u.words.join(", ")}
+                  </span>
+                </span>
+              </li>
             ))}
-          </div>
+          </ul>
         </div>
-      )}
-
-      {total > 0 && covered === 0 && (
-        <Help className="at-mt3">
-          Nothing to pair yet. It grows on its own as you add phrases that use words already in the
-          deck — each phrase becomes a context for every word inside it.
-        </Help>
       )}
     </>
   );
@@ -4610,12 +5372,6 @@ function StatusMenu({ card, disabled, onStatus }: {
   const [open, setOpen] = useState(false);
   /* The same close-on-anything-else the filter menus use, registered only
      while it is open. */
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
   const now = statusNow(card);
   const choices = statusChoices(card);
   const shown = statusLabel(card);
@@ -4650,7 +5406,7 @@ function StatusMenu({ card, disabled, onStatus }: {
           <Icon name={open ? "chevronUp" : "chevronDown"} size={16} />
         </button>
         {open && (
-          <Popover className="at-pickmenu at-statuspick" role="menu">
+          <Popover className="at-pickmenu at-statuspick" role="menu" onClose={() => setOpen(false)}>
             {choices.map((c) => (
               <button
                 key={c.value}
@@ -4909,8 +5665,13 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
    back on is this line. */
 const SHOW_IN_CONTEXT = false;
 
-export function TeachSpace({ account, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose }: {
+export function TeachSpace({ account, spaceName: shownName, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose, personalOnly = false }: {
   account: User;
+  /** The name of the space on screen — for an App admin, the one at the
+      address rather than their own. */
+  spaceName?: string | null;
+  /** A learner's My space (0.545): only their own decks and cards, no courses. */
+  personalOnly?: boolean;
   languages: Record<LangId, Lang>;
   settings?: any;
   /* The languages switched off by the switch above the space, which lives
@@ -4939,15 +5700,40 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      Read from the prop at the first render only, so this is where the
      teacher was rather than where they have since gone. */
   const back = useRef(resume || null).current;
-  const [tab, setTab] = useState((back && back.tab) || "courses");
+  const [tab, setTab] = useState((back && back.tab) || (personalOnly ? "decks" : "courses"));
   const [courses, setCourses] = useState<Course[]>(last ? last.courses : []);
-  const [decks, setDecks] = useState<Deck[]>(last ? unlockedDecks(last.decks) : []);
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
+  /* Everything this person may work on, both sides; `decks` and `cards`
+     below are the side on screen (0.545): the space's, or My space. Every
+     write goes through the setters, whole or by function, so the side not
+     on screen is never lost. */
+  const [allDecks, setDecks] = useState<Deck[]>(last ? unlockedDecks(last.decks) : []);
+  const [side, setSide] = useState<"space" | "mine">(personalOnly ? "mine" : "space");
+  const mineSide = side === "mine";
+  /* A My space deck on its way into the space, and the courses ticked for it. */
+  const [toSpace, setToSpace] = useState<{ deck: Deck; move: boolean } | null>(null);
+  const [toCourses, setToCourses] = useState<string[]>([]);
+  /* A My space card on its way into a deck of the space, and that deck. */
+  const [cardToSpace, setCardToSpace] = useState<{ card: Card; move: boolean } | null>(null);
+  const [cardDeck, setCardDeck] = useState("");
+  /* The space's own name on the toggle (0.549), cut short when long, in full on hover. */
+  const spaceName = shownName || (account.org && typeof account.org === "object" && account.org.name) || "Space";
+  const decks = useMemo(() => allDecks.filter((d) => !!d.personal === mineSide), [allDecks, mineSide]);
+  /* See useRun. A locked deck the server kept as it was outranks "done":
+     the teacher asked for a change that did not all happen. */
+  const { run, busy, setBusy, error, setError } = useRun({
+    snackErrors: true,
+    before: () => lockedHits.current.clear(),
+    instead: () => (lockedHits.current.size ? lockedNote(lockedHits.current) : null),
+  });
 
   const [courseView, setCourseView] = useState<any | null>(null);
+  /* The decks a course is still saving, and which way: shown on the
+     deck's row as "Adding…" or "Removing…" until the server answers, and
+     not tappable meanwhile, so a second tap cannot undo the first. */
+  const [deckSaving, setDeckSaving] = useState<Record<string, "add" | "drop">>({});
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
-  const [cards, setCards] = useState<Card[]>(last ? last.cards : []);
+  const [allCards, setCards] = useState<Card[]>(last ? last.cards : []);
+  const cards = useMemo(() => allCards.filter((c) => !!c.personal === mineSide), [allCards, mineSide]);
   /* Which recordings those cards name that the server does not hold, told
      with the cards. Set for the screens that show it as this renders —
      see setLostRecordings. */
@@ -5017,6 +5803,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   /* How many cards are waiting for a connection, so the space can say so
      rather than leaving a teacher to wonder where their work went. */
   const [kept, setKept] = useState(() => waitingToSend(CARD_OUTBOX));
+  /* Saves the server refused when they were sent from the queue, named
+     until the teacher dismisses them (0.580, audit finding 5). */
+  const [lastDropped, setLastDropped] = useState<{ name: string; msg: string }[] | null>(null);
   /* The teacher's own number systems, one per language they teach. Read
      when the screen that edits them is opened rather than on every visit
      to the card list: it is one request and most visits never want it. */
@@ -5041,6 +5830,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      selected cards or take off them, and the name of one being made on the
      spot. See tagActionScreen. */
   const [tagAction, setTagAction] = useState<"add" | "remove" | null>(null);
+  /* Changing the status of the selected cards: the screen is open while
+     this is set, holding the status chosen on it, if any yet. See
+     statusActionScreen. */
+  const [statusAction, setStatusAction] = useState<null | { to: "draft" | "review" | "published" | null; asking?: boolean }>(null);
   const [pickedTags, setPickedTags] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [newCardLang, setNewCardLang] = useState<LangId | null>(null);
@@ -5049,11 +5842,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      out of are a fact about the language, not about any one deck, and the
      same eleven words serve every deck written in it. */
   const [numbering, setNumbering] = useState<LangId | null>(null);
-  /* Which language's pronouns are open, and — where the teacher has more
-     than one that has them — which one is being chosen. The Numbers two-
-     step, for the same reason. */
+  /* Which language's pronouns are open. */
   const [pronouning, setPronouning] = useState<LangId | null>(null);
-  const [pronounLang, setPronounLang] = useState<LangId | null>(null);
+  /* The Word sets screen (0.569), off the Cards tab: every set, each
+     language's under its name, which is where Numbers and Pronouns are
+     opened from. It replaced an icon for each and a "Which language?" step
+     before either. */
+  const [wordSets, setWordSets] = useState(false);
   /* The open deck, being edited: null while it is only read. */
   const [deckDraft, setDeckDraft] = useState<DeckDraft | null>(null);
   const [discardingDeck, setDiscardingDeck] = useState(false);
@@ -5061,10 +5856,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
      cards the teacher already has: what is ticked, held until Done. */
   const [managing, setManaging] = useState(false);
   const [adding, setAdding] = useState<{ ids: string[]; parts: string[]; pronouns: boolean } | null>(null);
-  /* And which language, where the teacher has more than one to choose
-     from. The same two-step the New card button takes, for the same
-     reason and through the same control. */
-  const [numberLang, setNumberLang] = useState<LangId | null>(null);
   /* Already teaching something? Then this is a rare errand, folded away. */
   const [joinNote, setJoinNote] = useState("");
   const [selDecks, setSelDecks] = useState(() => new Set<string>());
@@ -5120,7 +5911,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     } finally {
       if (!background) setBusy(false);
     }
-  }, [account.handle]);
+  }, [account.handle, setBusy, setError]);
 
   /* See AdminSpace: how this mount arrived, read once. Arriving with the
      last contents means the check for what has changed runs quietly. */
@@ -5288,6 +6079,16 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   }, [taught, off]);
   const numberLangsOn = numberLangs.filter((id) => !!taughtOn[id]);
   const pronounLangsOn = pronounLangs.filter((id) => !!taughtOn[id]);
+  /* The languages with any word set to write, in the order they are
+     taught, and what the row that opens them says they hold. */
+  const wordSetLangsOn = Object.keys(taughtOn).filter((id) => numberLangsOn.includes(id) || pronounLangsOn.includes(id));
+  const wordSetNames = (langs: string[]) => {
+    const names = [
+      langs.some((id) => numberLangsOn.includes(id)) ? "numbers" : "",
+      langs.some((id) => pronounLangsOn.includes(id)) ? "pronouns" : "",
+    ].filter(Boolean).join(" and ");
+    return `${names.charAt(0).toUpperCase()}${names.slice(1)}, written once for the language`;
+  };
   /* And for making a card or a deck: with the switch on one language,
      that is the one — see langsToMakeIn. Exactly one is the only case
      where there is nothing to ask. None is not the same as one: it means
@@ -5499,7 +6300,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       const want = [...new Set([...had, ...into(m)])];
       /* Its decks alone: a teacher's copy of a published card with changes
          waiting is the changes, and sent whole it would publish them. */
-      if (want.length !== had.length) absorbSaved(await API.saveCard(m.existing, want, { touched: ["decks"] }));
+      if (want.length !== had.length) absorbSaved(await API.saveCard(m.existing, want, { touched: ["decks"], decksWere: had }));
     }
     setImporting(false);
     await refresh();
@@ -5542,7 +6343,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     <CardTile
       card={group}
       lang={languages[group.lang as LangId]}
-      meta={<><span className="at-statusbadge">Built-in</span>{plural(group.members.length, "pronoun")}</>}
+      meta={<><span className="at-statusbadge">Word set</span>{plural(group.members.length, "pronoun")}</>}
       onClick={() => setPronouning(group.lang as LangId)}
       actions={
         <>
@@ -5614,11 +6415,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       if (isNumberPart(c)) {
         return {
           word: c.label,
-          meaning: "Built-in numbers",
-          cells: { word: c.label, kind: "Numbers", subtype: "Built-in" },
+          meaning: "Numbers",
+          cells: { word: c.label, kind: "Numbers", subtype: "Word set" },
           open: () => {},
           actions: actGroup ? actGroup(c) : undefined,
-          lead: <span className="at-statusbadge">Built-in</span>,
+          lead: <span className="at-statusbadge">Word set</span>,
         };
       }
       if (isPronounGroup(c)) {
@@ -5629,7 +6430,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           cells: { word: said.word, meaning: said.en, kind: cardKindLabel(c), subtype: "Pronouns" },
           open: () => setPronouning(c.lang as LangId),
           actions: actGroup ? actGroup(c) : undefined,
-          lead: <span className="at-statusbadge">Built-in</span>,
+          lead: <span className="at-statusbadge">Word set</span>,
         };
       }
       const said = cardWords(c, langOfCard(c));
@@ -5999,28 +6800,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     },
   ];
 
-  /* See the note on AdminSpace's run: `done` is the confirmation, and may
-     be a function of what the call returned. */
-  async function run(fn: () => Promise<any>, done?: string | ((out: any) => string)) {
-    setBusy(true);
-    lockedHits.current.clear();
-    try {
-      const out = await fn();
-      setError("");
-      /* A locked deck the server kept as it was outranks "done": the
-         teacher asked for a change that did not all happen. */
-      if (lockedHits.current.size) snack(lockedNote(lockedHits.current), "warn");
-      else if (done) snack(typeof done === "function" ? done(out) : done, "good");
-      /* What it made, for a caller that has to know whether it did. */
-      return out;
-    } catch (e) {
-      setError(API.explain(e));
-      return undefined;
-    } finally {
-      setBusy(false);
-    }
-  }
-
   /**
    * A language's numbers and its clock, fetched when they are wanted.
    *
@@ -6152,38 +6931,68 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   };
   /* A save straight to the server, naming what it changed — for the
      screens that do not keep a save for later. */
+  /* With the decks this screen believed the card was in, so the server
+     applies only what was added or taken away (0.580). */
   const saveNamed = (card: Partial<Card>, decks: string[]) =>
-    API.saveCard(card, decks, card.id ? { touched: touchedBy(card, decks) } : {});
+    API.saveCard(card, decks, card.id
+      ? { touched: touchedBy(card, decks), decksWere: card.decks || [] }
+      : { personal: mineSide });
   const sendOrKeep = useCallback(async (card: Partial<Card>, decks: string[], given: API.SaveExtra = {}) => {
-    const extra: API.SaveExtra = given.touched || given.walk || given.into || !card.id
-      ? given
-      : { ...given, touched: touchedBy(card, decks) };
+    /* A new card made on the My space side is personal, for good (0.545). */
+    const withSide = !card.id && mineSide ? { ...given, personal: true } : given;
+    const extra: API.SaveExtra = withSide.touched || withSide.walk || withSide.into || !card.id
+      ? withSide
+      : { ...withSide, touched: touchedBy(card, decks) };
     try {
       return await API.saveCard(card, decks, extra);
     } catch (e) {
       if (String((e && (e as Error).message) || e) !== "offline") throw e;
-      keepPending(CARD_OUTBOX, { card, decks, extra });
+      /* A space only being tried is never written to, later or now
+         (README, "Trying a space"). */
+      if (API.tryingSpace()) throw new Error("trying-space-save");
+      /* With the space it was made in, so it is sent there whatever space
+         the app is in when the connection comes back (0.580). */
+      const kept = keepPending(CARD_OUTBOX, { card, decks, extra, org: API.currentOrg() });
+      /* Nowhere to keep it: said, and the editor stays open with what was
+         typed (0.580, audit finding 6). */
+      if (!kept) throw new Error("device-full");
       setKept(waitingToSend(CARD_OUTBOX));
       return { kept: true };
     }
   /* touchedBy reads the cards through a ref, so this is made once. */
-  }, []);
+  }, [mineSide]);
 
   /* And send them when there is something to send them down. One at a
      time, oldest first; a card the server refuses outright is dropped,
      because it will be refused again for the same reason. */
   const sendKeptCards = useCallback(async () => {
     if (isOffline()) return;
+    const dropped: { name: string; msg: string }[] = [];
+    const cardName = (c: Partial<Card>) =>
+      (c && (leadOf(c as Card).ar || c.name || leadOf(c as Card).en)) || "A card";
     const { sent } = await drainOutbox(CARD_OUTBOX, async (body) => {
-      const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra };
+      const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra; org?: string };
       try {
-        absorbSaved(await API.saveCard(held.card, held.decks, held.extra || {}));
+        absorbSaved(await API.saveCard(held.card, held.decks, held.extra || {}, held.org));
         return "sent";
       } catch (e) {
-        return String((e && (e as Error).message) || e) === "offline" ? "keep" : "drop";
+        /* Waited through anything that is not the server's own refusal; a
+           refusal drops it, and the teacher is told (0.580, audit finding 5). */
+        const msg = String((e && (e as Error).message) || e);
+        if (isTransient(msg)) return "keep";
+        dropped.push({ name: cardName(held.card), msg });
+        return "drop";
       }
     });
     setKept(waitingToSend(CARD_OUTBOX));
+    if (dropped.length) {
+      const n = dropped.length;
+      snack(
+        `${n} saved card${n === 1 ? "" : "s"} could not be sent and ${n === 1 ? "was" : "were"} discarded: ${API.explain(new Error(dropped[0].msg))}`,
+        "warn",
+      );
+      setLastDropped((was) => (was || []).concat(dropped));
+    }
     if (lockedHits.current.size) {
       snack(lockedNote(lockedHits.current), "warn");
       lockedHits.current.clear();
@@ -6273,6 +7082,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
   /* How many of a deck's cards are waiting for review, said on the deck —
      a teacher looks after a deck, and what in it is not yet reaching
      students is the thing worth seeing without opening it. */
+  const cardById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
   const deckWaiting = (deck: Deck): string => {
     const n = (deck.cardIds || []).filter((id) => waitingIds.has(id)).length;
     return n ? ` · ${n} to review` : "";
@@ -6314,7 +7124,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     if (!title) return;
     run(
       async () => {
-        const r = await API.createDeck(title, "", newDeckLang);
+        const r = await API.createDeck(title, "", newDeckLang, mineSide);
         const made = r && r.deck;
         if (made) {
           setDecks((prev) => prev.concat([made]));
@@ -6327,15 +7137,59 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   };
 
+  /* ---- a new deck takes over the screen, like a new card ----
+     Saved, it opens as the deck itself: that is where its courses, its
+     lock and its cards are. */
+  if (naming) {
+    return (
+      <NewDeck
+        choices={choicesOn}
+        mustAsk={mustAskOn}
+        initialLang={knownOn.length === 1 ? soleLangOn : ""}
+        busy={busy}
+        onClose={() => setNaming(null)}
+        onSave={(title, lang) =>
+          run(
+            async () => {
+              const r = await API.createDeck(title, "", lang || soleLangOn, mineSide);
+              setNaming(null);
+              await refresh();
+              if (r && r.deck && r.deck.id) setOpenDeck(r.deck.id);
+            },
+            `${title} created`
+          )
+        }
+      />
+    );
+  }
+
+  /* ---- a card: read, edited or made ----
+     The editor, drawn over whichever list it was opened from rather than
+     in place of it, the way a card read used to be: Back lands on the list
+     where it was left, scrolled where it was scrolled. The screen is
+     portalled to the app's root, so where in the tree it sits decides
+     nothing else. */
   /* ---- reviewing a card's sentences takes over the screen ----
      Its sentences are worked out against every card this teacher holds,
      since what fills a blank is the whole collection. */
-  if (reviewing) {
+  const reviewScreen = reviewing ? (() => {
     const fresh = cards.find((c) => c.id === reviewing.id) || reviewing;
     const pool = lendable.some((c) => c.id === fresh.id) ? lendable : lendable.concat([fresh]);
     const lang = langOfCard(fresh) || languages[soleLang];
-    const took = (card: Card) => {
-      setEditing((e) => (e && e.card && e.card.id === card.id ? { ...e, card: { ...e.card, ...card }, opened: Date.now() } : e));
+    /*
+     * The editor's card, as the review left it.
+     *
+     * A review changes nothing the editor holds — the server keeps the
+     * review beside the card's words — so the editor stays as it is, with
+     * whatever the teacher had typed (0.580, audit finding 9). Narrowing a
+     * blank does change the card's words, and an editor left holding the
+     * old ones would quietly put them back on Save; that one, and only
+     * that one, draws the editor afresh.
+     */
+    const took = (card: Card, redraw = false) => {
+      setEditing((e) => (e && e.card && e.card.id === card.id
+        ? { ...e, card: { ...e.card, ...card }, ...(redraw ? { opened: Date.now() } : null) }
+        : e));
     };
     return (
       <ReviewScreen
@@ -6367,7 +7221,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               if (r && r.card && r.card.id === fresh.id) frame = r.card;
             }
             if (frame) {
-              took(frame);
+              took(frame, true);
               setReviewing(frame);
             }
             snack(`Narrowed — ${plural(Math.max(0, changed.length - 1), "word")} tagged`, "good");
@@ -6377,41 +7231,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         }}
       />
     );
-  }
-
-  /* ---- a new deck takes over the screen, like a new card ----
-     Saved, it opens as the deck itself: that is where its courses, its
-     lock and its cards are. */
-  if (naming) {
-    return (
-      <NewDeck
-        choices={choicesOn}
-        mustAsk={mustAskOn}
-        initialLang={knownOn.length === 1 ? soleLangOn : ""}
-        busy={busy}
-        onClose={() => setNaming(null)}
-        onSave={(title, lang) =>
-          run(
-            async () => {
-              const r = await API.createDeck(title, "", lang || soleLangOn);
-              setNaming(null);
-              await refresh();
-              if (r && r.deck && r.deck.id) setOpenDeck(r.deck.id);
-            },
-            `${title} created`
-          )
-        }
-      />
-    );
-  }
-
-  /* ---- a card: read, edited or made ----
-     The editor, drawn over whichever list it was opened from rather than
-     in place of it, the way a card read used to be: Back lands on the list
-     where it was left, scrolled where it was scrolled. The screen is
-     portalled to the app's root, so where in the tree it sits decides
-     nothing else. */
-  const cardScreen = editing ? (() => {
+  })() : null;
+  const editorScreen = editing ? (() => {
     const forDeck = editing.decks[0]
       ? decks.find((d) => d.id === editing.decks[0])
       : decks[0] || { courses: [] };
@@ -6428,6 +7249,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         decks={decksIn(new Set([(editLang || LANGUAGES[DEFAULT_LANGUAGE]).id]), editing.decks)}
         inDecks={editing.decks}
         busy={busy}
+        error={error}
         onClose={() => setEditing(null)}
         allCards={lendable}
         making={editing.making}
@@ -6442,6 +7264,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           return c && c.id ? <StatusMenu card={c} disabled={busy || off} onStatus={(to) => setStatus(c, to)} /> : null;
         }}
         onExport={editing.card && editing.card.id ? () => exportCards([editing.card!.id]) : undefined}
+        /* A My space card into the space (0.549, 3a): teachers and admins. */
+        onToSpace={editing.card && editing.card.id && editing.card.personal && !personalOnly
+          ? (move: boolean) => {
+              setCardDeck("");
+              setCardToSpace({ card: editing.card as Card, move });
+            }
+          : undefined}
         about={
           editing.card && editing.card.id ? (
             <ReviewLine state={reviewMap.get(editing.card.id)} onOpen={() => setReviewing(editing.card)} />
@@ -6466,7 +7295,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
              card opened from a list is, or to edit where this one was. */
           setEditing({ card: other, decks: other.decks || [], lang: other.lang || (editLang || {}).id || "", opened: Date.now(), locked: !!editing.locked })
         }
-        onSave={({ forms, note, name, examples, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next, exit }) =>
+        onSave={({ forms, note, name, examples, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next, exit, publish }) =>
           run(
             async () => {
               const [main, ...subs] = forms;
@@ -6580,7 +7409,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 /* A new card starts as a draft, and a change to a published
                    card waits for publishing — see "A card's status" in
                    save-card. Its decks, ID and tags apply at once. */
-                editing.card && editing.card.id ? { into: "changes" } : { status: "draft" },
+                {
+                  /* With the decks the editor opened with, so only what the
+                     teacher added or took away is applied (0.580). */
+                  ...(editing.card && editing.card.id ? { into: "changes" as const, decksWere: editing.decks } : { status: "draft" as const }),
+                  /* Save and publish: the same save, out to students in
+                     the same request — kept on the device with it, too. */
+                  ...(publish ? { publish: true } : {}),
+                },
               );
               absorbSaved(r);
               /*
@@ -6683,6 +7519,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 /* Kept for later rather than saved, which is a different
                    promise and has to read as one. */
                 kept: !!(r && r.kept),
+                published: !!publish,
                 waiting,
                 /* And how many other cards a rename followed the name
                    into, which is the one thing about this save that
@@ -6713,9 +7550,13 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                already written, say so — that is the moment the link is
                worth making, and the alternative is a deck whose coverage
                quietly falls as it grows. */
-            (done: { name: string, kept: boolean, waiting: number, trimmed: string[], moved: number, waits: string }) =>
+            (done: { name: string, kept: boolean, published: boolean, waiting: number, trimmed: string[], moved: number, waits: string }) =>
               done.kept
-                ? `${done.name} saved on this device — it goes up when you're back online`
+                ? done.published
+                  ? `${done.name} saved on this device — it's published when you're back online`
+                  : `${done.name} saved on this device — it goes up when you're back online`
+                : done.published && !done.moved && !done.trimmed.length && !done.waiting
+                ? `${done.name} saved and published — students get it now`
                 : done.moved
                 ? `${done.name} saved · the new name went into ${plural(done.moved, "other card")}`
                 : done.trimmed.length
@@ -6737,7 +7578,39 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               })()
             : undefined
         }
-        confirming={
+        confirming={cardToSpace ? (
+          <ConfirmModal
+            title={`${cardToSpace.move ? "Move" : "Copy"} this card to ${spaceName}?`}
+            confirmLabel={cardToSpace.move ? "Move it" : "Copy it"}
+            danger={false}
+            busy={busy || !cardDeck}
+            body={
+              <>
+                <p>
+                  {cardToSpace.move
+                    ? "The card becomes the space's, in the deck you choose. Nothing stays in My space."
+                    : "A copy goes into the deck you choose. The copy and this card won't stay in sync."}
+                </p>
+                <RadioGroup
+                  name="card-to-space"
+                  label="Into which deck"
+                  value={cardDeck}
+                  onChange={setCardDeck}
+                  options={allDecks.filter((x) => !x.personal).map((x) => ({ value: x.id, label: x.title }))}
+                />
+              </>
+            }
+            onCancel={() => setCardToSpace(null)}
+            onConfirm={() =>
+              run(async () => {
+                await API.cardToSpace(cardToSpace.card.id, cardDeck, cardToSpace.move);
+                setCardToSpace(null);
+                setEditing(null);
+                await refresh();
+              })
+            }
+          />
+        ) : 
           exportScreen ? exportScreen : confirm && confirm.kind === "card" && confirm.card ? (
             <ConfirmModal
               title={`Delete "${leadOf(confirm.card).en || leadOf(confirm.card).ar}"?`}
@@ -6746,6 +7619,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               busy={busy}
               body={
                 <>
+                  {confirm.card.owner && confirm.card.owner !== account.handle ? <OthersWork what="card" /> : null}
                   <p>
                     Gone from every deck, and from your students' apps. Recordings go too. This
                     can't be undone.
@@ -6770,6 +7644,129 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       />
     );
   })() : null;
+  /* The review is drawn over the card's editor where one is open, in the
+     same place in the tree, never instead of it: taking the editor down
+     took everything typed into it (0.580, audit finding 9). */
+  const cardScreen = editorScreen ? <>{editorScreen}{reviewScreen}</> : null;
+  if (reviewScreen && !editorScreen) return reviewScreen;
+
+
+
+
+  /* ---- what a deck can hold besides cards: parts of the numbers, and
+         pronouns ----
+     Numbers are one document per language and pronouns one screen, so
+     neither is a card a teacher would find in a list to add. This is the
+     one place a deck takes them: the parts of the numbers by name — 0 to
+     9, 20 to 99, telling the hour — each bringing the
+     words it is built of, and the pronouns one person at a time. Nothing
+     of either reaches a student except through a deck. */
+  const numberPartsOf = (langId: LangId | undefined) => [
+    ...((composerFor(langId) || { ranges: () => [] }).ranges()),
+    ...((timeComposerFor(langId) || { ranges: () => [] }).ranges()),
+  ];
+  const pronounCardsOf = (langId: LangId | undefined): Card[] => {
+    const own = cards.filter((c) => isPronounCard(c) && c.lang === langId);
+    const group = groupPronouns(own).find(isPronounGroup);
+    const order = group ? group.members : [];
+    return order.map((id) => own.find((c) => c.id === id)).filter(Boolean) as Card[];
+  };
+  /* Which ranges of a language's numbers this teacher's words can build —
+     the test a student's device applies (see rangeChecks), so "written"
+     here means what it means to them. */
+  const openRanges = (langId: LangId): Set<string> => {
+    const sys = systems ? systems.numbers.find((n) => n.languageId === langId) || null : null;
+    const clock = sys && systems
+      ? systems.times.find((t) => t.languageId === langId && t.numberSystemId === sys.id) || null
+      : null;
+    return new Set(
+      rangeChecks(composerFor(langId), sys, timeComposerFor(langId), clock).filter((c) => c.open).map((c) => c.range.id),
+    );
+  };
+  /* A language's word sets, each with how much is written and how many
+     of the language's decks hold it — see WordSet. */
+  const wordSetsOf = (langId: LangId): WordSet[] => {
+    const lang = languages[langId];
+    const inLang = decks.filter((d) => ((langOfDeck(d) || {}).id || d.lang) === langId);
+    const out: WordSet[] = [];
+    const parts = composerFor(langId) ? numberPartsOf(langId) : [];
+    if (parts.length) {
+      const ready = openRanges(langId);
+      const ids = new Set(parts.map((r) => r.id));
+      out.push({
+        kind: "numbers",
+        lang: langId,
+        name: "Numbers",
+        written: parts.filter((r) => ready.has(r.id)).length,
+        total: parts.length,
+        unit: "range",
+        decks: inLang.filter((d) => partsNow(d.parts || []).some((p) => ids.has(p))).length,
+        open: () => setNumbering(langId),
+      });
+    }
+    if (lang && hasPronouns(lang)) {
+      const own = pronounCardsOf(langId);
+      const holding = new Set(own.flatMap((c) => c.decks || []));
+      out.push({
+        kind: "pronouns",
+        lang: langId,
+        name: "Pronouns",
+        written: own.length,
+        total: personsOf(verbOf(lang)).length,
+        unit: "pronoun",
+        decks: inLang.filter((d) => holding.has(d.id)).length,
+        open: () => setPronouning(langId),
+      });
+    }
+    return out;
+  };
+  /* The pronouns into a deck or out of it, from their own screen (0.569):
+     every pronoun card of the language, as Add existing cards does it. */
+  const pronounsInDeck = (langId: LangId, deckId: string, on: boolean) =>
+    run(async () => {
+      for (const card of pronounCardsOf(langId)) {
+        const inNow = card.decks || [];
+        if (on === inNow.includes(deckId)) continue;
+        absorbSaved(await saveNamed(card, on ? inNow.concat([deckId]) : inNow.filter((x) => x !== deckId)));
+      }
+    }, on ? "Added to the deck" : "Taken out of the deck");
+
+  /* ---- the Word sets screen (0.569) ----
+     Every set the teacher can write, each language's under its name where
+     more than one is switched on, so one tap opens the right one. A set
+     opens over this screen, and closing it comes back here. */
+  const wordSetsScreen = () => {
+    const several = wordSetLangsOn.length > 1;
+    const tiles = (langId: LangId) => (
+      <div className="at-decklist2">
+        {wordSetsOf(langId).map((s) => (
+          <OpenRow
+            key={s.kind}
+            title={s.name}
+            meta={wordSetLine(s)}
+            onOpen={s.open}
+            label={several ? `${s.name}, ${(languages[langId] || { name: langId }).name}` : undefined}
+          />
+        ))}
+      </div>
+    );
+    return (
+      <Screen title="Word sets" onBack={() => setWordSets(false)}>
+        <Help>
+          Lists every language has, such as numbers and pronouns. You write the words once for the
+          language, then add the set to a deck as a whole, or a range of numbers at a time.
+        </Help>
+        <Notice kind="error">{error}</Notice>
+        {several
+          ? wordSetLangsOn.map((id) => (
+            <Section key={id} title={(languages[id] || { name: id }).name}>
+              {tiles(id)}
+            </Section>
+          ))
+          : wordSetLangsOn.length ? tiles(wordSetLangsOn[0]) : null}
+      </Screen>
+    );
+  };
   /* Where nothing below draws a list to sit over, it is the screen. */
   if (cardScreen && (pronouning || numbering || (!openDeck && courseView))) return cardScreen;
 
@@ -6789,6 +7786,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         cards={cards}
         busy={busy}
         onClose={() => setPronouning(null)}
+        decks={decks
+          .filter((d) => ((langOfDeck(d) || {}).id || d.lang) === pronouning)
+          .map((d) => ({ id: d.id, title: String(d.title || ""), locked: !!d.locked, cardCount: d.cardCount || 0 }))}
+        onDeck={(deckId, on) => void pronounsInDeck(pronouning, deckId, on)}
         onSave={async (card, inDecks) => {
           const r = await sendOrKeep(card, inDecks);
           absorbSaved(r);
@@ -7163,24 +8164,124 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   };
 
-  /* ---- what a deck can hold besides cards: parts of the numbers, and
-         pronouns ----
-     Numbers are one document per language and pronouns one screen, so
-     neither is a card a teacher would find in a list to add. This is the
-     one place a deck takes them: the parts of the numbers by name — 0 to
-     9, 20 to 99, telling the hour — each bringing the
-     words it is built of, and the pronouns one person at a time. Nothing
-     of either reaches a student except through a deck. */
-  const numberPartsOf = (langId: LangId | undefined) => [
-    ...((composerFor(langId) || { ranges: () => [] }).ranges()),
-    ...((timeComposerFor(langId) || { ranges: () => [] }).ranges()),
-  ];
-  const pronounCardsOf = (langId: LangId | undefined): Card[] => {
-    const own = cards.filter((c) => isPronounCard(c) && c.lang === langId);
-    const group = groupPronouns(own).find(isPronounGroup);
-    const order = group ? group.members : [];
-    return order.map((id) => own.find((c) => c.id === id)).filter(Boolean) as Card[];
+  /* The status of every selected card at once — the card screen's status
+     menu, for many. Publish sends out drafts and cards waiting for review,
+     and the changes on published cards that have any. Draft and Ready for
+     review take published cards away from students, so they ask first and
+     say how many (the owner's call, 0.592): the card is unpublished, which
+     brings its unpublished changes with it, then given the status asked
+     for. One request per card, as tagging is; a card that is someone
+     else's is counted and left, not the end of the batch. */
+  const statusActionScreen = () => {
+    if (!statusAction) return null;
+    const picked = pickedIds(selCards)
+      .map((id) => cards.find((c) => c.id === id))
+      .filter(Boolean) as Card[];
+    const live = (c: Card) => !c.status || c.status === "published";
+    const published = picked.filter(live);
+    const drafts = picked.filter((c) => !live(c));
+    const wouldChange = (to: "draft" | "review" | "published") =>
+      to === "published"
+        ? drafts.length + published.filter((c) => c.changes).length
+        : drafts.filter((c) => c.status !== to).length + published.length;
+    const to = statusAction.to;
+    const close = () => setStatusAction(null);
+    const go = () => {
+      if (!to) return;
+      run(
+        async () => {
+          let changed = 0;
+          let refused = 0;
+          for (const card of picked) {
+            try {
+              if (to === "published") {
+                if (live(card) && !card.changes) continue;
+                absorbSaved(await API.cardStatus(card.id, "published"));
+              } else if (live(card)) {
+                const r = await API.cardStatus(card.id, "unpublish");
+                absorbSaved(r.card.status === to ? r : await API.cardStatus(card.id, to));
+              } else {
+                if (card.status === to) continue;
+                absorbSaved(await API.cardStatus(card.id, to));
+              }
+              changed += 1;
+            } catch (e) {
+              if ((e as Error).message === "not-yours") refused += 1;
+              else throw e;
+            }
+          }
+          close();
+          setSelCards(new Set());
+          return { changed, refused };
+        },
+        ({ changed, refused }: { changed: number; refused: number }) =>
+          [
+            changed
+              ? to === "published"
+                ? `${plural(changed, "card")} published — students get them now`
+                : `${plural(changed, "card")} marked ${to === "review" ? "ready for review" : "as drafts"}`
+              : "Nothing to change — they were already like that",
+            refused ? `${plural(refused, "card")} belong to someone else and stayed` : "",
+          ]
+            .filter(Boolean)
+            .join(". "),
+      );
+    };
+    const choices: { id: "draft" | "review" | "published"; title: string }[] = [
+      { id: "draft", title: "Draft" },
+      { id: "review", title: "Ready for review" },
+      { id: "published", title: "Publish" },
+    ];
+    return (
+      <Screen title="Change the status of the selected cards" onBack={close}>
+        <Help>
+          Publish sends drafts and cards waiting for review out to students, and publishes any changes on cards
+          they already have. Draft and Ready for review take published cards away from students until they are
+          published again.
+        </Help>
+        <CheckList
+          options={choices.map((c) => ({
+            id: c.id,
+            title: c.title,
+            note: `changes ${wouldChange(c.id)} of the ${plural(picked.length, "selected card")}`,
+          }))}
+          chosen={to ? [to] : []}
+          onToggle={(id, on) => setStatusAction({ to: on ? null : (id as "draft" | "review" | "published") })}
+        />
+        <div className="at-row at-mt5">
+          <Button variant="ghost" onClick={close} icon="close">
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            icon="check"
+            disabled={!to || busy}
+            onClick={() => (to !== "published" && published.length ? setStatusAction({ to, asking: true }) : go())}
+          >
+            Change status
+          </Button>
+        </div>
+        {statusAction.asking && (
+          <ConfirmModal
+            title={`Unpublish ${plural(published.length, "card")}?`}
+            confirmLabel="Unpublish them"
+            busy={busy}
+            body={
+              <p>
+                {published.length === 1 ? "One of the selected cards is" : `${published.length} of the selected cards are`}{" "}
+                published. Students will stop seeing {published.length === 1 ? "it" : "them"} until{" "}
+                {published.length === 1 ? "it is" : "they are"} published again. Any changes waiting on{" "}
+                {published.length === 1 ? "it" : "them"} stay, and become the card.
+              </p>
+            }
+            onCancel={() => setStatusAction({ to })}
+            onConfirm={go}
+          />
+        )}
+      </Screen>
+    );
   };
+
   /* What a saved deck holds of the things the screen can change, in the
      shape a draft of it takes — so starting to edit is copying this, and
      whether anything has changed is comparing against it. */
@@ -7224,8 +8325,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   };
 
-  /* A deck's built-in cards — its number ranges and the language's
-     pronouns — written straight away from the Manage cards page. A deck
+  /* A deck's word sets — its number ranges and the language's pronouns —
+     written straight away from the Manage cards page. A deck
      being edited has its draft brought along, so saving the edit does not
      put back what was just changed. */
   const saveBuiltins = async (d: Deck, parts: string[], pronounsOn: boolean) => {
@@ -7240,13 +8341,16 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     setDeckDraft((dd) => (dd ? { ...dd, parts, pronouns: pronounsOn ? pron.map((c) => c.id) : [] } : dd));
   };
   /* Add existing cards: the teacher's cards in the deck's language, ticked
-     where they are in it already, with the built-in ones in a group of
-     their own at the top. Nothing changes until Done. */
+     where they are in it already, with the word sets in a group of their
+     own at the top, each saying how much of it is written. Nothing changes
+     until Done. */
   const addingScreen = (d: Deck) => {
     const langId = (langOfDeck(d) || {}).id || d.lang;
     const picked = adding || { ids: [], parts: [], pronouns: false };
     const parts = numberPartsOf(langId);
     const pron = pronounCardsOf(langId);
+    const ready = parts.length ? openRanges(langId) : new Set<string>();
+    const pronSet = wordSetsOf(langId).find((s) => s.kind === "pronouns");
     const own = sortCards(
       filterCards(cards.filter((c) => c.lang === langId && !isPronounCard(c)), cardFilter, waitingIds),
       sortKey,
@@ -7275,11 +8379,24 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         }
       >
         <Notice kind="error">{error}</Notice>
-        {(parts.length > 0 || pron.length > 0) && (
-          <Section title="Built-in" lede="Ready-made with the language. Each range of numbers brings the number words it needs.">
+        {(parts.length > 0 || !!pronSet) && (
+          <Section title="Word sets"
+            lede="Lists every language has, written once for the language. Each range of numbers brings the number words it needs. A set still being written can go in: students get what is written so far.">
             <CheckList
-              options={parts.map((r) => ({ id: r.id, title: r.label }))
-                .concat(pron.length ? [{ id: "builtin:pronouns", title: "Pronouns" }] : [])}
+              options={parts.map((r): { id: string; title: string; note?: string; disabled?: boolean } =>
+                ({ id: r.id, title: r.label, note: ready.has(r.id) ? undefined : "Words still to write" }))
+                .concat(pronSet ? [{
+                  id: "builtin:pronouns",
+                  title: "Pronouns",
+                  /* Nothing to put in a deck until one is written: a deck
+                     holds the pronouns as their cards. */
+                  disabled: !pron.length,
+                  note: !pron.length
+                    ? "None written yet"
+                    : pronSet.written < pronSet.total
+                      ? `${pronSet.written} of ${plural(pronSet.total, "pronoun")} written`
+                      : undefined,
+                }] : [])}
               chosen={picked.parts.concat(picked.pronouns ? ["builtin:pronouns"] : [])}
               onToggle={(id: string) =>
                 setAdding(id === "builtin:pronouns"
@@ -7359,6 +8476,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     );
   };
 
+  if (wordSets && !openDeck) return wordSetsScreen();
+
   /* ---- an open deck takes over the screen, showing its cards the same
          way the Cards tab does ---- */
   if (openDeck) {
@@ -7375,7 +8494,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
     const held = deckView ? deckView.held : [];
     const mine = deckView ? deckView.mine : [];
     const langId = (langOfDeck(d) || {}).id || d.lang;
-    /* The deck's built-in numbers, a range to an entry, ahead of its cards
+    /* The deck's number ranges, word sets, a range to an entry, ahead of its cards
        — the pronouns are already one entry among them. */
     const numberEntries: NumberPart[] = numberPartsOf(langId)
       .filter((r) => partsNow(d.parts || []).includes(r.id))
@@ -7388,7 +8507,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
       <div className="at-minicard">
         <div className="at-minikind">Numbers</div>
         <div className="ar">{n.label}</div>
-        <div className="at-minimeta"><span className="at-statusbadge">Built-in</span></div>
+        <div className="at-minimeta"><span className="at-statusbadge">Word set</span></div>
         {extra ? <div className="at-miniacts">{extra}</div> : null}
       </div>
     );
@@ -7509,6 +8628,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               { label: "Add to another deck", onClick: () => setCardAction("add") },
               { label: "Add tags", onClick: () => setTagAction("add") },
               { label: "Remove tags", onClick: () => setTagAction("remove") },
+              { label: "Change status", onClick: () => setStatusAction({ to: null }) },
               { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(realIds(picked)) },
               {
                 label: "Delete",
@@ -7529,6 +8649,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
           {exportScreen}
           {importScreen}
           {tagAction && tagActionScreen()}
+          {statusAction && statusActionScreen()}
           {cardsConfirm}
         </Screen>
       );
@@ -7612,8 +8733,16 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     <Icon name="download" />
                   </Button>
                 </span>
+                {/* The language, then what the deck holds on a line of its own,
+                    and, only when some of it sends students nothing, why
+                    (0.563). */}
                 <span className="at-formrole">
-                  {(langOfDeck(d) || {}).name} · {deckSize(d, held.length)}
+                  <span className="at-formline">{(langOfDeck(d) || {}).name}</span>
+                  <span className="at-formline">{deckSize(d, held.length)}</span>
+                  {(() => {
+                    const off = notReaching(d, held);
+                    return off ? <span className="at-formline at-notreach">{off.long}</span> : null;
+                  })()}
                 </span>
               </div>
               <fieldset className="at-cardlock" disabled={!editing}
@@ -7630,6 +8759,9 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                 {/* Which courses carry it, as a card says which decks it
                     is in: the names, each with its way out, and the way to
                     add another on the end of the row. */}
+                {/* A My space deck is in no course; in their place, whether its
+                    owner practises it (0.545, 59b, 61a). */}
+                {d.personal ? null : (
                 <Field label="Courses" lede="Students in these courses see this deck.">
                   {!shown.courses.length ? (
                     <Nudge
@@ -7677,8 +8809,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     />
                   )}
                 </Field>
+                )}
 
               </fieldset>
+
+              {(d.parts || []).length ? <NumbersFrom deckId={d.id} /> : null}
 
               {/* The whole deck, whatever the list below is showing: what a
                   deck covers is a fact about the deck, not about the cards
@@ -7686,16 +8821,56 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   in context is part of the same score, so it is read under
                   it rather than under a heading of its own. */}
               <Field label="Deck quality" lede={QUALITY_LEDE}>
-                {openQuality && <DeckQuality quality={openQuality} />}
-                <div className="at-mt4">
-                  <ContextReport cards={held} lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]} />
-                </div>
+                {openQuality && (
+                  <DeckQuality quality={openQuality} cards={held}
+                    lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]}
+                    onOpenCard={(id) => openCard(held.find((c) => String(c.id) === id))} />
+                )}
               </Field>
             </div>
 
-            {/* The cards, built-in ones among them, to read: which cards
+            {/* The cards, word sets among them, to read: which cards
                 the deck holds is changed on Manage cards. */}
             <Section title="Cards" lede={deckEmpty ? undefined : "Tap a card to see it."}>
+            {/* A word set the deck holds that is still being written
+                (0.569): what is missing, and the way straight to the set.
+                Students already get what is written, so it says so rather
+                than reading as a fault. Numbers drawn from another
+                teacher's are theirs to write, so no button then. */}
+            {(() => {
+              const notes: { key: string; text: string; open?: () => void }[] = [];
+              const waiting = (d.partsWaiting || []).filter((p) => (d.parts || []).includes(p)).length;
+              if (waiting) {
+                const ours = !d.numbersFrom || d.numbersFrom === account.handle;
+                notes.push({
+                  key: "numbers",
+                  text: `${waiting === 1 ? "A range" : `${waiting} ranges`} of numbers in this deck still ${waiting === 1 ? "needs its" : "need their"} words written. Students get the other ranges, and ${waiting === 1 ? "this one" : "these"} as soon as ${waiting === 1 ? "it is" : "they are"} written.`,
+                  open: ours ? () => setNumbering(langId) : undefined,
+                });
+              }
+              const lang = languages[langId];
+              const pron = pronounCardsOf(langId);
+              const total = lang && hasPronouns(lang) ? personsOf(verbOf(lang)).length : 0;
+              if (total > pron.length && pron.some((c) => (c.decks || []).includes(d.id))) {
+                const left = total - pron.length;
+                notes.push({
+                  key: "pronouns",
+                  text: `${plural(left, "pronoun")} still to write. Students get the ${plural(pron.length, "pronoun")} already written, and the rest as each is written.`,
+                  open: () => setPronouning(langId),
+                });
+              }
+              return notes.map((n) => (
+                <div className="at-mb3" key={n.key}>
+                  <Nudge
+                    icon={n.key === "numbers" ? "hash" : "person"}
+                    tone="attention"
+                    action={n.open ? <Button size="sm" icon="edit" onClick={n.open}>Write them</Button> : undefined}
+                  >
+                    {n.text}
+                  </Nudge>
+                </div>
+              ));
+            })()}
             <ItemList
               noun="card"
               items={listed}
@@ -7743,6 +8918,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         {cardAction === "add" && cardActionScreen(d.id)}
         {exportScreen}
         {tagAction && tagActionScreen()}
+        {statusAction && statusActionScreen()}
 
         {discardingDeck && (
           <ConfirmModal
@@ -7805,6 +8981,34 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
         )}
       </Field>
     );
+    /* A deck put in or taken out of this course. What the server saved
+       comes back with the answer — the deck's courses and the course's
+       decks — and is put on screen as it is, rather than fetching every
+       course, deck and card again: that fetch is what made each tap take
+       seconds. */
+    const toggleDeck = (id: string, on: boolean) => {
+      if (deckSaving[id]) return;
+      const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
+      setDeckSaving((now) => ({ ...now, [id]: on ? "drop" : "add" }));
+      run(
+        async () => {
+          const r: any = on ? await API.detachDeck(id, c.id) : await API.attachDeck(id, c.id);
+          const saved = r && r.deck;
+          if (saved && Array.isArray(saved.courses))
+            setDecks((prev) => prev.map((d) => (d.id === id ? { ...d, courses: saved.courses } : d)));
+          else await refresh(true);
+          if (r && r.course && Array.isArray(r.course.decks))
+            setCourses((prev) => prev.map((x) => (x.id === c.id ? { ...x, decks: r.course.decks } : x)));
+        },
+        on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
+      ).finally(() =>
+        setDeckSaving((now) => {
+          const next = { ...now };
+          delete next[id];
+          return next;
+        }),
+      );
+    };
     return (
       /* Laid out like a deck's screen — see .at-screen.cardform: one sheet
          ruled into sections, each headed at the editor's size with what it
@@ -7869,17 +9073,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
                   chosen={mine.map((d) => d.id)}
                   onOpen={(id) => setOpenDeck(id)}
-                  onToggle={(id, on) => {
-                    const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
-                    run(
-                      async () => {
-                        if (on) await API.detachDeck(id, c.id);
-                        else await API.attachDeck(id, c.id);
-                        await refresh();
-                      },
-                      on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
-                    );
-                  }}
+                  onToggle={toggleDeck}
+                  saving={deckSaving}
                   find={{
                     placeholder: "Search decks",
                     match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
@@ -7902,17 +9097,8 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                       decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
                       chosen={mine.map((d) => d.id)}
                       onOpen={(id) => setOpenDeck(id)}
-                      onToggle={(id, on) => {
-                        const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
-                        run(
-                          async () => {
-                            if (on) await API.detachDeck(id, c.id);
-                            else await API.attachDeck(id, c.id);
-                            await refresh();
-                          },
-                          on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
-                        );
-                      }}
+                      onToggle={toggleDeck}
+                      saving={deckSaving}
                       find={{
                         placeholder: "Search decks",
                         match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
@@ -7938,16 +9124,25 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
   return (
     <SpaceFrame
+      space="Teaching"
       tabs={[
         ["courses", "Courses", "school"],
-        ["decks", "Decks", "folder"],
-        ["cards", "Cards", "cards"],
+        /* Material is the space's decks and cards, My space the teacher's
+           own (0.550): the same lists, one side each. Decks and Cards are
+           chosen inside each. */
+        ["material", "Material", "folder"],
+        ["myspace", "My space", "person"],
         /* In context is hidden for now, on the owner's word, and comes
            back later; what it shows is still built when it is asked for. */
         ...(SHOW_IN_CONTEXT ? [["context", "In context", "search"] as [string, string, string]] : []),
       ]}
-      tab={tab}
-      onTab={setTab}
+      tab={tab === "decks" || tab === "cards" ? (mineSide ? "myspace" : "material") : tab}
+      onTab={(k: string) => {
+        if (k === "material" || k === "myspace") {
+          setSide(k === "myspace" ? "mine" : "space");
+          if (tab !== "decks" && tab !== "cards") setTab("decks");
+        } else setTab(k);
+      }}
       error={error}
       busy={busy}
     >
@@ -7956,6 +9151,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               true of the space rather than of whichever list is on screen —
               and a teacher who has just written a card on a train should
               see that it is still coming however far down a list they are. */}
+          {lastDropped && lastDropped.length > 0 && (
+            <TopBanner
+              kind="error"
+              actions={<Button size="sm" variant="ghost" onClick={() => setLastDropped(null)}>Dismiss</Button>}
+            >
+              {`Not sent, and discarded: ${lastDropped.map((d) => `${d.name} (${API.explain(new Error(d.msg))})`).join("; ")}`}
+            </TopBanner>
+          )}
           {kept > 0 && (
             <TopBanner>
               {`${plural(kept, "card")} saved on this device, waiting for a connection. `}
@@ -8032,6 +9235,20 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
           {tab === "cards" && (
             <>
+              {/* Decks or Cards, inside Material and My space (0.550): the card
+                  screen's own tab row. */}
+              <Tabs
+                tabs={[["decks", "Decks", "folder"], ["cards", "Cards", "cards"]]}
+                value={tab}
+                onChange={setTab}
+                label="Decks or cards"
+              />
+              {/* Which of the two you are in, in one line (0.551). */}
+              <Help className="at-mb3">
+                {mineSide
+                  ? "Only you see these. Copy or move them to the space when they're ready."
+                  : `${spaceName}'s decks and cards, shared with its teachers.`}
+              </Help>
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
                   <LanguageRadio
@@ -8058,65 +9275,6 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                       }}
                     >
                       Next
-                    </Button>
-                  </div>
-                </Screen>
-              )}
-
-              {/* Which language's numbers, where the teacher has more than
-                  one that builds them. The same two-step the New card
-                  button takes, through the same control: the words are a
-                  fact about one language and nothing on the screen could
-                  work out which. */}
-              {pronounLang !== null && (
-                <Screen title="Pronouns" onBack={() => setPronounLang(null)}>
-                  <LanguageRadio
-                    languages={Object.fromEntries(pronounLangsOn.map((id) => [id, taught[id]]))}
-                    value={pronounLang}
-                    onChange={setPronounLang}
-                    label="Which language's pronouns?"
-                  />
-                  <div className="at-row at-mt5">
-                    <Button variant="ghost" onClick={() => setPronounLang(null)}>
-                      Cancel
-                    </Button>
-                    <Button variant="primary"
-                      disabled={!pronounLang}
-                      onClick={() => {
-                        setPronouning(pronounLang);
-                        setPronounLang(null);
-                      }}
-                    >
-                      Next
-                    </Button>
-                  </div>
-                </Screen>
-              )}
-
-              {numberLang !== null && (
-                <Screen title="Numbers" onBack={() => setNumberLang(null)}>
-                  <LanguageRadio
-                    languages={Object.fromEntries(numberLangsOn.map((id) => [id, taught[id]]))}
-                    value={numberLang}
-                    onChange={setNumberLang}
-                    label="Which language's numbers?"
-                  />
-                  <Help>
-                    Each language builds its numbers out of its own words, so they are filled
-                    in one language at a time.
-                  </Help>
-                  <div className="at-row at-mt5">
-                    <Button variant="ghost" onClick={() => setNumberLang(null)}>
-                      Cancel
-                    </Button>
-                    <Button variant="primary"
-                      disabled={!numberLang}
-                      onClick={() => {
-                        setNumbering(numberLang);
-                        setNumberLang(null);
-                      }}
-                    >
-                      Open them
                     </Button>
                   </div>
                 </Screen>
@@ -8153,6 +9311,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
               {cardAction && cardActionScreen()}
               {tagAction && tagActionScreen()}
+              {statusAction && statusActionScreen()}
 
 
               {/* What is waiting on the teacher: sentences nobody has read
@@ -8206,6 +9365,19 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
               <Help>
                 A card is one thing to learn — a word, a phrase, a sentence. Add it to a deck so students get it.
               </Help>
+              {/* Word sets (0.569): one row, however many sets there are,
+                  opening the screen that lists them. Above the cards
+                  because it is where a teacher already looks, and one line
+                  so it never pushes the cards down. */}
+              {wordSetLangsOn.length ? (
+                <div className="at-mb3">
+                  <OpenRow
+                    title="Word sets"
+                    meta={wordSetNames(wordSetLangsOn)}
+                    onOpen={() => setWordSets(true)}
+                  />
+                </div>
+              ) : null}
 
               <ItemList
                 noun="card"
@@ -8215,46 +9387,10 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     ? null
                     : `${shownCards.length} of ${plural(onCards.length, "card")}`
                 }
-                /* Numbers are written a set at a time rather than a card
-                   at a time, so they get their own screen off the toolbar
-                   — beside the search rather than in the list, because it
-                   is a different way in to the same cards and not a card
-                   in it. Icon alone: the row is narrow on a phone and the
-                   word is on the screen it opens. */
-                tools={
-                  <>
-                  <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />
-                  {numberLangsOn.length || pronounLangsOn.length ? (
-                    <>
-                      {numberLangsOn.length ? (
-                        <IconButton
-                          icon="hash"
-                          label="Numbers"
-                          onClick={() =>
-                            numberLangsOn.length === 1
-                              ? setNumbering(numberLangsOn[0])
-                              : setNumberLang(numberLangsOn[0])
-                          }
-                        />
-                      ) : null}
-                      {/* Pronouns, beside Numbers and for the same reason:
-                          a fixed set written once per language, rather
-                          than a card at a time. */}
-                      {pronounLangsOn.length ? (
-                        <IconButton
-                          icon="person"
-                          label="Pronouns"
-                          onClick={() =>
-                            pronounLangsOn.length === 1
-                              ? setPronouning(pronounLangsOn[0])
-                              : setPronounLang(pronounLangsOn[0])
-                          }
-                        />
-                      ) : null}
-                    </>
-                  ) : null}
-                  </>
-                }
+                /* Numbers and pronouns used to have an icon each here; they
+                   are word sets now, reached from the row above the list
+                   (0.569). */
+                tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
                 menus={cardMenus}
                 searchBelow
                 size="small"
@@ -8300,6 +9436,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                   { label: "Remove from a deck", onClick: () => setCardAction("remove") },
                   { label: "Add tags", onClick: () => setTagAction("add") },
                   { label: "Remove tags", onClick: () => setTagAction("remove") },
+                  { label: "Change status", onClick: () => setStatusAction({ to: null }) },
                   { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(pickedIds(picked)) },
                   {
                     label: "Delete",
@@ -8359,6 +9496,60 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
 
           {tab === "decks" && (
             <>
+              {toSpace && (
+                <ConfirmModal
+                  title={`${toSpace.move ? "Move" : "Copy"} ${toSpace.deck.title} to ${spaceName}?`}
+                  confirmLabel={toSpace.move ? "Move it" : "Copy it"}
+                  danger={false}
+                  busy={busy}
+                  body={
+                    <>
+                      <p>
+                        {toSpace.move
+                          ? "The deck and your cards in it become the space's. Nothing stays in My space."
+                          : "A new deck of the space is made, with copies of your cards. The copy and this deck won't stay in sync."}
+                      </p>
+                      {courses.filter((c: any) => c.teaching || account.admin || account.orgAdmin).length ? (
+                        <CheckList
+                          options={courses
+                            .filter((c: any) => c.teaching || account.admin || account.orgAdmin)
+                            .map((c) => ({ id: c.id, title: c.title }))}
+                          chosen={toCourses}
+                          onToggle={(id: string, wasOn: boolean) =>
+                            setToCourses((prev) => (wasOn ? prev.filter((x) => x !== id) : prev.concat([id])))}
+                        />
+                      ) : null}
+                      <Help>Tick the courses to put it in, or none for now.</Help>
+                    </>
+                  }
+                  onCancel={() => {
+                    setToSpace(null);
+                    setToCourses([]);
+                  }}
+                  onConfirm={() =>
+                    run(async () => {
+                      await API.copyToSpace(toSpace.deck.id, toSpace.move, toCourses);
+                      setToSpace(null);
+                      setToCourses([]);
+                      await refresh();
+                    })
+                  }
+                />
+              )}
+              {/* Decks or Cards, inside Material and My space (0.550): the card
+                  screen's own tab row. */}
+              <Tabs
+                tabs={[["decks", "Decks", "folder"], ["cards", "Cards", "cards"]]}
+                value={tab}
+                onChange={setTab}
+                label="Decks or cards"
+              />
+              {/* Which of the two you are in, in one line (0.551). */}
+              <Help className="at-mb3">
+                {mineSide
+                  ? "Only you see these. Copy or move them to the space when they're ready."
+                  : `${spaceName}'s decks and cards, shared with its teachers.`}
+              </Help>
               {deckAction && (
                 <Screen
                   title={
@@ -8453,6 +9644,20 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                     ? "No decks in the languages switched on."
                     : "No decks yet. Make one, then add it to a course so students can see it."
                 }
+                /* With no decks at all, the same prompt the Cards tab shows
+                   with no cards, in place of an empty list. */
+                emptyPanel={decks.length ? undefined : (
+                  <Nudge
+                    icon="folder"
+                    action={
+                      <Button variant="primary" icon="add" onClick={() => setNaming("new")}>
+                        New deck
+                      </Button>
+                    }
+                  >
+                    No decks yet. A deck is a set of cards. Make your first one, then add it to a course so students can see it.
+                  </Nudge>
+                )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
                 tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
                 onNew={() => setNaming("new")}
@@ -8505,6 +9710,11 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                         <>
                           <LockMark locked={d.locked && DECK_LOCKS} />
                           {`${(langOfDeck(d) || { name: "" }).name} · ${deckSize(d)}${deckWaiting(d)}`}
+                          {(() => {
+                            /* Its cards that send students nothing yet (0.563). */
+                            const off = notReaching(d, (d.cardIds || []).map((id) => cardById.get(id)).filter(Boolean) as Card[]);
+                            return off ? <span className="at-notreach">{` · ${off.short}`}</span> : null;
+                          })()}
                           <QualityMark quality={qualities.get(d.id)} />
                           {(() => {
                             /* How many of its cards have a recording the
@@ -8522,6 +9732,19 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                               e.stopPropagation();
                               exportDecks([d.id]);
                             }} />
+                          {/* A My space deck into the space (0.549; 2a, 9b, 10a). */}
+                          {d.personal && !personalOnly && (
+                            <>
+                              <IconButton icon="copy" label="Copy to the space" onClick={(e: React.MouseEvent) => {
+                                e.stopPropagation();
+                                setToSpace({ deck: d, move: false });
+                              }} />
+                              <IconButton icon="upload" label="Move to the space" onClick={(e: React.MouseEvent) => {
+                                e.stopPropagation();
+                                setToSpace({ deck: d, move: true });
+                              }} />
+                            </>
+                          )}
                           <IconButton icon="delete" label="Delete deck" danger onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
                               if (d.locked && DECK_LOCKS) {
@@ -8534,11 +9757,14 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                                 confirmLabel: "Delete the deck",
                                 confirmWord: d.title,
                                 body: (
-                                  <p>
-                                    Its {plural(d.cardCount || 0, "card")} go with
-                                    it, out of every course and out of the apps of everyone
-                                    studying it. There is no undoing this.
-                                  </p>
+                                  <>
+                                    {d.owner !== account.handle ? <OthersWork name={(d as any).ownerName} what="deck" /> : null}
+                                    <p>
+                                      Its {plural(d.cardCount || 0, "card")} go with
+                                      it, out of every course and out of the apps of everyone
+                                      studying it. There is no undoing this.
+                                    </p>
+                                  </>
                                 ),
                                 action: () => API.deleteDeck(d.id),
                               });
@@ -8546,6 +9772,12 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                         </>
                       }
                       footer={
+                        d.personal ? (
+                          /* My space (0.545, 59b): whether you practise it. */
+                          <TileNote live={d.practise !== false}>
+                            {d.practise !== false ? "Practised in your Learning" : "Not practised"}
+                          </TileNote>
+                        ) : (
                         <TileNote live={live}>
                           {live ? (
                             <>
@@ -8557,6 +9789,7 @@ export function TeachSpace({ account, languages, settings, langsOff, onLangChoic
                             <>Not in a course yet — nobody can see it</>
                           )}
                         </TileNote>
+                        )
                       }
                     />
                   );
@@ -8594,37 +9827,55 @@ export function StudentCourses({
   onJoin,
   onRefresh,
   onPractise,
+  spaces,
+  mySpaceIds,
 }: {
   courses: Course[];
+  /** Every space the account is in, to say so when a code joins another. */
+  mySpaceIds?: string[];
+  /** Your spaces, when Learning shows more than one: the courses go under
+      a heading per space (memberships). */
+  spaces?: { id: string; name: string }[];
   decks: (Deck & { courseId: string, courseTitle?: string })[];
   languages: Record<LangId, Lang>;
   busy?: boolean;
   error?: Node;
-  onJoin: (code: string) => Promise<any>;
+  /** Not given while the super admin tries a space (0.574): no joining. */
+  onJoin?: (code: string) => Promise<any>;
   onRefresh?: () => void;
   onPractise: (deckTitle: string) => void;
 }) {
   const [note, setNote] = useState("");
+  const groups = spaces && spaces.length > 1
+    ? spaces.map((o) => ({ key: o.id, title: o.name, courses: courses.filter((c) => (c as any).org === o.id) }))
+    : undefined;
   return (
     <CoursesPage
       courses={courses}
+      groups={groups}
       languages={languages}
       busy={busy}
       error={error}
       lead="Open a course to see its decks."
-      emptyLead="You're not in a course yet. Enter the code your teacher gave you below."
+      emptyLead={onJoin ? "You're not in a course yet. Enter the code your teacher gave you below." : "There are no courses here yet."}
       joinTitle="Join a course"
       joinHint="Enter the code your teacher gave you."
       joinPlaceholder="Course code"
       joinNote={note}
-      onJoin={async (code) => {
+      onJoin={onJoin && (async (code) => {
         try {
           const r = await onJoin(code);
-          setNote(r && r.course ? `Joined ${r.course.title}.` : "Joined.");
+          setNote(
+            r && r.course
+              ? r.space && mySpaceIds && mySpaceIds.length && !mySpaceIds.includes(r.space.id)
+                ? `Joined ${r.course.title}, in ${r.space.name}.`
+                : `Joined ${r.course.title}.`
+              : "Joined."
+          );
         } catch (e) {
           setNote(API.explain(e));
         }
-      }}
+      })}
       renderCourse={(c) => {
         const mine = decks.filter((d) => d.courseId === c.id);
         return (
@@ -8662,3 +9913,1090 @@ export function StudentCourses({
     />
   );
 }
+
+/*
+ * Whose numbers a deck's number parts use (0.541).
+ *
+ * Saved as soon as it is chosen, like a deck's parts: it is not part of the
+ * deck's Edit, because it changes what students hear rather than what the
+ * deck is called. Shown only on a deck that holds number parts.
+ */
+function NumbersFrom({ deckId }: { deckId: string }) {
+  const [sources, setSources] = useState<{ handle: string; displayName: string }[] | null>(null);
+  const [chosen, setChosen] = useState("");
+  const [error, setError] = useState("");
+  useEffect(() => {
+    let live = true;
+    API.numberSources(deckId).then(
+      (r) => {
+        if (!live) return;
+        setSources(r.sources);
+        setChosen(r.chosen);
+      },
+      (e) => live && setError(API.explain(e)),
+    );
+    return () => {
+      live = false;
+    };
+  }, [deckId]);
+  if (error) return <Notice kind="error">{error}</Notice>;
+  if (!sources || !sources.length) return null;
+  return (
+    <Field label="Numbers from" lede="Whose numbers and recordings this deck's students practise.">
+      <RadioGroup
+        name={`numbers-from-${deckId}`}
+        label="Numbers from"
+        quiet
+        value={chosen}
+        options={sources.map((x) => ({ value: x.handle, label: x.displayName }))}
+        onChange={async (h) => {
+          const was = chosen;
+          setChosen(h);
+          try {
+            await API.setDeckNumbers(deckId, h);
+          } catch (e) {
+            setChosen(was);
+            setError(API.explain(e));
+          }
+        }}
+      />
+    </Field>
+  );
+}
+
+/** The space a refused key or code belongs to, when the server said so (53b). */
+function otherSpace(e: unknown): API.OrgCard | null {
+  const err = e as { message?: string; data?: { space?: API.OrgCard } } | null;
+  return err && err.message === "other-space" && err.data && err.data.space ? err.data.space : null;
+}
+
+/* ------------------------------------------------------------------
+   Spaces, for the App admin (0.543; docs/PLAN-spaces.md, B7 stage 3)
+
+   Every space: create one with its first space admin, change its name,
+   address, logo and colour, choose its admins, close and reopen it, or
+   delete it for good. Built from the screens the rest of Admin uses: tiles
+   for the list, a Screen for one space, ConfirmModal for anything that
+   can't be taken back.
+   ------------------------------------------------------------------ */
+function SpacesTab() {
+  const [orgs, setOrgs] = useState<API.OrgRow[] | null>(null);
+  const { run: runIt, busy, error, setError } = useRun({ refresh: () => load(), quietDone: true });
+  const [openId, setOpenId] = useState<string | null>(null);
+  const [making, setMaking] = useState<{ name: string; slug: string; adminName: string; self: boolean } | null>(null);
+  const [made, setMade] = useState<{ name: string; admin: string; key: string; slug: string } | null>(null);
+  const [restoringAny, setRestoringAny] = useState(false);
+  /* Whether it worked, which a dialog waits on before it closes. */
+  const run = async (work: () => Promise<unknown>, said?: string) =>
+    (await runIt(async () => {
+      await work();
+      return true;
+    }, said)) === true;
+  const { setConfirm, modal: dialog } = useConfirm(run, {
+    busy,
+    after: (p) => {
+      if (p.closeAfter) setOpenId(null);
+    },
+  });
+
+  const load = useCallback(async () => {
+    try {
+      setOrgs((await API.adminOrgs()).orgs);
+    } catch (e) {
+      setError(API.explain(e));
+    }
+  }, [setError]);
+  useEffect(() => {
+    load();
+  }, [load]);
+
+
+  const open = orgs && openId ? orgs.find((o) => o.id === openId) || null : null;
+
+  /* A space's file, for a space that may no longer exist (0.583): the
+     file says which space it is. */
+  if (restoringAny) {
+    return (
+      <BackupFlow
+        mode="restore"
+        door={{ kind: "space" }}
+        stem="space"
+        onClose={() => {
+          setRestoringAny(false);
+          load();
+        }}
+      />
+    );
+  }
+
+  if (making) {
+    return (
+      <Screen
+        title="New space"
+        onBack={() => setMaking(null)}
+        action={
+          <Button variant="primary" size="sm" icon="check"
+            disabled={busy || !making.name.trim() || !making.slug.trim() || (!making.self && !making.adminName.trim())}
+            onClick={() =>
+              run(async () => {
+                const r = await API.createOrg(making.name.trim(), making.slug.trim().toLowerCase(),
+                  making.self ? "" : making.adminName.trim(), "", "", making.self);
+                /* No key to show when you are its admin yourself (0.552). */
+                setMade(r.key ? { name: r.org.name, admin: r.admin.displayName, key: r.key, slug: r.org.slug } : null);
+                setMaking(null);
+              }, `${making.name.trim()} created`)
+            }
+          >
+            {busy ? "Saving…" : "Create"}
+          </Button>
+        }
+      >
+        <Notice kind="error">{error}</Notice>
+        <Field label={<>Name <span className="req">required</span></>}>
+          <input className="at-input" placeholder="Lingua Academy" value={making.name} autoFocus
+            onChange={(e) => setMaking({ ...making, name: e.target.value })} />
+        </Field>
+        <Field label={<>Address <span className="req">required</span></>}>
+          <AddressInput placeholder="lingua-academy" value={making.slug}
+            onChange={(slug) => setMaking({ ...making, slug })} />
+        </Field>
+        <Help>An address can be changed later, and the old one keeps working. Once used, it is never given to another space.</Help>
+        {/* You as its admin (0.552), so running a new space needs no second
+            account. Others can be made its admins later, from the space. */}
+        <RadioGroup
+          name="new-space-admin"
+          label="Its first space admin"
+          value={making.self ? "me" : "new"}
+          onChange={(v) => setMaking({ ...making, self: v === "me" })}
+          options={[
+            { value: "me", label: "I'll be this space's admin" },
+            { value: "new", label: "Create a new admin account" },
+          ]}
+        />
+        {!making.self && (
+          <Field label={<>Their name <span className="req">required</span></>} lede="Their account is made in the new space, and you'll be shown their sign-in key to hand over.">
+            <input className="at-input" placeholder="Their name" value={making.adminName}
+              onChange={(e) => setMaking({ ...making, adminName: e.target.value })} />
+          </Field>
+        )}
+      </Screen>
+    );
+  }
+
+  if (open) return <SpaceScreen org={open} busy={busy} error={error} dialog={dialog}
+    onBack={() => setOpenId(null)} run={run} ask={setConfirm} />;
+
+  return (
+    <>
+      {dialog}
+      <Notice kind="error">{error}</Notice>
+      <div className="at-row" style={{ marginBottom: 14 }}>
+        <Button variant="primary" icon="add"
+          onClick={() => setMaking({ name: "", slug: "", adminName: "", self: true })}>
+          New space
+        </Button>
+        <Button variant="ghost" icon="refresh" onClick={() => setRestoringAny(true)}>
+          Restore a space from a file
+        </Button>
+      </div>
+      {made && (
+        <div className="at-sub">
+          <CodeBox label={`Sign-in key for ${made.admin}, space admin of ${made.name}`} code={made.key} />
+          <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
+            <Button variant="ghost" size="sm" onClick={() => setMade(null)}>Done</Button>
+          </div>
+          <Help>
+            Send it to them through something private, with the address manytongues.co/{made.slug}.
+            You won't see it again, but you can issue another.
+          </Help>
+        </div>
+      )}
+      {/* The library's list, with its search (0.580). */}
+      {orgs && (
+        <ItemList
+          noun="space"
+          items={orgs}
+          itemKey={(o) => o.id}
+          match={(o, q) => `${o.name} ${o.slug}`.toLowerCase().includes(q)}
+          empty="No spaces match."
+          renderItem={(o) => (
+          <Tile key={o.id}
+            title={o.name}
+            meta={`manytongues.co/${o.slug} · ${plural(o.people.length, "person")}`}
+            onOpen={() => setOpenId(o.id)}
+            /* Open goes into the space itself, as its admin sees it (0.552);
+               the tile still opens its settings. */
+            actions={o.archived ? null : (
+              <Button size="sm" variant="ghost"
+                onClick={(e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  window.location.assign(`/${o.slug}?open=admin`);
+                }}>
+                Open
+              </Button>
+            )}
+            footer={o.archived ? <TileNote>Closed</TileNote> : null}
+          />
+          )}
+        />
+      )}
+    </>
+  );
+}
+
+/*
+ * A space's address as one line (0.560): the fixed part of it, then the
+ * box the space's own part is typed in, so what is typed is read as the
+ * whole address it makes.
+ */
+function AddressInput({ value, onChange, placeholder }: {
+  value: string;
+  onChange: (slug: string) => void;
+  placeholder?: string;
+}) {
+  return (
+    <label className="at-input at-addrinput">
+      <span className="at-addrpre" aria-hidden="true">manytongues.co/</span>
+      <input
+        aria-label="Address, after manytongues.co/"
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value.toLowerCase().replace(/\s+/g, "-"))}
+      />
+    </label>
+  );
+}
+
+/* One space, as the App admin manages it. */
+function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
+  org: API.OrgRow;
+  busy: boolean;
+  error: string;
+  dialog: React.ReactNode;
+  onBack: () => void;
+  run: (work: () => Promise<unknown>, said?: string) => Promise<boolean>;
+  ask: (p: Pending) => void;
+}) {
+  /* Read until Edit, as a deck is (0.559): the draft is what Edit opened
+     with, and nothing reaches the server until Save. */
+  type SpaceDraft = { name: string; slug: string; colour: string };
+  const [draft, setDraft] = useState<SpaceDraft | null>(null);
+  const [picking, setPicking] = useState(false);
+  const snack = useSnackbar();
+  const editing = !!draft;
+  const saved: SpaceDraft = { name: org.name, slug: org.slug, colour: org.colour || "" };
+  const shown = draft || saved;
+  const edit = (change: Partial<SpaceDraft>) => setDraft((d) => ({ ...(d || saved), ...change }));
+  const changed = !!draft && (draft.name.trim() !== org.name || draft.slug.trim() !== org.slug || draft.colour !== (org.colour || ""));
+  if (picking) {
+    return (
+      <ImageScreen
+        title={`${org.name}'s logo`}
+        images={org.logo ? [org.logo] : []}
+        onChange={(next) => run(() => API.updateOrg(org.id, { logo: next[next.length - 1] || "" }), "Logo saved")}
+        onClose={() => setPicking(false)}
+      />
+    );
+  }
+  const admins = new Set(org.admins || []);
+  return (
+    /* Laid out like a deck's screen (0.559): read first, Edit and Save
+       floating in the corner, the cross asking before anything is lost. */
+    <Screen
+      title={editing ? "Edit space" : "Space"}
+      scrollKey={org.id}
+      className="cardform"
+      onBack={
+        editing
+          ? () => (changed
+            ? ask({
+              title: "Discard your changes?",
+              confirmLabel: "Discard",
+              body: <p>What you changed about {org.name} hasn't been saved.</p>,
+              action: async () => setDraft(null),
+            })
+            : setDraft(null))
+          : onBack
+      }
+      backIcon={editing ? "close" : "back"}
+      backLabel={editing ? "Cancel" : "Back"}
+      fab={
+        editing
+          ? {
+            icon: "save",
+            label: "Save",
+            off: !changed || !shown.name.trim(),
+            busy,
+            onClick: async () => {
+              if (busy || !draft) return;
+              if (!changed) return snack("No changes to save.");
+              if (!draft.name.trim()) return snack("Some required fields are missing. They're marked with *.", "warn");
+              const ok = await run(() => API.updateOrg(org.id, {
+                name: draft.name.trim(),
+                ...(draft.slug.trim() !== org.slug ? { slug: draft.slug.trim().toLowerCase() } : {}),
+                colour: draft.colour,
+              }), "Saved");
+              if (ok) setDraft(null);
+            },
+          }
+          : { icon: "edit", label: "Edit", onClick: () => setDraft(saved) }
+      }
+    >
+      {dialog}
+      <Notice kind="error">{error}</Notice>
+      {org.archived ? <Notice kind="warn">This space is closed. Its people can't sign in.</Notice> : null}
+      {/* The space's own facts, headed the way a deck heads "This deck".
+          Read, they are the edit's own controls held still. */}
+      <div className="at-formblock">
+        <div className="at-formhead">
+          <span className="at-formnum">About this space</span>
+        </div>
+        <fieldset className="at-cardlock" disabled={!editing}>
+          <Field label={<>Name<span className="at-reqstar" aria-hidden="true" /></>}>
+            <input className="at-input" value={shown.name} onChange={(e) => edit({ name: e.target.value })} />
+          </Field>
+          <Field label="Address">
+            {editing ? (
+              <AddressInput value={shown.slug} onChange={(slug) => edit({ slug })} />
+            ) : (
+              <p className="at-readvalue">manytongues.co/{shown.slug}</p>
+            )}
+            {org.formerSlugs.length ? (
+              <Help>Still answers to {org.formerSlugs.map((x) => `/${x}`).join(", ")}</Help>
+            ) : null}
+          </Field>
+          <Field label="Logo" lede="Shown on the space's sign-in page and at the top of the You menu.">
+            {editing ? (
+              <Button size="sm" icon="image" onClick={() => setPicking(true)}>{org.logo ? "Change the logo" : "Add a logo"}</Button>
+            ) : (
+              <p className="at-readvalue">{org.logo ? "Set" : "None"}</p>
+            )}
+          </Field>
+          <Field label="Colour" lede="Used on the space's sign-in page only.">
+            {editing ? (
+              <>
+                <input type="color" value={shown.colour || "#3b5bdb"} onChange={(e) => edit({ colour: e.target.value })} />
+                {shown.colour ? <Button variant="ghost" size="sm" onClick={() => edit({ colour: "" })}>No colour</Button> : null}
+              </>
+            ) : (
+              <p className="at-readvalue">
+                {shown.colour ? (
+                  <>
+                    <span aria-hidden="true" style={{ display: "inline-block", width: 14, height: 14, borderRadius: 4, background: shown.colour, verticalAlign: "-2px", marginInlineEnd: 6 }} />
+                    {shown.colour}
+                  </>
+                ) : "None"}
+              </p>
+            )}
+            {shown.colour && !usableAccent(shown.colour) ? (
+              <Help>This colour is too faint to use; the app's own will be shown.</Help>
+            ) : null}
+          </Field>
+        </fieldset>
+      </div>
+      <Section title="Invite people">
+      <CodeBox long label="Invitation link" hint="Anyone with it can make an account in this space."
+        code={`${window.location.origin}/${org.slug}?join=${org.inviteCode}`} />
+      </Section>
+      <Section title="Space admins" lede="They run this space: its courses, its people, its reports.">
+        {org.people.length === 0 ? <Help>Nobody is in this space yet.</Help> : null}
+        {org.people.map((p) => (
+          <Tile key={p.handle}
+            title={p.displayName}
+            meta={admins.has(p.handle) ? "Space admin" : p.handle}
+            actions={
+              admins.has(p.handle) ? (
+                <Button variant="ghost" size="sm" disabled={busy}
+                  onClick={() => run(() => API.orgAdmins(org.id, { remove: p.handle }), `${p.displayName} is no longer a space admin`)}>
+                  Remove as admin
+                </Button>
+              ) : (
+                <Button variant="ghost" size="sm" disabled={busy}
+                  onClick={() => run(() => API.orgAdmins(org.id, { add: p.handle }), `${p.displayName} is now a space admin`)}>
+                  Make space admin
+                </Button>
+              )
+            }
+          />
+        ))}
+      </Section>
+      <SpaceExtras org={org} />
+      {/* Main closes and goes like any other space (0.560); the server
+          refuses the one your own account is in. */}
+      <Section title="Closing">
+          <div className="at-row">
+            {org.archived ? (
+              <Button disabled={busy} onClick={() => run(() => API.archiveOrg(org.id, false), `${org.name} reopened`)}>
+                Reopen the space
+              </Button>
+            ) : (
+              <Button disabled={busy}
+                onClick={() => ask({
+                  title: `Close ${org.name}?`,
+                  confirmLabel: "Close the space",
+                  body: <p>Its people won't be able to sign in until you reopen it. Nothing is deleted.</p>,
+                  action: () => API.archiveOrg(org.id, true),
+                })}>
+                Close the space
+              </Button>
+            )}
+            <Button variant="danger" disabled={busy}
+              onClick={() => ask({
+                title: `Delete ${org.name} for good?`,
+                confirmLabel: "Delete the space",
+                confirmWord: org.name,
+                closeAfter: true,
+                body: (
+                  <>
+                    <p>
+                      Every account in it ({plural(org.people.length, "person")}), with their practice history, and every
+                      course, deck and card in it are deleted. Its address becomes free again.
+                    </p>
+                    <p>This can't be undone.</p>
+                  </>
+                ),
+                action: () => API.deleteOrg(org.id, org.name),
+              })}>
+              Delete the space
+            </Button>
+          </div>
+        </Section>
+    </Screen>
+  );
+}
+
+/*
+ * The space's invitation link, at the top of People (0.544, 37a): to copy
+ * and send, and to replace when it has gone somewhere it shouldn't.
+ */
+function InviteLink({ invite, busy, onReplace }: {
+  invite: { code: string; slug: string; name: string };
+  busy: boolean;
+  onReplace: () => void;
+}) {
+  /* The join codes' own box (0.549), laid out for something as long as a link. */
+  return (
+    <CodeBox
+      long
+      label="Invitation link"
+      hint={`Anyone with it can make an account in ${invite.name}. You then give them a role.`}
+      code={`${window.location.origin}/${invite.slug}?join=${invite.code}`}
+      busy={busy}
+      onNew={onReplace}
+    />
+  );
+}
+
+const FORMER_WHY: Record<string, string> = {
+  left: "Left",
+  removed: "Removed",
+  "deleted-self": "Deleted their account",
+  "deleted-by-admin": "Deleted by the app admin",
+};
+
+/*
+ * Former members (0.544; 25a, 30c, 67a, 31a): who left, was removed or was
+ * deleted, with what can still be done — reactivate a suspended account,
+ * hand someone's material to a teacher who is still here, and delete them
+ * for good (0.552): their account, everything they made here, and the entry.
+ */
+function FormerMembers({ former, people, busy, ask }: {
+  former: import("./types.ts").FormerMember[];
+  people: { handle: string; displayName: string }[];
+  busy: boolean;
+  ask: (p: Pending) => void;
+}) {
+  const [handingFrom, setHandingFrom] = useState<string | null>(null);
+  const [heir, setHeir] = useState("");
+  return (
+    <Section head title="Former members" lede="People who left, were removed or were deleted.">
+      <ItemList
+        noun="former member"
+        items={former.slice().reverse()}
+        itemKey={(r) => r.handle}
+        match={(r, q) => `${r.displayName} ${r.handle}`.toLowerCase().includes(q)}
+        empty="Nobody matches."
+        renderItem={(r) => {
+        const suspended = r.why === "left" || r.why === "removed";
+        return (
+          <Tile key={r.handle}
+            title={r.displayName}
+            meta={`${FORMER_WHY[r.why] || r.why} · ${shortDate(r.left)} · joined ${shortDate(r.joined)}${
+              r.courses.length ? ` · was in ${r.courses.map((c) => c.title).join(", ")}` : ""}`}
+            actions={
+              <>
+                {suspended && (
+                  <Button size="sm" disabled={busy}
+                    onClick={() => ask({
+                      title: `Reactivate ${r.displayName}?`,
+                      confirmLabel: "Reactivate",
+                      body: <p>They can sign in again and are put back on the courses they were in.</p>,
+                      action: () => API.reactivateUser(r.handle),
+                    })}>
+                    Reactivate
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" disabled={busy}
+                  onClick={() => {
+                    setHeir("");
+                    setHandingFrom(r.handle);
+                  }}>
+                  Hand their material to…
+                </Button>
+                {/* Only for someone whose account is already gone (0.578):
+                    an account is deleted only from Super admin → People,
+                    never from here. This clears the entry and what of
+                    theirs is left in the space. */}
+                {!suspended && (
+                  <IconButton icon="delete" label="Delete permanently" danger
+                    onClick={() => ask({
+                      title: `Delete ${r.displayName} permanently?`,
+                      confirmLabel: "Delete permanently",
+                      body: (
+                        <p>
+                          Their account is already gone. This takes them off this list, and deletes any
+                          decks and cards of theirs still in this space. There is no undoing this.
+                        </p>
+                      ),
+                      action: () => API.purgeFormer(r.handle),
+                    })} />
+                )}
+              </>
+            }
+          />
+        );
+      }}
+      />
+      {handingFrom ? (
+        <ConfirmModal
+          title="Hand their material to…"
+          confirmLabel="Hand it over"
+          danger={false}
+          busy={busy || !heir}
+          body={
+            <RadioGroup
+              name="hand-over"
+              label="Who should own their decks and cards now"
+              value={heir}
+              onChange={setHeir}
+              options={people.map((p) => ({ value: p.handle, label: p.displayName }))}
+            />
+          }
+          onCancel={() => setHandingFrom(null)}
+          onConfirm={() => {
+            const from = handingFrom;
+            setHandingFrom(null);
+            ask({
+              title: "Hand it over?",
+              confirmLabel: "Hand it over",
+              danger: false,
+              body: <p>Every deck and card they made for the space becomes theirs to look after. Their numbers stay theirs.</p>,
+              action: () => API.handOver(from, heir),
+            } as Pending);
+          }}
+        />
+      ) : null}
+    </Section>
+  );
+}
+
+/* Deleting what somebody else made (0.544, 94a): said first, in so many words. */
+function OthersWork({ name, what }: { name?: string; what: "deck" | "card" }) {
+  return (
+    <Notice kind="warn">
+      {name ? `${name} made this ${what}.` : `Someone else made this ${what}.`} Deleting it removes it from
+      every course it's in, for every student. This can't be undone.
+    </Notice>
+  );
+}
+
+
+/*
+ * A space's storage figures, its backup and its restore (0.546; 60a, 63a;
+ * 0.583, docs/PLAN-space-backup.md): how much it holds, and the whole of it
+ * in one file — its people, courses, decks, cards, recordings and pictures,
+ * its members' My space here, and every member's practice — with the same
+ * choice of parts as the site's backup. Put back through the same engine as
+ * the site's, which never overwrites.
+ */
+function SpaceExtras({ org }: { org: API.OrgRow }) {
+  const [usage, setUsage] = useState<API.OrgUsage | null>(null);
+  const [flow, setFlow] = useState<"download" | "restore" | null>(null);
+  const [said, setSaid] = useState("");
+  useEffect(() => {
+    let live = true;
+    API.orgUsage(org.id).then((r) => live && setUsage(r.usage), () => {});
+    return () => {
+      live = false;
+    };
+  }, [org.id]);
+  const megabytes = usage ? (usage.bytes / (1024 * 1024)).toFixed(1) : "";
+  return (
+    <Section title="Storage and backup">
+      {usage ? (
+        <Help>
+          {plural(usage.people, "person")}, {plural(usage.courses, "course")}, {plural(usage.decks, "deck")},{" "}
+          {plural(usage.cards, "card")}, including everyone's My space here; {plural(usage.recordings, "recording")} and{" "}
+          {plural(usage.pictures, "picture")}, about {megabytes} MB. A recording used by two spaces counts in both.
+        </Help>
+      ) : null}
+      <div className="at-row">
+        <Button size="sm" icon="download" onClick={() => setFlow("download")}>
+          Back up this space
+        </Button>
+        <Button size="sm" variant="ghost" icon="refresh" onClick={() => setFlow("restore")}>
+          Restore this space from a file
+        </Button>
+      </div>
+      {said ? <Help>{said}</Help> : null}
+      {flow && (
+        <BackupFlow
+          mode={flow}
+          door={{ kind: "space", space: org.id, name: org.name }}
+          source={() => API.exportOrgManifest(org.id)}
+          stem={`space-${org.slug}`}
+          onClose={() => setFlow(null)}
+          onFinished={(p) =>
+            setSaid(p.state === "done" ? `Saved a backup of ${org.name}. ${p.note || ""}` : p.note || "")
+          }
+        />
+      )}
+    </Section>
+  );
+}
+
+/*
+ * Super admin · People (0.547; 6b, 7b): everyone in every space, under each
+ * space's name, with one search over all of them. A new key, suspending,
+ * reactivating and deleting work wherever the person is: each call is sent
+ * as from their space.
+ */
+type Person = User & { org: string; orgs?: string[]; suspendedIn?: Record<string, unknown>; suspendedApp?: unknown };
+
+function EveryonePeople({ me }: { me: string }) {
+  const [data, setData] = useState<{
+    orgs: API.SuperOrg[];
+    /* Every space each person is in, and their suspension in each
+       (memberships); `org` alone from an older server. */
+    people: Person[];
+  } | null>(null);
+  /* Adding an existing person to a space (memberships): who, and where. */
+  const [adding, setAdding] = useState<User | null>(null);
+  const [addTo, setAddTo] = useState("");
+  const [q, setQ] = useState("");
+  /* See useRun and useConfirm: a yes runs, then the list is read again. */
+  const { run, busy, setBusy, error, setError } = useRun({ refresh: () => load() });
+  const { setConfirm, modal: confirmModal } = useConfirm(run, { busy });
+  const [newKey, setNewKey] = useState<{ name: string; handle?: string; key: string } | null>(null);
+  /* Everyone once, or under each of their spaces (0.578). */
+  const [view, setView] = useState<"all" | "spaces">("all");
+  /* Taking one space away from someone (0.578): who, and which. */
+  const [removing, setRemoving] = useState<Person | null>(null);
+  const [removeFrom, setRemoveFrom] = useState("");
+  const load = useCallback(() => API.everyone().then((r) => setData(r), (e) => setError(API.explain(e))), [setError]);
+  useEffect(() => {
+    load();
+  }, [load]);
+  const needle = q.trim().toLowerCase();
+  const match = (u: User) => !needle || `${u.displayName} ${u.handle}`.toLowerCase().includes(needle);
+  /* Why someone is not using a space (memberships, 0.578): "suspended",
+     "removed", "left", or "" when they are. */
+  const whyIn = (u: Person, org: string): string => {
+    const was: any = u.suspendedIn ? u.suspendedIn[org] : u.org === org ? u.suspended : null;
+    return was ? String(was.why || "suspended") : "";
+  };
+  const spacesOf = (u: Person) => u.orgs || (u.org ? [u.org] : []);
+  const gone = (u: Person, org: string) => {
+    const why = whyIn(u, org);
+    return why === "removed" || why === "left";
+  };
+  /* The same actions in both views; `o` is the space a row is under, or
+     null in All. */
+  const actionsFor = (u: Person, o: API.SuperOrg | null) => {
+    const keyOrg = o ? o.id : spacesOf(u)[0];
+    const hereWhy = o ? whyIn(u, o.id) : "";
+    const others = u.handle !== me && !u.admin;
+    const removable = spacesOf(u).filter((id) => !gone(u, id));
+    const theirSpaces = spacesOf(u).map((id) => (data && data.orgs.find((x) => x.id === id)) || null).filter(Boolean) as API.SuperOrg[];
+    return (
+      <>
+        <PersonActions
+          person={u}
+          org={o}
+          keyOrg={keyOrg}
+          mayKey
+          /* Under a space, its own actions; in All, taking a space away
+             asks which, below. */
+          mayAct={others && !!o}
+          suspendable={!u.suspendedApp}
+          suspendedHere={!!o && (hereWhy === "suspended" || gone(u, o.id))}
+          removable={!!o && !gone(u, o.id)}
+          onConfirm={setConfirm}
+          onNewKey={setNewKey}
+        />
+        {/* Yourself too, as the super admin (0.575). */}
+        {(!u.admin || u.handle === me) && data && data.orgs.some((x) => !x.archived && !spacesOf(u).includes(x.id)) && (
+          <IconButton icon="add" label="Add to a space" onClick={() => {
+            setAddTo("");
+            setAdding(u);
+          }} />
+        )}
+        {others && !o && removable.length > 0 && (
+          <IconButton icon="close" label="Remove from a space" onClick={() => {
+            setRemoveFrom(removable.length === 1 ? removable[0] : "");
+            setRemoving(u);
+          }} />
+        )}
+        {/* Across the whole app (0.578): yours alone, to lift too. */}
+        {others && (u.suspendedApp ? (
+          <IconButton icon="unlock" label="Lift the suspension everywhere" onClick={() => setConfirm({
+            title: `Lift ${u.displayName}'s suspension?`,
+            confirmLabel: "Lift it",
+            body: <p>They can sign in again and are put back on the courses they were on, in every space.</p>,
+            action: () => API.liftApp(u.handle),
+          })} />
+        ) : (
+          <IconButton icon="block" label="Suspend everywhere" onClick={() => setConfirm({
+            title: `Suspend ${u.displayName} everywhere?`,
+            confirmLabel: "Suspend everywhere",
+            body: (
+              <p>
+                They can't sign in anywhere, and come off every course in every space. Each space
+                shows them as suspended by the super admin, and only you can lift it. Nothing is
+                deleted.
+              </p>
+            ),
+            action: () => API.suspendApp(u.handle),
+          })} />
+        ))}
+        {u.handle !== me && (
+          <IconButton icon="delete" label="Delete person" danger onClick={() => setConfirm({
+            title: `Delete ${u.displayName}?`,
+            confirmLabel: "Delete for good",
+            confirmWord: u.handle,
+            body: (
+              <p>
+                {theirSpaces.length
+                  ? `${u.displayName} is in ${theirSpaces.map((x) => x.name).join(", ")}. Their account goes from ${theirSpaces.length === 1 ? "it" : "all of them"}: `
+                  : "Their account goes: "}
+                key, My space, practice history and course places. What they made for a space stays
+                there, under their name. There is no undoing this.
+              </p>
+            ),
+            action: () => API.deleteUser(u.handle, keyOrg),
+          })} />
+        )}
+      </>
+    );
+  };
+  return (
+    <>
+      {confirmModal}
+      {adding && data && (() => {
+        const theirs = (data.people.find((p) => p.handle === adding.handle) || {}) as { orgs?: string[]; org?: string };
+        const inNow = theirs.orgs || (theirs.org ? [theirs.org] : []);
+        const open = data.orgs.filter((o) => !o.archived && !inNow.includes(o.id));
+        return (
+          <ConfirmModal
+            title={`Add ${adding.displayName} to a space`}
+            confirmLabel="Add"
+            busy={busy}
+            body={
+              <>
+                <p>Their own key opens it too. No new key is made.</p>
+                <RadioGroup
+                  name="add-to-space"
+                  label="Space"
+                  value={addTo}
+                  options={open.map((o) => ({ value: o.id, label: o.name }))}
+                  onChange={setAddTo}
+                />
+              </>
+            }
+            onCancel={() => setAdding(null)}
+            onConfirm={async () => {
+              if (!addTo) return;
+              setBusy(true);
+              try {
+                await API.addMember(adding.handle, addTo);
+                /* Yourself (0.575): the app learns of the new space at
+                   once, and starts again if it changes where you are. */
+                if (adding.handle === me) {
+                  const acc = API.loadAccount();
+                  if (acc) {
+                    const r = await API.whoAmI(acc.key).catch(() => null);
+                    if (r) API.saveAccount({ ...r.user, key: acc.key });
+                  }
+                  window.location.reload();
+                  return;
+                }
+                setAdding(null);
+                await load();
+              } catch (e) {
+                setError(API.explain(e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+        );
+      })()}
+      {removing && data && (() => {
+        const theirs = spacesOf(removing).filter((id) => !gone(removing, id));
+        const open = data.orgs.filter((o) => theirs.includes(o.id));
+        return (
+          <ConfirmModal
+            title={`Remove ${removing.displayName} from a space`}
+            confirmLabel="Remove"
+            busy={busy}
+            body={
+              <>
+                <p>
+                  They come off that space's courses and People list, and move to its Former members.
+                  Their account and their other spaces stay.
+                </p>
+                <RadioGroup
+                  name="remove-from-space"
+                  label="Space"
+                  value={removeFrom}
+                  options={open.map((o) => ({ value: o.id, label: o.name }))}
+                  onChange={setRemoveFrom}
+                />
+              </>
+            }
+            onCancel={() => setRemoving(null)}
+            onConfirm={async () => {
+              if (!removeFrom) return;
+              setBusy(true);
+              try {
+                await API.removeFromSpace(removing.handle, removeFrom);
+                setRemoving(null);
+                await load();
+              } catch (e) {
+                setError(API.explain(e));
+              } finally {
+                setBusy(false);
+              }
+            }}
+          />
+        );
+      })()}
+      <Notice kind="error">{error}</Notice>
+      {/* Everyone once, or under each space they are in (0.578). */}
+      <Tabs
+        tabs={[["all", "All", "person"], ["spaces", "By space", "layers"]]}
+        value={view}
+        onChange={(v: string) => setView(v === "spaces" ? "spaces" : "all")}
+        label="Everyone or by space"
+      />
+      <input className="at-input" placeholder="Search everyone, in every space" value={q}
+        onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 14 }} />
+      {newKey && (
+        <div className="at-sub">
+          <CodeBox label={`New sign-in key for ${newKey.name}`} code={newKey.key} />
+          <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
+            <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>Done</Button>
+          </div>
+        </div>
+      )}
+      {data && view === "all" && (() => {
+        const everyone = data.people.filter(match).slice().sort((a, b) => a.displayName.localeCompare(b.displayName));
+        return (
+          <div className="at-everyone" data-el="everyone-all">
+            <ItemList
+              noun="person"
+              plural="people"
+              items={everyone}
+              itemKey={(u) => u.handle}
+              query={q}
+              match={(u, nq) => `${u.displayName} ${u.handle}`.toLowerCase().includes(nq)}
+              empty="Nobody matches."
+              renderItem={(u) => {
+              const names = spacesOf(u).map((id) => {
+                const o = data.orgs.find((x) => x.id === id);
+                const why = whyIn(u, id);
+                return `${o ? o.name : id}${why === "suspended" ? " (suspended)" : why === "removed" ? " (removed)" : why === "left" ? " (left)" : ""}`;
+              });
+              return (
+                <Tile key={u.handle}
+                  title={u.displayName}
+                  meta={`${u.handle}${u.admin ? " · App admin" : ""}${u.suspendedApp ? " · Suspended everywhere" : ""} · ${names.join(", ") || "In no space"}`}
+                  actions={actionsFor(u, null)}
+                />
+              );
+              }}
+            />
+          </div>
+        );
+      })()}
+      {/* Each space a part of its own, headed the way Settings and
+          Progress head theirs (0.552). Someone in several spaces is under
+          each. */}
+      {data && view === "spaces" && (
+      <div className="at-ruled at-everyone" data-el="everyone-spaces">
+      {data.orgs.map((o) => {
+        const here = data.people.filter((u) => spacesOf(u).includes(o.id) && match(u));
+        if (!here.length) return null;
+        return (
+          <Section head key={o.id} title={o.name} lede={`manytongues.co/${o.slug}`}>
+            <ItemList
+              noun="person"
+              plural="people"
+              items={here}
+              itemKey={(u) => u.handle}
+              query={q}
+              match={(u, nq) => `${u.displayName} ${u.handle}`.toLowerCase().includes(nq)}
+              renderItem={(u) => {
+              const why = whyIn(u, o.id);
+              return (
+                <Tile key={u.handle}
+                  title={u.displayName}
+                  meta={`${u.handle}${u.admin ? " · App admin" : o.admins.includes(u.handle) ? " · Space admin" : ""}${
+                    u.suspendedApp ? " · Suspended everywhere" : why === "suspended" ? " · Suspended" : why === "removed" ? " · Removed" : why === "left" ? " · Left" : ""}`}
+                  actions={actionsFor(u, o)}
+                />
+              );
+              }}
+            />
+          </Section>
+        );
+      })}
+      </div>
+      )}
+    </>
+  );
+}
+
+/*
+ * Super admin · Reports (0.547; 1c, 8b): learners' reports from every
+ * space, each with its space, to read and dismiss. A card is fixed from
+ * inside its space.
+ */
+function EveryReport({ languages }: { languages: Record<string, any> }) {
+  /* Ticked reports, per space (0.580: the same list Admin's Flags tab is). */
+  const [picked, setPicked] = useState<Record<string, Set<string>>>({});
+  const [clearing, setClearing] = useState<{ ids: string[]; org: string } | null>(null);
+  const [data, setData] = useState<{ orgs: API.SuperOrg[]; flags: (Flag & { org: string })[]; feedback?: Feedback[] } | null>(null);
+  const [error, setError] = useState("");
+  /* Card reports or feedback about the app (0.552), and whichever was
+     looked at last opens next time. */
+  const [kind, setKindState] = useState<"cards" | "feedback">(() => {
+    try {
+      return localStorage.getItem(REPORTS_KIND_KEY) === "feedback" ? "feedback" : "cards";
+    } catch (e) {
+      return "cards";
+    }
+  });
+  const setKind = (next: "cards" | "feedback") => {
+    setKindState(next);
+    try {
+      localStorage.setItem(REPORTS_KIND_KEY, next);
+    } catch (e) {
+      /* private browsing: it opens on card reports next time */
+    }
+  };
+  const load = useCallback(() => API.allReports().then((r) => setData(r), (e) => setError(API.explain(e))), []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  if (!data) return <Notice kind="error">{error}</Notice>;
+  const nameOf = (id: string) => (data.orgs.find((o) => o.id === id) || { name: id }).name;
+  const flags = data.flags.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+  const feedback = (data.feedback || []).slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+  const dismiss = async (work: () => Promise<unknown>) => {
+    try {
+      await work();
+      await load();
+    } catch (e) {
+      setError(API.explain(e));
+    }
+  };
+  return (
+    <>
+      <Segmented
+        label="Which reports"
+        style={{ marginBottom: 14 }}
+        options={[
+          { value: "cards" as const, label: "Card reports" },
+          { value: "feedback" as const, label: "Feedback" },
+        ]}
+        value={kind}
+        onChange={setKind}
+      />
+      <Notice kind="error">{error}</Notice>
+      {kind === "cards" ? (
+        <>
+          {!flags.length ? <Help>No reports in any space.</Help> : null}
+          {/* Each space's under its name, in the list Admin uses. */}
+          {[...new Set(flags.map((f) => f.org))].map((org) => {
+            const here = flags.filter((f) => f.org === org);
+            return (
+              <Section key={org} title={nameOf(org)} count={here.length}>
+                <ReportList
+                  flags={here}
+                  languages={languages}
+                  selected={picked[org] || new Set()}
+                  onSelectedChange={(next) => setPicked((was) => ({ ...was, [org]: next }))}
+                  onCopy={(chosen) => {
+                    const text = flagsToText(chosen, {
+                      at: Date.now(),
+                      release: APP_BUILD,
+                      cards: {},
+                      names: {
+                        kind: flagTitle,
+                        exercise: (language, type) => exerciseLabel(languages, language, type),
+                        course: () => "",
+                        deck: () => "",
+                        when: dateTime,
+                      },
+                    });
+                    if (navigator.clipboard) void navigator.clipboard.writeText(text);
+                  }}
+                  onClear={(ids) => setClearing({ ids, org })}
+                />
+              </Section>
+            );
+          })}
+          {clearing && (
+            <ConfirmModal
+              title={`Clear ${plural(clearing.ids.length, "report")}?`}
+              confirmLabel="Clear"
+              body={<p>They go for good. Nothing about the cards changes.</p>}
+              onCancel={() => setClearing(null)}
+              onConfirm={async () => {
+                const { ids, org } = clearing;
+                setClearing(null);
+                setPicked((was) => ({ ...was, [org]: new Set() }));
+                await dismiss(() => API.deleteFlagsIn(ids, org));
+              }}
+            />
+          )}
+        </>
+      ) : (
+        <>
+          {!feedback.length ? <Help>No feedback from any space.</Help> : null}
+          <ItemList
+            noun="report"
+            items={feedback}
+            itemKey={(f) => f.id}
+            match={(f, q) => `${feedbackTitle(f.kind)} ${f.handleName || f.handle} ${f.note || ""}`.toLowerCase().includes(q)}
+            empty="Nothing matches."
+            renderItem={(f) => (
+              <Tile key={f.id}
+                title={feedbackTitle(f.kind)}
+                meta={`${nameOf(f.org)} · ${f.handleName || f.handle} · ${shortDate(f.at)}${f.screen ? ` · on ${f.screen}` : ""} · "${f.note}"`}
+                actions={
+                  <Button variant="ghost" size="sm" onClick={() => dismiss(() => API.deleteFeedback([f.id]))}>
+                    Dismiss
+                  </Button>
+                }
+              />
+            )}
+          />
+        </>
+      )}
+    </>
+  );
+}
+const REPORTS_KIND_KEY = "arabic-trainer:super-reports";
+

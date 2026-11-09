@@ -1012,3 +1012,9 @@ export function tableCount(
   const filled = all.filter((c) => c.form && str(c.form.ar)).length;
   return { filled, blank: all.length - filled };
 }
+
+/* What a table's cells wait on, where it says nothing: the word — the rule
+   every one-row table has followed since there was one. One reading for
+   the trainer and the editor (0.580; it was written out in both). */
+export const waitsOnWord = (spec: VerbSpec | null | undefined): boolean =>
+  !!spec && (spec.gate || "word") === "word";

@@ -22,8 +22,8 @@
 
 import { test } from "node:test";
 import assert from "node:assert/strict";
+import { buildOnce } from "./helpers.mjs";
 import path from "node:path";
-import { build } from "esbuild";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { CORPUS, DECKS, POOL } from "./card-corpus.mjs";
@@ -31,23 +31,12 @@ import { blanksOn, combosOf, examplesOf, fieldsOn, fillersFor } from "../src/car
 import { LANGUAGES } from "../src/languages.ts";
 import { leadOf } from "../src/cards.ts";
 
-const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".readout-build");
 
 /* shared.tsx is JSX and imports React, so it is bundled the way the other
    tests bundle it. React stays external, which is what lets the rendering
    below use the same copy. */
-await build({
-  entryPoints: [path.join(here, "..", "src", "shared.tsx")],
-  outfile: path.join(out, "shared.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-});
-const { CardReadout } = await import(path.join(out, "shared.js"));
+const built = await buildOnce(["shared.tsx"]);
+const { CardReadout } = await import(path.join(built, "shared.js"));
 
 /** The card as a teacher reads it, as one run of words. */
 const readOut = (/** @type {Record<string, any>} */ card) => {

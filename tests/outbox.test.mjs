@@ -227,6 +227,44 @@ test("dropping one by name leaves the rest", () => {
   store.clear();
   const first = keep("flag", { n: 1 });
   keep("flag", { n: 2 });
+  assert.ok(first);
   drop(first.id);
   assert.deepEqual(pendingOf(loadOutbox(), "flag").map((p) => p.body), [{ n: 2 }]);
+});
+
+/* ---- a full device, and a server that has not answered (0.580) ---- */
+
+test("a device whose storage is full keeps nothing, and says so", async () => {
+  const { keep: keepIt } = await import("../src/outbox.ts");
+  store.clear();
+  assert.ok(keepIt("card", { n: 1 }), "the first is kept");
+  const real = store.setItem;
+  store.setItem = () => {
+    throw new Error("QuotaExceededError");
+  };
+  try {
+    assert.equal(keepIt("card", { n: 2 }), null, "the second could not be, and the caller is told");
+  } finally {
+    store.setItem = real;
+  }
+  assert.equal(waiting("card"), 1, "nothing pretends it was kept");
+  assert.deepEqual(pendingOf(loadOutbox(), "card").map((p) => p.body), [{ n: 1 }]);
+});
+
+test("only the server's own refusal drops queued work", async () => {
+  const { isTransient } = await import("../src/outbox.ts");
+  /** @type {[string, boolean][]} */
+  const table = [
+    ["offline", true],
+    ["bad-response", true],
+    ["http-500", true],
+    ["http-502", true],
+    ["http-504", true],
+    ["http-404", false],
+    ["http-5000", false],
+    ["no-card", false],
+    ["not-yours", false],
+    ["deck-locked", false],
+  ];
+  for (const [msg, waits] of table) assert.equal(isTransient(msg), waits, msg);
 });

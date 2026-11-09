@@ -20,6 +20,7 @@ export const BOTH = "On both screens";
 export const QUESTION = "The question screen";
 export const ANSWER = "The answer screen";
 export const END = "The screen at the end";
+export const SPACES = "Learning, for someone in more than one space";
 
 /* [name, what it is, an example of what it holds] */
 export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
@@ -64,6 +65,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["match-sound", "In the grid of recordings, the play button standing where a word would. A target of its own, drawn long: tapping it only plays the word, and tapping the rest of the tile pairs it like any other tile.", ""],
     ["match-form-tag", "On a tile, which form of its card it is. Only where two forms of one card are in the grid, and on both the word and the meaning.", "plural"],
     ["answer-self", "The two answers to \"could you follow all of it\". Nobody else was in the room, so the reader marks it.", ""],
+    ["question-verb-meaning", "On Who is it?: what the verb means, with nobody in it — the card's own meaning, so it does not give the person away.", "to keep"],
     ["question-context-meaning", "On a gap-fill, what the phrase means — behind the nudge until asked for. Heard rather than read, the word's own meaning.", "book"],
     ["hint-button", "The question-mark button in the bar at the foot. Reveals the nudge, and puts it away again.", "Show meaning"],
     ["hint-value", "The nudge, once revealed.", ""],
@@ -85,7 +87,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["answer-value", "The right answer. Shown only when you got it wrong or asked to see it.", ""],
     ["answer-meaning", "On a \"which word is missing?\" question once answered: what the whole sentence means, under the verdict. Only where the sentence has its English.", "The book is big"],
     ["answer-value-text", "The right answer itself, in whichever language was asked for.", "كِتاب"],
-    ["answer-person", "On Who is it?: every person the form is about, once answered — two where two persons are spelt the same.", "you (m) · she"],
+    ["answer-person", "On Who is it?: every person the form is about, once answered — every one of them is to be ticked, two where two persons are spelt the same.", "you (m) · she"],
     ["also-heading", "The heading over everything else worth knowing.", "Learn more"],
     ["also", "The box under it: whichever of the blocks below the card has.", ""],
     ["also-row", "Two of the short blocks side by side — how it is pronounced beside how it sounds.", ""],
@@ -93,6 +95,9 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["also-context-label", "The small line naming that block.", "Where it turned up"],
     ["also-context-text", "The phrase the word appeared in, as the teacher recorded it.", "الكتاب كبير"],
     ["also-context-meaning", "What the phrase means.", "the book is big"],
+    ["also-phrase-said", "On a question with a gap in a phrase or sentence, once answered: how the whole of it is pronounced, not only the missing word.", ""],
+    ["also-phrase-said-label", "The small line naming that block.", "How the whole phrase is pronounced"],
+    ["also-phrase-said-text", "The phrase or sentence in Latin letters.", "il-kitaab kbiir"],
     ["also-script", "How it is written, when the question was heard rather than read.", ""],
     ["also-script-label", "The small line naming that block.", "How it's written"],
     ["also-script-text", "The word written out, for a question that was only heard.", "كِتاب"],
@@ -122,6 +127,11 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
   ]],
   [END, [
     ["what-moved", "The cards this sitting moved up a level, cleared, or learnt — left out altogether when none did.", "airport — learnt · key — up to writing it from a cue"],
+  ]],
+  [SPACES, [
+    ["space-filter", "The round button in Learning's top right corner, for someone in more than one space: All your spaces, or one of them. Home, Progress, Cards, Courses and the session started from them follow it.", "All your spaces · Lingua · Main"],
+    ["my-spaces", "At the top of the menu behind your initial: your spaces, one per line, to go to another. For the super admin, \"Where you are\": Super admin, your spaces, and a space you opened.", "Super admin · Main · Lingua"],
+    ["stranded", "The page someone sees when they have no space to open: suspended in, removed from or gone from each of theirs, with a box for an invitation link or a course code.", "You're suspended in Lingua."],
   ]],
 ];
 

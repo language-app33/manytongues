@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import type { OnboardingPlace } from "./spaces.tsx";
 import type {
   Course, DayMoves, Deck, Doc, ExerciseSpec, ExerciseState, FlagKind, FlagVerdict, Form, Item,
   Lang, LangId, Millis, Question, SavedSession, Settings, User,
@@ -19,11 +20,13 @@ import {
   DeckSwitch,
   ChoiceSwitch,
   CheckList,
-  ClipList,
+  usePicture,
   ConfirmModal,
   Empty,
   Field as FormField,
   FLAG_KINDS,
+  FEEDBACK_KINDS,
+  type FeedbackKind,
   FLAG_NOTE_MAX,
   BannerHost,
   Help,
@@ -59,6 +62,7 @@ import {
   useSlowWait,
   useSnackbar,
   useSnackbarState,
+  TabTitle,
 } from "./shared.tsx";
 import { renameLangIds } from "./lang-ids.ts";
 
@@ -127,6 +131,7 @@ function ChunkFallback() {
   return slow ? <Help>Loading…</Help> : null;
 }
 import * as API from "./courses-api.ts";
+import { placeRows } from "./places.ts";
 import {
   DEFAULT_LANGUAGE,
   EX,
@@ -141,15 +146,12 @@ import {
   answerFields,
   derivedValue,
   dimValues,
-  dimsOf,
   contextTokens,
   EASY_TYPES,
   exOf,
   findWordSpan,
   gluedTo,
-  splitForms,
   guessKind,
-  inScript,
   kindOf,
   isListening,
   isGrid,
@@ -157,17 +159,15 @@ import {
   answerLabel,
   askLabel,
   lentLabel,
-  labelFor,
   langOf,
   quizAttrOf,
   scriptVars,
   setActiveLang,
   verdictText,
+  otherFormNote,
   verdictWord,
-  GRAMMAR,
   defaultMarking,
   grammarFields,
-  normDimValue,
   showsOneAnswer,
   keysFor,
   answerOf,
@@ -203,6 +203,7 @@ import {
   subjectSlot,
   tensesOf,
   isFrame,
+  waitsOnWord,
 } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf, withLead } from "./cards.ts";
 import { cardMatches } from "./search.ts";
@@ -289,11 +290,9 @@ import { buildContextIndex } from "./context-index.ts";
 import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
-import { drainOutbox, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { knownMissing as knownMissingAt, MISSING_CLIPS, pictureData } from "./pictures.ts";
+import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 import {
-  DEFAULT_SPEAKERS,
-  DIALOG_KIND,
-  MAX_SPEAKERS,
   ORDER_SEP,
   SELF_ALL,
   SELF_SOME,
@@ -310,7 +309,6 @@ import {
   isText,
   isTwoSided,
   linesOf,
-  namedPart,
   pickedFrom,
   proseOf,
   replyOptions,
@@ -318,7 +316,6 @@ import {
   scrambledLines,
   sideOf,
   speakerName,
-  speakersOf,
 } from "./dialogs.ts";
 import {
   ALT_SEP,
@@ -329,11 +326,11 @@ import {
   firstOfEach,
   meaningForTurn,
   meaningsOf,
-  joinAlternatives,
   packAnswers,
   shownAlternatives,
   splitAlternatives,
   withAnswer as oneAnswer,
+  fillerVariants,
 } from "./answers.ts";
 import { asMeaning, cellEnglish, fieldsLost, fillForm, fillsOf, hasSlots, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
 import type { Value } from "./variables.ts";
@@ -343,7 +340,7 @@ import type { Review } from "./review.ts";
 import { liftSubtypeTagsIn } from "./subtype-tags.ts";
 import { tickCapitals } from "./capitals.ts";
 import { spellRuns, typoed } from "./spelling.ts";
-import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, whoChoices, whoIsRight } from "./verb-drills.ts";
+import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, meaningWithoutWho, whoAllRight, whoChoices, whoIsRight, WHO_JOIN } from "./verb-drills.ts";
 import type { Tense } from "./verb-drills.ts";
 import { cappedAt, skillSeed } from "./skills.ts";
 import type { SkillCaps } from "./skills.ts";
@@ -863,7 +860,19 @@ import {
    recombined across items.
    ================================================================== */
 
-const KEY = "arabic-trainer-v3";
+/*
+ * The App admin trying a space that is none of theirs (0.574): its slug,
+ * or "". Practice there is kept apart on the device, under keys ending in
+ * TRIAL, never synced, and dropped on leaving. Read once, at start: the
+ * document's key depends on it.
+ */
+const TRYING = API.tryingSpace();
+const TRIAL = API.trialSuffix(TRYING);
+const MAIN_KEY = "arabic-trainer-v3";
+const KEY = MAIN_KEY + TRIAL;
+/* Somebody's practice, set aside on this device when they log out, until
+   they sign in here again (0.580, audit finding 8). See DECISIONS.md. */
+const PARKED_KEY = (handle: string) => `${MAIN_KEY}:parked:${handle}`;
 
 /* What a reported problem is filed under while it waits for a connection.
    See outbox.ts: one queue, and the kind is how two sorts of waiting work
@@ -874,13 +883,6 @@ const FLAG_OUTBOX = "flag";
    Ordered easiest to hardest: recognition, then decoding, then
    production from sound, then production from meaning.
    ------------------------------------------------------------------ */
-
-
-/* Recording limits. Opus at 24kbps mono is roughly 3KB a second, so a
-   two-second clip lands near 6KB — small enough to sync freely. */
-const MAX_RECORD_MS = 15000;
-const MAX_CLIP_BYTES = 400000;
-const AUDIO_BITRATE = 24000;
 
 
 /* Nobody, for the account screen when nobody is signed in. It renders
@@ -923,10 +925,6 @@ const EMPTY: Doc = {
 };
 
 const now = () => Date.now();
-
-
-
-
 
 
 /* ------------------------------------------------------------------
@@ -1151,124 +1149,6 @@ function studentViews(
 const DIFF_RANK: Record<string, number> = { easy: 0, steady: 1, unrated: 2, hard: 3 };
 
 
-
-
-/* ------------------------------------------------------------------
-   Items
-   ------------------------------------------------------------------ */
-
-function cleanTags(input: unknown) {
-  const raw = Array.isArray(input) ? input : String(input || "").split(",");
-  const out: string[] = [];
-  for (const t of raw) {
-    const tag = String(t).trim().replace(/\s+/g, " ");
-    if (tag && !out.includes(tag)) out.push(tag);
-  }
-  return out;
-}
-
-
-
-/* A sub-item is a form of its parent — a plural, a feminine — carrying the
-   same three fields and its own progress, but no decks of its own. */
-function makeSub(src: Record<string, any> = {}) {
-  const { ar = "", lat = "", en = "", note = "", recs = [] } = src;
-  return {
-    id: `s${now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
-    ar: ar.trim(),
-    lat: lat.trim(),
-    en: en.trim(),
-    ...dimValues(src),
-    note: note.trim(),
-    /* The language it is written in, kept on the form itself — see
-       settingsFor. A card made here is in whatever the app is set to. */
-    lang: activeLang().id,
-    recs: recs || [],
-    created: now(),
-    updated: now(),
-    s: freshStates(),
-  };
-}
-
-/* A line of a dialog. A form in every respect that matters — three
-   fields, its own recordings, its own progress — plus who says it and
-   which word cards it uses. */
-function makeLine(src: Record<string, any> = {}) {
-  const { ar = "", lat = "", en = "", who = 0, uses = [], recs = [] } = src;
-  return {
-    id: src.id || `l${now().toString(36)}${Math.random().toString(36).slice(2, 7)}`,
-    who: Math.max(0, Math.min(MAX_SPEAKERS - 1, Number(who) || 0)),
-    ar: ar.trim(),
-    lat: lat.trim(),
-    en: en.trim(),
-    uses: (uses || []).filter(Boolean),
-    lang: src.lang || activeLang().id,
-    recs: recs || [],
-    created: src.created || now(),
-    updated: now(),
-    s: src.s || freshStates(),
-  };
-}
-
-function makeItem(src: Record<string, any> = {}) {
-  const {
-    ar = "",
-    lat = "",
-    en = "",
-    kind = "",
-    note = "",
-    tags = [],
-    subs = [],
-    recs = [],
-    lines = [],
-  } = src;
-  const text = ar || en || lat;
-  const s = freshStates();
-  const scene = (lines || []).filter((l: any) => l && (l.ar || l.en || l.lat));
-  const id = `${now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
-  return {
-    id,
-    /* The card's own word first, then whatever other forms it was given —
-       one list, and the word answers to the card's own id. */
-    forms: [
-      {
-        id,
-        ar: ar.trim(),
-        lat: lat.trim(),
-        en: en.trim(),
-        lang: activeLang().id,
-        recs: recs || [],
-        ...dimValues(src),
-        created: now(),
-        updated: now(),
-        s,
-      },
-      ...(subs || []).map((x: Record<string, any>) => (x.id ? x : makeSub(x))),
-    ],
-    /* A card with a conversation on it is a dialog whatever else was
-       said: the kind follows the content rather than a picker somebody
-       has to remember to set. */
-    kind: scene.length ? DIALOG_KIND : kind || guessKind(text, activeLang()),
-    ...(scene.length
-      ? {
-          lines: scene.map((l: any) => (l.id && l.s ? l : makeLine(l))),
-          speakers: speakersOf(src),
-          /* What the card says, including saying nothing: a scene that
-             names no part must not acquire one by being copied. */
-          you: namedPart(src),
-        }
-      : null),
-    lang: activeLang().id,
-    note: note.trim(),
-    tags: cleanTags(tags),
-    locked: false,
-    flags: [],
-    created: now(),
-    updated: now(),
-  };
-}
-
-
 /* ------------------------------------------------------------------
    One app, more than one language
 
@@ -1284,10 +1164,6 @@ function makeItem(src: Record<string, any> = {}) {
    which is why this is two small functions rather than a new argument on
    forty.
    ------------------------------------------------------------------ */
-/* Which of a card's fields belong to a form rather than to the card: the
-   three words, its recordings, and whatever grammar the languages declare.
-   Asked where a patch from the editor is taken apart. */
-const FORM_FIELDS = new Set(["ar", "lat", "en", "recs", ...Object.keys(dimValues({}))]);
 
 /* A card or one of its forms — both carry the language, and both are
    asked. */
@@ -1333,14 +1209,6 @@ export function askedUnits(item: Item) {
    — the one question a screenshot cannot answer. */
 export function drillableUnits(item: Item, settings: Settings) {
   return askedUnits(item).filter(({ unit }) => enabledTypes(unit, settings).length >= 2);
-}
-
-/* Totals for the list indicators: how many forms, how many clips. */
-function familyCounts(it: Item) {
-  const units = unitsOf(it);
-  let clips = 0;
-  for (const { unit } of units) clips += (unit.recs || []).length;
-  return { forms: units.length, subs: units.length - 1, clips };
 }
 
 
@@ -1662,6 +1530,23 @@ export function lentTags(unit: Form | null | undefined, lang: Lang): string[] {
     if (!out.includes(line)) out.push(line);
   }
   return out;
+}
+
+/**
+ * The other ways a filled sentence may be written: each filler's other
+ * accepted answers put where its first stands — see fillerVariants.
+ */
+export function filledVariantsOf(unit: Form | null | undefined): string[] {
+  const filled = unit ? ((unit as Record<string, any>).filled as Record<string, string> | undefined) : undefined;
+  if (!unit || !filled) return [];
+  const fillers: { first: string; others: string[] }[] = [];
+  for (const ref of Object.values(filled)) {
+    const found = ref ? VALUE_OWNER.get(ref) : null;
+    if (!found) continue;
+    const alts = splitAlternatives(String(found.form.ar || "")).map((a) => a.trim()).filter(Boolean);
+    if (alts.length > 1) fillers.push({ first: alts[0], others: alts.slice(1) });
+  }
+  return fillers.length ? fillerVariants(String(unit.ar || ""), fillers) : [];
 }
 
 /*
@@ -2273,9 +2158,6 @@ function sentencesCleared(card: Item, lang: Lang): boolean {
   });
 }
 
-/* What a table's cells wait on, where it says nothing: the word, which is
-   the rule every one-row table has followed since there was one. */
-const waitsOnWord = (spec: VerbSpec): boolean => (spec.gate || "word") === "word";
 
 /*
  * Working them out, across every card in hand.
@@ -3997,10 +3879,12 @@ const LEARNED_PING_MS = 15 * 60 * 1000;
    answer between tunnels making its own failed request. */
 const LEARNED_RETRY_MS = 60 * 1000;
 let learnedQuietUntil = 0;
-function reportLearning(account: User | null) {
+/* `orgs` are the spaces the session's cards came from (memberships), so
+   each space's admin sees practice in their space alone. */
+function reportLearning(account: User | null, orgs?: string[]) {
   if (!account || now() < learnedQuietUntil) return;
   learnedQuietUntil = now() + LEARNED_PING_MS;
-  API.practiced().catch(() => {
+  API.practiced(orgs).catch(() => {
     learnedQuietUntil = Math.min(learnedQuietUntil, now() + LEARNED_RETRY_MS);
   });
 }
@@ -4699,6 +4583,10 @@ const MODES = {
     label: "Regular",
     blurb: "A balanced mix, the way a normal review works — a few exercise types per card.",
   },
+  catchup: {
+    label: "Catch up",
+    blurb: "Only what is due — reviews that have come round and cards in learning waiting for their next question, longest waiting first. No new cards, and only the questions that are due.",
+  },
   ultimate: {
     label: "Ultimate",
     blurb: "Every chosen card that is new, still being learnt or due for review, in every exercise type it has — repeating anything you miss until you have it right. Cleared and learnt cards wait until they are due.",
@@ -5099,8 +4987,21 @@ function drawRange(
  *   questions that went wrong.
  * - **Get started:** recognition questions only.
  * - **Ultimate:** every question each card has open.
+ * - **Catch up:** the pool is cards with a question due now, asked those
+ *   questions and no others, longest waiting first. Not the mix: no new
+ *   cards, no shares, nothing brought forward to fill a place.
  */
-export type SessionMode = "regular" | "ultimate" | "started" | "mistakes" | "unseen" | "weak";
+export type SessionMode = "regular" | "ultimate" | "started" | "mistakes" | "unseen" | "weak" | "catchup";
+
+/*
+ * A question Catch up asks: one already met whose time has come round.
+ * A question never asked — a new card, or a level that has just opened on
+ * one — is not waiting to be caught up on, so it stays for a regular
+ * session to bring in.
+ */
+function dueToCatchUp(s: ExerciseState | null | undefined): boolean {
+  return !!s && s.phase !== "new" && !!s.due && s.due <= now();
+}
 
 /* What sort of card this is, for the order of questions: no more than two
    of one kind running. The owner's three — a word, a sentence (a phrase, a
@@ -5164,6 +5065,17 @@ export function buildSession({
     .filter((it) => !isRangeSkill(it) || (systemFor(it, sets) && numbers.ready(it)));
   if (!drillable.length) return { exercises: [], reason: "none-drillable" };
 
+  /* The mode's own questions: recognition alone for Get started, what
+     went wrong for Weak spots, worst first, and what is due for Catch up. */
+  const allowed = (t: string, unit: Form) =>
+    mode !== "started" || (EASY_TYPES.includes(typeOf(t)) && typeAllowedNow(t, unit));
+  const typesOf = (unit: Form): string[] => {
+    const open = askableTypes(unit, settings).filter((t) => allowed(t, unit));
+    if (mode === "catchup") return open.filter((t) => dueToCatchUp(stateOf(unit, t)));
+    if (mode !== "weak") return open;
+    return inOrder(open.filter((t) => weakness(stateOf(unit, t)) > 0), (t) => -weakness(stateOf(unit, t)));
+  };
+
   /* The mode's own pool, narrowed from the cards chosen. */
   const units = (it: Item) => drillableUnits(it, settings);
   const pool = drillable.filter((it) =>
@@ -5173,32 +5085,26 @@ export function buildSession({
       ? units(it).some(({ unit }) => notSeenLately(unit, settings))
       : mode === "weak"
       ? isWeak(it, settings)
+      : mode === "catchup"
+      ? units(it).some(({ unit }) => typesOf(unit).length > 0)
       : true
   );
   if (!pool.length) {
     return {
       exercises: [],
-      reason: mode === "weak" ? "nothing-weak" : mode === "mistakes" ? "no-mistakes" : mode === "unseen" ? "no-unseen" : "none-drillable",
+      reason: mode === "weak" ? "nothing-weak" : mode === "mistakes" ? "no-mistakes" : mode === "unseen" ? "no-unseen" : mode === "catchup" ? "caught-up" : "none-drillable",
     };
   }
-
-  /* And the mode's own questions: recognition alone for Get started, what
-     went wrong for Weak spots, worst first. */
-  const allowed = (t: string, unit: Form) =>
-    mode !== "started" || (EASY_TYPES.includes(typeOf(t)) && typeAllowedNow(t, unit));
-  const typesOf = (unit: Form): string[] => {
-    const open = askableTypes(unit, settings).filter((t) => allowed(t, unit));
-    if (mode !== "weak") return open;
-    return inOrder(open.filter((t) => weakness(stateOf(unit, t)) > 0), (t) => -weakness(stateOf(unit, t)));
-  };
 
   /* Numbers and nothing else — see gridCompany. */
   const onlyNumbers = pool.every((it) => isFromSystem(it));
 
   /* Ultimate has no length of its own: every card the mix lets in, asked
-     every question it has. Any other session is the length it was given,
-     or SESSION_SIZE. */
-  const everyCard = mode === "ultimate" && !budgetIn;
+     every question it has. Catch up given none is everything due. Any
+     other session is the length it was given, or SESSION_SIZE. */
+  const catchUp = mode === "catchup";
+  const asksAll = mode === "ultimate" || catchUp;
+  const everyCard = asksAll && !budgetIn;
   const budget = everyCard ? Number.POSITIVE_INFINITY : Math.max(4, budgetIn || SESSION_SIZE);
 
   /* Every card of the pool, where it stands. Chance first, between cards
@@ -5213,9 +5119,12 @@ export function buildSession({
     : every;
   if (!rows.length) return { exercises: [], reason: every.length ? "none-due" : "nothing-due" };
 
-  /* Which cards: the session mix (session-mix.ts). */
+  /* Which cards: the session mix (session-mix.ts) — or, for Catch up,
+     simply the longest waiting first. Every card in its pool has something
+     due and none is new, so there are no shares to keep and nothing to
+     fill a gap with. */
   const everything = !!(practice || includeAll);
-  const mix = everything
+  const mix = everything || catchUp
     ? null
     : mixSession(rows, {
         places: everyCard ? rows.length : budget / PER_UNIT,
@@ -5223,7 +5132,7 @@ export function buildSession({
         dayCards: (perDay || 0) / PER_UNIT,
         everyNew: mode === "ultimate",
       });
-  const cards = mix ? mix.cards : rows;
+  const cards = mix ? mix.cards : catchUp ? rows.slice().sort((a, b) => a.due - b.due) : rows;
   if (!cards.length) return { exercises: [], reason: "nothing-due" };
 
   /* --- how much of each card: a form is asked two ways, and a card takes
@@ -5246,12 +5155,16 @@ export function buildSession({
        two lines at a time across three evenings is learnt better than one
        swallowed whole in one. The whole-scene exercises come along beside
        them, which is what the card's own unit is. */
-    const take = isDialog(it)
+    /* Catch up takes every form with something due: leaving one out
+       would leave it behind, which is what the session is there to stop. */
+    const take = catchUp
+      ? parent.concat(subs)
+      : isDialog(it)
       ? parent.concat(subs.slice(0, MAX_DIALOG_LINES))
       : formOf().slice(0, MAX_UNITS_PER_FAMILY);
     return take.map(({ unit, isSub }) => {
       const own = typesOf(unit);
-      const offered = (mode === "weak" ? own : pickableTypes(unit, settings).filter((t) => own.includes(t)))
+      const offered = (mode === "weak" || catchUp ? own : pickableTypes(unit, settings).filter((t) => own.includes(t)))
         .filter((t) => !onlyNumbers || !borrowsPhrase(t));
       /* A form on its top is asked the top questions that are due, and
          not the ones that are not: answered early they count for nothing
@@ -5259,7 +5172,7 @@ export function buildSession({
          practice — it is asked them anyway, which is what it is there for. */
       const due = atItsTop(unit, settings) ? offered.filter((t) => stateReady(stateOf(unit, t))) : offered;
       const ordered = due.length ? due : offered;
-      const picked = mode === "ultimate" ? ordered.slice() : ordered.slice(0, Math.min(PER_UNIT, ordered.length));
+      const picked = asksAll ? ordered.slice() : ordered.slice(0, Math.min(PER_UNIT, ordered.length));
       /* Asked in the table's own order, which runs from recognition to
          production: which exercises a unit gets is a matter of chance,
          the order they come in is not. What went wrong is asked worst
@@ -5351,7 +5264,8 @@ export function buildSession({
     rankOf: (c) => (c.askedFor ? -1 : DIFF_RANK[itemDifficulty(c.card.it, settings)]),
     deal,
     finish,
-    topUp: !everyCard,
+    /* Catch up never pads a short session with questions not yet due. */
+    topUp: !everyCard && !catchUp,
   });
 
   /* At least two kinds of question, judged on the material: a session is
@@ -5360,7 +5274,7 @@ export function buildSession({
      Get started draws on two gentle types, one of which needs a recording,
      so it takes a card on one; and Weak spots is the one session where one
      exercise repeated is exactly what is wanted. */
-  const minTypes = mode === "weak" ? 0 : mode === "started" ? 1 : 2;
+  const minTypes = mode === "weak" || catchUp ? 0 : mode === "started" ? 1 : 2;
   const offered = new Set(plans.flatMap((p) => enabledTypes(p.unit, settings).filter((t) => allowed(t, p.unit))));
   if (offered.size < minTypes) return { exercises: [], reason: "no-variety" };
 
@@ -5851,7 +5765,8 @@ export function buildManualSession({ items, settings, ids, mode, count, minutes,
   systems?: SystemSet[];
 }) {
   const chosen = new Set(ids);
-  const budget = count && count < 999 ? count : minutes ? minutes * TIMED_PER_MINUTE : mode === "ultimate" ? undefined : SESSION_SIZE;
+  /* Ultimate, and Catch up's "Everything due", have no length: everything. */
+  const budget = count && count < 999 ? count : minutes ? minutes * TIMED_PER_MINUTE : mode === "ultimate" || mode === "catchup" ? undefined : SESSION_SIZE;
   const built = buildSession({
     items, settings, inDeck: (it) => chosen.has(it.id), budget, perDay, systems, mode: mode as SessionMode,
   });
@@ -6789,21 +6704,6 @@ function relatedWords(items: Item[], lang: Lang, text: string) {
   return out.slice(0, 6);
 }
 
-/* Making your own cards is switched off while courses settle: material
-   comes from a teacher. Everything it needs is still here, so turning it
-   back on is a one-line change.
-
-   The screens and helpers only that feature reaches — the card editor, the
-   bulk-add sheet with its CSV and Markdown parser, the recorder, the zip
-   backup — are reached through OWN below. With the flag off the bundler
-   sees OWN as null and leaves all of it out of the build, which was about a
-   quarter of this file being parsed on every launch for nothing. */
-const OWN_CARDS = false;
-
-const OWN = OWN_CARDS
-  ? { ItemSheet, BulkAddSheet, parseLines, makeZip, readZip }
-  : null;
-
 /* ------------------------------------------------------------------
    Account
 
@@ -6909,12 +6809,13 @@ function AlsoBox({ children }: { children?: Node }) {
     </div>
   );
   const rows: any[] = [];
-  const short = shown.filter((el) => alsoName(el) !== "also-context");
+  const wide = (el: any) => alsoName(el) === "also-context" || alsoName(el) === "also-phrase-said";
+  const short = shown.filter((el) => !wide(el));
   const pair = short.filter((el) => ALSO_PAIR.includes(alsoName(el)));
   const rest = pair.length === 2 ? short.filter((el) => !pair.includes(el)) : short;
   if (pair.length === 2) rows.push(row(pair));
   for (let i = 0; i < rest.length; i += 2) rows.push(row(rest.slice(i, i + 2)));
-  rows.push(...shown.filter((el) => alsoName(el) === "also-context"));
+  rows.push(...shown.filter(wide));
   return (
     <>
       <p className="at-alsomore" data-el="also-heading">
@@ -6949,256 +6850,6 @@ function RelatedWords({ pairs, settings }: { pairs: any[]; settings: Settings })
   );
 }
 
-
-/* ------------------------------------------------------------------
-   Import / export
-   ------------------------------------------------------------------ */
-
-/* Open, because the loops below add a name per grammatical field and per
-   language, and a column heading is whatever the file happened to say. */
-const FIELD_ALIASES: Record<string, string> = {
-  ar: "ar", arabic: "ar", script: "ar",
-  lat: "lat", latin: "lat", tr: "lat", translit: "lat", transliteration: "lat", roman: "lat",
-  en: "en", eng: "en", english: "en", meaning: "en", translation: "en",
-  tag: "tags", tags: "tags",
-  note: "note", notes: "note",
-  num: "number", plurality: "number",
-  gen: "gender",
-  reg: "register", addressee: "register",
-  cl: "classifier", clf: "classifier",
-};
-/* Every grammatical field answers to its own name, without that having to be
-   written here each time one is added. */
-for (const f of grammarFields()) FIELD_ALIASES[f] = f;
-/* And every language answers to what it calls its own columns — "Hebrew",
-   "Pronunciation note" — so a table headed in the language's own terms is
-   read as a table. Only "Arabic" was written in above, by hand. */
-const aliasKey: (label: unknown) => string = (label) => String(label || "").toLowerCase().replace(/[^a-z]/g, "");
-for (const L of Object.values(LANGUAGES)) {
-  if (L.scriptLabel) FIELD_ALIASES[aliasKey(L.scriptLabel)] = "ar";
-  /* And to what it called them before 0.213, when the column was named
-     after the script rather than the language — a file exported then is
-     still a file somebody has. */
-  if (L.scriptLabel) FIELD_ALIASES[aliasKey(`${L.scriptLabel} script`)] = "ar";
-  if (L.translitLabel) FIELD_ALIASES[aliasKey(L.translitLabel)] = "lat";
-}
-const FIELD_ORDER = ["en", "ar", "lat", "tags", "note"].concat(grammarFields());
-
-/* The importer's worked example, written in whichever language is being
-   learnt: a markdown table with the language's own column names and two
-   rows from its pack, and the same rows as a bare placeholder. It used to
-   be an Arabic table for everyone. */
-function sampleTable(L: Lang) {
-  const rows = L.sample || [];
-  const head = ["English", L.scriptLabel, L.translitLabel, "Decks"];
-  const decks = ["class 12 june", "numbers"];
-  const line: (cells: string[]) => string = (cells) => `| ${cells.join(" | ")} |`;
-  return [
-    line(head),
-    line(head.map((h) => "-".repeat(h.length))),
-    ...rows.map((r, i) => line([r.en, r.ar, r.lat || "", decks[i] || ""])),
-  ].join("\n");
-}
-function samplePlaceholder(L: Lang) {
-  return (L.sample || [])
-    .map((r, i) => [r.en, r.ar, r.lat, i === 0 ? "class 12 june" : ""].filter(Boolean).join(" | "))
-    .join("\n");
-}
-const MD_SEPARATOR = /^:?-+:?$/;
-const ESC = "\u0000";
-
-function splitRow(line: string) {
-  return (line.includes("\t") ? line.split("\t") : line.split("|")).map((p) => p.trim());
-}
-
-function stripMd(cell: string) {
-  return cell
-    .split(ESC)
-    .join("|")
-    .replace(/`([^`]*)`/g, "$1")
-    .replace(/\*\*([^*]+)\*\*/g, "$1")
-    .replace(/__([^_]+)__/g, "$1")
-    .replace(/\*([^*]+)\*/g, "$1")
-    .trim();
-}
-
-function mdCells(line: string) {
-  return line
-    .replace(/\\\|/g, ESC)
-    .replace(/^\|/, "")
-    .replace(/\|\s*$/, "")
-    .split("|")
-    .map(stripMd);
-}
-
-function isSeparatorLine(line?: string) {
-  if (!line) return false;
-  const t = line.trim();
-  if (!t.startsWith("|")) return false;
-  const cells = mdCells(t);
-  return cells.length > 0 && cells.every((c) => MD_SEPARATOR.test(c));
-}
-
-/* The three fields a card can accept more than one of. */
-const MANY_FIELDS = new Set(["ar", "lat", "en"]);
-
-/*
- * The field a column heading names: "English", or "English 2" for a second
- * accepted answer, "Arabic 3" for a third. One answer to a cell, as one to
- * a box in the editor — nothing written inside a cell splits it (0.439) —
- * so the extra answers each have a column of their own. A second answer is
- * read as `en#1`, its place in the list, and folded in by foldAnswers.
- */
-function fieldOf(heading: string): string | undefined {
-  const t = heading.toLowerCase().trim();
-  const m = /^(.*?)\s*(\d+)$/.exec(t);
-  const at = m ? Number(m[2]) : 1;
-  const key = FIELD_ALIASES[(m ? m[1] : t).replace(/[^a-z]/g, "")];
-  if (!key || at < 1) return undefined;
-  if (at === 1) return key;
-  return MANY_FIELDS.has(key) ? `${key}#${at - 1}` : undefined;
-}
-
-/* The answers read from numbered columns, into the field they belong to:
-   one answer to a line (see ALT_SEP), in the order the columns number
-   them. A transliteration stays beside the word in the same place. */
-function foldAnswers(row: Record<string, string>) {
-  for (const f of MANY_FIELDS) {
-    const list = [row[f] || ""];
-    for (const [k, v] of Object.entries(row)) {
-      const m = /^(\w+)#(\d+)$/.exec(k);
-      if (m && m[1] === f) list[Number(m[2])] = v || "";
-    }
-    row[f] = joinAlternatives(Array.from(list, (x) => x || ""));
-  }
-}
-
-function readHeader(cells: string[]): string[] | null {
-  if (cells.length < 2) return null;
-  const map = cells.map(fieldOf);
-  return map.every(Boolean) ? (map as string[]) : null;
-}
-
-/**
- * A row read out of a pasted table: the fields every card has, plus
- * whichever grammatical fields the language declares, which is why the
- * type is open.
- */
-type ParsedRow = Record<string, any> & {
-  ar: string;
-  lat: string;
-  en: string;
-  note: string;
-  tags: string[];
-};
-/**
-/**
- * `skipped` rides on the array because the importer wants both the rows
- * and the count of lines that held nothing, and the callers all read the
- * rows first.
- */
-export function parseLines(text: string, knownTags: string[] = []): ParsedRow[] & { skipped?: number } {
-  const out: ParsedRow[] & { skipped?: number } = [];
-  const known = new Set(knownTags.map((t) => t.toLowerCase()));
-  const lines = String(text).split(/\r?\n/);
-  const mdMode = lines.some((l) => l.trim().startsWith("|"));
-  let order: string[] | null = null;
-  let skipped = 0;
-
-  for (let li = 0; li < lines.length; li++) {
-    const line = lines[li].trim();
-    if (!line || line.startsWith("#")) continue;
-
-    let cells: string[];
-    if (mdMode) {
-      if (!line.startsWith("|")) continue;
-      if (isSeparatorLine(line)) continue;
-      cells = mdCells(line);
-      if (isSeparatorLine(lines[li + 1])) {
-        const header = readHeader(cells);
-        if (header) order = header;
-        continue;
-      }
-    } else {
-      cells = splitRow(line);
-    }
-
-    if (!order && !out.length) {
-      const header = readHeader(cells);
-      if (header) {
-        order = header;
-        continue;
-      }
-    }
-
-    const row: Record<string, string> = { ar: "", lat: "", en: "", tags: "", note: "" };
-    for (const f of grammarFields()) row[f] = "";
-    const loose: { value: string, i: number }[] = [];
-
-    cells.forEach((cell: string, i: number) => {
-      const m = cell.match(/^([A-Za-z]+(?:\s*\d+)?)\s*[:=]\s*([\s\S]*)$/);
-      const key = m && fieldOf(m[1]);
-      if (key) row[key] = m[2].trim();
-      else loose.push({ value: cell, i });
-    });
-
-    if (loose.length) {
-      const usesGaps = loose.some((c) => !c.value);
-      if (order || usesGaps) {
-        for (const { value, i } of loose) {
-          const key = order ? order[i] : FIELD_ORDER[i];
-          if (key && !row[key] && value) row[key] = value;
-        }
-        if (row.ar && !inScript(row.ar)) {
-          const holder = ["en", "lat"].find((k) => row[k] && inScript(row[k]));
-          if (holder) {
-            const tmp = row.ar;
-            row.ar = row[holder];
-            row[holder] = tmp;
-          }
-        }
-      } else {
-        const values = loose.map((c) => c.value);
-        const arIdx = values.findIndex((v) => inScript(v));
-        if (arIdx !== -1 && !row.ar) row.ar = values.splice(arIdx, 1)[0] || "";
-        if (values.length > 1 && known.size && !row.tags) {
-          const parts = cleanTags(values[values.length - 1]);
-          if (parts.length && parts.every((t) => known.has(t.toLowerCase()))) {
-            row.tags = values.pop() || "";
-          }
-        }
-        const slots = FIELD_ORDER.filter((k) => !row[k]);
-        values.forEach((v, i) => {
-          if (slots[i]) row[slots[i]] = v;
-        });
-      }
-    }
-
-    foldAnswers(row);
-    if (!row.ar && !row.lat && !row.en) {
-      skipped += 1;
-      continue;
-    }
-    out.push({
-      ar: row.ar,
-      lat: row.lat,
-      en: row.en,
-      note: row.note,
-      tags: cleanTags(row.tags),
-      ...Object.fromEntries(
-        Object.values(GRAMMAR).map((d) => [d.field, normDimValue(d, row[d.field])])
-      ),
-      ...Object.fromEntries(
-        grammarFields()
-          .filter((f) => !Object.values(GRAMMAR).some((d) => d.field === f))
-          .map((f) => [f, row[f] || ""])
-      ),
-    });
-  }
-
-  out.skipped = skipped;
-  return out;
-}
 
 /* ------------------------------------------------------------------
    Storage
@@ -7466,6 +7117,24 @@ export function merge(parsedIn: Record<string, any> | null | undefined) {
 
 async function loadData() {
   if (!window.storage) return { ...EMPTY };
+  if (TRYING) {
+    /* Trying a space (0.574): its own document, or a fresh one that starts
+       with your own preferences. Never the older keys. */
+    try {
+      const res = await window.storage.get(KEY);
+      if (res && res.value) return merge(JSON.parse(res.value));
+    } catch (e) {
+      /* none yet */
+    }
+    try {
+      const res = await window.storage.get(MAIN_KEY);
+      const own = res && res.value ? JSON.parse(res.value) : null;
+      if (own && own.settings) return merge({ settings: own.settings, items: [] });
+    } catch (e) {
+      /* no preferences of your own to copy */
+    }
+    return { ...EMPTY };
+  }
   for (const key of [KEY, "arabic-trainer-v2", "arabic-trainer-v1"]) {
     try {
       const res = await window.storage.get(key);
@@ -7643,6 +7312,15 @@ export const SOUNDS: Record<string, (c: AudioContext) => void> = {
     note(c, { freq: 260, to: 190, dur: 0.16, type: "triangle", peak: 0.07 });
     note(c, { freq: 190, to: 140, at: 0.15, dur: 0.26, type: "triangle", peak: 0.062 });
   },
+  /* A tile in a matching grid picked up, put against its other half, or
+     freed. The lightest thing here, because a grid of five is ten of
+     these in a row: a soft tap that says the tile heard you, and nothing
+     about whether the pair is right — the grid is only marked once it is
+     checked. Triangle rather than sine so it is not lost the way a lone
+     sine blip was (see tick). */
+  select: (c) => {
+    note(c, { freq: 880, to: 990, dur: 0.07, type: "triangle", peak: 0.055 });
+  },
   // A little bubble, for undo and other small reversals.
   pop: (c) => {
     note(c, { freq: 420, to: 900, dur: 0.07, peak: 0.05 });
@@ -7809,6 +7487,14 @@ function base64ToBlob(dataUrl: unknown) {
   return new Blob([bytes], { type: mime });
 }
 
+/* A size, said the way a person reads one. */
+function formatBytes(n: number) {
+  if (!n) return "—";
+  if (n < 1024) return `${n} B`;
+  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
+  return `${(n / 1048576).toFixed(1)} MB`;
+}
+
 /* --- the API the rest of the app uses --- */
 
 /*
@@ -7850,21 +7536,9 @@ async function saveClipBlob(id: string, blob: Blob) {
   }
 }
 
-/* Clips the server has already said it doesn't hold, and when it said so.
-   Remembered for a few minutes rather than the whole session: a recording
-   published a moment ago can take up to a minute to reach every edge. */
-const MISSING_CLIPS: Map<string, Millis> = new Map();
-const MISSING_FOR_MS = 5 * 60000;
-
-function knownMissing(id: string) {
-  const at = MISSING_CLIPS.get(id);
-  if (at === undefined) return false;
-  if (now() - at > MISSING_FOR_MS) {
-    MISSING_CLIPS.delete(id);
-    return false;
-  }
-  return true;
-}
+/* Clips the server has already said it doesn't hold: one list, shared with
+   the teaching screens — see pictures.ts. */
+const knownMissing = (id: string) => knownMissingAt(id, now());
 
 /*
  * Recordings the server has said it does not hold, kept across launches.
@@ -8023,15 +7697,6 @@ async function clipUrl(id: string) {
   return blob ? URL.createObjectURL(blob) : null;
 }
 
-async function dropClip(id: string) {
-  await idbRun("readwrite", (st) => st.delete(id));
-  try {
-    await window.storage.delete(AUDIO_KEY(id));
-  } catch (e) {
-    /* already gone */
-  }
-  clipsChanged();
-}
 
 /* The pictures on this device: how many, and how much room they take. */
 async function imageStats() {
@@ -8049,6 +7714,47 @@ async function imageStats() {
  * session needs it, which the confirmation says. The text store a browser
  * without IndexedDB keeps its recordings in is emptied too.
  */
+/*
+ * Recordings and pictures no card on this device names any more, gone
+ * (0.580, audit finding 22).
+ *
+ * Every one fetched was kept for good, so a learner who moved through
+ * three courses carried the sound of all three. Each is a copy of what
+ * the server holds, so what goes here comes back the next time a session
+ * asks for it. Run after a sync settles, at most once a day; "Clear device
+ * media" in Account settings is still the way to clear everything.
+ */
+export async function sweepMedia(referenced: { clips: Set<string>; images: Set<string> }) {
+  let gone = 0;
+  for (const [store, keep] of [[DB_STORE, referenced.clips], [IMAGE_STORE, referenced.images]] as const) {
+    const keys = (await idbRun("readonly", (st) => st.getAllKeys(), store)) || [];
+    for (const k of keys) {
+      if (typeof k !== "string" || keep.has(k)) continue;
+      /* A delete answers undefined whether or not it found anything. */
+      await idbRun("readwrite", (st) => st.delete(k), store);
+      gone += 1;
+      if (store === IMAGE_STORE) IMAGES_HELD.delete(k);
+    }
+  }
+  if (gone) clipsChanged();
+  return gone;
+}
+
+/** What a document's cards name: every recording and every picture. */
+export function mediaOf(items: Item[]) {
+  const clips = new Set<string>();
+  const images = new Set<string>();
+  for (const it of items || []) {
+    for (const { unit } of unitsOf(it)) {
+      for (const r of unit.recs || []) if (r && r.id) clips.add(String(r.id));
+      for (const h of Array.isArray(unit.images) ? unit.images : []) if (typeof h === "string") images.add(h);
+    }
+  }
+  return { clips, images };
+}
+
+const MEDIA_SWEPT = "arabic-trainer:media-swept";
+
 async function clearDeviceMedia() {
   await idbRun("readwrite", (st) => st.clear());
   await idbRun("readwrite", (st) => st.clear(), IMAGE_STORE);
@@ -8140,9 +7846,11 @@ function imageBlob(hash: string): Promise<Blob | null> {
     const here = await idbRun("readonly", (st) => st.get(hash), IMAGE_STORE);
     if (here) return here as Blob;
     try {
-      const r = await API.getImage(hash);
-      if (r && r.data) {
-        const blob = base64ToBlob(r.data);
+      /* Through the one picture fetch, so a picture the editor or the menu
+         already asked for this session is not asked for again. */
+      const data = await pictureData(hash);
+      if (data) {
+        const blob = base64ToBlob(data);
         if ((await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE)) !== undefined) clipsChanged();
         return blob;
       }
@@ -8250,132 +7958,6 @@ async function migrateClips(ids: string[]) {
 }
 
 /* ------------------------------------------------------------------
-   Zip
-
-   Written by hand rather than pulled from a library: a few dozen lines,
-   no dependency, and the files go in uncompressed because audio is
-   already compressed. Reading handles both uncompressed and deflated
-   entries, so a zip edited elsewhere still imports.
-   ------------------------------------------------------------------ */
-
-const CRC_TABLE = (() => {
-  const t = new Uint32Array(256);
-  for (let i = 0; i < 256; i++) {
-    let c = i;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    t[i] = c >>> 0;
-  }
-  return t;
-})();
-
-function crc32(bytes: Uint8Array) {
-  let c = 0xffffffff;
-  for (let i = 0; i < bytes.length; i++) c = CRC_TABLE[(c ^ bytes[i]) & 0xff] ^ (c >>> 8);
-  return (c ^ 0xffffffff) >>> 0;
-}
-
-function u32(n: number) {
-  return [n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
-}
-function u16(n: number) {
-  return [n & 255, (n >>> 8) & 255];
-}
-
-interface ZipEntry {
-  name: string;
-  blob: Blob;
-}
-
-async function makeZip(entries: ZipEntry[]): Promise<Blob> {
-  const enc = new TextEncoder();
-  /* Blob parts rather than plain byte arrays: they are only ever handed
-     to the Blob at the end, and a view onto a shared buffer is a part but
-     not a Uint8Array<ArrayBuffer>. */
-  const chunks: BlobPart[] = [];
-  const central: BlobPart[] = [];
-  let offset = 0;
-
-  for (const e of entries) {
-    const nameBytes = enc.encode(e.name);
-    const data = new Uint8Array(await e.blob.arrayBuffer());
-    const crc = crc32(data);
-
-    const local = new Uint8Array([
-      0x50, 0x4b, 0x03, 0x04, ...u16(20), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
-      ...u32(crc), ...u32(data.length), ...u32(data.length),
-      ...u16(nameBytes.length), ...u16(0),
-    ]);
-    chunks.push(local, nameBytes, data);
-
-    central.push(
-      new Uint8Array([
-        0x50, 0x4b, 0x01, 0x02, ...u16(20), ...u16(20), ...u16(0), ...u16(0), ...u16(0),
-        ...u16(0), ...u32(crc), ...u32(data.length), ...u32(data.length),
-        ...u16(nameBytes.length), ...u16(0), ...u16(0), ...u16(0), ...u16(0),
-        ...u32(0), ...u32(offset),
-      ]),
-      nameBytes
-    );
-    offset += local.length + nameBytes.length + data.length;
-  }
-
-  const centralSize = central.reduce((n, c) => n + (c as Uint8Array).length, 0);
-  const end = new Uint8Array([
-    0x50, 0x4b, 0x05, 0x06, ...u16(0), ...u16(0),
-    ...u16(entries.length), ...u16(entries.length),
-    ...u32(centralSize), ...u32(offset), ...u16(0),
-  ]);
-
-  return new Blob([...chunks, ...central, end], { type: "application/zip" });
-}
-
-async function readZip(blob: Blob): Promise<ZipEntry[]> {
-  const buf = new Uint8Array(await blob.arrayBuffer());
-  const view = new DataView(buf.buffer);
-  const dec = new TextDecoder();
-
-  // Find the end-of-directory record, scanning back from the tail.
-  let eocd = -1;
-  for (let i = buf.length - 22; i >= 0 && i > buf.length - 66000; i--) {
-    if (view.getUint32(i, true) === 0x06054b50) {
-      eocd = i;
-      break;
-    }
-  }
-  if (eocd < 0) throw new Error("not-a-zip");
-
-  const count = view.getUint16(eocd + 10, true);
-  let p = view.getUint32(eocd + 16, true);
-  const out: ZipEntry[] = [];
-
-  for (let i = 0; i < count; i++) {
-    if (view.getUint32(p, true) !== 0x02014b50) break;
-    const method = view.getUint16(p + 10, true);
-    const size = view.getUint32(p + 20, true);
-    const nameLen = view.getUint16(p + 28, true);
-    const extraLen = view.getUint16(p + 30, true);
-    const commentLen = view.getUint16(p + 32, true);
-    const local = view.getUint32(p + 42, true);
-    const name = dec.decode(buf.subarray(p + 46, p + 46 + nameLen));
-
-    const lnameLen = view.getUint16(local + 26, true);
-    const lextraLen = view.getUint16(local + 28, true);
-    const start = local + 30 + lnameLen + lextraLen;
-    let data = buf.subarray(start, start + size);
-
-    if (method === 8) {
-      // Deflated, which our own exports never are — but be forgiving.
-      const ds = new DecompressionStream("deflate-raw");
-      const stream = new Blob([data]).stream().pipeThrough(ds);
-      data = new Uint8Array(await new Response(stream).arrayBuffer());
-    }
-    out.push({ name, blob: new Blob([data]) });
-    p += 46 + nameLen + extraLen + commentLen;
-  }
-  return out;
-}
-
-/* ------------------------------------------------------------------
    Audio
 
    Clips are deliberately kept OUT of the synced document. The document
@@ -8387,136 +7969,6 @@ async function readZip(blob: Blob): Promise<ZipEntry[]> {
 
 const AUDIO_KEY = (id: string) => `audio-${id}`;
 
-const RECORD_MIMES = [
-  "audio/webm;codecs=opus",
-  "audio/ogg;codecs=opus",
-  "audio/webm",
-  "audio/mp4",
-];
-
-function pickMime() {
-  if (typeof MediaRecorder === "undefined") return "";
-  for (const m of RECORD_MIMES) {
-    try {
-      if (MediaRecorder.isTypeSupported(m)) return m;
-    } catch (e) {
-      /* older browser */
-    }
-  }
-  return "";
-}
-
-function canRecord() {
-  return !!(
-    typeof MediaRecorder !== "undefined" &&
-    navigator.mediaDevices &&
-    navigator.mediaDevices.getUserMedia
-  );
-}
-
-
-/* Live capture. Mono, and opus where the browser offers it. */
-function startRecorder(onStop: (blob: Blob) => void, onError: (err: unknown) => void) {
-  const mime = pickMime();
-  let stopped = false;
-  let rec: MediaRecorder | null = null;
-  let stream: MediaStream | null = null;
-  const chunks: Blob[] = [];
-
-  navigator.mediaDevices
-    .getUserMedia({
-      audio: { channelCount: 1, echoCancellation: true, noiseSuppression: true },
-    })
-    .then((st) => {
-      if (stopped) {
-        st.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      stream = st;
-      rec = new MediaRecorder(st, {
-        ...(mime ? { mimeType: mime } : {}),
-        audioBitsPerSecond: AUDIO_BITRATE,
-      });
-      rec.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
-      rec.onstop = async () => {
-        st.getTracks().forEach((t) => t.stop());
-        const blob = new Blob(chunks, { type: mime || "audio/webm" });
-        onStop(blob);
-      };
-      rec.start();
-    })
-    .catch((err) => onError(err));
-
-  return {
-    stop() {
-      stopped = true;
-      if (rec && rec.state !== "inactive") rec.stop();
-      else if (stream) stream.getTracks().forEach((t) => t.stop());
-    },
-  };
-}
-
-/*
- * Re-encode an uploaded file to opus by playing it into a MediaRecorder.
- * It runs in real time — a five-second clip takes five seconds — so it's
- * only worth doing for files big enough to matter. Falls back to the
- * original bytes wherever the browser can't oblige.
- */
-async function compressAudio(file: File) {
-  const raw = await file.arrayBuffer();
-  if (raw.byteLength <= 60000 || !canRecord()) return { blob: file, mime: file.type };
-
-  try {
-    const Ctx = window.AudioContext || (window as any).webkitAudioContext;
-    const ctx = new Ctx();
-    const buf = await ctx.decodeAudioData(raw.slice(0));
-    if (buf.duration > MAX_RECORD_MS / 1000) {
-      ctx.close();
-      throw new Error("too-long");
-    }
-
-    const dest = ctx.createMediaStreamDestination();
-    const src = ctx.createBufferSource();
-    src.buffer = buf;
-    src.connect(dest);
-
-    const mime = pickMime();
-    const rec = new MediaRecorder(dest.stream, {
-      ...(mime ? { mimeType: mime } : {}),
-      audioBitsPerSecond: AUDIO_BITRATE,
-    });
-    const chunks: Blob[] = [];
-    rec.ondataavailable = (e) => e.data && e.data.size && chunks.push(e.data);
-
-    const done: Promise<void> = new Promise((res) => {
-      rec.onstop = () => res();
-    });
-    rec.start();
-    src.start();
-    await new Promise((r) => setTimeout(r, buf.duration * 1000 + 250));
-    rec.stop();
-    await done;
-    ctx.close();
-
-    const out = new Blob(chunks, { type: mime || "audio/webm" });
-    return out.size && out.size < raw.byteLength
-      ? { blob: out, mime: mime || "audio/webm", dur: buf.duration }
-      : { blob: file, mime: file.type, dur: buf.duration };
-  } catch (e) {
-    return { blob: file, mime: file.type };
-  }
-}
-
-function formatBytes(n: number) {
-  if (!n) return "—";
-  if (n < 1024) return `${n} B`;
-  if (n < 1024 * 1024) return `${Math.round(n / 1024)} KB`;
-  return `${(n / 1048576).toFixed(1)} MB`;
-}
-
-function newRecId() {
-  return `r${now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
-}
 
 /* ------------------------------------------------------------------
    Arabic keyboard
@@ -9183,11 +8635,16 @@ function MatchGrid({
   /**
    * Whether the words are heard rather than read: a play button on each
    * tile where the word would be. The play button is a target of its own:
-   * tapping it only plays the word, and tapping the rest of the tile picks
-   * it up, pairs it or frees it as a tap on a word does. The owner first
-   * had one tap do both, then asked for them apart — a learner listening
-   * through the column to find the one they want kept picking tiles up and
-   * undoing pairs they had meant to keep.
+   * tapping the rest of the tile picks it up, pairs it or frees it as a tap
+   * on a word does, and tapping the button plays the word and picks the
+   * tile up as well, ready for its other half — but never more than that.
+   * The owner first had one tap do everything, then asked for them apart —
+   * a learner listening through the column to find the one they want kept
+   * picking tiles up and undoing pairs they had meant to keep — and then
+   * asked for playing to pick up again, on these terms: a paired tile only
+   * plays, keeping its pair, and with a meaning held, playing only plays,
+   * so listening for the meaning's recording pairs nothing and the meaning
+   * stays held until the tile itself is tapped.
    */
   heard?: boolean;
 }) {
@@ -9262,6 +8719,7 @@ function MatchGrid({
      up — or put down again, where it was already held. */
   const tapWord = (id: string) => {
     if (checked) return;
+    sfx("select");
     if (pairedAt(id) !== null) {
       setPairs((p) => {
         const next = { ...p };
@@ -9282,6 +8740,7 @@ function MatchGrid({
 
   const tapMeaning = (at: number) => {
     if (checked) return;
+    sfx("select");
     const owner = takenBy(at);
     /* Tapping a meaning already spoken for frees it, which is the only way
        back from a pairing made by mistake that does not need a third
@@ -9303,6 +8762,15 @@ function MatchGrid({
       return;
     }
     setHeld((h) => (h && h.col === "meaning" && h.at === at ? null : { col: "meaning", at }));
+  };
+
+  /* What playing a sound tile does to the grid besides playing: it picks
+     the tile up, and nothing else. A paired tile keeps its pair, a meaning
+     already held stays held, and a tile already held stays so — stopping
+     the clip does not put it down. See `heard`. */
+  const pickUpHeard = (id: string) => {
+    if (checked || pairedAt(id) !== null || heldMeaning !== null) return;
+    setHeld({ col: "word", id });
   };
 
   const numberOf = (id: string) =>
@@ -9401,8 +8869,9 @@ function MatchGrid({
               <span className={`at-matchword${heard ? " heard" : lang.direction === "rtl" ? " rtl" : ""}`}>
                 {heard ? (
                   /* The play button drawn wherever a recording is, drawn
-                     long here, and a button of its own: it plays and does
-                     nothing else, the tap never reaching the tile. */
+                     long here, and a button of its own: it plays and picks
+                     the tile up, the tap never reaching the tile — which
+                     would free a pair or complete one. */
                   <button
                     type="button"
                     className={`at-clipplay at-matchplay${sounding === w.id ? " on" : ""}`}
@@ -9410,6 +8879,7 @@ function MatchGrid({
                     aria-label={sounding === w.id ? `Stop recording ${i + 1}` : `Play recording ${i + 1}`}
                     onClick={(e) => {
                       e.stopPropagation();
+                      pickUpHeard(w.id);
                       play(w);
                     }}
                     onKeyDown={(e) => e.stopPropagation()}
@@ -9528,7 +8998,7 @@ function MatchGrid({
  *   the meanings up, in the interface font — an English tile set in the
  *   script's size and direction is a sentence pretending to be a word.
  */
-function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase", field = "ar" }: {
+function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase", field = "ar", multi = false }: {
   options: any[];
   lang: Lang;
   value: string;
@@ -9536,22 +9006,31 @@ function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase"
   disabled?: boolean;
   kind?: string;
   field?: string;
+  /** Several may be ticked: the value is their texts, in the tiles' order, joined by WHO_JOIN. */
+  multi?: boolean;
 }) {
   const textOf = (option: any) => String((option && option[field]) || "");
+  const ticked = multi ? value.split(WHO_JOIN).filter(Boolean) : [];
+  const isOn = (text: string) => (multi ? ticked.includes(text) : value === text);
+  const toggle = (text: string) => {
+    if (!multi) return onChange(text);
+    const next = isOn(text) ? ticked.filter((t) => t !== text) : ticked.concat([text]);
+    onChange(options.map(textOf).filter((t) => next.includes(t)).join(WHO_JOIN));
+  };
   return (
-    <div className="at-replies" data-el="answer-choices">
+    <div className={`at-replies${multi ? " multi" : ""}`} data-el="answer-choices" role={multi ? "group" : undefined}>
       {options.map((option) => {
         const text = textOf(option);
         return (
           <button
             type="button"
             key={option.id}
-            className={`at-reply${value === text ? " on" : ""}${kind === "word" ? " word" : ""}${
+            className={`at-reply${isOn(text) ? " on" : ""}${kind === "word" ? " word" : ""}${
               field === "en" ? " en" : ""
             }`}
-            aria-pressed={value === text}
+            aria-pressed={isOn(text)}
             disabled={disabled}
-            onClick={() => onChange(text)}
+            onClick={() => toggle(text)}
           >
             {field === "en" ? asMeaning(text) : <Arabic text={text} kind={kind} lang={lang} />}
           </button>
@@ -9878,92 +9357,189 @@ function AfterAnswer({ ok, overridden, onOverride, onFlag, flagged, onContinue }
           a screen has the whole window, the way out where every other
           screen keeps it, and Send at its foot. */}
       {open && (
-        <Screen
+        <ReportScreen
           title="Flag a problem"
-          onBack={close}
-          rise
           backLabel="Back to the question"
-          footer={
-            <Button variant="primary" disabled={!ready} onClick={send}>
-              Send
-            </Button>
-          }
-        >
-          <div className="at-flagmenu" data-el="flag-menu">
-            {/* Why it is worth the half minute. Reporting a bad question
-                is a favour done for the next person to meet it, and
-                nothing on the screen said so. */}
-            <p className="at-flagmenu-lede" data-el="flag-menu-lede">
-              Any issue or feedback you report helps us improve the app.
-            </p>
-            <div className="at-flagopts">
-              {FLAG_KINDS.map((k) => (
-                <button
-                  key={k.key}
-                  className={`at-flagopt${picked === k.key ? " on" : ""}`}
-                  aria-pressed={picked === k.key}
-                  onClick={() => setPicked(k.key)}
-                >
-                  <span className="at-flagopt-title">{k.title}</span>
-                  <span className="at-flagopt-what">{k.what}</span>
-                  {/* Said only where it is true: on a right answer, or
-                      one already overturned, there is nothing to count. */}
-                  {k.fixes && !ok && !overridden && (
-                    <span className="at-flagopt-does">Counts it correct</span>
-                  )}
-                </button>
-              ))}
-            </div>
-            {/* One box for all four, under them: whichever is picked, there
-                may be more to say, and a box that belonged to one option
-                said there was only room for words on that one. It asks
-                for them outright only where they are owed. */}
-            <div className="at-flagnote" data-el="flag-note">
-              <label className="at-flagnote-label" htmlFor="flag-note-input">
-                Tell us what happened
-                <span className="at-flagnote-need" data-el="flag-note-need">
-                  {needsNote ? "Required" : "Optional"}
-                </span>
-              </label>
-              <textarea
-                id="flag-note-input"
-                data-el="flag-note-input"
-                className="at-input at-flagtext"
-                rows={4}
-                maxLength={FLAG_NOTE_MAX}
-                placeholder="The recording plays the wrong word…"
-                value={note}
-                aria-required={needsNote}
-                onChange={(e) => setNote(e.target.value)}
-              />
-            </div>
-          </div>
-        </Screen>
+          options={FLAG_KINDS.map((k) => ({
+            ...k,
+            /* Said only where it is true: on a right answer, or one
+               already overturned, there is nothing to count. */
+            does: k.fixes && !ok && !overridden ? "Counts it correct" : undefined,
+          }))}
+          picked={picked}
+          onPick={(k) => setPicked(k as FlagKind)}
+          note={note}
+          onNote={setNote}
+          needsNote={needsNote}
+          ready={ready}
+          placeholder="The recording plays the wrong word…"
+          onClose={close}
+          onSend={send}
+        />
       )}
     </div>
   );
 }
 
 
+/*
+ * The screen a report is written on: a set of options, one box for the
+ * person's own words, and Send at the foot. Flagging a question uses it
+ * with the four kinds of problem with a card; Share feedback in the You
+ * menu (0.552) uses it with its two, so the two read and work the same.
+ */
+function ReportScreen({ title, backLabel, options, picked, onPick, note, onNote, needsNote, ready, placeholder, onClose, onSend }: {
+  title: string;
+  backLabel: string;
+  options: { key: string; title: string; what: string; does?: string }[];
+  picked: string | null;
+  onPick: (key: string) => void;
+  note: string;
+  onNote: (next: string) => void;
+  needsNote: boolean;
+  ready: boolean;
+  placeholder: string;
+  onClose: () => void;
+  onSend: () => void;
+}) {
+  /* A screen of its own rather than a panel over the foot. The panel had
+     four cards, a box and two buttons to fit into whatever the keyboard
+     left of a phone, and scrolled inside itself to do it; a screen has the
+     whole window, the way out where every other screen keeps it, and Send
+     at its foot. */
+  return (
+    <Screen
+      title={title}
+      onBack={onClose}
+      rise
+      backLabel={backLabel}
+      footer={
+        <Button variant="primary" disabled={!ready} onClick={onSend}>
+          Send
+        </Button>
+      }
+    >
+      <div className="at-flagmenu" data-el="flag-menu">
+        {/* Why it is worth the half minute. Reporting a problem is a
+            favour done for the next person to meet it, and nothing on the
+            screen said so. */}
+        <p className="at-flagmenu-lede" data-el="flag-menu-lede">
+          Any issue or feedback you report helps us improve the app.
+        </p>
+        <div className="at-flagopts">
+          {options.map((k) => (
+            <button
+              key={k.key}
+              className={`at-flagopt${picked === k.key ? " on" : ""}`}
+              aria-pressed={picked === k.key}
+              onClick={() => onPick(k.key)}
+            >
+              <span className="at-flagopt-title">{k.title}</span>
+              <span className="at-flagopt-what">{k.what}</span>
+              {k.does ? <span className="at-flagopt-does">{k.does}</span> : null}
+            </button>
+          ))}
+        </div>
+        {/* One box for every option, under them: whichever is picked, there
+            may be more to say, and a box that belonged to one option said
+            there was only room for words on that one. It asks for them
+            outright only where they are owed. */}
+        <div className="at-flagnote" data-el="flag-note">
+          <label className="at-flagnote-label" htmlFor="flag-note-input">
+            Tell us what happened
+            <span className="at-flagnote-need" data-el="flag-note-need">
+              {needsNote ? "Required" : "Optional"}
+            </span>
+          </label>
+          <textarea
+            id="flag-note-input"
+            data-el="flag-note-input"
+            className="at-input at-flagtext"
+            rows={4}
+            maxLength={FLAG_NOTE_MAX}
+            placeholder={placeholder}
+            value={note}
+            aria-required={needsNote}
+            onChange={(e) => onNote(e.target.value)}
+          />
+        </div>
+      </div>
+    </Screen>
+  );
+}
+
+/*
+ * Share feedback (0.552): about the app rather than a card, from the You
+ * menu. Both options need words. It goes to the App admin alone, with the
+ * space the person is in and where in the app they were.
+ */
+function FeedbackScreen({ onClose, onSend }: {
+  onClose: () => void;
+  onSend: (kind: FeedbackKind, note: string) => void;
+}) {
+  const [picked, setPicked] = useState<FeedbackKind | null>(null);
+  const [note, setNote] = useState("");
+  const ready = !!picked && !!note.trim();
+  return (
+    <ReportScreen
+      title="Share feedback"
+      backLabel="Back"
+      options={FEEDBACK_KINDS}
+      picked={picked}
+      onPick={(k) => setPicked(k as FeedbackKind)}
+      note={note}
+      onNote={setNote}
+      needsNote
+      ready={ready}
+      placeholder={picked === "idea" ? "It would help if…" : "When I tap…, nothing happens"}
+      onClose={onClose}
+      onSend={() => {
+        if (!picked || !ready) return;
+        onSend(picked, note.trim());
+        onClose();
+      }}
+    />
+  );
+}
+
 /* ==================================================================
    Main
    ================================================================== */
 
 /* Whether this person teaches anything, kept across launches so the space
-   selector is right the moment the app opens rather than a request later. */
-const TEACHES_KEY = "arabic-trainer-teaches";
+   selector is right the moment the app opens rather than a request later.
+   Per space (0.582): somebody may teach in one of their spaces and only
+   learn in another. A space not yet known reads as "no". */
+const TEACHES_PREFIX = "arabic-trainer-teaches:";
+const teachesKey = () => `${TEACHES_PREFIX}${API.currentOrg()}`;
+/* Which of your spaces Learning shows (memberships): an org id, or "" for
+   all. Per device. */
+const SPACE_FILTER_KEY = "arabic-trainer:space-filter";
 function loadTeaches() {
   try {
-    return localStorage.getItem(TEACHES_KEY) === "1";
+    return localStorage.getItem(teachesKey()) === "1";
   } catch (e) {
     return false;
   }
 }
 function saveTeaches(yes: boolean) {
   try {
-    localStorage.setItem(TEACHES_KEY, yes ? "1" : "0");
+    localStorage.setItem(teachesKey(), yes ? "1" : "0");
   } catch (e) {
     /* private browsing; the next launch just asks again */
+  }
+}
+/* Signing out forgets it for every space: the next person is not them. */
+function forgetTeaches() {
+  try {
+    const gone: string[] = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && (k.startsWith(TEACHES_PREFIX) || k === "arabic-trainer-teaches")) gone.push(k);
+    }
+    for (const k of gone) localStorage.removeItem(k);
+  } catch (e) {
+    /* nothing kept */
   }
 }
 
@@ -9982,7 +9558,7 @@ function saveTeaches(yes: boolean) {
  * version it already has, and without one every launch pulled every deck
  * and every card in full.
  */
-const MATERIAL_KEY = "arabic-trainer:material";
+const MATERIAL_KEY = "arabic-trainer:material" + TRIAL;
 
 interface HeldMaterial {
   courses: Course[];
@@ -10141,6 +9717,153 @@ export default function ArabicTrainer() {
   const [account, setAccount] = useState(() => API.loadAccount());
 
   /*
+   * The address, read once (0.543; docs/PLAN-spaces.md, B6). Its first part
+   * names a space; `?join=` carries an invite. The space's public face is
+   * fetched at once, signed in or not: Onboarding shows it, and an App admin
+   * works in it (x-org, set through setAddressOrg).
+   */
+  /* The account as this render has it, for the address lookup, which
+     answers after the render that started it. */
+  const accountNow = useRef(account);
+  accountNow.current = account;
+  const [address] = useState(() => {
+    const slug = (window.location.pathname.split("/")[1] || "").toLowerCase();
+    const join = new URLSearchParams(window.location.search).get("join") || "";
+    return { slug, join };
+  });
+  const [addressSpace, setAddressSpace] = useState<OnboardingPlace["org"] | null>(null);
+  const [addressUnknown, setAddressUnknown] = useState(false);
+  /* Read by the course refresh, which must not ask before it is known
+     while trying a space (0.574). */
+  const addressSpaceId = (addressSpace && addressSpace.id) || "";
+  const addressIdRef = useRef(addressSpaceId);
+  addressIdRef.current = addressSpaceId;
+  /* Why the device was just signed out — a closed space, a suspension. */
+  const [signedOutWhy, setSignedOutWhy] = useState("");
+  useEffect(() => {
+    let live = true;
+    /* A failed lookup is tried again, further apart each time (0.582):
+       until it answers, an App admin's requests here wait for it. */
+    let delay = 2000;
+    const look = (slug: string, hops = 0): void => {
+      if (!slug) return;
+      API.orgInfo(slug).then(
+        (r) => {
+          if (!live) return;
+          if (r.moved && hops < 3) {
+            window.history.replaceState(null, "", `/${r.moved}${window.location.search}`);
+            look(r.moved, hops + 1);
+          } else if (r.org) {
+            /* The address decides the space a request acts in for nobody
+               signed in, and for an App admin. A member's is known from
+               the account (API.actingSpace, 0.582). */
+            const who = accountNow.current;
+            if (!who || who.admin) API.setAddressOrg(r.org.id);
+            setAddressSpace(r.org);
+          }
+        },
+        (e) => {
+          if (!live) return;
+          const err = e instanceof Error ? e : new Error(String(e));
+          /* Whatever waits on the lookup fails with it. No such space:
+             the unknown-address screen, and nothing to try again. */
+          API.spaceLookupFailed(err);
+          if (err.message === "no-space") {
+            setAddressUnknown(true);
+            return;
+          }
+          const wait = delay;
+          delay = Math.min(delay * 2, 30000);
+          setTimeout(() => {
+            if (live) look(slug, hops);
+          }, wait);
+        },
+      );
+    };
+    look(address.slug);
+    return () => {
+      live = false;
+    };
+  }, [address.slug]);
+
+  /*
+   * Being signed in means being at your own space's address (B6). An App
+   * admin may open any space and stays where they are; somebody who
+   * followed another space's invite link is asked what they meant (82b).
+   */
+  /*
+   * The spaces this account is in (memberships), as whoami last said. At
+   * the address of one of them, that is the space you are in: switching
+   * space in the You menu is going to its address. Anywhere else, the
+   * space whoami landed you in.
+   */
+  const accountOrgs: API.OrgCard[] =
+    account && Array.isArray((account as any).orgs) && (account as any).orgs.length
+      ? (account as any).orgs
+      : account && (account as any).org && typeof (account as any).org === "object"
+        ? [(account as any).org]
+        : [];
+  const atOwnAddress = account && !account.admin ? accountOrgs.find((o) => o.slug === address.slug) || null : null;
+  const accountOrg = account && (atOwnAddress || (account as any).org);
+  const accountOrgId: string = accountOrg && typeof accountOrg === "object" ? accountOrg.id : "";
+  /* Suspended in, removed from or gone from every space (0.578): signed in,
+     with nothing to use but a way back. */
+  const stranded = account && !account.admin && Array.isArray(account.stranded) && account.stranded.length
+    ? account.stranded
+    : null;
+  /*
+   * The space chosen at the top of Learning (memberships): one of yours, or
+   * "" for all of them. Remembered on this device, like the languages. Only
+   * offered to someone in more than one space.
+   */
+  /* The super admin too, in their own spaces (0.577); not while trying a
+     space, where Learning is that space alone. */
+  const learnSpaces = account && !(account.admin && TRYING) ? accountOrgs : [];
+  const [spaceFilter, setSpaceFilterState] = useState(() => {
+    try {
+      return localStorage.getItem(SPACE_FILTER_KEY) || "";
+    } catch (e) {
+      return "";
+    }
+  });
+  const setSpaceFilter = (id: string) => {
+    setSpaceFilterState(id);
+    try {
+      localStorage.setItem(SPACE_FILTER_KEY, id);
+    } catch (e) {
+      /* private browsing: it lasts until the app is closed */
+    }
+  };
+  /* The space on screen: an App admin works in the one at the address,
+     everyone else in their own. Named once, so the corner menu and
+     Teaching cannot disagree about it. */
+  const shownSpace = account && account.admin && addressSpace ? addressSpace : accountOrg || null;
+  const [inviteSetAside, setInviteSetAside] = useState(false);
+  /* Joining another space from its invitation (memberships). */
+  const [joinBusy, setJoinBusy] = useState(false);
+  const [joinError, setJoinError] = useState("");
+  /* Another space's invitation, followed while signed in: "Join it?". One
+     of your own spaces' is simply where you are. */
+  const strayInvite =
+    !inviteSetAside && !!account && !account.admin && !!accountOrg && !!address.join &&
+    !!addressSpace && !accountOrgs.some((o) => o.id === addressSpace.id);
+  const accountOrgIds = accountOrgs.map((o) => o.id).join(" ");
+  useEffect(() => {
+    /* An invitation to a space you are already in has nothing left to do. */
+    if (!address.join || !addressSpace || !accountOrgIds.split(" ").includes(addressSpace.id)) return;
+    const q = new URLSearchParams(window.location.search);
+    if (!q.has("join")) return;
+    q.delete("join");
+    const rest = q.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+  }, [address.join, addressSpace, accountOrgIds]);
+  useEffect(() => {
+    if (!account || account.admin || !accountOrg || !accountOrg.slug || strayInvite) return;
+    const here = (window.location.pathname.split("/")[1] || "").toLowerCase();
+    if (here !== accountOrg.slug) window.history.replaceState(null, "", `/${accountOrg.slug}`);
+  }, [account, accountOrg, strayInvite]);
+
+  /*
    * Who the account is, rather than which object holds it. A re-render can
    * hand back a fresh object for the same person, and every hook below
    * wants to re-run when the person changes and not when the reference
@@ -10155,12 +9878,31 @@ export default function ArabicTrainer() {
      depends on it. */
   const accountAdmin = !!(account && account.admin);
   /* A teacher opens into teaching; everyone else into learning. */
-  const [space, setSpace] = useState(() => (loadTeaches() ? "teach" : "learn"));
+  /* `?open=admin` or `?open=super` (0.552): an App admin arriving from
+     Open on a space's tile, or from the way back to Spaces, lands where they
+     asked rather than where they last were. */
+  const [space, setSpace] = useState(() => {
+    const open = new URLSearchParams(window.location.search).get("open");
+    /* Super admin is only ever shown at one of your own addresses: in a
+       space you are trying, its Admin (0.574). */
+    if (open === "super" && TRYING) return "admin";
+    if (open === "admin" || open === "super") return open;
+    return loadTeaches() ? "teach" : "learn";
+  });
+  useEffect(() => {
+    const q = new URLSearchParams(window.location.search);
+    if (!q.has("open")) return;
+    q.delete("open");
+    const rest = q.toString();
+    window.history.replaceState(null, "", `${window.location.pathname}${rest ? `?${rest}` : ""}`);
+  }, []);
   /* Where a space's sections go in the bar at the foot of the window. State
      rather than a ref, so the tab strips that portal into it render again
      once it exists. */
   const [dockSlot, setDockSlot] = useState<HTMLElement | null>(null);
   const [screen, setScreen] = useState<string | null>(null); // null | "settings" | "guide"
+  /* Share feedback (0.552), open over whatever screen it was asked from. */
+  const [sharing, setSharing] = useState(false);
   /* Remembered, because it decides whether the Teaching option exists at all.
      Deriving it only from a fresh network call meant a slow or failed request
      took the space selector away, with no way back but signing out. */
@@ -10301,14 +10043,35 @@ export default function ArabicTrainer() {
   useEffect(() => {
     if (!account) return;
     API.setKey(account.key);
-    API.whoAmI(account.key)
+    /* Where to land (memberships): the space at the address when it is
+       one of yours, else the one last used on this device. The invitation
+       followed, if any, lets an account with no open space back in. */
+    API.whoAmI(account.key, (atOwnAddress && atOwnAddress.id) || API.lastSpace(), address.join)
       .then((r) => {
         const merged = { ...r.user, key: account.key };
         API.saveAccount(merged);
+        if (!r.user.admin && r.user.org) API.rememberSpace(r.user.org.id);
+        /* The super admin's spaces changed since this device last knew
+           (0.575): a space tried here is now theirs, or the other way
+           round. The practice document's key depends on it, so start
+           again; a trial that became a membership leaves nothing behind. */
+        const tryingNow = API.tryingSpace();
+        if (tryingNow !== TRYING) {
+          if (TRYING) API.dropTrial(TRYING);
+          window.location.reload();
+          return;
+        }
         setAccount(merged);
       })
-      .catch(() => {
-        /* offline, or the key was replaced — keep working locally */
+      .catch((e) => {
+        /* Offline, or the key was replaced: keep working locally. Only a
+           closed space or a suspended account signs the device out (B8). */
+        const why = String(e && (e as Error).message);
+        if (why === "space-closed" || why === "suspended" || why === "suspended-app") {
+          API.clearAccount();
+          setAccount(null);
+          setSignedOutWhy(API.explain(e));
+        }
       });
   /* The key, not the account object: a re-render hands back a new
      object for the same person, and re-checking who they are on
@@ -10493,6 +10256,8 @@ export default function ArabicTrainer() {
     /* Defaulted rather than required: most callers have no token in hand
        and want whatever this device is already signed in with. */
     async (token: string = "") => {
+      /* Trying a space (0.574): its practice stays on this device. */
+      if (TRYING) return;
       const key = token || loadSyncConfig().token;
       if (!key || syncing.current) return;
       /*
@@ -10514,7 +10279,7 @@ export default function ArabicTrainer() {
       owed.current = false;
       let sent = false;
       try {
-        const { merged, changed, lost } = await syncOnce(dataRef.current, key);
+        const { merged, changed, lost, serverNow } = await syncOnce(dataRef.current, key);
         sent = true;
         if (lost) {
           /* The shared copy could not be read and this sync has replaced
@@ -10542,7 +10307,8 @@ export default function ArabicTrainer() {
              without a state for an exercise type that did not exist yet —
              and taking it as-is put an incomplete card into memory that
              crashed the next render. */
-          const adopted = merge(mergeData(dataRef.current, merged));
+          /* By the server's clock, as the merge inside the trip was. */
+          const adopted = merge(mergeData(dataRef.current, merged, serverNow ?? Date.now()));
           fromSync.current = true;
           commit(adopted);
           /* Through the one writer, which cancels the debounced save still
@@ -10700,6 +10466,8 @@ export default function ArabicTrainer() {
       }
       return;
     }
+    /* Trying a space (0.574): no sync, so no token. */
+    if (TRYING) return;
     let alive = true;
     tokenFor(account.key).then((token) => {
       if (!alive) return;
@@ -10714,6 +10482,29 @@ export default function ArabicTrainer() {
      than the person behind it does. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, accountKey, runSync]);
+
+  /* Once a sync has settled, and never while a session is running: the
+     recordings and pictures nothing names any more are cleared from the
+     device, at most once a day (0.580). A device with no cards at all —
+     just logged out, say — keeps what it has. */
+  useEffect(() => {
+    if (syncState !== "ok" || session) return;
+    const items = dataRef.current.items || [];
+    if (!items.length) return;
+    let last = 0;
+    try {
+      last = Number(localStorage.getItem(MEDIA_SWEPT) || 0);
+    } catch (e) {
+      return;
+    }
+    if (Date.now() - last < 86400000) return;
+    try {
+      localStorage.setItem(MEDIA_SWEPT, String(Date.now()));
+    } catch (e) {
+      return;
+    }
+    void sweepMedia(mediaOf(items));
+  }, [syncState, session]);
 
   /* After anything changes: soon, or with the session's next trip while
      questions are being answered. See syncAfterChange in sync.ts. */
@@ -10799,7 +10590,9 @@ export default function ArabicTrainer() {
         await API.reportFlag(body as API.FlagReport);
         return "sent";
       } catch (e) {
-        return String((e && (e as Error).message) || e) === "offline" ? "keep" : "drop";
+        /* A server error or a gateway's page is the server not having
+           answered yet: wait for it (0.580). */
+        return isTransient(String((e && (e as Error).message) || e)) ? "keep" : "drop";
       }
     });
     setToSend(left);
@@ -10928,6 +10721,66 @@ export default function ArabicTrainer() {
     }
     return false;
   }, []);
+
+  /*
+   * Logging out sets the practice aside, per person (0.580, audit
+   * finding 8).
+   *
+   * The document on this device is always the signed-in person's. At log
+   * out it goes up one more time if it can, then is moved to a slot named
+   * by the person's handle, and the main document is emptied — so the next
+   * person to sign in here neither sees it nor has it pushed under their
+   * key. When the same person signs in here again, it is merged back. Set
+   * aside rather than wiped because a log out offline must not lose
+   * answers that never reached the server.
+   */
+  const parkForLogOut = useCallback(async () => {
+    const who = account && account.handle;
+    if (!who || TRYING || !window.storage) return;
+    if (!isOffline() && loadSyncConfig().token) {
+      await writeNow();
+      /* One more trip, bounded: the document is set aside either way. */
+      await Promise.race([
+        Promise.resolve(runSync()).catch(() => {}),
+        new Promise((r) => setTimeout(r, 20000)),
+      ]);
+    }
+    const doc = dataRef.current;
+    const slim = { ...doc, items: (doc.items || []).map(compactItem) };
+    const kept = await window.storage.set(PARKED_KEY(who), JSON.stringify(slim));
+    if (!kept) {
+      flash("Not enough space on this device to set your progress aside; it stays until you sign in again.", "warn");
+      return;
+    }
+    /* No more trips under this person's key, and none owed. */
+    if (syncTimer.current) {
+      clearTimeout(syncTimer.current);
+      syncTimer.current = null;
+    }
+    owed.current = false;
+    saveSyncConfig({ ...loadSyncConfig(), token: "" });
+    setSyncCfg((c) => ({ ...c, token: "" }));
+    fromSync.current = true;
+    commit({ ...EMPTY });
+    await writeNow();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountKey, runSync, writeNow, commit]);
+
+  /* And taken back when they sign in here again. */
+  const adoptParked = useCallback(async (handle: string) => {
+    if (TRYING || !window.storage) return;
+    let parked: any = null;
+    try {
+      const res = await window.storage.get(PARKED_KEY(handle));
+      parked = res && res.value ? JSON.parse(res.value) : null;
+    } catch (e) {
+      return;
+    }
+    if (!parked) return;
+    fromSync.current = true;
+    commit(merge(mergeData(dataRef.current, parked)));
+    if (await writeNow()) await window.storage.delete(PARKED_KEY(handle));
+  }, [commit, writeNow]);
 
   /* Takes the next document, or a function of the current one. The
      function form is for anything that can run while a sync or a course
@@ -11364,17 +11217,66 @@ export default function ArabicTrainer() {
   /* And the cards that leaves. Everything a learner is shown reads this
      rather than the whole document: the card list, progress, what is ready
      to practise, and what a session is dealt from. */
-  const inPlay = useCallback(
-    (it: Item) => !langsOff.includes(langIdOf(it, settings)),
-    [langsOff, settings]
+  /*
+   * And the space chosen at the top of Learning, for someone in more than
+   * one (memberships). A card's space is its course's; a number's is the
+   * space of a deck its system fills; a card the learner wrote is in none,
+   * and is shown whichever space is chosen. Like the languages, this is
+   * what every reader below is given, so a session started while a space
+   * is chosen draws from that space alone (1a).
+   */
+  const orgOfCourse = useMemo(
+    () => new Map(myCourses.map((c) => [c.id, (c as any).org || ""] as [string, string])),
+    [myCourses]
   );
+  const orgOfSystem = useMemo(() => {
+    const m = new Map<string, string>();
+    for (const d of courseDecks as any[]) {
+      const org = orgOfCourse.get(d.courseId) || "";
+      for (const sid of [d.numbersSystemId, d.timeSystemId]) if (sid && org && !m.has(sid)) m.set(sid, org);
+    }
+    return m;
+  }, [courseDecks, orgOfCourse]);
+  const spaceOfItem = useCallback(
+    (it: Item): string | null => {
+      const src: any = (it as any).source;
+      if (!src) return null;
+      if (src.courseId) return orgOfCourse.get(src.courseId) || null;
+      if (src.systemId) return orgOfSystem.get(src.systemId) || null;
+      return null;
+    },
+    [orgOfCourse, orgOfSystem]
+  );
+  const spaceNameOf = useMemo(() => new Map(learnSpaces.map((o) => [o.id, o.name] as [string, string])),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [learnSpaces.map((o) => `${o.id}:${o.name}`).join(" ")]);
+  const spaceNow = learnSpaces.length > 1 && learnSpaces.some((o) => o.id === spaceFilter) ? spaceFilter : "";
+  const inPlay = useCallback(
+    (it: Item) => {
+      if (langsOff.includes(langIdOf(it, settings))) return false;
+      if (!spaceNow) return true;
+      const at = spaceOfItem(it);
+      return at === null || at === spaceNow;
+    },
+    [langsOff, settings, spaceNow, spaceOfItem]
+  );
+  const narrowed = langsOff.length > 0 || !!spaceNow;
   const shown = useMemo(
-    () => (langsOff.length ? items.filter(inPlay) : items),
-    [items, langsOff, inPlay]
+    () => (narrowed ? items.filter(inPlay) : items),
+    [items, narrowed, inPlay]
   );
   const drillable = useMemo(
-    () => (langsOff.length ? drillableAll.filter(inPlay) : drillableAll),
-    [drillableAll, langsOff, inPlay]
+    () => (narrowed ? drillableAll.filter(inPlay) : drillableAll),
+    [drillableAll, narrowed, inPlay]
+  );
+  /* The courses and decks Learning shows, under the same choice. */
+  const learnCourses = useMemo(
+    () => (spaceNow ? myCourses.filter((c) => ((c as any).org || "") === spaceNow) : myCourses),
+    [myCourses, spaceNow]
+  );
+  const learnDecks = useMemo(
+    () => (spaceNow ? courseDecks.filter((d: any) => orgOfCourse.get(d.courseId) === spaceNow) : courseDecks),
+    [courseDecks, spaceNow, orgOfCourse]
   );
 
   /* How much is waiting, in the languages that are switched on: the number
@@ -11525,6 +11427,8 @@ export default function ArabicTrainer() {
       flash(
         built.reason === "no-mistakes"
           ? "Nothing to fix — none of those have gone wrong recently"
+          : built.reason === "caught-up"
+          ? "You're all caught up — nothing in those cards is due yet"
           : built.reason === "no-unseen"
           ? "You've practised all of those in the last few days, or they're already cleared"
           : built.reason === "none-due"
@@ -11558,6 +11462,9 @@ export default function ArabicTrainer() {
        speak either way. */
     async (announce: boolean | "changes") => {
       if (!account) return true;
+      /* Trying a space (0.574): not until the address has said which
+         space, or the answer is the App admin's own. */
+      if (TRYING && !addressIdRef.current) return true;
       /* A focus and a visibility change arrive together when a tab comes
          back; one refresh at a time is enough. */
       if (refreshing.current) return true;
@@ -11578,7 +11485,8 @@ export default function ArabicTrainer() {
           dataRef.current.parked || {},
         );
         setTeaches(r.teaches);
-        saveTeaches(r.teaches);
+        /* Trying a space (0.574): its answer is not yours to keep. */
+        if (!TRYING) saveTeaches(r.teaches);
         materialVersion.current = r.version || "";
         answered = true;
         if (r.unchanged) {
@@ -11746,6 +11654,13 @@ export default function ArabicTrainer() {
   /* A course can be deleted, or its decks changed, by a teacher on another
      device. Without this the home screen keeps showing a course that is gone
      until the app is reloaded. */
+  /* Trying a space (0.574): ask for its material once the address has
+     said which space it is. */
+  useEffect(() => {
+    if (TRYING && ready && account && addressSpaceId) refreshCourses(false);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, accountHandle, addressSpaceId, refreshCourses]);
+
   const recheckCourses = useCallback(() => {
     if (ready && account) refreshCourses(false);
   /* The handle, not the account object, for the same reason. */
@@ -12015,6 +11930,14 @@ export default function ArabicTrainer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [verbTense, spec, item && item.id]);
   const verbPlace = placeInTense(verbTense, item);
+  /* What the verb means on "who is it?", with nobody in it: the card's
+     own meaning where it has one, else the form's with its person taken
+     off the front. */
+  const whoMeaning =
+    spec && spec.picks === "person" && item
+      ? String((parentItem && parentItem.forms[0] && parentItem.forms[0].id !== item.id && parentItem.forms[0].en) || "").trim() ||
+        meaningWithoutWho(item.en, verbTense ? verbTense.places.map((p) => p.person) : [])
+      : "";
 
   /*
    * Whether the pronunciation or the meaning is beside the question.
@@ -12095,6 +12018,14 @@ export default function ArabicTrainer() {
      it in order, playing a part — has no line of its own, which is what
      `at` being null means. */
   const dialog = isDialog(parentItem) ? parentItem : null;
+  /* How the whole phrase or sentence a gap was in is said, for the answer
+     screen — see also-phrase-said. Empty where it was not written down. */
+  const phraseSaid =
+    spec && spec.promptField === "context" && context
+      ? String(context.lat || "").trim()
+      : spec && spec.promptField === "gap" && dialog && item && item.gap
+        ? String((linesOf(dialog)[item.gap.line] || {}).lat || "").trim()
+        : "";
   const scene = dialog && item ? sceneOf(item.id) : null;
   const at = scene && scene.at !== WHOLE_SCENE ? scene.at : null;
   /* Everything said before this line: the question, in a dialog. What
@@ -12223,6 +12154,26 @@ export default function ArabicTrainer() {
   }, [item, parentItem, spec, qLang.id]);
 
   /*
+   * The card's other forms the prompt reads the same as, where the prompt
+   * does say which one it wants: "Not good" with "feminine" under it, and
+   * the masculine beside it on the card. Written instead, that form is the
+   * right word in the wrong form — nearly right, and the verdict says
+   * which form it was (0.586). Where the prompt says nothing they are
+   * twins, and right.
+   */
+  const namedKin = useMemo(() => {
+    if (!item || !parentItem || !spec || spec.picks || hasSlots(parentItem)) return [] as Form[];
+    if (!askLabel(item, parentItem, qLang) || twins.length) return [] as Form[];
+    return twinsOf({
+      unit: item,
+      kin: unitsOf(parentItem).map((u) => u.unit),
+      promptField: spec.promptField || "",
+      told: false,
+    }) as Form[];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [item, parentItem, spec, qLang.id, twins]);
+
+  /*
    * The learner's other cards that this question cannot tell from the one
    * it asks — صَبِر = patience, when صَبِر = cactus is asked for its
    * meaning. See siblingsAsked.
@@ -12245,24 +12196,27 @@ export default function ArabicTrainer() {
   const choices = useMemo(() => {
     if (!spec || !spec.picks) return [];
     /*
-     * Who a verb's form is about: the persons of its own tense, the right
-     * one and those whose forms look most like it. A person whose form is
-     * spelt the same is offered too and is as right — see whoIsRight.
+     * Who a verb's form is about: the persons of its own tense, every one
+     * whose form is spelt the same, and those whose forms look most like
+     * it. All the right ones are always offered and all are to be ticked —
+     * see whoChoices and whoAllRight.
      */
     if (spec.picks === "person") {
       if (!verbTense || !item) return [];
       const { right, wrong } = whoChoices(verbTense, item, qLang, editDistance, PICK_OPTIONS);
       const lead = right.find((p) => p.id === colOf(item)) || right[0];
       if (!lead) return [];
-      const others = right.filter((p) => p !== lead).concat(wrong).slice(0, PICK_OPTIONS - 1);
+      const rightIds = new Set(right.map((p) => `who:${p.id}`));
+      const others = right.filter((p) => p !== lead).concat(wrong);
       const asOption = (p: { id: string; label: string }) => ({ id: `who:${p.id}`, en: p.label || p.id });
       const reps = (statesOf(item)[(exercise && exercise.type) || ""] || {}).reps || 0;
       return optionsFor({
         answer: asOption(lead),
         pool: others.map(asOption),
-        wanted: PICK_OPTIONS,
+        wanted: right.length + wrong.length,
         seed: `${item.id} who ${reps}`,
         textOf: (o) => o.en,
+        near: (o) => rightIds.has(o.id),
       });
     }
     if (spec.picks === "reply") {
@@ -12641,8 +12595,9 @@ export default function ArabicTrainer() {
     if (!spec || !spec.verbDrill || !verbTense || !item) return null;
     const verdict = (ok: boolean) => ({ ok, reason: ok ? "exact" : "wrong" });
     if (spec.picks === "person") {
-      const person = verbTense.places.find((p) => (p.person.label || p.person.id) === typed);
-      return verdict(!!person && whoIsRight(verbTense, item, person.person.id, qLang));
+      const ticked = typed.split(WHO_JOIN).filter(Boolean);
+      const ids = verbTense.places.filter((p) => ticked.includes(p.person.label || p.person.id)).map((p) => p.person.id);
+      return verdict(whoAllRight(verbTense, item, ids, qLang));
     }
     if (spec.answerMode === "vread" || spec.answerMode === "vrow") {
       return verdict(verbMarks(true).every((m) => m.right));
@@ -12705,6 +12660,30 @@ export default function ArabicTrainer() {
           result = also;
           break;
         }
+      }
+    }
+    /* The sentence written with another answer its filler accepts —
+       كيفك where it was filled with كيف حالك. See fillerVariants. */
+    if (!result.ok && !verbOwn && spec && !spec.picks && spec.answerField === "ar") {
+      for (const variant of filledVariantsOf(item)) {
+        const also = checkAnswer(typed, { ...item, ar: variant, answers: undefined, lat: "" }, exercise.type, qSettings);
+        if (also.ok) {
+          result = also;
+          break;
+        }
+      }
+    }
+    /* Another form of this card, where the question named the one it
+       wanted: the word is known and the form is not. */
+    if (!result.ok && !verbOwn && namedKin.length) {
+      const wrote = namedKin.find((k) => checkAnswer(typed, k, exercise.type, qSettings).ok);
+      if (wrote) {
+        result = {
+          ...result,
+          ok: false,
+          reason: "otherForm",
+          note: otherFormNote(askLabel(wrote, parentItem, qLang), askLabel(item, parentItem, qLang)),
+        };
       }
     }
     /*
@@ -13001,10 +12980,18 @@ export default function ArabicTrainer() {
      * about, while the guide promised that anything done offline is sent
      * when a connection returns.
      */
-    if (isOffline()) {
-      keepPending(FLAG_OUTBOX, report);
+    /* Kept to send later, or said plainly that it could not be: a device
+       whose storage is full keeps nothing (0.580). */
+    const keepReport = () => {
+      if (!keepPending(FLAG_OUTBOX, report)) {
+        flash("This device's storage is full, so the report could not be kept. Free some space and send it again.", "warn");
+        return;
+      }
       setToSend(waitingToSend(FLAG_OUTBOX));
       flash("Saved — it will be sent when you're back online", "good");
+    };
+    if (isOffline()) {
+      keepReport();
       return;
     }
     API.reportFlag(report)
@@ -13014,13 +13001,11 @@ export default function ArabicTrainer() {
            be told the same thing; anything else never arrived, so it
            waits. `offline` is what the client calls a request that could
            not be made at all. */
-        if (String((e && (e as Error).message) || e) !== "offline") {
+        if (!isTransient(String((e && (e as Error).message) || e))) {
           flash("Noted on this device. We couldn't reach the server.", "warn");
           return;
         }
-        keepPending(FLAG_OUTBOX, report);
-        setToSend(waitingToSend(FLAG_OUTBOX));
-        flash("Saved — it will be sent when you're back online", "good");
+        keepReport();
       });
   }
 
@@ -13121,7 +13106,21 @@ export default function ArabicTrainer() {
     }
     /* Before the grading, not after: a question answered is learning done,
        whether it was right or wrong. */
-    reportLearning(account);
+    reportLearning(
+      account,
+      session
+        ? (() => {
+            const want = new Set((session.exercises || []).map((q: Question) => q.id));
+            const orgs = new Set<string>();
+            for (const it of items) {
+              if (!want.has(it.id)) continue;
+              const at = spaceOfItem(it);
+              if (at) orgs.add(at);
+            }
+            return [...orgs];
+          })()
+        : undefined
+    );
     /* This question, and no other: the mark names the question it was
        made on, so a session that ended on it cannot carry it into the
        next one. Put down once read. */
@@ -13220,12 +13219,6 @@ export default function ArabicTrainer() {
 
   /* ---------------- items ---------------- */
 
-  function addItems(list: any[]) {
-    const fresh = list.filter((p) => p.ar || p.lat || p.en).map(makeItem);
-    if (!fresh.length) return 0;
-    persist({ ...data, items: items.concat(fresh) });
-    return fresh.length;
-  }
 
   /*
    * The learner asks for a card, or stops asking.
@@ -13253,121 +13246,25 @@ export default function ArabicTrainer() {
     flash(on ? "Marked — it is in your next session" : "No longer high priority");
   }
 
-  /* Editing keeps every existing progress record. Sub-items are matched by
-     id where they already exist, so correcting a plural's spelling doesn't
-     reset what you've learnt about it. */
-  function updateItem(id: string, patch: Record<string, any>) {
-    const target = items.find((i) => i.id === id);
-    if (target && target.locked && !("locked" in patch)) {
-      flash("That card is locked — unlock it first");
-      return;
-    }
-    persist({
-      ...data,
-      items: items.map((i) => {
-        if (i.id !== id) return i;
-        const next: Item = { ...i, updated: now() };
-        /* A patch is a card the editor has handed back, so its words belong
-           to the card's own form and the rest of it to the card. Which is
-           which is asked of the fields a form has — the three words, its
-           recordings and whatever grammar the languages declare. */
-        const lead: Record<string, any> = { ...leadOf(i), updated: now() };
-        for (const [k, v] of Object.entries(patch)) {
-          if (k === "subs" || k === "s" || k === "forms") continue;
-          if (k === "tags") next.tags = cleanTags(v);
-          else if (FORM_FIELDS.has(k)) lead[k] = typeof v === "string" ? v.trim() : v;
-          else (next as Record<string, any>)[k] = typeof v === "string" ? v.trim() : v;
-        }
-        {
-          const old = new Map(subFormsOf(i).map((x) => [x.id, x]));
-          const rest = (patch.subs || subFormsOf(i)).map((draft: Record<string, any>) => {
-            const prev = draft.id && old.get(draft.id);
-            return prev
-              ? {
-                  ...prev,
-                  ar: (draft.ar || "").trim(),
-                  en: (draft.en || "").trim(),
-                  lat: (draft.lat || "").trim(),
-                  /* Every grammatical and lexical value the languages
-                     declare — not a fixed pair of Arabic ones, which
-                     silently dropped a Vietnamese form's classifier. */
-                  ...dimValues(draft),
-                  note: (draft.note || "").trim(),
-                  recs: draft.recs || [],
-                  s: prev.s,
-                  updated: now(),
-                }
-              : makeSub(draft);
-          });
-          /* And the tenses held as skills, which the editor never shows
-             and so never hands back: they are the learner's progress, not
-             the card's wording. */
-          const kept = tenseFormsOf(i).filter((t) => !rest.some((x: Form) => x.id === t.id));
-          next.forms = [lead as Form, ...rest, ...kept];
-        }
-        return withTenses(next, LANGUAGES[String(next.lang || settings.language || DEFAULT_LANGUAGE)] || null);
-      }),
-    });
-  }
-
-  /* Set the same field on many items — used by the bulk bar. */
-  function bulkEdit(ids: string[], patch: Record<string, any>) {
-    updateMany(unlockedOf(ids), (i) => ({ ...i, ...patch }));
-  }
-
-  /* Locked items are left alone by anything that changes them. */
-  function unlockedOf(ids: string[]) {
-    const set = new Set(ids);
-    const targets = items.filter((i) => set.has(i.id));
-    const locked = targets.filter((i) => i.locked).length;
-    if (locked) flash(`${plural(locked, "locked card")} left unchanged`);
-    return targets.filter((i) => !i.locked).map((i) => i.id);
-  }
-
-  function tagMany(ids: string[], tag: string) {
-    const clean = cleanTags(tag)[0];
-    if (!clean) return;
-    updateMany(unlockedOf(ids), (i) =>
-      (i.tags || []).includes(clean) ? i : { ...i, tags: (i.tags || []).concat([clean]) }
-    );
-  }
-
-  function setLockedMany(ids: string[], locked: boolean) {
-    sfx("tick");
-    updateMany(ids, (i) => ({ ...i, locked }));
-    flash(`${plural(ids.length, "item")} ${locked ? "locked" : "unlocked"}`);
-  }
-
-  function removeItems(ids: string[]) {
-    const set = new Set(Array.isArray(ids) ? ids : [ids]);
-    const targets = items.filter((i) => set.has(i.id));
-    const blocked = targets.filter((i) => i.locked).length;
-    const gone = targets.filter((i) => !i.locked);
-    if (blocked) {
-      flash(
-        gone.length
-          ? `${plural(blocked, "locked card")} kept`
-          : `Locked — unlock ${blocked === 1 ? "it" : "them"} first`
-      );
-    }
-    if (!gone.length) return;
-    // Tombstones, so the deletion reaches other devices instead of the
-    // items simply reappearing on the next sync.
-    const goneIds = new Set(gone.map((i) => i.id));
-    const tombstones = { ...(data.tombstones || {}) };
-    for (const it of gone) tombstones[it.id] = now();
-    persist({ ...data, items: items.filter((i) => !goneIds.has(i.id)), tombstones });
-    sfx("warn");
-    setLastDeleted(gone);
-    if (undoTimer.current) clearTimeout(undoTimer.current);
-    undoTimer.current = setTimeout(() => setLastDeleted(null), 15000);
-  }
 
   /* A short message for things quietly refused, so a locked card doesn't
      just silently fail to delete — and for the ones that worked, so a save
      is not answered with silence. The two are told apart by kind. */
   function flash(msg: string, kind?: string) {
     snack.show(msg, kind);
+  }
+
+  /*
+   * Feedback about the app (0.552). It says where it was sent from in
+   * words — the space and the section — because "it doesn't work" is
+   * answerable only once you know where. Not kept for later when offline:
+   * it is about the app, not a card, and there is no card to note it on.
+   */
+  function sendFeedback(kind: FeedbackKind, note: string) {
+    const where = [SPACE_LABEL[space] || space, session ? "practice session" : tab].filter(Boolean).join(" · ");
+    API.sendFeedback({ kind, note: note.slice(0, FLAG_NOTE_MAX), screen: where, release: APP_BUILD })
+      .then(() => flash("Thank you for the feedback 🫶", "good"))
+      .catch((e) => flash(API.explain(e), "warn"));
   }
 
   function undoDelete() {
@@ -13383,14 +13280,6 @@ export default function ArabicTrainer() {
     if (undoTimer.current) clearTimeout(undoTimer.current);
   }
 
-  /* Apply the same change to many items at once. */
-  function updateMany(ids: string[], fn: (it: Item) => Item) {
-    const set = new Set(ids);
-    persist({
-      ...data,
-      items: items.map((i) => (set.has(i.id) ? { ...fn(i), updated: now() } : i)),
-    });
-  }
 
   /* The one prep, set, changed or cleared from Prep mode — see Prep. */
   const savePrep = (p: Prep | null) => {
@@ -13407,122 +13296,6 @@ export default function ArabicTrainer() {
       },
       settingsUpdated: now(),
     });
-
-  /* Everything, in one file: the cards as JSON plus each recording as a
-     real audio file. Streams into a zip rather than building one huge
-     string, and the clips stay playable outside the app. */
-  async function exportEverything() {
-    if (!OWN) return;
-    flash("Gathering recordings…");
-    const entries = [
-      {
-        name: "cards.json",
-        blob: new Blob([JSON.stringify(data, null, 2)], { type: "application/json" }),
-      },
-    ];
-    let missing = 0;
-    for (const it of items) {
-      for (const { unit } of unitsOf(it)) {
-        for (const rec of unit.recs || []) {
-          const blob = await clipBlob(rec.id);
-          if (!blob) {
-            missing += 1;
-            continue;
-          }
-          const ext = (rec.mime || "").includes("mp4")
-            ? "m4a"
-            : (rec.mime || "").includes("ogg")
-            ? "ogg"
-            : (rec.mime || "").includes("wav")
-            ? "wav"
-            : "webm";
-          entries.push({ name: `audio/${rec.id}.${ext}`, blob });
-        }
-      }
-    }
-    try {
-      const zip = await OWN.makeZip(entries);
-      const url = URL.createObjectURL(zip);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `arabic-${dayKey()}.zip`;
-      a.click();
-      URL.revokeObjectURL(url);
-      flash(
-        `Exported ${entries.length - 1} recording${entries.length === 2 ? "" : "s"}` +
-          (missing ? ` · ${missing} not on this device` : "")
-      );
-    } catch (e) {
-      flash("Couldn't build the backup");
-    }
-  }
-
-  /* A file is folded in the way another device's copy is: card by card,
-     newer edit wins, deletions honoured. It used to replace the whole
-     document — settings, history and the sync secret included — so an old
-     backup wiped everything added since, and someone else's backup signed
-     you into their sync. */
-  function absorb(parsed: any) {
-    return merge(mergeData(dataRef.current, merge(parsed)));
-  }
-
-  function confirmImport(parsed: any) {
-    const n = (parsed.items || []).length;
-    return window.confirm(
-      `Merge ${plural(n, "card")} from this file into your collection? ` +
-        "Cards you already have keep whichever version was edited last."
-    );
-  }
-
-  async function importZip(file: File) {
-    if (!OWN) return;
-    flash("Reading the backup…");
-    try {
-      const files = await OWN.readZip(file);
-      const doc = files.find((f) => f.name === "cards.json");
-      if (!doc) {
-        flash("No cards.json in that zip");
-        return;
-      }
-      let clips = 0;
-      for (const f of files) {
-        const m = /^audio\/([^.]+)\./.exec(f.name);
-        if (!m) continue;
-        if (await saveClipBlob(m[1], f.blob)) clips += 1;
-      }
-      const parsed = JSON.parse(await doc.blob.text());
-      if (!Array.isArray(parsed.items)) {
-        flash("That backup looks damaged");
-        return;
-      }
-      if (!confirmImport(parsed)) return;
-      persist(absorb(parsed));
-      flash(`Merged ${parsed.items.length} cards and ${clips} recordings`);
-    } catch (e) {
-      flash("Couldn't read that backup");
-    }
-  }
-
-  function importFile(file: File) {
-    if (!OWN) return;
-    if (/\.zip$/i.test(file.name)) return importZip(file);
-    const r = new FileReader();
-    r.onload = () => {
-      const text = String(r.result || "");
-      try {
-        const parsed = JSON.parse(text);
-        if (Array.isArray(parsed.items)) {
-          if (confirmImport(parsed)) persist(absorb(parsed));
-          return;
-        }
-      } catch (e) {
-        /* not JSON */
-      }
-      addItems(OWN.parseLines(text, allTags));
-    };
-    r.readAsText(file);
-  }
-
 
   /* ---------------- render ---------------- */
 
@@ -13559,11 +13332,77 @@ export default function ArabicTrainer() {
     }
   }, [timeLeft, session, exercise]);
 
+  /* Signed in, holding another space's invite link (82b). */
+  if (ready && account && strayInvite && addressSpace && accountOrg) {
+    return (
+      <div className={`at ${settings.theme || "auto"}`}>
+        <div className="ob">
+          <div className="ob-box">
+            <h2>Join {addressSpace.name}?</h2>
+            <Lede>
+              You're signed in as {account.displayName}. Joining adds {addressSpace.name} to this
+              account; your other spaces stay.
+            </Lede>
+            {joinError ? <Notice kind="warn">{joinError}</Notice> : null}
+            <Button variant="primary" wide className="at-mt4" disabled={joinBusy}
+              onClick={async () => {
+                setJoinBusy(true);
+                setJoinError("");
+                try {
+                  await API.joinSpace(address.join);
+                  const r = await API.whoAmI(account.key, addressSpace.id);
+                  API.saveAccount({ ...r.user, key: account.key });
+                  API.rememberSpace(addressSpace.id);
+                  /* Into the space just joined, the way switching space is. */
+                  window.location.assign(`/${addressSpace.slug}`);
+                } catch (e) {
+                  setJoinError(API.explain(e));
+                  setJoinBusy(false);
+                }
+              }}
+            >
+              Join {addressSpace.name}
+            </Button>
+            <Button variant="ghost" wide className="at-mt3"
+              onClick={() => {
+                window.history.replaceState(null, "", `/${accountOrg.slug}`);
+                setInviteSetAside(true);
+              }}
+            >
+              Not now
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   if (ready && !account) {
     return (
       <div className={`at ${settings.theme || "auto"}`}>
         <React.Suspense fallback={<ChunkFallback />}>
-          <Onboarding onDone={(a: any) => setAccount(a)} />
+          <Onboarding
+            onDone={async (a: any) => {
+              /* The App admin signing in at a space that is none of theirs
+                 tries it (0.574): its practice has its own key on the
+                 device, read at start, so start again. */
+              if (API.tryingSpace() !== TRYING) {
+                window.location.reload();
+                return;
+              }
+              /* What this person set aside here at their last log out comes
+                 back before their first sync, which setAccount starts. */
+              if (a && a.handle) await adoptParked(a.handle);
+              setSignedOutWhy("");
+              setAccount(a);
+            }}
+            place={{
+              org: addressSpace || undefined,
+              unknown: addressUnknown,
+              joinCode: address.join,
+              notice: signedOutWhy,
+            }}
+          />
         </React.Suspense>
       </div>
     );
@@ -13600,7 +13439,9 @@ export default function ArabicTrainer() {
    * answer to "am I losing anything?" is no, and that is the question
    * behind the look at the dot.
    */
-  const syncNote = offline
+  const syncNote = TRYING
+    ? "Practice here stays on this device"
+    : offline
     ? `Offline — your work is saved on this device${
         toSend ? ` · ${plural(toSend, "report")} to send` : ""
       }`
@@ -13616,7 +13457,7 @@ export default function ArabicTrainer() {
         !inExercise && space === "learn" && (tab === "progress" || tab === "items") ? " untitled" : ""
       }${inExercise ? " in-exercise" : ""}${kbOpen ? " kb-open" : ""}${
         inExercise && session.pausedAt ? " paused" : ""
-      }`}
+      }${stranded ? " stranded" : ""}`}
       /* Every rule that lays out the language being learnt reads these two.
          Nothing set them, so the fallbacks applied and Vietnamese was laid
          out right-to-left, like Arabic. */
@@ -13645,6 +13486,25 @@ export default function ArabicTrainer() {
       {/* A problem reported without a connection is kept and sent later;
           until then the learner is told so in the band, not only in the
           corner menu, where it was easy to never look. */}
+      {/* An App admin inside a space that is none of theirs (0.552, 0.574):
+          which one, and the way back to the list of spaces it was opened
+          from, on one line. Leaving drops what trying it kept. */}
+      {account && account.admin && addressSpace && accountOrg && !!TRYING && (
+        <TopBanner
+          oneLine
+          actions={
+            <Button size="sm" variant="ghost" icon="back"
+              onClick={() => {
+                API.dropTrial(TRYING);
+                window.location.assign(`/${accountOrg.slug || ""}?open=super`);
+              }}>
+              Back to Spaces
+            </Button>
+          }
+        >
+          {`You're in ${addressSpace.name}.`}
+        </TopBanner>
+      )}
       {toSend > 0 && (
         <TopBanner>
           {`${plural(toSend, "report")} saved on this device, waiting for a connection. `}
@@ -13652,12 +13512,27 @@ export default function ArabicTrainer() {
         </TopBanner>
       )}
       <div className="at-wrap">
+          {/* No space to use (0.578): what happened, and the way back in.
+              Everything else on the page is hidden; the You menu stays, for
+              Settings and logging out. */}
+          {stranded && account && (
+            <StrandedPanel
+              stranded={stranded}
+              onJoined={async () => {
+                const r = await API.whoAmI(account.key).catch(() => null);
+                if (r) API.saveAccount({ ...r.user, key: account.key });
+                window.location.assign("/");
+              }}
+            />
+          )}
           {/* The same tab strip the teaching and admin spaces use, shown in
               the bar at the foot of the window like theirs. Courses is not
               one of them: it is reached from the corner menu, since it is
               somewhere you go to join or look something up rather than a
               place you work in every day. */}
-          {!inExercise && space === "learn" && (
+          {/* Not while there is no space to use (0.580, audit finding 15):
+              the panel above is the whole page. */}
+          {!inExercise && space === "learn" && !stranded && (
             <Tabs
               dock
               tabs={[
@@ -13673,10 +13548,27 @@ export default function ArabicTrainer() {
               }}
             />
           )}
+          {/* Which of your spaces Learning shows, for someone in more than
+              one (memberships): all of them, or one. Every tab follows it,
+              and so does the session started from it. */}
+          {!inExercise && space === "learn" && !session && !stranded && learnSpaces.length > 1 && (
+            <LearnSpaceButton
+              spaces={learnSpaces}
+              value={spaceNow}
+              onChange={(id) => setSpaceFilter(id)}
+            />
+          )}
 
         {/* ============ STUDY ============ */}
-        {tab === "home" && (
+        {!stranded && tab === "home" && (
           <>
+            {/* The super admin trying a space (0.574): what this is, and
+                that nothing here is kept. */}
+            {TRYING && !inExercise && (
+              <Help>
+                {`You're trying ${(addressSpace && addressSpace.name) || "this space"} as a learner. Practice here stays on this device and is dropped when you leave.`}
+              </Help>
+            )}
             {/* Where it is most likely to be read by the person it is for:
                 above what they came here to do, once, and gone for good on
                 a tap. See useInstallOffer for why installing is the one
@@ -13734,7 +13626,8 @@ export default function ArabicTrainer() {
                    read wrong. Courses is a tap away either way — the tab
                    strip above does not go anywhere. */
                 action={
-                  coursesKnown && myCourses.length === 0 ? (
+                  /* Not while trying a space: there is no joining there (0.574). */
+                  coursesKnown && myCourses.length === 0 && !TRYING ? (
                     <Button variant="primary" onClick={openCourses} icon="school">
                       Join a course
                     </Button>
@@ -14231,6 +14124,16 @@ export default function ArabicTrainer() {
                         {formLabelText}
                       </p>
                     )}
+                    {/* What the verb means, on "who is it?": a learner
+                        reported being asked who a form was about without
+                        anything saying what it meant. The verb's own
+                        meaning ("to keep"), not the form's ("I keep"),
+                        which would be the answer. */}
+                    {spec.picks === "person" && whoMeaning && (
+                      <p className="at-ctxmeaning" data-el="question-verb-meaning">
+                        {asMeaning(whoMeaning)}
+                      </p>
+                    )}
                     {/* Which card it means, where another card the learner
                         has shows the same thing — the teacher's clue, or
                         "not patience". Under the prompt, where "feminine"
@@ -14373,6 +14276,9 @@ export default function ArabicTrainer() {
                         value={typed}
                         disabled={!!checked}
                         onChange={setTyped}
+                        /* Who a form is about: every person it could be is
+                           ticked, so the tiles toggle rather than choose. */
+                        multi={spec.picks === "person"}
                       />
                     ) : spec.answerMode === "choice" ? (
                       <Segmented
@@ -14739,9 +14645,32 @@ export default function ArabicTrainer() {
                               kind="phrase"
                               name="also-context-text"
                             />
+                            {String((context || alsoContext).lat || "").trim() ? (
+                              <Field
+                                value={(context || alsoContext).lat}
+                                field="lat"
+                                kind="phrase"
+                                name="also-context-said"
+                              />
+                            ) : null}
                             <p className="at-ctxmeaning" data-el="also-context-meaning">
                               {asMeaning((context || alsoContext).en)}
                             </p>
+                          </div>
+                        )}
+                        {/* The whole phrase, said, once a gap in it has
+                            been answered: the pronunciation below is the
+                            missing word's alone, and two learners asked
+                            for the sentence's (0.586). The phrase itself
+                            is still up at the top, so only how it is said
+                            comes here. Never before the answer: it holds
+                            the word. */}
+                        {phraseSaid && (
+                          <div className="at-answeralso" data-el="also-phrase-said">
+                            <p className="at-alsolabel" data-el="also-phrase-said-label">
+                              How the whole {spec.promptField === "gap" ? "sentence" : "phrase"} is pronounced
+                            </p>
+                            <Field value={phraseSaid} field="lat" kind="phrase" name="also-phrase-said-text" />
                           </div>
                         )}
                         {spec.promptField === "audio" && spec.answerField !== "ar" && item.ar && (
@@ -14986,34 +14915,29 @@ export default function ArabicTrainer() {
         )}
 
         {/* ============ ITEMS ============ */}
-        {tab === "items" && (
+        {!stranded && tab === "items" && !inExercise && <TabTitle>Cards</TabTitle>}
+        {!stranded && tab === "items" && (
           <ItemsTab
             items={shown}
             allTags={allTags}
             data={data}
             settings={settings}
-            courseDecks={courseDecks}
-            myCourses={myCourses}
+            courseDecks={learnDecks}
+            myCourses={learnCourses}
             deckWanted={deckWanted}
             onDeckWantedUsed={() => setDeckWanted(null)}
-            onExportAll={exportEverything}
-            onAdd={addItems}
-            onUpdate={updateItem}
             onPriority={setPriority}
-            onRemove={(id) => removeItems([id])}
-            onRemoveMany={removeItems}
-            onBulkEdit={bulkEdit}
-            onSetLocked={setLockedMany}
-            onTagMany={tagMany}
-            onImport={importFile}
           />
         )}
 
         {/* ============ PROGRESS ============ */}
-        {tab === "progress" && (
+        {!stranded && tab === "progress" && !inExercise && <TabTitle>Progress</TabTitle>}
+        {!stranded && tab === "progress" && (
           <ProgressTab
             items={shown}
-            myCourses={myCourses}
+            myCourses={learnCourses}
+            spaceOf={!spaceNow && learnSpaces.length > 1 ? spaceOfItem : undefined}
+            spaceNames={!spaceNow && learnSpaces.length > 1 ? spaceNameOf : undefined}
             settings={settings}
             moves={data.moves}
             perDay={perDay}
@@ -15066,18 +14990,33 @@ export default function ArabicTrainer() {
           />
         )}
 
-        {tab === "courses" && (
+        {!stranded && tab === "courses" && (
           <Screen title="Courses" onBack={() => setTab(coursesBack)}>
           <React.Suspense fallback={<ChunkFallback />}>
           <StudentCourses
-            courses={myCourses}
-            decks={courseDecks}
+            courses={learnCourses}
+            decks={learnDecks}
+            spaces={!spaceNow && learnSpaces.length > 1 ? learnSpaces : undefined}
+            mySpaceIds={accountOrgs.map((o) => o.id)}
             languages={LANGUAGES}
             busy={courseBusy}
             error={courseError}
-            onJoin={async (code: string) => {
-              await API.joinCourse(code);
+            /* Trying a space is not joining it (0.574). */
+            onJoin={TRYING ? undefined : async (code: string) => {
+              const r = await API.joinCourse(code);
+              /* A course in another space joins that space too
+                 (memberships): the account learns of it, so the You menu
+                 and Settings list it. */
+              if (account && r && r.space && !accountOrgs.some((o) => o.id === r.space.id)) {
+                const who = await API.whoAmI(account.key, accountOrgId).catch(() => null);
+                if (who) {
+                  const merged = { ...who.user, key: account.key };
+                  API.saveAccount(merged);
+                  setAccount(merged);
+                }
+              }
               await refreshCourses(true);
+              return r;
             }}
             onRefresh={() => refreshCourses(true)}
             onPractise={(deckTitle: string) => {
@@ -15096,6 +15035,7 @@ export default function ArabicTrainer() {
           <React.Suspense fallback={<ChunkFallback />}>
             <TeachSpace
               account={account}
+              spaceName={shownSpace && shownSpace.name}
               languages={LANGUAGES}
               settings={settings}
               langsOff={teachLangsOff}
@@ -15121,10 +15061,24 @@ export default function ArabicTrainer() {
           </React.Suspense>
         )}
 
-        {space === "admin" && account && account.admin && (
+
+        {space === "admin" && account && (account.admin || account.orgAdmin) && (
           <React.Suspense fallback={<ChunkFallback />}>
             <AdminSpace
               account={account}
+              spaceName={shownSpace && shownSpace.name}
+              languages={LANGUAGES}
+              onClose={() => setSpace("learn")}
+            />
+          </React.Suspense>
+        )}
+
+        {space === "super" && account && account.admin && (
+          <React.Suspense fallback={<ChunkFallback />}>
+            <AdminSpace
+              superMode
+              account={account}
+              spaceName={shownSpace && shownSpace.name}
               languages={LANGUAGES}
               onClose={() => setSpace("learn")}
             />
@@ -15143,6 +15097,10 @@ export default function ArabicTrainer() {
               setSession(null);
             }}
           />
+        )}
+
+        {sharing && (
+          <FeedbackScreen onClose={() => setSharing(false)} onSend={sendFeedback} />
         )}
 
         {screen && (
@@ -15170,7 +15128,12 @@ export default function ArabicTrainer() {
               setSpace("learn");
               setScreen(null);
             }}
-            onLogOut={() => {
+            onLogOut={async () => {
+              /* This person's practice is set aside first, so the next
+                 person to sign in starts clean (0.580). */
+              await parkForLogOut();
+              /* Every space tried on this device goes too (0.574). */
+              API.dropTrial();
               API.clearAccount();
               setAccount(null);
               setSpace("learn");
@@ -15179,7 +15142,7 @@ export default function ArabicTrainer() {
               setMyCourses([]);
               setCourseDecks([]);
               setTeaches(false);
-              saveTeaches(false);
+              forgetTeaches();
             }}
             onBecameAdmin={() =>
               account &&
@@ -15259,9 +15222,9 @@ export default function ArabicTrainer() {
 
       {/* The app's name heads the learning page and scrolls away with it;
           a space frame carries its own. */}
-      {/* Home has it large and centred, as the page's title. Progress and
-          Cards go without a heading, the section in the bar being the
-          title; Courses, reached from the menu, is headed with its name. */}
+      {/* Home has it large, at the left (0.576), as the page's title. Progress and
+          Cards are headed with their name, as every tab is (0.553);
+          Courses, reached from the menu, is headed with its own. */}
       {!inExercise && space === "learn" && tab === "home" && (
         <div className="at-brand at-brand-home">
           <img className="at-brandmark" src="/logo.svg" alt="" width={48} height={48} />
@@ -15275,10 +15238,25 @@ export default function ArabicTrainer() {
           sections, and beside them what is true wherever you are — which
           space and which languages, and you. */}
       {(() => {
-        const spaces = ["learn"]
-          .concat(teaches || (account && account.admin) ? ["teach"] : [])
-          .concat(account && account.admin ? ["admin"] : []);
-        const choices = space === "learn" ? langChoices : space === "teach" ? teachChoices : [];
+        /* Where you are, and the space's own modes (0.574). A space admin
+           sees Teaching, for the space's material (6a), and Admin, for its
+           people and courses (0.544). The App admin's Super admin is a
+           level above spaces: a place in "Where you are", not a mode. */
+        const iAmAppAdmin = !!(account && account.admin);
+        const hereId = iAmAppAdmin ? (addressSpace && addressSpace.id) || accountOrgId : accountOrgId;
+        const { places, placeNow, modes } = placeRows({
+          admin: iAmAppAdmin,
+          orgAdmin: !!(account && account.orgAdmin),
+          teaches,
+          trying: !!TRYING,
+          space,
+          mine: accountOrgs,
+          opened: TRYING && addressSpace ? addressSpace : null,
+          hereId,
+        });
+        const spaces: string[] = modes;
+        const homeSlug = (accountOrg && typeof accountOrg === "object" && accountOrg.slug) || "";
+        const choices = space === "learn" ? langChoices : space === "teach" || space === "mine" ? teachChoices : [];
         return (
           <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
             {/* One bar: the space's sections, then the space and languages,
@@ -15288,12 +15266,51 @@ export default function ArabicTrainer() {
             <div className="at-dockmain" ref={setDockSlot} />
             <div className="at-docksub">
               <CornerMenu
+                spaceShown={shownSpace}
+                mySpaces={places}
+                placeNow={placeNow}
+                placesLabel={iAmAppAdmin ? "Where you are" : "Your spaces"}
+                onMySpace={(to) => {
+                  if (to.id === "super") {
+                    /* Super admin is shown only at one of your own
+                       addresses: from a tried space, go home first, and
+                       leave the trial behind. */
+                    if (TRYING) {
+                      API.dropTrial(TRYING);
+                      window.location.assign(`/${homeSlug}?open=super`);
+                      return;
+                    }
+                    setTrialBack(null);
+                    setSpace("super");
+                    return;
+                  }
+                  if (TRYING && addressSpace && to.id === addressSpace.id) {
+                    setSpace("admin");
+                    return;
+                  }
+                  if (TRYING) {
+                    API.dropTrial(TRYING);
+                    window.location.assign(`/${to.slug}`);
+                    return;
+                  }
+                  /* Back from Super admin to the space whose address this is. */
+                  if (to.id === hereId) {
+                    setTrialBack(null);
+                    setSpace("learn");
+                    return;
+                  }
+                  /* Going to another of your spaces is going to its address:
+                     every screen then agrees about where you are. */
+                  API.rememberSpace(to.id);
+                  window.location.assign(`/${to.slug}`);
+                }}
                 account={account}
                 /* The dot stands for the whole action, so it stays lit until
                    every part of it is done — this device's cards, the courses,
                    and the spaces this person belongs to. */
                 syncState={
-                  offline
+                  /* Trying a space (0.574): nothing syncs. */
+                  TRYING || offline
                     ? "off"
                     : spacesBusy || (syncState === "idle" && courseBusy)
                     ? "syncing"
@@ -15315,8 +15332,8 @@ export default function ArabicTrainer() {
                     setSpace(to);
                   },
                   choices,
-                  off: space === "teach" ? teachLangsOff : langsOff,
-                  onLangs: (next) => setSetting(space === "teach" ? "teachLangsOff" : "langsOff", next),
+                  off: space === "teach" || space === "mine" ? teachLangsOff : langsOff,
+                  onLangs: (next) => setSetting(space === "teach" || space === "mine" ? "teachLangsOff" : "langsOff", next),
                   note:
                     space === "teach"
                       ? "Select the languages you see in your courses, decks, and cards. This doesn't change anything for your students."
@@ -15324,7 +15341,7 @@ export default function ArabicTrainer() {
                 }}
                 /* Only Learning: Teaching and Admin have Courses in their bar. */
                 onCourses={
-                  space === "learn"
+                  space === "learn" && !stranded
                     ? () => {
                         setTrialBack(null);
                         setSession(null);
@@ -15334,6 +15351,7 @@ export default function ArabicTrainer() {
                 }
                 onSettings={() => setScreen("settings")}
                 onGuide={() => setScreen("guide")}
+                onFeedback={account ? () => setSharing(true) : undefined}
               />
             </div>
             </div>
@@ -15808,16 +15826,7 @@ function ItemsTab({
   myCourses = [],
   deckWanted,
   onDeckWantedUsed,
-  onExportAll,
-  onAdd,
-  onUpdate,
   onPriority,
-  onRemove,
-  onRemoveMany,
-  onBulkEdit,
-  onSetLocked,
-  onTagMany,
-  onImport,
 }: {
   items: Item[];
   allTags: string[];
@@ -15827,18 +15836,9 @@ function ItemsTab({
   myCourses?: Course[];
   deckWanted?: string | null;
   onDeckWantedUsed: () => void;
-  onExportAll: () => void;
-  onAdd: (items: any[]) => void;
-  onUpdate: (id: string, patch: any) => void;
   onPriority: (id: string, on: boolean) => void;
-  onRemove: (id: string) => void;
-  onRemoveMany: (ids: string[]) => void;
-  onBulkEdit: (ids: string[], patch: any) => void;
-  onSetLocked: (ids: string[], locked: boolean) => void;
-  onTagMany: (ids: string[], tag: string) => void;
-  onImport: (file: any) => void;
 }) {
-  const [sheet, setSheet] = useState<any | null>(null); // null | "single" | "bulk" | {edit:item}
+  const [sheet, setSheet] = useState<any | null>(null); // null | {view:item}
   const [q, setQ] = useState("");
   const [filterTags, setFilterTags] = useState<string[]>([]);
 
@@ -15849,14 +15849,6 @@ function ItemsTab({
     setQ("");
     if (onDeckWantedUsed) onDeckWantedUsed();
   }, [deckWanted, onDeckWantedUsed]);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [confirmId, setConfirmId] = useState<any | null>(null);
-
-  useEffect(() => {
-    if (!confirmId) return;
-    const t = setTimeout(() => setConfirmId(null), 6000);
-    return () => clearTimeout(t);
-  }, [confirmId]);
 
   /* Escape and the body-scroll lock belong to Screen, which every sheet
      here now goes through. Doing it again from the tab meant two owners for
@@ -15882,26 +15874,6 @@ function ItemsTab({
       .sort((a, b) => b.created - a.created);
   }, [items, q, filterTags]);
 
-  /* Course cards are not a student's to change, so a selection offers
-     nothing destructive. With OWN_CARDS off there is nothing at all, and the
-     list hides the whole selection mode by itself. */
-  const bulkActions = useMemo(
-    () =>
-      OWN
-        ? [
-            { label: "Lock", onClick: (ids: string[]) => onSetLocked(ids, true) },
-            { label: "Unlock", onClick: (ids: string[]) => onSetLocked(ids, false) },
-            { label: "Add a tag", onClick: (ids: string[]) => setBulk({ kind: "tag", ids, tag: "" }) },
-            { label: "Delete", danger: true, onClick: (ids: string[]) => setBulk({ kind: "delete", ids }) },
-          ]
-        : [],
-    [onSetLocked]
-  );
-
-  /* Both used to be a browser prompt and a browser confirm — the only two
-     places in the app that left it to the browser to ask. */
-  const [bulk, setBulk] = useState<any | null>(null);
-
   return (
     <>
       <Help className="at-mb3">
@@ -15923,22 +15895,6 @@ function ItemsTab({
               level: (it) => standingShort(standing(cardStandings(it, settings, items))),
             })}
             busy={false}
-            onNew={OWN ? () => setSheet("single") : undefined}
-            filters={
-              OWN ? (
-                <div className="at-row at-mt2">
-                  <Button variant="ghost" size="sm" onClick={() => setSheet("dialog")} icon="add">
-                    Add a conversation
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => setSheet("bulk")}
-          icon="add"
-        >
-          Add several at once
-        </Button>
-                  <Button variant="ghost" size="sm" onClick={onExportAll} icon="download">Export everything</Button>
-                </div>
-              ) : null
-            }
             empty="No cards match."
             match={cardMatches}
             count={
@@ -15946,9 +15902,8 @@ function ItemsTab({
                 ? `${plural(items.length, "card")}`
                 : `${filtered.length} of ${items.length}`
             }
-            selected={selected}
-            onSelectedChange={setSelected}
-            bulkActions={bulkActions}
+            /* Course cards are not a student's to change, so there is
+               nothing to select them for. */
             /* The library's tile, not a copy of it. This screen had its own
                hand-written version, which is how the student's card and the
                teacher's came to show different things. Tap to see the whole
@@ -15983,17 +15938,6 @@ function ItemsTab({
         </>
       )}
 
-      {OWN && (sheet === "single" || sheet === "dialog") && (
-        <OWN.ItemSheet
-          mode="add"
-          scene={sheet === "dialog"}
-          items={items}
-          allTags={allTags}
-          settings={settings}
-          onSave={(drafts) => onAdd(drafts)}
-          onClose={() => setSheet(null)}
-        />
-      )}
       {sheet && sheet.view && (
         <CardScreen
           card={sheet.view}
@@ -16001,1161 +15945,9 @@ function ItemsTab({
           settings={settings}
           onPriority={onPriority}
           onBack={() => setSheet(null)}
-          action={
-            OWN && !sheet.view.locked ? (
-              <Button size="sm"
-                onClick={() => setSheet({ edit: items.find((i) => i.id === sheet.view.id) || sheet.view })}
-              >
-                Edit
-              </Button>
-            ) : null
-          }
-        />
-      )}
-      {OWN && sheet && sheet.edit && (
-        <OWN.ItemSheet
-          mode="edit"
-          initial={sheet.edit}
-          scene={isDialog(sheet.edit)}
-          items={items}
-          allTags={allTags}
-          settings={settings}
-          onSave={(drafts) => onUpdate(sheet.edit.id, drafts[0])}
-          onClose={() => setSheet(null)}
-        />
-      )}
-      {bulk && bulk.kind === "delete" && (
-        <ConfirmModal
-          title={`Delete ${plural(bulk.ids.length, "card")}?`}
-          confirmLabel="Delete them"
-          body={<p>Locked cards are kept. This can't be undone.</p>}
-          onCancel={() => setBulk(null)}
-          onConfirm={() => {
-            onRemoveMany(bulk.ids);
-            setBulk(null);
-          }}
-        />
-      )}
-
-      {bulk && bulk.kind === "tag" && (
-        <Screen title={`Tag ${plural(bulk.ids.length, "card")}`} onBack={() => setBulk(null)}>
-          <FormField label="Tag to add" hint="Cards can carry several tags.">
-            <input
-              className="at-input"
-              value={bulk.tag}
-              autoFocus
-              onChange={(e) => setBulk({ ...bulk, tag: e.target.value })}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && bulk.tag.trim()) {
-                  onTagMany(bulk.ids, bulk.tag.trim());
-                  setBulk(null);
-                }
-              }}
-            />
-          </FormField>
-          <div className="at-row">
-            <Button
-              variant="primary"
-              disabled={!bulk.tag.trim()}
-              onClick={() => {
-                onTagMany(bulk.ids, bulk.tag.trim());
-                setBulk(null);
-              }}
-            >
-              Add the tag
-            </Button>
-          </div>
-        </Screen>
-      )}
-
-      {OWN && sheet === "bulk" && (
-        <OWN.BulkAddSheet
-          allTags={allTags}
-          onAdd={onAdd}
-          onImport={onImport}
-          onClose={() => setSheet(null)}
         />
       )}
     </>
-  );
-}
-
-/* ------------------------------------------------------------------
-   Bulk action bar
-   ------------------------------------------------------------------ */
-
-
-/* ------------------------------------------------------------------
-   Full-screen: add or edit one item, with its other forms
-   ------------------------------------------------------------------ */
-
-/* Label, RTL input, and an on-screen keyboard that only appears while the
-   field is focused — otherwise it dominates every form it sits in.
-   preventDefault on mousedown keeps focus when a key is tapped. */
-function ArabicField({ label, hint, value, onChange, mode, placeholder, inputRef, lang }: {
-  label?: Node;
-  hint?: Node;
-  value: string;
-  onChange: (value: string) => void;
-  mode?: string;
-  placeholder?: string;
-  inputRef?: React.MutableRefObject<HTMLInputElement | null>;
-  lang?: Lang;
-}) {
-  /* The field already reads the active language for the input's own script
-     and direction. The keyboard needs a pack too, and two of the three call
-     sites pass none — which used to hand `undefined` to a component that
-     reads its rows off it, the moment someone opened the keys. */
-  const L = lang || activeLang();
-  const own: React.MutableRefObject<any | null> = useRef(null);
-  const ref = inputRef || own;
-  const [focused, setFocused] = useState(false);
-  const [keysOpen, setKeysOpen] = useKeysOpen(mode);
-
-  return (
-    <div className="at-field">
-      {label && <label className="at-label">{label}</label>}
-      <div className={`at-inputwrap${activeLang().direction === "rtl" ? " rtl" : ""}`}>
-        <input
-          ref={ref}
-          lang={activeLang().id}
-          dir={activeLang().direction}
-          className="at-input ar"
-          value={value}
-          placeholder={placeholder}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          onChange={(e) => onChange(e.target.value)}
-        />
-        <span onMouseDown={(e) => e.preventDefault()}>
-          <KeysButton on={keysOpen} onClick={() => setKeysOpen((v) => !v)} />
-        </span>
-      </div>
-      {focused && keysOpen && (
-        <div onMouseDown={(e) => e.preventDefault()}>
-          <Keyboard
-            onKey={(ch) => caretInsert(ref, value, onChange, ch)}
-            onBack={() => caretBackspace(ref, value, onChange)}
-            onClear={() => onChange("")}
-            onHide={() => setKeysOpen(false)}
-            lang={L}
-          />
-        </div>
-      )}
-      {hint && !focused && <Help>{hint}</Help>}
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------
-   Recordings editor — one per unit, several clips each
-   ------------------------------------------------------------------ */
-
-function ClipPlayer({ rec, onPlay }: { rec: any; onPlay: (rec: any) => void | Promise<void> }) {
-  const [busy, setBusy] = useState(false);
-  return (
-    <button
-      className="at-clipplay"
-      disabled={busy}
-      onClick={async () => {
-        setBusy(true);
-        await onPlay(rec);
-        setBusy(false);
-      }}
-      title="Play"
-    >
-      <Icon name="play" />
-    </button>
-  );
-}
-
-function RecordingsField({ recs, onChange, label = "Recordings" }: {
-  recs?: any[];
-  onChange: (recs: any[]) => void;
-  label?: string;
-}) {
-  const [recording, setRecording] = useState(false);
-  const [elapsed, setElapsed] = useState(0);
-  const [error, setError] = useState("");
-  const [working, setWorking] = useState("");
-  const handle: React.MutableRefObject<ReturnType<typeof startRecorder> | null> = useRef(null);
-  const started = useRef(0);
-  const tick: React.MutableRefObject<ReturnType<typeof setInterval> | null> = useRef(null);
-  const audioRef: React.MutableRefObject<HTMLAudioElement | null> = useRef(null);
-
-  useEffect(() => () => {
-    if (handle.current) handle.current.stop();
-  }, []);
-
-  const urlRef = useRef("");
-  useEffect(() => () => {
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-  }, []);
-
-  async function play(rec: { id: string }) {
-    const url = await clipUrl(rec.id);
-    if (!url) {
-      setError("That clip isn't on this device yet");
-      return;
-    }
-    if (!audioRef.current) audioRef.current = new Audio();
-    if (urlRef.current) URL.revokeObjectURL(urlRef.current);
-    urlRef.current = url;
-    audioRef.current.src = url;
-    try {
-      await audioRef.current.play();
-    } catch (e) {
-      setError("Couldn't play that clip");
-    }
-  }
-
-  function begin() {
-    setError("");
-    if (!canRecord()) {
-      setError("This browser won't let the app use the microphone");
-      return;
-    }
-    started.current = now();
-    setElapsed(0);
-    setRecording(true);
-    sfx("record");
-    tick.current = setInterval(() => setElapsed(now() - started.current), 200);
-
-    handle.current = startRecorder(
-      async (blob) => {
-        if (tick.current) clearInterval(tick.current);
-        setRecording(false);
-        const dur = (now() - started.current) / 1000;
-        if (blob.size > MAX_CLIP_BYTES) {
-          setError(`That clip is ${formatBytes(blob.size)} — too big to sync. Keep it shorter.`);
-          return;
-        }
-        const id = newRecId();
-        if (!(await saveClipBlob(id, blob))) {
-          setError("Couldn't save that clip");
-          return;
-        }
-        onChange(
-          (recs || []).concat([
-            { id, label: "", mime: blob.type, size: blob.size, dur: Math.round(dur * 10) / 10, added: now() },
-          ])
-        );
-      },
-      (err) => {
-        if (tick.current) clearInterval(tick.current);
-        setRecording(false);
-        setError(
-          (err instanceof Error ? err.name : "") === "NotAllowedError"
-            ? "Microphone permission was refused"
-            : "Couldn't reach the microphone"
-        );
-      }
-    );
-
-    // Hard stop, so a forgotten recording can't run away.
-    setTimeout(() => {
-      if (handle.current) handle.current.stop();
-    }, MAX_RECORD_MS);
-  }
-
-  function end() {
-    sfx("stop");
-    if (handle.current) handle.current.stop();
-  }
-
-  async function upload(file: File) {
-    setError("");
-    setWorking("Compressing…");
-    try {
-      const { blob, mime, dur } = await compressAudio(file);
-      if (blob.size > MAX_CLIP_BYTES) {
-        setError(
-          `Still ${formatBytes(blob.size)} after compressing — too big to sync. Try a shorter clip.`
-        );
-        return;
-      }
-      const id = newRecId();
-      if (!(await saveClipBlob(id, blob))) {
-        setError("Couldn't save that clip");
-        return;
-      }
-      onChange(
-        (recs || []).concat([
-          {
-            id,
-            label: file.name.replace(/\.[^.]+$/, "").slice(0, 24),
-            mime: mime || blob.type,
-            size: blob.size,
-            dur: dur ? Math.round(dur * 10) / 10 : 0,
-            added: now(),
-          },
-        ])
-      );
-    } catch (e) {
-      setError("Couldn't read that file");
-    } finally {
-      setWorking("");
-    }
-  }
-
-  const list = recs || [];
-
-  return (
-    <FormField label={<>{label} <span className="at-optional">— optional, several allowed</span></>}>
-
-      {list.length > 0 && (
-        <div className="at-cliplist">
-          {list.map((rec, i) => (
-            <div className="at-clip" key={rec.id}>
-              <ClipPlayer rec={rec} onPlay={play} />
-              <input
-                className="at-clipname"
-                value={rec.label}
-                placeholder={`Voice ${i + 1}`}
-                onChange={(e) => {
-                  const next = list.slice();
-                  next[i] = { ...rec, label: e.target.value.slice(0, 24) };
-                  onChange(next);
-                }}
-              />
-              <span className="at-clipmeta">
-                {rec.dur ? `${rec.dur}s` : ""} {formatBytes(rec.size)}
-              </span>
-              <button
-                className="at-x"
-                aria-label="Delete recording"
-                onClick={() => {
-                  dropClip(rec.id);
-                  onChange(list.filter((x) => x.id !== rec.id));
-                }}
-              >
-                <Icon name="close" />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      <div className="at-chips" style={{ marginTop: list.length ? 10 : 0 }}>
-        {recording ? (
-          <Button variant="danger" size="sm" onClick={end} icon="pause">Stop — {(elapsed / 1000).toFixed(1)}s</Button>
-        ) : (
-          <Button size="sm" onClick={begin} disabled={!!working} icon="mic">Record</Button>
-        )}
-        <label className="at-btn sm ghost">
-          {working || "Upload a file"}
-          <input
-            type="file"
-            accept="audio/*"
-            className="at-hidden"
-            onChange={(e) => {
-              const f = e.target.files && e.target.files[0];
-              if (f) upload(f);
-              e.target.value = "";
-            }}
-          />
-        </label>
-      </div>
-
-      <Notice kind="error">{error}</Notice>
-      {!error && list.length === 0 && (
-        <Help>
-          A recording unlocks two more exercises for this form — hearing it and writing the
-          English, or hearing it and writing the script. Several voices are better than one.
-        </Help>
-      )}
-    </FormField>
-  );
-}
-
-/* An empty form, with whatever values the languages declare, from the one
-   place that knows them. */
-const BLANK_SUB = { ar: "", lat: "", en: "", ...dimValues({}), note: "", recs: [] };
-/* A turn nobody has written yet. No grammar on it: a line of a dialog is
-   a thing somebody says, and whether it is singular or plural is a
-   question about a word. */
-const BLANK_LINE = { ar: "", lat: "", en: "", who: 0, uses: [], recs: [] };
-
-/**
- * @param props  `scene` writes a conversation rather than a word; `items` is what
- *   the learner already has, for finding which of their words a line uses.
- */
-function ItemSheet({ mode, initial, allTags, settings, onSave, onClose, scene = false, items = [] }: {
-  mode?: string;
-  initial?: any;
-  allTags: string[];
-  settings: Settings;
-  onSave: (item: any) => void;
-  onClose: () => void;
-  scene?: boolean;
-  items?: Item[];
-}) {
-  const lang = langOf(settings);
-  /* Held once: only some languages declare a lexical axis, and reading it
-     off the pack at each use makes every one of them a separate question
-     about whether this language has one. */
-  const lexical = lang.lexical;
-  /* Open, because the grammatical fields dimValues() spreads in differ per
-     language and the tags are one editable string here, not a list. */
-  const blank = (): Record<string, any> => ({
-    ar: "",
-    lat: "",
-    en: "",
-    recs: [],
-    ...dimValues({}),
-    kind: "",
-    note: "",
-    tags: "",
-    subs: [],
-    /* A conversation starts as two people and two empty turns: an empty
-       scene with an "add a line" button is a form that has to be
-       assembled before it can be filled in. */
-    ...(scene
-      ? {
-          speakers: DEFAULT_SPEAKERS.slice(),
-          /* Nobody's part, until somebody says so. */
-          you: null,
-          lines: [{ ...BLANK_LINE, who: 0 }, { ...BLANK_LINE, who: 1 }],
-        }
-      : null),
-  });
-
-  const [draft, setDraft] = useState(() =>
-    initial
-      ? {
-          ar: initial.ar,
-          lat: initial.lat,
-          en: initial.en,
-          recs: initial.recs || [],
-          ...dimValues(initial),
-          kind: initial.kind || "",
-          note: initial.note || "",
-          tags: (initial.tags || []).join(", "),
-          subs: subFormsOf(initial).map((x: Record<string, any>) => ({ ...x })),
-          ...(scene
-            ? {
-                speakers: speakersOf(initial),
-                you: namedPart(initial),
-                lines: linesOf(initial).map((x: Record<string, any>) => ({ ...x })),
-              }
-            : null),
-        }
-      : blank()
-  );
-  const [step, setStep] = useState("form");
-  // In add mode you can stack up several items and check them together.
-  const [queue, setQueue] = useState<any[]>([]);
-  // When set, the form is editing that queued item rather than adding a new one.
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const arRef: React.MutableRefObject<HTMLInputElement | null> = useRef(null);
-
-  const set = (k: string, v: any) =>
-    setDraft((d) => ({ ...d, [k]: v }));
-  /* A conversation needs two turns before it is one. One line with a
-     reply missing is a phrase card that has been put in the wrong
-     editor. */
-  const written = scene ? (draft.lines || []).filter((l: any) => l.ar.trim()) : [];
-  const canSave = scene ? written.length >= 2 : [draft.ar, draft.lat, draft.en].some((v) => v.trim());
-
-  /* The words this learner already has, for the links below. Dialogs are
-     left out: a scene is not a word that turns up inside another one. */
-  const wordCards = useMemo(
-    () => items.filter((i: Item) => !isDialog(i) && leadOf(i).ar),
-    [items]
-  );
-  /*
-   * Which of those words a line uses, found rather than ticked.
-   *
-   * The app already knows how to find a word inside a run of words — it is
-   * what puts a phrase behind the gap-fill — so asking somebody writing a
-   * scene to also tick off its vocabulary would be asking them to do by
-   * hand what the matcher does better. What it finds is shown under the
-   * conversation, so it can be seen to be right.
-   */
-  const usesIn = (text: string) =>
-    wordCards.filter((w: Item) => splitForms(leadOf(w).ar).some((word) => !!findWordSpan(text, word, lang)));
-
-  const linked = (lines: any[]) =>
-    lines
-      .filter((l) => l.ar.trim())
-      .map((l) => ({ ...l, uses: usesIn(l.ar).map((w) => w.id) }));
-
-  const previewItem = useMemo(
-    () => makeItem(scene ? { ...draft, lines: linked(draft.lines || []) } : draft),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [draft, wordCards]
-  );
-  const previewUnits = unitsOf(previewItem);
-  /* What the whole card will be drilled as: the scene's own exercises and
-     every line's, gathered, because a dialog's exercises are spread across
-     its units rather than sitting on the card. */
-  const previewTypes = useMemo(() => {
-    if (!scene) return availableTypes(leadOf(previewItem));
-    const found = new Set(availableTypes(leadOf(previewItem), lang, null));
-    linesOf(previewItem).forEach((ln, at) => {
-      for (const t of availableTypes(ln, lang, { card: previewItem, at })) found.add(t);
-    });
-    return TYPES.filter((t) => found.has(t));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [previewItem]);
-  // What review will show: everything queued, plus whatever is in the form.
-  const pending = useMemo(
-    () => (canSave ? queue.concat([draft]) : queue).map((d) => makeItem(d)),
-    [queue, draft, canSave]
-  );
-
-  function setSub(i: number, k: string, v: any) {
-    setDraft((d) => {
-      const subs = d.subs.slice();
-      subs[i] = { ...subs[i], [k]: v };
-      return { ...d, subs };
-    });
-  }
-
-  /* The same, for a turn in a conversation. */
-  function setLine(i: number, k: string, v: any) {
-    setDraft((d) => {
-      const lines = (d.lines || []).slice();
-      lines[i] = { ...lines[i], [k]: v };
-      return { ...d, lines };
-    });
-  }
-
-  const tidy = (d: Record<string, any>) => ({
-    ...d,
-    subs: (d.subs || []).filter((x: Record<string, any>) => x.ar || x.en || x.lat),
-    /* Blank turns are dropped and the words each line uses are worked out
-       here, on the way to being stored, so a scene edited a week later
-       picks up whatever vocabulary has been added since. */
-    ...(scene ? { lines: linked(d.lines || []) } : null),
-  });
-
-  /* Stack the current form and start a fresh one, keeping the filing
-     details that usually carry across a batch. */
-  function queueCurrent() {
-    if (!canSave) return;
-    setQueue((q) => q.concat([tidy(draft)]));
-    setDraft((d) => ({ ...blank(), tags: d.tags, kind: d.kind }));
-    requestAnimationFrame(() => arRef.current && arRef.current.focus());
-  }
-
-  function toReview() {
-    if (editingIndex !== null) {
-      if (canSave) {
-        const updated = tidy(draft);
-        setQueue((q) => q.map((x, i) => (i === editingIndex ? updated : x)));
-      }
-      setEditingIndex(null);
-      setDraft(blank());
-    } else if (canSave) {
-      setQueue((q) => q.concat([tidy(draft)]));
-      setDraft((d) => ({ ...blank(), tags: d.tags, kind: d.kind }));
-    }
-    setStep("review");
-  }
-
-  /* Open one of the queued items back up in the form. */
-  function editQueued(i: number) {
-    setDraft(queue[i]);
-    setEditingIndex(i);
-    setStep("form");
-    requestAnimationFrame(() => arRef.current && arRef.current.focus());
-  }
-
-  function cancelQueuedEdit() {
-    setEditingIndex(null);
-    setDraft(blank());
-    setStep("review");
-  }
-
-  function backToForm() {
-    setStep("form");
-    requestAnimationFrame(() => arRef.current && arRef.current.focus());
-  }
-
-  function saveAll() {
-    const list = mode === "edit" ? [tidy(draft)] : queue;
-    if (!list.length) return;
-    onSave(list);
-    onClose();
-  }
-
-  return (
-    <Screen
-      title={step === "review"
-            ? mode === "edit"
-              ? "Check your changes"
-              : `Check ${plural(queue.length, "item")}`
-            : mode === "edit"
-            ? "Edit card"
-            : editingIndex !== null
-            ? `Editing item ${editingIndex + 1}`
-            : queue.length
-            ? `Add another (${queue.length} ready)`
-            : "Add a card"}
-      onBack={() => (step === "review" ? setStep("form") : onClose())}
-      action={
-        mode === "add" && queue.length > 0 && (
-                  <span className="at-sheetnote">{queue.length} ready</span>
-                )
-      }
-      footer={
-        <>
-              {step === "form" ? (
-                <>
-                  <Button variant="ghost"
-                    onClick={editingIndex !== null ? cancelQueuedEdit : onClose}
-                  >
-                    {editingIndex !== null ? "Cancel edit" : "Cancel"}
-                  </Button>
-                  {mode === "add" && editingIndex === null && (
-                    <Button variant="ghost" disabled={!canSave} onClick={queueCurrent}>
-                      Add another
-                    </Button>
-                  )}
-                  <Button variant="primary"
-                    disabled={mode === "edit" ? !canSave : !canSave && !queue.length}
-                    onClick={mode === "edit" ? () => setStep("review") : toReview}
-                  >
-                    {mode === "edit"
-                      ? "Review"
-                      : editingIndex !== null
-                      ? "Save changes"
-                      : `Review ${canSave ? queue.length + 1 : queue.length}`}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="ghost" onClick={backToForm}>
-                    {mode === "edit" ? "Back to edit" : "Add more"}
-                  </Button>
-                  <Button variant="primary" onClick={saveAll}>
-                    {mode === "edit"
-                      ? "Save changes"
-                      : `Save ${plural(pending.length, "card")}`}
-                  </Button>
-                </>
-              )}
-        </>
-      }
-    >
-      {step === "form" ? (
-        <>
-          {scene && (
-            <>
-              {/* ---- 1. the scene ---- */}
-              <div className="at-group">
-                <div className="at-grouphead">
-                  <span>The scene</span>
-                  <span className="req">Two lines or more</span>
-                </div>
-
-                <FormField label="What it is called">
-                  <input
-                    className="at-input"
-                    value={draft.en}
-                    placeholder="At the door"
-                    onChange={(e) => set("en", e.target.value)}
-                  />
-                </FormField>
-
-                <FormField label={<>Where it happens <span className="at-optional">optional</span></>}>
-                  <input
-                    className="at-input"
-                    value={draft.note}
-                    placeholder="Two neighbours meet in the morning"
-                    onChange={(e) => set("note", e.target.value)}
-                  />
-                </FormField>
-
-                <div className="at-field">
-                  <label className="at-label">Who is in it</label>
-                  <div className="at-inline">
-                    {(draft.speakers || []).map((name: string, i: number) => (
-                      <input
-                        key={i}
-                        className="at-input"
-                        value={name}
-                        placeholder={`Speaker ${i + 1}`}
-                        aria-label={`Speaker ${i + 1}`}
-                        onChange={(e) =>
-                          setDraft((d) => ({
-                            ...d,
-                            speakers: (d.speakers || []).map((s: string, j: number) =>
-                              j === i ? e.target.value : s
-                            ),
-                          }))
-                        }
-                      />
-                    ))}
-                  </div>
-                  {(draft.speakers || []).length < MAX_SPEAKERS && (
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="at-mt2"
-                      onClick={() =>
-                        setDraft((d) => ({ ...d, speakers: (d.speakers || []).concat([""]) }))
-                      }
-                    >
-                      Add someone
-                    </Button>
-                  )}
-                </div>
-
-                <FormField label="You play">
-                  <Segmented
-                    label="You play"
-                    options={[
-                      {
-                        value: (null as number | null),
-                        label: (draft.speakers || []).length > 2 ? "Any of them" : "Either",
-                      },
-                      ...(draft.speakers || []).map((n: string, i: number) => ({
-                        value: (i as number | null),
-                        label: n || `Speaker ${i + 1}`,
-                      })),
-                    ]}
-                    value={draft.you}
-                    onChange={(v: number | null) => set("you", v)}
-                  />
-                  <Help>
-                    Whose turns are yours to produce when the whole scene is
-                    asked. Left open, the question takes the parts in turn, so
-                    a scene met twice has been held up from both ends.
-                  </Help>
-                </FormField>
-              </div>
-
-              {/* ---- 2. the conversation ---- */}
-              <div className="at-group">
-                <div className="at-grouphead">
-                  <span>The conversation</span>
-                  <span className="opt">{plural((draft.lines || []).length, "line")}</span>
-                </div>
-
-                {(draft.lines || []).map((ln: Record<string, any>, i: number) => (
-                  <div className="at-subedit" key={i}>
-                    <div className="at-subedithead">
-                      <Segmented
-                        label={`Who says line ${i + 1}`}
-                        options={(draft.speakers || []).map((n: string, j: number) => ({
-                          value: j,
-                          label: n || `Speaker ${j + 1}`,
-                        }))}
-                        value={ln.who || 0}
-                        onChange={(v: number) => setLine(i, "who", v)}
-                      />
-                      {(draft.lines || []).length > 2 && (
-                        <button
-                          className="at-x"
-                          aria-label={`Remove line ${i + 1}`}
-                          onClick={() =>
-                            setDraft((d) => ({
-                              ...d,
-                              lines: (d.lines || []).filter(
-                                (_: unknown, j: number) => j !== i
-                              ),
-                            }))
-                          }
-                        >
-                          <Icon name="close" />
-                        </button>
-                      )}
-                    </div>
-
-                    <ArabicField
-                      value={ln.ar}
-                      onChange={(v: string) => setLine(i, "ar", v)}
-                      mode={settings.keyboard}
-                      inputRef={i === 0 ? arRef : undefined}
-                      placeholder={lang.scriptLabel}
-                    />
-
-                    <div className="at-inline">
-                      <div className="at-field">
-                        <input
-                          className="at-input"
-                          value={ln.lat}
-                          placeholder="How it sounds"
-                          aria-label={`How line ${i + 1} sounds`}
-                          onChange={(e) => setLine(i, "lat", e.target.value)}
-                        />
-                      </div>
-                      <div className="at-field">
-                        <input
-                          className="at-input"
-                          value={ln.en}
-                          placeholder="What it means"
-                          aria-label={`What line ${i + 1} means`}
-                          onChange={(e) => setLine(i, "en", e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <RecordingsField
-                      recs={ln.recs}
-                      onChange={(v: any) => setLine(i, "recs", v)}
-                      label="Recording for this line"
-                    />
-
-                    {ln.ar.trim() && (
-                      <div className="at-uses">
-                        {usesIn(ln.ar).length ? (
-                          <>
-                            <span className="at-useslabel">Uses</span>
-                            {usesIn(ln.ar).map((w: Item) => (
-                              <span className="at-tag" key={w.id}>
-                                {leadOf(w).ar}
-                              </span>
-                            ))}
-                          </>
-                        ) : (
-                          <span className="at-useslabel">
-                            None of your words yet — it will still be drilled as a line.
-                          </span>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                ))}
-
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  style={{ margin: "10px 0 8px" }}
-                  onClick={() =>
-                    setDraft((d) => ({
-                      ...d,
-                      lines: (d.lines || []).concat([
-                        /* Whoever did not speak last, which is what a
-                           conversation does on its own. */
-                        {
-                          ...BLANK_LINE,
-                          who:
-                            (d.lines || []).length && (d.speakers || []).length > 1
-                              ? (Number((d.lines || []).at(-1)?.who || 0) + 1) % (d.speakers || []).length
-                              : 0,
-                        },
-                      ]),
-                    }))
-                  }
-                >
-                  Add a line
-                </Button>
-
-                <div className={`at-status${previewTypes.length ? "" : " warn"}`}>
-                  {!canSave
-                    ? "Two lines with something in them, and it can be practised"
-                    : `Will be drilled as ${previewTypes
-                        .map((t) => exOf(t, lang).short)
-                        .join(", ")}`}
-                </div>
-                <Help>
-                  No recordings needed. A scene with none is drilled every way
-                  above; where a line has one, it can be heard as well as read.
-                </Help>
-              </div>
-            </>
-          )}
-
-          {/* ---- 1. the word itself ---- */}
-          {!scene && (
-          <div className="at-group">
-            <div className="at-grouphead">
-              <span>The word</span>
-              <span className="req">Script + one other</span>
-            </div>
-
-            <ArabicField
-              label={langOf(settings).scriptLabel}
-              value={draft.ar}
-              onChange={(v) => set("ar", v)}
-              mode={settings.keyboard}
-              inputRef={arRef}
-            />
-
-            <div className="at-inline">
-              <FormField label="English">
-                <input
-                  className="at-input"
-                  value={draft.en}
-                  placeholder="book"
-                  onChange={(e) => set("en", e.target.value)}
-                />
-              </FormField>
-              <FormField label="Transliteration">
-                <input
-                  className="at-input"
-                  value={draft.lat}
-                  placeholder="kitāb"
-                  onChange={(e) => set("lat", e.target.value)}
-                />
-              </FormField>
-            </div>
-
-            <Help>
-              One answer to a box: whatever is typed here, a slash included, is one answer.
-            </Help>
-
-            <RecordingsField
-              recs={draft.recs}
-              onChange={(v) => set("recs", v)}
-            />
-
-            <div className={`at-status${previewTypes.length >= 2 ? "" : " warn"}`}>
-              {!canSave
-                ? "Fill the script and one other field"
-                : previewTypes.length >= 2
-                ? `Will be drilled as ${previewTypes.map((t) => exOf(t, langOf(settings)).short).join(", ")}`
-                : "Not enough to practice yet — needs script plus English or transliteration"}
-            </div>
-          </div>
-          )}
-
-          {/* ---- 2. grammar ---- */}
-          {!scene && (dimsOf(lang).length > 0 || lang.lexical) && (
-            <div className="at-group">
-              <div className="at-grouphead">
-                <span>Grammar</span>
-              </div>
-              {dimsOf(lang).map((dim) => (
-                <div className="at-field" key={dim.field}>
-                  <label className="at-label">
-                    {dim.label}{" "}
-                    {dim.required ? (
-                      <span className="req">required</span>
-                    ) : (
-                      <span className="at-optional">optional</span>
-                    )}
-                  </label>
-                  <Segmented
-                    label={dim.label}
-                    options={dim.options.map(([value, label]) => ({ value, label }))}
-                    value={draft[dim.field]}
-                    onChange={(v) =>
-                      set(dim.field, !dim.required && draft[dim.field] === v ? "" : v)
-                    }
-                  />
-                </div>
-              ))}
-              {lexical && (
-                <FormField label={<>{lexical.label} <span className="at-optional">optional</span></>}>
-                  <input
-                    className="at-input"
-                    value={draft[lexical.key] || ""}
-                    placeholder={lexical.help || ""}
-                    onChange={(e) => set(lexical.key, e.target.value)}
-                  />
-                </FormField>
-              )}
-            </div>
-          )}
-
-          {/* ---- 3. other forms ---- */}
-          {!scene && (
-          <div className="at-group">
-            <div className="at-grouphead">
-              <span>Other forms</span>
-              <span className="opt">
-                {draft.subs.length
-                  ? `${draft.subs.length} added`
-                  : "optional"}
-              </span>
-            </div>
-
-            {draft.subs.length === 0 ? (
-              <div className="at-emptyforms">
-                <Help>
-                  A plural, a feminine — any form worth learning in its own right. Each keeps
-                  its own progress, and this card won't count as learnt until they all are.
-                </Help>
-                <Button size="sm"
-                  className="at-mt3"
-                  onClick={() =>
-                    setDraft((d) => ({ ...d, subs: d.subs.concat([{ ...BLANK_SUB }]) }))
-                  }
-                >
-                  Add a form
-                </Button>
-              </div>
-            ) : (
-              <>
-                {draft.subs.map((sb: Record<string, any>, i: number) => (
-                  <div className="at-subedit" key={i}>
-                    <div className="at-subedithead">
-                      <span className="at-formtag">{labelFor(sb) || "form"}</span>
-                      <button
-                        className="at-x"
-                        aria-label="Remove form"
-                        onClick={() =>
-                          setDraft((d) => ({
-                            ...d,
-                            subs: d.subs.filter((_: unknown, j: number) => j !== i),
-                          }))
-                        }
-                      >
-                        <Icon name="close" />
-                      </button>
-                    </div>
-
-                    <ArabicField
-                      value={sb.ar}
-                      onChange={(v) => setSub(i, "ar", v)}
-                      mode={settings.keyboard}
-                      placeholder={langOf(settings).scriptNative}
-                    />
-
-                    <div className="at-inline">
-                      <div className="at-field">
-                        <input
-                          className="at-input"
-                          value={sb.en}
-                          placeholder="English"
-                          onChange={(e) => setSub(i, "en", e.target.value)}
-                        />
-                      </div>
-                      <div className="at-field">
-                        <input
-                          className="at-input"
-                          value={sb.lat}
-                          placeholder="Transliteration"
-                          onChange={(e) => setSub(i, "lat", e.target.value)}
-                        />
-                      </div>
-                    </div>
-
-                    <RecordingsField
-                      recs={sb.recs}
-                      onChange={(v) => setSub(i, "recs", v)}
-                      label="Recordings for this form"
-                    />
-
-                    {dimsOf(lang).map((dim) => (
-                      <FormField label={dim.label} key={dim.field}>
-                        <Segmented
-                          label={dim.label}
-                          options={dim.options.map(([value, label]) => ({ value, label }))}
-                          value={sb[dim.field]}
-                          onChange={(v) =>
-                            setSub(i, dim.field, !dim.required && sb[dim.field] === v ? "" : v)
-                          }
-                        />
-                      </FormField>
-                    ))}
-                  </div>
-                ))}
-                <Button variant="ghost" size="sm"
-                  style={{ margin: "10px 0 8px" }}
-                  onClick={() =>
-                    setDraft((d) => ({ ...d, subs: d.subs.concat([{ ...BLANK_SUB }]) }))
-                  }
-                >
-                  Add another form
-                </Button>
-              </>
-            )}
-          </div>
-          )}
-
-          {/* ---- 4. filing ---- */}
-          <div className="at-group">
-            <div className="at-grouphead">
-              <span>Filing</span>
-              <span className="opt">optional</span>
-            </div>
-
-            <FormField label="Decks">
-              <input
-                className="at-input"
-                value={draft.tags}
-                placeholder="class 12 june, numbers"
-                onChange={(e) => set("tags", e.target.value)}
-              />
-              {allTags.length > 0 && (
-                <div className="at-tags at-mt2">
-                  {allTags.slice(0, 10).map((t) => (
-                    <span
-                      key={t}
-                      className={`at-tag pick${cleanTags(draft.tags).includes(t) ? " on" : ""}`}
-                      onClick={() =>
-                        set(
-                          "tags",
-                          cleanTags(draft.tags).includes(t)
-                            ? cleanTags(draft.tags).filter((x) => x !== t).join(", ")
-                            : (draft.tags ? draft.tags + ", " : "") + t
-                        )
-                      }
-                    >
-                      {t}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </FormField>
-
-            {/* A scene has a length of its own and it is not one of these
-                three. The note above holds its setting, so the one below
-                would be a second note about the same thing. */}
-            {!scene && (
-              <>
-            <div className="at-inline">
-              <FormField label="Length">
-                <Segmented
-                  label="Kind"
-                  options={["", "word", "phrase", "sentence"].map((k) => ({
-                    value: k,
-                    label: k || "auto",
-                  }))}
-                  value={draft.kind}
-                  onChange={(v) => set("kind", v)}
-                />
-              </FormField>
-            </div>
-
-            <FormField label="Note">
-              <input
-                className="at-input"
-                value={draft.note}
-                placeholder="root, irregular plural, where you heard it"
-                onChange={(e) => set("note", e.target.value)}
-              />
-            </FormField>
-              </>
-            )}
-          </div>
-        </>
-      ) : (
-        <>
-          {mode === "edit" ? (
-            <ReviewItem item={previewItem} units={previewUnits} total={1} index={0} />
-          ) : (
-            <>
-              <Help>
-                {pending.length === 1
-                  ? "This is exactly what will be stored."
-                  : `All ${pending.length} items as they will be stored. Remove any that look wrong, or go back and add more.`}
-              </Help>
-              {pending.map((it, i) => (
-                <ReviewItem
-                  key={i}
-                  item={it}
-                  units={unitsOf(it)}
-                  index={i}
-                  total={pending.length}
-                  onEdit={i < queue.length ? () => editQueued(i) : undefined}
-                  onRemove={
-                    pending.length > 1
-                      ? () => setQueue((q) => q.filter((_, j) => j !== i))
-                      : undefined
-                  }
-                />
-              ))}
-            </>
-          )}
-        </>
-      )}
-    </Screen>
   );
 }
 
@@ -17225,6 +16017,8 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
             ? `${s.minutes} min`
             : s.count && s.count < 999
             ? `${s.count} questions`
+            : s.mode === "catchup"
+            ? "everything due"
             : "everything";
           return (
             <div className="at-item at-sessionrow" key={s.id}>
@@ -17262,12 +16056,6 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
         })}
       </div>
 
-      {list.some((s) => missingFromSaved(s, items).length) && (
-        <Help className="at-mt3">
-          A session keeps the cards it was built from by name, so one you
-          have since deleted is no longer in it.
-        </Help>
-      )}
     </Screen>
   );
 }
@@ -17306,7 +16094,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
      already given, so the Mode section gets read as "confirm this" rather
      than "pick one" — and Ultimate, which is the longest session on offer,
      is the last one to hand somebody by default. */
-  const [mode, setMode] = useState(editing ? editing.mode : "");
+  const [mode, pickMode] = useState(editing ? editing.mode : "");
   /*
    * What is picked, two ways, as the two pickers show it: whole decks, and
    * single cards. A kept session is read back into the same two — what it
@@ -17334,9 +16122,18 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   });
   /* A new session opens on 20 questions, the owner's choice of default
      (0.499): unlike the mode, a length is something most people take as
-     offered. "" only for a kept session that had none — an Ultimate one. */
-  const [limitKind, setLimitKind] = useState( // "" | count | time
-    !editing ? "count" : editing.minutes ? "time" : editing.count && editing.count < 999 ? "count" : ""
+     offered. "" only for a kept session that had none — an Ultimate one —
+     and "all" for a Catch up kept as everything due. */
+  const [limitKind, setLimitKind] = useState( // "" | count | time | all
+    !editing
+      ? "count"
+      : editing.minutes
+      ? "time"
+      : editing.count && editing.count < 999
+      ? "count"
+      : editing.mode === "catchup"
+      ? "all"
+      : ""
   );
   const [count, setCount] = useState(editing && editing.count && editing.count < 999 ? editing.count : 20);
   const [minutes, setMinutes] = useState(editing && editing.minutes ? editing.minutes : 5);
@@ -17352,6 +16149,16 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
   usePageLock();
+
+  /* "Everything due" is Catch up's alone; moving to another mode puts the
+     length back to the usual twenty rather than leaving one it cannot use. */
+  const setMode = (m: string) => {
+    pickMode(m);
+    if (m !== "catchup" && limitKind === "all") {
+      setLimitKind("count");
+      setCount(20);
+    }
+  };
 
   const picked = useMemo(() => {
     const on = new Set(cards);
@@ -17562,12 +16369,29 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
               />
             </FormField>
 
+            {mode === "catchup" && (
+              <>
+                <div className="at-lengthor">or</div>
+                <FormField label="No limit" className="at-lengthgroup">
+                  <Segmented
+                    size={null}
+                    label="Everything due"
+                    options={[{ value: "all", label: "Everything due" }]}
+                    value={limitKind === "all" ? "all" : null}
+                    onChange={() => setLimitKind("all")}
+                  />
+                </FormField>
+              </>
+            )}
+
             {said.length && <p className="at-formneed unmet">{said.length}</p>}
             {limitKind && (
               <Help>
-                {limitKind === "count"
-                  ? `The session ends after ${count} questions.`
-                  : `The session ends after ${minutes} minutes.`}
+                {limitKind === "all"
+                  ? "The session ends when everything due has been answered."
+                  : limitKind === "count"
+                  ? `The session ends after ${count} questions${mode === "catchup" ? ", or sooner if less than that is due" : ""}.`
+                  : `The session ends after ${minutes} minutes${mode === "catchup" ? ", or sooner if less than that is due" : ""}.`}
               </Help>
             )}
           </>
@@ -17626,285 +16450,6 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
             </FormField>
           )}
         </div>
-      )}
-    </Screen>
-  );
-}
-
-/* ------------------------------------------------------------------
-   Full-screen: view an item without risking a change to it
-   ------------------------------------------------------------------ */
-
-
-
-/* A read-only rendering of what is about to be saved. */
-function ReviewItem({ item, units, index, total, onRemove, onEdit }: {
-  item: Item;
-  units: { unit: Form, isSub: boolean }[];
-  index: number;
-  total: number;
-  onRemove?: () => void;
-  onEdit?: () => void;
-}) {
-  const counts = familyCounts(item);
-  return (
-    <div className="at-reviewgroup">
-      {(total > 1 || onEdit) && (
-        <div className="at-reviewbar">
-          <span className="at-eyebrow">
-            {total > 1 ? `Item ${index + 1} of ${total}` : "This card"}
-          </span>
-          <span className="at-reviewacts">
-            {onEdit && (
-              <Button variant="ghost" size="sm" onClick={onEdit}>
-                Edit
-              </Button>
-            )}
-            {onRemove && (
-              <Button variant="ghost" size="sm" onClick={onRemove}>
-                Remove
-              </Button>
-            )}
-          </span>
-        </div>
-      )}
-
-      {units.map(({ unit, isSub }, i) => {
-        const types = availableTypes(unit);
-        return (
-          <div className="at-reviewcard" key={i}>
-            <div className="at-reviewhead">
-              <span className="at-formtag">{labelFor(unit)}</span>
-              <span className="at-eyebrow">
-                {isSub ? "Other form" : "Main entry"}
-              </span>
-            </div>
-
-            {unit.ar ? (
-              /* A plain paragraph, not a Stat. Stat wraps its value in
-                 .at-statvalue, which sets the UI serif and its own size at
-                 the same specificity as .at-arabic.word and later in the
-                 file — so the preview of the word came out in the interface
-                 face at stat size instead of the script's own. */
-              <p
-                className="at-arabic word"
-                lang={activeLang().id}
-                dir={activeLang().direction}
-              >
-                {unit.ar}
-              </p>
-            ) : (
-              <Notice kind="warn">
-                {`No ${activeLang().scriptLabel} — this form can't be practiced.`}
-              </Notice>
-            )}
-            {unit.en && <p className="at-en" style={{ fontSize: 20 }}>{asMeaning(unit.en)}</p>}
-            {unit.lat && <p className="at-latin" style={{ fontSize: 17 }}>{unit.lat}</p>}
-            {unit.note && <p className="at-note">{unit.note}</p>}
-
-            <ClipList
-                    clips={(unit.recs || []).map((r: any, i: number) => ({
-                      id: r.id,
-                      label: r.label || `Voice ${i + 1}`,
-                    }))}
-                    load={clipUrl}
-                  />
-
-            <Help>
-              {types.length >= 2 ? (
-                <>Exercises: {types.map((t) => exOf(t, activeLang()).label).join(" · ")}</>
-              ) : (
-                <span className="at-warn">
-                  Fewer than two exercise types — add the {activeLang().scriptLabel} plus English
-                  {activeLang().translitDrilled !== false
-                    ? ` or a ${activeLang().translitLabel.toLowerCase()}`
-                    : ""}
-                  .
-                </span>
-              )}
-            </Help>
-          </div>
-        );
-      })}
-
-      <div className="at-reviewcard">
-        <div className="at-reviewhead">
-          <span className="at-eyebrow">
-            Filed as
-          </span>
-        </div>
-        <div className="at-flags" style={{ justifyContent: "center", marginTop: 0 }}>
-          <span className="at-flag">{item.kind}</span>
-          {counts.subs > 0 && <span className="at-flag forms">⌥ {counts.forms} forms</span>}
-          {counts.clips > 0 && <span className="at-flag audio">♪ {counts.clips}</span>}
-        </div>
-        {item.tags.length ? (
-          <div className="at-tags" style={{ justifyContent: "center", marginTop: 10 }}>
-            {item.tags.map((t) => (
-              <span className="at-tag" key={t}>
-                {t}
-              </span>
-            ))}
-          </div>
-        ) : (
-          <Help className="at-mt2">Not in any deck</Help>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------------------
-   Full-screen: add many, with a review step
-   ------------------------------------------------------------------ */
-
-function BulkAddSheet({ allTags, onAdd, onImport, onClose }: {
-  allTags: string[];
-  onAdd: (items: any[]) => void;
-  onImport: (file: File) => void;
-  onClose: () => void;
-}) {
-  const [bulk, setBulk] = useState("");
-  const [step, setStep] = useState("paste");
-  const parsed = useMemo(() => parseLines(bulk, allTags), [bulk, allTags]);
-  const prepared = useMemo(() => parsed.map((p) => makeItem(p)), [parsed]);
-  const weak = prepared.filter((p) => availableTypes(leadOf(p)).length < 2).length;
-
-  return (
-    <Screen
-      title={step === "review" ? `Check ${plural(parsed.length, "card")}` : "Add in bulk"}
-      onBack={() => (step === "review" ? setStep("paste") : onClose())}
-      action={
-        step === "paste" && (
-                  <label className="at-btn sm ghost" style={{ flex: "none" }}>
-                    Open a file
-                    <input
-                      type="file"
-                      accept=".zip,.json,.md,.csv,.txt"
-                      className="at-hidden"
-                      onChange={(e) => {
-                        const f = e.target.files && e.target.files[0];
-                        if (f) {
-                          onImport(f);
-                          onClose();
-                        }
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                )
-      }
-      footer={
-        <>
-              {step === "paste" ? (
-                <>
-                  <Button variant="ghost" onClick={onClose}>
-                    Cancel
-                  </Button>
-                  <Button variant="primary"
-                    disabled={!parsed.length}
-                    onClick={() => setStep("review")}
-                  >
-                    Review {parsed.length || ""}
-                  </Button>
-                </>
-              ) : (
-                <>
-                  <Button variant="ghost" onClick={() => setStep("paste")}>
-                    Back to edit
-                  </Button>
-                  <Button variant="primary"
-                    onClick={() => {
-                      onAdd(parsed);
-                      onClose();
-                    }}
-                  >
-                    Add {plural(parsed.length, "card")}
-                  </Button>
-                </>
-              )}
-        </>
-      }
-    >
-      {step === "paste" ? (
-        <>
-          <div className="at-syntax">
-            <p className="at-eyebrow" style={{ margin: "0 0 8px" }}>
-              Syntax
-            </p>
-            <p>
-              <strong>A markdown table works as-is.</strong> Paste it below, or open an{" "}
-              <code>.md</code> file. Columns in this order:
-            </p>
-            <pre dir="auto">{sampleTable(activeLang())}</pre>
-            <p>Headings and prose around the table are ignored.</p>
-            <p>
-              Add <code>Number</code> and <code>Gender</code> columns if you want them — or
-              label cells <code>num:</code> and <code>gen:</code>. Anything without a number is
-              filed as singular, and you can change it in bulk afterwards.
-            </p>
-            <p>Without a table, one card per line, cells split by <code>|</code> or a tab:</p>
-            {/* The one place the script's name is lowered on purpose: these
-                are cells to copy, sitting beside "english" and "decks",
-                and a capital here would read as part of what to type. */}
-            <pre>
-              english | {activeLang().scriptLabel.toLowerCase()} |{" "}
-              {activeLang().translitLabel.toLowerCase()} | decks | note
-            </pre>
-            <p>
-              Trailing fields can be left off. Use <code>||</code> only to skip a field in the{" "}
-              <em>middle</em> of a line. Lines starting with <code>#</code> are ignored.
-            </p>
-          </div>
-
-          <textarea
-            className="at-input"
-            value={bulk}
-            dir="auto"
-            style={{ minHeight: 220 }}
-            placeholder={samplePlaceholder(activeLang())}
-            onChange={(e) => setBulk(e.target.value)}
-          />
-          {bulk.trim() && (
-            <Help>
-              {plural(parsed.length, "card")} read
-              {parsed.skipped ? `, ${parsed.skipped} line(s) skipped` : ""}.
-            </Help>
-          )}
-        </>
-      ) : (
-        <>
-          <Help>
-            Every row as it will be stored. {!!parsed.skipped && `${parsed.skipped} line(s) couldn't be read and were dropped. `}
-            {weak > 0 && (
-              <span className="at-warn">
-                {plural(weak, "item")} lack two exercise types and won't be
-                practiced until filled in.
-              </span>
-            )}
-          </Help>
-          <div className="at-preview">
-            <div className="at-previewhead">
-              <span>English</span>
-              <span>{activeLang().scriptLabel}</span>
-              <span>Translit.</span>
-              <span>Decks</span>
-            </div>
-            {prepared.map((p, i) => (
-              <div
-                className={`at-previewrow${availableTypes(leadOf(p)).length < 2 ? " weak" : ""}`}
-                key={i}
-              >
-                <span className="cell en">{asMeaning(leadOf(p).en) || "—"}</span>
-                <span className="cell ar" lang={activeLang().id} dir={activeLang().direction}>
-                  {leadOf(p).ar || "—"}
-                </span>
-                <span className="cell lat">{leadOf(p).lat || "—"}</span>
-                <span className="cell tag">{p.tags.join(", ") || "—"}</span>
-              </div>
-            ))}
-          </div>
-        </>
       )}
     </Screen>
   );
@@ -19019,9 +17564,16 @@ function ProgressTab({
   perDay = 0,
   prep = null,
   onPrep,
+  spaceOf,
+  spaceNames,
 }: {
   items: Item[];
   myCourses?: Course[];
+  /** A card's space, and every space's name, when Learning shows more than
+      one (memberships): two decks of one name in two spaces are then two
+      tiles, each saying its space. Absent: decks by name alone. */
+  spaceOf?: (it: Item) => string | null;
+  spaceNames?: Map<string, string>;
   settings: Settings;
   /** What the ladder did each day — see `moves` on the document. */
   moves?: Record<string, DayMoves>;
@@ -19154,28 +17706,34 @@ function ProgressTab({
    * more cards here than those tiles show.
    */
   const deckRows = useMemo(() => {
-    const held: Map<string, { n: number; learnt: number; got: number }> = new Map();
+    const held: Map<string, { name: string; space: string; n: number; learnt: number; got: number }> = new Map();
     for (const it of counted) {
       const toward = progress.toward.get(it.id);
       /* A card that can never be asked is not progress to be short of. */
       if (!toward) continue;
+      const space = (spaceNames && spaceOf && spaceOf(it)) || "";
       for (const deck of it.tags || []) {
-        const row = held.get(deck) || { n: 0, learnt: 0, got: 0 };
+        const key = `${space}|${deck}`;
+        const row = held.get(key) || { name: deck, space, n: 0, learnt: 0, got: 0 };
         row.n++;
         row.got += toward.share;
         if (toward.at.status === "done") row.learnt++;
-        held.set(deck, row);
+        held.set(key, row);
       }
     }
     return [...held.entries()]
-      .map(([name, { n, learnt, got }]) => ({
+      .map(([key, { name, space, n, learnt, got }]) => ({
+        key,
         name,
+        space,
+        spaceName: (spaceNames && space && spaceNames.get(space)) || "",
         n,
         learnt,
         pct: deckPercent({ n, learnt, got }),
       }))
       .sort((a, b) => b.pct - a.pct || a.name.localeCompare(b.name));
-  }, [counted, progress]);
+  }, [counted, progress, spaceOf, spaceNames]);
+  const deckOpenRow = deckRows.find((d) => d.key === deckOpen) || null;
 
   /* Where the prep stands, for the line beside the button. */
   const prepNow = prep ? prepStatus(prep, items, settings) : null;
@@ -19187,7 +17745,7 @@ function ProgressTab({
       <Section
         head
         title="The ladder"
-        lede="Where your cards are on the learning ladder. A card moves up a level once you have answered everything below it right twice running — and counts as learnt once it has come back twice since and you were right."
+        lede="See how well you know each card. Answer a card correctly twice in a row to move it up a level."
       >
 
       {/* A number you want to see the cards behind is a number worth
@@ -19346,11 +17904,11 @@ function ProgressTab({
               <button
                 type="button"
                 className={`at-deckstat${d.pct === 100 ? " done" : ""}`}
-                key={d.name}
+                key={d.key}
                 aria-haspopup="dialog"
-                onClick={() => setDeckOpen(d.name)}
+                onClick={() => setDeckOpen(d.key)}
               >
-                <span className="at-deckstatname">{d.name}</span>
+                <span className="at-deckstatname">{d.spaceName ? `${d.name} · ${d.spaceName}` : d.name}</span>
                 <b>
                   {d.pct}
                   <i>%</i>
@@ -19379,7 +17937,7 @@ function ProgressTab({
           decks it is about. The button starts
           one, or opens the one there is; the line beside it says what is
           being prepped for. */}
-      <Section head title="Prep mode" lede="Get some decks ready by a set date, like an exam or the start of a class.">
+      <Section head title="Prep mode" lede="Get some decks ready by a set date, like an exam, an upcoming trip, or the start of a class.">
         <div className="at-prepbar">
           <Button variant="ghost" onClick={() => setPrepOpen(true)} aria-haspopup="dialog">
             {prep ? "Edit prep mode" : "Start prep mode"}
@@ -19417,10 +17975,14 @@ function ProgressTab({
         />
       )}
 
-      {deckOpen && (
+      {deckOpenRow && (
         <DeckScreen
-          name={deckOpen}
-          cards={items.filter((it) => (it.tags || []).includes(deckOpen))}
+          name={deckOpenRow.name}
+          cards={items.filter(
+            (it) =>
+              (it.tags || []).includes(deckOpenRow.name) &&
+              (!deckOpenRow.space || (spaceOf && spaceOf(it)) === deckOpenRow.space)
+          )}
           progressOf={progressOf}
           towardOf={progress.toward}
           settings={settings}
@@ -19553,7 +18115,7 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
         <span className="at-formnum">Your account</span>
       </div>
 
-      <FormField label="Display name" lede="What teachers and classmates see. Change it whenever you like.">
+      <FormField label="Display name" lede="The name your teachers and classmates see.">
         <input
           className="at-input"
           defaultValue={me.displayName}
@@ -19563,7 +18125,7 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
 
       <FormField
         label="Handle"
-        lede="Fixed for good, because course rosters point at it. Safe to share — it identifies you without letting anyone in."
+        lede="This is a permanent username for admins to add you to a course or identify your account. You cannot change it."
       >
         <p className="at-handle">{me.handle}</p>
       </FormField>
@@ -19572,9 +18134,7 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
         label="Sign-in key"
         lede={
           <>
-            Five words that sign you in on any device and keep them together.{" "}
-            <em>Never share it</em> — anyone who has it is you. If you lose it, your administrator
-            can issue a new one; you keep your handle, your courses and everything you have learnt.
+            The key you use to sign into the app.
           </>
         }
       >
@@ -19618,6 +18178,66 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
 
 /* Closing an account is irreversible, so it asks for the handle rather
    than a yes/no anyone taps through. */
+/* Leaving one's space (0.544, 52a), asked once more before it happens. */
+/**
+ * Leaving a space. With one space, as it always was: the account can't
+ * sign in until reactivated or invited back. With several (memberships),
+ * one per space, and leaving one keeps the others: the app reloads at the
+ * plain address, which lands in another of them.
+ */
+function LeaveSpace({ onLeft, space, others = 0, admin = false }: {
+  onLeft: () => void;
+  /** The super admin, who comes back through Super admin → People (0.575). */
+  admin?: boolean;
+  space?: { id: string; name: string };
+  /** How many other spaces the account is in. */
+  others?: number;
+}) {
+  const [asking, setAsking] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const name = space && others > 0 ? space.name : "this space";
+  return (
+    <>
+      <Notice kind="error">{error}</Notice>
+      <Button variant="danger" size="sm" onClick={() => setAsking(true)}>{`Leave ${name}`}</Button>
+      {asking && (
+        <ConfirmModal
+          title={`Leave ${name}?`}
+          confirmLabel="Leave"
+          busy={busy}
+          body={
+            admin ? (
+              <p>Its courses leave your Learning, and your other spaces stay. You can add yourself back in Super admin → People.</p>
+            ) : others > 0 ? (
+              <p>Its courses leave your Learning, and your other spaces stay. You can come back with an invitation link or a course code.</p>
+            ) : (
+              <p>Your account stays. Until you come back with an invitation link or a course code, the app shows only a page saying so.</p>
+            )
+          }
+          onCancel={() => setAsking(false)}
+          onConfirm={async () => {
+            setBusy(true);
+            try {
+              await API.leaveSpace(space && space.id);
+              if (others > 0) {
+                window.location.assign("/");
+                return;
+              }
+              API.clearAccount();
+              onLeft();
+            } catch (e) {
+              setError(API.explain(e));
+              setBusy(false);
+              setAsking(false);
+            }
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 function CloseAccount({ handle, onClosed }: { handle: string; onClosed: () => void }) {
   const [open, setOpen] = useState(false);
   const [typed, setTyped] = useState("");
@@ -19694,8 +18314,8 @@ const initialsOf = (name?: string | null) =>
     .join("")
     .toUpperCase() || "?";
 
-const SPACE_LABEL: Record<string, string> = { learn: "Learning", teach: "Teaching", admin: "Admin" };
-const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", admin: "tune" };
+const SPACE_LABEL: Record<string, string> = { learn: "Learning", teach: "Teaching", admin: "Admin", mine: "My space", super: "Super admin" };
+const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", admin: "tune", mine: "person", super: "key" };
 
 
 /*
@@ -19740,7 +18360,8 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part
     <div className="at-place">
       {spacesToo && (
         <>
-          <div className="at-spacepick" role="radiogroup" aria-label="Space">
+          <div className="at-spacepick" role="radiogroup" aria-label="Space"
+            style={{ gridTemplateColumns: `repeat(${spaces.length}, minmax(0, 1fr))` }}>
             {spaces.map((sp) => (
               <button
                 key={sp}
@@ -19760,29 +18381,15 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part
         <>
           <p className="at-eyebrow">Languages</p>
           <Help>{note}</Help>
-          <div className="at-cklist">
-            {choices.map((c) => {
-              const chosen = !off.includes(c.id);
-              return (
-                <button
-                  key={c.id}
-                  className={`at-ck${chosen ? " on" : ""}`}
-                  role="checkbox"
-                  aria-checked={chosen}
-                  /* Not disabled: the last one on is pressable and simply
-                     holds. Just its name, to keep the list short. Ticking
-                     keeps the menu open:
-                     you are usually ticking more than one. */
-                  onClick={() => toggle(c.id)}
-                >
-                  <span className="at-ckbox">{chosen ? "✓" : ""}</span>
-                  <span className="at-cktext">
-                    <b>{c.name}</b>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
+          {/* The library's tick list (0.580). Not disabled: the last one on
+              is pressable and simply holds. Just its name, to keep the list
+              short. Ticking keeps the menu open: you are usually ticking more
+              than one. */}
+          <CheckList
+            options={choices.map((c) => ({ id: c.id, title: c.name }))}
+            chosen={choices.filter((c) => !off.includes(c.id)).map((c) => c.id)}
+            onToggle={(id) => toggle(id)}
+          />
         </>
       )}
     </div>
@@ -19932,8 +18539,20 @@ function AppVersion() {
   );
 }
 
-function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide }: {
+function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide, onFeedback, spaceShown, mySpaces, placeNow, placesLabel, onMySpace }: {
   account: User | null;
+  /** Where you can be (0.574): every space this account is in, when it is
+      in more than one (memberships); for the App admin, Super admin first,
+      then their spaces, then the space they opened. */
+  mySpaces?: { id: string; slug: string; label: string; logo?: string; logoData?: string; opened?: boolean }[];
+  /** Which of them is current: "super", or a space id. */
+  placeNow?: string;
+  /** "Your spaces", or "Where you are" for the App admin. */
+  placesLabel?: string;
+  onMySpace?: (space: { id: string; slug: string }) => void;
+  /** The space you are in, named at the top (0.543): its name, and its
+      logo as a data URL or a stored picture's hash. */
+  spaceShown?: { name: string; logoData?: string; logo?: string } | null;
   syncState?: string;
   /** What to say about it. Worked out by the app, which is the only thing
       that knows whether this was the connection or the passphrase. */
@@ -19947,15 +18566,11 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
   onCourses?: () => void;
   onSettings: () => void;
   onGuide: () => void;
+  /** Share feedback about the app (0.552), for anyone signed in. */
+  onFeedback?: () => void;
 }) {
   const [open, setOpen] = useState(false);
 
-  useEffect(() => {
-    if (!open) return;
-    const close = () => setOpen(false);
-    window.addEventListener("click", close);
-    return () => window.removeEventListener("click", close);
-  }, [open]);
 
   return (
     <div className="at-corner" onClick={(e) => e.stopPropagation()}>
@@ -19972,7 +18587,24 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
       </button>
 
       {open && (
-        <Popover className="at-cmenu">
+        <Popover className="at-cmenu" onClose={() => setOpen(false)}>
+          {/* Where you are (0.576): a list under one heading when there is
+              a choice, else the space's name as one quiet line. */}
+          {mySpaces && mySpaces.length > 1 && onMySpace ? (
+            <div data-el="my-spaces">
+            <SpacePlaces
+              label={placesLabel || "Your spaces"}
+              places={mySpaces}
+              now={placeNow || ""}
+              onPick={(to) => {
+                if (to.id !== placeNow) onMySpace(to);
+              }}
+            />
+            </div>
+          ) : spaceShown ? (
+            <SpaceLine space={spaceShown} />
+          ) : null}
+          {(mySpaces && mySpaces.length > 1) || spaceShown ? <div className="at-crule" /> : null}
           <div className="at-cwho">
             <span className="at-cavatar">{initialsOf(account && account.displayName)}</span>
             <span className="at-cwhotext">
@@ -20022,6 +18654,20 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
             </span>
             <span className="at-clinetext">How it works</span>
           </button>
+          {onFeedback && (
+            <button
+              className="at-cline at-cbig"
+              onClick={() => {
+                setOpen(false);
+                onFeedback();
+              }}
+            >
+              <span className="at-cico">
+                <Icon name="feedback" size={22} />
+              </span>
+              <span className="at-clinetext">Share feedback</span>
+            </button>
+          )}
 
           <div className="at-crule" />
           {/* The row states where sync has got to; the button is the only
@@ -20190,7 +18836,7 @@ function DeviceMedia({ allClipIds, onDevice, allImageIds, imagesOnDevice, onDown
     <div className="at-formblock">
       <div className="at-formhead">
         <span className="at-formnum">Recordings and pictures on this device</span>
-        <span className="at-formrole">Saved here so you can keep practising without an internet connection.</span>
+        <span className="at-formrole">These are the recordings and pictures saved on your device so you can keep practicing without an internet connection.</span>
       </div>
       <p className="at-devicefigures">
         {stats ? (held ? `${both(stats.clips, stats.images)}, ${formatBytes(stats.bytes)}` : "Nothing saved yet.") : "Counting…"}
@@ -20228,7 +18874,7 @@ function DeviceMedia({ allClipIds, onDevice, allImageIds, imagesOnDevice, onDown
           )}
           {held > 0 && !busy && (
             <Button variant="ghost" size="sm" onClick={() => setRemoving(true)} icon="delete">
-              Remove from this device
+              Remove all from this device
             </Button>
           )}
         </div>
@@ -20322,8 +18968,7 @@ function AccountSettings({
         <div className="at-formhead">
           <span className="at-formnum">Sign out</span>
           <span className="at-formrole">
-            Leaves this device signed out. Nothing on the server changes, and your key brings it
-            all back — so only do this if you have the key written down somewhere.
+            Make sure to save your sign-in key somewhere before logging out!
           </span>
         </div>
         <Button onClick={() => setLoggingOut(true)}>Log out</Button>
@@ -20337,7 +18982,7 @@ function AccountSettings({
           body={
             <p>
               You'll need your sign-in key to get back in, and nobody can recover it for you except
-              your administrator. Your account, courses and progress stay exactly as they are.
+              your space's admin. Your account, courses and progress stay exactly as they are.
             </p>
           }
           onCancel={() => setLoggingOut(false)}
@@ -20373,8 +19018,8 @@ function AccountSettings({
               label="Running this site"
               lede={
                 isAdmin
-                  ? "You create courses, decide who teaches them, and can delete either. Nothing done in there can be taken back."
-                  : "Only needed by whoever runs this site. An administrator key turns this account into the one that manages everyone else's."
+                  ? "Where you can create courses, decide who teaches them, and can delete either."
+                  : "Only needed by whoever runs this app."
               }
             >
               {isAdmin ? (
@@ -20389,24 +19034,22 @@ function AccountSettings({
             </FormField>
 
             <FormField
-              label="Reset scheduling"
+              label="Reset progress"
               lede="Sends every card back to the start, as though never practiced. Your cards, forms, decks and recordings all stay. What goes is everything the app has worked out about how well you know them — intervals, ease, difficulty and history. Nothing will be due until you practice it again."
             >
               <Button variant="danger" size="sm" onClick={() => setResetting(true)}>
-                Reset scheduling
+                Reset progress
               </Button>
             </FormField>
 
             {resetting && (
               <ConfirmModal
-                title="Reset scheduling on every card?"
-                confirmLabel="Reset scheduling"
+                title="Reset progress on every card?"
+                confirmLabel="Reset progress"
                 confirmWord="reset"
                 body={
                   <p>
-                    Every card goes back to the beginning. The cards themselves are kept; what you
-                    lose is the record of how well you know them, which can't be rebuilt except by
-                    practicing again.
+                    Every card resets to the beginning: you lose the record of how well you know each card, which can't be rebuilt except by practicing again.
                   </p>
                 }
                 onCancel={() => setResetting(false)}
@@ -20417,9 +19060,50 @@ function AccountSettings({
               />
             )}
 
+            {/* Leaving the space (52a): suspended until its admin reactivates
+                you. Never offered to the App admin, who would be locked out
+                of their own app. */}
+            {/* The super admin leaves a space they added themselves to
+                (0.575): any but their first, where they land. */}
+            {account.admin && (() => {
+              const theirs: { id: string; name: string }[] = Array.isArray((account as any).orgs) ? (account as any).orgs : [];
+              return theirs.slice(1).map((o) => (
+                <FormField
+                  key={o.id}
+                  label={`Leave ${o.name}`}
+                  lede="Its courses leave your Learning, and anything of yours in its My space is deleted. You can still open it from Super admin → Spaces, or add yourself back in Super admin → People."
+                >
+                  <LeaveSpace onLeft={onCloseAccount} space={o} others={theirs.length - 1} admin />
+                </FormField>
+              ));
+            })()}
+            {!account.admin && (() => {
+              /* One line per space you are in (memberships). */
+              const theirs: { id: string; name: string }[] = Array.isArray((account as any).orgs) ? (account as any).orgs : [];
+              if (theirs.length > 1) {
+                return theirs.map((o) => (
+                  <FormField
+                    key={o.id}
+                    label={`Leave ${o.name}`}
+                    lede="Its courses leave your Learning and you're listed among its former members. Your account and your other spaces stay."
+                  >
+                    <LeaveSpace onLeft={onCloseAccount} space={o} others={theirs.length - 1} />
+                  </FormField>
+                ));
+              }
+              return (
+                <FormField
+                  label="Leave this space"
+                  lede="Your account stays, with nothing to open until you come back with an invitation link or a course code. Nothing is deleted."
+                >
+                  <LeaveSpace onLeft={onCloseAccount} space={theirs[0]} />
+                </FormField>
+              );
+            })()}
+
             <FormField
-              label="Close this account"
-              lede="Removes your account from the server: your handle, your courses, and any decks you made for them. Cards on this device stay until you clear them. There is no undoing it and no way to get the handle back."
+              label="Delete your account"
+              lede="Deletes your account, your My space and your practice history from the server, and takes you off every course. Decks and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
             >
               <CloseAccount onClosed={onCloseAccount} handle={account.handle} />
             </FormField>
@@ -20471,8 +19155,8 @@ function AppPreferences({ settings, setSetting }: {
           />
         </FormField>
         <FormField
-          label="On-screen keys"
-          lede="Keys for the language you're learning, when your device hasn't got them."
+          label="On-screen keyboard"
+          lede="Display an on-screen keyboard for the language you're learning."
         >
           <Segmented
             options={[{ value: "auto", label: "When needed" }, { value: "always", label: "Always" }, { value: "never", label: "Never" }]}
@@ -20488,7 +19172,7 @@ function AppPreferences({ settings, setSetting }: {
         </div>
         <FormField
           label="Sounds"
-          lede="The short sounds after an answer. Loud carries on a bus; soft is for a quiet room."
+          lede="The short sounds the app plays after you answer an exercise."
         >
           <div className="at-row">
             <Segmented
@@ -20548,3 +19232,182 @@ export function homeLine({ review, fresh, behind }: Ready): string {
   return "All caught up — a practice session now still helps them stick";
 }
 
+/*
+ * The space you are in, at the top of the You menu (0.543, 28a): its logo
+ * and name, read-only. Built from the menu's own "who" row, so it needs no
+ * styling of its own. A logo comes as a data URL (from the address) or as
+ * a stored picture's hash (from the account), fetched the way any picture
+ * is.
+ */
+function SpaceLine({ space }: { space: { name: string; logoData?: string; logo?: string } }) {
+  /* A place, not a person (0.576): a square badge and a plain name, so it
+     is not read as a second account above your own. */
+  return (
+    <div className="at-spaceline" aria-label={`Space: ${space.name}`}>
+      <SpaceBadge space={space} />
+      <span className="at-spacename">{space.name}</span>
+    </div>
+  );
+}
+
+/*
+ * A space's logo, or its initials, in a small square (0.576). Super admin,
+ * which is no space, has its key instead. A logo comes as a data URL (from
+ * the address) or as a stored picture's hash (from the account), fetched
+ * the way any picture is.
+ */
+function SpaceBadge({ space, icon }: { space?: { name: string; logoData?: string; logo?: string }; icon?: string }) {
+  const logo = space && space.logo;
+  const logoData = space && space.logoData;
+  /* Fetched once a session, however often the menu opens (0.580). */
+  const fetched = usePicture(logoData ? "" : logo || "");
+  const src = logoData || fetched.src;
+  if (icon) {
+    return (
+      <span className="at-spacebadge plain" aria-hidden="true">
+        <Icon name={icon} size={16} />
+      </span>
+    );
+  }
+  return src
+    ? <img className="at-spacebadge" src={src} alt="" />
+    : <span className="at-spacebadge" aria-hidden="true">{initialsOf((space && space.name) || "")}</span>;
+}
+
+/*
+ * Someone with no space they may use (0.578): suspended in, removed from or
+ * gone from each space they were in. Said plainly, with the way back in:
+ * an invitation link or a course code, typed or pasted.
+ */
+function StrandedPanel({ stranded, onJoined }: {
+  stranded: { space: { name: string }; why: string }[];
+  onJoined: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const said = (why: string, name: string) =>
+    why === "removed" ? `You were removed from ${name}.` : why === "left" ? `You left ${name}.` : `You're suspended in ${name}.`;
+  return (
+    <div className="at-strandedbox" data-el="stranded">
+      <h2>No space to open</h2>
+      {stranded.map((s) => (
+        <p key={s.space.name} className="at-strandedline">{said(s.why, s.space.name)}</p>
+      ))}
+      <Help>Ask its admin to let you back in, or use an invitation to another space.</Help>
+      <Notice kind="error">{error}</Notice>
+      <div className="at-toolbar at-mt3">
+        <input
+          className="at-input at-search"
+          placeholder="Invitation link or course code"
+          aria-label="Invitation link or course code"
+          value={code}
+          onChange={(e) => setCode(e.target.value)}
+        />
+        <Button variant="primary" disabled={!code.trim() || busy}
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            /* A pasted invitation link carries its code after join=. */
+            let given = code.trim();
+            try {
+              const asUrl = new URL(given);
+              given = asUrl.searchParams.get("join") || given;
+            } catch (e) {
+              /* not a link: a code */
+            }
+            try {
+              await API.joinCourse(given);
+              onJoined();
+            } catch (e) {
+              setError(API.explain(e));
+              setBusy(false);
+            }
+          }}>
+          Join
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/*
+ * A list of places to choose from, one per line (0.576): the You menu's
+ * "Where you are" / "Your spaces", and the list behind Learning's space
+ * button. One per line, so any number of spaces fits, and a long name is
+ * cut short rather than pushing the menu wider.
+ */
+function SpacePlaces({ label, places, now, onPick }: {
+  label: string;
+  places: { id: string; label: string; logo?: string; logoData?: string; opened?: boolean; icon?: string }[];
+  now: string;
+  onPick: (place: any) => void;
+}) {
+  return (
+    <div className="at-places" role="radiogroup" aria-label={label}>
+      <p className="at-placeshead">{label}</p>
+      {places.map((p) => {
+        const on = p.id === now;
+        return (
+          <button
+            key={p.id}
+            role="radio"
+            aria-checked={on}
+            className={`at-place-row${on ? " on" : ""}`}
+            onClick={() => onPick(p)}
+          >
+            <SpaceBadge
+              space={{ name: p.label, logo: p.logo, logoData: p.logoData }}
+              icon={p.icon || (p.id === "super" ? SPACE_ICON.super : undefined)}
+            />
+            <span className="at-place-name">{p.label}</span>
+            {p.opened && <span className="at-place-tag">Opened</span>}
+            {on && <span className="at-place-tick"><Icon name="check" size={18} /></span>}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/*
+ * Which of your spaces Learning shows (0.576), as a button in the top
+ * right corner instead of a row across the page: the row ran off the edge
+ * with more than a few spaces. Showing all of them, the button carries the
+ * layers icon; narrowed to one, it fills and carries that space's initials,
+ * so a narrowed Learning never looks like the whole of it.
+ */
+function LearnSpaceButton({ spaces, value, onChange }: {
+  spaces: { id: string; name: string; logo?: string }[];
+  value: string;
+  onChange: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const chosen = spaces.find((o) => o.id === value) || null;
+  return (
+    <div className="at-learnspace" onClick={(e) => e.stopPropagation()}>
+      <button
+        className={`at-learnspacebtn${chosen ? " on" : ""}${open ? " open" : ""}`}
+        aria-label={`Which space: ${chosen ? chosen.name : "all of them"}`}
+        aria-expanded={open}
+        data-el="space-filter"
+        onClick={() => setOpen((v) => !v)}
+      >
+        {chosen ? initialsOf(chosen.name) : <Icon name="layers" size={20} />}
+      </button>
+      {open && (
+        <Popover className="at-cmenu at-learnspacemenu" onClose={() => setOpen(false)}>
+          <SpacePlaces
+            label="Which space"
+            places={[{ id: "", label: "All your spaces", icon: "layers" }, ...spaces.map((o) => ({ id: o.id, label: o.name, logo: o.logo }))]}
+            now={value}
+            onPick={(p) => {
+              setOpen(false);
+              onChange(p.id);
+            }}
+          />
+        </Popover>
+      )}
+    </div>
+  );
+}

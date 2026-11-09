@@ -3,9 +3,8 @@
    key, my-material with a version, legacy document cleanup, sparse
    storage. Run with: node tests/smoke.mjs */
 import { JSDOM } from "jsdom";
-import { build } from "esbuild";
 import path from "node:path";
-import { must } from "./helpers.mjs";
+import { buildOnce, must } from "./helpers.mjs";
 import { asMeaning, fillNames } from "../src/variables.ts";
 
 /*
@@ -40,16 +39,14 @@ Math.random = () => {
 
 /* Built inside the project so the bundle's bare "react" imports resolve to
    the project's node_modules. */
-import { mkdirSync, rmSync } from "node:fs";
-const out = path.resolve("tests/.smoke-build");
-rmSync(out, { recursive: true, force: true });
-mkdirSync(out, { recursive: true });
-await build({
-  entryPoints: [
-    "src/ArabicTrainer.tsx",
-    "src/storage.ts",
-    "src/gallery.tsx",
-    "src/shared.tsx",
+/* Through the build every test shares (0.580): one per state of the
+   source and set of options — see buildOnce. */
+const out = await buildOnce(
+  [
+    "ArabicTrainer.tsx",
+    "storage.ts",
+    "gallery.tsx",
+    "shared.tsx",
     /*
      * The teaching space is loaded lazily, so its screens arrive through
      * the app's own import rather than from this list — the card editor
@@ -58,30 +55,24 @@ await build({
      * button this walk does not press, so it is named here and driven on
      * its own at the foot of the file.
      */
-    "src/number-system-editor.tsx",
+    "number-system-editor.tsx",
     /* And the review screens, reached from a card's page and a toolbar
        button this walk does not press — driven on their own at the foot. */
-    "src/review-sheet.tsx",
+    "review-sheet.tsx",
   ],
-  bundle: true,
-  format: "esm",
-  splitting: true,
-  outdir: out,
-  jsx: "automatic",
-  platform: "browser",
-  /* One React: the bundle imports the same copy the test renders with. */
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  logLevel: "silent",
-  /* The same three vite freezes into a real build, so the version line is
-     exercised here the way it actually ships rather than through its
-     "no one defined this" fallback. */
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0.1"',
-    __APP_VERSION__: '"abc1234"',
-    __BUILT_AT__: '"2026-09-05T13:00:00.000Z"',
+  {
+    splitting: true,
+    /* The same three vite freezes into a real build, so the version line is
+       exercised here the way it actually ships rather than through its
+       "no one defined this" fallback. */
+    define: {
+      "process.env.NODE_ENV": '"development"',
+      __APP_RELEASE__: '"0.1"',
+      __APP_VERSION__: '"abc1234"',
+      __BUILT_AT__: '"2026-09-05T13:00:00.000Z"',
+    },
   },
-});
+);
 
 const dom = new JSDOM(`<!doctype html><html><body><div id="root"></div></body></html>`, {
   url: "https://manytongues.test/",
@@ -321,10 +312,31 @@ const signedUp = [];
    whatever else is in hand — so for that one the course is emptied and the
    only thing left is the skills. */
 let materialQuiet = false;
+/* Memberships: an account in two spaces, each with a course of its own.
+   Off except in the walk that sets it. */
+let materialTwoSpaces = false;
+/** @type {any[]} */
+const joinedSpaces = [];
+/* Who whoami answers as, where a walk signs somebody else in. */
+/** @type {any} */
+let whoamiAs = null;
 /* Saves the stub takes, where a walk turns them on — see save-card below. */
 let takeSaves = false;
+/* A walk's own answer to a save, where it needs the server to fail, be
+   unreachable or refuse (0.580): a function of the request, or null. */
+/** @type {null | ((opts: any) => any)} */
+let saveReply = null;
+/* The space each save named, by its x-org header. */
+/** @type {string[]} */
+const saveOrgs = [];
+/* Reviews sent, and what the card says once one is. */
+/** @type {any[]} */
+const reviewsSent = [];
 /** @type {any[]} */
 const savedCards = [];
+/** Whether each save asked to be published too, in the order they came. */
+/** @type {boolean[]} */
+const savedPublish = [];
 
 /**
  * The whole server, as far as the app is concerned.
@@ -365,9 +377,31 @@ const fakeFetch = async (input, opts = {}) => {
   }
 
   if (url.pathname === "/api/courses") {
-    if (action === "whoami") return json({ ok: true, user: { ...account, key: undefined } });
+    /* With every space the account may use (memberships): the account's
+       own `orgs` where a test gives it several, else its one space. */
+    if (action === "whoami") {
+      const own = /** @type {any} */ (whoamiAs || account);
+      const orgs = own && Array.isArray(own.orgs) ? own.orgs : own && own.org ? [own.org] : [];
+      return json({ ok: true, user: { ...own, key: undefined, orgs } });
+    }
     if (action === "my-material") {
       materialHits += 1;
+      if (materialTwoSpaces) {
+        const lingua = { ...card, id: "k999999999999", ar: "قلم", en: "pen", lat: "qalam", subs: [], clips: [] };
+        return json({
+          ok: true, version: "v-two", teaches: false,
+          courses: [
+            { id: "c1", org: "main", title: "Arabic 101", language: "ar-PS", decks: ["d1"], role: "student", studying: true, teaching: false },
+            { id: "c9", org: "lingua", title: "Lingua Arabic", language: "ar-PS", decks: ["d9"], role: "student", studying: true, teaching: false },
+          ],
+          decks: [
+            { id: "d1", title: "Lesson 1", owner: "t-1", cardIds: [card.id, phrase.id], cardCount: 2, courseId: "c1", courseTitle: "Arabic 101", courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: 1 }], version: 3 },
+            { id: "d9", title: "Lesson 1", owner: "t-9", cardIds: [lingua.id], cardCount: 1, courseId: "c9", courseTitle: "Lingua Arabic", courseLanguage: "ar-PS", courses: [{ courseId: "c9", addedAt: 1 }], version: 1 },
+          ],
+          cards: [{ deckId: "d1", cards: [card, phrase] }, { deckId: "d9", cards: [lingua] }],
+          systems: [],
+        });
+      }
       if (materialQuiet) {
         return json({
           ok: true, version: "v-quiet", teaches: true,
@@ -452,6 +486,8 @@ const fakeFetch = async (input, opts = {}) => {
       lockedDecks.push(body);
       return json({ ok: true });
     }
+    /* Whose numbers a deck uses (0.541): nobody here has any. */
+    if (action === "number-sources") return json({ ok: true, sources: [], chosen: "" });
     if (action === "set-deck-parts") {
       const body = JSON.parse(opts.body || "{}");
       savedParts.push(body);
@@ -492,10 +528,19 @@ const fakeFetch = async (input, opts = {}) => {
     /* A card saved, where a walk has asked for saves to be taken — the
        Pronouns screen's. Off otherwise, so nothing earlier comes to rely on
        a save the stub did not used to answer. */
+    if (action === "save-card") saveOrgs.push(String((opts.headers || {})["x-org"] || ""));
+    if (action === "save-card" && saveReply) return saveReply(opts);
+    if (action === "review-card") {
+      const body = JSON.parse(opts.body || "{}");
+      reviewsSent.push(body);
+      const was = [frameCard].find((c) => c.id === body.cardId) || frameCard;
+      return json({ ok: true, card: { ...was, rev: (was.rev || 1) + 1, review: { ok: body.ok || [], no: body.no || [], at: 1, by: "t-1" }, decks: ["d2"] } });
+    }
     if (action === "save-card" && takeSaves) {
       const body = JSON.parse(opts.body || "{}");
       const card = { ...(body.card || {}), id: (body.card && body.card.id) || `k-saved-${savedCards.length + 1}` };
       savedCards.push(card);
+      savedPublish.push(body.publish === true);
       return json({ ok: true, card: { ...card, decks: body.decks || [] }, decks: [] });
     }
     if (action === "image") {
@@ -506,6 +551,18 @@ const fakeFetch = async (input, opts = {}) => {
       reported.push(JSON.parse(opts.body || "{}"));
       return json({ ok: true, id: "flag-1" });
     }
+    /* Memberships: a space's public face, and joining it signed in. */
+    if (action === "org-info" && materialTwoSpaces) {
+      const slug = url.searchParams.get("slug");
+      if (slug === "lingua") return json({ ok: true, org: { id: "lingua", slug: "lingua", name: "Lingua", logo: "", colour: "", logoData: "", closed: false } });
+      if (slug === "main") return json({ ok: true, org: { id: "main", slug: "main", name: "Main", logo: "", colour: "", logoData: "", closed: false } });
+      return json({ error: "no-space" }, 404);
+    }
+    if (action === "join-space") {
+      joinedSpaces.push(JSON.parse(opts.body || "{}"));
+      return json({ ok: true, space: { id: "lingua", slug: "lingua", name: "Lingua", logo: "", colour: "" } });
+    }
+    if (action === "practiced" || action === "leave-space") return json({ ok: true });
     return json({ error: "unknown-action" }, 400);
   }
   if (url.pathname === "/api/sync") {
@@ -2681,16 +2738,16 @@ if (/Build a session/.test(document.body.textContent)) {
   const both = cardCount();
   /* The languages are at the top of the menu behind your initial. */
   const swBtn = () => document.querySelector(".at-cornerbtn");
-  const rows = () => [...document.querySelectorAll(".at-cmenu .at-ck")];
-  const swSaid = () => rows().map((r) => `${(r.querySelector("b") || {}).textContent}:${r.getAttribute("aria-checked")}`).join(", ");
+  const rows = () => [...document.querySelectorAll(".at-cmenu .at-tickrow")];
+  const swSaid = () => rows().map((r) => `${(r.querySelector("b") || {}).textContent}:${String(!!(/** @type {any} */ (r.querySelector("input")) || {}).checked)}`).join(", ");
 
   click(swBtn());
   await sleep(200);
   check("pressing it opens the languages being learnt", rows().length === 2,
     rows().map((r) => (r.textContent || "").replace(/\s+/g, " ")).join(" · ") || "nothing opened");
   check("with every one of them ticked to start with",
-    rows().length > 0 && rows().every((r) => r.getAttribute("aria-checked") === "true"),
-    rows().map((r) => r.getAttribute("aria-checked")).join(","));
+    rows().length > 0 && rows().every((r) => String(!!(/** @type {any} */ (r.querySelector("input")) || {}).checked) === "true"),
+    rows().map((r) => String(!!(/** @type {any} */ (r.querySelector("input")) || {}).checked)).join(","));
 
   /* Switch the second language off. */
   const viRow = rows().find((r) => /Vietnamese/.test(r.textContent || ""));
@@ -2709,8 +2766,8 @@ if (/Build a session/.test(document.body.textContent)) {
   click(arRow);
   await sleep(250);
   check("the last language on cannot be switched off",
-    !!arRow && arRow.getAttribute("aria-checked") === "true" && cardCount() === both - 1,
-    `${arRow ? arRow.getAttribute("aria-checked") : "no row"}, ${cardCount()} cards`);
+    !!arRow && String(!!(/** @type {any} */ (arRow.querySelector("input")) || {}).checked) === "true" && cardCount() === both - 1,
+    `${arRow ? String(!!(/** @type {any} */ (arRow.querySelector("input")) || {}).checked) : "no row"}, ${cardCount()} cards`);
   check("and the row says only the language's name",
     /^\s*✓?\s*Palestinian Arabic\s*$/.test((arRow || {}).textContent || ""),
     ((arRow || {}).textContent || "").replace(/\s+/g, " "));
@@ -3241,6 +3298,12 @@ check("no console errors during the session", errors.length === 0, errors.slice(
     const len = runs(played(kind));
     check(`${kind} lasts long enough to be noticed`, len >= least,
       `${len.toFixed(2)}s, wanted ${least}s`);
+  }
+  /* A tap on a matching tile is heard ten times in a grid of five, so it
+     has to be over before the next tap. */
+  {
+    const len = runs(played("select"));
+    check("a matching tile's tap is short", len <= 0.12, `${len.toFixed(2)}s`);
   }
   setSounds("off");
   check("off schedules nothing at all", played("correct").length === 0);
@@ -4429,7 +4492,11 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      learner's own nav and card list are still in the document behind it,
      so everything below is looked for inside the frame. */
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
+  /* Since 0.550 the space's cards are under Material, chosen there with
+     its own Decks / Cards tabs. */
+  click(frameButtons(frame).find((b) => /^Material$/.test((b.textContent || "").trim())) || null);
+  await sleep(500);
+  const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test((b.textContent || "").trim()));
   check("the teaching space has a Cards tab of its own", teachTabs.length > 0,
     [...document.querySelectorAll('.at-dock [role="tab"]')].map((b) => b.textContent).join("|"));
   click(teachTabs[teachTabs.length - 1]);
@@ -4594,6 +4661,12 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   const saveOff = () => isOff(buttonNamed(/^Save$/));
   check("Save is off until something changes", !!saveOff(),
     `Save ${isOff(buttonNamed(/^Save$/)) ? "off" : "on"}`);
+  /* And beside it, Save and publish: before Save in the row, so Save keeps
+     the corner, and off whenever Save is. */
+  const fabNames = () => [...document.querySelectorAll(".at-screen.cardform button.at-fab")].map(spokenName);
+  check("Save and publish floats beside Save, off with it",
+    fabNames().join(" | ") === "Save and publish | Save" && isOff(buttonNamed(/^Save and publish$/)),
+    fabNames().join(" | "));
   /* And a tap on it says so, rather than nothing happening. */
   clickNamed(/^Save$/);
   await sleep(150);
@@ -4645,6 +4718,19 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("and with it saved the card is read again, Edit in the corner",
     !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save$/),
     [...document.querySelectorAll(".at-fab")].map(spokenName).join(" | "));
+  /* Save and publish: the same save, asking to be published, and back to
+     reading the card as Save is. A plain Save never asks. */
+  click(cardEdit());
+  await sleep(400);
+  typeOn(noteBox(), `${(noteBox() || { value: "" }).value}z`);
+  await sleep(150);
+  clickNamed(/^Save and publish$/);
+  await sleep(500);
+  const asks = savedPublish.slice(savesBefore);
+  check("Save and publish saves the card asking for it to be published, and goes back to reading it",
+    asks.length === 3 && !asks[0] && !asks[1] && asks[2] && savedCards[savedCards.length - 1].id === both[0].id &&
+      !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save and publish$/),
+    `${asks.join(", ")} · ${buttonNamed(/^Edit$/) ? "reading" : "still editing"}`);
   clickNamed(/^Back$/);
   await sleep(400);
   takeSaves = false;
@@ -7749,18 +7835,222 @@ const openPronounTables = async () => {
   await sleep(300);
 }
 
+/* ---- a save that fails, one that waits, and one refused (0.580) ----
+
+   The audit of 0.579 found four ways a teacher's save went missing. A
+   failed save said why on the frame behind the editor, where nobody could
+   see it. A save kept offline was dropped the first time the server
+   answered with anything but its own JSON — a 502 page during a deploy —
+   and dropped silently when it was refused. A full device kept nothing
+   and said it had. And a kept save was sent to whichever space the app
+   was in by then. Each is walked here, on the card saved as a Name. */
+{
+  const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
+  const OUTBOX = "arabic-trainer:outbox";
+  const queued = () => {
+    try {
+      return /** @type {any[]} */ (JSON.parse(w.localStorage.getItem(OUTBOX) || "[]")).filter((p) => p.kind === "card");
+    } catch (e) {
+      return [];
+    }
+  };
+  const saveFab = () => /** @type {any} */ ((cardOnScreen() || document).querySelector('.at-fab[aria-label="Save"]'));
+  /** Write into the card's name box, as a teacher would. */
+  const setName = async (/** @type {string} */ v) => {
+    const screen = cardOnScreen();
+    const field = screen && [...screen.querySelectorAll(".at-field")].find((f) =>
+      /^Card name$/.test(((f.querySelector(".at-label") || {}).textContent || "").trim()));
+    const box = /** @type {HTMLInputElement | null} */ (field ? field.querySelector("input") : null);
+    if (!box) return false;
+    must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(box, v);
+    box.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(150);
+    return true;
+  };
+  const openNablus = async () => {
+    const tile = [...frame.querySelectorAll(".at-minicard")]
+      .find((t) => ((t.querySelector(".ar") || {}).textContent || "").trim() === "نابلس");
+    click(tile);
+    await sleep(450);
+    click(cardEdit());
+    await sleep(450);
+  };
+  const online = () => {
+    w.dispatchEvent(new w.Event("online"));
+  };
+  /** @param {number} status @param {string} body */
+  const answer = (status, body) => () => ({
+    ok: status < 300, status, json: async () => JSON.parse(body), text: async () => body,
+  });
+  const offlineSave = () => {
+    throw new TypeError("Failed to fetch");
+  };
+  const errorBanner = () => [...document.querySelectorAll(".at-banner.error")].map((b) => b.textContent || "").join(" ");
+  const before = queued().length;
+
+  /* A server error: the editor stays, and says why inside itself. */
+  await openNablus();
+  await setName("Nablus, the city");
+  saveReply = answer(500, JSON.stringify({ error: "server" }));
+  click(saveFab());
+  await sleep(500);
+  const editorNow = cardOnScreen();
+  check("a save the server fails leaves the editor open",
+    !!editorNow && !!saveFab(), editorNow ? "open" : "closed");
+  check("and says why inside the editor, not behind it",
+    !!editorNow && !!editorNow.querySelector(".at-notice.error"),
+    editorNow ? ((editorNow.querySelector(".at-notice") || {}).textContent || "(no notice)") : "no editor");
+  check("with Save still on, to try again", !!saveFab() && !isOff(saveFab()), "Save is off");
+
+  /* A full device: nothing kept, and said. */
+  const realSet = w.Storage.prototype.setItem;
+  w.Storage.prototype.setItem = function (/** @type {string} */ k, /** @type {string} */ v) {
+    if (k === OUTBOX) throw new w.DOMException("full", "QuotaExceededError");
+    return realSet.call(this, k, v);
+  };
+  saveReply = offlineSave;
+  click(saveFab());
+  await sleep(500);
+  w.Storage.prototype.setItem = realSet;
+  check("with the device full, a save that cannot be sent keeps the editor open",
+    !!cardOnScreen(), "the editor closed as though it were kept");
+  check("and says the device is full",
+    /storage is full/.test((cardOnScreen() || document.body).textContent || ""),
+    ((cardOnScreen() || document.body).querySelector(".at-notice.error") || {}).textContent || "(nothing said)");
+  check("and keeps nothing it cannot keep", queued().length === before, `${queued().length} queued`);
+
+  /* Offline: kept on the device, with the space it was made in. */
+  click(saveFab());
+  await sleep(600);
+  const held = queued();
+  check("offline, the save is kept on the device", held.length === before + 1, `${held.length} queued`);
+  check("with the space it was made in",
+    held.length > 0 && "org" in held[held.length - 1].body, JSON.stringify(held.length ? Object.keys(held[held.length - 1].body) : []));
+  /* Made in another space than the one the app is in now. */
+  if (held.length) {
+    held[held.length - 1].body.org = "lingua";
+    const all = /** @type {any[]} */ (JSON.parse(w.localStorage.getItem(OUTBOX) || "[]"))
+      .map((p) => (p.id === held[held.length - 1].id ? held[held.length - 1] : p));
+    w.localStorage.setItem(OUTBOX, JSON.stringify(all));
+  }
+  if (cardOnScreen()) {
+    backOut();
+    await sleep(300);
+  }
+
+  /* The connection comes back mid-deploy: a gateway's page, not the
+     server's answer. It waits, and nothing is said. */
+  saveReply = answer(502, "<!doctype html><title>Bad gateway</title>");
+  online();
+  await sleep(600);
+  check("a 502 page on reconnecting leaves the save waiting", queued().length === before + 1, `${queued().length} queued`);
+  check("and says nothing is lost", !/discarded/.test(errorBanner()), errorBanner());
+  /* And the server comes back: sent, to the space it was made in. */
+  const orgsBefore = saveOrgs.length;
+  saveReply = answer(200, JSON.stringify({ ok: true, card: { ...oldName, decks: [] }, decks: [] }));
+  online();
+  await sleep(600);
+  check("once the server answers, it is sent", queued().length === before, `${queued().length} queued`);
+  check("to the space it was made in", saveOrgs.slice(orgsBefore).includes("lingua"), saveOrgs.slice(orgsBefore).join(",") || "(none sent)");
+
+  /* Refused: dropped, and named. */
+  await openNablus();
+  await setName("Nablus again");
+  saveReply = offlineSave;
+  click(saveFab());
+  await sleep(600);
+  if (cardOnScreen()) {
+    backOut();
+    await sleep(300);
+  }
+  saveReply = answer(400, JSON.stringify({ error: "not-yours" }));
+  online();
+  await sleep(600);
+  check("a save the server refuses is dropped", queued().length === before, `${queued().length} queued`);
+  check("and the teacher is told which card", /نابلس/.test(errorBanner()), errorBanner() || "(no banner)");
+  clickNamed(/^Dismiss$/);
+  await sleep(200);
+  check("until they dismiss it", !errorBanner(), errorBanner());
+  saveReply = null;
+}
+
+/* ---- reviewing sentences from inside an editor keeps what was typed ----
+
+   Saving a review used to redraw the editor from the saved card, and
+   everything typed since Edit went with it (0.580, audit finding 9). */
+{
+  const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
+  const tile = [...frame.querySelectorAll(".at-minicard")]
+    .find((t) => /اسمي/.test(t.textContent || ""));
+  click(tile);
+  await sleep(450);
+  click(cardEdit());
+  await sleep(450);
+  const field = [...((cardOnScreen() || document).querySelectorAll(".at-field"))].find((f) =>
+    /^Card name$/.test(((f.querySelector(".at-label") || {}).textContent || "").trim()));
+  const box = /** @type {HTMLInputElement | null} */ (field ? field.querySelector("input") : null);
+  if (box) {
+    must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(box, "Typed before reviewing");
+    box.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(150);
+  }
+  check("the frame's editor offers Review sentences", clickNamed(/^Review sentences$/), "no Review sentences button");
+  await sleep(450);
+  const sentBefore = reviewsSent.length;
+  check("and the review screen saves", clickNamed(/^Save review$/), "no Save review button");
+  await sleep(600);
+  check("the review went to the server", reviewsSent.length === sentBefore + 1, `${reviewsSent.length - sentBefore} sent`);
+  const after = [...((cardOnScreen() || document).querySelectorAll(".at-field"))].find((f) =>
+    /^Card name$/.test(((f.querySelector(".at-label") || {}).textContent || "").trim()));
+  const afterBox = /** @type {HTMLInputElement | null} */ (after ? after.querySelector("input") : null);
+  check("what was typed is still there", !!afterBox && afterBox.value === "Typed before reviewing",
+    afterBox ? afterBox.value : "no name box");
+  const save = /** @type {any} */ ((cardOnScreen() || document).querySelector('.at-fab[aria-label="Save"]'));
+  check("and Save is still on", !!save && !isOff(save), save ? "off" : "no Save");
+  check("and nothing asked to discard it", !buttonNamed(/^Discard changes$/), "a Discard question is up");
+  /* Out: Cancel and Discard, which puts the card back to being read, then
+     Back off it — see backOut. As many times as it takes, and said if it
+     will not go, since every walk after this starts from the card list. */
+  for (let i = 0; i < 3 && cardOnScreen(); i++) {
+    backOut();
+    await sleep(400);
+  }
+  check("and the card can be left afterwards", !cardOnScreen(),
+    [...document.querySelectorAll("button.at-back")].map((b) => b.getAttribute("aria-label")).join(", "));
+}
+
 /* ---- a language's pronouns, written once ----
 
-   The Pronouns screen, off the Cards tab beside Numbers: one row per
-   column of the verb table. Filled in and saved, each row goes up as a
-   card of the Pronoun kind that says which column it is. */
+   The Pronouns screen, a word set (0.569): reached from the Word sets row
+   above the Cards tab's list, through the screen that lists every set.
+   One row per column of the verb table. Filled in and saved, each row goes
+   up as a card of the Pronoun kind that says which column it is. */
 {
   takeSaves = true;
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
-  const btn = /** @type {any} */ (frameButtons(frame)
-    .find((b) => b.getAttribute("aria-label") === "Pronouns") || null);
-  check("the Cards tab offers Pronouns beside Numbers", !!btn, btn ? "there" : "(no button)");
-  click(btn);
+  check("the Cards tab no longer has an icon each for Numbers and Pronouns",
+    !frameButtons(frame).some((b) => /^(Numbers|Pronouns)$/.test(b.getAttribute("aria-label") || "")),
+    frameButtons(frame).map((b) => b.getAttribute("aria-label")).filter(Boolean).join(" | "));
+  const setsRow = /** @type {any} */ ([...frame.querySelectorAll("button.at-openrow")]
+    .find((b) => /^Word sets/.test((b.textContent || "").trim())) || null);
+  check("but one Word sets row above the cards, saying what it holds",
+    !!setsRow && /Numbers and pronouns, written once for the language/.test(setsRow.textContent || ""),
+    setsRow ? (setsRow.textContent || "").trim() : "(no row)");
+  click(setsRow);
+  await sleep(400);
+  const setsScreen = () => /** @type {any} */ ([...document.querySelectorAll(".at-screen")]
+    .find((sc) => ((sc.querySelector(".at-screenhead h2") || {}).textContent || "").trim() === "Word sets") || null);
+  const setTile = (/** @type {string} */ name) => /** @type {any} */ (setsScreen()
+    ? [...setsScreen().querySelectorAll("button.at-openrow")].find((b) => ((b.querySelector(".at-decktitle") || {}).textContent || "").trim() === name) || null
+    : null);
+  check("which opens a screen listing each set",
+    !!setTile("Numbers") && !!setTile("Pronouns"),
+    setsScreen() ? (setsScreen().textContent || "").slice(0, 200) : "(no screen)");
+  check("each saying how much of it is written and how many decks hold it",
+    /^0 of 9 pronouns written · in no deck yet$/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || "") &&
+      / ranges? written · in /.test(((setTile("Numbers") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
+    `${((setTile("Pronouns") || {}).textContent || "")} | ${((setTile("Numbers") || {}).textContent || "")}`);
+  click(setTile("Pronouns"));
   await sleep(400);
   const screen = () => /** @type {any} */ ([...document.querySelectorAll(".at-screen")]
     .find((sc) => /^Pronouns · /.test(((sc.querySelector(".at-screenhead h2") || {}).textContent || "").trim())) || null);
@@ -7804,7 +8094,15 @@ const openPronounTables = async () => {
     `${reading("With to be")} | ${reading("As a question")}`);
   check("and a reading left as it came is not stored, so it goes on following the English",
     !sent.enIs && !sent.enAsk, JSON.stringify({ enIs: sent.enIs, enAsk: sent.enAsk }));
+  check("once one is written, the set can be put in a deck from its own screen",
+    !!screen() && [...screen().querySelectorAll("button")].some((b) => /^Add this word set to a deck$/.test((b.textContent || "").trim())),
+    screen() ? [...screen().querySelectorAll("button")].map((b) => (b.textContent || "").trim()).join(" | ") : "(no screen)");
   click([...(screen() || document).querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
+  await sleep(300);
+  check("closing the set goes back to Word sets, which counts what was written",
+    !!setsScreen() && /^1 of 9 pronouns written/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
+    setsScreen() ? ((setTile("Pronouns") || {}).textContent || "(no tile)") : "(not on Word sets)");
+  click([...(setsScreen() || document).querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
   await sleep(300);
 
   /* And on the Cards tab they are one entry, not a tile each: the set is
@@ -7815,9 +8113,10 @@ const openPronounTables = async () => {
   const faceOf = (/** @type {Element} */ t) => ((t.querySelector(".ar") || {}).textContent || "").trim();
   const nameOf = (/** @type {Element} */ t) => ((t.querySelector(".at-mininame") || {}).textContent || "").trim();
   const entry = () => /** @type {any} */ (tiles().find((t) => nameOf(t) === "Pronouns") || null);
-  check("the pronouns are listed as one Pronouns entry, not a tile each",
+  check("the pronouns are listed as one Pronouns entry, not a tile each, marked as a word set",
     !!entry() && !tiles().some((t) => nameOf(t) !== "Pronouns" && faceOf(t) === "أنا") &&
-      /1 pronoun/.test((entry() || {}).textContent || ""),
+      /1 pronoun/.test((entry() || {}).textContent || "") && /Word set/.test((entry() || {}).textContent || "") &&
+      !/Built-in/.test((entry() || {}).textContent || ""),
     tiles().map((t) => nameOf(t) || faceOf(t)).join(" | "));
   click(entry());
   await sleep(400);
@@ -8756,6 +9055,24 @@ const openPronounTables = async () => {
     heads.join(" | ") || "(no table)");
   check("and a row per card", document.querySelectorAll(".at-cardtable tbody tr[data-card]").length > 0,
     String(document.querySelectorAll(".at-cardtable tbody tr").length));
+  /* Nothing to show, no table: a heading row with no rows under it was
+     left standing over the "nothing matches" line (0.581). */
+  {
+    const box = /** @type {any} */ (one("input.at-search", null));
+    const put = (/** @type {string} */ v) => {
+      if (!box) return;
+      const setter = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the setter").set;
+      must(setter, "the setter").call(box, v);
+      box.dispatchEvent(new w.Event("input", { bubbles: true }));
+    };
+    put("zzqqxx-no-such-card");
+    await sleep(150);
+    check("a search that finds nothing leaves no empty table behind",
+      !!box && !one(".at-cardtable", null),
+      box ? `${document.querySelectorAll(".at-cardtable thead th").length} headings still drawn` : "(no search box)");
+    put("");
+    await sleep(150);
+  }
   click(sizeBtn());
   await sleep(150);
   check("and it comes back round to where it started rather than running out",
@@ -8765,15 +9082,16 @@ const openPronounTables = async () => {
   /* ---- and what a deck holds besides cards ----
      Numbers are one document per language, so a deck takes them in parts,
      by name, from a screen of their own. */
-  check("read, an open deck offers no way to change its built-in cards",
+  check("read, an open deck offers no way to change its word sets",
     !buttonNamed(/^Choose built-in cards$/), "the button is there before Edit");
   click(document.querySelector('.at-fab[aria-label="Edit"]'));
   await sleep(250);
   check("Edit swaps the back arrow for a cross that cancels",
     !!document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'),
     [...document.querySelectorAll(".at-screenhead .at-back")].map((b) => b.getAttribute("aria-label")).join(" | "));
-  /* Since 0.523 the built-in cards are among the deck's cards, added on
-     Manage cards with the rest and saved there and then. */
+  /* Since 0.523 the word sets (built-in cards before 0.569) are among the
+     deck's cards, added on Manage cards with the rest and saved there and
+     then. */
   click(document.querySelector('.at-screenhead .at-back[aria-label="Cancel"]'));
   await sleep(250);
   click(buttonNamed(/^Manage this deck's cards$/));
@@ -8783,6 +9101,10 @@ const openPronounTables = async () => {
     [...document.querySelectorAll(".at-screenhead h2")].map((h) => h.textContent).join(" | "));
   click(buttonNamed(/^Add existing cards$/));
   await sleep(300);
+  check("and adding heads the sets Word sets",
+    [...document.querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Word sets") &&
+      ![...document.querySelectorAll(".at-eyebrow")].some((e) => (e.textContent || "").trim() === "Built-in"),
+    [...document.querySelectorAll(".at-eyebrow")].map((e) => e.textContent).join(" | "));
   const partRow = (/** @type {RegExp} */ re) =>
     [...document.querySelectorAll(".at-tickrow, label")].find((r) => re.test(r.textContent || ""));
   check("and adding lists the parts of the numbers, with counting inside them rather than parts of its own",
@@ -9839,7 +10161,7 @@ const openPronounTables = async () => {
      somebody and the app is the wrong place to be vague about a
      connection. */
   check("and says that setting up needs a connection and the rest does not",
-    /connection/i.test(host5.textContent || ""),
+    /connection|internet/i.test(host5.textContent || ""),
     (host5.textContent || "").slice(0, 200).replace(/\s+/g, " "));
 
   /* The way in for somebody who has been here before. */
@@ -10147,8 +10469,13 @@ const openPronounTables = async () => {
         kind = "who";
         met.who += 1;
         met.whoOptions = options.map((b) => (b.textContent || "").trim());
-        const right = options.find((b) => formOf[personOf((b.textContent || "").trim())] === prompt);
-        click(right || options[0]);
+        /* Every person the form could be is ticked (since 0.586), one tap
+           each — the tiles toggle. */
+        const right = options.filter((b) => formOf[personOf((b.textContent || "").trim())] === prompt);
+        for (const b of right.length ? right : [options[0]]) {
+          click(b);
+          await sleep(20);
+        }
       } else {
         const giveUp = btn(/^I don.t know$/);
         if (giveUp) click(giveUp);
@@ -10281,7 +10608,7 @@ const openPronounTables = async () => {
       chooseImage: 0, promptPicked: 0, promptWritten: 0, answerPicture: 0, tiles: 0,
       /* The grid of recordings, where one comes up. */
       soundGrids: 0, soundTiles: 0, wordsInScript: false, noEnglish: false,
-      unpairs: false, playOnly: false, soundVerdict: "", learnMore: false, marked: false,
+      unpairs: false, playPicks: false, playKeepsPair: false, playLeavesMeaning: false, tapPutsDown: false, soundVerdict: "", learnMore: false, marked: false,
     };
     for (let n = 0; n < 40 && host.querySelector(".at-instruction"); n++) {
       const pics = host.querySelector(".at-picchoices");
@@ -10319,21 +10646,43 @@ const openPronounTables = async () => {
              again, it lets go — and is left held, so one more tap puts it
              down before the grid is played through. */
           const w0 = () => /** @type {Element} */ (host.querySelector('[data-el="match-word"]'));
-          /* Its play button is a target of its own: pressing it plays the
-             word and leaves the tile neither held nor paired. */
+          const w1 = () => /** @type {Element} */ (host.querySelectorAll('[data-el="match-word"]')[1]);
+          const m0 = () => /** @type {Element} */ (host.querySelector('[data-el="match-meaning"]'));
+          const isOn = (/** @type {Element} */ el) => el.classList.contains("on");
+          const isPaired = (/** @type {Element} */ el) => el.classList.contains("paired");
+          /* Its play button plays the word and picks the tile up, ready to
+             be paired with a tap on a word in the script. */
           click(w0().querySelector('[data-el="match-sound"]'));
           await sleep(25);
-          met.playOnly = !w0().classList.contains("on") && !w0().classList.contains("paired");
+          met.playPicks = isOn(w0()) && !isPaired(w0());
+          click(m0());
+          await sleep(25);
+          const paired = isPaired(w0());
+          /* Played again once paired, it only plays: the pair is kept. */
+          click(w0().querySelector('[data-el="match-sound"]'));
+          await sleep(25);
+          met.playKeepsPair = paired && isPaired(w0()) && !isOn(w0());
+          /* With a word in the script held, playing a recording only plays
+             it: nothing is paired, and the word stays held. */
+          const free = /** @type {Element} */ (
+            [...host.querySelectorAll('[data-el="match-meaning"]')].find((el) => !el.classList.contains("paired"))
+          );
+          click(free);
+          await sleep(25);
+          click(w1().querySelector('[data-el="match-sound"]'));
+          await sleep(25);
+          met.playLeavesMeaning = isOn(free) && !isOn(w1()) && !isPaired(w1());
+          click(free);
+          await sleep(25);
+          /* Tapping the tile itself is as it was: a paired recording lets
+             go and is left held, and one more tap puts it down before the
+             grid is played through. */
           click(w0());
           await sleep(25);
-          click(host.querySelector('[data-el="match-meaning"]'));
-          await sleep(25);
-          const paired = w0().classList.contains("paired");
+          met.unpairs = !isPaired(w0()) && isOn(w0());
           click(w0());
           await sleep(25);
-          met.unpairs = paired && !w0().classList.contains("paired");
-          click(w0());
-          await sleep(25);
+          met.tapPutsDown = !isOn(w0());
         }
         const seen = await playGrid();
         if (sounds) {
@@ -10409,8 +10758,14 @@ const openPronounTables = async () => {
     heardGrid.wordsInScript && heardGrid.noEnglish, JSON.stringify(heardGrid));
   check("tapping a paired recording lets go of its pair, as a word tile does",
     heardGrid.unpairs, JSON.stringify(heardGrid));
-  check("and its play button only plays: the tile is neither picked up nor paired",
-    heardGrid.playOnly, JSON.stringify(heardGrid));
+  check("its play button plays the recording and picks it up, ready to pair",
+    heardGrid.playPicks, JSON.stringify(heardGrid));
+  check("played again once paired, a recording keeps its pair",
+    heardGrid.playKeepsPair, JSON.stringify(heardGrid));
+  check("with a word held, playing a recording pairs nothing and the word stays held",
+    heardGrid.playLeavesMeaning, JSON.stringify(heardGrid));
+  check("and tapping a held recording outside its play button puts it down",
+    heardGrid.tapPutsDown, JSON.stringify(heardGrid));
   check("the grid is marked, and a miss is told the right words are shown",
     heardGrid.marked && !/meanings/.test(heardGrid.soundVerdict), JSON.stringify(heardGrid));
   check("and there is no Learn more under it",
@@ -10837,14 +11192,17 @@ const openPronounTables = async () => {
   }
   const frame = () => host.querySelector(".at-screen.bare");
   const swBtn = () => host.querySelector(".at-cornerbtn");
-  const rows = () => [...host.querySelectorAll(".at-cmenu .at-ck")];
+  const rows = () => [...host.querySelectorAll(".at-cmenu .at-tickrow")];
   const listed = () => [...((frame() || host).querySelectorAll(".at-minicard"))]
     .map((t) => (t.textContent || "").replace(/\s+/g, " "));
   const hasHouse = () => listed().some((t) => /house/i.test(t));
   const learnOff = () => JSON.stringify((JSON.parse(localStorage.getItem("arabic-trainer:arabic-trainer-v3") || "{}").settings || {}).langsOff);
-  const cardsTab = [...host.querySelectorAll(".at-dock [role=tab]"), ...((frame() || host).querySelectorAll("button"))]
-    .filter((b) => /^Cards$/.test(b.textContent || ""))[0];
-  click(cardsTab);
+  /* Since 0.550 the space's cards are under Material, then its Cards tab. */
+  const inFrame = (/** @type {RegExp} */ re) => [...host.querySelectorAll(".at-dock [role=tab]"), ...((frame() || host).querySelectorAll("button"))]
+    .filter((b) => re.test((b.textContent || "").trim())).pop();
+  click(inFrame(/^Material$/) || null);
+  await sleep(500);
+  click(inFrame(/^Cards$/) || null);
   await sleep(500);
 
   /* The languages are at the top of the menu behind your initial. */
@@ -10866,9 +11224,9 @@ const openPronounTables = async () => {
   check("switching Vietnamese off takes its card out of Teaching's list",
     !hasHouse() && listed().length === shown - 1, `${shown} before, ${listed().length} after`);
   check("and Arabic is what is left ticked",
-    rows().filter((r) => r.getAttribute("aria-checked") === "true").map((r) => r.textContent || "").join("|").includes("Arabic")
-      && rows().filter((r) => r.getAttribute("aria-checked") === "true").length === 1,
-    rows().map((r) => `${r.textContent}:${r.getAttribute("aria-checked")}`).join(", "));
+    rows().filter((r) => String(!!(/** @type {any} */ (r.querySelector("input")) || {}).checked) === "true").map((r) => r.textContent || "").join("|").includes("Arabic")
+      && rows().filter((r) => String(!!(/** @type {any} */ (r.querySelector("input")) || {}).checked) === "true").length === 1,
+    rows().map((r) => `${r.textContent}:${String(!!(/** @type {any} */ (r.querySelector("input")) || {}).checked)}`).join(", "));
   check("and Learning's own choice is not touched by it", learnOff() === learnWas, `${learnWas} before, ${learnOff()} after`);
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);
@@ -11273,6 +11631,276 @@ const openPronounTables = async () => {
   root8.unmount();
   host8.remove();
   anyWindow.fetch = anyGlobal.fetch = fetchBefore;
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+}
+
+/* ---- memberships: one account, two spaces ----
+
+   Learning shows both spaces' courses, a row at the top narrows every tab
+   to one, and the You menu lists both. An account in one space sees no
+   row. And another space's invitation, followed signed in, asks to join
+   it rather than to make a new account. */
+{
+  const MAIN = { id: "main", slug: "main", name: "Main", logo: "", colour: "" };
+  const LINGUA = { id: "lingua", slug: "lingua", name: "Lingua", logo: "", colour: "" };
+  const both = { ...account, org: MAIN, orgs: [MAIN, LINGUA] };
+  const fresh = () => {
+    localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, items: [],
+    }));
+    localStorage.removeItem("arabic-trainer:space-filter");
+  };
+  materialTwoSpaces = true;
+  /* A learner: the device opens in Learning. The harness's first app is
+     still mounted and polling, and an answer already on its way when the
+     stub changed can write "teaches" back, so that settles first. Kept
+     per space since 0.582: this opens at Main's address. */
+  await sleep(1500);
+  localStorage.setItem("arabic-trainer-teaches:main", "0");
+  localStorage.setItem("arabic-account", JSON.stringify(both));
+  whoamiAs = both;
+  fresh();
+  window.history.replaceState(null, "", "/main");
+
+  const hostM = document.createElement("div");
+  document.body.appendChild(hostM);
+  const rootM = createRoot(hostM);
+  rootM.render(React.createElement(App));
+  await sleep(2500);
+  const ready = () => Number((hostM.querySelector(".at-home[data-ready]") || { getAttribute: () => "-1" }).getAttribute("data-ready"));
+  /* Since 0.576 a button in the top right corner, opening a list. */
+  const row = () => hostM.querySelector('[data-el="space-filter"]');
+  const listed = () => [...hostM.querySelectorAll(".at-learnspacemenu button")];
+  const openList = async () => {
+    if (!listed().length && row()) {
+      click(row());
+      await sleep(200);
+    }
+  };
+  /* By the name on the line, not its initials badge. */
+  const nameOf = (/** @type {Element} */ b) => ((b.querySelector(".at-place-name") || b).textContent || "").trim();
+  const rowButton = (/** @type {RegExp} */ re) => listed().find((b) => re.test(nameOf(b)));
+  await openList();
+  check("an account in two spaces sees which space Learning shows", !!row() && !!rowButton(/^All your spaces$/) && !!rowButton(/^Lingua$/) && !!rowButton(/^Main$/),
+    row() ? listed().map(nameOf).join(" · ") : `no button; ${hostM.querySelector(".at-screen") ? "Teaching open" : "Learning open"}`);
+  const all = ready();
+  click(rowButton(/^Lingua$/));
+  await sleep(400);
+  const inLingua = ready();
+  check("the button then shows the space's initials", (row() && (row() || { textContent: "" }).textContent) === "L",
+    row() ? String((row() || { textContent: "" }).textContent) : "no button");
+  await openList();
+  click(rowButton(/^Main$/));
+  await sleep(400);
+  const inMain = ready();
+  check("choosing a space narrows what is ready to practise", all > 0 && inLingua > 0 && inMain > 0 && inLingua < all && inMain < all,
+    `all ${all}, Lingua ${inLingua}, Main ${inMain}`);
+  check("and the choice is remembered on the device", localStorage.getItem("arabic-trainer:space-filter") === "main",
+    String(localStorage.getItem("arabic-trainer:space-filter")));
+  await openList();
+  click(rowButton(/^All your spaces$/));
+  await sleep(300);
+  check("All shows everything again", ready() === all, `${ready()} of ${all}`);
+
+  click(hostM.querySelector(".at-cornerbtn"));
+  await sleep(300);
+  const inMenu = hostM.querySelector('[data-el="my-spaces"]');
+  check("the You menu lists both spaces", !!inMenu && /Main/.test(inMenu.textContent || "") && /Lingua/.test(inMenu.textContent || ""),
+    inMenu ? (inMenu.textContent || "") : "not listed");
+  rootM.unmount();
+  hostM.remove();
+
+  /* One space: no row, and no list in the menu. */
+  whoamiAs = { ...account, org: MAIN, orgs: [MAIN] };
+  localStorage.setItem("arabic-account", JSON.stringify(whoamiAs));
+  fresh();
+  const hostO = document.createElement("div");
+  document.body.appendChild(hostO);
+  const rootO = createRoot(hostO);
+  rootO.render(React.createElement(App));
+  await sleep(2000);
+  check("an account in one space sees no row of spaces", !hostO.querySelector('[data-el="space-filter"]'));
+
+  /* Another space's invitation, followed signed in. */
+  rootO.unmount();
+  hostO.remove();
+  window.history.replaceState(null, "", "/lingua?join=lingua-code");
+  const hostJ = document.createElement("div");
+  document.body.appendChild(hostJ);
+  const rootJ = createRoot(hostJ);
+  rootJ.render(React.createElement(App));
+  await sleep(2000);
+  const text = hostJ.textContent || "";
+  check("another space's invitation asks to join it", /Join Lingua\?/.test(text) && !/make a new account/i.test(text),
+    text.slice(0, 160));
+  const join = [...hostJ.querySelectorAll("button")].find((b) => /^Join Lingua$/.test((b.textContent || "").trim()));
+  /* jsdom does not navigate: the reload into the space is all that is left. */
+  const assign = window.location.assign;
+  try {
+    Object.defineProperty(window.location, "assign", { value: () => {}, configurable: true });
+  } catch (e) {
+    /* a jsdom that will not let it be replaced: the join call is still checked */
+  }
+  click(join);
+  await sleep(600);
+  check("joining sends the invitation's code", joinedSpaces.length === 1 && joinedSpaces[0].code === "lingua-code",
+    JSON.stringify(joinedSpaces));
+  try {
+    Object.defineProperty(window.location, "assign", { value: assign, configurable: true });
+  } catch (e) {
+    /* as above */
+  }
+  rootJ.unmount();
+  hostJ.remove();
+
+  materialTwoSpaces = false;
+  whoamiAs = null;
+  window.history.replaceState(null, "", "/");
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+}
+
+/* ---- no space to open: the panel, and only the panel (0.580) ----
+
+   Someone removed from their only space saw the panel saying so with the
+   learner's tabs and last screens still drawn behind it (audit finding
+   15). Now the panel and the You menu are all there is — online, and
+   when the app is opened again offline. */
+{
+  const stranded = { ...account, stranded: [{ space: { name: "Lingua" }, why: "removed" }] };
+  whoamiAs = stranded;
+  localStorage.setItem("arabic-account", JSON.stringify(stranded));
+  const mountOnce = async () => {
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    await sleep(2000);
+    return { host, r };
+  };
+  const look = (/** @type {Element} */ host) => ({
+    panel: !!host.querySelector('[data-el="stranded"]'),
+    /* Learning's own tabs, by name: the switch between spaces is not one. */
+    tabs: [...host.querySelectorAll('[role="tab"]')]
+      .filter((t) => /^(Home|Progress|Cards)$/.test((t.textContent || "").trim())).length,
+    tabNames: [...host.querySelectorAll('[role="tab"]')].map((t) => (t.textContent || "").trim()).join("|"),
+    home: !!host.querySelector(".at-home"),
+    menu: !!host.querySelector(".at-cornerbtn"),
+  });
+  const one = await mountOnce();
+  const seen = look(one.host);
+  check("with no space to open, the panel says so", seen.panel, JSON.stringify(seen));
+  check("and no Home, Progress or Cards is drawn behind it", seen.tabs === 0 && !seen.home, JSON.stringify(seen));
+  check("and the You menu is still there", seen.menu, JSON.stringify(seen));
+  one.r.unmount();
+  one.host.remove();
+  const wasOnline = Object.getOwnPropertyDescriptor(w.navigator, "onLine");
+  Object.defineProperty(w.navigator, "onLine", { value: false, configurable: true });
+  const two = await mountOnce();
+  const offlineSeen = look(two.host);
+  check("opened again offline, it is still only the panel",
+    offlineSeen.panel && offlineSeen.tabs === 0 && !offlineSeen.home, JSON.stringify(offlineSeen));
+  two.r.unmount();
+  two.host.remove();
+  if (wasOnline) Object.defineProperty(w.navigator, "onLine", wasOnline);
+  else Object.defineProperty(w.navigator, "onLine", { value: true, configurable: true });
+  whoamiAs = null;
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+}
+
+/* ---- logging out sets the practice aside, per person (0.580) ----
+
+   Log out used to leave the document where it was, and the next person to
+   sign in on the device had it — and pushed it up under their own key
+   (audit finding 8). Now it is set aside under the person's handle, the
+   next person starts clean, and it comes back when the first signs in
+   again. */
+{
+  const MAIN_DOC = "arabic-trainer:arabic-trainer-v3";
+  const PARKED = `${MAIN_DOC}:parked:${account.handle}`;
+  const omar = { handle: "omar-1b2c", displayName: "Omar", key: "quartz-ember-fjord-gable-9c8d", admin: false };
+  const mine = {
+    id: "kparked00001", kind: "word", tags: [], created: 1, updated: 1, lang: "ar-PS",
+    forms: [{ id: "kparked00001-f", ar: "شمس", en: "sun", lat: "shams", s: {} }],
+  };
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+  localStorage.setItem(MAIN_DOC, JSON.stringify({ version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, items: [mine] }));
+  localStorage.removeItem(PARKED);
+  remoteDocs.clear();
+  whoamiAs = null;
+  const tokenOf = async (/** @type {string} */ key) => {
+    const bytes = new TextEncoder().encode(key.trim());
+    const d = await crypto.subtle.digest("SHA-256", bytes);
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+  const holds = (/** @type {any} */ doc) => !!doc && (doc.items || []).some((/** @type {any} */ it) => it.id === mine.id);
+  const mainDoc = () => {
+    try {
+      return JSON.parse(localStorage.getItem(MAIN_DOC) || "null");
+    } catch (e) {
+      return null;
+    }
+  };
+
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(2500);
+  const here = (/** @type {RegExp} */ re) => [...host.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
+  const logOut = async () => {
+    click(host.querySelector(".at-cornerbtn"));
+    await sleep(300);
+    /* The menu's lines carry an icon's name before their words. */
+    click([...host.querySelectorAll("button.at-cline")].find((b) => /Settings$/.test((b.textContent || "").trim())));
+    await sleep(400);
+    click(here(/^Log out$/));
+    await sleep(200);
+    /* The confirmation's, which is the last button of that name. */
+    click([...host.querySelectorAll("button")].filter((b) => /^Log out$/.test((b.textContent || "").trim())).pop());
+    await sleep(1500);
+  };
+  const signIn = async (/** @type {string} */ key) => {
+    click(here(/sign-in key/));
+    await sleep(200);
+    const box = /** @type {HTMLInputElement | null} */ (host.querySelector("#signin-key"));
+    if (box) {
+      must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(box, key);
+      box.dispatchEvent(new w.Event("input", { bubbles: true }));
+      await sleep(100);
+    }
+    click(here(/^Sign in$/));
+    await sleep(2500);
+  };
+
+  const tokenA = await tokenOf(account.key);
+  check("signed in, the practice goes up under the person's own key", holds((remoteDocs.get(tokenA) || {}).data),
+    remoteDocs.has(tokenA) ? "sent without it" : "nothing sent");
+  await logOut();
+  check("logging out empties the document on the device", !holds(mainDoc()),
+    JSON.stringify(((mainDoc() || {}).items || []).map((/** @type {any} */ i) => i.id)));
+  check("and sets it aside under the person's handle", holds(JSON.parse(localStorage.getItem(PARKED) || "null")),
+    localStorage.getItem(PARKED) ? "set aside without it" : "nothing set aside");
+
+  /* Somebody else signs in here. */
+  whoamiAs = omar;
+  await signIn(omar.key);
+  const tokenB = await tokenOf(omar.key);
+  check("the next person signs in", remoteDocs.has(tokenB) || !here(/sign-in key/), (host.textContent || "").slice(0, 100));
+  check("and nothing of the first person's goes up under their key", !holds((remoteDocs.get(tokenB) || {}).data),
+    "the first person's card was sent under the second's key");
+  check("nor is on the device for them", !holds(mainDoc()), "it is in the main document");
+
+  /* And the first comes back. */
+  await logOut();
+  whoamiAs = null;
+  await signIn(account.key);
+  check("signing in again brings the practice back", holds(mainDoc()),
+    JSON.stringify(((mainDoc() || {}).items || []).map((/** @type {any} */ i) => i.id)));
+  check("and nothing is left set aside", localStorage.getItem(PARKED) === null, "still set aside");
+
+  r.unmount();
+  host.remove();
+  whoamiAs = null;
   localStorage.setItem("arabic-account", JSON.stringify(account));
 }
 

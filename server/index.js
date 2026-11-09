@@ -310,12 +310,29 @@ function closeOn(server) {
   }
 }
 
+/**
+ * The start-up migration, which must never keep the site down (0.580,
+ * audit finding 14). It is idempotent and runs again at the next start, so
+ * a failure is logged and the site serves anyway.
+ * @param {{ migrate?: () => Promise<number> }} [opts]
+ * @returns {Promise<boolean>} whether it ran without throwing
+ */
+export async function migrateOnStart({ migrate = renameStoredLangs } = {}) {
+  try {
+    const renamed = await migrate();
+    if (renamed) console.log(`renamed the language in ${renamed} stored documents`);
+    return true;
+  } catch (err) {
+    console.error("language rename migration failed; serving anyway:", err);
+    return false;
+  }
+}
+
 /* Started directly rather than imported by a test. */
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   /* Before anything is served, so no request reads a language by an id the
      app no longer knows. */
-  const renamed = await renameStoredLangs();
-  if (renamed) console.log(`renamed the language in ${renamed} stored documents`);
+  await migrateOnStart();
   const server = createApp();
   closeOn(server);
   server.listen(PORT, () => {

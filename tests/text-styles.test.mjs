@@ -15,7 +15,9 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { TEXT_STYLES, TYPE_SCALE } from "../src/text-styles.ts";
 
-const raw = readFileSync(new URL("../src/index.css", import.meta.url), "utf8");
+/* Both sheets, in the order they load (teaching.css since 0.580). */
+const raw = readFileSync(new URL("../src/index.css", import.meta.url), "utf8") + "\n" +
+  readFileSync(new URL("../src/teaching.css", import.meta.url), "utf8");
 /* Comments first: one sitting above a rule is otherwise read as part of
    its selector, and every style with a note above it would go missing. */
 const css = raw.replace(/\/\*[\s\S]*?\*\//g, " ");

@@ -795,6 +795,38 @@ export interface User {
   displayName: string;
   admin: boolean;
   created: Millis;
+  /**
+   * The space (org) this account belongs to (0.542). Stored as its id;
+   * whoami answers with the space's card. Absent on older accounts: Main.
+   */
+  org?: string | { id: string; slug: string; name: string; logo: string; colour: string };
+  /** Whether this account runs its space (0.544). Worked out by whoami, never stored. */
+  orgAdmin?: boolean;
+  /**
+   * Every space this account may use, as whoami answers them
+   * (memberships). Absent from an older server: `org` alone. On the server
+   * the record keeps `orgs` as ids, with `suspendedIn`, `lastLearnedIn`
+   * and `lastTaughtIn` per space; none of those is ever sent, like the
+   * key's digest.
+   */
+  orgs?: { id: string; slug: string; name: string; logo: string; colour: string }[];
+  /** False until the person has ticked that their key is saved (0.544). Absent: saved. */
+  keySaved?: boolean;
+  /** While suspended: when, by whom, why, and the courses to put back (0.544). */
+  suspended?: {
+    at: Millis;
+    by: string;
+    why: "left" | "removed" | "suspended";
+    courses: { id: string; title: string; roles: string[] }[];
+  };
+  /** Suspended across the whole app by the super admin (0.578). */
+  suspendedApp?: { at: Millis; by: string };
+  /**
+   * Whoami's answer for someone with no space they may use (0.578): each
+   * space they are suspended in, were removed from or left. They still sign
+   * in, to a page that says so.
+   */
+  stranded?: { space: { id: string; slug: string; name: string; logo: string; colour: string }; why: string }[];
   /** Signed in or asked who they are. */
   lastSeen?: Millis;
   /** The app said a session was practiced. */
@@ -986,6 +1018,10 @@ export interface VerbExample {
  * without knowing which language uses which.
  */
 export type Card = {
+  /** Its space (0.542); absent: Main. */
+  org?: string;
+  /** Made in its owner's My space (0.545): theirs alone. */
+  personal?: boolean;
   id: string;
   owner?: string;
   lang: LangId;
@@ -1214,6 +1250,21 @@ export interface Deck {
    * fileIntoDecks in numbers/generate.ts.
    */
   parts?: string[];
+  /** Its space (0.542); absent: Main. */
+  org?: string;
+  /** A deck in its owner's My space (0.545): theirs alone, never in a course. */
+  personal?: boolean;
+  /** My space decks only: whether its owner practises it (59b). */
+  practise?: boolean;
+  /** Whose numbers and clock fill `parts`; absent means the owner (0.541). */
+  numbersFrom?: string;
+  /**
+   * Sent with a learner's decks: the number system and clock `parts` are
+   * filled from, or null for none. Absent on an answer from an older
+   * server, where every system is filed as before.
+   */
+  numbersSystemId?: string | null;
+  timeSystemId?: string | null;
   /**
    * Which of `parts` its students get nothing from yet, because the words
    * those parts are built of are not all written. Worked out by the
@@ -1224,6 +1275,10 @@ export interface Deck {
 }
 
 export interface Course {
+  /** Its space (0.542); absent: Main. */
+  org?: string;
+  /** The "My space" group in Learning (0.545), made on the fly and never stored. */
+  personal?: boolean;
   id: string;
   title: string;
   description?: string;
@@ -1249,6 +1304,10 @@ export interface AdminOverview {
   courses: Course[];
   decks: (Deck & { cardCount: number; ownerName: string; courseTitles: string[] })[];
   flags: Flag[];
+  /** Who has left the space this overview is of (0.544). */
+  former?: FormerMember[];
+  /** The space's invitation link and its admins (0.544). */
+  invite?: { code: string; slug: string; name: string; admins: string[] } | null;
 }
 
 /* ---- the schedule ---- */
@@ -1775,6 +1834,23 @@ export interface DayMoves {
  */
 export type WireDoc = Partial<Doc>;
 
+/* ---- feedback about the app (0.552) ---- */
+
+/** Something a person said about the app itself, from the You menu. */
+export interface Feedback {
+  id: string;
+  kind: "broken" | "idea";
+  note: string;
+  handle: string;
+  handleName: string;
+  /** The space they were in. */
+  org: string;
+  /** Where in the app they were when they sent it, in words. */
+  screen: string;
+  release?: string;
+  at: Millis;
+}
+
 /* ---- reported problems ---- */
 
 /** Which of the four things a learner said — three complaints, and "too
@@ -1877,4 +1953,15 @@ export interface Flag {
   release?: string;
   /** Added when the report is read, never stored. */
   cardState?: CardState;
+}
+
+/** One Former members record (0.544; docs/PLAN-spaces.md, B2). */
+export interface FormerMember {
+  handle: string;
+  displayName: string;
+  joined: Millis;
+  left: Millis;
+  courses: { id: string; title: string; roles: string[] }[];
+  why: "left" | "removed" | "deleted-self" | "deleted-by-admin";
+  by: string;
 }

@@ -7190,3 +7190,654 @@ Advanced tab's state in the draft, and only the save trims it: `basicCard`
 cuts what is written down to the first form, and `droppedByBasic` names
 what that cut would lose, for the line under the box. The cost is two word
 drafts per screen; only the shown one is saved.
+
+---
+
+## A deck's numbers come from one person
+
+**2 November 2026** · `number-sources`, `set-deck-numbers` and `partsWaiting`
+in `server/api/courses.js`, `src/number-decks.ts`
+
+A deck holds number *parts* (0 to 10, telling the hour), and the words come
+from a teacher's number system. The device was sent every system of every
+teacher connected to the learner's courses and filed each into every deck of
+its language, so a course with two teachers who had numbers gave each number
+twice. A deck now names one source, `numbersFrom`, defaulting to its owner;
+the server stamps each deck it sends with that person's system and clock ids,
+and the device files a system only into the decks that name it
+(`decksForSystem`).
+
+Weighed: keeping "everyone's" and de-duplicating on the device. Rejected
+because two teachers' recordings of the same number are different answers,
+and only a person can say which one a class should hear. A deck answered by
+an older server carries no `numbersSystemId` and is filed as before, so a
+deploy caught half way doesn't empty anyone's numbers. Progress already made
+on a system is kept: items are keyed by the system's id, and a system no
+longer filed into a deck is simply not dealt.
+
+Part of the spaces plan (`docs/PLAN-spaces.md`, stage 1).
+
+---
+
+## The space a request acts in is held for the whole request
+
+**2 November 2026** · `orgScope`, `inScope` and the record readers in
+`server/api/courses.js`
+
+The plan (`docs/PLAN-spaces.md`, B3) asked for an org check in every
+action and a changed signature for `canEditDeck`. There are some sixty
+actions, and every one written by hand is one more place to forget. So
+the org is worked out once, after the caller is known, and kept in an
+`AsyncLocalStorage` for the rest of the request — per request rather than
+per process, because requests interleave. While it is set, `readCourse`,
+`readDeck`, `readCard` and `readUser` answer null for another org's record,
+`everyCourse` and `canEditDeck` see only this org, and the lists read
+straight off an index are filtered with `inScope`. Another space's record
+looks like no record at all, and every action already knows what to do
+with that.
+
+Cost: a raw `readJson` of a course, deck, card or user bypasses the wall,
+so new code reads through the four readers or filters with `inScope`.
+`tests/spaces.test.mjs` is what catches a slip, and it fails until a new
+action is placed in its table. Two slips it caught on the first run:
+`admin-delete-user` took a stranger off every roster through
+`wipeAccount`, and the export let an administrator take any card. Both are
+now limited to the acting org.
+
+---
+
+## An account is made with a code, except the very first
+
+**2 November 2026** · `signup` and `codeTarget` in `server/api/courses.js`
+
+Since 0.543 the code someone signs up with decides their space: a space's
+invitation code or a course code (24b). An empty site has nobody to invite
+anyone, so the first account on it is made without a code, into Main —
+the owner's, who then claims admin. Tests that make many accounts sign up
+with Main's invitation code, read through `admin-orgs`, the way a person
+would (`mainInviteCode` in `tests/helpers.mjs`).
+
+Space invitation codes share the one table of codes with course codes;
+an invitation is recorded as `org:<id>` where a course code records the
+course's id, so `codeTarget` tells them apart and `courseForCode` still
+finds a restored course's codes.
+
+## Deleting a space leaves recordings and pictures
+
+**2 November 2026** · `admin-delete-org`
+
+The plan said to delete the recordings and pictures nothing else uses.
+They are stored by their content and shared across spaces, so working out
+"nothing else" means reading every card and number system on the site, and
+getting it wrong deletes another space's audio. Left behind, one costs
+storage and nothing else. So a deleted space's media stays; a later tidy-up
+can collect what nothing points at, the way `admin-clear` already does.
+
+---
+
+## Deleting an account no longer rewrites the list of decks
+
+**2 November 2026** · `wipeAccount` in `server/api/courses.js`
+
+`wipeAccount` read every deck, kept the ones it could see that weren't the
+person's, and wrote that back as the site's list of decks. Since 0.542 a
+request sees one space, so deleting one account would have dropped every
+other space's decks from the list. It was caught writing 0.544, before
+anything shipped. Every list `wipeAccount` touches is now changed by taking
+out what it names (`updateJson` with a filter), and a test deletes an
+account and checks that no deck anywhere fell off the list.
+
+It also read the person's cards from `owncards:`, a list nothing writes any
+more; cards are listed under `mycards:`. So deleting an account had
+quietly left its cards behind. With 0.544's rule (85a) the space's cards are
+meant to stay; the person's private ones are now found under `mycards:` and
+deleted.
+
+---
+
+## My space is private by the same wall as spaces
+
+**3 November 2026** · `inScope` in `server/api/courses.js`
+
+A personal deck or card is hidden from everyone but its owner by one line
+in `inScope`, the check every scoped reader and list already goes through
+since 0.542. So "someone else's My space" reads as nothing at all,
+everywhere at once, without each action knowing about My space.
+
+In Learning, a learner's practised decks arrive as a course built on the
+fly, `my-space`, so the app's existing course handling deals, groups and
+counts them. Costs, accepted: `my-material` reads the site's deck list on
+each refresh that finds a change, to find the person's own decks; and a
+learner's own cards can't be reported (they are theirs to fix), so a report
+from My space names only the card.
+
+## Word sets
+
+**5 November 2026** · `WordSet` and `wordSetsOf` in `src/spaces.tsx`,
+`src/pronouns-editor.tsx`
+
+Numbers and pronouns were called "built-in", which told teachers the app
+supplied the words; it supplies only the list, and the teacher fills it.
+Months, days of the week and more are coming, so the name had to be for
+the kind rather than the contents: a **word set**. One `WordSet`
+description per set feeds the Word sets screen, a deck's notes and Add
+existing cards, so a new set is one more entry in `wordSetsOf` and a
+screen to write it on.
+
+"Written" for numbers is `rangeChecks` over the teacher's own system — the
+test a student's device applies — counted in ranges, not boxes, because a
+range is what a deck holds. A deck's note about missing number words reads
+the server's `partsWaiting` instead, which also knows when the deck draws
+on another teacher's numbers; then there is no "Write them" button, as the
+words are not this teacher's to write.
+
+Pronouns stay one card each (their deck membership is the cards'), so a
+pronoun saved for the first time takes the decks the rest of the set is
+in. Costs, accepted: a set with no pronoun written cannot be put in a deck
+yet — there is nothing to hold it — and the picker says "None written
+yet" rather than hiding it.
+
+
+---
+
+## One account, several spaces, without a migration
+
+**5 November 2026** · `memberOf`, `suspensionIn`, `inScope` in `server/api/courses.js`
+
+An account now carries `orgs`, the spaces it is in. Nothing rewrites the
+accounts that exist: `memberOf` reads an account without `orgs` as being
+in its one `org`, and `suspensionIn` reads an old `suspended` as a
+suspension in that space. This is the same choice `orgOf` made when
+spaces came in, for the same reason: a migration pass is one more thing
+that can half-run. `org` is still written, as the first space, so a reader
+that was missed keeps meaning something, and a backup restored into an
+older build still finds its people.
+
+What was per account and became per space: suspension, Former members,
+"last practised" and "last changed material". "Last seen" stays one date,
+because signing in is not in any space. The account-wide moments are kept
+beside the per-space ones for Super admin (the owner's answer, 3a for
+Super admin, 3b for space admins). A space admin sees the old account-wide
+date until the person practises again, because there is nothing better to
+show and showing "never" would be wrong.
+
+A request still acts in one space. Three learner actions read across every
+space the caller may use (`WIDE`); everything else is unchanged, so every
+check that already kept spaces apart still does. The cost: an action added
+to `WIDE` later reads across spaces with no other check, so it must be one
+that only ever reads the caller's own things.
+
+---
+
+## A space admin can't give a new key to someone in two spaces
+
+**5 November 2026** · `admin-reissue-key` in `server/api/courses.js`
+
+One key opens every space its person is in. A space admin issuing one
+would be handing out a way into spaces they don't run. So a space admin
+may issue a key only to someone in their space alone; for anyone else the
+super admin does it (the owner's answer 3a). A suspended membership
+counts: the key would open it the day it is reactivated. Cost: a space
+admin who is refused learns the person is in more than one space, though
+not which.
+
+---
+
+## A course code from another space joins it
+
+**5 November 2026** · `joinByCode` in `server/api/courses.js`
+
+Typed in Learning, a course code from another space used to be refused as
+"other-space" with an offer to make a new account. It now joins the
+course and the space, which is the whole point of one account. Someone a
+space's admin removed can't come back this way: the code would undo the
+admin's decision. They come back when that admin, or the super admin,
+puts them back. Someone who left of their own accord can rejoin by code.
+
+---
+
+## Learning's space row narrows the same test the languages do
+
+**5 November 2026** · `inPlay` and `spaceOfItem` in `src/ArabicTrainer.tsx`
+
+Learning already had one place that decides what a learner is shown and
+practises: `inPlay`, which the languages switch narrows, and `shown`, which
+every Learning screen and every session builder reads. The space row is a
+second clause in that same test rather than a filter applied screen by
+screen, so Home's count, the session, Progress and Cards cannot disagree
+about which space is chosen. A card's space is its course's; a number's
+is the space of a deck its system fills; a card the learner wrote is in
+none and is shown whichever space is chosen, because hiding a learner's
+own work behind a space they didn't put it in would be wrong.
+
+Going to another of your spaces from the You menu reloads the page at its
+address, as Super admin's Open does. Cost: a reload. What it buys: every
+screen, Teaching above all, reads the space it is in from one place.
+
+The three stages of `docs/PLAN-memberships.md` shipped as one release,
+0.573, because the owner asked for the whole plan at once; the plan's
+stage boundaries are kept in its checklists.
+
+---
+
+## The super admin tries a space on the device, not as a member
+
+**5 November 2026** · `trying` in `server/api/courses.js`, `tryingSpace` and `dropTrial` in `src/courses-api.ts`
+
+Inside a space opened from Super admin, Learning deals every course of
+that space to the super admin, and their practice there is kept apart on
+the device under its own keys, never synced, and dropped on leaving.
+
+**Why not make them a member of every space.** Membership is what puts
+someone on a roster: they would appear in every space's People list and
+head count, every space's courses would mix into their own Learning at
+home, and every space's material would download to their device. Trying
+is meant to show what a learner there sees, and leave no trace.
+
+**Why not sync it.** The synced document is one per account, so trial
+practice would mix with their own; a document per tried space would grow
+on the server for something meant to be thrown away. Cost: a trial on one
+device is not seen on another, and it is gone when they leave the space.
+
+---
+
+## Space admins suspend and remove; only the super admin deletes
+
+**5 November 2026** · `admin-remove-member`, `admin-suspend-app`, `STRANDED_MAY` in `server/api/courses.js`
+
+The owner's rule: a space admin can never delete an account, and an
+account is deleted only from Super admin → People. Before this, Former
+members' "Delete permanently" let a space admin delete a suspended
+member's whole account, including one also in other spaces' People lists.
+It now refuses while the account exists.
+
+Suspend and remove are kept apart because they answer different
+questions. Suspended is "not now": the person stays on the list and only
+the admin lifts it, so a code they still hold does not undo it. Removed is
+"not here": they leave the list for Former members and may come back the
+way anyone joins, with an invitation or a code. Records written by the old
+Suspend, which already moved people to Former members, read as removed.
+
+Suspending across the app is a flag on the account, not a suspension in
+each space, so no space admin can lift what the super admin decided, and
+lifting it restores the courses it took away in every space.
+
+Someone with no space to use is no longer signed out: an empty sign-out
+told them nothing. They sign in to a page that names the space and why,
+and takes an invitation or a code. They may rename, mark their key saved
+and close their account; nothing else answers them until they are back in
+a space.
+
+
+---
+
+## Progress follows a reissued key
+
+**6 November 2026** · `moveSyncDoc` in `server/api/sync.js`, `admin-reissue-key`
+
+A person's practice is stored under a fingerprint of their sign-in key, so
+the server never needs the key itself. A new key therefore pointed at an
+empty document. The server now moves the document, and every recording it
+names, to the new key's fingerprint when it issues the key — never over a
+document already there, and the old one is removed once it is copied.
+
+**Why not keep the document under the account instead.** It would mean the
+sync endpoint knowing who a token belongs to, which is the thing it was
+built not to know. A move at the one moment a key changes keeps that.
+
+**What it costs.** A device still holding the old key may push to the old
+fingerprint after the move. Nothing is lost: when that device signs in with
+the new key, the old-key document is drained into the new one as any older
+private key's is (`LEGACY_SYNC_KEYS`).
+
+---
+
+## A device sets the practice aside per person at log out
+
+**6 November 2026** · `parkForLogOut`, `adoptParked`, `PARKED_KEY` in `src/ArabicTrainer.tsx`
+
+The document on a device is always the signed-in person's. At log out it is
+synced once more if it can be, then moved to a slot named by the person's
+handle, and the main copy is emptied; the sync key is cleared first, so
+the empty copy is never pushed. Signing in again merges the slot back
+before the first sync starts, and removes it.
+
+**Why set aside rather than wipe.** A log out offline must not lose answers
+that never reached the server. Wiping would be simpler and is what a shared
+computer wants; setting aside keeps the one promise the app makes about
+practice — it is never lost.
+
+**What it costs.** One document's worth of storage per person who has used
+the device, until they sign in there again. If storage will not take the
+copy, the document is left in place and the person is told; the next person
+then sees it, as before 0.580.
+
+---
+
+## Card saves merge by top-level field on the server
+
+**6 November 2026** · `save-card`, `card-status` in `server/api/courses.js`
+
+A save is worked out from the card as the request read it. If the card
+moved in the meantime — another tab, another teacher, a status change —
+only the top-level fields this request changed are laid over the card as it
+stands when the write lands (`updateJson`), and the revision moves once per
+write. A status change is worked out from the card at that moment too.
+
+**What it costs.** Two people changing *the same* field at the same moment
+still leave the later one's: `forms` is one field, so two edits to a card's
+words at once are not merged word by word. That is rare and visible (the
+second editor's words are what they see); merging inside a field would mean
+knowing what every field means, and a wrong merge is worse than a visible
+last-wins. The card's decks are not a field here: the change this request
+made to them is laid over the decks the card is in now.
+
+---
+
+## Deck membership travels as a change
+
+**6 November 2026** · `decksWere` in `save-card`; `saveNamed` and the editor's Save in `src/spaces.tsx`
+
+Every add or remove sent the card's whole list of decks, rebuilt from what
+the screen believed, so a screen that was out of date put back a deck
+somebody else had removed. Screens now send the decks they believed the
+card was in beside the ones they want; the server applies only what was
+added and what was taken away, over the decks the card is in when the write
+lands.
+
+**What it costs.** Two kinds of request for one action. An older build sends
+no `decksWere`, and its list is taken as the list, as before.
+
+---
+
+## A queued save waits through server errors and is dropped only on refusal
+
+**6 November 2026** · `isTransient` in `src/outbox.ts`; `sendKeptCards` in `src/spaces.tsx`
+
+Work saved without a connection waits on the device. It used to be dropped
+on any answer but "offline", which included a gateway's error page during a
+deploy. Now only the server's own refusal — an answer in its own words, a
+4xx with JSON — drops it, and the teacher is told which card and why; no
+connection, a timeout, a 5xx and a body that is not the server's JSON all
+mean "not answered yet", and the work waits.
+
+**What it costs.** A server that is broken in a way that keeps answering 5xx
+keeps the queue waiting for as long as it is broken (the queue's fortnight
+cap still applies). That is the right side to err on: the alternative is
+losing a teacher's work to an outage.
+
+---
+
+## Pruning uses the server's clock
+
+**6 November 2026** · `mergeData(local, remote, now)` and `serverTimeOf` in `src/sync.ts`
+
+Deletions and set-aside progress are kept a fixed number of days and then
+aged out at the next merge. Aged by the device's clock, a phone set months
+ahead aged out yesterday's. A sync now ages them by the time in the
+server's answer; a merge with no server in it — an imported file, a
+document set aside at log out — still uses the device's.
+
+**What it costs.** Nothing much: one header read. A server whose clock is
+wrong would age things wrongly for everyone, but that is one clock to keep
+right instead of every learner's.
+
+---
+
+## Teaching reads are conditional on an ETag
+
+**6 November 2026** · `jsonTagged` in `server/api/courses.js`; `call` in `src/courses-api.ts`; `pullTeaching`
+
+Teaching and Admin ask for the whole space every 45 seconds while they are
+open, and with nothing changed got the whole space back and wrote it to the
+device again. The three lists and the admin overview now carry an ETag; the
+device sends it back, a match is a bare 304, and a refresh where nothing
+moved changes nothing on screen or on the device.
+
+**What it costs.** The server still reads and serialises the lists to know
+whether they moved — the saving is the transfer, the device's parsing and
+its storage writes, not the server's reads. The ETags are kept in memory, so
+the first ask after a reload is a whole one.
+
+---
+
+## Teacher-only styles ride with the teaching chunk
+
+**6 November 2026** · `src/teaching.css`, `scripts/css-split.mjs`
+
+About a fifth of the stylesheet styled screens only teachers and admins
+open. Those rules now live in `src/teaching.css`, imported by
+`src/spaces.tsx`, so the build serves them with the lazily loaded teaching
+code. A rule moves only when every class it names is used by the teaching
+files alone; a learner's screen keeps everything it uses, and a test checks
+that no learner screen uses a class only the teaching sheet styles.
+
+**What it costs.** The moved rules now come after the learner's sheet
+rather than where they stood in it. Where a teaching-only rule and a
+general rule set the same property on the same element with the same
+weight, the teaching rule now wins where the general one may have won
+before. Every teaching screen is on the release's list to check by hand at
+phone and desktop width for exactly that.
+
+---
+
+## The learner card editor behind OWN_CARDS is removed rather than kept
+
+**6 November 2026** · `src/ArabicTrainer.tsx`, `src/imports.ts`
+
+Learners making their own cards was switched off in 0.404, and its editor,
+bulk-add sheet, recorder and zip backup stayed in the source behind a flag
+so it could be turned back on with one line. It was about a quarter of the
+trainer, read by nobody and kept compiling by everyone.
+
+It is removed. The one piece something else used — the reader for a pasted
+table of words — moved to `src/imports.ts`.
+
+**What it costs.** Turning learners' own cards back on is now a piece of
+work, not a flag: the editor would be built again, most likely from the
+teacher's card editor, which has moved far past the learner's since 0.404.
+
+---
+
+## One acting space, decided at the request layer
+
+**7 November 2026** · `src/courses-api.ts` (`actingSpace`), `src/shared.tsx`
+
+The server acts in the space a request names (`x-org`), and in the
+caller's own first space when it names none. The app named it only once
+it knew it: for an App admin at another space's address, after the
+address lookup answered; for a member, after a screen effect that ran
+after the screens' own first fetches. Anything sent in between acted in
+the wrong space, and what came back was kept on the device as if it were
+the space on screen.
+
+Now one function answers which space a request acts in, synchronously
+wherever the account says, and "not yet known" for an App admin at another
+space's address. A request then waits for the lookup instead of leaving
+without it; sign-up and the lookup itself, which are anonymous, do not.
+The device keeps Admin, Teaching and the "teaches" flag per space, and an
+answer for a space other than the one now acting is dropped.
+
+The server's fallback is unchanged: the client no longer relies on it.
+
+**What it costs.** An admin at another space's address waits for one
+lookup before anything loads, and a failed lookup fails what was waiting
+on it until the next attempt succeeds. The first visit to a space on a
+device starts blank rather than showing whatever was kept.
+
+## A restore adds and never overwrites
+
+**8 November 2026** · `server/api/courses.js` (`restoreOne`, `admin-restore-chunk`)
+
+A restore used to write every record in the file over the site's copy. For
+a person in several spaces that set their whole account back to the day of
+the file — spaces joined since gone, a replaced key working again, a
+suspension lifted — and a card edited since lost its edit without a word.
+
+Now a record already on the site is left exactly as it is, a record the
+site lacks is written, and lists that are naturally a union (a deck's cards,
+a course's decks, a person's cards, Former members, a teacher's systems,
+the indexes) gain what they lack. Practice is folded in with the merge two
+devices use. Two writes beyond that, each the owner's choice by name: the
+deletion record of an account ticked to bring back, and a space's name,
+logo, colour and admins when "keep" is unticked. Every record not written
+is reported with why; a prefix the engine does not know is reported, never
+skipped in silence.
+
+Two small departures from the plan, both on the safe side. A deck that
+gains cards has its count and version moved, as on any change to its cards,
+or learners' devices would never fetch them. And a re-created space whose
+address was taken does not list the taken address among its former ones:
+deleting that space later would take the address from the space that has it.
+
+**What it costs.** A restore cannot repair a record that exists but is
+wrong. The way back to the file's copy is to delete the record — a card, or
+the whole space — and restore. Both are deliberate.
+
+## Deleted on purpose means a deletion record exists
+
+**8 November 2026** · `server/api/courses.js` (`restoreVerdicts`)
+
+An account in the file that the site lacks was either deleted since, or
+lost. The `gone:` record that deleting an account writes tells the two
+apart: with one, the account stays deleted unless the owner ticks it in the
+preview; without one, it is re-created with its old key. Deleting a whole
+space drops its `gone:` records, which is why restoring a deleted space
+brings its people back.
+
+The same deletion frees a handle for reuse, so a handle in the file can name
+a different person on the site. `created` is set once when an account is
+made and carried into every backup, so a different `created` means a
+different person, and the preview stops the restore with their names.
+
+## Progress is keyed by handle in a backup
+
+**8 November 2026** · `server/api/sync.js`, the backup manifest
+
+A practice document lives under a hash of the person's key, and a new key
+moves it. A backup that carried it by key would put it back under a key
+that no longer opens anything. So the file names it by handle
+(`progress:<handle>`, `paudio:<handle>:<id>`), and a restore finds the
+person's current key from their account on the site.
+
+---
+
+## "Who is it?" is every right person ticked, and the instruction always says so
+
+**8 November 2026** · `src/verb-drills.ts` (`whoChoices`, `whoAllRight`), `src/languages.ts` (`vwho`, `vwhorec`)
+
+A form spelt the same for several persons — ساكن is *I*, *you (m)* and
+*he* — used to take any one of them as right. A learner reported that this
+taught the form as "I" and nothing else. The owner chose (0.586) that the
+learner ticks every person the form could be, and nobody it could not.
+
+**The instruction says "tick everyone it fits" on every asking**, including
+when only one person fits. Saying it only on the forms with several would
+tell the learner how many to tick, which is half the answer.
+
+**Every right person is always on offer**, however many there are, with at
+least one wrong one beside them, so ticking everything is never right.
+
+**The meaning shown is the verb's, not the form's.** "I keep" over بخلّي
+would be the answer, so the card's own meaning ("to keep") is shown, or,
+where it has none, the form's with its subject taken off the front.
+
+What it costs: a learner who knew one of the persons and not the others is
+now marked wrong, where before they were marked right.
+
+## A sentence's filler accepts what its card accepts
+
+**8 November 2026** · `src/answers.ts` (`fillerVariants`), `src/ArabicTrainer.tsx` (`filledVariantsOf`)
+
+A blank is filled with its value card's first accepted answer, because two
+answers joined by a slash are not a sentence. Written with the value's
+second answer (كيفك for كيف حالك), the sentence was marked nearly right. The
+sentence as filled is still the one shown everywhere. Only the marking also
+tries it with each other answer of each filler, put where the first one
+stands, and only where the first one appears in the sentence word for word.
+A filler the sentence changed on the way in is not guessed at.
+
+---
+
+## Catch up: what is due, outside the mix
+
+**8 November 2026** · `buildSession` (`mode: "catchup"`, `dueToCatchUp`) and the Build screen in `src/ArabicTrainer.tsx`
+
+The owner asked for a custom session mode that only reviews due cards, and
+answered four questions about it: everything waiting counts (reviews and
+cards in learning), only the questions due are asked, there is a length or
+"Everything due", and the longest waiting come first.
+
+So Catch up does not go through the session mix. The mix exists to balance
+learning against reviews and to decide when new cards come in; a session of
+nothing but what is due has no new cards and no balance to keep, and the
+owner's "longest waiting first" is a plain sort on the soonest due question.
+A question counts as due when it has been met (not `new`) and its date has
+passed — so a level just opened on a card, which the mix treats as waiting,
+is left for a regular session: it is new material, not backlog.
+
+Every form of a card with something due is taken, not the usual two, and a
+session is never topped up with questions not due, so it may be shorter
+than its length. It is not refused for want of variety either: one kind of
+question due is still what there is to catch up on.
+
+"Everything due" is kept as a count of 999 with no minutes, as Ultimate's
+no-length is, and read back as such for a Catch up.
+
+## Material from before spaces is placed by the restore that brings it back
+
+**8 November 2026** · `server/api/courses.js` (`restoreOne`)
+
+A backup taken before spaces (0.542) names no space on its courses, decks,
+cards and reports, and a record that names none reads as Main's. Restored
+for a class that had moved to a space, every card landed in Main: the
+space's course still listed the decks (my-material reads deck rows without
+scoping them) with their counts, while every card was scoped out.
+
+Such a record now takes the space the restore is run from (x-org), and a
+copy already on the site that names no space is given that space — the one
+change a restore makes to a record it finds, by the owner's choice (2a),
+so that restoring again from the right space mends a restore that went
+wrong. Only `org` is added; nothing else about the record moves. A record
+that names its space, in the file or on the site, keeps it. Run from Main,
+`into` is empty and the engine behaves exactly as before.
+
+**What it costs.** Genuine Main material from before spaces, restored from
+inside another space, moves into that space. The Restore screen counts such
+records and names the space before anything is written.
+
+---
+
+## Save and publish, one request (0.591)
+
+**9 November 2026** · `publish` in save-card (`server/api/courses.js`);
+`ScreenFab` and `Screen` in `src/shared.tsx`; `trySave`, `save` in
+`src/card-editor.tsx`; the editor's `onSave` in `src/spaces.tsx`
+
+**What was wanted.** A second floating button beside Save while a card is
+edited: Save and publish. Until now publishing an edit was Save, then the
+status menu, then Publish.
+
+**What changed.** save-card takes `publish: true`, and after writing the
+card publishes what it wrote exactly as card-status "published" would: a
+draft loses its status, and a published card's `pending` is laid over it
+and dropped. It is one request rather than a save followed by
+`cardStatus`, so a save kept in the outbox offline carries the flag and is
+published when it goes up, and a dropped connection cannot leave a card
+saved but not out. A `walk` publishes nothing. Decks are bumped by the
+existing `liveMoved` comparison, which sees the change.
+
+`Screen`'s `fab` takes a list; the editor passes Save and publish (marked
+`second`, the quieter style) then Save, so Save keeps the corner. Each
+says it is busy only when it sent the save in flight.
+
+**Choices the owner made.** Offline, kept and published later (rather than
+off). After publishing, back to reading the card, as Save does. Off
+whenever Save is: waiting changes with nothing new are published from the
+status menu. Shown on every card, Ready for review included, since anyone
+who may edit a card may already publish it.
+
+**What it costs.** Publishing is one tap from the middle of an edit; the
+quieter style and the position away from the corner are the guard, and
+Unpublish is the way back. On phones under 360px the buttons lose a
+little padding so both names fit.

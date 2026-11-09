@@ -101,7 +101,64 @@ after(async () => {
  * @param {string} pathname
  * @param {{ method?: string, key?: string, token?: string, body?: unknown }} [opts]
  */
-async function api(pathname, { method = "GET", key, token, body } = {}) {
+/*
+ * Since 0.543 an account is made with an invite or course code; only the
+ * first account on an empty site needs none. These tests make accounts by
+ * the dozen, so the helper does what a person would: it signs up with
+ * Main's invite code, read by a first account made for the purpose.
+ */
+/** @type {Promise<string> | null} */
+let mainCode = null;
+function codeForMain() {
+  if (!mainCode) {
+    mainCode = (async () => {
+      const first = await raw("/api/courses?action=signup", { method: "POST", body: { displayName: "Site owner" } });
+      const key = first.json.key;
+      await raw("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
+      const orgs = await raw("/api/courses?action=admin-orgs", { key });
+      return orgs.json.orgs.find((/** @type {any} */ o) => o.id === "main").inviteCode;
+    })();
+  }
+  return mainCode;
+}
+
+/*
+ * Since 0.545 only a space's teachers and admins make its decks (33a). A
+ * test whose account makes decks without teaching anything makes it a
+ * teacher first, of a staff course the site owner keeps for the purpose.
+ */
+/** @type {{ key: string, course: string } | null} */
+let staff = null;
+/** @param {string} handle */
+async function teaching(handle) {
+  const assign = () => staff
+    ? raw("/api/courses?action=assign-teacher", { method: "POST", key: staff.key, body: { courseId: staff.course, handle } })
+    : Promise.resolve({ status: 0 });
+  if ((await assign()).status === 200) return;
+  /* First time, or a test since cleared the site: a fresh staff room, run
+     by an administrator made through Main's invitation. */
+  const boss = await raw("/api/courses?action=signup", {
+    method: "POST", body: { displayName: "Staff room", code: await codeForMain() },
+  });
+  await raw("/api/courses?action=claim-admin", { method: "POST", key: boss.json.key, body: { adminKey: ADMIN_KEY } });
+  const course = await raw("/api/courses?action=create-course", {
+    method: "POST", key: boss.json.key, body: { title: "Staff room", language: "ar-PS" },
+  });
+  staff = { key: boss.json.key, course: course.json.course.id };
+  const done = await assign();
+  assert.equal(done.status, 200, "made a teacher of the staff room");
+}
+
+/** @param {string} pathname @param {any} [opts] */
+async function api(pathname, opts = {}) {
+  if (pathname.includes("action=signup") && opts.body && !("code" in opts.body)) {
+    opts = { ...opts, body: { ...opts.body, code: await codeForMain() } };
+  }
+  return raw(pathname, opts);
+}
+
+/** @param {string} pathname @param {any} [opts] */
+async function raw(pathname, { method = "GET", key, token, body } = {}) {
   /** @type {Record<string, string>} */
   const headers = { "content-type": "application/json" };
   if (key) headers["x-key"] = key;
@@ -253,6 +310,7 @@ test("the deployed version is whatever is in dist, read fresh", async () => {
 test("a card remembers which words it teaches, and keeps the list clean", async () => {
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rana" } });
   const key = made.json.key;
+  await teaching(made.json.user.handle);
   await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
 
   const word = await api("/api/courses?action=save-card", {
@@ -1172,6 +1230,7 @@ test("a card that says nothing about being a sentence is read by its holes", asy
 test("cards saved at the same moment all reach the deck and the collection", async () => {
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Suha" } });
   const key = made.json.key;
+  await teaching(made.json.user.handle);
   const deck = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Lesson 1", lang: "ar-PS" },
   });
@@ -1488,6 +1547,7 @@ test("signing in, practising and writing a card are recorded apart", async () =>
 test("a teaching action that is refused is not recorded as work done", async () => {
   const owner = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Yara" } });
   const other = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Fadi" } });
+  await teaching(owner.json.user.handle);
   const deck = await api("/api/courses?action=create-deck", {
     method: "POST", key: owner.json.key, body: { title: "Yara's deck" },
   });
@@ -3084,7 +3144,11 @@ test("a backup holds a teacher's numbers, and a restore puts them back", async (
     },
   });
   assert.equal(put.status, 200, put.text);
-  assert.equal(put.json.written, 2, "a prefix the allowlist has not got is skipped in silence");
+  /* The system comes back; the teacher's map of systems, which is still
+     on the site, gains the entry it lacks (0.583: a list is added to, never
+     written over). Nothing is skipped. */
+  assert.equal(put.json.written + put.json.merged, 2, "a prefix the allowlist has not got is skipped in silence");
+  assert.deepEqual(put.json.skipped, []);
   const back = (await api("/api/courses?action=my-systems", { key })).json.systems;
   assert.equal(back.length, 1);
   assert.equal(back[0].lexemes["unit.1"].forms.standalone, "one");
@@ -3100,29 +3164,14 @@ test("a backup holds a teacher's numbers, and a restore puts them back", async (
  * "Cards" ticked put the cards back and left the numbers screen empty.
  */
 test("a backup of the cards made and restored by the app carries the numbers", async () => {
-  const { build } = await import("esbuild");
-  const here = path.dirname(new URL(import.meta.url).pathname);
-  const out = path.join(here, ".backup-build", "app.js");
-  /* One bundle for both, so the key the client is given is the key the
-     backup's requests carry. React is left external and resolved from the
-     project, which is why the bundle is built inside it. */
-  await build({
-    stdin: {
-      contents:
-        'export { BACKUP_PARTS, buildBackup, restoreBackup } from "../src/spaces.tsx";\n' +
-        'export { setKey } from "../src/courses-api.ts";\n',
-      resolveDir: here,
-      loader: "ts",
-    },
-    outfile: out,
-    bundle: true,
-    format: "esm",
-    jsx: "automatic",
-    external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-    loader: { ".jsx": "jsx" },
-    logLevel: "silent",
-  });
-  const app = await import(out);
+  /* One build for both, split so they share one copy of the client, and
+     so the key the client is given is the key the backup's requests
+     carry (see buildOnce). */
+  const { buildOnce } = await import("./helpers.mjs");
+  const built = await buildOnce(["spaces.tsx", "courses-api.ts"], { splitting: true });
+  const spaces = await import(path.join(built, "spaces.js"));
+  const client = await import(path.join(built, "courses-api.js"));
+  const app = { ...spaces, setKey: client.setKey };
 
   const admin = await anAdmin("Rafa");
   const saved = (await api("/api/courses?action=save-system", {
@@ -3228,7 +3277,10 @@ test("a deck says which of its number parts reach nobody yet", async () => {
   assert.deepEqual(await waitingNow(), ["numbers:11-99"]);
 });
 
-test("closing an account takes its numbers with it", async () => {
+/* Until 0.544 closing an account took its numbers with it. Since then a
+   deleted teacher's numbers stay, so decks that use them keep working (85a;
+   docs/PLAN-spaces.md). */
+test("closing an account leaves its numbers for the decks that use them", async () => {
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Omar" } });
   const key = made.json.key;
   const saved = await api("/api/courses?action=save-system", {
@@ -3241,12 +3293,12 @@ test("closing an account takes its numbers with it", async () => {
 
   const { getStore } = await import("../server/store.js");
   const store = getStore("arabic-courses");
-  assert.equal(await store.get(`numsys:${id}`, { type: "text" }), null, "the system is gone");
-  assert.equal(
+  assert.ok(await store.get(`numsys:${id}`, { type: "text" }), "the system stays");
+  assert.ok(
     await store.get(`mysystems:${made.json.user.handle}`, { type: "text" }),
-    null,
-    "and the index that pointed at it",
+    "and the index that points at it",
   );
+  assert.equal(await store.get(`user:${made.json.user.handle}`, { type: "text" }), null, "the account is gone");
 });
 
 test("an unreadable record fails the request rather than reading as absent", async () => {
@@ -3261,6 +3313,7 @@ test("an unreadable record fails the request rather than reading as absent", asy
    */
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Ziad" } });
   const key = made.json.key;
+  await teaching(made.json.user.handle);
   const deck = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Lesson 1", description: "", lang: "ar-PS" },
   });
@@ -3436,6 +3489,7 @@ test("a teacher of neither the deck nor the course cannot attach one to the othe
      */
     const boss = await anAdmin("Layla");
     const teacher = await someone("Samir");
+    await teaching(teacher.handle);
     const mine = await aDeck(teacher.key, "Samir's deck");
     const hers = await aDeck(boss.key, "Layla's deck");
     const theirCourse = await aCourse(boss.key, "Taught by Samir");
@@ -4412,6 +4466,7 @@ test("a sentence card waits for review, and only its teachers can review it or r
 test("a deck marked locked keeps the mark but refuses nothing while locks are set aside", async () => {
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rana" } });
   const key = made.json.key;
+  await teaching(made.json.user.handle);
   const deckOf = async (/** @type {string} */ title) =>
     (await api("/api/courses?action=create-deck", { method: "POST", key, body: { title, lang: "ar-PS" } }))
       .json.deck.id;
@@ -4465,6 +4520,7 @@ test("a deck marked locked keeps the mark but refuses nothing while locks are se
 test("a teacher exports a deck or a card, and only their own", async () => {
   const t = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rana" } });
   const key = t.json.key;
+  await teaching(t.json.user.handle);
   const other = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Ziad" } });
 
   const deck = await api("/api/courses?action=create-deck", {
@@ -4593,7 +4649,7 @@ test("the server says how big recordings and pictures are, and leaves out the on
  * up by, and it holds rosters as they were — naming people who may since
  * have gone.
  */
-test("a restored course's codes open it, and a person it names can be removed", async () => {
+test("a restored course's codes open it, and a person it names without an account is left off", async () => {
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Salma" } });
   const key = made.json.key;
   await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
@@ -4617,10 +4673,9 @@ test("a restored course's codes open it, and a person it names can be removed", 
   assert.equal(joined.status, 200, joined.text);
   assert.equal(joined.json.role, "student");
 
-  const gone = await api("/api/courses?action=admin-delete-user", {
-    method: "POST", key, body: { handle: "gone-person" },
-  });
-  assert.equal(gone.status, 200, gone.text);
+  /* A name with no account behind it never makes it onto the restored
+     roster at all (0.583; docs/PLAN-space-backup.md, 14a), so there is
+     nobody left to remove. */
   const mine = await api("/api/courses?action=my-courses", { key: learner.json.key });
   const after = mine.json.courses.find((/** @type {any} */ c) => c.id === id);
   assert.deepEqual(after.students, [learner.json.user.handle], "the person is off the roster");

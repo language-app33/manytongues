@@ -94,10 +94,15 @@ export interface Check {
 
 export interface Fix {
   key: string;
-  /** What to do, in a sentence. */
+  /** What to do, as a headline (0.563): "Record 5 words or sentences". */
+  title: string;
+  /** Why, or how, in a line under it. */
   text: string;
   /** About how many points doing it would add. */
   gain: number;
+  /** The cards it is about, worst first, where it is about particular ones
+      (0.561): the words that need sentences, the words without a picture. */
+  cards?: string[];
 }
 
 export interface Quality {
@@ -110,6 +115,11 @@ export interface Quality {
   /** For the screen and the tests: each word card and how far its forms
       are met. */
   words: { id: string; share: number; forms: { ar: string; need: number; met: number }[] }[];
+  /** Every sentence that uses words no card in the course teaches, with
+      those words (0.586): a warning shown in full beside the score, not
+      only when it is among the suggestions worth most. A learner asked to
+      practise each word on its own before meeting it in a sentence. */
+  untaught: { id: string; text: string; words: string[] }[];
 }
 
 export interface QualityOptions {
@@ -461,12 +471,24 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
   /* A word form is a unit; so is a sentence, all of its versions together,
      which is short of something where any version is. */
   const units: Held[][] = [];
+  /* Which card each unit is on, for the tips that name them (0.563). */
+  const unitCard: Map<Held[], string> = new Map();
   for (const card of words) {
     for (const form of formsOf(card) as Held[]) {
-      if (trim(form.ar) && isAsked(form as never) && !hasSlots(form)) units.push([form]);
+      if (trim(form.ar) && isAsked(form as never) && !hasSlots(form)) {
+        const u = [form];
+        units.push(u);
+        unitCard.set(u, String(card.id));
+      }
     }
   }
-  for (const s of said) if (s.units.length) units.push(s.units);
+  for (const s of said) {
+    if (s.units.length) {
+      units.push(s.units);
+      unitCard.set(s.units, String(s.card.id));
+    }
+  }
+  const cardsOfUnits = (list: Held[][]) => list.map((u) => unitCard.get(u) || "").filter(Boolean);
   const unrecorded = units.filter((u) => u.some((v) => !heard(v)));
   const unpictured = words.filter((c) =>
     !(formsOf(c) as Held[]).some((f) => Array.isArray(f.images) && f.images.length > 0));
@@ -478,12 +500,16 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
      with it — any of each, where a card accepts several. */
   const seenWords: Set<string> = new Set();
   let repeats = 0;
+  const repeated: string[] = [];
   for (const c of words) {
     const w = wordOf(c);
     const keys = answersIn(w.ar).flatMap((a) =>
       splitForms(String(w.en || "")).map((e) => `${a}|${e.toLowerCase()}`));
     if (!keys.length) keys.push(`${trim(w.ar)}|${trim(w.en).toLowerCase()}`);
-    if (keys.some((k) => seenWords.has(k))) repeats++;
+    if (keys.some((k) => seenWords.has(k))) {
+      repeats++;
+      repeated.push(String(c.id));
+    }
     for (const k of keys) seenWords.add(k);
   }
   const longest = lang ? longSentenceOf(lang) : 12;
@@ -502,7 +528,7 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
     { key: "scene", weight: SCENE_POINTS, share: scenes.length ? 1 : 0, applies: true },
   ];
 
-  const empty = { score: null, checks, fixes: [], words: wordRows };
+  const empty = { score: null, checks, fixes: [], words: wordRows, untaught: [] };
   if (!words.length && !said.length) return empty;
 
   /* The conversation is worth its 5 whatever else applies; the points of a
@@ -519,15 +545,19 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
 
   /* ---- what would raise it ---- */
   const fixes: Fix[] = [];
-  const add = (key: string, gain: number, text: string) => {
-    if (gain > 0.05) fixes.push({ key, gain, text });
+  const add = (key: string, gain: number, title: string, text: string, cards?: string[]) => {
+    if (gain > 0.05) fixes.push({ key, gain, title, text, ...(cards && cards.length ? { cards: [...new Set(cards)] } : null) });
   };
+  const idsOf = (list: Said[]) => list.map((x) => String(x.card.id));
   if (short.length) {
     const lost = wordRows.reduce((t, w) => t + (1 - w.share), 0) / wordRows.length;
     add("words", worth("words") * lost,
-      `${count(short.length, "word")} ${verb(short.length, "needs", "need")} more sentences in this deck. The word itself wants two, and each other form one.`);
+      `Use ${count(short.length, "word")} in more sentences`,
+      "Each word should appear in 2 sentences in this deck, and each of its other forms in 1.",
+      short.slice().sort((a, b) => a.share - b.share).map((w) => w.id));
   } else if (!said.length && words.length) {
-    add("words", worth("words"), "Add sentences that use this deck's words.");
+    add("words", worth("words"), "Add sentences",
+      "None of this deck's words appear in a sentence yet, so they can't be practised in context.");
   }
   /* Links the app can see and nobody has confirmed: worth what confirming
      them all would add. Only where asked for — it reads every word of the
@@ -550,7 +580,8 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
     }
     if (n) {
       add("confirm", worth("words") * (mean(rowsFrom(more)) - mean(wordRows)),
-        `${count(n, "link")} between a word and a sentence in this deck ${verb(n, "is", "are")} waiting for you to confirm, on the In context tab.`);
+        `Confirm ${count(n, "word")} found in a sentence`,
+        `The app spotted ${n === 1 ? "a word" : "words"} of this deck inside a sentence. Confirm ${n === 1 ? "it" : "them"} on the In context tab so ${n === 1 ? "it counts" : "they count"}.`);
     }
   }
   if (said.length) {
@@ -558,37 +589,58 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
     if (onlyUnlinked.length) {
       const n = onlyUnlinked.length;
       add("unlinked", worth("sentences") * (n / said.length),
-        `${count(n, "sentence")} ${verb(n, "isn't", "aren't")} linked to any word card. Say which words ${verb(n, "it teaches", "they teach")}.`);
+        `Link ${count(n, "sentence")} to ${n === 1 ? "its" : "their"} words`,
+        `Open ${n === 1 ? "the sentence" : "each sentence"} and choose which of this deck's words it practises.`,
+        idsOf(onlyUnlinked));
     }
     if (onlyStrange.length) {
       const n = onlyStrange.length;
       add("unknown", worth("sentences") * (n / said.length),
-        `${count(n, "sentence")} ${verb(n, "uses", "use")} a word no deck in the course teaches (${sampleOf(onlyStrange)}).`);
+        `${count(n, "sentence")} ${verb(n, "uses", "use")} words nobody teaches`,
+        `No deck in the course has a card for: ${sampleOf(onlyStrange)}. Add cards for them, or reword the ${n === 1 ? "sentence" : "sentences"}.`,
+        idsOf(onlyStrange));
     }
     if (both.length) {
       const n = both.length;
       add("both", worth("sentences") * (n / said.length),
-        `${count(n, "sentence")} ${verb(n, "needs", "need")} both a link to a word card and ${verb(n, "its", "their")} words taught (${sampleOf(both)}).`);
+        `Link ${count(n, "sentence")} and teach ${n === 1 ? "its" : "their"} new words`,
+        `Choose which words ${n === 1 ? "it practises" : "each practises"}, and add cards for: ${sampleOf(both)}.`,
+        idsOf(both));
     }
   } else if (words.length) {
-    add("sentences", worth("sentences"), "Add sentences: none of this deck's words can be practised inside one yet.");
+    add("sentences", worth("sentences"), "Add sentences",
+      "None of this deck's words appear in a sentence yet, so they can't be practised in context.");
   }
   add("recordings", worth("recordings") * (1 - share(unrecorded.length, units.length)),
-    `${count(unrecorded.length, "word, form or sentence", "words, forms or sentences")} ${verb(unrecorded.length, "has", "have")} no recording.`);
+    `Record ${count(unrecorded.length, "word or sentence", "words or sentences")}`,
+    "Students hear them as they practise.",
+    cardsOfUnits(unrecorded));
   add("pictures", worth("pictures") * (1 - share(unpictured.length, words.length)),
-    `${count(unpictured.length, "word")} ${verb(unpictured.length, "has", "have")} no picture.`);
+    `Add a picture to ${count(unpictured.length, "word")}`,
+    "Pictures help students remember a word.",
+    unpictured.map((c) => String(c.id)));
   add("pronunciation", worth("pronunciation") * (1 - share(unspelt.length, units.length)),
-    `${count(unspelt.length, "word, form or sentence", "words, forms or sentences")} ${verb(unspelt.length, "has", "have")} no pronunciation written.`);
+    `Write the pronunciation of ${count(unspelt.length, "word or sentence", "words or sentences")}`,
+    "Spelled in Latin letters, for students still learning the script.",
+    cardsOfUnits(unspelt));
   add("reviewed", worth("reviewed") * (1 - share(unreviewed.length, reviewing.length)),
-    `${count(unreviewed.length, "card")} with blanks ${verb(unreviewed.length, "has", "have")} sentences waiting for your review.`);
+    `Check the sentences made for ${count(unreviewed.length, "card")}`,
+    `The app filled in ${unreviewed.length === 1 ? "this card's" : "these cards'"} blanks. Make sure each sentence reads right.`,
+    unreviewed.map((c) => String(c.id)));
   add("repeats", worth("repeats") * (1 - share(repeats, words.length)),
-    `${count(repeats, "word is", "words are")} on more than one card.`);
+    `Merge ${count(repeats, "repeated word")}`,
+    "The same word, with the same meaning, is on more than one card.",
+    repeated);
   add("long", worth("long") * (1 - share(long.length, said.length)),
-    `${count(long.length, "sentence")} ${verb(long.length, "is", "are")} longer than ${longest} words.`);
-  add("scene", worth("scene") * (scenes.length ? 0 : 1), "Add a conversation or a text.");
+    `Shorten ${count(long.length, "long sentence")}`,
+    `Sentences over ${longest} words are hard to answer.`,
+    idsOf(long));
+  add("scene", worth("scene") * (scenes.length ? 0 : 1), "Add a conversation or a text",
+    "It practises the deck's words together, the way they're really used.");
   fixes.sort((a, b) => b.gain - a.gain);
 
-  return { score: Math.round(earned), checks, fixes, words: wordRows };
+  const untaught = strange.map((x) => ({ id: String(x.card.id), text: x.texts[0] || "", words: unknownOf(x) }));
+  return { score: Math.round(earned), checks, fixes, words: wordRows, untaught };
 }
 
 /** Which colour a score is shown in. */

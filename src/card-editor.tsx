@@ -17,10 +17,11 @@ import type { ExampleSentence } from "./examples.ts";
 import { MAX_EXAMPLES, blankSentence, exampleCells, examplesRowOf, filledExample, othersOf, readExample, sentenceOf, verbExamplesOf, wishOf } from "./examples.ts";
 import { wordsOffered } from "./context-index.ts";
 import { longSentenceOf, sentenceWords, wordCount } from "./sentence-words.ts";
-import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
+import { cellsIn, citationOf, citedWord, foldJoined, framesOf, isCell, isFrame, joinsOf, linkLoops, NO_PARTNER, partnerOf, personsOf, rowIdsOf, slotLinks, slotRows, tensesOf, waitsOnWord } from "./verbs.ts";
 import { formsOf, leadOf, subFormsOf, wordOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
 import type { Node } from "./shared.tsx";
+import { primePicture } from "./pictures.ts";
 import {
   asksLexical,
   categoriesOf,
@@ -84,6 +85,7 @@ import {
   Segmented,
   plural,
   useOffline,
+  usePicture,
   usePageLock,
   ConfirmModal,
   Overlay,
@@ -1393,33 +1395,11 @@ function blobToDataUrl(blob: Blob) {
    is sharp on any screen this app is read on, and a JPEG of that is a
    few hundred kilobytes. */
 
-/* Every picture this screen has fetched or made, by hash, so the same one
-   is fetched once however many times it is drawn. A picture never changes
-   once written, so nothing here goes stale. */
-const imageCache = new Map<string, Promise<string>>();
-const imageData = (hash: string): Promise<string> => {
-  const held = imageCache.get(hash);
-  if (held) return held;
-  const asked = API.getImage(hash).then((r) => r.data);
-  /* A failure is not kept: the next draw asks again. */
-  asked.catch(() => imageCache.delete(hash));
-  imageCache.set(hash, asked);
-  return asked;
-};
 
 /** One stored picture, drawn once its bytes arrive. */
 function StoredImage({ hash, alt, className = "" }: { hash: string; alt: string; className?: string }) {
-  const [src, setSrc] = useState("");
-  const [lost, setLost] = useState(false);
-  useEffect(() => {
-    let live = true;
-    setLost(false);
-    imageData(hash).then(
-      (d) => live && setSrc(d),
-      () => live && setLost(true),
-    );
-    return () => { live = false; };
-  }, [hash]);
+  /* The one picture fetch — see usePicture. */
+  const { src, lost } = usePicture(hash);
   if (lost) return <span className={`at-imgslot lost ${className}`}>Couldn&rsquo;t load</span>;
   if (!src) return <span className={`at-imgslot ${className}`} aria-busy="true" />;
   return <img className={className} src={src} alt={alt} />;
@@ -1467,7 +1447,8 @@ export function ImageScreen({ title, images, onChange, onClose }: {
       const hash = await hashOf(small);
       const data = await blobToDataUrl(small);
       await API.putImage(hash, data);
-      imageCache.set(hash, Promise.resolve(data));
+      /* Into the one picture cache, so it is drawn without a fetch. */
+      primePicture(hash, data);
       if (!images.includes(hash)) onChange(images.concat([hash]).slice(0, MAX_IMAGES));
     } catch (e) {
       setError(
@@ -3508,11 +3489,6 @@ export const tableFor = (
   return specOf(lang, table) ? table : "";
 };
 
-/* What a table's cells wait on, where it says nothing: the word — the rule
-   every one-row table has followed since there was one. The same reading
-   the trainer makes. */
-const waitsOnWord = (spec: VerbSpec | null | undefined): boolean =>
-  !!spec && (spec.gate || "word") === "word";
 
 /*
  * The three kinds of card, and what each of them is.
@@ -6717,7 +6693,7 @@ function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, d
  * the Advanced tab writes it in — so ticking the box carries it over
  * without anything to copy: it is the same form.
  */
-function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onExport, onDelete }: {
+function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onExport, onToSpace, onDelete }: {
   lang: Lang;
   scene: boolean;
   word: WordDraft;
@@ -6733,6 +6709,8 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   onToggleDeck: (id: string, on: boolean) => void;
   /** Export the card, where it can be — on a saved card being read. */
   onExport?: () => void;
+  /** A My space card into the space (0.549): copy or move it into a deck. */
+  onToSpace?: (move: boolean) => void;
   /** Delete the card — on a saved card being edited, at the foot. */
   onDelete?: () => void;
 }) {
@@ -6751,6 +6729,16 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
             <Button reads size="sm" className="iconly" aria-label="Export this card" title="Export this card" onClick={onExport}>
               <Icon name="download" />
             </Button>
+            {onToSpace ? (
+              <>
+                <Button reads size="sm" className="iconly" aria-label="Copy to the space" title="Copy to the space" onClick={() => onToSpace(false)}>
+                  <Icon name="copy" />
+                </Button>
+                <Button reads size="sm" className="iconly" aria-label="Move to the space" title="Move to the space" onClick={() => onToSpace(true)}>
+                  <Icon name="upload" />
+                </Button>
+              </>
+            ) : null}
           </span>
         ) : null}
       </div>
@@ -9793,7 +9781,11 @@ function NounEditor({ word, lang, allCards, selfId }: {
               index={i}
               form={f}
               title={box.title}
-              role={box.help ? box.help : i < 0 ? "Empty — never asked." : ""}
+              /* What to write, then — where the box is asked and nothing is
+                 in it yet — that it is not asked until it is. A box that is
+                 never asked on its own (the plural after three to ten) says
+                 so in its own line, so only that line. */
+              role={[box.help || "", i < 0 && !box.unasked ? "Empty — never asked." : ""].filter(Boolean).join(" ")}
               of={box.title.toLowerCase()}
               canCopy={false}
               /* Already marked: the box says what it is. A card whose answers
@@ -10571,13 +10563,16 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   );
 }
 
-export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, about, below }: {
+export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below, error = null }: {
   card: Card | null;
+  /** Why the last save failed, said inside this screen, which covers the
+      space it opened from (0.580, audit finding 12). */
+  error?: string | null;
   lang: Lang;
   decks: Deck[];
   inDecks?: string[];
   allCards: Card[];
-  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean }) => void;
+  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean, publish: boolean }) => void;
   /** Open another of the teacher's cards in place of this one — the
       cards the Meanings block names. */
   onOpenCard?: (card: Card) => void;
@@ -10615,6 +10610,8 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   status?: (off: boolean) => Node;
   /** Export this card, beside Edit while it is locked. */
   onExport?: () => void;
+  /** A My space card into the space (0.549): copy or move it into a deck. */
+  onToSpace?: (move: boolean) => void;
   /** Drawn over the tabs, and on the Exercises tab, and never locked: the
       line about sentences waiting for review, and the exercises to try. */
   about?: Node;
@@ -10709,7 +10706,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     !(card && SPEAKER_COLUMNS.has(String(card.person || "")));
   /* The question a change to a shared word asks, while it is being asked:
      what would be saved, and which cards it would be offered to. */
-  const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null, exit: boolean } | null>(null);
+  const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null, exit: boolean, publish: boolean } | null>(null);
   const meanings = advanced && shape === "word";
   /* The card as a save would write it — a basic card cut down to its word. */
   const written = () => {
@@ -10769,11 +10766,16 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   /* A tap on a field of a card being read. */
   /* Read fields are plain words now, so a tap on one needs no answer. */
   const viewOnly = () => {};
-  /* The floating Save: saves where it can, and otherwise says why not. */
-  const trySave = () => {
+  /* Which of the two floating buttons sent the save under way, so only
+     that one says it is busy. */
+  const [publishing, setPublishing] = useState(false);
+  /* The floating Save, and Save and publish beside it: saves where it can,
+     and otherwise says why not. */
+  const trySave = (publish = false) => {
     if (busy) return;
     if (canSave && changed) {
-      save();
+      setPublishing(publish);
+      save(null, false, publish);
       return;
     }
     setNameAsked(true);
@@ -10787,7 +10789,9 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   const leave = () => (changed ? setDiscarding(true) : quit());
   /* `exit` is Save and exit: the card is saved and the editor closes.
      Save alone keeps it open on the card as saved. */
-  const save = (next: "meaning" | "word" | null = null, exit = false) => {
+  /* `publish` is Save and publish: the same save, sent out to students in
+     the same request. */
+  const save = (next: "meaning" | "word" | null = null, exit = false, publish = false) => {
     sending.current = snapshot;
     const out = written();
     const extra = {
@@ -10798,10 +10802,10 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     const changes = stored && shape === "word" ? wordChanges(card, out.forms as any) : [];
     const others = cardsSharingChange(allCards, { id: selfId, lang: lang.id }, changes);
     if (others.length) {
-      setCarrying({ written: out, cards: others, changes, next: extra.next, exit });
+      setCarrying({ written: out, cards: others, changes, next: extra.next, exit, publish });
       return;
     }
-    onSave({ ...out, ...extra, carry: null, exit });
+    onSave({ ...out, ...extra, carry: null, exit, publish });
   };
   /* Whether there is a connection, for the line above the first field. */
   const offline = useOffline();
@@ -10897,9 +10901,17 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         fab={
           locked
             ? onUnlock ? { icon: "edit", label: "Edit", onClick: onUnlock } : null
-            : { icon: "save", label: "Save", off: !canSave || !changed, busy: !!busy, onClick: trySave }
+            : [
+                /* Beside Save, and quieter than it: what a Save would
+                   write, published in the same step. Off whenever Save is
+                   — changes already waiting are published from the status
+                   menu. */
+                { icon: "verify", label: "Save and publish", busyLabel: "Publishing…", second: true, off: !canSave || !changed || (!!busy && !publishing), busy: !!busy && publishing, onClick: () => trySave(true) },
+                { icon: "save", label: "Save", off: !canSave || !changed || (!!busy && publishing), busy: !!busy && !publishing, onClick: () => trySave(false) },
+              ]
         }
       >
+          {error && <Notice kind="error">{error}</Notice>}
           {about}
           {/* Said before the typing rather than after it.
               A save that cannot be made is now kept on the device and sent
@@ -10938,6 +10950,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
                 setChosen((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
               }
               onExport={locked ? onExport : undefined}
+              onToSpace={locked ? onToSpace : undefined}
               onDelete={!locked && stored && onDelete ? onDelete : undefined}
             />
           </TabPanel>
@@ -11053,7 +11066,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
           cards={carrying.cards}
           onCancel={() => setCarrying(null)}
           onAnswer={(carry) => {
-            const { written, cards, changes, next, exit } = carrying;
+            const { written, cards, changes, next, exit, publish } = carrying;
             setCarrying(null);
             onSave({
               ...written,
@@ -11061,6 +11074,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               capitals: asksCapitals ? capitals : undefined,
               next,
               exit,
+              publish,
               carry: carry ? { ids: cards.map((c) => c.id), changes } : null,
             });
           }}

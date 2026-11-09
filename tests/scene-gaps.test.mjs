@@ -12,8 +12,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import path from "node:path";
-import { build } from "esbuild";
-import { must } from "./helpers.mjs";
+import { must, buildOnce } from "./helpers.mjs";
 
 import {
   GAP_BLANK,
@@ -164,25 +163,8 @@ test("a text asks them of each sentence, and a conversation of itself", () => {
 
 /* ---- the question, as the trainer casts it ---- */
 
-const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".scene-gaps-build");
-await build({
-  entryPoints: [path.join(here, "..", "src", "ArabicTrainer.tsx")],
-  outfile: path.join(out, "trainer.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
-const { installIndexes, resolveQuestion } = await import(path.join(out, "trainer.js"));
+const built = await buildOnce(["ArabicTrainer.tsx"]);
+const { installIndexes, resolveQuestion } = await import(path.join(built, "ArabicTrainer.js"));
 
 const settings = { language: "vi", strict: false, types: {}, kinds: {} };
 

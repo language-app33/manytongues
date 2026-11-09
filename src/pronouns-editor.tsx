@@ -20,6 +20,11 @@
  * card alone: taking a card away is the card list's job, where what else
  * it is in can be seen.
  *
+ * The pronouns are a word set (0.569): a deck takes them as a whole, from
+ * here or from the deck's Add existing cards. So a pronoun written after the
+ * set is in a deck goes into that deck too, and students get each one as
+ * soon as it is written rather than only those that were there first.
+ *
  * Each row also says what the pronoun reads as in English with *to be* —
  * "I am" — and as a question — "am I", which is what the `{{pronoun-is}}`
  * and `{{is-pronoun}}` blanks put in a sentence's English. They arrive
@@ -34,7 +39,7 @@ import { verbOf } from "./languages.ts";
 import { personsOf, picksOf } from "./verbs.ts";
 import { formsOf } from "./cards.ts";
 import { beReadings } from "./variables.ts";
-import { Button, Field, Help, Notice, Screen, plural } from "./shared.tsx";
+import { Button, DeckSwitch, Field, Help, Notice, Screen, plural } from "./shared.tsx";
 import { RecordingScreen, ScriptInput } from "./card-editor.tsx";
 import * as API from "./courses-api.ts";
 
@@ -97,11 +102,15 @@ export const pronounCardFor = (cards: Card[], langId: string, person: string): C
 export const hasPronouns = (lang: Lang | null | undefined): boolean =>
   personsOf(verbOf(lang)).length > 1;
 
-export function PronounsEditor({ lang, cards, busy, onSave, onClose }: {
+export function PronounsEditor({ lang, cards, busy, onSave, onClose, decks, onDeck }: {
   lang: Lang;
   /** The teacher's cards, which is where the pronouns already written are. */
   cards: Card[];
   busy?: boolean;
+  /** The decks in this language, which the set can be put in from here. */
+  decks?: { id: string; title: string; locked?: boolean; cardCount?: number }[];
+  /** Put the whole set into a deck, or take it out; saved straight away. */
+  onDeck?: (deckId: string, on: boolean) => void;
   /** Save one card; resolves when the server has it (or it is kept for later). */
   onSave: (card: Partial<Card>, decks: string[]) => Promise<unknown>;
   onClose: () => void;
@@ -117,6 +126,11 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose }: {
   const [recording, setRecording] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  /* The decks the set is in: any that holds a pronoun of it. */
+  const setDecks = useMemo(
+    () => [...new Set(Object.values(held).flatMap((c) => (c && Array.isArray((c as any).decks) ? (c as any).decks as string[] : [])))],
+    [held],
+  );
 
   const set = (id: string, patch: Partial<Row>) =>
     setRows((r) => ({ ...r, [id]: { ...(r[id] || EMPTY), ...patch } }));
@@ -177,7 +191,7 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose }: {
               ...picks,
             }],
           } as Partial<Card>,
-          card && Array.isArray((card as any).decks) ? (card as any).decks : [],
+          card && Array.isArray((card as any).decks) ? (card as any).decks : setDecks,
         );
       }
     } catch (e) {
@@ -223,6 +237,20 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose }: {
         are filled in for you; change them only if you want other words.
       </Help>
       <Notice kind="error">{error}</Notice>
+      {decks && onDeck ? (
+        <Field label="Decks" lede="The decks this set is in. A pronoun written later goes into them too.">
+          {Object.values(held).some(Boolean) ? (
+            <DeckSwitch
+              decks={decks}
+              chosen={setDecks}
+              of="word set"
+              onToggle={(id, wasOn) => onDeck(id, !wasOn)}
+            />
+          ) : (
+            <Help>Write and save a pronoun first, then the set can go in a deck.</Help>
+          )}
+        </Field>
+      ) : null}
       <div className="at-formblock at-pronouns">
         {persons.map((p) => {
           const row = rows[p.id] || EMPTY;

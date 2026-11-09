@@ -11,8 +11,7 @@ import assert from "node:assert/strict";
 import { readFileSync, readdirSync } from "node:fs";
 import { formsOf, subFormsOf } from "../src/cards.ts";
 import { anotherMeaningOf } from "../src/meanings.ts";
-import { must } from "./helpers.mjs";
-import { build } from "esbuild";
+import { must, buildOnce } from "./helpers.mjs";
 import path from "node:path";
 
 /* spaces.tsx is JSX and imports React, so it is bundled the way the smoke
@@ -22,77 +21,36 @@ import path from "node:path";
    external, and node resolves that from node_modules relative to the file
    doing the importing. */
 const here = path.dirname(new URL(import.meta.url).pathname);
-const out = path.join(here, ".cards-build");
-await build({
-  entryPoints: [path.join(here, "..", "src", "spaces.tsx")],
-  outfile: path.join(out, "spaces.js"),
-  bundle: true,
-  format: "esm",
-  external: ["react", "react-dom", "react-dom/client"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-});
+const built1 = await buildOnce(["spaces.tsx"]);
 const { cardHasAudio, cardFormCount, cardAdded, cardChanged, sortCards, filterCards, blanksInUse, CARD_SORTS } =
-  await import(path.join(out, "spaces.js"));
+  await import(path.join(built1, "spaces.js"));
 
 /* The editor's own rules live in card-editor.tsx now, bundled the same way:
    what a card opens as, which table it lays out, what a save carries. */
-await build({
-  entryPoints: [path.join(here, "..", "src", "card-editor.tsx")],
-  outfile: path.join(out, "card-editor.js"),
-  bundle: true,
-  format: "esm",
-  external: ["react", "react-dom", "react-dom/client"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-});
+const built2 = await buildOnce(["card-editor.tsx"]);
 const { shapeOf, shapeChoices, shapeLabel, categoryChoices, categoryOffers, tableFor,
   initialForms, initialCells, initialCategory, initialFrames, storedFormsOf, asideOf, tableCellsOf,
   canSaveWord, canSaveVerb, canSaveScene, writtenCard, writtenLines, ownerLabel, askParts, partAsked,
   partLends, setPartFlags, keptNotAsked,
   nounLayoutOf, nounBoxes, placeNounForms, stampNounForms, leadFirst, formSays, blankLabel } =
-  await import(path.join(out, "card-editor.js"));
+  await import(path.join(built2, "card-editor.js"));
 
 /* The two halves of card identity live in shared.tsx, so it is bundled the
    same way. They are one subject with the sorting above: what a card is
    called, on the device and on the server. */
-await build({
-  entryPoints: [path.join(here, "..", "src", "shared.tsx")],
-  outfile: path.join(out, "shared.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-});
-const { localIdFor, cardToItem, serverCardId, foldCourses, deckSize } = await import(path.join(out, "shared.js"));
+const built3 = await buildOnce(["shared.tsx"]);
+const { localIdFor, cardToItem, serverCardId, foldCourses, deckSize, notReaching } = await import(path.join(built3, "shared.js"));
 
 /* And which recording a question leads with, which is a plain function of a
    card's progress and belongs with the rest of them. The trainer is bundled
    the same way; nothing in it touches a browser on the way in. */
-await build({
-  entryPoints: [path.join(here, "..", "src", "ArabicTrainer.tsx")],
-  outfile: path.join(out, "trainer.js"),
-  bundle: true,
-  format: "esm",
-  jsx: "automatic",
-  external: ["react", "react-dom", "react-dom/client", "react/jsx-runtime"],
-  loader: { ".jsx": "jsx" },
-  logLevel: "silent",
-  define: {
-    "process.env.NODE_ENV": '"development"',
-    __APP_RELEASE__: '"0"',
-    __APP_VERSION__: '"test"',
-    __BUILT_AT__: '"0"',
-  },
-});
+const built4 = await buildOnce(["ArabicTrainer.tsx"]);
 const { leadSpeed, deckPercent, levelPercent, nextReviewAt, reviewLine, nextPassAt, passLine,
   formIsAmbiguous, formTagsAt, kinTags, twinsOf,
   onePerLevel, quietUnits, easedUnits,
   drillableUnits, askedUnits, agreeTook, laddered, liftStates, merge,
   setValueIndex, valueKey, setMateCounts } =
-  await import(path.join(out, "trainer.js"));
+  await import(path.join(built4, "ArabicTrainer.js"));
 const { TYPES, LANGUAGES, verbOf, attachedOf, specOf, levelOf, askLabel } = await import(path.join(here, "..", "src", "languages.ts"));
 const { leadsOf } = await import(path.join(here, "..", "src", "review.ts"));
 const { fillText } = await import(path.join(here, "..", "src", "variables.ts"));
@@ -2831,6 +2789,20 @@ test("a noun is laid out in boxes, with two sides for a person or an animal", ()
   assert.deepEqual(nounBoxes(LANGUAGES["he-IL"], "single").map((/** @type {any} */ b) => b.title), ["Singular", "Dual", "Plural"]);
 });
 
+test("a dual box says its English is written with “two”, and is still asked", () => {
+  /* Bare, "hours" would read the same as the plural box's English. */
+  const duals = [
+    ...nounBoxes(arPS(), "single"),
+    ...nounBoxes(arPS(), "paired"),
+    ...nounBoxes(LANGUAGES["he-IL"], "single"),
+  ].filter((/** @type {any} */ b) => b.number === "dual");
+  assert.equal(duals.length, 4);
+  for (const b of duals) {
+    assert.match(String(b.help), /“two”/, b.title);
+    assert.equal(b.unasked, undefined, b.title);
+  }
+});
+
 test("Arabic's plural after three to ten says which nouns want it, and is not asked on its own", () => {
   /* Days and months take a t after three to ten that they have nowhere
      else. The box says so under it, and a form written into it is said
@@ -2843,7 +2815,7 @@ test("Arabic's plural after three to ten says which nouns want it, and is not as
   assert.match(String(counted.help), /eleven up the singular/);
   assert.equal(counted.unasked, true);
   for (const b of boxes.filter((/** @type {any} */ b) => b.number !== "counted")) {
-    assert.equal(b.help, undefined, b.title);
+    if (b.number !== "dual") assert.equal(b.help, undefined, b.title);
     assert.equal(b.unasked, undefined, b.title);
   }
   /* And a form already in it sits in it. */
@@ -2955,34 +2927,29 @@ test("a noun opened from storage reads its old grammar into the boxes, and saves
   assert.deepEqual(placed.extras, []);
 });
 
-/* A deck of numbers holds parts, not cards, and used to say "0 cards" for
-   it — the teacher had just added them and the deck said it was empty. */
-test("a deck's size counts its number parts beside its cards", () => {
+/* A number part is counted as a card like any other (0.563): a deck of
+   numbers used to say "0 cards" while it held them. */
+test("a deck's size counts its number parts as cards", () => {
   assert.equal(deckSize({ cardCount: 0 }), "0 cards");
   assert.equal(deckSize({ cardCount: 1, parts: [] }), "1 card");
-  assert.equal(deckSize({ cardCount: 0, parts: ["numbers:0-10", "time:hours"] }), "2 number parts");
-  assert.equal(deckSize({ cardCount: 5, parts: ["numbers:0-10"] }), "5 cards · 1 number part");
+  assert.equal(deckSize({ cardCount: 0, parts: ["numbers:0-10", "time:hours"] }), "2 cards");
+  assert.equal(deckSize({ cardCount: 5, parts: ["numbers:0-10"] }), "6 cards");
   /* An open deck counts the cards it has in hand rather than the record's. */
-  assert.equal(deckSize({ cardCount: 9, parts: ["numbers:0-10"] }, 3), "3 cards · 1 number part");
+  assert.equal(deckSize({ cardCount: 9, parts: ["numbers:0-10"] }, 3), "4 cards");
 });
 
-/* And it says when a part sends students nothing: a deck of numbers nobody
-   had written said "5 number parts" while its students had nothing. */
-test("a deck's size says when its number parts are not ready", () => {
+/* And which of them don't reach students yet, and why: drafts, cards
+   waiting for review, number parts whose words nobody has written. */
+test("a deck says which of its cards don't reach students yet", () => {
   const five = ["numbers:0-9", "numbers:10-19", "numbers:20-99", "numbers:100-999", "numbers:1000+"];
-  assert.equal(deckSize({ cardCount: 0, parts: five, partsWaiting: five }), "5 number parts · none ready yet");
+  assert.equal(notReaching({ parts: five, partsWaiting: [] }, [{}, { status: "published" }]), null);
   assert.equal(
-    deckSize({ cardCount: 0, parts: five, partsWaiting: ["numbers:20-99", "numbers:100-999", "numbers:1000+"] }),
-    "5 number parts · 3 not ready yet",
+    notReaching({ parts: five, partsWaiting: ["numbers:20-99", "numbers:100-999"] }, [{ status: "draft" }, { status: "review" }, {}]).long,
+    "4 don't reach students yet: 1 draft, 1 waiting for review, 2 need their number words written",
   );
-  assert.equal(deckSize({ cardCount: 0, parts: five, partsWaiting: [] }), "5 number parts");
-  assert.equal(
-    deckSize({ cardCount: 4, parts: ["numbers:0-9"], partsWaiting: ["numbers:0-9"] }),
-    "4 cards · 1 number part · none ready yet",
-  );
-  /* A part no longer on the deck is not counted against it — the deck
-     can change before the next look says which parts wait. */
-  assert.equal(deckSize({ cardCount: 0, parts: ["numbers:0-9"], partsWaiting: ["numbers:10-19"] }), "1 number part");
+  assert.equal(notReaching({ parts: [], partsWaiting: [] }, [{ status: "draft" }]).short, "1 not reaching students");
+  /* A part no longer on the deck is not counted against it. */
+  assert.equal(notReaching({ parts: ["numbers:0-9"], partsWaiting: ["numbers:10-19"] }, []), null);
 });
 
 test("filtering by kind of card, and by the subtypes of each kind", () => {

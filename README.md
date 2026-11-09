@@ -277,6 +277,16 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   limit on cards in learning, and leaves out Cleared and Learnt cards that
   are not yet due.
 
+  **Catch up** is the one mode that steps outside the mix. Its pool is the
+  chosen cards with a question due now — reviews come round and cards in
+  learning waiting for their next question — and it asks only those due
+  questions, longest waiting first. No new card comes in (a question never
+  yet asked is not something to catch up on), and nothing not yet due is
+  brought forward to fill a short session: twenty questions with eight due
+  is eight. Besides a count or minutes it offers "Everything due", which
+  asks the lot. With nothing due it says the learner is caught up rather
+  than starting.
+
   They were six sliders under an Advanced disclosure, under a sentence
   saying the defaults were sensible — and two of the defaults were why the
   same handful of words kept coming round. Three exercises a form made an
@@ -1133,12 +1143,22 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   the language's context, a lookup rather than a comparison per word, which
   is what lets every deck in the list be scored at once. Tests:
   `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
+- **Word sets: lists every language has, written once (0.569).** Numbers
+  and pronouns so far, months and days of the week to come. The app knows
+  the list; the teacher writes the words once for the language, and a deck
+  takes the set as a whole (numbers a range at a time). All of them are
+  reached from one **Word sets** row on Teaching → Cards, whose screen
+  lists each set under its language with how much is written and how many
+  decks hold it. A set can go into a deck before it is finished: students
+  get what is written, and a pronoun written later joins the decks that
+  already hold the set. The word was "built-in" before 0.569, which wrongly
+  said the app supplied the words. Why: DECISIONS.md, "Word sets".
 - **A number is built, not memorised, and so is a time.** A learner who
   knows *forty* and *seven* knows *forty-seven*, so numbers are not cards
   one at a time. A language's numbers are **one document** — the words it
   builds them out of, each with the faces it wears — written on one screen
-  and never a card: the teacher reaches it from **Teaching → Cards**, the
-  `#` in the list's toolbar. Its first screen only lists — the parts of
+  and never a card: the teacher reaches it from **Teaching → Cards**,
+  through the **Word sets** row above the list. Its first screen only lists — the parts of
   the numbers (0 to 9, 10 to 19, 20 to 99, 100 to 999, 1,000 to
   999,999,999, and the billions up to eleven digits),
   the clock, and the numbers written out by hand — and each opens on a
@@ -1268,6 +1288,13 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   whose box is empty comes in as any card. And one never answered beside a
   word already cleared is given its reading as done and starts on writing
   — `creditNumbers` again.
+
+  **A deck's numbers come from one person** (since 0.541): its own
+  choice, `numbersFrom`, set on the deck's screen under "Numbers from",
+  or its owner. The server stamps each deck it sends a learner with that
+  person's system and clock ids, and the device files a system only into
+  the decks that name it (`decksForSystem` in `src/number-decks.ts`), so
+  two teachers with numbers no longer give a course every number twice.
 
   **A deck holds the parts it teaches.** A system is one document per
   language and not cards, so a deck cannot list it among its cards: it
@@ -1438,6 +1465,11 @@ One Node process serves both the built app and the API, so it needs a host
 that runs a process rather than static files alone. `npm start` runs it, and
 it listens on `PORT`.
 
+Before it listens, the server rewrites any stored document still naming a
+language by an id the app has since renamed (`server/rename-langs.js`). If
+that fails, it is logged — "language rename migration failed; serving
+anyway" — and the site starts regardless; it runs again at the next start.
+
 Nothing is needed at run time: the server imports only Node built-ins and the
 app's own files, and everything else — React included — is compiled into
 `dist/` by the build. The build itself does need the devDependencies, so
@@ -1466,7 +1498,6 @@ Environment variables:
 |---|---|
 | `PORT` | port to listen on. Defaults to 3000; most hosts set this for you. |
 | `DATA_DIR` | where documents are written. Overrides an attached volume. |
-| `SIGNUP_CODE` | if set, making an account requires this code. Leave unset to let anyone sign up. |
 | `ADMIN_KEY` | if set, an account can promote itself to administrator once by entering it. |
 
 ### Version numbers
@@ -1487,6 +1518,184 @@ what I merged actually running?" — see `scripts/version.mjs` for where it
 comes from. The app compares its own commit against `/api/version` and
 offers a Reload when a service worker is still serving an older copy, so a
 release number alone is never taken as proof of a deploy.
+
+## Spaces
+
+A **space** is a walled-off part of the app for one organisation, with its
+own people, courses, decks and cards; nothing in one can be seen or
+touched from another. In code it is an **org**, because "space" already
+names Learning, Teaching and Admin there. Everything that existed before
+spaces is in the first one, **Main**. The plan, the decisions behind it
+and the stages still to come are in `docs/PLAN-spaces.md`.
+
+How the wall is kept, in `server/api/courses.js` (since 0.542):
+
+- Every person, course, deck, card and report carries `org`. One written
+  before spaces has none and is Main's: `orgOf` is the only reader of it,
+  so no migration was written.
+- A request acts in the caller's own org, or, for an App admin, in the
+  one its `x-org` header names. That org is held for the request in
+  `orgScope`, and while it is set the record readers (`readCourse`,
+  `readDeck`, `readCard`, `readUser`) answer null for another org's record.
+  So something in another space reads exactly like something that doesn't
+  exist, whichever action asked. Lists read straight off an index are
+  filtered with `inScope` where they are read.
+- `tests/spaces.test.mjs` tries every action across two real spaces, and
+  fails if a new action is added without being placed in its table.
+
+Addresses and joining (since 0.543):
+
+- A space lives at `manytongues.co/<address>`. The app reads the address
+  once at start (`org-info` gives the space's name, logo and colour, or
+  where an old address moved to), shows that space's own sign-in page, and
+  once someone is signed in keeps the address on their own space. An App
+  admin stays wherever they opened, and works in that space.
+- Every request says which space it acts in (`x-org`), and one function
+  decides it: `actingSpace` in `src/courses-api.ts` (0.582). A member's
+  is known from the account at once; an App admin at another space's
+  address is not known until `org-info` answers, and a request then waits
+  for it rather than leaving without it. What the device keeps of Admin
+  and Teaching is filed under the same space.
+- An account is made with a code: a space's invitation
+  (`/<address>?join=<code>`) or a course code, and the code decides the
+  space. The only account made without one is the very first on an empty
+  site, which is the owner's. `SIGNUP_CODE` is gone.
+- A key or code from another space is stopped and named, with the way
+  there. A closed space refuses its people until it reopens.
+- Spaces are made, renamed, given an address, logo and colour, closed,
+  reopened and deleted in Admin → Spaces. Deleting an account, or a whole
+  space, also erases each account's practice history (`forgetSyncDoc` in
+  `server/api/sync.js`).
+
+Running a space (since 0.544):
+
+- A space admin is an account named in its org's `admins`, never an App
+  admin. In their own space they get `iManage` on the server — courses,
+  people, every non-personal deck and card, reports — and the `admin-`
+  actions in `SPACE_ADMIN_MAY`; the rest stays the App admin's. Only the App
+  admin acts on a space admin's account.
+- Suspending (removed by a space admin, or left by the person) keeps the
+  account, takes it off its rosters and remembers them on `suspended`, and
+  writes a Former members record (`former:<org>`). Reactivating puts them
+  back.
+- Deleting an account (`wipeAccount`) keeps what it made for the space and
+  its numbers, deletes its personal material and practice history, keeps
+  its name under `gone:<handle>` (so the handle is never reused and the
+  material keeps its author), and writes a Former members record.
+  `admin-hand-over` gives a former member's material to someone still here.
+
+My space (since 0.545):
+
+- A deck or card made in someone's My space carries `personal: true`, set
+  once when it is made. `inScope` hides it from everyone but its owner, so
+  every reader and list keeps it private without code of its own.
+- A personal card goes only into personal decks; a personal deck never
+  onto a course (`copy-to-space` makes a separate copy for that). Course
+  cards can be borrowed into a personal deck (`borrow-cards`) and reach the
+  owner only while a course of theirs still carries them.
+- `my-material` adds the owner's practised personal decks as a course made
+  on the fly, `my-space`, never stored, so Learning deals them like any
+  course. Teaching shows one side at a time (`side` in `TeachSpace`); a
+  learner's "My space" is `TeachSpace` with `personalOnly`.
+
+A space's backup and restore (since 0.583; `docs/PLAN-space-backup.md`):
+`admin-export-org-manifest` is the backup manifest limited to one org,
+members' My space made there included, its chunks fetched like a backup's;
+`admin-org-usage` counts what an org holds and the bytes of its media. Both
+are the App admin's, from Super admin → Spaces (Back up this space, Restore
+this space from a file, and Restore a space from a file for one that is
+gone).
+
+- Every manifest carries `bytes`, the stored size of each chunk kind
+  (0.584), which the backup screen adds up per part before downloading.
+- Every manifest says what it is in `scope`: `{ kind: "site" }` or
+  `{ kind: "space", space, slug, name }`. A file without it is the site's.
+- Both kinds carry people's practice as `progress:<handle>` and the
+  recordings it names as `paudio:<handle>:<id>`, read from the sync store by
+  the account's `keyHash`. Keyed by handle so a new key does not strand it.
+- One engine restores both (`admin-restore-chunk`, `restoreOne`), deciding
+  each person once with `restoreVerdicts` — kept, not a member, deleted
+  (a `gone:` record exists), re-create, or another person (`created`
+  differs) — and `admin-restore-preview` asks the same function first.
+- A restore never overwrites and never removes: a record already here is
+  left alone, lists gain what they lack, practice is folded in with the
+  devices' own merge, and every record not written comes back with why.
+
+Since 0.580 a space's backup keeps everyone who is a member of it, not only
+those whose first space it is, and both kinds carry former members' card
+lists, cards, numbers and recordings, which stay live for students after the
+account goes.
+
+Memberships (since 0.573; `docs/PLAN-memberships.md`, all three stages in one release):
+
+- An account may be in several spaces. `orgs` on the user record lists
+  them; one written before has only `org` and is in that one space.
+  `memberOf` is the only reader of either. `org` is still written, as the
+  first space.
+- Suspension is per space (`suspendedIn`, read through `suspensionIn`,
+  which also reads an old `suspended`), and so are "last practised" and
+  "last changed material" (`lastLearnedIn`, `lastTaughtIn`). The
+  account-wide moments stay, for Super admin.
+- A request still acts in one org. For a member it is the one `x-org`
+  names, when they may act there (in it, not suspended, not closed), else
+  the first they may. Three actions read across every space the caller may
+  use, and only those (`WIDE`): `my-material`, `report-flag` and
+  `practiced`. Not `my-courses`, which is Teaching's list and of one space. `inScope` treats a user record as in scope when one of
+  its spaces is.
+- Joining is by code (`joinByCode`): a course code or an invitation, signed
+  in or at sign-in, adds the space. `addMembership` and `removeMembership`
+  are the two writes of a membership; reactivating, rejoining and the App
+  admin's `admin-add-member` all go through the first, removal from one
+  space of several through the second. `wipeAccount` walks every space.
+- A space admin may give a new key only to someone in their space alone
+  (`many-spaces`). A new key carries the person's practice with it: the
+  server moves their sync document and its recordings to the new key's
+  fingerprint (`moveSyncDoc`, 0.580).
+- In the app, the address is the space you are in when it is one of yours
+  (`atOwnAddress` in the trainer); a member's requests carry it as `x-org`.
+  Going to another of your spaces, from the You menu, reloads at its
+  address. Learning's space row narrows `inPlay`, the same test the
+  languages switch narrows, so every reader of `shown` follows it. A
+  card's space is its course's (`spaceOfItem`); a learner's own card is in
+  none and is shown under every choice.
+
+Trying a space (since 0.574):
+
+- Super admin is a level above spaces, not a mode beside Learning,
+  Teaching and Admin. `placeRows` in `src/places.ts` decides both controls
+  of the You menu: "Where you are" at its top (Super admin, the App
+  admin's own spaces, the opened space) and the toggle of a space's modes
+  at its foot, which is empty at Super admin. `whoami` names all of the
+  App admin's own spaces in `orgs`, so the app can tell them apart.
+- On the server, `trying` is `iAmAdmin && !memberOf(me).includes(acting)`:
+  the App admin in a space they are not in. Then `my-material` and
+  `my-courses` deal every course of that space as a learner's, with no
+  codes, and the join handler refuses with `trying-space`. No roster or
+  membership is written; `practiced` already counts only the caller's own
+  spaces, so practice there counts nowhere.
+- In the app, `tryingSpace()` (courses-api.ts) is read once at start.
+  While it is set, the practice document, the material cache and the
+  Teaching and Admin caches use keys ending in `:trying:<slug>`, sync is
+  off, and the teaches flag is not saved. `dropTrial` removes those keys
+  on every way out of the space, and every trial's keys on log out.
+- Since 0.578, who may do what to a person. A space admin, and the App
+  admin acting in a space, may suspend (`suspendedIn[org].why =
+  "suspended"`: still listed, no Former members record, a code does not
+  lift it) and remove (`why = "removed"`, `admin-remove-member`: under
+  Former members, back with an invitation or a code). Neither deletes an
+  account: `admin-delete-user` is the App admin's alone, and the app offers
+  it only in Super admin → People; `admin-purge-former` refuses while the
+  account exists (`account-exists`). The App admin's `admin-suspend-app`
+  sets `suspendedApp` on the account, with every course it was on, which
+  `admin-lift-app` puts back; while set, every request from that key is
+  refused (`suspended-app`). Someone with no space they may use still gets
+  a `whoami` answer, with `stranded` listing why for each space, and may
+  use only joins and `STRANDED_MAY` (rename, key-saved, delete-account).
+- Since 0.575 the App admin may be a member of a space like anyone else:
+  `admin-add-member` accepts their own handle, and `leave-space` removes
+  one of their memberships (`removeMembership`, no Former members record),
+  never their first. The app's start-up `whoami` reloads when
+  `tryingSpace()` no longer matches what the page started with.
 
 ## How it fits together
 
@@ -1554,7 +1763,10 @@ src/
                    locale and every name it cannot work out are passed in.
   imports.ts       a teacher's import read against what they already have:
                    which cards are new, already theirs, or the same word as
-                   one of theirs, and which decks they have. Pure.
+                   one of theirs, and which decks they have; and a pasted
+                   table of words read into rows (`parseLines`). Pure.
+  pictures.ts      fetching a stored picture, once a session for every
+                   screen, and the one list of recordings the server lacks
   ArabicTrainer.tsx  the learner's app: scheduler, session builder, screens
   spaces.tsx       the teaching and admin spaces, loaded lazily so a student
                    never downloads them
@@ -1562,7 +1774,10 @@ src/
                    from, apart from the spaces so each reads as itself
   shared.tsx       the component library both sides use
   sync.ts          merging two devices' documents, and clip sync
-  index.css        one stylesheet, with the design tokens at the top
+  index.css        the stylesheet every screen loads, design tokens at the top
+  teaching.css     the teaching screens' own rules, loaded with spaces.tsx;
+                   written by scripts/css-split.mjs, and checked by
+                   tests/css-usage.test.mjs
 server/
   index.js         the process: routes /api, serves dist/, nothing else
   store.js         documents on disk, with the conditional writes sync needs.
@@ -1666,7 +1881,9 @@ rationed: once at launch, a few seconds after a change outside a session,
 and during a session only when it stops, when the app is put away, and
 otherwise at most every few minutes — `syncAfterChange` in `src/sync.ts`.
 Recordings live in IndexedDB, keyed by a hash of their contents, and are
-fetched on demand.
+fetched on demand. Since 0.583 a backup holds each person's synced document
+too (the Progress part), and putting it back folds it into whatever is there
+by then with the same merge two devices use, never over it.
 
 Course cards carry a `source` pointing back at the deck they came from. The
 teacher owns their wording; the student owns their progress. When a teacher
@@ -1675,6 +1892,14 @@ sync does not hand it back — and the progress that was on it is set aside
 beside the document rather than destroyed, restored if the card returns and
 aged out on the same schedule as the tombstones. A card can go missing for
 reasons nobody decided, and the device cannot tell those from a withdrawal.
+Since 0.580 a sync ages both by the server's clock (the answer's Date
+header), so a device whose clock is far ahead cannot age them out early.
+
+Logging out sets the document aside on the device under the person's handle
+and empties the main copy, so the next person to sign in there starts
+clean; signing in again merges it back before the first sync (0.580, see
+DECISIONS.md). Recordings and pictures that no card on the device names any
+more are cleared from IndexedDB once a day, after a sync.
 
 A card that fills a variable (`fills: "name"`) belongs to no deck: the server
 sends it with every deck whose phrases leave a hole of that name. It is the

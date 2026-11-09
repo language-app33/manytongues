@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.541 — 9 November 2026
+## 0.594 — 9 November 2026
 
 **A copied picture can be pasted onto a card.**
 
@@ -21,6 +21,1245 @@ and moves once per batch of work you would notice, not once per commit.
 - If what was copied is text rather than a picture, the screen says so.
 - Checked in a browser: Ctrl+V and the button each added a picture, and
   copied text gave the message. Still to try by hand on a phone.
+
+## 0.593 — 9 November 2026
+
+**A noun's dual box says how to write its English.**
+
+- On the Advanced tab of an Arabic or Hebrew noun, the Dual box now says
+  to write the English with "two", like "two hours", so it doesn't read
+  the same as the plural. It shows on both sides of a person or an animal.
+- While the Dual box is empty it still says it is never asked, after that
+  line.
+
+## 0.592 — 9 November 2026
+
+**Change the status of several cards at once.**
+
+- Tick cards in the Cards tab, or in a deck's Manage cards, and the bulk
+  actions now have Change status: Draft, Ready for review or Publish, each
+  saying how many of the ticked cards it would change.
+- Publish sends drafts and cards waiting for review out to students, and
+  publishes the changes waiting on cards they already have. Published cards
+  with nothing waiting are left as they are.
+- Draft and Ready for review take published cards away from students. When
+  any of the ticked cards are published, the app says how many and asks
+  before unpublishing them; any changes waiting on them become the card.
+- Cards that belong to someone else are left and counted in the message.
+- To check by hand: a mix of draft, waiting, published and changed cards
+  through each choice, on both lists.
+
+## 0.591 — 9 November 2026
+
+**Save and publish, beside Save, when editing a card.**
+
+- Editing a card now has two floating buttons: Save, in the corner as
+  before, and Save and publish beside it. Save and publish saves the card
+  and sends it to students in one go — a new card, a draft, or changes to
+  a card that is already out. Afterwards the card is shown as read, with
+  "Published" at the top.
+- It is off whenever Save is off. Changes already waiting from an earlier
+  Save are still published from the status menu.
+- Offline, the card is kept on the device as Save does, and published
+  when the connection comes back.
+- It is offered on every card, "Ready for review" included: anyone who can
+  edit a card could already publish it from the status menu.
+- Save and publish is the quieter of the two, so the corner keeps the
+  button a thumb is used to. Checked at phone widths down to 320px: both
+  names fit.
+
+## 0.590 — 9 November 2026
+
+**Adding a deck to a course is quicker, and says it is working.**
+
+For teachers:
+
+- **A deck you tap in a course's deck list says "Adding…"** (or
+  "Removing…") with a small turning ring until it is saved, then switches
+  to "Added". It can't be tapped again while it is saving, so a second
+  tap no longer undoes the first. Taking a deck out with the × on its
+  name shows the same ring.
+- **And the wait is much shorter.** Each tap used to reload all your
+  courses, decks and cards before anything on screen changed; now only
+  the one change is saved and shown.
+- The "added to the course" message still appears where it did, and can
+  still cover "Another deck" on some screens; that is left for later.
+
+## 0.589 — 8 November 2026
+
+**A backup from before spaces goes back into your space, cards and all.**
+
+For admins:
+
+- **Restoring an old backup no longer leaves a course's decks empty.**
+  Backups taken before spaces arrived (2 November) don't say which space
+  their courses, decks and cards belong to, and Restore filed them all
+  under Main. A class that had since moved to a space of its own then
+  showed its decks, each saying how many cards it held, with no cards in
+  them, for the teacher and the students alike.
+- **Now that material goes into the space you restore from.** Restore
+  says so before you press it, names the space, and tells you to switch
+  to another space first if that is where it belongs. Anything that
+  already names a space keeps it.
+- **If this has already happened to you**, switch to the space the class
+  belongs to and restore the same file again from Super admin → App. The
+  cards an earlier restore left in Main move into the space and appear.
+  This is the one thing a restore now changes about something already on
+  the site: it gives material from before spaces a space, and nothing
+  else about it changes.
+
+Trade-off: restored from inside a space, material from before spaces that
+is still in Main moves into that space, so restore an old backup from the
+space it belongs to. Restored from Main, nothing changes from before. To
+check by hand: in a space other than Main, restore a backup from before
+2 November, then open a deck in Teaching and as a student.
+
+## 0.588 — 8 November 2026
+
+**Playing a recording picks it up, ready to pair.**
+
+- In "Match each recording to its word", and in the grids that match
+  number recordings to their figures, pressing a recording's play button
+  now also selects it, so the next tap on the right pairs it. Before,
+  playing only played, and the card had to be tapped as well.
+- Playing a recording that is already paired only plays it: the pair is
+  kept.
+- With a word on the right already selected, playing recordings only
+  plays them, so listening for the right one pairs nothing and the word
+  stays selected. Tap the card itself to pair it.
+- Tapping a card outside its play button still selects it, deselects it,
+  pairs it or frees it, as before. Stopping a recording does not
+  deselect it.
+- Selecting a recording by playing it does not make the soft tap from
+  0.585: the recording is already sounding.
+
+To check by hand: in a listening grid, play a recording, then tap a word
+on the right — they should pair. Play a paired recording — it should stay
+paired.
+
+## 0.587 — 8 November 2026
+
+**A new custom session mode, Catch up: only what is due.**
+
+For learners:
+
+- **Catch up practises only the cards waiting for you** among the decks
+  and cards you pick: reviews that have come round, and cards you are
+  still learning whose next question has. It never brings in a new card.
+- **Each card is asked only the questions that are due**, nothing early.
+- **The longest waiting come first** when more is due than fits.
+- **Pick a length as usual, or "Everything due"** to clear the whole pile
+  in one sitting. A length larger than what is due gives a shorter session
+  rather than padding it with things not yet due.
+- **With nothing due, it says you're all caught up** instead of starting.
+- Kept Catch up sessions show "everything due" in Saved sessions when they
+  have no length.
+
+Trade-off: a question that has just opened on a card you know (a new
+level) counts as new, so Catch up leaves it for a regular session. To check
+by hand: build a Catch up over a deck with some reviews due, try 10
+questions and "Everything due", and one over cards with nothing due.
+## 0.586 — 8 November 2026
+
+**Fixes from a learner's 18 reports.** What each question asks is now
+clearer, and some right answers that were marked wrong or nearly right
+now count as right.
+
+For students:
+
+- **"Who is it?" asks you to tick everyone the form could be.** ساكن
+  can be "I", "you" or "he", and بتحكي can be "you" or "she". Before, any
+  one of them counted. Now you tick all the right people and none of the
+  wrong ones. The question says so every time, so it doesn't give away how
+  many there are.
+- **"Who is it?" says what the verb means.** It shows the verb's own
+  meaning ("to keep"), not the form's ("I keep"), which would give away
+  the answer.
+- **"See the pattern" shows the English pronouns clearly.** I, you, she,
+  they and the rest were there in small grey type and went unnoticed. They
+  are now as easy to read as the rest of the row.
+- **"Which word is missing?" in a phrase shows what the phrase means from
+  the start.** It was hidden behind the hint button, so a word like اه
+  ("yes") could not be told from the other choices. The version where you
+  type the word still keeps the meaning behind the hint.
+- **After a gap in a phrase or sentence, "Learn more" shows how the whole
+  of it is pronounced**, not only the missing word. "Where it turned up"
+  shows the phrase's pronunciation too.
+- **A sentence built around a word with several accepted answers takes any
+  of them.** "How do we say how are you??" now takes كيفك as well as كيف
+  حالك.
+- **Writing another form of the card than the one the question names is
+  nearly right, not wrong.** Asked for "Not good" marked *feminine*,
+  writing the masculine says "Nearly — that is the masculine. This one
+  asks for the feminine."
+
+For teachers:
+
+- **Deck quality lists every sentence with words no card teaches**, with
+  those words, so you can add the cards or reword the sentence. Before,
+  it was only one of the suggestions and could be hidden by bigger ones.
+  The app never adds words to practise on its own.
+
+Checked and left alone:
+
+- The wrong choices in "choose the meaning" already come only from cards
+  in the learner's own courses, so a hard word among them is on one of
+  those cards.
+- Where a card has two forms with the same English and nothing saying
+  which is masculine or feminine (or singular or plural), the app can't
+  tell the learner which one it wants, so it still accepts either. The
+  card editor already warns about this. The teacher fixes it by marking
+  each form.
+
+Trade-offs:
+
+- "Who is it?" is harder: leaving out one right person is now a miss.
+- "Which word is missing?" (choosing) is easier, now that the meaning is
+  shown from the start.
+
+To check by hand:
+
+- A "Who is it?" question on a form shared by two persons (بتكتب: you (m)
+  and she): only ticking both is right.
+- A sentence card filled from a value card that accepts two answers: the
+  sentence written with the second answer is marked right.
+- A deck with a sentence using a word that has no card: the warning under
+  Deck quality names the sentence and the word.
+
+## 0.585 — 8 November 2026
+
+**Tapping a card in a matching exercise makes a short, soft sound.**
+
+For learners:
+
+- **Picking up a card, putting it against its pair, or freeing it again now
+  answers with a light tap**, so you know the tap registered without
+  looking back at the tile. It says nothing about whether the pair is
+  right — the grid is still only marked when you check it.
+- It follows your sound setting: louder on Loud, quieter on Soft, and
+  silent on Off. Playing a recording in the listening grid does not make it.
+
+To check by hand: on a phone, tap through a matching grid with sound on,
+then with sound off.
+
+## 0.584 — 8 November 2026
+
+For the App admin, in Super admin → Spaces → a space → Back up this space:
+
+- **The screen says which space it is backing up.** It is titled "Back up"
+  and the space's name, says the file holds that space and nothing from any
+  other, and each part is described as that space's ("The space itself",
+  "Its people", "Every card in the space…") rather than in words that read
+  as if every space were going into the file. The site's own backup is now
+  titled "Back up the site".
+- **Each part says how large it will make the file**, beside how many
+  things it holds, and under the list the whole file's size for what is
+  ticked — so you can see at a glance that the recordings are most of it.
+  The same sizes show on the site's backup.
+
+Trade-off: the screen reads what the space holds as it opens, which takes
+a few seconds on a large space before the sizes appear. Downloading within
+two minutes uses that same reading; after that the file is made fresh.
+
+To check by hand: open a space with recordings, Back up this space, and
+see its name in the title and a size on each part; untick Recordings and
+images and see the total drop.
+
+## 0.583 — 8 November 2026
+
+**A space can be backed up and put back, and putting anything back can no
+longer lose anything.** (`docs/PLAN-space-backup.md`)
+
+For the App admin, in Super admin:
+
+- **Back up this space** replaces Export this space, under each space in
+  Spaces. It offers the same choice of parts as the site's backup, and the
+  file now holds the space's members' My space material made there, and
+  every member's practice.
+- **Restore this space from a file** sits beside it, and **Restore a space
+  from a file** at the top of the list puts back a space that was deleted
+  whole — its people with their old keys, their My space and their practice.
+- **Backups now include people's practice**, both kinds, as a new part
+  called Progress, ticked by default. Putting it back folds it into whatever
+  the person has practised since, the way two of their devices do when they
+  meet, so nothing practised since is lost.
+- **A restore never overwrites and never removes.** It adds what the file
+  holds and the site lacks: a deleted card comes back, a deck gets back a
+  card it lost, but a card edited since keeps its edit, and nobody's
+  account, key, spaces or suspensions are touched.
+- **Before anything is written, Check what this will do** shows, by name,
+  who is left as they are, who will not be put back into the space (left or
+  removed since), who will be re-created with their old key, and who was
+  deleted since and stays deleted unless you tick them back. It names whose
+  names come off restored courses, which spaces will be re-created, and how
+  many cards, decks and courses it adds against how many are already there.
+  Restore waits until that has run for the choices on screen.
+- **When the space still exists**, it keeps its current name, address, look
+  and admins unless you choose the file's (never its address or codes). When
+  its old address has been taken by another space, it asks for a new one.
+- **Afterwards it reports** what it added, what it folded in, and everything
+  it left alone and why, by name where the reason is about a person.
+- **Each door takes its own files.** Super admin → App's Restore a backup
+  refuses a space's file and says whose it is; a space's restore refuses the
+  site's file. Files made before this release are taken as the site's.
+- **Clear data gains Progress too**: the one place on the site that removes
+  people's practice, still behind the deploy's admin key.
+
+Trade-offs: a backup is larger (Progress can be left out when size matters);
+a restore cannot repair a record that exists but is wrong — delete it, or
+the whole space, and restore; and taking a backup reads every member's
+practice, a few seconds on a teaching site. For learners, teachers and space
+admins nothing changes.
+
+To check by hand on the deployed site:
+
+1. Back up a space with a member whose first space is Main and who has
+   practised; Verify the file: complete, with Progress in it.
+2. In that space delete a card, take a card out of a deck and remove a
+   student; restore the file. The preview names the student under "not put
+   back"; afterwards the card and the deck's card are back, the student is
+   still out, and nothing else moved.
+3. Give that member a new key and restore again: the new key works, the old
+   one is refused.
+4. Delete a member's account, restore: they are listed as deleted since,
+   unticked. Tick them and restore: back in this space only, old key working.
+5. Practise on a device, restore an older file: both the newer and the older
+   practice are there.
+6. Delete the whole space and restore it: its people, keys, practice and My
+   space are back.
+7. Restore the same file again: nothing added.
+8. A space's file in Super admin → App is refused with the space's name, and
+   the site's file in Spaces likewise.
+9. Back up the site, Clear data (all parts), restore: everyone, everything
+   and all practice are back, and your own key still works.
+
+## 0.582 — 7 November 2026
+
+**A space shows its own things and nobody else's, from the first moment.**
+
+For teachers and admins:
+
+- **Opening a space from Super Admin, or landing at a space's address, can
+  no longer show another space's decks, cards or people.** Before, the first
+  moment after opening could fetch your own first space's contents instead,
+  and they could stay on screen until a reload.
+- **Nothing you do in that first moment can land in the wrong space.** The
+  app now waits the moment it takes to learn which space it is in, rather
+  than acting before it knows.
+- **The first visit to a space on a device starts blank** while it loads,
+  rather than showing another space's list.
+- **Teaching is offered per space.** Someone who teaches in one of their
+  spaces and only learns in another opens straight into the right one in
+  each.
+
+Trade-off: an App admin opening another space's address on a slow
+connection sees Admin or Teaching load a moment later than before, because
+it no longer guesses. To check by hand: open a space from Super Admin with
+`?open=admin`, and a member of two spaces at each of their addresses.
+
+## 0.581 — 6 November 2026
+
+For teachers:
+
+- **An empty card list no longer shows a table heading with nothing under
+  it.** In the table view, the Cards tab (and an open deck) used to keep the
+  row of column names standing when there were no cards at all, or when a
+  search or filter matched none. Now the table goes, leaving only the
+  "make your first card" panel or the "nothing matches" line.
+
+## 0.580 — 6 November 2026
+
+**Nothing a teacher saves or a learner practises goes missing quietly any
+more.** Every fix from the 6 November audit of 0.579
+(`docs/AUDIT-stability-0.579.md`).
+
+For students:
+
+- **A new sign-in key keeps your progress.** When an admin gives you a new
+  key, your practice and recordings move with it, so signing in on a new
+  phone picks up where you were.
+- **Logging out sets your practice aside on that device.** The next person
+  to sign in there starts with nothing of yours, and nothing of yours is
+  sent up under their name. When you sign in there again, it comes back.
+- **A phone with its clock set wrong can no longer bring deleted cards back**
+  or lose progress that was set aside.
+- **The "no space to open" page shows only the way back in**, with nothing
+  from Learning behind it.
+- Recordings and pictures no card of yours uses any more are cleared from
+  your device once a day, so it does not fill up over time.
+
+For teachers:
+
+- **Two people editing one card at once both keep their changes**, and so
+  does one person in two tabs. Changing a card's status at the same moment
+  as someone saves it no longer undoes the save.
+- **Adding a card to a deck, or taking it out, no longer undoes somebody
+  else's change** made from another screen.
+- **A card saved while offline is never silently dropped.** It waits
+  through server errors and deploys, and is discarded only if the server
+  refuses it — and then you are told which card and why, until you dismiss
+  it.
+- **If your device's storage is full, saving says so** and keeps the editor
+  open with what you typed, instead of saying it was saved.
+- **A card saved offline goes to the space you made it in**, even if you
+  have moved to another space by the time it is sent.
+- **Reviewing sentences from inside the card editor keeps what you typed.**
+- **A save that fails says why inside the editor**, and says it aloud.
+- Teaching and Admin no longer download the whole space again every 45
+  seconds when nothing has changed.
+
+For admins:
+
+- **A full backup now really holds everything**, including the cards,
+  recordings and numbers of teachers whose accounts were deleted. **A
+  space's export includes everyone in that space**, including members whose
+  first space is elsewhere.
+- **Super admin uses Admin's own People actions and report list**, so the
+  two say the same things. Super admin's Reports now has search, Copy and
+  Clear for ticked reports, grouped by space.
+- The "new sign-in key" dialogs say the same thing in both places: the
+  person's handle, courses and progress are untouched.
+
+Behind the scenes:
+
+- The learner card editor, switched off since 0.404, is gone.
+- The stylesheet learners download is about 30% smaller: unused rules are
+  gone, repeated ones merged, and teacher-only styles load with the
+  teaching screens.
+- Recordings and pictures are served so a browser may keep them.
+- A failing step at server start-up no longer keeps the site down.
+- The checks share one build of the app and the slowest simulation is
+  smaller, so they run in a fraction of the time.
+
+Trade-offs:
+
+- Two people changing **the same part** of a card at the same moment (its
+  words, say) still leave whichever saved last.
+- A shared device keeps one set-aside copy of practice for each person who
+  has logged out there, until they sign in there again.
+- Teacher-only styles now load after the rest. A screen where the two used
+  to compete may look slightly different — that is what the screen checks
+  below are for.
+
+To check by hand:
+
+- Issue a new key to a student who has practised, sign in with it on
+  another device, and see their progress there.
+- Export a space that has a member whose first space is Main; the export
+  lists them and their cards.
+- Edit one card in two tabs: change its note in one and its name in the
+  other, save both, and both changes are there.
+- Save a card offline, then reconnect while a deploy is happening; it
+  waits, and goes once the site is back.
+- Log out and in on one device as two people: the second sees none of the
+  first's practice, and the first gets theirs back.
+- Open a sentence card, Edit, type something, Review sentences, Save review:
+  what you typed is still there.
+- Every Teaching, Admin and Super admin screen, the card editor, the number
+  editor, the gallery and the review sheet, at phone and desktop width,
+  after the stylesheet split.
+
+## 0.579 — 6 November 2026
+
+**Learning's space button sits level with the app's name, and its list
+opens on top.**
+
+- The round space button in Learning's top right corner is now centred on
+  the line of the logo and "ManyTongues" on Home, and on the tab's title
+  on Progress and Cards. It sat a little too high.
+- The list it opens now shows over the logo and name. It used to open
+  underneath them.
+
+To check by hand: as a learner in two or more spaces, on a phone, the
+button lines up with the logo and name on Home and with the title on
+Progress and Cards, and its list covers the name when open.
+
+## 0.578 — 5 November 2026
+
+**Suspending, removing and deleting people: who can do what.**
+
+Space admins:
+
+- **A space admin can never delete anyone.** The Delete on a person in
+  Admin → People is gone, and so is the bulk Delete. This is true for the
+  super admin too: an account is now deleted only from Super admin →
+  People.
+- **Suspend** is in that space only, on each person and in bulk. A
+  suspended person comes off the space's courses and can't use it, but
+  stays on its People list marked "Suspended", with Reactivate beside them.
+  An invitation or course code doesn't lift it.
+- **Remove from this space** is new, on each person and in bulk. The
+  person comes off the space's courses and its People list and moves to
+  Former members. Their account and their other spaces stay. They can come
+  back with an invitation link or a course code, or be reactivated from
+  Former members.
+- **Former members no longer deletes accounts.** "Delete permanently" is
+  only offered for someone whose account is already gone, and clears
+  their entry and what of theirs is left in the space.
+
+The super admin:
+
+- **Super admin → People has two tabs: All and By space.** All lists
+  everyone once, with the spaces they are in. By space lists each space's
+  people under it, so someone in several spaces appears under each.
+- **Suspend everywhere:** the person can't sign in anywhere and comes off
+  every course in every space. Each space's People list shows them as
+  "Suspended by the super admin", and no space admin can undo it. Lifting
+  it puts them back on every course they were on.
+- **Remove from a space**, beside "Add to a space": under a space in By
+  space, or choosing one of their spaces in All.
+- **Delete** is here and only here. Its confirmation names every space the
+  person is in.
+
+Someone left with no space:
+
+- Someone suspended in, removed from, or who left their only space can
+  still sign in. They see a page that says so ("You're suspended in …",
+  "You were removed from …", "You left …"), with a box for an invitation
+  link or a course code, and their You menu for Settings and logging out.
+  Until now they were signed out.
+
+Also included:
+
+- Tests for the super admin in several spaces (0.575 to 0.577), which were
+  released without them.
+- People suspended before this release are treated as removed: they are
+  under Former members, not on the People list, and can come back with an
+  invitation or a code.
+
+To check by hand, on the deployed app:
+
+- As a space admin, in Admin → People: no Delete anywhere; Suspend keeps
+  the person listed as suspended; Remove moves them to Former members.
+- Sign in as someone suspended in their only space: the "No space to
+  open" page, and a course code from another space gets them in.
+- As the super admin: the All and By space tabs; Suspend everywhere on
+  someone, then sign in as them (refused), then Lift and check their
+  courses are back.
+
+## 0.577 — 5 November 2026
+
+**The super admin's Learning covers all their spaces, with the space
+button.**
+
+- A super admin in several spaces now sees, at home in Learning, the
+  courses they are on in every one of their spaces, and the space button
+  in the top right corner to narrow it to one. Until now they saw only the
+  space they were in, and no button.
+- Inside a space opened from Super admin, nothing changes: that space's
+  courses as a try-out, and no button.
+- Released without running the tests, at the owner's request. The type
+  check and the build were run.
+
+To check by hand: as the super admin in two spaces, on a course in each,
+Learning shows both courses and the corner button; choosing one space
+narrows it.
+
+## 0.576 — 5 November 2026
+
+**Spaces are listed one per line, and Learning's space choice moves to a
+button in the top right corner.**
+
+- **The You menu's "Where you are" (super admin) and "Your spaces"** are
+  now a list under one heading, one place per line: the space's logo or
+  initials in a small square, its name, and a tick on the one you are in.
+  A long name is cut short with "…", so the menu no longer runs off the
+  right edge with more than a few spaces. Super admin is first, with its
+  key; a space opened from Super admin is marked "Opened".
+- **A space is no longer drawn like a person.** Someone in one space sees
+  its name as one quiet line with its square badge, above their own name.
+- **Learning's "All · space · space" row is gone.** For someone in more
+  than one space, a round button in the top right corner opens the list:
+  "All your spaces", then each space. With one space chosen, the button
+  fills green and shows that space's initials, so a narrowed Learning
+  never looks like the whole of it. Someone in one space sees no button.
+- **The app's logo and name on Learning's Home are at the left**, leaving
+  the top right corner to the space button.
+- Released without running the tests, at the owner's request. The type
+  check, lint and build were run, and the menu and the button were looked
+  at in a browser at phone width.
+
+To check by hand, on the deployed app:
+
+- As the super admin with several spaces, open the You menu: one line per
+  place, nothing past the right edge, the tick on where you are.
+- As a learner in two or more spaces, the button in the top right of
+  Learning opens the list; choosing a space narrows Home, Progress and
+  Cards, and the button shows its initials; "All your spaces" undoes it.
+- A learner in one space sees no button, and their space's name as one
+  line at the top of the You menu.
+
+## 0.575 — 5 November 2026
+
+**The super admin can add themselves to an existing space.**
+
+- **Super admin → People** now has **Add to a space** on your own row too.
+  The space becomes one of yours, like anyone else's membership: it is
+  listed among your spaces in "Where you are", you appear in its People
+  list and head count, and its admin can make you a space admin.
+- In a space you are in, Learning shows the courses you are on, not every
+  course as when trying it. Put yourself on a course from its Admin, or
+  with a course code. Practice there syncs and counts like your own.
+- If you were trying that space on this device, the app starts again and
+  the trial's practice is dropped.
+- **Settings has a Leave line** for each space you added yourself to.
+  Leaving takes its courses out of your Learning and deletes anything of
+  yours in its My space; you can still open it from Super admin → Spaces.
+  Your first space can't be left.
+- Released without running the tests, at the owner's request. The type
+  check and the build were run.
+
+To check by hand, on the deployed app, as the super admin:
+
+- Super admin → People: on your own row, Add to a space, pick a space.
+  The app reloads; "Where you are" lists it among your spaces, with no
+  "You're in …" band there.
+- Put yourself on one of its courses; Learning there shows it.
+- Settings → Leave that space: you land back home, and the space is only
+  reachable from Super admin → Spaces again.
+- Another device signed in as you picks up the new space on its next
+  start.
+
+## 0.574 — 5 November 2026
+
+**Super admin is a level above spaces, and the super admin can try a space
+as a learner.** Only the super admin sees any of this; space admins,
+teachers and learners see everything as in 0.573.
+
+- **"Where you are"** at the top of the You menu lists Super admin, then
+  each of your own spaces, then the space you opened from Super admin →
+  Spaces while you are in it. Choosing Super admin or one of your spaces
+  from an opened space takes you there, reloading the app, as Back to
+  Spaces does.
+- **The toggle at the foot of the You menu keeps only the space's own
+  modes:** Learning, Teaching and Admin. Super admin is no longer one of
+  its buttons, and at Super admin the toggle is not shown.
+- **In an opened space you get Learning as well**, as a try-out: every
+  course there is dealt to you as if you were in it. You are put on no
+  roster and do not become a member. Teaching and Admin are that space's,
+  as before.
+- **Practice there stays on this device** and is dropped when you leave
+  the space, by Back to Spaces or "Where you are", and on logging out. It
+  is not synced and counts nowhere. App preferences start as a copy of
+  yours, and changes made there are dropped with the rest. Learning's Home
+  says so, and the You menu's sync line reads "Practice here stays on this
+  device".
+- **No joining while trying:** the Courses page has no join box there,
+  and the server refuses a course code with "You're trying this space,
+  not joining it."
+- **The band at the top of an opened space is one line:** "You're in
+  {space}." with Back to Spaces beside it. A long name is cut short.
+- Reports flagged while trying land in that space's reports under your
+  name. Recordings and pictures downloaded there stay on the device, as
+  any download does.
+
+To check by hand, on the deployed app, at phone width, as the super admin:
+
+- At home, "Where you are" lists Super admin and your space(s); the toggle
+  shows Learning, Teaching and Admin.
+- At Super admin, the toggle is gone, and the foot bar shows Spaces,
+  People, Reports, App.
+- Open a space from Super admin → Spaces: "Where you are" lists it as well,
+  chosen; Learning lists its courses and deals a session; Courses has no
+  join box; Teaching shows its material and none of your own My space.
+- Back to Spaces, and choosing Super admin or your space, leave your own
+  Learning as it was.
+- The band fits on one line with a long space name.
+- A learner in two spaces sees "Your spaces" as in 0.573, and a teacher's
+  and a space admin's toggle are unchanged.
+- Known edge: typing an *old* address of one of your own spaces gives a
+  try-out of it until you go to its current address.
+
+## 0.573 — 5 November 2026
+
+**One account can be in several spaces, and Learning shows them all.**
+
+Joining and moving around:
+
+- **Joining another space** is the same as joining the first: open its
+  invitation link, or type one of its course codes in Learning → Courses.
+  Signed in, another space's invitation now asks "Join {space}?" instead of
+  telling you to make a new account. The account is then in both, with one
+  key.
+- **The You menu lists your spaces** when you are in more than one. Tapping
+  one takes you to its address. Teaching and Admin are of the space you are
+  in, as before.
+- Signing in at a space you're not in no longer stops you: you land in
+  your own. At manytongues.co, you land in the space you were last in on
+  that device.
+- **Leaving is per space.** Settings has a Leave line for each space you
+  are in. Leaving one, or being removed from it, takes its courses out of
+  your Learning and lists you among its former members; your account and
+  your other spaces stay. Someone who left can come back with an
+  invitation link or a course code. Someone removed can't; their space's
+  admin, or the super admin, puts them back.
+- A closed space hides its courses from people who are also in another
+  space, instead of locking them out.
+- Deleting an account removes it from every space it is in, with a former
+  members record in each.
+
+Learning across spaces:
+
+- **Home, Progress, Cards and Courses show every space's material**, and
+  one daily session draws from all of it.
+- **For someone in more than one space**, a row at the top of Learning
+  reads All · and then each space. Choosing a space narrows every tab, and
+  a session started then draws from that space alone. The choice is
+  remembered on the device. With one space, nothing changes.
+- Under All, Courses puts each space's courses under its own heading, and
+  Progress names the space on each deck, so two decks called "Lesson 1"
+  in two spaces are two tiles.
+
+For admins:
+
+- **Lost keys:** one key opens every space its person is in, so a space
+  admin can give a new key only to someone in their space alone. For
+  anyone in more than one, only the super admin can, and the space admin
+  is told so.
+- **Admin → People** shows "Last practised" and "Last changed material" for
+  that space only. Super admin still sees the account's own dates. Until
+  someone practises after this release, the date shown is the one shown
+  before.
+- **Super admin → People** lists someone under every space they are in, and
+  has **Add to a space** on each person: their own key opens it too, and
+  no new key is made. Someone a space admin removed is put back with their
+  courses.
+
+People who already have two accounts keep both. Nothing is merged.
+
+To check by hand, on the deployed app:
+
+- With a learner in one space, type a course code from another space in
+  Learning → Courses. The course appears under that space's heading, the
+  row at the top of Learning appears, and the You menu lists both spaces.
+- Choose each space in the row: Home's number changes, and a session
+  started then asks only that space's cards.
+- In each space's Admin → People, "Last practised" counts only that space.
+- As a space admin, try to give that learner a new key: it is refused with
+  a sentence saying to ask the super admin.
+- In Super admin → People, use Add to a space on someone, then sign in as
+  them and check the You menu lists the new space.
+## 0.572 — 5 November 2026
+
+**Courses: the first course sits closer to its heading.**
+
+- The space between "My courses" and the first course is now the same as
+  between a heading and what follows it in the card editor. Since 0.570 it
+  was about twice that, left behind by the search box that moved up.
+- Released without running the test suite, at the owner's request.
+
+## 0.571 — 5 November 2026
+
+**Courses: one clear button, bigger headings.**
+
+- Typing in the course search no longer shows two crosses at its right
+  end. Only the larger one, which closes the search, is left.
+- "My courses" and the heading over the box for joining a course are now
+  the size of the headings in the card editor.
+- Released without running the test suite, at the owner's request.
+
+## 0.570 — 5 November 2026
+
+**Courses are searched from a button beside "My courses".**
+
+- The search box above the course list is gone. In its place, a search
+  button sits at the end of the "My courses" line.
+- Pressing it opens a search field that grows out of the button to the
+  left, over the heading. Pressing it again (now a cross) closes the
+  field and clears the search; so does leaving the field empty.
+- The courses page is shared by Teaching and Learning, so both change.
+- Released without running the test suite or checking in a browser, at
+  the owner's request.
+
+## 0.569 — 5 November 2026
+
+**"Built-in" cards are now word sets, all found in one place.**
+
+- Numbers and pronouns are called **word sets**: lists every language
+  has, which you write once for the language and add to a deck as a
+  whole. "Built-in" wrongly suggested the app came with the words.
+  Months, days of the week and more will join them later.
+- Teaching → Cards has one **Word sets** row above the list, in place of
+  the two small Numbers and Pronouns icons. It opens a screen listing
+  each set, under its language when more than one is switched on, so
+  there is no "Which language?" step any more.
+- Each set says how much of it is written and how many decks hold it,
+  such as "6 of 9 pronouns written · in 2 decks". Numbers count in
+  ranges, the way a deck holds them.
+- The Pronouns screen has its own Decks line, so the set can be put in a
+  deck from there as well as from the deck. Numbers already could, a
+  range at a time.
+- A deck can take a set that is not finished. The deck then says what is
+  still to write, with a Write them button that opens the set. Students
+  get what is written so far.
+- A pronoun written after the set is in a deck now joins that deck too.
+  Before, it stayed out of every deck and reached no student.
+- In a deck and on Add existing cards, these entries are marked "Word
+  set", and each range and the pronouns say when words are still missing.
+- The trade-off: pronouns can go into a deck only once at least one is
+  written, because until then there is nothing to put in it.
+
+To check by hand: on a phone, open Teaching → Cards → Word sets, open
+Pronouns, write one and save, put the set in a deck, then open that deck
+and check the "still to write" note and its Write them button. With two
+languages switched on, check that each has its own heading.
+
+## 0.568 — 4 November 2026
+
+**Teaching names the space you are in, also for a super admin.**
+
+- The line at the top of Material → Decks and Cards ("…'s decks and
+  cards, shared with its teachers.") and the Copy/Move to the space
+  confirmations named the super admin's own space, even while they were
+  working in another one. They now name the space being worked in, as the
+  menu behind your initial already did. Nothing changes for anyone else.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: as super admin, open another space's Teaching →
+Material and read the line above the list; it names that space.
+
+## 0.567 — 4 November 2026
+
+**Teaching → Material → Decks prompts you to make your first deck.**
+
+- With no decks yet, the Decks tab shows the same kind of panel the Cards
+  tab shows with no cards: a short line on what a deck is and a New deck
+  button, in place of an empty list.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: in a space with no decks, open Teaching → Material →
+Decks and see the panel; press New deck and make one.
+
+## 0.566 — 4 November 2026
+
+**Admin → People heads its list "This space's people".**
+
+- The part of People where you add someone and see everyone in the space
+  now has a heading, "This space's people", like Invite people above it
+  and Former members below.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: open Admin → People and see the new heading above the
+list.
+
+## 0.565 — 4 November 2026
+
+**The title bar at the top of each tab spans the whole window.**
+
+- The bar holding a tab's title ("Teaching · Courses", "Progress" and so
+  on) and the line under it now run edge to edge on a wide window, as
+  they already did on a phone. The logo and title stay in line with the
+  page beneath.
+- Checked in a browser on a wide window and at phone size: the bar reaches
+  both edges, and nothing scrolls sideways.
+- Released without running the test suite, at the owner's request.
+
+To check by hand: on a computer, open a tab in Teaching or Admin, and
+Progress or Cards in Learning, and see the white bar reach both sides.
+
+## 0.564 — 4 November 2026
+
+**New wording across Settings, Progress, the welcome screen and Teaching,
+from the owner's review in the wording workshop.**
+
+- Settings: the display name, handle and sign-in key are explained more
+  plainly ("The name your teachers and classmates see.", "This is a
+  permanent username…", "The key you use to sign into the app."). The
+  warning about sharing the key is gone from that line.
+- Settings: "Reset scheduling" is now "Reset progress", in its label,
+  button and confirmation; "Close this account" is now "Delete your
+  account"; "On-screen keys" is now "On-screen keyboard"; the Sounds,
+  Log out, administrator and device-recordings explanations are
+  shorter; "Remove from this device" is now "Remove all from this
+  device".
+- Progress: the ladder and Prep mode explanations are shorter.
+- Welcome screen: "Your language journey starts here. After a quick
+  setup, you can learn anywhere, with or without internet."
+- Teaching: Export and Import explain themselves more simply; deck
+  quality now reads "Decks with higher scores tend to achieve better
+  learning outcomes."
+- Removed: the note under Saved sessions about deleted cards, and the
+  warning under a new course's language choice.
+
+To check by hand: open Settings, Progress, the welcome screen (signed
+out), and a deck's Export screen in Teaching, and read the new lines.
+
+## 0.563 — 4 November 2026
+
+**Deck quality tips say what to do, and a deck counts number parts as cards.**
+
+- Each quality tip now has a bold headline saying what to do ("Record 5
+  words or sentences", "Link 1 sentence to its words"), and a line under it
+  saying why or how.
+- Every tip about particular cards lists them, to tap and open: unlinked
+  sentences, sentences with untaught words, recordings, pronunciation,
+  pictures, sentences to check, repeated words and long sentences, as well
+  as words that need more sentences.
+- The word and the number in each of those pills are centred.
+- "See every word and its sentences" is gone.
+- **Number parts count as cards**: a deck with 2 cards and 1 number part says
+  "3 cards", everywhere a deck's size is shown.
+- On a deck's screen, under "This deck", the language and the number of
+  cards are each on a line of their own. When some cards don't reach
+  students, a third line says how many and why: "3 don't reach students
+  yet: 1 draft, 1 waiting for review, 1 needs its number words written".
+  Deck tiles in Material say "3 not reaching students". This replaces
+  "none ready yet".
+- Released without running the test suite, at the owner's request. The
+  tests for the new wording and the deck's size were updated to match.
+
+## 0.562 — 4 November 2026
+
+**A deck's quality tips are always shown.**
+
+- The tips that would raise a deck's quality show under the score without
+  a tap; the "What would raise it" button is gone.
+- The words tip lists every word that needs more sentences, not just the
+  first 12.
+- "Not in any phrase yet" is gone from the list of every word and its
+  sentences. The words tip names them, counted the same way as the score,
+  so the two no longer disagree.
+- Released without running the test suite, at the owner's request.
+
+## 0.561 — 4 November 2026
+
+**A deck's quality: one place to see what to fix, and on which words.**
+
+- **What would raise it** now shows each suggestion as a card of its own:
+  an icon for what to add, the points it is worth, and where it is about
+  particular words, those words. "Words need more sentences" lists the
+  words, worst first, each with how many more sentences it needs; tap one
+  to open its card. "No picture" lists the words without one the same way.
+- Under the score, a bar shows where the deck stands, and a fainter part of
+  it shows where the suggestions would take it ("These would take it to
+  about 87.").
+- **Show the pairings** is gone, with the line above it. Every word and the
+  sentences it is paired with is still there, under a quieter **See every
+  word and its sentences**, for checking a pairing.
+- Released without running the test suite, at the owner's request.
+
+## 0.560 — 4 November 2026
+
+**A space's address is typed straight after manytongues.co/, and Main is a space like any other.**
+
+- On a space's screen and on the New space form, "manytongues.co/" now sits
+  fixed at the start of the address box, with the address typed right after
+  it, instead of on a line of its own above. Read, the address is one line:
+  "manytongues.co/…". A space that has had other addresses says under the
+  field which ones it still answers to.
+- **Main's address can be changed**, and Main can be closed and deleted,
+  like any other space. Its old address forwards to the new one.
+- Trade-off: nobody can close or delete the space their own account is in,
+  since that would lock them out or delete them. For the super admin that
+  is Main, unless their account is elsewhere.
+- Released without running the test suite, at the owner's request.
+
+## 0.559 — 4 November 2026
+
+**A space's screen in Super admin reads first, then edits, like a deck's.**
+
+- Super admin → Spaces → a space now opens to read: its name, address,
+  logo and colour as plain text, with **Edit** floating in the bottom
+  corner. Edit turns them into fields, and **Save** floats where Edit was.
+  The cross at the top cancels, and asks first if something was changed.
+- The screen is titled "Space", or "Edit space" while editing, as a deck's
+  is "Deck" or "Edit deck".
+- The big gap above "About this space" is gone.
+- The logo is still saved as soon as it is chosen, and the invitation
+  link, space admins, storage and closing work in either mode, as before.
+- Released without running the test suite, at the owner's request.
+
+## 0.558 — 4 November 2026
+
+**Tiles: a larger title and details line, centred on their buttons.**
+
+- Everywhere tiles are used (Admin's and Super admin's lists, course
+  tiles in Teaching and Learning, the number system screens), the title is
+  a little larger and so is the line of details under it.
+- The title and details now sit centred on the buttons beside them,
+  rather than lined up with their top.
+- On a phone, the buttons stay on the right and a long title wraps beside
+  them. A tile with three or more buttons still puts them under the text
+  on a phone, so the title isn't squeezed.
+- Admin → People's tiles change the same way.
+- Released without running the test suite, at the owner's request.
+
+## 0.557 — 3 November 2026
+
+**Learning's tab titles match Teaching's.**
+
+- Progress and Cards no longer leave a gap above their title, so it no
+  longer slides up a little before staying put. It sits at the very top
+  from the start, as in Teaching.
+- Every tab title now sits on a white bar, in all four spaces.
+- Checked in a browser at phone size against Teaching.
+- Released without running the test suite, at the owner's request.
+
+## 0.556 — 3 November 2026
+
+**Learning's tab titles stay at the top too.**
+
+- In Learning, Progress and Cards now keep their title at the top while
+  the page scrolls, as the other spaces already did. In 0.555 they
+  scrolled away with the page.
+- Progress's title sits on the same white as the rest of that page.
+- Checked in a browser at phone size: every tab with a title, in all four
+  spaces, shows the logo and the line beneath, and keeps its title in
+  place while scrolling.
+- Released without running the test suite, at the owner's request.
+
+## 0.555 — 3 November 2026
+
+**Tab titles stay at the top, with the logo and a line under them.**
+
+- Each tab's title now stays in place at the top while the page scrolls
+  under it, in every space.
+- The ManyTongues logo sits just left of the title, and a thin line runs
+  across beneath it.
+- Released without running the test suite, at the owner's request.
+
+## 0.554 — 3 November 2026
+
+**Tab titles sit in the page, and the app name is gone from Teaching, Admin and Super admin.**
+
+- The titles added in 0.553 were pinned to the top of the window, over the
+  app name and the page. They now sit at the top of the page and scroll
+  away with it.
+- Teaching, Admin and Super admin no longer show the app name and logo
+  above the page. Home in Learning keeps its large one.
+- Released without running the test suite, at the owner's request.
+
+## 0.553 — 3 November 2026
+
+**Every tab says which one it is at the top.**
+
+- In Learning, Progress and Cards are headed with their name. Home and the
+  Courses page are unchanged.
+- In Teaching, Admin and Super admin, the heading names the space too:
+  "Teaching · Material", "Admin · People", "Super admin · Reports" and so
+  on, in the words of the bar at the foot of the window. Inside Material
+  and My space, the Decks and Cards tabs aren't part of the heading.
+- The headings are the size used inside Progress and scroll away with the
+  page. A screen opened over a tab — a course, a deck, a person — keeps
+  its own title instead.
+- Admin → People no longer has a second "People" heading under the new one.
+- Released without running the test suite, at the owner's request.
+
+## 0.552 — 3 November 2026
+
+**Share feedback, deleting former members for good, and opening any space.**
+
+- **Share feedback** in the You menu, for everyone signed in. It opens the
+  same screen as flagging a question, with two options: "Something isn't
+  working properly" and "I have an idea of something to improve". Words are
+  required. It goes to the super admin alone, with the sender's space and
+  the part of the app they were in.
+- **Super admin → Reports** has a toggle at the top: **Card reports** ·
+  **Feedback**. It opens on whichever you used last. Feedback is dismissed
+  the same way as card reports.
+- **Admin → People → Former members:** "Delete permanently" replaces
+  "Remove this record", for space admins as well as the super admin. For
+  someone who left or was removed, their account goes for good, along with
+  every deck and card they made in the space, including any in courses.
+  The warning suggests handing their material over first. For someone
+  already deleted, it clears their entry. Reports they sent stay.
+- **Super admin → Spaces:** each space's tile has an **Open** button. It
+  takes you into that space as its admin sees it, with a band at the top
+  naming the space and a **Back to Spaces** button.
+- **New space:** you can choose "I'll be this space's admin" instead of
+  making a new admin account. No key to hand over.
+- Tiles in Super admin's Spaces, People and Reports have space between
+  them, as everywhere else.
+- Headings in Super admin's People and App, an opened space, and Admin →
+  People now look and are spaced like Settings and Progress.
+- To check by hand: Open on a space and Back to Spaces; deleting a
+  suspended former member. Feedback isn't in backups yet.
+- Released without running the test suite, at the owner's request.
+
+## 0.551 — 3 November 2026
+
+**Material and My space say which one you're in.**
+
+- Under the Decks / Cards tabs, one line: in Material, "{your space}'s
+  decks and cards, shared with its teachers."; in My space, "Only you see
+  these. Copy or move them to the space when they're ready."
+
+## 0.550 — 3 November 2026
+
+**Teaching: Material and My space. Students no longer have a My space.**
+
+- In Teaching, **Decks** and **Cards** become two tabs: **Material**, the
+  space's own decks and cards and nothing that is only yours, and **My
+  space**, your own. Inside each, the same row of tabs as the card screen
+  chooses between Decks and Cards. The Space / My space switch is gone.
+- **Students** no longer have a My space: it's gone from the You menu, and
+  they can't make decks or cards. What students had made there is deleted
+  the first time this release runs.
+- **Nobody practises My space decks in Learning** any more; the My space
+  group there is gone. My space is a place to prepare material, then copy
+  or move it into the space.
+- A My space deck no longer holds cards borrowed from courses.
+- A teacher who stops teaching keeps their My space, hidden, for when they
+  teach again.
+- Released without running the test suite, at the owner's request.
+
+## 0.549 — 3 November 2026
+
+**Moving your own material into the space, and practising it from Learning.**
+
+- **Copy or move into the space.** In Teaching → Decks → My space, each
+  deck's tile has **Copy to the space** and **Move to the space**. Moving
+  leaves nothing in My space; copying keeps your version, separate from
+  then on. Either way you can tick the courses to put it in, or none for
+  now. A single card can be copied or moved too, from its own screen, into
+  any deck of the space you can change.
+- **Practise from Learning.** "Practise this myself" now lives in Learning,
+  in the My space group: a tick beside each of your decks. Decks switched
+  off stay listed there, so they can be switched back on.
+- **Cards from your courses** are chosen on a My space deck's screen as
+  before, and now work without tapping Edit.
+- **The Teaching toggle** says your space's name instead of "Space".
+- **The invitation link** sits in the same box as the join codes, across
+  the full width, with Copy and Replace underneath.
+- Released without running the test suite, at the owner's request.
+
+## 0.548 — 3 November 2026
+
+**The You menu's toggle is back in shape.**
+
+- In 0.547, Learning, Teaching and Admin were squeezed into slivers at the
+  left of the toggle, with Super admin stretched across. They are back on
+  one row, evenly spaced, with Super admin full width underneath.
+- Released without running the test suite, at the owner's request.
+
+## 0.547 — 3 November 2026
+
+**Super admin: the app admin's own tools, in every space.**
+
+- A new **Super admin** button in the You menu, on its own full-width row
+  under Learning, Teaching and Admin. Only app admins see it, whichever
+  space they are in.
+- Super admin holds what belongs to the whole app: **Spaces**, **People**
+  (everyone in every space, grouped by space, with one search across all
+  of them, and a new key, suspend, reactivate or delete for anyone),
+  **Reports** (learners' reports from every space, to read and dismiss),
+  and **App** (backups, restore, clearing).
+- **Admin** is now only about the space you're in, for space admins and
+  the app admin alike.
+- Released without running the test suite, at the owner's request.
+
+## 0.546 — 3 November 2026
+
+**A space's storage, and the whole space in one file.**
+
+- In Admin → Spaces, each space now shows how much it holds: people,
+  courses, decks, cards, recordings and pictures, and about how many
+  megabytes. A recording used by two spaces counts in both.
+- **Export this space** saves the whole space as one file: its people,
+  courses, decks, cards, recordings and pictures. Nobody's My space is in
+  it. It's for keeping; there's no restoring a single space yet.
+
+## 0.545 — 3 November 2026
+
+**My space: everyone's own decks and cards.**
+
+- Everyone has a **My space**: a private place for their own decks and
+  cards. Nobody else sees it, not a teacher, not the space's admin, not
+  you.
+- **Learners** find "My space" in the You menu, next to Learning. It is the
+  same screens teachers use, showing only their own decks and cards.
+- **Teachers** get a Space / My space switch at the top of Decks and Cards
+  in Teaching, to prepare material privately. A My space deck can be
+  copied to the space for a course; the copy and the original are
+  separate from then on.
+- Each My space deck has **Practise this myself**, ticked when it is made.
+  Practised decks appear in Learning as one more group, **My space**, and
+  are dealt in the same daily sessions as courses. The deck list says
+  "Not practised" on the ones left out.
+- A My space deck can also hold **cards from your courses**: the same
+  card, practised once. If the course stops carrying it, it drops out.
+- Only a space's teachers and admins now make decks for the space;
+  everyone else makes theirs in My space.
+
+## 0.544 — 2 November 2026
+
+**Space admins run their own space.**
+
+- A space admin sees Admin and Teaching for their space: they can make
+  courses, add people and make them teachers or students, issue a new key
+  to someone who lost theirs, read learners' reports, and see and edit all
+  of the space's decks and cards. Deleting courses and people, backups,
+  and everything about the space itself stay with you.
+- **Suspending.** A space admin can suspend someone: they can't sign in,
+  come off their courses, and appear under **Former members**, where they
+  can be reactivated and put back on their courses. Only you can suspend a
+  space admin, or give one a new key.
+- **Leaving.** Anyone but you can leave their space from Settings, which
+  suspends them in the same way.
+- **Deleting an account** — your own, or someone's by you — now keeps what
+  they made for the space, under their name, and leaves a record under
+  Former members. Their My space and practice history go. A space admin can
+  hand a former teacher's decks and cards to another teacher.
+- **Invitation link.** The space's link sits at the top of People, to copy,
+  or to replace when it has gone too far.
+- **Deleting someone else's deck or card** first says who made it, and that
+  it leaves every course for every student.
+- **Saving your key.** Right after signing up, and the first time someone
+  signs in to an account another person made, they tick "I've saved my key
+  somewhere safe" before carrying on. The sign-in page says who to ask about
+  a lost key: your space's admin, or contact@manytongues.co.
+
+## 0.543 — 2 November 2026
+
+**Spaces can be created, each with its own address.**
+
+- In Admin, a new **Spaces** tab (yours only) lists every space. Create one
+  with a name, an address such as `manytongues.co/lingua-academy`, and its
+  first space admin, whose sign-in key you're shown to hand over. Later you
+  can change its name, address, logo and colour, choose its admins, close
+  it, reopen it, or delete it for good after typing its name.
+- A space's address shows its own sign-in page, with its name, logo and
+  colour. A colour too faint to see is ignored, and the Spaces tab says so.
+- Making an account now needs a code: a space's invitation link, or a
+  course code from a teacher. The code decides which space the account is
+  in. The old single sign-up code is gone.
+- Signing in with a key, or using a code, from another space says whose it
+  is, with a button to go there or to make a new account here. Someone
+  signed in who follows another space's invitation is asked what they meant.
+- Once signed in, the address always shows your own space. The space's
+  name and logo are at the top of the You menu.
+- A closed space's people see "This space is closed" until it reopens.
+- Deleting an account now also erases its practice history from the server.
+- **To do by hand:** if the server has a `SIGNUP_CODE` setting, remove it.
+  It no longer does anything.
+
+## 0.542 — 2 November 2026
+
+**Spaces, underneath. Nothing changes on screen.**
+
+- Everything in the app now belongs to a space: the first one, called
+  Main, holds everything there is today. The server refuses anything that
+  crosses from one space to another, and checks of every kind of request
+  prove it.
+- Nobody will notice a difference yet. Creating spaces, and their
+  addresses, come next.
+- Two gaps found while checking, both only reachable by the app admin, are
+  closed: deleting a person from another space, and exporting another
+  space's cards.
+
+## 0.541 — 2 November 2026
+
+**A deck's numbers come from one teacher, chosen on the deck.**
+
+- A course with two teachers who both had numbers gave its students every
+  number twice, once in each teacher's words and voice. Now each number
+  comes once.
+- A deck that holds numbers has a new choice on its screen, **Numbers
+  from**: the deck owner's own numbers, or any other teacher's who has
+  numbers in that language. It starts on the owner's. Changing it takes
+  effect for students the next time their app checks in.
+- A teacher with no numbers of their own can make a numbers deck from a
+  colleague's numbers instead of writing their own.
 
 ## 0.540 — 31 October 2026
 
