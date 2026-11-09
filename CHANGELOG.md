@@ -8,6 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.592 — 9 November 2026
+
+**Change the status of several cards at once.**
+
+- Tick cards in the Cards tab, or in a deck's Manage cards, and the bulk
+  actions now have Change status: Draft, Ready for review or Publish, each
+  saying how many of the ticked cards it would change.
+- Publish sends drafts and cards waiting for review out to students, and
+  publishes the changes waiting on cards they already have. Published cards
+  with nothing waiting are left as they are.
+- Draft and Ready for review take published cards away from students. When
+  any of the ticked cards are published, the app says how many and asks
+  before unpublishing them; any changes waiting on them become the card.
+- Cards that belong to someone else are left and counted in the message.
+- To check by hand: a mix of draft, waiting, published and changed cards
+  through each choice, on both lists.
+
 ## 0.591 — 9 November 2026
 
 **Save and publish, beside Save, when editing a card.**
