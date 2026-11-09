@@ -7664,3 +7664,204 @@ The server's fallback is unchanged: the client no longer relies on it.
 lookup before anything loads, and a failed lookup fails what was waiting
 on it until the next attempt succeeds. The first visit to a space on a
 device starts blank rather than showing whatever was kept.
+
+## A restore adds and never overwrites
+
+**8 November 2026** · `server/api/courses.js` (`restoreOne`, `admin-restore-chunk`)
+
+A restore used to write every record in the file over the site's copy. For
+a person in several spaces that set their whole account back to the day of
+the file — spaces joined since gone, a replaced key working again, a
+suspension lifted — and a card edited since lost its edit without a word.
+
+Now a record already on the site is left exactly as it is, a record the
+site lacks is written, and lists that are naturally a union (a deck's cards,
+a course's decks, a person's cards, Former members, a teacher's systems,
+the indexes) gain what they lack. Practice is folded in with the merge two
+devices use. Two writes beyond that, each the owner's choice by name: the
+deletion record of an account ticked to bring back, and a space's name,
+logo, colour and admins when "keep" is unticked. Every record not written
+is reported with why; a prefix the engine does not know is reported, never
+skipped in silence.
+
+Two small departures from the plan, both on the safe side. A deck that
+gains cards has its count and version moved, as on any change to its cards,
+or learners' devices would never fetch them. And a re-created space whose
+address was taken does not list the taken address among its former ones:
+deleting that space later would take the address from the space that has it.
+
+**What it costs.** A restore cannot repair a record that exists but is
+wrong. The way back to the file's copy is to delete the record — a card, or
+the whole space — and restore. Both are deliberate.
+
+## Deleted on purpose means a deletion record exists
+
+**8 November 2026** · `server/api/courses.js` (`restoreVerdicts`)
+
+An account in the file that the site lacks was either deleted since, or
+lost. The `gone:` record that deleting an account writes tells the two
+apart: with one, the account stays deleted unless the owner ticks it in the
+preview; without one, it is re-created with its old key. Deleting a whole
+space drops its `gone:` records, which is why restoring a deleted space
+brings its people back.
+
+The same deletion frees a handle for reuse, so a handle in the file can name
+a different person on the site. `created` is set once when an account is
+made and carried into every backup, so a different `created` means a
+different person, and the preview stops the restore with their names.
+
+## Progress is keyed by handle in a backup
+
+**8 November 2026** · `server/api/sync.js`, the backup manifest
+
+A practice document lives under a hash of the person's key, and a new key
+moves it. A backup that carried it by key would put it back under a key
+that no longer opens anything. So the file names it by handle
+(`progress:<handle>`, `paudio:<handle>:<id>`), and a restore finds the
+person's current key from their account on the site.
+
+---
+
+## "Who is it?" is every right person ticked, and the instruction always says so
+
+**8 November 2026** · `src/verb-drills.ts` (`whoChoices`, `whoAllRight`), `src/languages.ts` (`vwho`, `vwhorec`)
+
+A form spelt the same for several persons — ساكن is *I*, *you (m)* and
+*he* — used to take any one of them as right. A learner reported that this
+taught the form as "I" and nothing else. The owner chose (0.586) that the
+learner ticks every person the form could be, and nobody it could not.
+
+**The instruction says "tick everyone it fits" on every asking**, including
+when only one person fits. Saying it only on the forms with several would
+tell the learner how many to tick, which is half the answer.
+
+**Every right person is always on offer**, however many there are, with at
+least one wrong one beside them, so ticking everything is never right.
+
+**The meaning shown is the verb's, not the form's.** "I keep" over بخلّي
+would be the answer, so the card's own meaning ("to keep") is shown, or,
+where it has none, the form's with its subject taken off the front.
+
+What it costs: a learner who knew one of the persons and not the others is
+now marked wrong, where before they were marked right.
+
+## A sentence's filler accepts what its card accepts
+
+**8 November 2026** · `src/answers.ts` (`fillerVariants`), `src/ArabicTrainer.tsx` (`filledVariantsOf`)
+
+A blank is filled with its value card's first accepted answer, because two
+answers joined by a slash are not a sentence. Written with the value's
+second answer (كيفك for كيف حالك), the sentence was marked nearly right. The
+sentence as filled is still the one shown everywhere. Only the marking also
+tries it with each other answer of each filler, put where the first one
+stands, and only where the first one appears in the sentence word for word.
+A filler the sentence changed on the way in is not guessed at.
+
+---
+
+## Catch up: what is due, outside the mix
+
+**8 November 2026** · `buildSession` (`mode: "catchup"`, `dueToCatchUp`) and the Build screen in `src/ArabicTrainer.tsx`
+
+The owner asked for a custom session mode that only reviews due cards, and
+answered four questions about it: everything waiting counts (reviews and
+cards in learning), only the questions due are asked, there is a length or
+"Everything due", and the longest waiting come first.
+
+So Catch up does not go through the session mix. The mix exists to balance
+learning against reviews and to decide when new cards come in; a session of
+nothing but what is due has no new cards and no balance to keep, and the
+owner's "longest waiting first" is a plain sort on the soonest due question.
+A question counts as due when it has been met (not `new`) and its date has
+passed — so a level just opened on a card, which the mix treats as waiting,
+is left for a regular session: it is new material, not backlog.
+
+Every form of a card with something due is taken, not the usual two, and a
+session is never topped up with questions not due, so it may be shorter
+than its length. It is not refused for want of variety either: one kind of
+question due is still what there is to catch up on.
+
+"Everything due" is kept as a count of 999 with no minutes, as Ultimate's
+no-length is, and read back as such for a Catch up.
+
+## Material from before spaces is placed by the restore that brings it back
+
+**8 November 2026** · `server/api/courses.js` (`restoreOne`)
+
+A backup taken before spaces (0.542) names no space on its courses, decks,
+cards and reports, and a record that names none reads as Main's. Restored
+for a class that had moved to a space, every card landed in Main: the
+space's course still listed the decks (my-material reads deck rows without
+scoping them) with their counts, while every card was scoped out.
+
+Such a record now takes the space the restore is run from (x-org), and a
+copy already on the site that names no space is given that space — the one
+change a restore makes to a record it finds, by the owner's choice (2a),
+so that restoring again from the right space mends a restore that went
+wrong. Only `org` is added; nothing else about the record moves. A record
+that names its space, in the file or on the site, keeps it. Run from Main,
+`into` is empty and the engine behaves exactly as before.
+
+**What it costs.** Genuine Main material from before spaces, restored from
+inside another space, moves into that space. The Restore screen counts such
+records and names the space before anything is written.
+
+---
+
+## Save and publish, one request (0.591)
+
+**9 November 2026** · `publish` in save-card (`server/api/courses.js`);
+`ScreenFab` and `Screen` in `src/shared.tsx`; `trySave`, `save` in
+`src/card-editor.tsx`; the editor's `onSave` in `src/spaces.tsx`
+
+**What was wanted.** A second floating button beside Save while a card is
+edited: Save and publish. Until now publishing an edit was Save, then the
+status menu, then Publish.
+
+**What changed.** save-card takes `publish: true`, and after writing the
+card publishes what it wrote exactly as card-status "published" would: a
+draft loses its status, and a published card's `pending` is laid over it
+and dropped. It is one request rather than a save followed by
+`cardStatus`, so a save kept in the outbox offline carries the flag and is
+published when it goes up, and a dropped connection cannot leave a card
+saved but not out. A `walk` publishes nothing. Decks are bumped by the
+existing `liveMoved` comparison, which sees the change.
+
+`Screen`'s `fab` takes a list; the editor passes Save and publish (marked
+`second`, the quieter style) then Save, so Save keeps the corner. Each
+says it is busy only when it sent the save in flight.
+
+**Choices the owner made.** Offline, kept and published later (rather than
+off). After publishing, back to reading the card, as Save does. Off
+whenever Save is: waiting changes with nothing new are published from the
+status menu. Shown on every card, Ready for review included, since anyone
+who may edit a card may already publish it.
+
+**What it costs.** Publishing is one tap from the middle of an edit; the
+quieter style and the position away from the corner are the guard, and
+Unpublish is the way back. On phones under 360px the buttons lose a
+little padding so both names fit.
+
+---
+
+## One screen for putting cards in decks
+
+**9 November 2026** · `src/shared.tsx` (`DeckPickScreen`, `DeckSwitch`'s `onAdd`), `src/card-editor.tsx`, `src/spaces.tsx`
+
+A card being written chose its decks in a small sheet, which could pick
+only among decks that already existed. Selected cards chose theirs on a
+full screen, which had New deck at the top. The owner asked for the card
+to work the same way, so a card written for a deck not yet made need not
+be left to make it.
+
+Both now open `DeckPickScreen`. The card's ticks are a draft, applied by
+Done and thrown away by Cancel. The old sheet took each tap at once, and
+that immediacy is what this gives up. The draft is needed because a deck
+made on the screen is ticked in it before the card has said yes to
+anything. The deck is made in the card's language, read off the card as
+selected cards' decks read theirs off the selection.
+
+The other callers of `DeckSwitch` keep the sheet: a course's decks, Prep
+mode's and Build a session's. In those places, making a deck isn't
+something being chosen, and a course's deck list saves each tap as it
+goes.

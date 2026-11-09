@@ -334,6 +334,9 @@ const saveOrgs = [];
 const reviewsSent = [];
 /** @type {any[]} */
 const savedCards = [];
+/** Whether each save asked to be published too, in the order they came. */
+/** @type {boolean[]} */
+const savedPublish = [];
 
 /**
  * The whole server, as far as the app is concerned.
@@ -496,7 +499,7 @@ const fakeFetch = async (input, opts = {}) => {
       return json({
         ok: true,
         deck: {
-          id: `d${madeDecks.length + 1}`,
+          id: `made${madeDecks.length}`,
           title: body.title,
           owner: account.handle,
           lang: body.lang || "ar-PS",
@@ -537,6 +540,7 @@ const fakeFetch = async (input, opts = {}) => {
       const body = JSON.parse(opts.body || "{}");
       const card = { ...(body.card || {}), id: (body.card && body.card.id) || `k-saved-${savedCards.length + 1}` };
       savedCards.push(card);
+      savedPublish.push(body.publish === true);
       return json({ ok: true, card: { ...card, decks: body.decks || [] }, decks: [] });
     }
     if (action === "image") {
@@ -2357,7 +2361,7 @@ if (/Build a session/.test(document.body.textContent)) {
       const ledeText = lede ? (lede.textContent || "").replace(/\s+/g, " ").trim() : "";
       check(`${name}: ${isCleared ? "says how many reviews make a card learnt" : "and no count of reviews to go"}`,
         isCleared
-          ? ledeText === "It takes 2 reviews to move a card from Cleared to Learnt."
+          ? /^It takes 2 reviews to move a card from Cleared to Learnt — on each of its questions/.test(ledeText)
           : !/reviews? to move a card/.test(ledeText),
         ledeText || "(no line)");
       /* And no bar, which is the whole reason there is a line here at all. */
@@ -3294,6 +3298,12 @@ check("no console errors during the session", errors.length === 0, errors.slice(
     const len = runs(played(kind));
     check(`${kind} lasts long enough to be noticed`, len >= least,
       `${len.toFixed(2)}s, wanted ${least}s`);
+  }
+  /* A tap on a matching tile is heard ten times in a grid of five, so it
+     has to be over before the next tap. */
+  {
+    const len = runs(played("select"));
+    check("a matching tile's tap is short", len <= 0.12, `${len.toFixed(2)}s`);
   }
   setSounds("off");
   check("off schedules nothing at all", played("correct").length === 0);
@@ -4651,6 +4661,12 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   const saveOff = () => isOff(buttonNamed(/^Save$/));
   check("Save is off until something changes", !!saveOff(),
     `Save ${isOff(buttonNamed(/^Save$/)) ? "off" : "on"}`);
+  /* And beside it, Save and publish: before Save in the row, so Save keeps
+     the corner, and off whenever Save is. */
+  const fabNames = () => [...document.querySelectorAll(".at-screen.cardform button.at-fab")].map(spokenName);
+  check("Save and publish floats beside Save, off with it",
+    fabNames().join(" | ") === "Save and publish | Save" && isOff(buttonNamed(/^Save and publish$/)),
+    fabNames().join(" | "));
   /* And a tap on it says so, rather than nothing happening. */
   clickNamed(/^Save$/);
   await sleep(150);
@@ -4702,6 +4718,19 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   check("and with it saved the card is read again, Edit in the corner",
     !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save$/),
     [...document.querySelectorAll(".at-fab")].map(spokenName).join(" | "));
+  /* Save and publish: the same save, asking to be published, and back to
+     reading the card as Save is. A plain Save never asks. */
+  click(cardEdit());
+  await sleep(400);
+  typeOn(noteBox(), `${(noteBox() || { value: "" }).value}z`);
+  await sleep(150);
+  clickNamed(/^Save and publish$/);
+  await sleep(500);
+  const asks = savedPublish.slice(savesBefore);
+  check("Save and publish saves the card asking for it to be published, and goes back to reading it",
+    asks.length === 3 && !asks[0] && !asks[1] && asks[2] && savedCards[savedCards.length - 1].id === both[0].id &&
+      !!buttonNamed(/^Edit$/) && !buttonNamed(/^Save and publish$/),
+    `${asks.join(", ")} · ${buttonNamed(/^Edit$/) ? "reading" : "still editing"}`);
   clickNamed(/^Back$/);
   await sleep(400);
   takeSaves = false;
@@ -5493,42 +5522,83 @@ const openPronounTables = async () => {
     check("and says it is in none yet, as the offer to put it in one",
       !pills().length && /add this card to a deck/i.test(addBtn() ? addBtn().textContent || "" : ""),
       `${pills().length} pills · ${addBtn() ? (addBtn().textContent || "").trim() : "no button"}`);
-    check("the decks are put away until asked for", !document.querySelector(".at-decksheet"));
+    /* The same screen selected cards are put in decks from (0.594): the
+       decks to tick, with New deck at the top, so a card written for a
+       deck not yet made need not be left to make it. */
+    const pickScreen = () => [...document.querySelectorAll(".at-screen.over")]
+      .find((x) => x.getAttribute("aria-label") === "Add this card to…") || null;
+    const tickRows = () => [...((pickScreen() || document.createElement("div")).querySelectorAll(".at-tickrow"))];
+    const inScreen = (/** @type {RegExp} */ re) => [...((pickScreen() || document.createElement("div")).querySelectorAll("button"))]
+      .find((x) => re.test((x.textContent || "").trim()));
+    const setValue = must(
+      Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"),
+      "the input's value descriptor"
+    ).set;
+    check("the decks are put away until asked for", !pickScreen());
 
     click(addBtn());
+    await sleep(250);
+    check("pressing it opens the screen selected cards are put in decks from",
+      !!pickScreen() && tickRows().length > 0 && !!inScreen(/^New deck$/),
+      `${tickRows().length} decks · ${pickScreen() ? "screen" : "no screen"}`);
+    const firstDeck = ((tickRows()[0] && tickRows()[0].querySelector("b")) || {}).textContent || "";
+    click(tickRows()[0] && tickRows()[0].querySelector("input"));
+    await sleep(150);
+    /* Ticks are a draft until Done: Cancel leaves the card as it was. */
+    click(inScreen(/^Cancel$/));
     await sleep(200);
-    /* In a sheet of their own since 0.241, as a blank and a custom tag
-       are chosen: a list hanging off the button ran off a phone. */
-    const menu = document.querySelector('.at-decksheet[role="dialog"]');
-    const rows = menu ? [...menu.querySelectorAll(".at-deckpick")] : [];
-    check("pressing it opens the decks as a list to pick from, in a sheet", rows.length > 0 &&
-      /^Decks$/.test(((menu && menu.querySelector(".at-modaltitle")) || {}).textContent || ""),
-      `${rows.length} decks offered`);
-    const firstDeck = ((rows[0] && rows[0].querySelector("b")) || {}).textContent || "";
-    click(rows[0]);
+    check("Cancel shuts it and leaves the card's decks as they were",
+      !pickScreen() && !pills().length, pills().join(" | ") || "(none)");
+
+    click(addBtn());
+    await sleep(250);
+    click(tickRows()[0] && tickRows()[0].querySelector("input"));
+    await sleep(150);
+    click(inScreen(/^Done$/));
     await sleep(200);
-    /* And what picking one leaves is the deck itself, standing in the
-       section — the count that used to be on the button said how many and
-       never which. */
-    check("picking one stands it in the section as a deck of its own",
-      pills().length === 1 && pills()[0] === firstDeck.trim(),
+    check("Done stands the ticked deck in the section as a deck of its own",
+      !pickScreen() && pills().length === 1 && pills()[0] === firstDeck.trim(),
       pills().join(" | ") || "(no decks named)");
-    check("and the row now says it is added rather than offering to add it",
-      /added/i.test(((rows[0].querySelector(".at-deckmark") || {}).textContent || "")),
-      ((rows[0].querySelector(".at-deckmark") || {}).textContent || "").trim() || "(no mark)");
-    check("and the list stays open, because you are usually picking more than one",
-      !!document.querySelector(".at-decksheet"));
-    /* A tap outside the sheet puts it away, as it does every sheet. */
-    click(/** @type {any} */ (document.querySelector(".at-decksheet")).closest(".at-modalback"));
+
+    /* ---- a deck made on the spot, from the card ---- */
+    click(addBtn());
+    await sleep(250);
+    check("and it opens with the card's decks already ticked",
+      tickRows().some((r) => (r.textContent || "").includes(firstDeck.trim()) && !!r.querySelector("input:checked")));
+    const madeBefore = madeDecks.length;
+    click(inScreen(/^New deck$/));
+    await sleep(150);
+    const nameBox = /** @type {any} */ ((pickScreen() || document.createElement("div")).querySelector(".at-formblock input"));
+    check("New deck asks for a name, saying which language the deck will be",
+      !!nameBox && /It will be a .+ deck\./.test((pickScreen() || {}).textContent || ""),
+      ((pickScreen() || {}).textContent || "").slice(0, 120));
+    if (nameBox) {
+      must(setValue, "the input's value setter").call(nameBox, "Week 4 · Food");
+      nameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
+      await sleep(80);
+      click(inScreen(/^Create$/));
+      await sleep(400);
+    }
+    check("Create makes the deck in the card's language",
+      madeDecks.length === madeBefore + 1 && madeDecks[madeDecks.length - 1].title === "Week 4 · Food" &&
+        madeDecks[madeDecks.length - 1].lang === "ar-PS",
+      JSON.stringify(madeDecks[madeDecks.length - 1] || null));
+    const madeRow = tickRows().find((r) => /Week 4/.test(r.textContent || ""));
+    check("and it joins the list already ticked, which is why it was made",
+      !!madeRow && !!madeRow.querySelector("input:checked"),
+      tickRows().map((r) => (r.textContent || "").slice(0, 14)).join(" | ") || "no decks listed");
+    click(inScreen(/^Done$/));
     await sleep(200);
-    check("a tap outside puts it away", !document.querySelector(".at-decksheet"));
-    check("and the deck it was put in is still named",
-      pills().length === 1 && pills()[0] === firstDeck.trim(),
+    check("and after Done the card is in it",
+      pills().length === 2 && pills().includes("Week 4 · Food"),
       pills().join(" | ") || "(no decks named)");
+
     /* Out again from the pill itself, which is where a teacher looking at
        the deck they want rid of already is. */
     const drop = () => /** @type {any} */ (document.querySelector(".at-deckdrop"));
     check("the deck carries the cross that takes the card out of it", !!drop());
+    click(drop());
+    await sleep(200);
     click(drop());
     await sleep(200);
     check("and pressing it leaves the card in no deck, offering one again",
@@ -10440,8 +10510,13 @@ const openPronounTables = async () => {
         kind = "who";
         met.who += 1;
         met.whoOptions = options.map((b) => (b.textContent || "").trim());
-        const right = options.find((b) => formOf[personOf((b.textContent || "").trim())] === prompt);
-        click(right || options[0]);
+        /* Every person the form could be is ticked (since 0.586), one tap
+           each — the tiles toggle. */
+        const right = options.filter((b) => formOf[personOf((b.textContent || "").trim())] === prompt);
+        for (const b of right.length ? right : [options[0]]) {
+          click(b);
+          await sleep(20);
+        }
       } else {
         const giveUp = btn(/^I don.t know$/);
         if (giveUp) click(giveUp);
@@ -10574,7 +10649,7 @@ const openPronounTables = async () => {
       chooseImage: 0, promptPicked: 0, promptWritten: 0, answerPicture: 0, tiles: 0,
       /* The grid of recordings, where one comes up. */
       soundGrids: 0, soundTiles: 0, wordsInScript: false, noEnglish: false,
-      unpairs: false, playOnly: false, soundVerdict: "", learnMore: false, marked: false,
+      unpairs: false, playPicks: false, playKeepsPair: false, playLeavesMeaning: false, tapPutsDown: false, soundVerdict: "", learnMore: false, marked: false,
     };
     for (let n = 0; n < 40 && host.querySelector(".at-instruction"); n++) {
       const pics = host.querySelector(".at-picchoices");
@@ -10612,21 +10687,43 @@ const openPronounTables = async () => {
              again, it lets go — and is left held, so one more tap puts it
              down before the grid is played through. */
           const w0 = () => /** @type {Element} */ (host.querySelector('[data-el="match-word"]'));
-          /* Its play button is a target of its own: pressing it plays the
-             word and leaves the tile neither held nor paired. */
+          const w1 = () => /** @type {Element} */ (host.querySelectorAll('[data-el="match-word"]')[1]);
+          const m0 = () => /** @type {Element} */ (host.querySelector('[data-el="match-meaning"]'));
+          const isOn = (/** @type {Element} */ el) => el.classList.contains("on");
+          const isPaired = (/** @type {Element} */ el) => el.classList.contains("paired");
+          /* Its play button plays the word and picks the tile up, ready to
+             be paired with a tap on a word in the script. */
           click(w0().querySelector('[data-el="match-sound"]'));
           await sleep(25);
-          met.playOnly = !w0().classList.contains("on") && !w0().classList.contains("paired");
+          met.playPicks = isOn(w0()) && !isPaired(w0());
+          click(m0());
+          await sleep(25);
+          const paired = isPaired(w0());
+          /* Played again once paired, it only plays: the pair is kept. */
+          click(w0().querySelector('[data-el="match-sound"]'));
+          await sleep(25);
+          met.playKeepsPair = paired && isPaired(w0()) && !isOn(w0());
+          /* With a word in the script held, playing a recording only plays
+             it: nothing is paired, and the word stays held. */
+          const free = /** @type {Element} */ (
+            [...host.querySelectorAll('[data-el="match-meaning"]')].find((el) => !el.classList.contains("paired"))
+          );
+          click(free);
+          await sleep(25);
+          click(w1().querySelector('[data-el="match-sound"]'));
+          await sleep(25);
+          met.playLeavesMeaning = isOn(free) && !isOn(w1()) && !isPaired(w1());
+          click(free);
+          await sleep(25);
+          /* Tapping the tile itself is as it was: a paired recording lets
+             go and is left held, and one more tap puts it down before the
+             grid is played through. */
           click(w0());
           await sleep(25);
-          click(host.querySelector('[data-el="match-meaning"]'));
-          await sleep(25);
-          const paired = w0().classList.contains("paired");
+          met.unpairs = !isPaired(w0()) && isOn(w0());
           click(w0());
           await sleep(25);
-          met.unpairs = paired && !w0().classList.contains("paired");
-          click(w0());
-          await sleep(25);
+          met.tapPutsDown = !isOn(w0());
         }
         const seen = await playGrid();
         if (sounds) {
@@ -10702,8 +10799,14 @@ const openPronounTables = async () => {
     heardGrid.wordsInScript && heardGrid.noEnglish, JSON.stringify(heardGrid));
   check("tapping a paired recording lets go of its pair, as a word tile does",
     heardGrid.unpairs, JSON.stringify(heardGrid));
-  check("and its play button only plays: the tile is neither picked up nor paired",
-    heardGrid.playOnly, JSON.stringify(heardGrid));
+  check("its play button plays the recording and picks it up, ready to pair",
+    heardGrid.playPicks, JSON.stringify(heardGrid));
+  check("played again once paired, a recording keeps its pair",
+    heardGrid.playKeepsPair, JSON.stringify(heardGrid));
+  check("with a word held, playing a recording pairs nothing and the word stays held",
+    heardGrid.playLeavesMeaning, JSON.stringify(heardGrid));
+  check("and tapping a held recording outside its play button puts it down",
+    heardGrid.tapPutsDown, JSON.stringify(heardGrid));
   check("the grid is marked, and a miss is told the right words are shown",
     heardGrid.marked && !/meanings/.test(heardGrid.soundVerdict), JSON.stringify(heardGrid));
   check("and there is no Learn more under it",

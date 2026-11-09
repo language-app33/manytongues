@@ -45,7 +45,7 @@ const { localIdFor, cardToItem, serverCardId, foldCourses, deckSize, notReaching
    card's progress and belongs with the rest of them. The trainer is bundled
    the same way; nothing in it touches a browser on the way in. */
 const built4 = await buildOnce(["ArabicTrainer.tsx"]);
-const { leadSpeed, deckPercent, levelPercent, nextReviewAt, reviewLine, nextPassAt, passLine,
+const { leadSpeed, deckPercent, levelPercent, nextReviewAt, reviewLine, nextPassAt, nextPass, passLine,
   formIsAmbiguous, formTagsAt, kinTags, twinsOf,
   onePerLevel, quietUnits, easedUnits,
   drillableUnits, askedUnits, agreeTook, laddered, liftStates, merge,
@@ -618,28 +618,75 @@ test("a card at the top of the ladder says when it next comes round", () => {
   const settings = { language: "ar-PS" };
   const day = 24 * 60 * 60 * 1000;
   const word = { id: "k", lang: "ar-PS", ar: "كِتاب", en: "book", lat: "kitaab", s: {} };
+  /** @type {string[]} */
   const keys = laddered(/** @type {any} */ (word), settings);
-  assert.ok(keys.length >= 2, "the word is asked more than one thing, or there is nothing to choose between");
+  const topLevel = Math.max(...keys.map(levelOf));
+  const top = keys.filter((k) => levelOf(k) === topLevel);
+  const below = keys.filter((k) => levelOf(k) < topLevel);
+  assert.ok(top.length && below.length, "the word has a top level and something under it");
 
-  /* The soonest of them, not the last and not whichever happens to be
-     first in the list: the next review is the next time the learner sees
-     the card, whichever question it turns out to be. */
+  /* The top question's date: the next review is the next time the learner
+     sees the card, and a card at its top is seen through its top question.
+     The test after this one says why the lower one's date does not count. */
   word.s = {
-    [keys[0]]: { phase: "review", due: 9 * day },
-    [keys[1]]: { phase: "review", due: 3 * day },
+    [top[0]]: { phase: "review", due: 9 * day },
+    [below[0]]: { phase: "review", due: 3 * day },
   };
-  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 3 * day);
+  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 9 * day);
 
   /* A key with no schedule behind it is not a review due at the epoch.
      Every card carries keys that have never been answered — a second
      accepted spelling is the usual one — and reading those as nought
      would put "due now" on every card on the screen. */
-  word.s = { [keys[0]]: { phase: "review", due: 6 * day } };
+  word.s = { [top[0]]: { phase: "review", due: 6 * day } };
   assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 6 * day);
 
   /* And a card with nothing scheduled at all reads as nothing, rather
      than as a date the line below would then do arithmetic on. */
   word.s = {};
+  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 0);
+});
+
+/*
+ * A learnt card is asked its top question and nothing else (atItsTop), so
+ * the questions below it are never answered again and their dates pass
+ * unasked. Reading them in put "Review due now" on every learnt card for
+ * good once a reading question fell due: no session dealt that question,
+ * the top one was not due, and a right answer on it moved nothing — most
+ * visibly in a custom session built on the card, where it was dealt, met
+ * several times over, and still said due (0.597).
+ */
+test("a learnt card's next review is its top question's, whatever fell due below it", () => {
+  const settings = { language: "ar-PS" };
+  const day = 24 * 60 * 60 * 1000;
+  const word = { id: "k", lang: "ar-PS", ar: "كِتاب", en: "book", lat: "kitaab", s: {} };
+  /** @type {string[]} */
+  const keys = laddered(/** @type {any} */ (word), settings);
+  const topLevel = Math.max(...keys.map(levelOf));
+  const top = keys.filter((k) => levelOf(k) === topLevel);
+  const below = keys.filter((k) => levelOf(k) < topLevel);
+  assert.ok(top.length && below.length, "the word has a top level and something under it");
+
+  /* Every lower question long overdue, the top one three weeks off: the
+     card is next seen in three weeks. */
+  word.s = {
+    ...Object.fromEntries(below.map((k) => [k, { phase: "review", due: 1 * day }])),
+    ...Object.fromEntries(top.map((k) => [k, { phase: "review", due: 30 * day }])),
+  };
+  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 30 * day);
+  assert.equal(reviewLine(nextReviewAt(/** @type {any} */ (word), settings), 9 * day), "Next review in 21d");
+
+  /* And the top one due is the card due, as before. */
+  word.s = {
+    ...Object.fromEntries(below.map((k) => [k, { phase: "review", due: 40 * day }])),
+    ...Object.fromEntries(top.map((k) => [k, { phase: "review", due: 8 * day }])),
+  };
+  assert.equal(reviewLine(nextReviewAt(/** @type {any} */ (word), settings), 9 * day), "Review due now");
+
+  /* Only the lower ones scheduled — a card whose top has never been
+     answered is not at its top, and nothing here should invent a date
+     for it. */
+  word.s = Object.fromEntries(below.map((k) => [k, { phase: "review", due: 1 * day }]));
   assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 0);
 });
 
@@ -654,6 +701,55 @@ test("what a card at the top of the ladder puts on its tile", () => {
   assert.equal(reviewLine(7 * day, 7 * day), "Review due now");
   assert.equal(reviewLine(6 * day, 7 * day), "Review due now");
   assert.equal(reviewLine(0, 7 * day), "No review scheduled");
+});
+
+/*
+ * A top question missed is put back for a retry and the card stays
+ * Cleared, one miss being forgiven. Its date was then read as a review's —
+ * "First review due now" — and the review it named could not count: a
+ * pass wants a question that came round in review, and this one is
+ * relearning. The learner got it right next session and the count stood
+ * still. The line now says a retry is what is waiting (0.598).
+ */
+test("a cleared card slipped on says its retry is due, not a review that cannot count", () => {
+  const settings = { language: "ar-PS" };
+  const day = 24 * 60 * 60 * 1000;
+  const min = 60 * 1000;
+  const word = { id: "k", lang: "ar-PS", ar: "كِتاب", en: "book", lat: "kitaab", s: {} };
+  /** @type {string[]} */
+  const keys = laddered(/** @type {any} */ (word), settings);
+  const topLevel = Math.max(...keys.map(levelOf));
+  const top = keys.filter((k) => levelOf(k) === topLevel);
+  const below = keys.filter((k) => levelOf(k) < topLevel);
+  const at = 9 * day;
+
+  /* Missed ten minutes ago: the retry has come round. */
+  word.s = {
+    ...Object.fromEntries(below.map((k) => [k, { phase: "review", due: 40 * day }])),
+    ...Object.fromEntries(top.map((k) => [k, { phase: "relearning", due: at - min, passes: 0 }])),
+  };
+  let next = nextPass(/** @type {any} */ (word), settings);
+  assert.equal(next.retry, true);
+  assert.equal(passLine(next.at, 0, at, next.retry), "Slipped · retry due now, then the first review");
+
+  /* Missed a minute ago: the retry is nine minutes off. */
+  word.s = {
+    ...Object.fromEntries(below.map((k) => [k, { phase: "review", due: 40 * day }])),
+    ...Object.fromEntries(top.map((k) => [k, { phase: "relearning", due: at + 9 * min, passes: 1 }])),
+  };
+  next = nextPass(/** @type {any} */ (word), settings);
+  assert.equal(passLine(next.at, 1, at, next.retry), "Slipped · retry in 9m, then the second review");
+
+  /* Back in review, the line is a review's again — and nextPassAt still
+     answers the moment alone, for the forecast that reads it. */
+  word.s = {
+    ...Object.fromEntries(below.map((k) => [k, { phase: "review", due: 40 * day }])),
+    ...Object.fromEntries(top.map((k) => [k, { phase: "review", due: at + 5 * day, passes: 1 }])),
+  };
+  next = nextPass(/** @type {any} */ (word), settings);
+  assert.equal(next.retry, false);
+  assert.equal(passLine(next.at, 1, at, next.retry), "Second review in 5d");
+  assert.equal(nextPassAt(/** @type {any} */ (word), settings), at + 5 * day);
 });
 
 /*
@@ -674,13 +770,14 @@ test("a cleared card's date is the review that counts towards learnt", () => {
   const below = keys.filter((k) => levelOf(k) < topLevel);
   assert.ok(top.length && below.length, "the word has a top level and something under it");
 
-  /* A lower question falling due sooner is when the card is next *seen*,
-     which is what Learnt says — but it is not a pass, so Cleared skips it. */
+  /* A lower question falling due sooner is not a pass, and — since 0.597 —
+     not when the card is next seen either, a card at its top being asked
+     its top alone. Both readings land on the top question's date. */
   word.s = {
     [below[0]]: { phase: "review", due: 1 * day, passes: 0 },
     ...Object.fromEntries(top.map((k) => [k, { phase: "review", due: 5 * day, passes: 0 }])),
   };
-  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 1 * day);
+  assert.equal(nextReviewAt(/** @type {any} */ (word), settings), 5 * day);
   assert.equal(nextPassAt(/** @type {any} */ (word), settings), 5 * day);
 
   /* One pass made, and the top question is still the one it waits on. */
@@ -2789,6 +2886,20 @@ test("a noun is laid out in boxes, with two sides for a person or an animal", ()
   assert.deepEqual(nounBoxes(LANGUAGES["he-IL"], "single").map((/** @type {any} */ b) => b.title), ["Singular", "Dual", "Plural"]);
 });
 
+test("a dual box says its English is written with “two”, and is still asked", () => {
+  /* Bare, "hours" would read the same as the plural box's English. */
+  const duals = [
+    ...nounBoxes(arPS(), "single"),
+    ...nounBoxes(arPS(), "paired"),
+    ...nounBoxes(LANGUAGES["he-IL"], "single"),
+  ].filter((/** @type {any} */ b) => b.number === "dual");
+  assert.equal(duals.length, 4);
+  for (const b of duals) {
+    assert.match(String(b.help), /“two”/, b.title);
+    assert.equal(b.unasked, undefined, b.title);
+  }
+});
+
 test("Arabic's plural after three to ten says which nouns want it, and is not asked on its own", () => {
   /* Days and months take a t after three to ten that they have nowhere
      else. The box says so under it, and a form written into it is said
@@ -2801,7 +2912,7 @@ test("Arabic's plural after three to ten says which nouns want it, and is not as
   assert.match(String(counted.help), /eleven up the singular/);
   assert.equal(counted.unasked, true);
   for (const b of boxes.filter((/** @type {any} */ b) => b.number !== "counted")) {
-    assert.equal(b.help, undefined, b.title);
+    if (b.number !== "dual") assert.equal(b.help, undefined, b.title);
     assert.equal(b.unasked, undefined, b.title);
   }
   /* And a form already in it sits in it. */

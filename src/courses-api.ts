@@ -409,6 +409,8 @@ export type SaveExtra = {
   /** The decks the screen believed the card was in before this change
       (0.580): the server then applies only what was added and removed. */
   decksWere?: string[];
+  /* Save and publish: what this save writes goes out to students too. */
+  publish?: boolean;
 };
 /* `org` is the space the save was made in, for one queued offline and sent
    from wherever the app is by then (0.580). */
@@ -545,7 +547,36 @@ export const keySaved = () => call("key-saved", { body: {} });
 export const leaveSpace = (org?: string) => call("leave-space", { body: {}, org });
 export const backupManifest = () => call("admin-backup-manifest");
 export const backupChunk = (keys: string[]) => call("admin-backup-chunk", { body: { keys } });
-export const restoreChunk = (records: Record<string, unknown>) => call("admin-restore-chunk", { body: { records } });
+/* A restore (0.583; docs/PLAN-space-backup.md): the owner's choices travel
+   with every request, and the server decides each record from the site. */
+export interface RestoreOptions {
+  scope: { kind: "site" } | { kind: "space"; space: string };
+  fileOrgs: string[];
+  created: Record<string, number>;
+  bringBack: string[];
+  keepSpaceCard: boolean;
+  newSlugs: Record<string, string>;
+}
+export interface RestoreAnswer {
+  ok: true;
+  written: number;
+  merged: number;
+  skipped: { key: string; why: string }[];
+  skippedMore: number;
+}
+export const restoreChunk = (records: Record<string, unknown>, options?: RestoreOptions): Promise<RestoreAnswer> =>
+  call("admin-restore-chunk", { body: { records, options } });
+export type PreviewPerson = { handle: string; displayName: string; at?: number; orgs?: string[] };
+export interface RestorePreview {
+  ok: true;
+  people: { kept: PreviewPerson[]; notMember: PreviewPerson[]; deleted: PreviewPerson[]; recreate: PreviewPerson[]; otherPerson: PreviewPerson[] };
+  rosters: { course: string; title: string; dropped: string[] }[];
+  spaces: { id: string; name: string; slug: string; exists: boolean; slugTaken: boolean; takenBy: string; newSlugProblem: string }[];
+  material: Record<"cards" | "decks" | "courses" | "flags", { add: number; have: number }>;
+  blockers: string[];
+}
+export const restorePreview = (body: Record<string, unknown>): Promise<RestorePreview> =>
+  call("admin-restore-preview", { body });
 
 /* Clearing what a backup would have held. Carries the deploy's admin key as
    well as the signed-in administrator: this is the one call that removes

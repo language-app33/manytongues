@@ -603,6 +603,23 @@ button {
   font-weight:800; letter-spacing:.05em; text-transform:uppercase;
   color: var(--muted); }
 .at-deckpick.on .at-deckmark { color: var(--accent); }
+/* A deck still being saved: the row says so in place of Add or Added,
+   with a turning ring, and is not tappable until the answer comes. Not
+   greyed like a locked deck — it is busy, not refused. */
+.at-deckpick.saving { cursor:progress; }
+.at-decksaving { display:inline-flex; align-items:center; gap:6px; color: var(--text); }
+.at-spin { display:inline-block; width:14px; height:14px; flex:none;
+  border:2px solid var(--line); border-top-color: var(--accent); border-radius:50%;
+  animation: at-spin 700ms linear infinite; }
+/* On a button, the ring takes the button's own lettering, so it shows on
+   a filled one as well as a plain one. */
+.at-btn .at-spin { border-color: currentColor; border-top-color: transparent; }
+/* In place of an icon button — a card's Remove while it is going: the
+   same footprint, so nothing beside it moves. */
+.at-spinslot { display:inline-flex; align-items:center; justify-content:center;
+  width:40px; height:40px; flex:none; }
+@keyframes at-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .at-spin { animation-duration: 2s; } }
 /* The deck and subtype sheets: the list a step under the line saying what
    it is for, and the note under the decks a step under them. */
 .at-decksheet .at-deckpicks { margin-top:4px; }
@@ -966,6 +983,9 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   padding-bottom:0; border-bottom:0; }
 /* Ticking decks: a real checkbox, so it looks and behaves like one. */
 .at-ticklist { display:flex; flex-direction:column; gap:6px; }
+/* A locked deck's padlock, kept beside its size on the decks screen
+   (DeckPickScreen, shared since 0.594). */
+.at-lockmark { white-space:nowrap; }
 .at-tickrow { display:flex; align-items:center; gap:10px; cursor:pointer;
   border:2px solid var(--line); border-radius: var(--r-sm); background: var(--raised);
   padding:10px 12px; }
@@ -3020,7 +3040,10 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
 .at-vrow { display:grid; grid-template-columns: minmax(64px, auto) 1fr; column-gap:12px; row-gap:2px;
   align-items:center; padding:8px 12px; border:1px solid var(--line); border-radius: var(--r-sm);
   background: var(--surface); }
-.at-vperson { color: var(--muted); font-size: var(--fs-sm); }
+/* Who each row is, in English, at reading size: a learner looking at a
+   tense asked for the English pronouns, which were there in small grey
+   and went unseen (0.586). */
+.at-vperson { color: var(--text); font-size: var(--fs-md); font-weight:600; }
 .at-vform { font-size: calc(var(--ask) * .7); line-height:1.3; text-align:end; }
 .at-vsaid { grid-column: 2; display:flex; flex-wrap:wrap; gap:4px 10px; justify-content:flex-end;
   font-size: var(--fs-sm); color: var(--text-soft); }
@@ -3052,6 +3075,12 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
   color: var(--text); }
 .at-reply.on { border-color: var(--jade-soft); background: var(--jade-bg); }
 .at-reply:disabled { cursor:default; }
+/* Tiles where more than one may be ticked ("who is it?") wear a box, so
+   a tap that leaves the others on reads as ticking, not as a slip. */
+.at-replies.multi .at-reply::before { content:""; display:inline-block; box-sizing:border-box;
+  width:1.1em; height:1.1em; line-height:1; text-align:center; vertical-align:-0.15em;
+  margin-inline-end:10px; border:2px solid var(--muted); border-radius:4px; }
+.at-replies.multi .at-reply.on::before { content:"✓"; border-color: var(--jade-soft); color: var(--text); }
 
 /* A word offered as a choice rather than typed. Sits at the size a word
    is asked at elsewhere; a line of a conversation is longer and takes the
@@ -3360,7 +3389,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    foot so it never sits over the last thing on the page. See ScreenFab. */
 .at-screen.hasfab .at-screenbody { padding-bottom: calc(104px + env(safe-area-inset-bottom)); }
 .at-fabrow { position:absolute; left:0; right:0; bottom: calc(16px + env(safe-area-inset-bottom));
-  max-width:640px; margin:0 auto; padding:0 16px; display:flex; justify-content:flex-end;
+  max-width:640px; margin:0 auto; padding:0 16px; display:flex; justify-content:flex-end; gap:12px;
   pointer-events:none; z-index:4; transition: bottom 160ms ease-out; }
 /* A message at the foot of the window lifts the button over it. */
 .at:has(.at-snack) .at-fabrow { bottom: calc(148px + env(safe-area-inset-bottom)); }
@@ -3370,11 +3399,22 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
   font-family: var(--ui); font-size:15px; font-weight:700; cursor:pointer;
   box-shadow: 0 6px 18px rgba(0,0,0,.35); }
 .at-fab > svg { width:24px; height:24px; flex:none; }
-.at-fab .at-fablabel { white-space:nowrap; overflow:hidden; max-width:120px;
+.at-fab .at-fablabel { white-space:nowrap; overflow:hidden; max-width:150px;
   transition: max-width 160ms ease-out, opacity 120ms ease-out; }
 .at-fab:not(.named) .at-fablabel { max-width:0; opacity:0; }
 .at-fab:not(.named) { gap:0; padding:0; justify-content:center; width:56px; }
 .at-fab.off { background: var(--raised); color: var(--muted); box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+/* The quieter of two — Save and publish beside Save: the surface, in the
+   accent's colour, so the corner's own button stays the one that stands
+   out and publishing is never the tap a thumb lands on by habit. */
+.at-fab.second:not(.off) { background: var(--raised); color: var(--jade); box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 2px var(--jade); }
+/* Two side by side on the narrowest phones: a little less air, so both
+   keep their names whole rather than both being cut. */
+.at-fab { flex:none; }
+@media (max-width: 359px) {
+  .at-fabrow { gap:8px; }
+  .at-fab.named { padding:0 12px; }
+}
 
 /* The tabs start at the top of the sheet and stay there: no gap above
    them that the sticking would take up on the first scroll. */

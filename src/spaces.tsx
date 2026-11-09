@@ -163,6 +163,7 @@ import {
   useRun,
   Popover,
   DeckSwitch,
+  DeckPickScreen,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
 export { LanguageTag, languageName } from "./shared.tsx";
@@ -978,6 +979,10 @@ export const BACKUP_PARTS: {
   index?: string;
   count: string;
   unit: string;
+  /* The same part, said of one space's backup (0.584): "Spaces" over a
+     file holding one space read as though it held them all. */
+  spaceTitle?: string;
+  spaceWhat?: string;
 }[] = [
   {
     key: "spaces",
@@ -987,6 +992,8 @@ export const BACKUP_PARTS: {
     prefixes: ["org:", "slug:", "former:", "gone:"],
     index: "orgs",
     count: "orgs",
+    spaceTitle: "The space itself",
+    spaceWhat: "Its name, address, look and admins, and every address it has had.",
     unit: "space",
   },
   {
@@ -997,6 +1004,8 @@ export const BACKUP_PARTS: {
     prefixes: ["user:", "key:"],
     index: "users",
     count: "users",
+    spaceTitle: "Its people",
+    spaceWhat: "Everyone in the space, with the fingerprint of each sign-in key — never the keys themselves.",
     unit: "account",
   },
   {
@@ -1007,6 +1016,7 @@ export const BACKUP_PARTS: {
     prefixes: ["course:"],
     index: "courses",
     count: "courses",
+    spaceWhat: "Its courses: who teaches each one, who studies it, and which decks it uses.",
     unit: "course",
   },
   {
@@ -1017,6 +1027,7 @@ export const BACKUP_PARTS: {
     prefixes: ["deck:"],
     index: "decks",
     count: "decks",
+    spaceWhat: "Its decks, including its members' My space decks made here.",
     unit: "deck",
   },
   {
@@ -1031,6 +1042,7 @@ export const BACKUP_PARTS: {
     kinds: ["card", "owncards", "system", "mysystems"],
     prefixes: ["card:", "mycards:", "owncards:", "numsys:", "timesys:", "mysystems:"],
     count: "cards",
+    spaceWhat: "Every card in the space, including its members' My space cards made here, and its teachers' numbers and clock. Not the audio.",
     unit: "card",
   },
   {
@@ -1041,7 +1053,20 @@ export const BACKUP_PARTS: {
     prefixes: ["flag:"],
     index: "flags",
     count: "flags",
+    spaceWhat: "What learners flagged in this space, and which question each was about.",
     unit: "report",
+  },
+  {
+    key: "progress",
+    title: "Progress",
+    /* Each person's practice document, which lives in the sync store under
+       a hash of their key, and the recordings it names (0.583). */
+    what: "Each person's practice: what they have answered and when it is next due, and any recordings they made on cards of their own. Put back by folding into whatever practice they have by then, never over it.",
+    kinds: ["progress", "paudio"],
+    prefixes: ["progress:", "paudio:"],
+    count: "progress",
+    spaceWhat: "Each member's practice — the whole of it, practice in their other spaces too, since one person has one record of it. Put back by folding into whatever they have practised by then, never over it.",
+    unit: "person",
   },
   {
     key: "clips",
@@ -1052,6 +1077,7 @@ export const BACKUP_PARTS: {
     kinds: ["clip", "image"],
     prefixes: ["clip:", "image:"],
     count: "clips",
+    spaceWhat: "The audio and pictures the space's cards and numbers use, which are nearly all of the size of a backup.",
     unit: "recording",
   },
 ];
@@ -1060,6 +1086,20 @@ export const BACKUP_PARTS: {
 const ALL_PARTS = BACKUP_PARTS.map((p) => p.key);
 
 const partsChosen = (parts: string[]) => BACKUP_PARTS.filter((p) => parts.includes(p.key));
+
+/* A size as a person reads it. */
+export function sizeWords(bytes: number) {
+  if (bytes < 1024) return bytes ? "under 1 KB" : "nothing";
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)} KB`;
+  if (bytes < 1024 * 1024 * 1024) return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
+/* How much one part adds to a file, from the manifest's bytes per kind. */
+export function partBytes(manifest: any, part: { kinds: string[] }) {
+  const b = (manifest && manifest.bytes) || {};
+  return part.kinds.reduce((n, k) => n + (Number(b[k]) || 0), 0);
+}
 
 /* Which parts a file holds. Files made before a backup could be partial say
    nothing, and a file that says nothing holds everything — which was true
@@ -1091,6 +1131,12 @@ export async function buildBackup(
   source: () => Promise<{ manifest: any }> = API.backupManifest,
 ) {
   const { manifest } = await source();
+  return buildFromManifest(manifest, onProgress, parts);
+}
+
+/* The file, from a manifest already in hand: the backup screen reads one
+   to say how large each part is, and a moment later builds from it. */
+async function buildFromManifest(manifest: any, onProgress: (done: number, total: number) => void, parts: string[]) {
   const chosen = partsChosen(parts);
   const kinds = new Set(chosen.flatMap((p) => p.kinds));
   const plan = (manifest.plan || []).filter((c: any) => kinds.has(c.kind));
@@ -1115,6 +1161,7 @@ export async function buildBackup(
       )
     ),
     chunks: (whole.chunks || []).filter((c: any) => kinds.has(c.kind)),
+    bytes: Object.fromEntries(Object.entries(whole.bytes || {}).filter(([k]) => kinds.has(k))),
   };
   return writeFile(kept, plan, API.backupChunk, parts, onProgress);
 }
@@ -1169,7 +1216,7 @@ async function writeFile(
   const seen = new Set<string>();
   const refs = { decks: new Set<string>(), clips: new Set<string>() };
   const counts: Record<string, number> = {
-    "user:": 0, "course:": 0, "deck:": 0, "card:": 0, "flag:": 0, "clip:": 0,
+    "user:": 0, "course:": 0, "deck:": 0, "card:": 0, "flag:": 0, "clip:": 0, "progress:": 0,
   };
 
   let blob = new Blob(
@@ -1237,6 +1284,7 @@ async function writeFile(
     ["cards", "card:", kept.counts && kept.counts.cards],
     ["reports", "flag:", kept.counts && kept.counts.flags],
     ["clips", "clip:", kept.counts && kept.counts.clips],
+    ["progress", "progress:", kept.counts && kept.counts.progress],
   ];
   for (const [label, prefix, want] of expect) {
     if (want !== undefined && counts[prefix] !== want) {
@@ -1261,17 +1309,22 @@ async function writeFile(
 
 /*
  * Puts a checked file back. Records go up in requests kept under a few
- * megabytes; the three indexes go last, and the server folds them into
- * whatever is there rather than replacing it. Restoring is additive: a
- * record in the file overwrites the one on the site with the same key,
- * and nothing else is touched.
+ * megabytes, in the file's own order — people first — and the indexes
+ * last. Since 0.583 the server adds and never overwrites, deciding each
+ * record from the site as it is; the owner's choices go with every request
+ * in `options`, and what it left alone comes back with why.
  */
 /**
  * @param parts  Which of BACKUP_PARTS to put back. A file may
  *   hold more than is wanted — the recordings when only the wording is
  *   being recovered, everybody's accounts when one course is.
  */
-export async function restoreBackup(file: any, onProgress: (done: number, total: number) => void, parts: string[] = ALL_PARTS) {
+export async function restoreBackup(
+  file: any,
+  onProgress: (done: number, total: number) => void,
+  parts: string[] = ALL_PARTS,
+  options?: API.RestoreOptions,
+) {
   const records = file.records || {};
   const chosen = partsChosen(parts);
   const wanted = (k: string) =>
@@ -1308,14 +1361,141 @@ export async function restoreBackup(file: any, onProgress: (done: number, total:
   }
   if (Object.keys(last).length) batches.push(last);
 
-  let written = 0;
+  const sum: { written: number; merged: number; skipped: { key: string; why: string }[]; skippedMore: number } = {
+    written: 0, merged: 0, skipped: [], skippedMore: 0,
+  };
   for (let i = 0; i < batches.length; i++) {
-    const r = await API.restoreChunk(batches[i]);
-    written += r.written || 0;
+    const r = await API.restoreChunk(batches[i], options || restoreOptionsFor(file, { kind: "site" }));
+    sum.written += r.written || 0;
+    sum.merged += r.merged || 0;
+    sum.skipped.push(...(r.skipped || []));
+    sum.skippedMore += r.skippedMore || 0;
     onProgress(i + 1, batches.length);
   }
-  return written;
+  return sum;
 }
+
+/*
+ * Whose a file is (0.583): the site's, or one space's. A file made before
+ * files said so is the site's — it was made by Back up the site, or by a
+ * space's old export, and either way the site's door takes it safely.
+ */
+export type FileScope = { kind: "site" } | { kind: "space"; space: string; slug: string; name: string };
+export function fileScope(file: any): FileScope {
+  const s = file && file.manifest && file.manifest.scope;
+  if (s && s.kind === "space" && typeof s.space === "string" && s.space) {
+    return { kind: "space", space: s.space, slug: String(s.slug || ""), name: String(s.name || s.slug || s.space) };
+  }
+  return { kind: "site" };
+}
+
+/* Where a restore was opened: the site's door, one space's, or the door for
+   a space that may no longer exist (any space's file). */
+export type RestoreDoor =
+  /* `into`: the name of the space the site's door is open in, where
+     material from before spaces goes (0.589). */
+  | { kind: "site"; into?: string }
+  | { kind: "space"; space?: string; name?: string };
+
+/* How many of a file's courses, decks and cards name no space: every one
+   in a backup taken before spaces (0.542). The server puts them in the
+   space the restore is run from — see restoreOne. */
+export function unspacedIn(file: any): number {
+  const rec = (file && file.records) || {};
+  return Object.entries<any>(rec).filter(
+    ([k, v]) => /^(course|deck|card):/.test(k) && v && typeof v === "object" && !Array.isArray(v) && !v.org,
+  ).length;
+}
+
+/** Why a door will not take a file, in words, or "" when it will. */
+export function doorRefusal(file: any, door: RestoreDoor): string {
+  const s = fileScope(file);
+  if (door.kind === "site") {
+    return s.kind === "space"
+      ? `This is a backup of the space ${s.name}. Restore it from Super admin → Spaces.`
+      : "";
+  }
+  if (s.kind === "site") return "This is a backup of the whole site. Restore it from Super admin → App.";
+  if (door.space && s.space !== door.space) {
+    return `This is a backup of the space ${s.name}, not of ${door.name || "this space"}.`;
+  }
+  return "";
+}
+
+/* What every request of one restore carries: the owner's choices, and the
+   file's facts the server needs to tell people apart — never a verdict. */
+export function restoreOptionsFor(
+  file: any,
+  door: RestoreDoor,
+  choices: { bringBack?: string[]; keepSpaceCard?: boolean; newSlugs?: Record<string, string> } = {},
+): API.RestoreOptions {
+  const s = fileScope(file);
+  const records = (file && file.records) || {};
+  const created: Record<string, number> = {};
+  for (const [k, v] of Object.entries<any>(records)) {
+    if (k.startsWith("user:") && v && typeof v.created === "number") created[k.slice(5)] = v.created;
+  }
+  const indexes = (file && file.manifest && file.manifest.indexes) || {};
+  return {
+    scope: s.kind === "space" && door.kind === "space" ? { kind: "space", space: s.space } : { kind: "site" },
+    fileOrgs: Array.isArray(indexes.orgs) ? indexes.orgs : [],
+    created,
+    bringBack: choices.bringBack || [],
+    keepSpaceCard: choices.keepSpaceCard !== false,
+    newSlugs: choices.newSlugs || {},
+  };
+}
+
+/* What the preview is sent: the few fields of the file it needs, never its
+   records whole. Only for the parts being put back. */
+export function previewBody(file: any, options: API.RestoreOptions, parts: string[] = ALL_PARTS) {
+  const records = (file && file.records) || {};
+  const of = (prefix: string) => Object.keys(records).filter((k) => k.startsWith(prefix));
+  const has = (part: string) => parts.includes(part);
+  return {
+    options,
+    fileScope: fileScope(file),
+    users: of("user:").map((k) => {
+      const u = records[k] || {};
+      return { handle: k.slice(5), created: u.created, orgs: u.orgs, org: u.org, displayName: u.displayName };
+    }),
+    courses: has("courses")
+      ? of("course:").map((k) => {
+          const c = records[k] || {};
+          return { id: c.id || k.slice(7), org: c.org, title: c.title, teachers: c.teachers, students: c.students };
+        })
+      : [],
+    orgs: has("spaces") ? of("org:").map((k) => ({ id: k.slice(4), slug: (records[k] || {}).slug, name: (records[k] || {}).name })) : [],
+    keys: {
+      cards: has("cards") ? of("card:").map((k) => k.slice(5)) : [],
+      decks: has("decks") ? of("deck:").map((k) => k.slice(5)) : [],
+      courses: has("courses") ? of("course:").map((k) => k.slice(7)) : [],
+      flags: has("flags") ? of("flag:").map((k) => k.slice(5)) : [],
+    },
+  };
+}
+
+/* Why a record was left alone, in the words the report uses. */
+const LEFT_BECAUSE: Record<string, string> = {
+  exists: "already here",
+  kept: "account already here, left as it is",
+  "key-changed": "key changed since",
+  "not-member": "not in this space",
+  deleted: "deleted since the backup",
+  "other-person": "the name now belongs to someone else",
+  "no-account": "no account to put it under",
+  "account-exists": "the account is here",
+  "slug-taken": "address taken",
+  "code-taken": "code in use by another course",
+  "too-large": "too large",
+  "not-allowed": "not allowed",
+  unreadable: "could not be read",
+  busy: "being changed at the same moment; run it again",
+  empty: "empty in the file",
+  error: "could not be written",
+};
+/* Reasons that are about a person, which the report lists by name. */
+const ABOUT_PEOPLE = new Set(["kept", "key-changed", "not-member", "deleted", "other-person"]);
 
 /* What a finished file says about itself, checked against what it holds. */
 export function verifyBackup(file: any) {
@@ -1333,6 +1513,7 @@ export function verifyBackup(file: any) {
     ["decks", "deck:", m.counts && m.counts.decks],
     ["cards", "card:", m.counts && m.counts.cards],
     ["clips", "clip:", m.counts && m.counts.clips],
+    ["progress", "progress:", m.counts && m.counts.progress],
   ];
   for (const [label, prefix, want] of expect) {
     const got = count(prefix);
@@ -1897,8 +2078,10 @@ function scriptStyle(languages: Record<LangId, Lang>, langId?: LangId) {
   return { ...(lang.fontStack ? { fontFamily: lang.fontStack } : null), ...scriptVars(lang) };
 }
 
-export function AdminSpace({ account, languages, onClose, superMode = false }: {
+export function AdminSpace({ account, spaceName, languages, onClose, superMode = false }: {
   account: User;
+  /** The space this is open in: where a restore puts material from before spaces. */
+  spaceName?: string | null;
   /** Super admin (0.547): the App admin's own tools, whichever space they are in. */
   superMode?: boolean;
   languages: Record<LangId, Lang>;
@@ -1916,11 +2099,9 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
   const [openCourse2, setOpenCourse2] = useState<string | null>(null); // a course being settled
   const [selPeople, setSelPeople] = useState(() => new Set<string>());
   const [backup, setBackup] = useState<Progress | null>(null); // { state, done, total, note }
-  /* Which of the two backup screens is open, and the file the restore one
-     is working from — held here rather than in the screen so choosing a
-     file survives a re-render of the tab underneath. */
+  /* Which of the two backup screens is open; the file a restore works
+     from is held by the flow itself (0.583). */
   const [backupMode, setBackupMode] = useState<"download" | "restore" | null>(null);
-  const [restoreFile, setRestoreFile] = useState<{ parsed: any, name: string } | null>(null);
   const [clearing, setClearing] = useState(false);
   /* Off until asked for: the gallery renders a specimen of every component,
      which is a lot of markup to carry on a tab that is mostly about backups. */
@@ -2921,8 +3102,13 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
                 working.
               </Help>
               <Help>
-                Students' own progress isn't in here. It lives on their devices and syncs back by
-                itself.
+                People's practice is in the Progress part. Putting it back folds it into whatever
+                they have practised since; it never replaces it.
+              </Help>
+              <Help>
+                A restore never overwrites or removes anything: it adds what the file holds and
+                the site lacks, after showing you what it will do. A space's own backup is
+                restored from Super admin → Spaces.
               </Help>
 
               <div className="at-row at-mt1">
@@ -2932,10 +3118,7 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
 
                 <Button
                   variant="ghost"
-                  onClick={() => {
-                    setRestoreFile(null);
-                    setBackupMode("restore");
-                  }}
+                  onClick={() => setBackupMode("restore")}
                   icon="refresh"
                 >
                   Restore a backup
@@ -3129,100 +3312,15 @@ export function AdminSpace({ account, languages, onClose, superMode = false }: {
           )}
 
           {backupMode && (
-            <BackupScreen
+            <BackupFlow
               mode={backupMode}
-              file={restoreFile ? restoreFile.parsed : null}
-              fileName={restoreFile ? restoreFile.name : ""}
-              busy={!!backup && (backup.state === "running" || backup.state === "restoring")}
-              progress={
-                backup && (backup.state === "running" || backup.state === "restoring")
-                  ? { done: backup.done || 0, total: backup.total || 0 }
-                  : null
-              }
-              onPickFile={(parsed, name) => setRestoreFile({ parsed, name })}
+              door={{
+                kind: "site",
+                into: spaceName || (account.org && typeof account.org === "object" ? account.org.name : "") || "this space",
+              }}
+              stem="backup"
               onClose={() => setBackupMode(null)}
-              onDownload={async (parts) => {
-                setBackup({ state: "running", done: 0, total: 0, note: "" });
-                try {
-                  const { blob, manifest, problems } = await buildBackup(
-                    (done, total) => setBackup({ state: "running", done, total, note: "" }),
-                    parts
-                  );
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement("a");
-                  const stamp = new Date(manifest.takenAt)
-                    .toISOString()
-                    .slice(0, 16)
-                    .replace(/[:T]/g, "-");
-                  a.href = url;
-                  /* Named for what is in it, so a folder of these can be
-                     read without opening any of them. */
-                  a.download = `backup-${stamp}${
-                    parts.length === ALL_PARTS.length ? "" : `-${parts.join("-")}`
-                  }.json`;
-                  a.click();
-                  /* Revoking straight away can cancel the download in
-                     some browsers; a moment later is soon enough. */
-                  setTimeout(() => URL.revokeObjectURL(url), 60000);
-                  setBackup({
-                    state: "done",
-                    counts: manifest.counts,
-                    takenAt: manifest.takenAt,
-                    note: problems.join(" "),
-                  });
-                  setBackupMode(null);
-                } catch (e) {
-                  setBackup({ state: "failed", note: API.explain(e) });
-                }
-              }}
-              onRestore={(parts) => {
-                const parsed = restoreFile && restoreFile.parsed;
-                if (!parsed) return;
-                const problems = verifyBackup(parsed);
-                const counts = (parsed.manifest && parsed.manifest.counts) || {};
-                const naming = partsChosen(parts).map((p) => p.title.toLowerCase()).join(", ");
-                setConfirm({
-                  title: "Restore this backup?",
-                  confirmLabel: "Restore",
-                  confirmWord: "restore",
-                  body: (
-                    <>
-                      <p>
-                        Putting back {naming}, taken{" "}
-                        {parsed.manifest && parsed.manifest.takenAt
-                          ? new Date(parsed.manifest.takenAt).toLocaleString()
-                          : "at an unknown time"}
-                        .
-                      </p>
-                      <p>
-                        Everything in the file is written back over whatever has the same
-                        name on the site. Anything made since the backup is left alone.
-                      </p>
-                      {problems.length ? (
-                        <p style={{ marginBottom: 0, color: "var(--rose)" }}>
-                          {problems.join(" ")}
-                        </p>
-                      ) : null}
-                    </>
-                  ),
-                  action: async () => {
-                    setBackup({ state: "restoring", done: 0, total: 0, note: "" });
-                    const written = await restoreBackup(
-                      parsed,
-                      (done, total) => setBackup({ state: "restoring", done, total, note: "" }),
-                      parts
-                    );
-                    setBackup({
-                      state: "restored",
-                      counts,
-                      takenAt: parsed.manifest && parsed.manifest.takenAt,
-                      note: `${written} records written.`,
-                    });
-                    setBackupMode(null);
-                    setRestoreFile(null);
-                  },
-                });
-              }}
+              onFinished={setBackup}
             />
           )}
 
@@ -3335,25 +3433,158 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
    three screens name the same things in the same words.
    ------------------------------------------------------------------ */
 
+/* What a restore did, as the report shows it. */
+type RestoreReport = { written: number; merged: number; skipped: { key: string; why: string }[]; skippedMore: number };
+
+/*
+ * The whole of one backup or restore, wherever it was opened (0.583): Super
+ * admin → App for the site, Super admin → Spaces for a space. One
+ * implementation, so the two doors cannot drift apart. `source` is where a
+ * backup's manifest comes from; `door` is which files a restore takes.
+ */
+function BackupFlow({
+  mode,
+  door,
+  source,
+  stem,
+  onClose,
+  onFinished,
+}: {
+  mode: "download" | "restore";
+  door: RestoreDoor;
+  source?: () => Promise<{ manifest: any }>;
+  stem: string;
+  onClose: () => void;
+  onFinished?: (p: Progress) => void;
+}) {
+  const [file, setFile] = useState<{ parsed: any; name: string } | null>(null);
+  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
+  const [report, setReport] = useState<RestoreReport | null>(null);
+  const { run, busy, error } = useRun({ quietDone: true });
+  const { setConfirm, modal } = useConfirm(run, { busy });
+
+  return (
+    <>
+      <BackupScreen
+        mode={mode}
+        door={door}
+        file={file ? file.parsed : null}
+        fileName={file ? file.name : ""}
+        busy={busy}
+        error={error}
+        progress={progress}
+        report={report}
+        onPickFile={(parsed, name) => {
+          setReport(null);
+          setFile({ parsed, name });
+        }}
+        onClose={onClose}
+        source={source || API.backupManifest}
+        onDownload={(parts, read) =>
+          run(async () => {
+            setProgress({ done: 0, total: 0 });
+            try {
+              /* The manifest the screen read for its sizes, while it is
+                 still fresh; otherwise a new one, so the file is as of now. */
+              const fresh = read && Date.now() - read.at < 2 * 60 * 1000;
+              const { blob, manifest, problems } = fresh && read
+                ? await buildFromManifest(read.manifest, (done, total) => setProgress({ done, total }), parts)
+                : await buildBackup((done, total) => setProgress({ done, total }), parts, source);
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              const stamp = new Date(manifest.takenAt).toISOString().slice(0, 16).replace(/[:T]/g, "-");
+              a.href = url;
+              /* Named for what is in it, so a folder of these can be read
+                 without opening any of them. */
+              a.download = `${stem}-${stamp}${parts.length === ALL_PARTS.length ? "" : `-${parts.join("-")}`}.json`;
+              a.click();
+              /* Revoking straight away can cancel the download in some
+                 browsers; a moment later is soon enough. */
+              setTimeout(() => URL.revokeObjectURL(url), 60000);
+              if (onFinished) onFinished({ state: "done", counts: manifest.counts, takenAt: manifest.takenAt, note: problems.join(" ") });
+              onClose();
+            } finally {
+              setProgress(null);
+            }
+          })
+        }
+        onRestore={(parts, options, naming) => {
+          const parsed = file && file.parsed;
+          if (!parsed) return;
+          setConfirm({
+            title: fileScope(parsed).kind === "space" ? "Restore this space?" : "Restore this backup?",
+            confirmLabel: "Restore",
+            confirmWord: "restore",
+            body: (
+              <>
+                <p>
+                  Putting back {naming}, taken{" "}
+                  {parsed.manifest && parsed.manifest.takenAt
+                    ? new Date(parsed.manifest.takenAt).toLocaleString()
+                    : "at an unknown time"}
+                  .
+                </p>
+                <p style={{ marginBottom: 0 }}>{NEVER_OVERWRITES}</p>
+              </>
+            ),
+            action: async () => {
+              setProgress({ done: 0, total: 0 });
+              try {
+                const done = await restoreBackup(parsed, (d, total) => setProgress({ done: d, total }), parts, options);
+                setReport(done);
+                if (onFinished) {
+                  onFinished({
+                    state: "restored",
+                    counts: (parsed.manifest && parsed.manifest.counts) || {},
+                    takenAt: parsed.manifest && parsed.manifest.takenAt,
+                    note: `Added ${done.written}, folded in ${done.merged}, left alone ${done.skipped.length + done.skippedMore}.`,
+                  });
+                }
+              } finally {
+                setProgress(null);
+              }
+            },
+          });
+        }}
+      />
+      {modal}
+    </>
+  );
+}
+
+/* The standing sentence over every restore (0.583). */
+const NEVER_OVERWRITES =
+  "Nothing on the site is overwritten or removed. This adds what the file holds and the site lacks.";
+
 function BackupScreen({
   mode,
+  door,
   file,
   fileName,
   onDownload,
   onRestore,
   onPickFile,
   progress,
+  report,
   busy,
+  error,
+  source,
   onClose,
 }: {
   mode: "download" | "restore";
+  door: RestoreDoor;
   file?: any;
   fileName?: string;
-  onDownload: (parts: string[]) => void;
-  onRestore: (parts: string[]) => void;
+  onDownload: (parts: string[], read: { manifest: any; at: number } | null) => void;
+  /* Where a backup's manifest comes from, read when the screen opens so
+     each part can say how large it is (0.584). */
+  source?: () => Promise<{ manifest: any }>;
+  onRestore: (parts: string[], options: API.RestoreOptions, naming: string) => void;
   onPickFile: (file: any, name: string) => void;
   progress?: { done: number, total: number } | null;
+  report?: RestoreReport | null;
   busy?: boolean;
+  error?: string;
   onClose: () => void;
 }) {
   const restoring = mode === "restore";
@@ -3364,17 +3595,92 @@ function BackupScreen({
   const held = file ? includedIn(file) : ALL_PARTS;
   const [parts, setParts] = useState(ALL_PARTS);
   const [readErr, setReadErr] = useState("");
+  /* The owner's choices for the preview and the restore. Any change clears
+     the preview, so Restore only ever runs what was last checked. */
+  const [bringBack, setBringBack] = useState<string[]>([]);
+  const [keepSpaceCard, setKeepSpaceCard] = useState(true);
+  const [newSlugs, setNewSlugs] = useState<Record<string, string>>({});
+  const [preview, setPreview] = useState<API.RestorePreview | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [previewErr, setPreviewErr] = useState("");
   useEffect(() => {
     if (file) setParts(includedIn(file));
+    setBringBack([]);
+    setKeepSpaceCard(true);
+    setNewSlugs({});
+    setPreview(null);
+    setPreviewErr("");
   }, [file]);
 
-  const counts = (file && file.manifest && file.manifest.counts) || null;
+  /* On a backup, what the site or the space holds now: read once as the
+     screen opens, for each part's count and size. */
+  const [read, setRead] = useState<{ manifest: any; at: number } | null>(null);
+  const [sizing, setSizing] = useState("");
+  /* Once per opening: the caller may hand a new function each time it draws. */
+  const sourceNow = useRef(source);
+  sourceNow.current = source;
+  useEffect(() => {
+    const from = sourceNow.current;
+    if (restoring || !from) return undefined;
+    let live = true;
+    setSizing("Working out how large each part is…");
+    from().then(
+      (r) => {
+        if (!live) return;
+        setRead({ manifest: r.manifest, at: Date.now() });
+        setSizing("");
+      },
+      () => live && setSizing(""),
+    );
+    return () => {
+      live = false;
+    };
+  }, [restoring]);
+  const ofSpace = door.kind === "space" && !!door.name;
+  const shown = restoring ? (file && file.manifest) || null : read ? read.manifest : null;
+  const counts = (shown && shown.counts) || null;
   const chosen = parts.filter((p) => !restoring || held.includes(p));
+  const total = shown && shown.bytes ? partsChosen(chosen).reduce((n, p) => n + partBytes(shown, p), 0) : null;
   const nothing = !chosen.length;
+  const refused = restoring && file ? doorRefusal(file, door) : "";
+  const problems = restoring && file ? verifyBackup(file) : [];
+  const options = file ? restoreOptionsFor(file, door, { bringBack, keepSpaceCard, newSlugs }) : null;
+
+  const check = async (choices: { bringBack?: string[]; keepSpaceCard?: boolean; newSlugs?: Record<string, string> } = {}) => {
+    if (!file) return;
+    setChecking(true);
+    setPreviewErr("");
+    try {
+      const o = restoreOptionsFor(file, door, { bringBack, keepSpaceCard, newSlugs, ...choices });
+      setPreview(await API.restorePreview(previewBody(file, o, chosen)));
+    } catch (e) {
+      setPreview(null);
+      setPreviewErr(API.explain(e));
+    } finally {
+      setChecking(false);
+    }
+  };
+  const ready = !!(file && preview && !preview.blockers.length && !refused && !nothing && !report);
+
+  const names = (list: API.PreviewPerson[]) => list.map((p) => p.displayName || p.handle).join(", ");
+  const group = (title: string, list: API.PreviewPerson[], note?: Node) =>
+    list.length ? (
+      <div className="at-mt3">
+        <p className="at-eyebrow">
+          {title} · {list.length}
+        </p>
+        <Help>{names(list)}</Help>
+        {note ? <Help>{note}</Help> : null}
+      </div>
+    ) : null;
 
   return (
     <Screen
-      title={restoring ? "Restore" : "Back up"}
+      title={
+        restoring
+          ? door.kind === "space" ? "Restore a space" : "Restore"
+          : ofSpace ? `Back up ${door.name}` : "Back up the site"
+      }
       onBack={onClose}
       rise
       action={
@@ -3382,25 +3688,38 @@ function BackupScreen({
           <Button
             variant="danger"
             size="sm"
-            disabled={!file || nothing || busy}
-            onClick={() => onRestore(chosen)}
+            disabled={!ready || busy || !options}
+            onClick={() =>
+              options &&
+              onRestore(chosen, options, partsChosen(chosen).map((p) => p.title.toLowerCase()).join(", "))
+            }
           >
             <Icon name="refresh" />
             {busy ? "Restoring…" : "Restore"}
           </Button>
         ) : (
-          <Button variant="primary" size="sm" disabled={nothing || busy} onClick={() => onDownload(chosen)}>
+          <Button variant="primary" size="sm" disabled={nothing || busy} onClick={() => onDownload(chosen, read)}>
             <Icon name="download" />
             {busy ? "Working…" : "Download"}
           </Button>
         )
       }
     >
-      <Help>
-        {restoring
-          ? "Everything you tick is written back over whatever has the same name on the site. Anything made since the backup is left alone, and anything you leave unticked is left in the file."
-          : "Tick what the file should hold. All of it is the backup to keep; less of it is for when you want the wording of every card without a gigabyte of audio behind it."}
-      </Help>
+      {restoring ? (
+        <Notice kind="info">{NEVER_OVERWRITES}</Notice>
+      ) : (
+        <>
+          <Help>
+            {ofSpace
+              ? `One file holding the space ${door.name} and nothing from any other space: its people, courses, decks, cards, recordings and pictures, its members' My space made here, and its members' practice.`
+              : "One file holding every space on the site, and everyone in them."}
+          </Help>
+          <Help>
+            Tick what the file should hold. All of it is the backup to keep; less of it is for when you want the
+            wording of every card without a gigabyte of audio behind it.
+          </Help>
+        </>
+      )}
 
       {restoring && (
         <div className="at-row at-mt3">
@@ -3427,43 +3746,59 @@ function BackupScreen({
         </div>
       )}
 
-      <Notice kind="error">{readErr}</Notice>
+      <Notice kind="error">{readErr || error || previewErr}</Notice>
 
       {restoring && file && (
         <div className="at-sub at-mt3">
           <p className="at-eyebrow">{fileName || "The file"}</p>
           <Help>
-            Taken{" "}
-            {file.manifest && file.manifest.takenAt
-              ? new Date(file.manifest.takenAt).toLocaleString()
-              : "at an unknown time"}
-            .
+            {fileScope(file).kind === "space" ? `A backup of the space ${(fileScope(file) as any).name}, taken ` : "A backup of the site, taken "}
+            {file.manifest && file.manifest.takenAt ? new Date(file.manifest.takenAt).toLocaleString() : "at an unknown time"}.
           </Help>
-          {verifyBackup(file).length ? (
+          {problems.length ? (
             <p className="at-hint" style={{ marginBottom: 0, color: "var(--rose)" }}>
-              {verifyBackup(file).join(" ")}
+              {problems.join(" ")}
             </p>
           ) : (
             <Help>Checked: it holds everything it says it holds.</Help>
           )}
+          {restoring && door.kind === "site" && unspacedIn(file) > 0 && (
+            <Help>
+              {plural(unspacedIn(file), "course, deck or card", "courses, decks or cards")} in it
+              {unspacedIn(file) === 1 ? " is" : " are"} from before spaces, so
+              {unspacedIn(file) === 1 ? " it goes" : " they go"} into {door.into || "this space"}, the space you
+              are in — and any of them already on the site with no space are moved there too. To put them in
+              another space, switch to it first.
+            </Help>
+          )}
         </div>
       )}
 
-      {(!restoring || file) && (
+      {refused ? <Notice kind="error">{refused}</Notice> : null}
+
+      {(!restoring || (file && !refused)) && !report && (
         <div className="at-field at-mt4">
           <CheckList
-            options={BACKUP_PARTS.filter((p) => !restoring || held.includes(p.key)).map((p) => ({
-              id: p.key,
-              title: p.title,
-              note:
-                counts && counts[p.count] !== undefined
-                  ? `${p.what} ${plural(counts[p.count], p.unit)} in the file.`
-                  : p.what,
-            }))}
+            options={BACKUP_PARTS.filter((p) => !restoring || held.includes(p.key)).map((p) => {
+              const spaceWords = (restoring ? fileScope(file).kind === "space" : ofSpace);
+              const what = spaceWords ? p.spaceWhat || p.what : p.what;
+              const many = counts && counts[p.count] !== undefined
+                ? plural(counts[p.count], p.unit, p.unit === "person" ? "people" : undefined)
+                : "";
+              const b = shown && shown.bytes ? partBytes(shown, p) : null;
+              const size = b === null ? "" : b >= 1024 ? `about ${sizeWords(b)}` : b > 0 ? sizeWords(b) : "";
+              const facts = [many, size].filter(Boolean).join(", ");
+              return {
+                id: p.key,
+                title: spaceWords ? p.spaceTitle || p.title : p.title,
+                note: facts ? `${what} ${facts}${restoring ? " in the file" : ""}.` : what,
+              };
+            })}
             chosen={parts}
-            onToggle={(id, on) =>
-              setParts((x) => (on ? x.filter((k) => k !== id) : x.concat([id])))
-            }
+            onToggle={(id, on) => {
+              setPreview(null);
+              setParts((x) => (on ? x.filter((k) => k !== id) : x.concat([id])));
+            }}
           />
           {restoring && held.length < ALL_PARTS.length && (
             <Help>
@@ -3473,8 +3808,150 @@ function BackupScreen({
             </Help>
           )}
           {nothing && <Help>Nothing ticked, so there is nothing to do.</Help>}
+          {!restoring && sizing ? <Help>{sizing}</Help> : null}
+          {!restoring && !nothing && total !== null ? (
+            <Help>The file will be {total >= 1024 ? `about ${sizeWords(total)}` : sizeWords(total)}.</Help>
+          ) : null}
         </div>
       )}
+
+      {restoring && file && !refused && !nothing && !report && (
+        <div className="at-row at-mt3">
+          <Button variant="primary" icon="verify" disabled={checking || busy} onClick={() => check()}>
+            {checking ? "Checking…" : "Check what this will do"}
+          </Button>
+        </div>
+      )}
+
+      {restoring && preview && !report && (
+        <div className="at-sub at-mt4">
+          {preview.blockers.map((b) => (
+            <Notice kind="error" key={b}>
+              {b}
+            </Notice>
+          ))}
+          <p className="at-eyebrow">People</p>
+          {group("Left as they are", preview.people.kept)}
+          {door.kind === "space" &&
+            group("Not put back into this space", preview.people.notMember, "Add them from People if you mean to.")}
+          {group("Re-created, with their old key", preview.people.recreate)}
+          {preview.people.deleted.length ? (
+            <div className="at-mt3">
+              <p className="at-eyebrow">Deleted since the backup — stays deleted · {preview.people.deleted.length}</p>
+              <Help>Tick anyone to bring back, with their old key.</Help>
+              <CheckList
+                options={preview.people.deleted.map((p) => ({
+                  id: p.handle,
+                  title: `Bring back ${p.displayName || p.handle}`,
+                  note: p.at ? `Deleted ${new Date(p.at).toLocaleDateString()}.` : undefined,
+                }))}
+                chosen={bringBack}
+                onToggle={(id, on) => {
+                  const next = on ? bringBack.filter((h) => h !== id) : bringBack.concat([id]);
+                  setBringBack(next);
+                  check({ bringBack: next });
+                }}
+              />
+            </div>
+          ) : null}
+          {bringBack.length && !preview.people.deleted.length ? (
+            <Help>
+              Bringing back {plural(bringBack.length, "person", "people")}.{" "}
+              <button type="button" className="at-linkbtn" onClick={() => {
+                setBringBack([]);
+                check({ bringBack: [] });
+              }}>
+                Undo
+              </button>
+            </Help>
+          ) : null}
+          {preview.people.otherPerson.length ? (
+            <p className="at-hint" style={{ color: "var(--rose)" }}>
+              Belongs to someone else now: {names(preview.people.otherPerson)}
+            </p>
+          ) : null}
+
+          {preview.rosters.length ? (
+            <div className="at-mt3">
+              <p className="at-eyebrow">Rosters</p>
+              {preview.rosters.map((r) => (
+                <Help key={r.course}>
+                  These names come off {r.title || "a restored course"} because they are not in the space:{" "}
+                  {r.dropped.join(", ")}.
+                </Help>
+              ))}
+            </div>
+          ) : null}
+
+          {preview.spaces.length ? (
+            <div className="at-mt3">
+              <p className="at-eyebrow">Spaces</p>
+              {preview.spaces.map((sp) => (
+                <div key={sp.id} className="at-mt1">
+                  <Help>
+                    {sp.name || sp.id}: {sp.exists ? "exists" : "will be re-created"}.
+                  </Help>
+                  {sp.exists ? (
+                    <RadioGroup
+                      name={`card-${sp.id}`}
+                      label="Its name, address, look and admins"
+                      quiet
+                      value={keepSpaceCard ? "keep" : "file"}
+                      onChange={(v) => {
+                        setKeepSpaceCard(v === "keep");
+                        setPreview(null);
+                      }}
+                      options={[
+                        { value: "keep", label: "Keep the space's current name, address, look and admins" },
+                        {
+                          value: "file",
+                          label: "Take the file's name, logo, colour and admins",
+                          note: "Its address and codes stay as they are now.",
+                        },
+                      ]}
+                    />
+                  ) : null}
+                  {sp.slugTaken ? (
+                    <Field label="New address for it" lede={`Its address ${sp.slug} now belongs to ${sp.takenBy}.`}>
+                      <input
+                        className="at-input"
+                        placeholder="new-address"
+                        value={newSlugs[sp.id] || ""}
+                        onChange={(e) => {
+                          setNewSlugs((m) => ({ ...m, [sp.id]: e.target.value.trim().toLowerCase() }));
+                          setPreview(null);
+                        }}
+                        onBlur={() => check()}
+                      />
+                    </Field>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="at-mt3">
+            <p className="at-eyebrow">Material</p>
+            <Help>
+              {(["cards", "decks", "courses", "flags"] as const)
+                .map((k) => {
+                  const m = preview.material[k];
+                  const unit = { cards: "card", decks: "deck", courses: "course", flags: "report" }[k];
+                  return `adds ${plural(m.add, unit)} (${m.have} already here)`;
+                })
+                .join(", ")
+                .replace(/^a/, "A")}
+              .
+            </Help>
+          </div>
+        </div>
+      )}
+
+      {restoring && file && !preview && !report && !refused && !nothing && (
+        <Help>Restore waits until you have checked what it will do with the choices above.</Help>
+      )}
+
+      {report && <RestoreResult report={report} />}
 
       {progress && progress.total > 0 && (
         <Help>
@@ -3482,6 +3959,40 @@ function BackupScreen({
         </Help>
       )}
     </Screen>
+  );
+}
+
+/* What a restore did: what it added, what it folded in, and everything it
+   left alone and why — by name where the reason is about a person. */
+function RestoreResult({ report }: { report: RestoreReport }) {
+  const byWhy = new Map<string, string[]>();
+  for (const s of report.skipped) {
+    const list = byWhy.get(s.why) || [];
+    list.push(s.key);
+    byWhy.set(s.why, list);
+  }
+  const left = report.skipped.length + report.skippedMore;
+  return (
+    <div className="at-sub at-mt4">
+      <p className="at-eyebrow">Restored</p>
+      <Help>
+        Added {report.written}, folded in {report.merged}, left alone {left}.
+      </Help>
+      {[...byWhy.entries()].map(([why, keys]) => {
+        /* By handle, from whichever records name one: an account's, a
+           person's list of cards, their practice. */
+        const people = ABOUT_PEOPLE.has(why) || why === "no-account"
+          ? [...new Set(keys.filter((k) => /^(user|mycards|owncards|mysystems|progress|paudio):/.test(k)).map((k) => k.split(":")[1]))]
+          : [];
+        return (
+          <Help key={why}>
+            {LEFT_BECAUSE[why] || why}: {plural(keys.length, "record")}
+            {people.length ? ` — ${people.join(", ")}` : ""}.
+          </Help>
+        );
+      })}
+      {report.skippedMore ? <Help>And {report.skippedMore} more not listed.</Help> : null}
+    </div>
   );
 }
 
@@ -4669,6 +5180,42 @@ function DeckQuality({ quality, cards, lang, onOpenCard }: {
               </ul>
         </>
       )}
+      {/* Every sentence with words no card teaches, in full (0.586). A
+          learner asked to practise a sentence's words on their own before
+          meeting the sentence; this says which sentences cannot be, and
+          which words they are waiting on. The app adds nothing to
+          practise: the teacher decides whether to add the cards or
+          reword the sentence. */}
+      {quality.untaught.length > 0 && (
+        <div className="at-qwarn" role="note">
+          <p className="at-qfixtitle">
+            <Icon name="search" size={18} />{" "}
+            {plural(quality.untaught.length, "sentence")} {quality.untaught.length === 1 ? "has" : "have"} words
+            students can't practise on their own
+          </p>
+          <p className="at-qfixtext">
+            No card in the course teaches these words, so students meet them for the first time inside the sentence. Add a card
+            for each, or reword the sentence.
+          </p>
+          <ul className="at-qwarnlist">
+            {quality.untaught.map((u, i) => (
+              <li key={`${u.id}-${i}`}>
+                <button type="button" className="at-qfixword" onClick={() => onOpenCard(u.id)} title="Open this card">
+                  <b lang={lang.id} dir={lang.direction} style={script}>
+                    {u.text}
+                  </b>
+                </button>
+                <span className="at-qwarnwords">
+                  {"No card for: "}
+                  <span lang={lang.id} dir={lang.direction} style={script}>
+                    {u.words.join(", ")}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </>
   );
 }
@@ -5181,6 +5728,16 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   });
 
   const [courseView, setCourseView] = useState<any | null>(null);
+  /* The decks a course is still saving, and which way: shown on the
+     deck's row as "Adding…" or "Removing…" until the server answers, and
+     not tappable meanwhile, so a second tap cannot undo the first. */
+  const [deckSaving, setDeckSaving] = useState<Record<string, "add" | "drop">>({});
+  /* Cards and word sets on their way out of a deck: a ring where their
+     Remove was until the server answers, and no second Remove meanwhile. */
+  const [leaving, setLeaving] = useState<Set<string>>(() => new Set());
+  /* Add existing cards' Done while it saves: how many of the cards that
+     change have been saved, said on the button. */
+  const [applying, setApplying] = useState<{ done: number; total: number } | null>(null);
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
   const [allCards, setCards] = useState<Card[]>(last ? last.cards : []);
   const cards = useMemo(() => allCards.filter((c) => !!c.personal === mineSide), [allCards, mineSide]);
@@ -5280,6 +5837,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      selected cards or take off them, and the name of one being made on the
      spot. See tagActionScreen. */
   const [tagAction, setTagAction] = useState<"add" | "remove" | null>(null);
+  /* Changing the status of the selected cards: the screen is open while
+     this is set, holding the status chosen on it, if any yet. See
+     statusActionScreen. */
+  const [statusAction, setStatusAction] = useState<null | { to: "draft" | "review" | "published" | null; asking?: boolean }>(null);
   const [pickedTags, setPickedTags] = useState<string[]>([]);
   const [newTagName, setNewTagName] = useState("");
   const [newCardLang, setNewCardLang] = useState<LangId | null>(null);
@@ -5314,7 +5875,6 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   /* The name of a deck being made from the add-to-a-deck screen, or null
      when nothing is being made. "" is a form that is open and empty, which
      is not the same as no form at all. */
-  const [newDeckName, setNewDeckName] = useState<string | null>(null);
   const [pickedCourses, setPickedCourses] = useState<string[]>([]);
   /* The card whose sentences are being reviewed — it takes over the
      screen, like the editor. Reports from students are not here at all:
@@ -6565,9 +7125,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   /* Made, then ticked: the deck a teacher just named is the one they were
      about to choose, so choosing it again by hand is a step that says
      nothing. */
-  const createDeckHere = () => {
-    const title = String(newDeckName || "").trim();
-    if (!title) return;
+  const createDeckHere = (title: string) =>
     run(
       async () => {
         const r = await API.createDeck(title, "", newDeckLang, mineSide);
@@ -6576,12 +7134,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
           setDecks((prev) => prev.concat([made]));
           setPickedDecks((prev) => prev.concat([made.id]));
         }
-        setNewDeckName(null);
         return made;
       },
       (made) => `${(made && made.title) || title} created`
     );
-  };
 
   /* ---- a new deck takes over the screen, like a new card ----
      Saved, it opens as the deck itself: that is where its courses, its
@@ -6694,6 +7250,20 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         lang={editLang || LANGUAGES[DEFAULT_LANGUAGE]}
         decks={decksIn(new Set([(editLang || LANGUAGES[DEFAULT_LANGUAGE]).id]), editing.decks)}
         inDecks={editing.decks}
+        /* A deck made from the card's decks screen, in the card's language;
+           the editor ticks it (0.594). */
+        onCreateDeck={(title) => {
+          const langId = (editLang || LANGUAGES[DEFAULT_LANGUAGE]).id;
+          return run(
+            async () => {
+              const r = await API.createDeck(title, "", langId, mineSide);
+              const made = r && r.deck;
+              if (made) setDecks((prev) => prev.concat([made]));
+              return made;
+            },
+            (made) => `${(made && made.title) || title} created`
+          );
+        }}
         busy={busy}
         error={error}
         onClose={() => setEditing(null)}
@@ -6741,7 +7311,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
              card opened from a list is, or to edit where this one was. */
           setEditing({ card: other, decks: other.decks || [], lang: other.lang || (editLang || {}).id || "", opened: Date.now(), locked: !!editing.locked })
         }
-        onSave={({ forms, note, name, examples, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next, exit }) =>
+        onSave={({ forms, note, name, examples, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next, exit, publish }) =>
           run(
             async () => {
               const [main, ...subs] = forms;
@@ -6855,9 +7425,14 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 /* A new card starts as a draft, and a change to a published
                    card waits for publishing — see "A card's status" in
                    save-card. Its decks, ID and tags apply at once. */
-                /* With the decks the editor opened with, so only what the
-                   teacher added or took away is applied (0.580). */
-                editing.card && editing.card.id ? { into: "changes", decksWere: editing.decks } : { status: "draft" },
+                {
+                  /* With the decks the editor opened with, so only what the
+                     teacher added or took away is applied (0.580). */
+                  ...(editing.card && editing.card.id ? { into: "changes" as const, decksWere: editing.decks } : { status: "draft" as const }),
+                  /* Save and publish: the same save, out to students in
+                     the same request — kept on the device with it, too. */
+                  ...(publish ? { publish: true } : {}),
+                },
               );
               absorbSaved(r);
               /*
@@ -6960,6 +7535,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 /* Kept for later rather than saved, which is a different
                    promise and has to read as one. */
                 kept: !!(r && r.kept),
+                published: !!publish,
                 waiting,
                 /* And how many other cards a rename followed the name
                    into, which is the one thing about this save that
@@ -6990,9 +7566,13 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                already written, say so — that is the moment the link is
                worth making, and the alternative is a deck whose coverage
                quietly falls as it grows. */
-            (done: { name: string, kept: boolean, waiting: number, trimmed: string[], moved: number, waits: string }) =>
+            (done: { name: string, kept: boolean, published: boolean, waiting: number, trimmed: string[], moved: number, waits: string }) =>
               done.kept
-                ? `${done.name} saved on this device — it goes up when you're back online`
+                ? done.published
+                  ? `${done.name} saved on this device — it's published when you're back online`
+                  : `${done.name} saved on this device — it goes up when you're back online`
+                : done.published && !done.moved && !done.trimmed.length && !done.waiting
+                ? `${done.name} saved and published — students get it now`
                 : done.moved
                 ? `${done.name} saved · the new name went into ${plural(done.moved, "other card")}`
                 : done.trimmed.length
@@ -7308,147 +7888,66 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      One screen for both places cards are selected: the Cards tab, and
      inside a deck — where the deck already open is left off the list,
      there being nothing to add a card to that it is already in. ---- */
-  const cardActionScreen = (inDeck?: string) => (
-    <Screen
-      title={
-        cardAction === "add"
-          ? "Add the selected cards to…"
-          : "Take the selected cards out of…"
-      }
-      onBack={() => {
-        setCardAction(null);
-        setNewDeckName(null);
-      }}
-    >
-      {/* Somewhere to put them that does not exist yet.
-          Before this, a teacher who had selected thirty cards
-          and then found no deck for them had to leave, make
-          the deck, and select the thirty again — so the way
-          out of the screen was to lose the work that got you
-          there. Only when adding: there is nothing to take a
-          card out of that was made a moment ago. */}
-      {cardAction === "add" &&
-        (newDeckName === null ? (
-          <div className="at-row at-mb3">
-            <Button variant="ghost" size="sm" icon="add" onClick={() => setNewDeckName("")}>
-              New deck
-            </Button>
-          </div>
-        ) : (
-          <div className="at-formblock at-mb3">
-            <Field
-              label="New deck"
-              hint={
-                /* The cards decide, so say which language it
-                   will be — silently making a deck in the
-                   wrong one is a thing nothing here shows
-                   until a student opens it. */
-                newDeckLang
-                  ? `It will be a ${languageName(languages, newDeckLang)} deck.`
-                  : ""
-              }
-            >
-              <input
-                className="at-input"
-                placeholder="e.g. Week 3 · Verbs"
-                value={newDeckName}
-                autoFocus
-                onChange={(e) => setNewDeckName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && createDeckHere()}
-              />
-            </Field>
-            <div className="at-row at-mt3">
-              <Button variant="ghost" size="sm" icon="close" onClick={() => setNewDeckName(null)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                size="sm"
-                icon="check"
-                disabled={!newDeckName.trim() || busy}
-                onClick={createDeckHere}
-              >
-                Create
-              </Button>
-            </div>
-          </div>
-        ))}
-
-      <CheckList
-        options={(cardAction === "add" ? decksIn(new Set([...pickedLangs, newDeckLang])) : decks).filter((d) => d.id !== inDeck).map((d) => ({
-          id: d.id,
-          title: d.title,
-          /* A locked deck is shown, and cannot be ticked: its cards stay
-             as they are until someone unlocks it. */
-          note: d.locked ? (
-            <>
-              <span className="at-lockmark" title="Locked" aria-label="Locked" role="img">
-                <Icon name="lock" size={12} />{" "}
-              </span>
-              {deckSize(d)}
-            </>
-          ) : (
-            deckSize(d)
-          ),
-          disabled: !!d.locked,
-        }))}
+  const cardActionScreen = (inDeck?: string) => {
+    const close = () => {
+      setCardAction(null);
+      setPickedDecks([]);
+    };
+    return (
+      <DeckPickScreen
+        title={
+          cardAction === "add"
+            ? "Add the selected cards to…"
+            : "Take the selected cards out of…"
+        }
+        decks={(cardAction === "add" ? decksIn(new Set([...pickedLangs, newDeckLang])) : decks).filter((d) => d.id !== inDeck)}
         chosen={pickedDecks}
         onToggle={(id, on) =>
           setPickedDecks((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
         }
-        empty="You have no decks yet."
+        /* Only when adding: there is nothing to take a card out of that
+           was made a moment ago. */
+        onCreate={cardAction === "add" ? createDeckHere : undefined}
+        /* The cards decide, so say which language it will be — silently
+           making a deck in the wrong one is a thing nothing here shows
+           until a student opens it. */
+        newHint={newDeckLang ? `It will be a ${languageName(languages, newDeckLang)} deck.` : ""}
+        busy={busy}
+        confirm={cardAction === "add" ? "Add" : "Remove"}
+        confirmOff={!pickedDecks.length}
+        onCancel={close}
+        onConfirm={() =>
+          run(
+            async () => {
+              /* Counted rather than assumed: a card already in
+                 the deck is skipped, so the number selected is
+                 not the number changed. */
+              let changed = 0;
+              for (const id of pickedIds(selCards)) {
+                const card = cards.find((c) => c.id === id);
+                if (!card) continue;
+                const inNow = card.decks || [];
+                const next =
+                  cardAction === "add"
+                    ? [...new Set(inNow.concat(pickedDecks))]
+                    : inNow.filter((x) => !pickedDecks.includes(x));
+                if (next.length === inNow.length) continue;
+                absorbSaved(await saveNamed(card, next));
+                changed += 1;
+              }
+              close();
+              setSelCards(new Set());
+              return changed;
+            },
+            (changed) =>
+              changed
+                ? `${plural(changed, "card")} ${cardAction === "add" ? "added" : "removed"}`
+                : "Nothing to change — they were already like that"
+          )
+        }
       />
-      <div className="at-row at-mt5">
-        <Button variant="ghost"
-          onClick={() => {
-            setCardAction(null);
-            setPickedDecks([]);
-            setNewDeckName(null);
-          }}
-          icon="close"
-        >
-          Cancel
-        </Button>
-        <Button variant="primary"
-          disabled={!pickedDecks.length || busy}
-          onClick={() =>
-            run(
-              async () => {
-                /* Counted rather than assumed: a card already in
-                   the deck is skipped, so the number selected is
-                   not the number changed. */
-                let changed = 0;
-                for (const id of pickedIds(selCards)) {
-                  const card = cards.find((c) => c.id === id);
-                  if (!card) continue;
-                  const inNow = card.decks || [];
-                  const next =
-                    cardAction === "add"
-                      ? [...new Set(inNow.concat(pickedDecks))]
-                      : inNow.filter((x) => !pickedDecks.includes(x));
-                  if (next.length === inNow.length) continue;
-                  absorbSaved(await saveNamed(card, next));
-                  changed += 1;
-                }
-                setCardAction(null);
-                setPickedDecks([]);
-                setNewDeckName(null);
-                setSelCards(new Set());
-                return changed;
-              },
-              (changed) =>
-                changed
-                  ? `${plural(changed, "card")} ${cardAction === "add" ? "added" : "removed"}`
-                  : "Nothing to change — they were already like that"
-            )
-          }
-          icon="check"
-        >
-          {cardAction === "add" ? "Add" : "Remove"}
-        </Button>
-      </div>
-    </Screen>
-  );
+    );
+  };
 
   /* ---- putting a group tag on the selected cards, or taking one off ----
      What the tag sheet in the editor does to one card, done to every card
@@ -7600,6 +8099,124 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     );
   };
 
+  /* The status of every selected card at once — the card screen's status
+     menu, for many. Publish sends out drafts and cards waiting for review,
+     and the changes on published cards that have any. Draft and Ready for
+     review take published cards away from students, so they ask first and
+     say how many (the owner's call, 0.592): the card is unpublished, which
+     brings its unpublished changes with it, then given the status asked
+     for. One request per card, as tagging is; a card that is someone
+     else's is counted and left, not the end of the batch. */
+  const statusActionScreen = () => {
+    if (!statusAction) return null;
+    const picked = pickedIds(selCards)
+      .map((id) => cards.find((c) => c.id === id))
+      .filter(Boolean) as Card[];
+    const live = (c: Card) => !c.status || c.status === "published";
+    const published = picked.filter(live);
+    const drafts = picked.filter((c) => !live(c));
+    const wouldChange = (to: "draft" | "review" | "published") =>
+      to === "published"
+        ? drafts.length + published.filter((c) => c.changes).length
+        : drafts.filter((c) => c.status !== to).length + published.length;
+    const to = statusAction.to;
+    const close = () => setStatusAction(null);
+    const go = () => {
+      if (!to) return;
+      run(
+        async () => {
+          let changed = 0;
+          let refused = 0;
+          for (const card of picked) {
+            try {
+              if (to === "published") {
+                if (live(card) && !card.changes) continue;
+                absorbSaved(await API.cardStatus(card.id, "published"));
+              } else if (live(card)) {
+                const r = await API.cardStatus(card.id, "unpublish");
+                absorbSaved(r.card.status === to ? r : await API.cardStatus(card.id, to));
+              } else {
+                if (card.status === to) continue;
+                absorbSaved(await API.cardStatus(card.id, to));
+              }
+              changed += 1;
+            } catch (e) {
+              if ((e as Error).message === "not-yours") refused += 1;
+              else throw e;
+            }
+          }
+          close();
+          setSelCards(new Set());
+          return { changed, refused };
+        },
+        ({ changed, refused }: { changed: number; refused: number }) =>
+          [
+            changed
+              ? to === "published"
+                ? `${plural(changed, "card")} published — students get them now`
+                : `${plural(changed, "card")} marked ${to === "review" ? "ready for review" : "as drafts"}`
+              : "Nothing to change — they were already like that",
+            refused ? `${plural(refused, "card")} belong to someone else and stayed` : "",
+          ]
+            .filter(Boolean)
+            .join(". "),
+      );
+    };
+    const choices: { id: "draft" | "review" | "published"; title: string }[] = [
+      { id: "draft", title: "Draft" },
+      { id: "review", title: "Ready for review" },
+      { id: "published", title: "Publish" },
+    ];
+    return (
+      <Screen title="Change the status of the selected cards" onBack={close}>
+        <Help>
+          Publish sends drafts and cards waiting for review out to students, and publishes any changes on cards
+          they already have. Draft and Ready for review take published cards away from students until they are
+          published again.
+        </Help>
+        <CheckList
+          options={choices.map((c) => ({
+            id: c.id,
+            title: c.title,
+            note: `changes ${wouldChange(c.id)} of the ${plural(picked.length, "selected card")}`,
+          }))}
+          chosen={to ? [to] : []}
+          onToggle={(id, on) => setStatusAction({ to: on ? null : (id as "draft" | "review" | "published") })}
+        />
+        <div className="at-row at-mt5">
+          <Button variant="ghost" onClick={close} icon="close">
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            icon="check"
+            disabled={!to || busy}
+            onClick={() => (to !== "published" && published.length ? setStatusAction({ to, asking: true }) : go())}
+          >
+            Change status
+          </Button>
+        </div>
+        {statusAction.asking && (
+          <ConfirmModal
+            title={`Unpublish ${plural(published.length, "card")}?`}
+            confirmLabel="Unpublish them"
+            busy={busy}
+            body={
+              <p>
+                {published.length === 1 ? "One of the selected cards is" : `${published.length} of the selected cards are`}{" "}
+                published. Students will stop seeing {published.length === 1 ? "it" : "them"} until{" "}
+                {published.length === 1 ? "it is" : "they are"} published again. Any changes waiting on{" "}
+                {published.length === 1 ? "it" : "them"} stay, and become the card.
+              </p>
+            }
+            onCancel={() => setStatusAction({ to })}
+            onConfirm={go}
+          />
+        )}
+      </Screen>
+    );
+  };
+
   /* What a saved deck holds of the things the screen can change, in the
      shape a draft of it takes — so starting to edit is copying this, and
      whether anything has changed is comparing against it. */
@@ -7649,7 +8266,18 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      put back what was just changed. */
   const saveBuiltins = async (d: Deck, parts: string[], pronounsOn: boolean) => {
     const langId = (langOfDeck(d) || {}).id || d.lang;
-    if (!sameSet(parts, draftOf(d).parts)) await API.setDeckParts(d.id, parts);
+    if (!sameSet(parts, draftOf(d).parts)) {
+      /* Put on screen from the answer, as the Numbers screen does, so
+         nothing has to fetch every deck again to show it. */
+      const r: any = await API.setDeckParts(d.id, parts);
+      setDecks((prev) =>
+        prev.map((x) =>
+          x.id === d.id
+            ? { ...x, parts: (r && r.parts) || parts, ...(r && r.partsWaiting ? { partsWaiting: r.partsWaiting } : null) }
+            : x
+        )
+      );
+    }
     const pron = pronounCardsOf(langId);
     for (const card of pron) {
       const inNow = card.decks || [];
@@ -7675,25 +8303,47 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       newestFirst,
     );
     const flip = (ids: string[], id: string) => (ids.includes(id) ? ids.filter((x) => x !== id) : ids.concat([id]));
-    const apply = () =>
+    /* Saved a card at a time, so the button counts them off: with a dozen
+       picked it is a wait, and a count is what says it is still moving.
+       What each save answers is put on screen as it comes (absorbSaved),
+       so nothing is fetched again at the end. */
+    const apply = () => {
+      if (applying) return;
+      const changing = cards.filter(
+        (c) => c.lang === langId && !isPronounCard(c) && picked.ids.includes(c.id) !== (c.decks || []).includes(d.id)
+      );
+      setApplying({ done: 0, total: changing.length });
       run(async () => {
-        for (const c of cards.filter((x) => x.lang === langId && !isPronounCard(x))) {
+        let done = 0;
+        for (const c of changing) {
           const inNow = c.decks || [];
           const want = picked.ids.includes(c.id);
-          if (want === inNow.includes(d.id)) continue;
           absorbSaved(await saveNamed(c, want ? inNow.concat([d.id]) : inNow.filter((x) => x !== d.id)));
+          done += 1;
+          setApplying({ done, total: changing.length });
         }
         await saveBuiltins(d, picked.parts, picked.pronouns);
         setAdding(null);
-        await refresh();
-      }, `${d.title} saved`);
+      }, `${d.title} saved`).finally(() => setApplying(null));
+    };
     return (
       <Screen title="Add existing cards" onBack={() => setAdding(null)} backIcon="close" backLabel="Cancel"
         className="cardform"
         action={
-          <Button variant="primary" size="sm" className="iconly" aria-label="Done" title="Done" onClick={apply}>
-            <Icon name="check" />
-          </Button>
+          applying ? (
+            <Button variant="primary" size="sm" disabled aria-busy="true">
+              <span className="at-spin" aria-hidden="true" />
+              <span role="status">
+                {applying.total > 1 && applying.done < applying.total
+                  ? `Saving ${applying.done + 1} of ${applying.total}…`
+                  : "Saving…"}
+              </span>
+            </Button>
+          ) : (
+            <Button variant="primary" size="sm" className="iconly" aria-label="Done" title="Done" onClick={apply}>
+              <Icon name="check" />
+            </Button>
+          )
         }
       >
         <Notice kind="error">{error}</Notice>
@@ -7777,18 +8427,27 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     const said = items.length === 1
       ? `${isNumberPart(items[0]) ? items[0].label : isPronounGroup(items[0]) ? "Pronouns" : "Card"} removed from ${d.title}`
       : `${plural(items.length, "card")} removed from ${d.title}`;
+    /* Each save's answer is put on screen as it comes, so nothing is
+       fetched again afterwards — that fetch was most of the wait. */
+    const ids = items.map((it) => it.id);
+    if (ids.some((id) => leaving.has(id))) return;
+    const mark = (on: boolean) =>
+      setLeaving((now) => {
+        const next = new Set(now);
+        for (const id of ids) on ? next.add(id) : next.delete(id);
+        return next;
+      });
+    mark(true);
     run(async () => {
       for (const c of cardsOut) absorbSaved(await saveNamed(c, (c.decks || []).filter((x) => x !== d.id)));
       if (builtins) await saveBuiltins(d, was.parts.filter((x) => !partsOut.includes(x)), pronOn && !pronOut);
       setSelCards(new Set());
-      await refresh();
       return true;
-    }).then((ok) => ok &&
+    }).finally(() => mark(false)).then((ok) => ok &&
       snack(said, "good", () =>
         run(async () => {
           for (const c of cardsOut) absorbSaved(await saveNamed(c, c.decks || []));
           if (builtins) await saveBuiltins(d, was.parts, pronOn);
-          await refresh();
         }, "Put back")
       )
     );
@@ -7829,7 +8488,11 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         {extra ? <div className="at-miniacts">{extra}</div> : null}
       </div>
     );
-    const removeBtn = (it: any) => (
+    const removeBtn = (it: any) => leaving.has(it.id) ? (
+      <span className="at-spinslot" role="status" aria-label="Removing from this deck…">
+        <span className="at-spin" aria-hidden="true" />
+      </span>
+    ) : (
       <IconButton
         icon="remove"
         label="Remove from this deck"
@@ -7946,6 +8609,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               { label: "Add to another deck", onClick: () => setCardAction("add") },
               { label: "Add tags", onClick: () => setTagAction("add") },
               { label: "Remove tags", onClick: () => setTagAction("remove") },
+              { label: "Change status", onClick: () => setStatusAction({ to: null }) },
               { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(realIds(picked)) },
               {
                 label: "Delete",
@@ -7966,6 +8630,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
           {exportScreen}
           {importScreen}
           {tagAction && tagActionScreen()}
+          {statusAction && statusActionScreen()}
           {cardsConfirm}
         </Screen>
       );
@@ -8234,6 +8899,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         {cardAction === "add" && cardActionScreen(d.id)}
         {exportScreen}
         {tagAction && tagActionScreen()}
+        {statusAction && statusActionScreen()}
 
         {discardingDeck && (
           <ConfirmModal
@@ -8296,6 +8962,34 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         )}
       </Field>
     );
+    /* A deck put in or taken out of this course. What the server saved
+       comes back with the answer — the deck's courses and the course's
+       decks — and is put on screen as it is, rather than fetching every
+       course, deck and card again: that fetch is what made each tap take
+       seconds. */
+    const toggleDeck = (id: string, on: boolean) => {
+      if (deckSaving[id]) return;
+      const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
+      setDeckSaving((now) => ({ ...now, [id]: on ? "drop" : "add" }));
+      run(
+        async () => {
+          const r: any = on ? await API.detachDeck(id, c.id) : await API.attachDeck(id, c.id);
+          const saved = r && r.deck;
+          if (saved && Array.isArray(saved.courses))
+            setDecks((prev) => prev.map((d) => (d.id === id ? { ...d, courses: saved.courses } : d)));
+          else await refresh(true);
+          if (r && r.course && Array.isArray(r.course.decks))
+            setCourses((prev) => prev.map((x) => (x.id === c.id ? { ...x, decks: r.course.decks } : x)));
+        },
+        on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
+      ).finally(() =>
+        setDeckSaving((now) => {
+          const next = { ...now };
+          delete next[id];
+          return next;
+        }),
+      );
+    };
     return (
       /* Laid out like a deck's screen — see .at-screen.cardform: one sheet
          ruled into sections, each headed at the editor's size with what it
@@ -8360,17 +9054,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
                   chosen={mine.map((d) => d.id)}
                   onOpen={(id) => setOpenDeck(id)}
-                  onToggle={(id, on) => {
-                    const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
-                    run(
-                      async () => {
-                        if (on) await API.detachDeck(id, c.id);
-                        else await API.attachDeck(id, c.id);
-                        await refresh();
-                      },
-                      on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
-                    );
-                  }}
+                  onToggle={toggleDeck}
+                  saving={deckSaving}
                   find={{
                     placeholder: "Search decks",
                     match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
@@ -8393,17 +9078,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                       decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
                       chosen={mine.map((d) => d.id)}
                       onOpen={(id) => setOpenDeck(id)}
-                      onToggle={(id, on) => {
-                        const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
-                        run(
-                          async () => {
-                            if (on) await API.detachDeck(id, c.id);
-                            else await API.attachDeck(id, c.id);
-                            await refresh();
-                          },
-                          on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
-                        );
-                      }}
+                      onToggle={toggleDeck}
+                      saving={deckSaving}
                       find={{
                         placeholder: "Search decks",
                         match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
@@ -8616,6 +9292,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
 
               {cardAction && cardActionScreen()}
               {tagAction && tagActionScreen()}
+              {statusAction && statusActionScreen()}
 
 
               {/* What is waiting on the teacher: sentences nobody has read
@@ -8740,6 +9417,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   { label: "Remove from a deck", onClick: () => setCardAction("remove") },
                   { label: "Add tags", onClick: () => setTagAction("add") },
                   { label: "Remove tags", onClick: () => setTagAction("remove") },
+                  { label: "Change status", onClick: () => setStatusAction({ to: null }) },
                   { label: "Export", icon: "download", onClick: (picked: string[]) => exportCards(pickedIds(picked)) },
                   {
                     label: "Delete",
@@ -9288,6 +9966,7 @@ function SpacesTab() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [making, setMaking] = useState<{ name: string; slug: string; adminName: string; self: boolean } | null>(null);
   const [made, setMade] = useState<{ name: string; admin: string; key: string; slug: string } | null>(null);
+  const [restoringAny, setRestoringAny] = useState(false);
   /* Whether it worked, which a dialog waits on before it closes. */
   const run = async (work: () => Promise<unknown>, said?: string) =>
     (await runIt(async () => {
@@ -9314,6 +9993,22 @@ function SpacesTab() {
 
 
   const open = orgs && openId ? orgs.find((o) => o.id === openId) || null : null;
+
+  /* A space's file, for a space that may no longer exist (0.583): the
+     file says which space it is. */
+  if (restoringAny) {
+    return (
+      <BackupFlow
+        mode="restore"
+        door={{ kind: "space" }}
+        stem="space"
+        onClose={() => {
+          setRestoringAny(false);
+          load();
+        }}
+      />
+    );
+  }
 
   if (making) {
     return (
@@ -9376,10 +10071,15 @@ function SpacesTab() {
     <>
       {dialog}
       <Notice kind="error">{error}</Notice>
-      <Button variant="primary" icon="add" style={{ marginBottom: 14 }}
-        onClick={() => setMaking({ name: "", slug: "", adminName: "", self: true })}>
-        New space
-      </Button>
+      <div className="at-row" style={{ marginBottom: 14 }}>
+        <Button variant="primary" icon="add"
+          onClick={() => setMaking({ name: "", slug: "", adminName: "", self: true })}>
+          New space
+        </Button>
+        <Button variant="ghost" icon="refresh" onClick={() => setRestoringAny(true)}>
+          Restore a space from a file
+        </Button>
+      </div>
       {made && (
         <div className="at-sub">
           <CodeBox label={`Sign-in key for ${made.admin}, space admin of ${made.name}`} code={made.key} />
@@ -9793,14 +10493,17 @@ function OthersWork({ name, what }: { name?: string; what: "deck" | "card" }) {
 
 
 /*
- * A space's storage figures and its export (0.546; 60a, 63a): how much it
- * holds, and the whole of it in one file — its people, courses, decks,
- * cards, recordings and pictures, without anyone's My space.
+ * A space's storage figures, its backup and its restore (0.546; 60a, 63a;
+ * 0.583, docs/PLAN-space-backup.md): how much it holds, and the whole of it
+ * in one file — its people, courses, decks, cards, recordings and pictures,
+ * its members' My space here, and every member's practice — with the same
+ * choice of parts as the site's backup. Put back through the same engine as
+ * the site's, which never overwrites.
  */
 function SpaceExtras({ org }: { org: API.OrgRow }) {
   const [usage, setUsage] = useState<API.OrgUsage | null>(null);
-  const [progress, setProgress] = useState("");
-  const [error, setError] = useState("");
+  const [flow, setFlow] = useState<"download" | "restore" | null>(null);
+  const [said, setSaid] = useState("");
   useEffect(() => {
     let live = true;
     API.orgUsage(org.id).then((r) => live && setUsage(r.usage), () => {});
@@ -9810,40 +10513,35 @@ function SpaceExtras({ org }: { org: API.OrgRow }) {
   }, [org.id]);
   const megabytes = usage ? (usage.bytes / (1024 * 1024)).toFixed(1) : "";
   return (
-    <Section title="Storage and export">
-      <Notice kind="error">{error}</Notice>
+    <Section title="Storage and backup">
       {usage ? (
         <Help>
           {plural(usage.people, "person")}, {plural(usage.courses, "course")}, {plural(usage.decks, "deck")},{" "}
-          {plural(usage.cards, "card")}; {plural(usage.recordings, "recording")} and {plural(usage.pictures, "picture")},{" "}
-          about {megabytes} MB. A recording used by two spaces counts in both.
+          {plural(usage.cards, "card")}, including everyone's My space here; {plural(usage.recordings, "recording")} and{" "}
+          {plural(usage.pictures, "picture")}, about {megabytes} MB. A recording used by two spaces counts in both.
         </Help>
       ) : null}
-      <Button size="sm" icon="download" disabled={!!progress}
-        onClick={async () => {
-          setError("");
-          setProgress("Starting…");
-          try {
-            const { blob, manifest } = await buildBackup(
-              (done, total) => setProgress(`${done} of ${total}`),
-              ALL_PARTS,
-              () => API.exportOrgManifest(org.id),
-            );
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement("a");
-            const stamp = new Date(manifest.takenAt).toISOString().slice(0, 16).replace(/[:T]/g, "-");
-            a.href = url;
-            a.download = `space-${org.slug}-${stamp}.json`;
-            a.click();
-            setTimeout(() => URL.revokeObjectURL(url), 60000);
-          } catch (e) {
-            setError(API.explain(e));
-          } finally {
-            setProgress("");
+      <div className="at-row">
+        <Button size="sm" icon="download" onClick={() => setFlow("download")}>
+          Back up this space
+        </Button>
+        <Button size="sm" variant="ghost" icon="refresh" onClick={() => setFlow("restore")}>
+          Restore this space from a file
+        </Button>
+      </div>
+      {said ? <Help>{said}</Help> : null}
+      {flow && (
+        <BackupFlow
+          mode={flow}
+          door={{ kind: "space", space: org.id, name: org.name }}
+          source={() => API.exportOrgManifest(org.id)}
+          stem={`space-${org.slug}`}
+          onClose={() => setFlow(null)}
+          onFinished={(p) =>
+            setSaid(p.state === "done" ? `Saved a backup of ${org.name}. ${p.note || ""}` : p.note || "")
           }
-        }}>
-        {progress ? `Exporting · ${progress}` : "Export this space"}
-      </Button>
+        />
+      )}
     </Section>
   );
 }

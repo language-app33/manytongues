@@ -210,6 +210,7 @@ const PLACES: Record<string, [string, string]> = {
   StripAsk: [TEACH, "Editing a card · taking a tag off every card"],
   RecordingOverlays: [TEACH, "Editing a card · recording a form"],
   DeckSwitch: [TEACH, "Editing a card · which decks it is in"],
+  DeckPickScreen: [TEACH, "Putting cards in decks · a card being written, or selected cards"],
   Nudge: [TEACH, "An empty part of a deck, course or card, inviting you to fill it"],
   ChoiceSwitch: [TEACH, "Editing a card · its subtype, and a built session's mode"],
   BlankNameBox: [TEACH, "Editing a card · naming a blank nobody has named yet"],
@@ -282,6 +283,8 @@ const PLACES: Record<string, [string, string]> = {
   LearnSpaceButton: [LEARN, "Learning · which space, from the top right corner"],
   StrandedPanel: [LEARN, "Signed in with no space to open: suspended, removed or left"],
   BackupScreen: [ADMIN, "App · backing up and restoring"],
+  RestoreResult: [ADMIN, "App · what a restore did"],
+  BackupFlow: [ADMIN, "App · backing up and restoring"],
   ClearScreen: [ADMIN, "App · clearing the site"],
 
   /* Before you are signed in */

@@ -93,6 +93,7 @@ import {
   ChoiceSwitch,
   Popover,
   DeckSwitch,
+  DeckPickScreen,
   Locked,
   Pressable,
   AudioPrompt,
@@ -1416,6 +1417,11 @@ const picturesOf = (made: number): string => (made ? plural(made, "image") : "Ad
  * phone — to take one with the camera. Choosing opens the device's own
  * picker, which on a phone offers the camera anyway; the second button is
  * the shortcut for the teacher standing in front of the thing.
+ *
+ * A picture copied elsewhere — a screenshot, an image copied from a web
+ * page — can be pasted straight in: Ctrl/⌘+V anywhere on the screen, or
+ * the Paste button where the browser lets a page read the clipboard
+ * (it asks the first time, or offers its own Paste bubble on a phone).
  */
 export function ImageScreen({ title, images, onChange, onClose }: {
   title: string;
@@ -1456,6 +1462,48 @@ export function ImageScreen({ title, images, onChange, onClose }: {
     }
   }
 
+  /* The newest of add, for the paste listener set once below. */
+  const addRef = useRef(add);
+  addRef.current = add;
+  const canPaste = !locked && !busy && !full;
+  useEffect(() => {
+    if (!canPaste) return;
+    const onPaste = (e: ClipboardEvent) => {
+      /* A paste into a box of text is that box's, not a picture. */
+      const t = e.target as HTMLElement | null;
+      if (t && (t.isContentEditable || /^(INPUT|TEXTAREA)$/.test(t.tagName))) return;
+      const items = Array.from((e.clipboardData && e.clipboardData.items) || []);
+      const pic = items.find((it) => it.kind === "file" && /^image\//.test(it.type));
+      if (pic) {
+        e.preventDefault();
+        addRef.current(pic.getAsFile());
+      } else if (items.length) {
+        setError("There's no picture on the clipboard. Copy an image first, then paste.");
+      }
+    };
+    document.addEventListener("paste", onPaste);
+    return () => document.removeEventListener("paste", onPaste);
+  }, [canPaste]);
+
+  /* The button's way: asks the browser for what was copied. */
+  const readable = typeof navigator !== "undefined" && !!(navigator.clipboard && navigator.clipboard.read);
+  async function pasteFromClipboard() {
+    setError("");
+    try {
+      for (const item of await navigator.clipboard.read()) {
+        const type = item.types.find((t) => /^image\//.test(t));
+        if (type) {
+          const blob = await item.getType(type);
+          await add(new File([blob], `pasted.${type.split("/")[1] || "png"}`, { type }));
+          return;
+        }
+      }
+      setError("There's no picture on the clipboard. Copy an image first, then paste.");
+    } catch {
+      setError("The browser didn't let the app read the clipboard. Try Ctrl+V (⌘+V on a Mac) instead.");
+    }
+  }
+
   const picker = (label: string, icon: string, camera: boolean) => (
     <label className={`at-btn sm${camera ? " ghost" : ""}${busy || full ? " off" : ""}`}>
       <Icon name={icon} />
@@ -1479,7 +1527,7 @@ export function ImageScreen({ title, images, onChange, onClose }: {
     <Screen title={title} onBack={onClose} rise backLabel="Back to the card">
       <Help>
         A picture of what this form means, shown with it. Up to {MAX_IMAGES}. A card with no
-        picture is still a card.
+        picture is still a card. A picture you have copied can be pasted here too.
       </Help>
       <Notice kind="error">{error}</Notice>
       <section className="at-panel">
@@ -1506,6 +1554,17 @@ export function ImageScreen({ title, images, onChange, onClose }: {
           <div className="at-chips" style={{ marginTop: 12 }}>
             {picker("Choose an image", "image", false)}
             {picker("Take a photo", "camera", true)}
+            {readable && (
+              <button
+                type="button"
+                className={`at-btn sm ghost${busy || full ? " off" : ""}`}
+                disabled={busy || full}
+                onClick={pasteFromClipboard}
+              >
+                <Icon name="paste" />
+                Paste
+              </button>
+            )}
           </div>
         )}
         {!locked && full && <Help>That is as many as one form may have. Remove one to add another.</Help>}
@@ -6635,7 +6694,7 @@ function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, d
  * the Advanced tab writes it in — so ticking the box carries it over
  * without anything to copy: it is the same form.
  */
-function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onExport, onToSpace, onDelete }: {
+function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onSetDecks, onCreateDeck, onExport, onToSpace, onDelete }: {
   lang: Lang;
   scene: boolean;
   word: WordDraft;
@@ -6649,6 +6708,11 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   decks: Deck[];
   chosen: string[];
   onToggleDeck: (id: string, on: boolean) => void;
+  /** Every deck the card is in at once — what Done on the decks screen
+      leaves ticked. */
+  onSetDecks: (ids: string[]) => void;
+  /** Make a deck in the card's language, from the decks screen. */
+  onCreateDeck?: (title: string) => Promise<Deck | null | undefined>;
   /** Export the card, where it can be — on a saved card being read. */
   onExport?: () => void;
   /** A My space card into the space (0.549): copy or move it into a deck. */
@@ -6658,8 +6722,39 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
 }) {
   /* Read, the panel for a card in no deck says so and offers nothing. */
   const locked = useContext(Locked);
+  /* The decks ticked on the decks screen while it is open, and null while
+     it is shut. A draft, so Cancel leaves the card's decks as they were
+     (0.594). */
+  const [picking, setPicking] = useState<string[] | null>(null);
   return (
     <>
+    {picking && (
+      <DeckPickScreen
+        title="Add this card to…"
+        decks={decks}
+        chosen={picking}
+        onToggle={(id, on) => setPicking((x) => (x ? (on ? x.filter((y) => y !== id) : x.concat([id])) : x))}
+        onCreate={
+          onCreateDeck
+            ? async (title) => {
+                /* Made, then ticked: the deck just named is the one this
+                   card was about to go in. */
+                const made = await onCreateDeck(title);
+                if (made) setPicking((x) => (x ? x.concat([made.id]) : x));
+                return made;
+              }
+            : undefined
+        }
+        newHint={`It will be a ${lang.name} deck.`}
+        confirm="Done"
+        onCancel={() => setPicking(null)}
+        onConfirm={() => {
+          onSetDecks(picking);
+          setPicking(null);
+        }}
+        empty={`No ${lang.name} decks yet. Make one with New deck, above.`}
+      />
+    )}
     <div className="at-formblock">
       <div className="at-formhead">
         <span className="at-formnum">This card</span>
@@ -6759,7 +6854,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
           )}
           {chosen.length || !locked ? (
             <div className={chosen.length ? "at-deckhold" : "at-nudgeact"}>
-              <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} />
+              <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} onAdd={() => setPicking(chosen.slice())} />
             </div>
           ) : null}
         </div>
@@ -9723,7 +9818,11 @@ function NounEditor({ word, lang, allCards, selfId }: {
               index={i}
               form={f}
               title={box.title}
-              role={box.help ? box.help : i < 0 ? "Empty — never asked." : ""}
+              /* What to write, then — where the box is asked and nothing is
+                 in it yet — that it is not asked until it is. A box that is
+                 never asked on its own (the plural after three to ten) says
+                 so in its own line, so only that line. */
+              role={[box.help || "", i < 0 && !box.unasked ? "Empty — never asked." : ""].filter(Boolean).join(" ")}
               of={box.title.toLowerCase()}
               canCopy={false}
               /* Already marked: the box says what it is. A card whose answers
@@ -10501,7 +10600,7 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   );
 }
 
-export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below, error = null }: {
+export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below, error = null }: {
   card: Card | null;
   /** Why the last save failed, said inside this screen, which covers the
       space it opened from (0.580, audit finding 12). */
@@ -10509,8 +10608,12 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   lang: Lang;
   decks: Deck[];
   inDecks?: string[];
+  /** Make a deck in this card's language from its decks screen, so a card
+      written for a deck not yet made need not be left to make it (0.594).
+      Resolves to the deck made, or nothing where it could not be. */
+  onCreateDeck?: (title: string) => Promise<Deck | null | undefined>;
   allCards: Card[];
-  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean }) => void;
+  onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean, publish: boolean }) => void;
   /** Open another of the teacher's cards in place of this one — the
       cards the Meanings block names. */
   onOpenCard?: (card: Card) => void;
@@ -10644,7 +10747,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     !(card && SPEAKER_COLUMNS.has(String(card.person || "")));
   /* The question a change to a shared word asks, while it is being asked:
      what would be saved, and which cards it would be offered to. */
-  const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null, exit: boolean } | null>(null);
+  const [carrying, setCarrying] = useState<{ written: ReturnType<typeof writtenCard>, cards: Card[], changes: WordChange[], next: "meaning" | "word" | null, exit: boolean, publish: boolean } | null>(null);
   const meanings = advanced && shape === "word";
   /* The card as a save would write it — a basic card cut down to its word. */
   const written = () => {
@@ -10704,11 +10807,16 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   /* A tap on a field of a card being read. */
   /* Read fields are plain words now, so a tap on one needs no answer. */
   const viewOnly = () => {};
-  /* The floating Save: saves where it can, and otherwise says why not. */
-  const trySave = () => {
+  /* Which of the two floating buttons sent the save under way, so only
+     that one says it is busy. */
+  const [publishing, setPublishing] = useState(false);
+  /* The floating Save, and Save and publish beside it: saves where it can,
+     and otherwise says why not. */
+  const trySave = (publish = false) => {
     if (busy) return;
     if (canSave && changed) {
-      save();
+      setPublishing(publish);
+      save(null, false, publish);
       return;
     }
     setNameAsked(true);
@@ -10722,7 +10830,9 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
   const leave = () => (changed ? setDiscarding(true) : quit());
   /* `exit` is Save and exit: the card is saved and the editor closes.
      Save alone keeps it open on the card as saved. */
-  const save = (next: "meaning" | "word" | null = null, exit = false) => {
+  /* `publish` is Save and publish: the same save, sent out to students in
+     the same request. */
+  const save = (next: "meaning" | "word" | null = null, exit = false, publish = false) => {
     sending.current = snapshot;
     const out = written();
     const extra = {
@@ -10733,10 +10843,10 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
     const changes = stored && shape === "word" ? wordChanges(card, out.forms as any) : [];
     const others = cardsSharingChange(allCards, { id: selfId, lang: lang.id }, changes);
     if (others.length) {
-      setCarrying({ written: out, cards: others, changes, next: extra.next, exit });
+      setCarrying({ written: out, cards: others, changes, next: extra.next, exit, publish });
       return;
     }
-    onSave({ ...out, ...extra, carry: null, exit });
+    onSave({ ...out, ...extra, carry: null, exit, publish });
   };
   /* Whether there is a connection, for the line above the first field. */
   const offline = useOffline();
@@ -10832,7 +10942,14 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
         fab={
           locked
             ? onUnlock ? { icon: "edit", label: "Edit", onClick: onUnlock } : null
-            : { icon: "save", label: "Save", off: !canSave || !changed, busy: !!busy, onClick: trySave }
+            : [
+                /* Beside Save, and quieter than it: what a Save would
+                   write, published in the same step. Off whenever Save is
+                   — changes already waiting are published from the status
+                   menu. */
+                { icon: "verify", label: "Save and publish", busyLabel: "Publishing…", second: true, off: !canSave || !changed || (!!busy && !publishing), busy: !!busy && publishing, onClick: () => trySave(true) },
+                { icon: "save", label: "Save", off: !canSave || !changed || (!!busy && publishing), busy: !!busy && !publishing, onClick: () => trySave(false) },
+              ]
         }
       >
           {error && <Notice kind="error">{error}</Notice>}
@@ -10873,6 +10990,8 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               onToggleDeck={(id, on) =>
                 setChosen((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
               }
+              onSetDecks={setChosen}
+              onCreateDeck={onCreateDeck}
               onExport={locked ? onExport : undefined}
               onToSpace={locked ? onToSpace : undefined}
               onDelete={!locked && stored && onDelete ? onDelete : undefined}
@@ -10990,7 +11109,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
           cards={carrying.cards}
           onCancel={() => setCarrying(null)}
           onAnswer={(carry) => {
-            const { written, cards, changes, next, exit } = carrying;
+            const { written, cards, changes, next, exit, publish } = carrying;
             setCarrying(null);
             onSave({
               ...written,
@@ -10998,6 +11117,7 @@ export function CardEditor({ card, lang, decks, inDecks, allCards, onSave, onDel
               capitals: asksCapitals ? capitals : undefined,
               next,
               exit,
+              publish,
               carry: carry ? { ids: cards.map((c) => c.id), changes } : null,
             });
           }}

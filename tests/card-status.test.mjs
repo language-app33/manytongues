@@ -382,3 +382,48 @@ test("an import is Ready for review: a new card is, and a published card's chang
   const handed = must((await material(studentKey)).cards.find((/** @type {any} */ c) => c.id === card.id), "the card");
   assert.equal(handed.forms[0].en, "book");
 });
+
+test("save and publish: a new card and a published card's changes reach students in one save", async () => {
+  const { key, deckId, studentKey } = await classroom("Nour");
+  const first = await material(studentKey);
+
+  /* A new card, which the card screen would otherwise make a draft. */
+  const made = await api("save-card", {
+    key,
+    body: { card: word("شمس", "sun"), decks: [deckId], status: "draft", publish: true },
+  });
+  assert.equal(made.status, 200, made.text);
+  assert.equal(made.json.card.status, "published");
+  const card = made.json.card;
+  const second = await material(studentKey);
+  assert.notEqual(second.version, first.version, "publishing is news to the student's device");
+  assert.ok(second.cards.some((/** @type {any} */ c) => c.id === card.id), "the student has it");
+
+  /* A change to it from the card screen, which would otherwise wait. */
+  const changed = await api("save-card", {
+    key,
+    body: {
+      card: { ...card, forms: [{ ...card.forms[0], en: "the sun" }] },
+      decks: [deckId],
+      into: "changes",
+      publish: true,
+    },
+  });
+  assert.equal(changed.status, 200, changed.text);
+  assert.equal(changed.json.card.status, "published");
+  assert.equal(changed.json.card.changes, undefined, "nothing is left waiting");
+  const third = await material(studentKey);
+  assert.notEqual(third.version, second.version);
+  const handed = must(third.cards.find((/** @type {any} */ c) => c.id === card.id), "the student's card");
+  assert.equal(handed.forms[0].en, "the sun");
+
+  /* And a draft that already exists, published by the save that edits it. */
+  const draft = await api("save-card", { key, body: { card: word("قمر", "moon"), decks: [deckId], status: "draft" } });
+  const out = await api("save-card", {
+    key,
+    body: { card: { ...draft.json.card, forms: [{ ar: "قمر", en: "the moon", lat: "" }] }, decks: [deckId], into: "changes", publish: true },
+  });
+  assert.equal(out.json.card.status, "published");
+  const fourth = await material(studentKey);
+  assert.equal(must(fourth.cards.find((/** @type {any} */ c) => c.id === draft.json.card.id), "the draft, out").forms[0].en, "the moon");
+});

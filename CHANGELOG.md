@@ -8,6 +8,440 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.598 — 9 November 2026
+
+**Five places where what the app said about a card's progress disagreed
+with what it did.** Found by going through the progress, scheduling and
+review-date code after 0.597.
+
+- **"This was too easy" on a Cleared card now counts as one of its two
+  reviews.** It used to say "counted as learnt" while leaving the card
+  Cleared with two reviews to go — and, because flagging a question also
+  takes it out of the grading, it threw away the very answer that would
+  have been a review had the question come round. Now the message says
+  "Counted as a review. One more, when it comes round, and it's learnt" —
+  or "Counted as a review — learnt" on the second. A review that had
+  genuinely come round is moved on so the card isn't dealt again next
+  session for a second one; one flagged early keeps its date, as every
+  early answer does. It counts on each of the card's top questions, so a
+  word with a picture moves too.
+- **Fix mistakes no longer keeps dealing a card for a slip on a question
+  it will never ask again.** A card at the top of its ladder is asked its
+  hardest question only, so a slip on an easier one (reading the script,
+  say) before the climb stayed in the record for good, and the card was in
+  every Fix mistakes session — dealt the one question it had never got
+  wrong. It now looks only at the questions a session can ask, as Weak
+  spots already did, so the two modes agree.
+- **The home screen no longer promises new words the session can't bring
+  in.** A sentence with a gap counted as ready to learn while none of the
+  words that could fill the gap were cleared yet, though the session
+  rightly left it out — so it could say "ready to learn 12 new words" and
+  bring 2. The count now uses the same test as the session.
+- **"2 reviews to go" says when it means on each of several questions.**
+  A word with a picture is written from its meaning and from the picture,
+  and each makes its own reviews; the card reports the fewer. So a card
+  could say "First review due now", have its review, and still say "First
+  review due now" — the other question hadn't had its turn. The card now
+  reads "Cleared · 2 reviews to go on each of 2 questions", and the line
+  above the Cleared list says the same. Nothing about how Learnt is
+  earned changes.
+- **A Cleared card you've just slipped on says so, instead of "First
+  review due now".** Miss its hardest question and leave the session
+  before the retry, and the card stayed Cleared with "First review due
+  now" — but that review couldn't count until the retry was got right,
+  so the count stood still after it. It now reads "Slipped · retry due
+  now, then the first review" (or "retry in 8m").
+- Each is covered by a test, except the home-screen count, whose change
+  is one word that makes it read the same list as the session; still to
+  be looked at by hand: a Cleared card's tile after Too easy, and the
+  Cleared list's wording on a card with a picture.
+
+## 0.597 — 9 November 2026
+
+**A learnt card no longer says "Review due now" when nothing on it is due.**
+
+- A card you have learnt is only ever asked its hardest question — writing
+  the word from its meaning. The easier questions below it stay on the
+  card but are never asked again, so their review dates quietly passed
+  and the card then read "Review due now" on the Progress tab for good:
+  no session would deal those questions, the hardest one wasn't due yet,
+  and a right answer on it moved nothing. It was most visible in a custom
+  session built on such a card, which was met several times over and
+  still said due.
+- The date on a learnt card is now the hardest question's — "Next review
+  in 20d" — the same question the home screen counts and a session asks.
+  Cards whose hardest question really is due still say "Review due now",
+  and answering it still moves the card as before. Cleared cards already
+  read this way and are unchanged.
+- Nothing about scheduling changes: no card's dates move, only what the
+  tile says. Covered by a test.
+
+## 0.596 — 9 November 2026
+
+**A copied picture can be pasted onto a card.**
+
+- On the screen for adding a picture, a picture you have copied — a
+  screenshot, or an image copied from a web page — can be pasted with
+  Ctrl+V (⌘+V on a Mac), or with the new Paste button beside Take a photo.
+- The first time the Paste button is used, the browser may ask to allow
+  it; on a phone it may show its own Paste bubble to tap. Where a browser
+  can't offer the button at all, it isn't shown, and Ctrl+V still works.
+- If what was copied is text rather than a picture, the screen says so.
+- Checked in a browser: Ctrl+V and the button each added a picture, and
+  copied text gave the message. Still to try by hand on a phone.
+
+## 0.595 — 9 November 2026
+
+**More places say they are working, and two of them are quicker.**
+
+For teachers:
+
+- **Putting a range of numbers in a deck** (Numbers → a range → Decks)
+  shows "Adding…" or "Removing…" with the turning ring on that deck until
+  it is saved, as a course's decks do since 0.590.
+- **Removing cards from a deck** (a card's Remove, or Remove from this
+  deck on several) shows the ring where Remove was until they have gone,
+  and Remove can't be pressed twice meanwhile. It is also much quicker:
+  it no longer reloads all your courses, decks and cards afterwards. The
+  same goes for Undo on the message that follows.
+- **Add existing cards → Done** turns into "Saving 3 of 12…" with the
+  ring while it works through the cards you picked, and can't be pressed
+  again. It no longer reloads everything at the end either.
+- **"Working…" now shows on every screen in Teaching and Admin**, not
+  only their main tabs: a course, a deck, Manage cards and the rest say it too
+  when something takes more than half a second. Like the confirmation
+  message, it sits near the bottom and can briefly cover what is there.
+
+## 0.594 — 9 November 2026
+
+**Make a deck while writing a card.**
+
+- In a card's Decks section, "Add this card to a deck" (and "Another
+  deck") now opens the same screen used to add selected cards to decks:
+  **New deck** at the top, the decks to tick below, and Cancel or Done at
+  the foot.
+- New deck asks only for a name and says which language the deck will be
+  — the card's. Create makes it and ticks it, so Done puts the card in it.
+- The card's decks start ticked. Nothing changes until Done; Cancel leaves
+  them as they were. The card itself is still saved with Save.
+- A card with no decks yet offers the same button, where it used to say
+  to go and make one under Decks.
+- Trade-off: choosing a card's decks is now a full screen with a Done
+  press, where it was a small window that took each tap at once.
+- Unchanged: the selected-cards screen, and choosing a course's decks,
+  Prep mode's decks and Build a session's decks.
+
+## 0.593 — 9 November 2026
+
+**A noun's dual box says how to write its English.**
+
+- On the Advanced tab of an Arabic or Hebrew noun, the Dual box now says
+  to write the English with "two", like "two hours", so it doesn't read
+  the same as the plural. It shows on both sides of a person or an animal.
+- While the Dual box is empty it still says it is never asked, after that
+  line.
+
+## 0.592 — 9 November 2026
+
+**Change the status of several cards at once.**
+
+- Tick cards in the Cards tab, or in a deck's Manage cards, and the bulk
+  actions now have Change status: Draft, Ready for review or Publish, each
+  saying how many of the ticked cards it would change.
+- Publish sends drafts and cards waiting for review out to students, and
+  publishes the changes waiting on cards they already have. Published cards
+  with nothing waiting are left as they are.
+- Draft and Ready for review take published cards away from students. When
+  any of the ticked cards are published, the app says how many and asks
+  before unpublishing them; any changes waiting on them become the card.
+- Cards that belong to someone else are left and counted in the message.
+- To check by hand: a mix of draft, waiting, published and changed cards
+  through each choice, on both lists.
+
+## 0.591 — 9 November 2026
+
+**Save and publish, beside Save, when editing a card.**
+
+- Editing a card now has two floating buttons: Save, in the corner as
+  before, and Save and publish beside it. Save and publish saves the card
+  and sends it to students in one go — a new card, a draft, or changes to
+  a card that is already out. Afterwards the card is shown as read, with
+  "Published" at the top.
+- It is off whenever Save is off. Changes already waiting from an earlier
+  Save are still published from the status menu.
+- Offline, the card is kept on the device as Save does, and published
+  when the connection comes back.
+- It is offered on every card, "Ready for review" included: anyone who can
+  edit a card could already publish it from the status menu.
+- Save and publish is the quieter of the two, so the corner keeps the
+  button a thumb is used to. Checked at phone widths down to 320px: both
+  names fit.
+
+## 0.590 — 9 November 2026
+
+**Adding a deck to a course is quicker, and says it is working.**
+
+For teachers:
+
+- **A deck you tap in a course's deck list says "Adding…"** (or
+  "Removing…") with a small turning ring until it is saved, then switches
+  to "Added". It can't be tapped again while it is saving, so a second
+  tap no longer undoes the first. Taking a deck out with the × on its
+  name shows the same ring.
+- **And the wait is much shorter.** Each tap used to reload all your
+  courses, decks and cards before anything on screen changed; now only
+  the one change is saved and shown.
+- The "added to the course" message still appears where it did, and can
+  still cover "Another deck" on some screens; that is left for later.
+
+## 0.589 — 8 November 2026
+
+**A backup from before spaces goes back into your space, cards and all.**
+
+For admins:
+
+- **Restoring an old backup no longer leaves a course's decks empty.**
+  Backups taken before spaces arrived (2 November) don't say which space
+  their courses, decks and cards belong to, and Restore filed them all
+  under Main. A class that had since moved to a space of its own then
+  showed its decks, each saying how many cards it held, with no cards in
+  them, for the teacher and the students alike.
+- **Now that material goes into the space you restore from.** Restore
+  says so before you press it, names the space, and tells you to switch
+  to another space first if that is where it belongs. Anything that
+  already names a space keeps it.
+- **If this has already happened to you**, switch to the space the class
+  belongs to and restore the same file again from Super admin → App. The
+  cards an earlier restore left in Main move into the space and appear.
+  This is the one thing a restore now changes about something already on
+  the site: it gives material from before spaces a space, and nothing
+  else about it changes.
+
+Trade-off: restored from inside a space, material from before spaces that
+is still in Main moves into that space, so restore an old backup from the
+space it belongs to. Restored from Main, nothing changes from before. To
+check by hand: in a space other than Main, restore a backup from before
+2 November, then open a deck in Teaching and as a student.
+
+## 0.588 — 8 November 2026
+
+**Playing a recording picks it up, ready to pair.**
+
+- In "Match each recording to its word", and in the grids that match
+  number recordings to their figures, pressing a recording's play button
+  now also selects it, so the next tap on the right pairs it. Before,
+  playing only played, and the card had to be tapped as well.
+- Playing a recording that is already paired only plays it: the pair is
+  kept.
+- With a word on the right already selected, playing recordings only
+  plays them, so listening for the right one pairs nothing and the word
+  stays selected. Tap the card itself to pair it.
+- Tapping a card outside its play button still selects it, deselects it,
+  pairs it or frees it, as before. Stopping a recording does not
+  deselect it.
+- Selecting a recording by playing it does not make the soft tap from
+  0.585: the recording is already sounding.
+
+To check by hand: in a listening grid, play a recording, then tap a word
+on the right — they should pair. Play a paired recording — it should stay
+paired.
+
+## 0.587 — 8 November 2026
+
+**A new custom session mode, Catch up: only what is due.**
+
+For learners:
+
+- **Catch up practises only the cards waiting for you** among the decks
+  and cards you pick: reviews that have come round, and cards you are
+  still learning whose next question has. It never brings in a new card.
+- **Each card is asked only the questions that are due**, nothing early.
+- **The longest waiting come first** when more is due than fits.
+- **Pick a length as usual, or "Everything due"** to clear the whole pile
+  in one sitting. A length larger than what is due gives a shorter session
+  rather than padding it with things not yet due.
+- **With nothing due, it says you're all caught up** instead of starting.
+- Kept Catch up sessions show "everything due" in Saved sessions when they
+  have no length.
+
+Trade-off: a question that has just opened on a card you know (a new
+level) counts as new, so Catch up leaves it for a regular session. To check
+by hand: build a Catch up over a deck with some reviews due, try 10
+questions and "Everything due", and one over cards with nothing due.
+## 0.586 — 8 November 2026
+
+**Fixes from a learner's 18 reports.** What each question asks is now
+clearer, and some right answers that were marked wrong or nearly right
+now count as right.
+
+For students:
+
+- **"Who is it?" asks you to tick everyone the form could be.** ساكن
+  can be "I", "you" or "he", and بتحكي can be "you" or "she". Before, any
+  one of them counted. Now you tick all the right people and none of the
+  wrong ones. The question says so every time, so it doesn't give away how
+  many there are.
+- **"Who is it?" says what the verb means.** It shows the verb's own
+  meaning ("to keep"), not the form's ("I keep"), which would give away
+  the answer.
+- **"See the pattern" shows the English pronouns clearly.** I, you, she,
+  they and the rest were there in small grey type and went unnoticed. They
+  are now as easy to read as the rest of the row.
+- **"Which word is missing?" in a phrase shows what the phrase means from
+  the start.** It was hidden behind the hint button, so a word like اه
+  ("yes") could not be told from the other choices. The version where you
+  type the word still keeps the meaning behind the hint.
+- **After a gap in a phrase or sentence, "Learn more" shows how the whole
+  of it is pronounced**, not only the missing word. "Where it turned up"
+  shows the phrase's pronunciation too.
+- **A sentence built around a word with several accepted answers takes any
+  of them.** "How do we say how are you??" now takes كيفك as well as كيف
+  حالك.
+- **Writing another form of the card than the one the question names is
+  nearly right, not wrong.** Asked for "Not good" marked *feminine*,
+  writing the masculine says "Nearly — that is the masculine. This one
+  asks for the feminine."
+
+For teachers:
+
+- **Deck quality lists every sentence with words no card teaches**, with
+  those words, so you can add the cards or reword the sentence. Before,
+  it was only one of the suggestions and could be hidden by bigger ones.
+  The app never adds words to practise on its own.
+
+Checked and left alone:
+
+- The wrong choices in "choose the meaning" already come only from cards
+  in the learner's own courses, so a hard word among them is on one of
+  those cards.
+- Where a card has two forms with the same English and nothing saying
+  which is masculine or feminine (or singular or plural), the app can't
+  tell the learner which one it wants, so it still accepts either. The
+  card editor already warns about this. The teacher fixes it by marking
+  each form.
+
+Trade-offs:
+
+- "Who is it?" is harder: leaving out one right person is now a miss.
+- "Which word is missing?" (choosing) is easier, now that the meaning is
+  shown from the start.
+
+To check by hand:
+
+- A "Who is it?" question on a form shared by two persons (بتكتب: you (m)
+  and she): only ticking both is right.
+- A sentence card filled from a value card that accepts two answers: the
+  sentence written with the second answer is marked right.
+- A deck with a sentence using a word that has no card: the warning under
+  Deck quality names the sentence and the word.
+
+## 0.585 — 8 November 2026
+
+**Tapping a card in a matching exercise makes a short, soft sound.**
+
+For learners:
+
+- **Picking up a card, putting it against its pair, or freeing it again now
+  answers with a light tap**, so you know the tap registered without
+  looking back at the tile. It says nothing about whether the pair is
+  right — the grid is still only marked when you check it.
+- It follows your sound setting: louder on Loud, quieter on Soft, and
+  silent on Off. Playing a recording in the listening grid does not make it.
+
+To check by hand: on a phone, tap through a matching grid with sound on,
+then with sound off.
+
+## 0.584 — 8 November 2026
+
+For the App admin, in Super admin → Spaces → a space → Back up this space:
+
+- **The screen says which space it is backing up.** It is titled "Back up"
+  and the space's name, says the file holds that space and nothing from any
+  other, and each part is described as that space's ("The space itself",
+  "Its people", "Every card in the space…") rather than in words that read
+  as if every space were going into the file. The site's own backup is now
+  titled "Back up the site".
+- **Each part says how large it will make the file**, beside how many
+  things it holds, and under the list the whole file's size for what is
+  ticked — so you can see at a glance that the recordings are most of it.
+  The same sizes show on the site's backup.
+
+Trade-off: the screen reads what the space holds as it opens, which takes
+a few seconds on a large space before the sizes appear. Downloading within
+two minutes uses that same reading; after that the file is made fresh.
+
+To check by hand: open a space with recordings, Back up this space, and
+see its name in the title and a size on each part; untick Recordings and
+images and see the total drop.
+
+## 0.583 — 8 November 2026
+
+**A space can be backed up and put back, and putting anything back can no
+longer lose anything.** (`docs/PLAN-space-backup.md`)
+
+For the App admin, in Super admin:
+
+- **Back up this space** replaces Export this space, under each space in
+  Spaces. It offers the same choice of parts as the site's backup, and the
+  file now holds the space's members' My space material made there, and
+  every member's practice.
+- **Restore this space from a file** sits beside it, and **Restore a space
+  from a file** at the top of the list puts back a space that was deleted
+  whole — its people with their old keys, their My space and their practice.
+- **Backups now include people's practice**, both kinds, as a new part
+  called Progress, ticked by default. Putting it back folds it into whatever
+  the person has practised since, the way two of their devices do when they
+  meet, so nothing practised since is lost.
+- **A restore never overwrites and never removes.** It adds what the file
+  holds and the site lacks: a deleted card comes back, a deck gets back a
+  card it lost, but a card edited since keeps its edit, and nobody's
+  account, key, spaces or suspensions are touched.
+- **Before anything is written, Check what this will do** shows, by name,
+  who is left as they are, who will not be put back into the space (left or
+  removed since), who will be re-created with their old key, and who was
+  deleted since and stays deleted unless you tick them back. It names whose
+  names come off restored courses, which spaces will be re-created, and how
+  many cards, decks and courses it adds against how many are already there.
+  Restore waits until that has run for the choices on screen.
+- **When the space still exists**, it keeps its current name, address, look
+  and admins unless you choose the file's (never its address or codes). When
+  its old address has been taken by another space, it asks for a new one.
+- **Afterwards it reports** what it added, what it folded in, and everything
+  it left alone and why, by name where the reason is about a person.
+- **Each door takes its own files.** Super admin → App's Restore a backup
+  refuses a space's file and says whose it is; a space's restore refuses the
+  site's file. Files made before this release are taken as the site's.
+- **Clear data gains Progress too**: the one place on the site that removes
+  people's practice, still behind the deploy's admin key.
+
+Trade-offs: a backup is larger (Progress can be left out when size matters);
+a restore cannot repair a record that exists but is wrong — delete it, or
+the whole space, and restore; and taking a backup reads every member's
+practice, a few seconds on a teaching site. For learners, teachers and space
+admins nothing changes.
+
+To check by hand on the deployed site:
+
+1. Back up a space with a member whose first space is Main and who has
+   practised; Verify the file: complete, with Progress in it.
+2. In that space delete a card, take a card out of a deck and remove a
+   student; restore the file. The preview names the student under "not put
+   back"; afterwards the card and the deck's card are back, the student is
+   still out, and nothing else moved.
+3. Give that member a new key and restore again: the new key works, the old
+   one is refused.
+4. Delete a member's account, restore: they are listed as deleted since,
+   unticked. Tick them and restore: back in this space only, old key working.
+5. Practise on a device, restore an older file: both the newer and the older
+   practice are there.
+6. Delete the whole space and restore it: its people, keys, practice and My
+   space are back.
+7. Restore the same file again: nothing added.
+8. A space's file in Super admin → App is refused with the space's name, and
+   the site's file in Spaces likewise.
+9. Back up the site, Clear data (all parts), restore: everyone, everything
+   and all practice are back, and your own key still works.
+
 ## 0.582 — 7 November 2026
 
 **A space shows its own things and nobody else's, from the first moment.**

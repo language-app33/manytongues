@@ -1499,6 +1499,34 @@ test("and where nothing has been recorded, whether it ever went wrong is what is
   assert.deepEqual([...new Set(got.exercises.map((/** @type {any} */ e) => e.id))], ["aged-bad"]);
 });
 
+test("a slip on a question the card has climbed past is not a mistake to fix", () => {
+  /*
+   * A card at the top of its ladder is asked its top alone (atItsTop), so
+   * a reading question's record is frozen where the climb left it. With a
+   * miss as its last answer — right, right, wrong is still solid — the
+   * card was in every Fix mistakes session for good, dealt the one
+   * question it had never got wrong (0.598). Weak spots already left it
+   * out; the two now read the same questions.
+   */
+  const climbed = word("climbed", "كلمة-c", "word c");
+  const items = [climbed, slipping("missed", [1, 0])].concat(deckOf(4));
+  installIndexes(items, settings);
+  /* Every question on its ladder solid, the reading one with the slip in
+     its record — read off the ladder the deck gives it, since the grids
+     and the pickings open only once there are cards to fill them. */
+  const keys = laddered(climbed.forms[0], settings);
+  assert.ok(keys.includes("ar2en") && keys.includes("en2ar"));
+  climbed.forms[0].s = Object.fromEntries(
+    keys.map((/** @type {string} */ k) => [k, { ...withHist(k === "ar2en" ? [1, 1, 0] : [1, 1, 1, 1]), interval: 6 }]),
+  );
+  assert.equal(isWeak(climbed, settings), false, "Weak spots does not count it");
+  const got = buildManualSession({
+    items, settings, ids: items.map((i) => i.id), mode: "mistakes", count: 20,
+  });
+  assert.deepEqual([...new Set(got.exercises.map((/** @type {any} */ e) => e.id))], ["missed"],
+    "and neither does Fix mistakes");
+});
+
 test("nothing going wrong at all is said rather than built into a session", () => {
   const items = [slipping("clean", [1, 1])].concat(deckOf(4));
   installIndexes(items, settings);

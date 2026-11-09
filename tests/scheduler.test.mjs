@@ -29,6 +29,7 @@ import {
   freshStates,
   reschedule,
   liftLevel,
+  liftPass,
   hasLevelAbove,
   stateReady,
   maturity,
@@ -45,6 +46,7 @@ import {
   cleared,
   learnt,
   passesMade,
+  PASSES_TO_LEARN,
   topLevelOf,
   cameRound,
   movedTo,
@@ -983,6 +985,27 @@ test("a card is on one level, and every level below it is done", () => {
      carrying one by some accident of history changes nothing. */
   const oddly = at({ ar2en: sure({ passes: 2 }), match: done, tr2ar: done, en2ar: done });
   assert.equal(must(standing(oddly), "a standing").status, "cleared");
+  /* And how many top questions the passes are made on — one here — so a
+     card with several can say "on each of 3 questions" (0.598). */
+  assert.equal(must(standing(all), "a standing").questions, 1);
+});
+
+test("a card with several top questions counts them, and its passes are the fewest", () => {
+  /* Written from the meaning and from the picture: two top questions,
+     each making its own passes. The card reports the weaker, and says how
+     many there are, because "2 reviews to go" is two on each of them. */
+  const done = sure();
+  const two = ["ar2en", "match", "tr2ar", "en2ar", "img2ar"];
+  const rows = standings(
+    climber({ ar2en: done, match: done, tr2ar: done, en2ar: sure({ passes: 1 }), img2ar: done }),
+    () => two,
+  );
+  const top = must(standing(rows), "a standing");
+  assert.equal(top.status, "cleared");
+  assert.equal(top.passes, 0, "the fewest");
+  assert.equal(top.questions, 2);
+  /* Lower rows carry neither. */
+  assert.deepEqual(rows.slice(0, -1).map((r) => r.questions), [0, 0, 0]);
 });
 
 test("a level a card has no material for is not one of its levels", () => {
@@ -1317,6 +1340,47 @@ test("a key already solid is left alone, and the schedule it had is kept", () =>
   assert.equal(out.ar2en.reps, had.ar2en.reps);
 });
 
+/*
+ * And at the top, "too easy" is one of the reviews that make the form
+ * learnt (0.598, the owner's choice). The lift itself still hands over no
+ * passes — the test above holds — so a form needs the lift *and* this.
+ */
+test("too easy at the top counts as one review, and a second makes the form learnt", () => {
+  /* Every key solid, no passes yet: a cleared form, its top review not due. */
+  const had = Object.fromEntries(LADDER.map((k) => [k, sure({ due: T + 5 * DAY, passes: 0 })]));
+  const out = liftPass(LADDER, stateIn(had), still);
+  assert.deepEqual(Object.keys(out).sort(), ["ctx2ar", "en2ar", "rec2ctx"], "the top level and nothing else");
+  for (const s of Object.values(out)) assert.equal(s.passes, 1);
+  const after = (/** @type {string} */ k) => out[k] || had[k];
+  assert.equal(passesMade(LADDER, after), 1);
+  assert.equal(cleared(LADDER, after), true);
+  assert.equal(learnt(LADDER, after), false, "one review of two");
+  /* Answered early: the gap and the date stay where they were, as every
+     early answer leaves them. */
+  assert.equal(out.en2ar.due, T + 5 * DAY);
+  assert.equal(out.en2ar.interval, had.en2ar.interval);
+
+  /* The second time, learnt — and never more than the two. */
+  const twice = liftPass(LADDER, (k) => out[k] || had[k], still);
+  assert.equal(learnt(LADDER, (k) => twice[k] || out[k] || had[k]), true);
+  const thrice = liftPass(LADDER, (k) => twice[k] || out[k] || had[k], still);
+  assert.equal(thrice.en2ar.passes, PASSES_TO_LEARN);
+});
+
+test("too easy on a top review that had come round moves the date on, so it is not dealt again tomorrow", () => {
+  const had = Object.fromEntries(LADDER.map((k) => [k, sure({ interval: 6, due: T - DAY, passes: 0 })]));
+  const out = liftPass(LADDER, stateIn(had), still);
+  assert.equal(out.en2ar.passes, 1);
+  assert.ok(out.en2ar.due > T + DAY, "rescheduled as an easy answer, not left due");
+  assert.ok(out.en2ar.interval > 6, "and the gap grew");
+  /* A top key not yet in review — a card lifted straight to the top — is
+     put there at a day, as liftLevel puts the keys below. */
+  const fresh = liftPass(LADDER, stateIn({}), still);
+  assert.equal(fresh.en2ar.phase, "review");
+  assert.equal(fresh.en2ar.passes, 1);
+  assert.ok(fresh.en2ar.due >= T + DAY);
+});
+
 test("a level the form has no exercise at is passed over, as openTypes passes it", () => {
   /* A verb's cell asked one exercise a level: lifting from its level-two
      key touches its level-one and level-two keys and opens level three. */
@@ -1453,7 +1517,7 @@ test("a card with no due date recorded is scheduled as it always was", () => {
 
 /** A standing, as the screens read one. */
 const at = (/** @type {number} */ level, /** @type {string} */ status) =>
-  ({ level, status, done: 0, of: 1, passes: 0 });
+  ({ level, status, done: 0, of: 1, passes: 0, questions: 0 });
 
 test("a card is reported as moved up, cleared or learnt, and never as slipping", () => {
   assert.equal(movedTo(at(1, "learning"), at(2, "none")), "up", "a rung gained");

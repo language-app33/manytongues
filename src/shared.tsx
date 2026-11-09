@@ -163,6 +163,9 @@ const ICONS: Record<string, string> = {
     "M12 14c1.66 0 2.99-1.34 2.99-3L15 5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z",
   remove: "M19 13H5v-2h14v2z",
   image: "M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z",
+  /* A clipboard, for pasting a picture copied elsewhere. */
+  paste:
+    "M19 2h-4.18C14.4.84 13.3 0 12 0S9.6.84 9.18 2H5c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm-7 0c.55 0 1 .45 1 1s-.45 1-1 1-1-.45-1-1 .45-1 1-1zm7 18H5V4h2v3h10V4h2v16z",
   camera:
     "M9 2 7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2h-3.17L15 2H9zm3 15c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8.2a3.2 3.2 0 1 0 0 6.4 3.2 3.2 0 0 0 0-6.4z",
   /* A learner saying "this one, please" — see `priority` on a card. A star
@@ -1066,7 +1069,7 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
      where the app's other passing remarks are said: in the snackbar's
      place, over the content, moving nothing. The confirmation that
      follows a slow save then lands in the same spot the waiting was in. */
-  const slow = useSlowWait(busy);
+  useWorking(busy);
 
   return (
     <div className="at-screen bare">
@@ -1085,11 +1088,6 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
           {children}
         </div>
       </div>
-      {slow && (
-        <p className="at-working" role="status">
-          Working…
-        </p>
-      )}
     </div>
   );
 }
@@ -3874,6 +3872,9 @@ export function useRun({ refresh, snackErrors = false, quietDone = false, before
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const snack = useSnackbar();
+  /* Said at the foot of the app however deep the screen it was started
+     from — see WorkingNote. */
+  useWorking(busy);
   const opts = useRef({ refresh, snackErrors, quietDone, before, instead });
   opts.current = { refresh, snackErrors, quietDone, before, instead };
   const run = useCallback(async (fn: () => Promise<any>, done?: string | ((out: any) => string)): Promise<any> => {
@@ -4126,7 +4127,11 @@ export function useScrollTop(key: unknown) {
  * nothing happened: a grey button that says nothing leaves a teacher
  * guessing.
  */
-export type ScreenFab = { icon: string; label: string; onClick: () => void; off?: boolean; busy?: boolean };
+/* A floating button. Most screens have one; the card editor has two —
+   Save and publish beside Save — and the first of a pair is the quieter
+   (`second`), so the corner keeps the button it always had. `busyLabel` is
+   what it reads while its own request is out. */
+export type ScreenFab = { icon: string; label: string; onClick: () => void; off?: boolean; busy?: boolean; busyLabel?: string; second?: boolean };
 
 export function Screen({ title, onBack, action, actionBelow, children, footer, backLabel = "Back", backIcon = "back", rise, className = "", fab, scrollKey }: {
   title?: Node;
@@ -4154,7 +4159,7 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
       being edited — rather than going back. */
   backIcon?: string;
   className?: string;
-  fab?: ScreenFab | null;
+  fab?: ScreenFab | ScreenFab[] | null;
 }) {
   const self: React.MutableRefObject<{ el: Element | null, close?: () => void }> = useRef({ el: null });
   /* The screen's own element, so the stack can be checked against the
@@ -4180,6 +4185,7 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
      scrolling up, no while scrolling down. A few pixels either way are
      ignored, so a finger resting on the glass does not flicker it. */
   const [fabNamed, setFabNamed] = useState(true);
+  const fabs = !fab ? [] : Array.isArray(fab) ? fab : [fab];
   const lastTop = useRef(0);
   const onBodyScroll = () => {
     const el = bodyRef.current;
@@ -4254,18 +4260,21 @@ export function Screen({ title, onBack, action, actionBelow, children, footer, b
           {footer ? <div className="at-screenfoot">{footer}</div> : null}
         </div>
       </div>
-      {fab ? (
+      {fabs.length ? (
         <div className="at-fabrow">
-          <button
-            type="button"
-            className={`at-fab${fabNamed ? " named" : ""}${fab.off || fab.busy ? " off" : ""}`}
-            aria-label={fab.busy ? "Saving…" : fab.label}
-            aria-disabled={fab.off || fab.busy ? "true" : undefined}
-            onClick={() => { if (!fab.busy) fab.onClick(); }}
-          >
-            <Icon name={fab.icon} />
-            <span className="at-fablabel">{fab.busy ? "Saving…" : fab.label}</span>
-          </button>
+          {fabs.map((one) => (
+            <button
+              key={one.label}
+              type="button"
+              className={`at-fab${fabNamed ? " named" : ""}${one.second ? " second" : ""}${one.off || one.busy ? " off" : ""}`}
+              aria-label={one.busy ? one.busyLabel || "Saving…" : one.label}
+              aria-disabled={one.off || one.busy ? "true" : undefined}
+              onClick={() => { if (!one.busy) one.onClick(); }}
+            >
+              <Icon name={one.icon} />
+              <span className="at-fablabel">{one.busy ? one.busyLabel || "Saving…" : one.label}</span>
+            </button>
+          ))}
         </div>
       ) : null}
     </div>
@@ -4526,6 +4535,58 @@ export function ConfirmModal({
    Half a second is the usual figure for this and it holds here: long
    enough that a healthy round trip never reaches it, short enough that
    somebody who has started to wonder is told before they wonder twice. */
+/*
+ * "Working…", said once for the whole app.
+ *
+ * It was said by a space's frame alone, so a screen opened from a space —
+ * a course, a deck, Manage cards — showed nothing at all while a save it
+ * had started was in flight: the frame that would have said so was not on
+ * screen. Now whatever is busy says so here (useWorking), and the one
+ * WorkingNote at the foot of the app speaks for all of them, wherever the
+ * person happens to be.
+ */
+const workingNow = new Set<object>();
+const workingWatchers = new Set<() => void>();
+function workingChanged() {
+  for (const w of [...workingWatchers]) w();
+}
+
+/** Counts this component as working while `busy` holds. */
+export function useWorking(busy: boolean | undefined) {
+  const me = useRef({});
+  useEffect(() => {
+    if (!busy) return undefined;
+    const token = me.current;
+    workingNow.add(token);
+    workingChanged();
+    return () => {
+      workingNow.delete(token);
+      workingChanged();
+    };
+  }, [busy]);
+}
+
+/* The note itself, rendered once, near the end of the app's tree. Only
+   after half a second, as before, so a quick save doesn't flash it. */
+export function WorkingNote() {
+  const [busy, setBusy] = useState(workingNow.size > 0);
+  useEffect(() => {
+    const watch = () => setBusy(workingNow.size > 0);
+    workingWatchers.add(watch);
+    watch();
+    return () => {
+      workingWatchers.delete(watch);
+    };
+  }, []);
+  const slow = useSlowWait(busy);
+  if (!slow) return null;
+  return (
+    <p className="at-working" role="status">
+      Working…
+    </p>
+  );
+}
+
 export function useSlowWait(waiting: boolean | undefined, ms: number = 500) {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
@@ -5874,7 +5935,7 @@ export interface DeckWords {
   another: string;
 }
 
-export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize }: {
+export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize, saving, onAdd }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
@@ -5900,9 +5961,20 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
   /** The small line under each row's name, or nothing. A deck says how
       big it is; a single card has nothing to add. */
   size?: ((d: Pick<Deck, "cardCount">) => Node) | null;
+  /** Decks whose change is still being saved, and which way. Such a row
+      says "Adding…" or "Removing…" and cannot be tapped until it is done,
+      where a save takes long enough for a teacher to wonder. */
+  saving?: Record<string, "add" | "drop">;
+  /** Where the decks are chosen somewhere else than this sheet — a card's
+      editor opens DeckPickScreen, the screen selected cards are put in
+      decks from, so a deck can be made on the way (0.594). Given, the add
+      button calls it, and is there even with no decks yet: making the
+      first one is what that screen is for. */
+  onAdd?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
+  const pending = saving || {};
 
   const all = decks || [];
   const wanted = q.trim().toLowerCase();
@@ -5942,13 +6014,19 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
                 <Icon name="lock" size={14} />
               </span>
             ) : (
-              <button
-                className="at-deckdrop"
-                aria-label={say.drop(d.title)}
-                onClick={() => onToggle(d.id, true)}
-              >
-                <Icon name="close" size={16} />
-              </button>
+              pending[d.id] ? (
+                <span className="at-deckdrop" role="status" aria-label={`Taking ${d.title} out…`}>
+                  <span className="at-spin" aria-hidden="true" />
+                </span>
+              ) : (
+                <button
+                  className="at-deckdrop"
+                  aria-label={say.drop(d.title)}
+                  onClick={() => onToggle(d.id, true)}
+                >
+                  <Icon name="close" size={16} />
+                </button>
+              )
             )}
           </span>
         ))}
@@ -5957,18 +6035,18 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
             yet: what it makes is what stands beside it. Its words are the
             whole invitation while the card is in nothing, and shorten to
             the bare offer once the row can speak for itself. */}
-        {all.length > 0 && (
+        {(all.length > 0 || onAdd) && (
           <button
             className="at-deckadd"
-            aria-expanded={open}
-            onClick={() => setOpen(true)}
+            aria-expanded={onAdd ? undefined : open}
+            onClick={() => (onAdd ? onAdd() : setOpen(true))}
           >
             <Icon name="add" size={17} />
             {inThese.length ? say.another : say.first}
           </button>
         )}
 
-        {!all.length && (
+        {!all.length && !onAdd && (
           <Help>{say.none}</Help>
         )}
       </div>
@@ -5996,13 +6074,15 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
             {find && wanted && !listed.length && <Help>Nothing matches that.</Help>}
             {listed.map((d) => {
               const on = chosen.includes(d.id);
+              const going = pending[d.id];
               return (
                 <button
-                  className={`at-deckpick${on ? " on" : ""}${d.locked ? " locked" : ""}`}
+                  className={`at-deckpick${on ? " on" : ""}${d.locked ? " locked" : ""}${going ? " saving" : ""}`}
                   key={d.id}
                   aria-pressed={on}
-                  disabled={!!d.locked}
-                  onClick={() => !d.locked && onToggle(d.id, on)}
+                  aria-busy={going ? true : undefined}
+                  disabled={!!d.locked || !!going}
+                  onClick={() => !d.locked && !going && onToggle(d.id, on)}
                 >
                   <span className="at-tickbody">
                     <b>{d.title}</b>
@@ -6014,6 +6094,11 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
                   <span className="at-deckmark">
                     {d.locked ? (
                       <span title="Locked" aria-label="Locked" role="img"><Icon name="lock" size={14} /></span>
+                    ) : going ? (
+                      <span className="at-decksaving" role="status">
+                        <span className="at-spin" aria-hidden="true" />
+                        {going === "add" ? "Adding…" : "Removing…"}
+                      </span>
                     ) : on ? "Added" : "Add"}
                   </span>
                 </button>
@@ -6024,6 +6109,133 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
         </PickSheet>
       )}
     </div>
+  );
+}
+
+/*
+ * Putting cards in decks, on a screen of its own: a New deck button at the
+ * top, the decks to tick, and Cancel or the confirming button at the foot.
+ *
+ * One screen for both ways cards go into decks — selected cards, and the
+ * card being written (0.594). The card's editor used to open a small sheet
+ * that could only choose among decks that already existed, so a teacher
+ * writing a card for a deck not yet made had to leave the card to make it.
+ * Selected cards already had New deck here; now the one card has it too,
+ * and the two cannot drift apart.
+ *
+ * The name being typed is this screen's own; making the deck is the
+ * caller's, which ticks it, since the deck just named is the one about to
+ * be chosen. `onCreate` resolving to something truthy means it was made
+ * and the name box closes; nothing, and it stays open with the name in it.
+ * Left out — taking cards out of decks — there is no New deck.
+ */
+export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHint, busy = false, error, confirm, confirmOff = false, onConfirm, onCancel, empty = "You have no decks yet." }: {
+  title: Node;
+  decks: Pick<Deck, "id" | "title" | "locked" | "cardCount">[];
+  chosen: string[];
+  onToggle: (id: string, wasOn: boolean) => void;
+  onCreate?: (title: string) => Promise<unknown>;
+  /** Under the new deck's name: which language it will be. */
+  newHint?: string;
+  busy?: boolean;
+  /** Why the last attempt failed, where this screen covers the place that
+      would otherwise say. */
+  error?: string | null;
+  confirm: string;
+  confirmOff?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+  empty?: Node;
+}) {
+  const [name, setName] = useState<string | null>(null);
+  /* Its own, as well as the caller's: a second Enter while the first deck
+     is still being made would make two. */
+  const [making, setMaking] = useState(false);
+  const make = async () => {
+    const t = String(name || "").trim();
+    if (!t || busy || making || !onCreate) return;
+    setMaking(true);
+    try {
+      if (await onCreate(t)) setName(null);
+    } finally {
+      setMaking(false);
+    }
+  };
+  return (
+    <Screen title={title} onBack={onCancel}>
+      {/* Somewhere to put them that does not exist yet.
+          Before this, a teacher who had selected thirty cards and then
+          found no deck for them had to leave, make the deck, and select
+          the thirty again — so the way out of the screen was to lose the
+          work that got you there. */}
+      {onCreate &&
+        (name === null ? (
+          <div className="at-row at-mb3">
+            <Button variant="ghost" size="sm" icon="add" onClick={() => setName("")}>
+              New deck
+            </Button>
+          </div>
+        ) : (
+          <div className="at-formblock at-mb3">
+            <Field label="New deck" hint={newHint || ""}>
+              <input
+                className="at-input"
+                placeholder="e.g. Week 3 · Verbs"
+                value={name}
+                autoFocus
+                onChange={(e) => setName(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && make()}
+              />
+            </Field>
+            <div className="at-row at-mt3">
+              <Button variant="ghost" size="sm" icon="close" onClick={() => setName(null)}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                size="sm"
+                icon="check"
+                disabled={!name.trim() || busy || making}
+                onClick={make}
+              >
+                Create
+              </Button>
+            </div>
+          </div>
+        ))}
+
+      <CheckList
+        options={decks.map((d) => ({
+          id: d.id,
+          title: d.title,
+          /* A locked deck is shown, and cannot be ticked: its cards stay
+             as they are until someone unlocks it. */
+          note: d.locked ? (
+            <>
+              <span className="at-lockmark" title="Locked" aria-label="Locked" role="img">
+                <Icon name="lock" size={12} />{" "}
+              </span>
+              {deckSize(d)}
+            </>
+          ) : (
+            deckSize(d)
+          ),
+          disabled: !!d.locked,
+        }))}
+        chosen={chosen}
+        onToggle={onToggle}
+        empty={empty}
+      />
+      {error ? <p className="at-formneed unmet at-mt3" role="alert">{error}</p> : null}
+      <div className="at-row at-mt5">
+        <Button variant="ghost" onClick={onCancel} icon="close">
+          Cancel
+        </Button>
+        <Button variant="primary" disabled={confirmOff || busy} onClick={onConfirm} icon="check">
+          {confirm}
+        </Button>
+      </div>
+    </Screen>
   );
 }
 
