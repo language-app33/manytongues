@@ -608,11 +608,18 @@ button {
    greyed like a locked deck — it is busy, not refused. */
 .at-deckpick.saving { cursor:progress; }
 .at-decksaving { display:inline-flex; align-items:center; gap:6px; color: var(--text); }
-.at-deckspin { display:inline-block; width:14px; height:14px; flex:none;
+.at-spin { display:inline-block; width:14px; height:14px; flex:none;
   border:2px solid var(--line); border-top-color: var(--accent); border-radius:50%;
-  animation: at-deckspin 700ms linear infinite; }
-@keyframes at-deckspin { to { transform: rotate(360deg); } }
-@media (prefers-reduced-motion: reduce) { .at-deckspin { animation-duration: 2s; } }
+  animation: at-spin 700ms linear infinite; }
+/* On a button, the ring takes the button's own lettering, so it shows on
+   a filled one as well as a plain one. */
+.at-btn .at-spin { border-color: currentColor; border-top-color: transparent; }
+/* In place of an icon button — a card's Remove while it is going: the
+   same footprint, so nothing beside it moves. */
+.at-spinslot { display:inline-flex; align-items:center; justify-content:center;
+  width:40px; height:40px; flex:none; }
+@keyframes at-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .at-spin { animation-duration: 2s; } }
 /* The deck and subtype sheets: the list a step under the line saying what
    it is for, and the note under the decks a step under them. */
 .at-decksheet .at-deckpicks { margin-top:4px; }

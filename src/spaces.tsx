@@ -5731,6 +5731,12 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      deck's row as "Adding…" or "Removing…" until the server answers, and
      not tappable meanwhile, so a second tap cannot undo the first. */
   const [deckSaving, setDeckSaving] = useState<Record<string, "add" | "drop">>({});
+  /* Cards and word sets on their way out of a deck: a ring where their
+     Remove was until the server answers, and no second Remove meanwhile. */
+  const [leaving, setLeaving] = useState<Set<string>>(() => new Set());
+  /* Add existing cards' Done while it saves: how many of the cards that
+     change have been saved, said on the button. */
+  const [applying, setApplying] = useState<{ done: number; total: number } | null>(null);
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
   const [allCards, setCards] = useState<Card[]>(last ? last.cards : []);
   const cards = useMemo(() => allCards.filter((c) => !!c.personal === mineSide), [allCards, mineSide]);
@@ -8199,7 +8205,18 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      put back what was just changed. */
   const saveBuiltins = async (d: Deck, parts: string[], pronounsOn: boolean) => {
     const langId = (langOfDeck(d) || {}).id || d.lang;
-    if (!sameSet(parts, draftOf(d).parts)) await API.setDeckParts(d.id, parts);
+    if (!sameSet(parts, draftOf(d).parts)) {
+      /* Put on screen from the answer, as the Numbers screen does, so
+         nothing has to fetch every deck again to show it. */
+      const r: any = await API.setDeckParts(d.id, parts);
+      setDecks((prev) =>
+        prev.map((x) =>
+          x.id === d.id
+            ? { ...x, parts: (r && r.parts) || parts, ...(r && r.partsWaiting ? { partsWaiting: r.partsWaiting } : null) }
+            : x
+        )
+      );
+    }
     const pron = pronounCardsOf(langId);
     for (const card of pron) {
       const inNow = card.decks || [];
@@ -8225,25 +8242,47 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       newestFirst,
     );
     const flip = (ids: string[], id: string) => (ids.includes(id) ? ids.filter((x) => x !== id) : ids.concat([id]));
-    const apply = () =>
+    /* Saved a card at a time, so the button counts them off: with a dozen
+       picked it is a wait, and a count is what says it is still moving.
+       What each save answers is put on screen as it comes (absorbSaved),
+       so nothing is fetched again at the end. */
+    const apply = () => {
+      if (applying) return;
+      const changing = cards.filter(
+        (c) => c.lang === langId && !isPronounCard(c) && picked.ids.includes(c.id) !== (c.decks || []).includes(d.id)
+      );
+      setApplying({ done: 0, total: changing.length });
       run(async () => {
-        for (const c of cards.filter((x) => x.lang === langId && !isPronounCard(x))) {
+        let done = 0;
+        for (const c of changing) {
           const inNow = c.decks || [];
           const want = picked.ids.includes(c.id);
-          if (want === inNow.includes(d.id)) continue;
           absorbSaved(await saveNamed(c, want ? inNow.concat([d.id]) : inNow.filter((x) => x !== d.id)));
+          done += 1;
+          setApplying({ done, total: changing.length });
         }
         await saveBuiltins(d, picked.parts, picked.pronouns);
         setAdding(null);
-        await refresh();
-      }, `${d.title} saved`);
+      }, `${d.title} saved`).finally(() => setApplying(null));
+    };
     return (
       <Screen title="Add existing cards" onBack={() => setAdding(null)} backIcon="close" backLabel="Cancel"
         className="cardform"
         action={
-          <Button variant="primary" size="sm" className="iconly" aria-label="Done" title="Done" onClick={apply}>
-            <Icon name="check" />
-          </Button>
+          applying ? (
+            <Button variant="primary" size="sm" disabled aria-busy="true">
+              <span className="at-spin" aria-hidden="true" />
+              <span role="status">
+                {applying.total > 1 && applying.done < applying.total
+                  ? `Saving ${applying.done + 1} of ${applying.total}…`
+                  : "Saving…"}
+              </span>
+            </Button>
+          ) : (
+            <Button variant="primary" size="sm" className="iconly" aria-label="Done" title="Done" onClick={apply}>
+              <Icon name="check" />
+            </Button>
+          )
         }
       >
         <Notice kind="error">{error}</Notice>
@@ -8327,18 +8366,27 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     const said = items.length === 1
       ? `${isNumberPart(items[0]) ? items[0].label : isPronounGroup(items[0]) ? "Pronouns" : "Card"} removed from ${d.title}`
       : `${plural(items.length, "card")} removed from ${d.title}`;
+    /* Each save's answer is put on screen as it comes, so nothing is
+       fetched again afterwards — that fetch was most of the wait. */
+    const ids = items.map((it) => it.id);
+    if (ids.some((id) => leaving.has(id))) return;
+    const mark = (on: boolean) =>
+      setLeaving((now) => {
+        const next = new Set(now);
+        for (const id of ids) on ? next.add(id) : next.delete(id);
+        return next;
+      });
+    mark(true);
     run(async () => {
       for (const c of cardsOut) absorbSaved(await saveNamed(c, (c.decks || []).filter((x) => x !== d.id)));
       if (builtins) await saveBuiltins(d, was.parts.filter((x) => !partsOut.includes(x)), pronOn && !pronOut);
       setSelCards(new Set());
-      await refresh();
       return true;
-    }).then((ok) => ok &&
+    }).finally(() => mark(false)).then((ok) => ok &&
       snack(said, "good", () =>
         run(async () => {
           for (const c of cardsOut) absorbSaved(await saveNamed(c, c.decks || []));
           if (builtins) await saveBuiltins(d, was.parts, pronOn);
-          await refresh();
         }, "Put back")
       )
     );
@@ -8379,7 +8427,11 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         {extra ? <div className="at-miniacts">{extra}</div> : null}
       </div>
     );
-    const removeBtn = (it: any) => (
+    const removeBtn = (it: any) => leaving.has(it.id) ? (
+      <span className="at-spinslot" role="status" aria-label="Removing from this deck…">
+        <span className="at-spin" aria-hidden="true" />
+      </span>
+    ) : (
       <IconButton
         icon="remove"
         label="Remove from this deck"

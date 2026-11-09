@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.591 — 9 November 2026
+
+**More places say they are working, and two of them are quicker.**
+
+For teachers:
+
+- **Putting a range of numbers in a deck** (Numbers → a range → Decks)
+  shows "Adding…" or "Removing…" with the turning ring on that deck until
+  it is saved, as a course's decks do since 0.590.
+- **Removing cards from a deck** (a card's Remove, or Remove from this
+  deck on several) shows the ring where Remove was until they have gone,
+  and Remove can't be pressed twice meanwhile. It is also much quicker:
+  it no longer reloads all your courses, decks and cards afterwards. The
+  same goes for Undo on the message that follows.
+- **Add existing cards → Done** turns into "Saving 3 of 12…" with the
+  ring while it works through the cards you picked, and can't be pressed
+  again. It no longer reloads everything at the end either.
+- **"Working…" now shows on every screen in Teaching and Admin**, not
+  only their main tabs: a course, a deck, Manage cards and the rest say it too
+  when something takes more than half a second. Like the confirmation
+  message, it sits near the bottom and can briefly cover what is there.
+
 ## 0.590 — 9 November 2026
 
 **Adding a deck to a course is quicker, and says it is working.**

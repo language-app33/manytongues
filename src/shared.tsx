@@ -1066,7 +1066,7 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
      where the app's other passing remarks are said: in the snackbar's
      place, over the content, moving nothing. The confirmation that
      follows a slow save then lands in the same spot the waiting was in. */
-  const slow = useSlowWait(busy);
+  useWorking(busy);
 
   return (
     <div className="at-screen bare">
@@ -1085,11 +1085,6 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
           {children}
         </div>
       </div>
-      {slow && (
-        <p className="at-working" role="status">
-          Working…
-        </p>
-      )}
     </div>
   );
 }
@@ -3874,6 +3869,9 @@ export function useRun({ refresh, snackErrors = false, quietDone = false, before
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const snack = useSnackbar();
+  /* Said at the foot of the app however deep the screen it was started
+     from — see WorkingNote. */
+  useWorking(busy);
   const opts = useRef({ refresh, snackErrors, quietDone, before, instead });
   opts.current = { refresh, snackErrors, quietDone, before, instead };
   const run = useCallback(async (fn: () => Promise<any>, done?: string | ((out: any) => string)): Promise<any> => {
@@ -4526,6 +4524,58 @@ export function ConfirmModal({
    Half a second is the usual figure for this and it holds here: long
    enough that a healthy round trip never reaches it, short enough that
    somebody who has started to wonder is told before they wonder twice. */
+/*
+ * "Working…", said once for the whole app.
+ *
+ * It was said by a space's frame alone, so a screen opened from a space —
+ * a course, a deck, Manage cards — showed nothing at all while a save it
+ * had started was in flight: the frame that would have said so was not on
+ * screen. Now whatever is busy says so here (useWorking), and the one
+ * WorkingNote at the foot of the app speaks for all of them, wherever the
+ * person happens to be.
+ */
+const workingNow = new Set<object>();
+const workingWatchers = new Set<() => void>();
+function workingChanged() {
+  for (const w of [...workingWatchers]) w();
+}
+
+/** Counts this component as working while `busy` holds. */
+export function useWorking(busy: boolean | undefined) {
+  const me = useRef({});
+  useEffect(() => {
+    if (!busy) return undefined;
+    const token = me.current;
+    workingNow.add(token);
+    workingChanged();
+    return () => {
+      workingNow.delete(token);
+      workingChanged();
+    };
+  }, [busy]);
+}
+
+/* The note itself, rendered once, near the end of the app's tree. Only
+   after half a second, as before, so a quick save doesn't flash it. */
+export function WorkingNote() {
+  const [busy, setBusy] = useState(workingNow.size > 0);
+  useEffect(() => {
+    const watch = () => setBusy(workingNow.size > 0);
+    workingWatchers.add(watch);
+    watch();
+    return () => {
+      workingWatchers.delete(watch);
+    };
+  }, []);
+  const slow = useSlowWait(busy);
+  if (!slow) return null;
+  return (
+    <p className="at-working" role="status">
+      Working…
+    </p>
+  );
+}
+
 export function useSlowWait(waiting: boolean | undefined, ms: number = 500) {
   const [slow, setSlow] = useState(false);
   useEffect(() => {
@@ -5949,7 +5999,7 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
             ) : (
               pending[d.id] ? (
                 <span className="at-deckdrop" role="status" aria-label={`Taking ${d.title} out…`}>
-                  <span className="at-deckspin" aria-hidden="true" />
+                  <span className="at-spin" aria-hidden="true" />
                 </span>
               ) : (
                 <button
@@ -6029,7 +6079,7 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
                       <span title="Locked" aria-label="Locked" role="img"><Icon name="lock" size={14} /></span>
                     ) : going ? (
                       <span className="at-decksaving" role="status">
-                        <span className="at-deckspin" aria-hidden="true" />
+                        <span className="at-spin" aria-hidden="true" />
                         {going === "add" ? "Adding…" : "Removing…"}
                       </span>
                     ) : on ? "Added" : "Add"}
