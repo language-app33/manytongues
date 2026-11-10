@@ -1347,8 +1347,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   one-letter connector attaches. A number written out by hand carries its
   own.
 - **A learner studying more than one language says which are in play.** A
-  switch at the top of Learning, beside the space tabs, lists the languages
-  they have cards in and holds the ones switched off in
+  switch in the sheet behind where you are, at the top of every page, lists
+  the languages they have cards in and holds the ones switched off in
   `settings.langsOff` — the ones *off*, so a language that arrives later is
   in play by default. Everything the learner is shown reads the cards it
   leaves: the card list, Progress, what is ready, and what a session is
@@ -1360,8 +1360,9 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   you teach is not narrowing what you learn. What it leaves off goes from
   Teaching's lists and nowhere else: students are sent everything, and an
   open course or deck shows all it holds. The space reports its languages
-  up to the bar the switch sits in; `src/lang-choice.ts` holds the rules
-  both switches read.
+  up to the app, which draws the switch; `src/lang-choice.ts` holds the
+  rules both switches read. With some switched off, the line at the top
+  says so ("Arabic only").
 - **A card is one meaning.** A word with two meanings is two cards, and so
   are two words for one meaning; each has its own schedule and decks. Which
   of a learner's cards share a side — the same word, or one accepted
@@ -1653,19 +1654,24 @@ Memberships (since 0.573; `docs/PLAN-memberships.md`, all three stages in one re
   fingerprint (`moveSyncDoc`, 0.580).
 - In the app, the address is the space you are in when it is one of yours
   (`atOwnAddress` in the trainer); a member's requests carry it as `x-org`.
-  Going to another of your spaces, from the You menu, reloads at its
-  address. Learning's space row narrows `inPlay`, the same test the
-  languages switch narrows, so every reader of `shown` follows it. A
+  Going to another of your spaces, from the sheet behind where you are,
+  reloads at its address; from Learning it goes with `?open=learn` and
+  narrows Learning to that space first. Learning's choice of space
+  (`spaceFilter`) narrows `inPlay`, the same test the languages switch
+  narrows, so every reader of `shown` follows it. A
   card's space is its course's (`spaceOfItem`); a learner's own card is in
   none and is shown under every choice.
 
 Trying a space (since 0.574):
 
 - Super admin is a level above spaces, not a mode beside Learning,
-  Teaching and Admin. `placeRows` in `src/places.ts` decides both controls
-  of the You menu: "Where you are" at its top (Super admin, the App
-  admin's own spaces, the opened space) and the toggle of a space's modes
-  at its foot, which is empty at Super admin. `whoami` names all of the
+  Teaching and Admin. `placeRows` in `src/places.ts` decides which places
+  and modes exist: Super admin, the App admin's own spaces, the opened
+  space, and the space's modes, none at Super admin. Since 0.601 one line
+  at the top of every page says where you are and opens one sheet that
+  changes it (`whereRows`, same file): a row per place, the modes of the
+  space you are in under its row, then the languages. Only that space's
+  modes are known; another of your spaces is a place to go. `whoami` names all of the
   App admin's own spaces in `orgs`, so the app can tell them apart.
 - On the server, `trying` is `iAmAdmin && !memberOf(me).includes(acting)`:
   the App admin in a space they are not in. Then `my-material` and

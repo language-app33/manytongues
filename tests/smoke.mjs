@@ -2764,9 +2764,10 @@ if (/Build a session/.test(document.body.textContent)) {
   const cardCount = () =>
     Number(((document.querySelector("button.at-rung") || {}).textContent || "").trim().match(/^\d+/));
   const both = cardCount();
-  /* The languages are at the top of the menu behind your initial. */
-  const swBtn = () => document.querySelector(".at-cornerbtn");
-  const rows = () => [...document.querySelectorAll(".at-cmenu .at-tickrow")];
+  /* The languages are in the sheet behind where you are, at the top of
+     the page (0.601). */
+  const swBtn = () => document.querySelector('[data-el="where-you-are"]');
+  const rows = () => [...document.querySelectorAll(".at-wheresheet .at-tickrow")];
   const swSaid = () => rows().map((r) => `${(r.querySelector("b") || {}).textContent}:${String(!!(/** @type {any} */ (r.querySelector("input")) || {}).checked)}`).join(", ");
 
   click(swBtn());
@@ -2787,6 +2788,9 @@ if (/Build a session/.test(document.body.textContent)) {
     /Arabic:true/.test(swSaid()) && /Vietnamese:false/.test(swSaid()), swSaid());
   check("and its cards go from the rest of Learning", cardCount() === both - 1,
     `${both} with both, ${cardCount()} with one`);
+  check("and the line at the top says which is left",
+    /Learning · Palestinian Arabic only/.test((swBtn() || {}).textContent || ""),
+    ((swBtn() || {}).textContent || "no line").replace(/\s+/g, " "));
 
   /* The last one on stays on: an app with no languages in it is a blank
      screen with nothing to say why. */
@@ -2806,13 +2810,14 @@ if (/Build a session/.test(document.body.textContent)) {
   check("switching it back on brings its cards back",
     cardCount() === both && !/:false/.test(swSaid()),
     `${cardCount()} cards, button says ${swSaid()}`);
-  /* Anywhere outside it puts it away. */
-  /* Progress has no heading now, so the press lands on the page itself. */
-  click(document.querySelector(".at-brand, .at-tabtitle") || document.querySelector(".at"));
+  /* Anywhere outside it puts it away: the sheet's backdrop. */
+  click(document.querySelector(".at-wheresheet")?.closest(".at-modalback") || null);
   await sleep(200);
   check("and pressing away from it closes it",
-    !document.querySelector(".at-cmenu"),
-    document.querySelector(".at-cmenu") ? "still open" : "put away");
+    !document.querySelector(".at-wheresheet"),
+    document.querySelector(".at-wheresheet") ? "still open" : "put away");
+  check("and the line no longer says only one",
+    !/only/.test((swBtn() || {}).textContent || ""), ((swBtn() || {}).textContent || "").replace(/\s+/g, " "));
 
   click(buttonNamed(/^Home$/));
   await sleep(300);
@@ -4502,14 +4507,14 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   backOut();
   await sleep(250);
 
-  /* Into the teaching space, which this person now teaches in: from the
-     space and language menu in the bar at the foot of the window. */
-  click(document.querySelector(".at-dock .at-cornerbtn"));
+  /* Into the teaching space, which this person now teaches in: from where
+     you are, at the top of the page (0.601), under the space's own row. */
+  click(document.querySelector('[data-el="where-you-are"]'));
   await sleep(200);
-  const toTeaching = [...document.querySelectorAll(".at-spacebtn")]
+  const toTeaching = [...document.querySelectorAll(".at-wheremode")]
     .find((b) => /Teaching/i.test(b.textContent || ""));
   check("a teacher can reach the teaching space", !!toTeaching,
-    [...document.querySelectorAll(".at-spacebtn")].map((b) => b.textContent).join(",") || "no space menu");
+    [...document.querySelectorAll(".at-wheremode")].map((b) => b.textContent).join(",") || "no sheet");
   click(toTeaching);
   await sleep(700);
 
@@ -6713,12 +6718,23 @@ const openPronounTables = async () => {
         /* And none of them can be typed in as a group, because each is
            already a name on this list. */
         const newInput = () => /** @type {any} */ (inSheet(".at-blanknew input")[0] || null);
-        const addBtn = () => /** @type {any} */ (inSheet(".at-blanknew button")[0] || null);
+        const addBtn = () => /** @type {any} */ (inSheet(".at-blanknew > .at-btn")[0] || null);
         typeInto(newInput(), "noun");
         await sleep(200);
         check("and a group cannot be named after one of them",
           !!addBtn() && addBtn().disabled,
           addBtn() ? (addBtn().disabled ? "refused" : "offered") : "(no button)");
+        /* A search box with something in it has a cross that empties it
+           (0.599), and only then. */
+        const cross = () => inSheet(".at-blanknew .at-searchclear")[0] || null;
+        check("a search box with something typed has a cross to clear it",
+          !!cross() && cross()?.getAttribute("aria-label") === "Clear the search",
+          cross() ? "there" : "(no cross)");
+        click(cross());
+        await sleep(150);
+        check("and the cross empties it, and goes",
+          newInput()?.value === "" && !cross(),
+          `"${newInput()?.value}" ${cross() ? "cross still there" : ""}`);
         typeInto(newInput(), "");
         await sleep(150);
       }
@@ -6738,7 +6754,7 @@ const openPronounTables = async () => {
          second one like it is made. */
       {
         const findBox = () => /** @type {any} */ (inSheet(".at-blanknew input")[0] || null);
-        const addNew = () => /** @type {any} */ (inSheet(".at-blanknew button")[0] || null);
+        const addNew = () => /** @type {any} */ (inSheet(".at-blanknew > .at-btn")[0] || null);
         const all = fillNames();
         typeInto(findBox(), "fri");
         await sleep(200);
@@ -11246,12 +11262,12 @@ const openPronounTables = async () => {
   r.render(React.createElement(App));
   await sleep(1500);
 
-  /* The spaces are in the space and language menu, in the bar at the foot
-     of the window, so the menu is opened to reach them. */
+  /* The modes are in the sheet behind where you are (0.601), so it is
+     opened to reach them. */
   const spaceBtn = async (/** @type {RegExp} */ re) => {
-    if (!host.querySelector(".at-spacebtn")) click(host.querySelector(".at-dock .at-cornerbtn"));
+    if (!document.querySelector(".at-wheremode")) click(host.querySelector('[data-el="where-you-are"]'));
     await sleep(200);
-    return [...host.querySelectorAll(".at-spacebtn")].find((b) => re.test(b.textContent || ""));
+    return [...document.querySelectorAll(".at-wheremode")].find((b) => re.test(b.textContent || ""));
   };
   /* A teacher opens into Teaching; asked for it all the same, in case this
      device has not yet heard that they teach. */
@@ -11260,8 +11276,9 @@ const openPronounTables = async () => {
     await sleep(900);
   }
   const frame = () => host.querySelector(".at-screen.bare");
-  const swBtn = () => host.querySelector(".at-cornerbtn");
-  const rows = () => [...host.querySelectorAll(".at-cmenu .at-tickrow")];
+  const swBtn = () => (frame() || host).querySelector('[data-el="where-you-are"]');
+  const sheet = () => document.querySelector(".at-wheresheet");
+  const rows = () => [...document.querySelectorAll(".at-wheresheet .at-tickrow")];
   const listed = () => [...((frame() || host).querySelectorAll(".at-minicard"))]
     .map((t) => (t.textContent || "").replace(/\s+/g, " "));
   const hasHouse = () => listed().some((t) => /house/i.test(t));
@@ -11274,9 +11291,11 @@ const openPronounTables = async () => {
   click(inFrame(/^Cards$/) || null);
   await sleep(500);
 
-  /* The languages are at the top of the menu behind your initial. */
-  check("a teacher of two languages has the menu that holds the language switch",
-    !!swBtn(), "no menu button in the bar");
+  /* The languages are in the sheet behind where you are (0.601). */
+  check("a teacher of two languages has the line that holds the language switch",
+    !!swBtn(), "no line at the top of the page");
+  check("and the line names Teaching", /Teaching/.test((swBtn() || {}).textContent || ""),
+    ((swBtn() || {}).textContent || "").replace(/\s+/g, " "));
   check("and it lists the cards in both", hasHouse(), listed().length + " cards");
   click(swBtn());
   await sleep(200);
@@ -11284,8 +11303,8 @@ const openPronounTables = async () => {
     rows().length === 2 && rows().some((r) => /Vietnamese/.test(r.textContent || "")),
     rows().map((r) => (r.textContent || "").replace(/\s+/g, " ")).join(" · ") || "nothing opened");
   check("and says what switching one off does here",
-    /doesn't change anything for your students/.test((host.querySelector(".at-cmenu") || {}).textContent || ""),
-    ((host.querySelector(".at-cmenu") || {}).textContent || "").slice(0, 80));
+    /doesn't change anything for your students/.test((sheet() || {}).textContent || ""),
+    ((sheet() || {}).textContent || "").slice(0, 80));
   const shown = listed().length;
   const learnWas = learnOff();
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
@@ -11300,7 +11319,7 @@ const openPronounTables = async () => {
   click(rows().find((r) => /Vietnamese/.test(r.textContent || "")));
   await sleep(300);
   check("switching it back on brings the card back", hasHouse(), listed().length + " cards");
-  click(host.querySelector(".at-brand"));
+  click(sheet()?.closest(".at-modalback") || null);
   await sleep(200);
   check("and nothing threw on the way", errors.length === before, errors.slice(before, before + 3).join(" | "));
   r.unmount();
@@ -11705,9 +11724,8 @@ const openPronounTables = async () => {
 
 /* ---- memberships: one account, two spaces ----
 
-   Learning shows both spaces' courses, a row at the top narrows every tab
-   to one, and the You menu lists both. An account in one space sees no
-   row. And another space's invitation, followed signed in, asks to join
+   Learning shows both spaces' courses, and where you are (0.601) narrows
+   every tab to one of them. An account in one space sees no line. And another space's invitation, followed signed in, asks to join
    it rather than to make a new account. */
 {
   const MAIN = { id: "main", slug: "main", name: "Main", logo: "", colour: "" };
@@ -11737,45 +11755,65 @@ const openPronounTables = async () => {
   rootM.render(React.createElement(App));
   await sleep(2500);
   const ready = () => Number((hostM.querySelector(".at-home[data-ready]") || { getAttribute: () => "-1" }).getAttribute("data-ready"));
-  /* Since 0.576 a button in the top right corner, opening a list. */
-  const row = () => hostM.querySelector('[data-el="space-filter"]');
-  const listed = () => [...hostM.querySelectorAll(".at-learnspacemenu button")];
+  /* Since 0.601, where you are: a line at the top of the page, and a
+     sheet behind it with a row for every place. */
+  const line = () => hostM.querySelector('[data-el="where-you-are"]');
+  /* Its words, not the space's initials in the badge before them. */
+  const lineSays = () => (((line() || hostM).querySelector(".at-placetext") || {}).textContent || "").replace(/\s+/g, " ").trim();
+  const listed = () => [...document.querySelectorAll('.at-wheresheet [data-el="where-place"]')];
   const openList = async () => {
-    if (!listed().length && row()) {
-      click(row());
+    if (!listed().length && line()) {
+      click(line());
       await sleep(200);
     }
   };
-  /* By the name on the line, not its initials badge. */
-  const nameOf = (/** @type {Element} */ b) => ((b.querySelector(".at-place-name") || b).textContent || "").trim();
+  /* By the name on the row, not its badge or the line under it. */
+  const nameOf = (/** @type {Element} */ b) => ((b.querySelector(".at-wheretext b") || b).textContent || "").trim();
   const rowButton = (/** @type {RegExp} */ re) => listed().find((b) => re.test(nameOf(b)));
+  /* Choosing another space goes to its address; jsdom does not navigate,
+     so where it would have gone is noted instead. */
+  const went = /** @type {string[]} */ ([]);
+  const assignWas = window.location.assign;
+  let stubbed = false;
+  try {
+    Object.defineProperty(window.location, "assign", { value: (/** @type {string} */ to) => went.push(String(to)), configurable: true });
+    stubbed = true;
+  } catch (e) {
+    /* a jsdom that will not let it be replaced: what is narrowed is still checked */
+  }
+  check("an account in two spaces is told where Learning is", lineSays() === "All your spaces · Learning", lineSays() || "no line");
   await openList();
-  check("an account in two spaces sees which space Learning shows", !!row() && !!rowButton(/^All your spaces$/) && !!rowButton(/^Lingua$/) && !!rowButton(/^Main$/),
-    row() ? listed().map(nameOf).join(" · ") : `no button; ${hostM.querySelector(".at-screen") ? "Teaching open" : "Learning open"}`);
+  check("and the sheet lists all of them, then each", !!rowButton(/^All your spaces$/) && !!rowButton(/^Lingua$/) && !!rowButton(/^Main$/),
+    listed().map(nameOf).join(" · ") || "no sheet");
   const all = ready();
   click(rowButton(/^Lingua$/));
   await sleep(400);
   const inLingua = ready();
-  check("the button then shows the space's initials", (row() && (row() || { textContent: "" }).textContent) === "L",
-    row() ? String((row() || { textContent: "" }).textContent) : "no button");
+  check("choosing another space narrows Learning to it", lineSays() === "Lingua · Learning", lineSays());
+  if (stubbed) {
+    check("and goes to its address, to learn there", went.length === 1 && went[0] === "/lingua?open=learn", JSON.stringify(went));
+  }
   await openList();
   click(rowButton(/^Main$/));
   await sleep(400);
   const inMain = ready();
   check("choosing a space narrows what is ready to practise", all > 0 && inLingua > 0 && inMain > 0 && inLingua < all && inMain < all,
     `all ${all}, Lingua ${inLingua}, Main ${inMain}`);
+  check("and the space you are in is narrowed to without going anywhere", went.length <= 1, JSON.stringify(went));
   check("and the choice is remembered on the device", localStorage.getItem("arabic-trainer:space-filter") === "main",
     String(localStorage.getItem("arabic-trainer:space-filter")));
   await openList();
   click(rowButton(/^All your spaces$/));
   await sleep(300);
-  check("All shows everything again", ready() === all, `${ready()} of ${all}`);
+  check("All shows everything again", ready() === all && lineSays() === "All your spaces · Learning", `${ready()} of ${all}; ${lineSays()}`);
+  if (stubbed) Object.defineProperty(window.location, "assign", { value: assignWas, configurable: true });
 
   click(hostM.querySelector(".at-cornerbtn"));
   await sleep(300);
-  const inMenu = hostM.querySelector('[data-el="my-spaces"]');
-  check("the You menu lists both spaces", !!inMenu && /Main/.test(inMenu.textContent || "") && /Lingua/.test(inMenu.textContent || ""),
-    inMenu ? (inMenu.textContent || "") : "not listed");
+  const menu = hostM.querySelector(".at-cmenu");
+  check("the You menu is only about you: no spaces, modes or languages in it",
+    !!menu && !/Lingua/.test(menu.textContent || "") && !menu.querySelector(".at-tickrow, .at-wheremode"),
+    menu ? (menu.textContent || "").slice(0, 120) : "no menu");
   rootM.unmount();
   hostM.remove();
 
@@ -11788,7 +11826,13 @@ const openPronounTables = async () => {
   const rootO = createRoot(hostO);
   rootO.render(React.createElement(App));
   await sleep(2000);
-  check("an account in one space sees no row of spaces", !hostO.querySelector('[data-el="space-filter"]'));
+  check("an account in one space, learning one language, has no line at the top",
+    !hostO.querySelector('[data-el="where-you-are"]'));
+  click(hostO.querySelector(".at-cornerbtn"));
+  await sleep(300);
+  check("and its You menu still names the space, as one quiet line",
+    /Main/.test(((hostO.querySelector(".at-cmenu .at-spaceline") || {}).textContent) || ""),
+    ((hostO.querySelector(".at-cmenu") || {}).textContent || "").slice(0, 80));
 
   /* Another space's invitation, followed signed in. */
   rootO.unmount();

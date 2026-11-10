@@ -129,8 +129,8 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["what-moved", "The cards this sitting moved up a level, cleared, or learnt — left out altogether when none did.", "airport — learnt · key — up to writing it from a cue"],
   ]],
   [SPACES, [
-    ["space-filter", "The round button in Learning's top right corner, for someone in more than one space: All your spaces, or one of them. Home, Progress, Cards, Courses and the session started from them follow it.", "All your spaces · Lingua · Main"],
-    ["my-spaces", "At the top of the menu behind your initial: your spaces, one per line, to go to another. For the super admin, \"Where you are\": Super admin, your spaces, and a space you opened.", "Super admin · Main · Lingua"],
+    ["where-you-are", "The button at the right of every tab's title, and under the app's name on Home (0.601): the place, the mode and the languages once some are off. It opens the sheet that changes them. Not there for someone with nothing to choose.", "Lingua · Teaching · Arabic only"],
+    ["where-place", "A row of the sheet behind where you are: Super admin, All your spaces, or one of your spaces, with what you do there. The space you are in has its modes under it; another space is gone to, and from Learning, learnt in.", "Main · You teach here."],
     ["stranded", "The page someone sees when they have no space to open: suspended in, removed from or gone from each of theirs, with a box for an invitation link or a course code.", "You're suspended in Lingua."],
   ]],
 ];

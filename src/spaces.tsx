@@ -128,6 +128,7 @@ import {
   Icon,
   IconButton,
   ItemList,
+  SearchBox,
   LanguageRadio,
   Lede,
   Notice,
@@ -10770,8 +10771,8 @@ function EveryonePeople({ me }: { me: string }) {
         onChange={(v: string) => setView(v === "spaces" ? "spaces" : "all")}
         label="Everyone or by space"
       />
-      <input className="at-input" placeholder="Search everyone, in every space" value={q}
-        onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 14 }} />
+      <SearchBox placeholder="Search everyone, in every space" aria-label="Search everyone, in every space"
+        value={q} onChange={setQ} style={{ marginBottom: 14 }} />
       {newKey && (
         <div className="at-sub">
           <CodeBox label={`New sign-in key for ${newKey.name}`} code={newKey.key} />
