@@ -7881,3 +7881,44 @@ The other callers of `DeckSwitch` keep the sheet: a course's decks, Prep
 mode's and Build a session's. In those places, making a deck isn't
 something being chosen, and a course's deck list saves each tap as it
 goes.
+
+---
+
+## Where you are is one line at the top of the page, and one sheet (0.601)
+
+**10 November 2026** · `src/places.ts` (`whereRows`, `langsSummary`), `src/ArabicTrainer.tsx` (`PlaceButton`, `WhereSheet`, `CornerMenu`), `src/shared.tsx` (`PlaceContext`, `TabTitle`)
+
+The owner found the app's choosers confusing, and they were four controls
+for one question. The space was chosen at the top of the You menu, and
+choosing one went to its address. Learning's corner button chose a space
+too, but only narrowed Learning. Learning, Teaching and Admin were a toggle
+at the foot of the same menu, with Super admin up among the spaces. The
+languages sat in its middle. Nothing on the page said which space you were
+in.
+
+Now the right of every tab's title, and the top of Home, holds one button
+that says where you are: "Lingua · Teaching · Arabic only". It opens one
+sheet. Super admin comes first, then "All your spaces" for someone
+learning in more than one, then each space with a line on what you do
+there, then the languages. The modes of the space you are in sit under
+its row, so a mode is one tap. The You menu keeps you and nothing about
+where. Settings no longer opens Super admin; the line is the one way in.
+
+**Why only the space you are in lists its modes.** Whether you teach in
+or run a space is worked out where you are: `my-courses` is of one space,
+and `orgAdmin` is the address's. Listing the modes of your other spaces
+would need the server to answer for all of them, and the owner asked for
+no change behind the screen. So another space is a place to go: the app
+picks its mode on arrival, as since 0.582, and from Learning it is gone to
+with `?open=learn`, to learn there.
+
+**Why choosing a space in Learning both narrows and goes (1a).** The
+corner button narrowed and the menu's list went, and the two looked alike;
+that likeness was the confusion. One action now does both. The space you
+are already in is narrowed to without reloading.
+
+**What it costs.** A line at the top of pages for anyone with a choice.
+Learning to another space reloads the app at its address, where the corner
+button changed the list in place. Someone in one space who only learns,
+in one language, has no line and keeps the space's name in the You menu.
+

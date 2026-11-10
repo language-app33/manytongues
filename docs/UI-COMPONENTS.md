@@ -43,11 +43,19 @@ flow goes through this: there is no second way to make one.
 form rather than putting buttons in the flow.
 
 ### `SpaceFrame` — 2 uses
-The Teaching and Admin shells. Full-bleed screen, pending dialog, error line,
-busy line, the app's name, contents; its tab strip goes to the bar at the
-foot of the window (`Tabs` with `dock`).
+The Teaching, Admin and Super admin shells. Full-bleed screen, pending
+dialog, error line, the tab's title, contents; its tab strip goes to the bar
+at the foot of the window (`Tabs` with `dock`).
 
-`tabs, tab, onTab, error, busy, label="Section", dialog, children`
+`tabs, tab, onTab, error, busy, label="Section", dialog, space, children`
+
+### `TabTitle` and `PlaceContext`
+`TabTitle` heads a tab with its name, held at the top as the page scrolls.
+At its right it shows whatever `PlaceContext` holds: the app's "where you
+are" button (0.601), which names the place, the mode and the languages and
+opens the sheet that changes them. The app provides it; nothing else
+should. Outside the app (the gallery) the context is empty and the title
+stands alone.
 
 ### `Section` — 7 uses
 A titled block. Replaces the hand-built eyebrow-plus-lede opener.

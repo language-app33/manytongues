@@ -8,6 +8,61 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.601 — 10 November 2026
+
+**Where you are is one line at the top of every page, and one place to
+change it.** Choosing a space, Learning, Teaching or Admin, and the
+languages used to be spread over the top, middle and foot of the You menu
+and a round button in Learning's corner.
+
+- **The line** sits at the right of each tab's title, and under the app's
+  name on Home. It names the space, what you are doing there, and the
+  languages once some are switched off: "Lingua School · Teaching",
+  "All your spaces · Learning", "Super admin", "Learning · Arabic only".
+- **Tapping it opens "Where you are".** Super admin is first, for the
+  super admin. Then comes "All your spaces", for anyone learning in more
+  than one. Then each of your spaces, with a line on what you do there.
+  The space you are in has Learning, Teaching and Admin under it, as you
+  have them, so changing mode is one tap. The language ticks are at the
+  foot.
+- **In Learning, choosing a space narrows Learning to it.** If it is
+  another of your spaces, the app goes to that space's address too, and
+  opens there in Learning.
+- **The You menu is only about you now**: Courses, Settings, How it
+  works, Share feedback and sync. Its list of spaces, its language ticks
+  and its Learning / Teaching / Admin toggle have gone, and so has
+  Learning's round space button.
+- **Settings no longer has "Open administration".** Super admin is reached
+  from the line, like everywhere else.
+- **Nothing changes for someone with nothing to choose**: one space, only
+  learning, one language. They see no line, and the You menu still names
+  their space.
+
+Trade-offs:
+
+- Only the space you are in lists its modes. Whether you teach in or run
+  your other spaces is only known once you are there, so they are a place
+  to go, and the app picks the mode when you arrive, as before.
+- Choosing another space from Learning now reloads the app at that space's
+  address, where the round button only changed the list in place.
+- On a narrow phone a long space name is shortened in the line ("Lingua
+  S… · Teaching"), so the mode always shows.
+
+To check by hand, on the deployed app at phone width:
+
+- As a learner in two spaces: the line reads "All your spaces · Learning".
+  Choose the other space in the sheet: the app opens at its address, and
+  the line names it.
+- As a teacher: in Teaching, the line is at the right of the tab's title.
+  Learning is one tap in the sheet, and back again.
+- As the super admin: Super admin is first in the sheet. Open a space from
+  Spaces: the line marks it Opened, and the "You're in …" band is still
+  there.
+
+Also included: the app's checks walk the line and the sheet instead of the
+old menu, and the decisions log says why only the space you are in lists
+its modes. Checked with `npm run check` on the pushed tree.
+
 ## 0.600 — 9 November 2026
 
 **A deck's score no longer counts a sentence with a blank that nothing

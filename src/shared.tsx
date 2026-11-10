@@ -979,6 +979,15 @@ export function Segmented<T extends string | number | boolean | null>({
 export const DockContext = createContext<HTMLElement | null>(null);
 
 /**
+ * Where you are (0.601): the button at the top of every page that says
+ * which space, which mode and which languages, and opens the one sheet
+ * that changes them. The app builds it, because only the app knows; a
+ * tab's title shows it, wherever the tab is drawn. Nothing when there is
+ * nothing to choose.
+ */
+export const PlaceContext = createContext<Node>(null);
+
+/**
  * @param props  Each tab is [key, label, iconName].
  */
 export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock = false }: {
@@ -1081,18 +1090,23 @@ export function Field({ label, lede, hint, optional, htmlFor, children, classNam
    used inside Progress, held in place as the page scrolls (0.555). */
 export function TabTitle({ children }: { children?: Node }) {
   /* Held at the top while the page scrolls under it (0.555), with the
-     app's mark beside it and a rule beneath. */
+     app's mark beside it and a rule beneath. Where you are sits at its
+     right (0.601), for anyone with somewhere else to be. */
+  const place = useContext(PlaceContext);
   return (
     <div className="at-pagetitle">
       <img className="at-brandmark" src="/logo.svg" alt="" width={28} height={28} />
       <h2 className="at-sectionhead">{children}</h2>
+      {place}
     </div>
   );
 }
 
 export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, children }: {
   tabs: [string, string, string?][];
-  /** The space's name, heading each tab as "{space} · {tab}" (0.553). */
+  /** Which of Teaching, Admin or Super admin this is. Each tab is headed
+      with its own name (0.553); the mode itself is said by where you are,
+      at the title's right (0.601), so it no longer prefixes the name. */
   space?: string;
   tab?: string;
   onTab: (key: string) => void;
@@ -1132,7 +1146,7 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
           {/* The tab's own name at the top (0.553), in the words of the bar.
               A screen opened over the tab covers it, with its own title. */}
           {space && tabs.find((t) => t[0] === tab) ? (
-            <TabTitle>{`${space} · ${(tabs.find((t) => t[0] === tab) as [string, string])[1]}`}</TabTitle>
+            <TabTitle>{(tabs.find((t) => t[0] === tab) as [string, string])[1]}</TabTitle>
           ) : null}
           {children}
         </div>
