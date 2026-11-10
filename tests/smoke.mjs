@@ -1292,6 +1292,34 @@ if (/Build a session/.test(document.body.textContent)) {
   check("and stands as a pill", sessionPills().some((p) => /Introductions/.test(p)), sessionPills().join("|"));
   check("so nothing is wanted any more", !off() && !wants(), wants());
 
+  /* "All cards" heads the Cards section, above Decks. Ticked, both
+     pickers stand idle and the session is every card; the deck already
+     chosen stays shown, and comes back when the box is unticked. */
+  {
+    const cardsBlock = [...document.querySelectorAll(".at-screen.cardform .at-formblock")]
+      .find((b) => b.querySelector(".at-formnum")?.textContent === "Cards");
+    const allBox = () => [...(cardsBlock?.querySelectorAll(".at-tickrow") || [])]
+      .find((r) => /All cards/.test(r.textContent || ""))?.querySelector("input");
+    const firstInBlock = cardsBlock?.querySelector(".at-tickrow, .at-field, .at-chooser");
+    check("an All cards box heads the Cards section, above Decks",
+      !!allBox() && !!firstInBlock?.closest(".at-tickrow") && !allBox()?.checked);
+    const pickerOff = () => /** @type {HTMLButtonElement[]} */ ([...(cardsBlock?.querySelectorAll(".at-deckadd") || [])]);
+    const before = sessionPills().join("|");
+    click(allBox());
+    await sleep(80);
+    check("ticked, Choose decks and Choose cards both go inactive",
+      pickerOff().length === 2 && pickerOff().every((b) => b.disabled) &&
+        cardsBlock?.querySelectorAll(".at-chooser.deckwrap.off").length === 2,
+      pickerOff().map((b) => `${b.textContent}:${b.disabled}`).join("|"));
+    check("and the deck chosen before stays shown, greyed", sessionPills().join("|") === before, sessionPills().join("|"));
+    check("and the session is still ready to start", !off() && !wants(), wants());
+    click(allBox());
+    await sleep(80);
+    check("unticked, the pickers come back as they were",
+      pickerOff().every((b) => !b.disabled) && sessionPills().join("|") === before && !allBox()?.checked,
+      sessionPills().join("|"));
+  }
+
   click([...document.querySelectorAll(".at-lengthgroup button")].find((b) => (b.textContent || "").trim() === "10"));
   await sleep(80);
   check("a length can still be changed", lit().join(",") === "10", lit().join(","));

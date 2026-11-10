@@ -5997,7 +5997,7 @@ export interface DeckWords {
   another: string;
 }
 
-export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize, saving, onAdd }: {
+export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize, saving, onAdd, disabled = false }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
@@ -6033,6 +6033,10 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
       button calls it, and is there even with no decks yet: making the
       first one is what that screen is for. */
   onAdd?: () => void;
+  /** Nothing can be chosen or taken off here for now — Build a session's
+      "All cards" box, ticked, stands in for both of its pickers. What was
+      chosen stays shown, greyed, so unticking the box gives it back. */
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [q, setQ] = useState("");
@@ -6053,7 +6057,7 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
   };
 
   return (
-    <div className="at-chooser deckwrap">
+    <div className={`at-chooser deckwrap${disabled ? " off" : ""}`} aria-disabled={disabled || undefined}>
       {/* The decks this card is in, each as a thing you can see and take
           off, with the way to add another on the end of the row. It was a
           pill saying "2 decks" that had to be opened to find out which
@@ -6084,7 +6088,8 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
                 <button
                   className="at-deckdrop"
                   aria-label={say.drop(d.title)}
-                  onClick={() => onToggle(d.id, true)}
+                  disabled={disabled}
+                  onClick={() => !disabled && onToggle(d.id, true)}
                 >
                   <Icon name="close" size={16} />
                 </button>
@@ -6101,7 +6106,8 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
           <button
             className="at-deckadd"
             aria-expanded={onAdd ? undefined : open}
-            onClick={() => (onAdd ? onAdd() : setOpen(true))}
+            disabled={disabled}
+            onClick={() => !disabled && (onAdd ? onAdd() : setOpen(true))}
           >
             <Icon name="add" size={17} />
             {inThese.length ? say.another : say.first}
@@ -6115,7 +6121,7 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
 
       {/* Stays open while decks are picked, because a card usually goes in
           more than one; the pills behind it change as it does. */}
-      {open && (
+      {open && !disabled && (
         <PickSheet
           title={title}
           lede={say.lede}

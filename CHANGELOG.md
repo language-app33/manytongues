@@ -8,6 +8,15 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.602 — 10 November 2026
+
+**Build a session can take every card in one tick.** The Cards section now
+opens with an "All cards" box, above Decks. Ticked, the session takes in
+every card you can practise, and the Choose decks and Choose cards buttons
+grey out and can't be used. Anything already chosen in them stays shown,
+greyed, and comes back if the box is unticked. A session saved with the box
+ticked keeps it ticked when opened again, and takes in cards added since.
+
 ## 0.601 — 10 November 2026
 
 **Where you are is one line at the top of every page, and one place to

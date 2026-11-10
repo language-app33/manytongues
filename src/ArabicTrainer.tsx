@@ -16189,13 +16189,18 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
    * the shape it was chosen in.
    */
   const [opened] = useState(() => {
-    if (!editing) return { decks: [] as string[], cards: [] as string[] };
+    if (!editing) return { all: false, decks: [] as string[], cards: [] as string[] };
     const picked = new Set(cardsOfSaved(editing, eligible).map((i) => i.id));
     const kept = describeSaved({ picked, groups: new Map(tagGroups), all: eligible });
     return kept.everything
-      ? { decks: tagGroups.map(([n]) => n), cards: eligible.filter((i) => !i.tags.length).map((i) => i.id) }
-      : { decks: kept.decks, cards: kept.ids };
+      ? { all: true, decks: [] as string[], cards: [] as string[] }
+      : { all: false, decks: kept.decks, cards: kept.ids };
   });
+  /* "All cards", ticked, is every card on offer, and the two pickers below
+     it stand idle — greyed, keeping what they held, so unticking it gives
+     back the choice made before. Kept, it is the Everything a saved
+     session already knows, so it takes in cards added later. */
+  const [allCards, setAllCards] = useState(opened.all);
   const [decks, setDecks] = useState<string[]>(opened.decks);
   const [cards, setCards] = useState<string[]>(opened.cards);
   /* The kept cards this screen cannot show — another language's, under the
@@ -16247,10 +16252,11 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   };
 
   const picked = useMemo(() => {
+    if (allCards) return new Set(eligible.map((i) => i.id));
     const on = new Set(cards);
     for (const [n, group] of tagGroups) if (decks.includes(n)) group.forEach((i) => on.add(i.id));
     return on;
-  }, [decks, cards, tagGroups]);
+  }, [allCards, eligible, decks, cards, tagGroups]);
 
   const byId = useMemo(() => new Map(eligible.map((i) => [i.id, i])), [eligible]);
   /* A card is named on its pill and in the list the way the old picker
@@ -16373,8 +16379,19 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
           <span className="at-formnum">Cards</span>
           <span className="at-formrole">Pick whole decks, single cards, or both.</span>
         </div>
-        <FormField label="Decks">
+        <CheckList
+          options={[{
+            id: "all",
+            title: "All cards",
+            note: "Every card you can practise. Decks and cards can't be chosen while this is ticked.",
+            disabled: !eligible.length,
+          }]}
+          chosen={allCards ? ["all"] : []}
+          onToggle={(_, wasOn) => setAllCards(!wasOn)}
+        />
+        <FormField label="Decks" className="at-mt5">
           <DeckSwitch
+            disabled={allCards}
             decks={tagGroups.map(([n, group]) => ({ id: n, title: n, cardCount: group.length }))}
             chosen={decks}
             onToggle={(id, wasOn) => setDecks((d) => (wasOn ? d.filter((x) => x !== id) : d.concat([id])))}
@@ -16389,6 +16406,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
         </FormField>
         <FormField label="Cards" className="at-mt5">
           <DeckSwitch
+            disabled={allCards}
             title="Cards"
             size={null}
             decks={(() => {

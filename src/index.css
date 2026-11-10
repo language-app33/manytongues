@@ -568,6 +568,12 @@ button {
  * that.
  */
 .at-chooser.deckwrap { display:block; width:100%; }
+/* Greyed as a ticked-off row is (.at-tickrow.off): there, but not to be used
+   while something else stands in for it. */
+.at-chooser.deckwrap.off { opacity:.55; }
+.at-chooser.deckwrap.off button { cursor:not-allowed; }
+.at-chooser.deckwrap.off .at-deckadd:hover { border-color: var(--faint); color: var(--muted); }
+.at-chooser.deckwrap.off .at-deckdrop:hover { background:none; }
 .at-deckpills { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
 .at-deckpills > .at-hint { margin:0; }
 /* A pill whose name opens what it names: the name is the button. */
