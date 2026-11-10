@@ -930,9 +930,11 @@ check("every card with something due counts, and a value is never one", homeCard
    beside them add up to the same count the attribute carries. */
 {
   const line = (homeCard()?.querySelector(".at-homeline")?.textContent || "").replace(/\s+/g, " ");
-  const m = /^(\d+) cards? ready to review(?: · (\d+) new words? waiting)?/.exec(line);
+  /* Ready to review is Cleared and Learnt cards alone (0.603); cards still
+     climbing are "in progress" beside it, or in its place. */
+  const m = /^(?:(\d+) cards? ready to review|Nothing to review —)(?:(?: ·)? (\d+) cards? in progress)?(?: · (\d+) new words? waiting)?/.exec(line);
   check("the home screen says how many cards are ready to review, above Start session",
-    !!m && Number(m[1]) + Number(m[2] || 0) === 6 &&
+    !!m && Number(m[1] || 0) + Number(m[2] || 0) + Number(m[3] || 0) === 6 &&
       !!homeCard()?.querySelector(".at-homeline + .at-row"),
     line || "no line");
 }

@@ -4594,7 +4594,7 @@ const MODES = {
   },
   catchup: {
     label: "Catch up",
-    blurb: "Only what is due — reviews that have come round and cards in learning waiting for their next question, longest waiting first. No new cards, and only the questions that are due.",
+    blurb: "Only reviews that are due — Cleared and Learnt cards whose review has come round, longest waiting first. Cards still being learnt and new cards are left for a regular session, and only the questions that are due are asked.",
   },
   ultimate: {
     label: "Ultimate",
@@ -5003,9 +5003,11 @@ function drawRange(
  *   questions that went wrong.
  * - **Get started:** recognition questions only.
  * - **Ultimate:** every question each card has open.
- * - **Catch up:** the pool is cards with a question due now, asked those
+ * - **Catch up:** the pool is Cleared and Learnt cards with a question due
+ *   now (`dueForReview`, which the home screen counts by), asked those
  *   questions and no others, longest waiting first. Not the mix: no new
- *   cards, no shares, nothing brought forward to fill a place.
+ *   cards, no cards still climbing, no shares, nothing brought forward to
+ *   fill a place.
  */
 export type SessionMode = "regular" | "ultimate" | "started" | "mistakes" | "unseen" | "weak" | "catchup";
 
@@ -5017,6 +5019,29 @@ export type SessionMode = "regular" | "ultimate" | "started" | "mistakes" | "uns
  */
 function dueToCatchUp(s: ExerciseState | null | undefined): boolean {
   return !!s && s.phase !== "new" && !!s.due && s.due <= now();
+}
+
+/*
+ * A card on review: climbed to the top of its ladder, Cleared or Learnt
+ * (0.603, the owner's 1b). Only these are Catch up's, and only these does
+ * the home screen count as ready to review. A card still climbing opens a
+ * new question each time it is answered well, and counted there it kept
+ * the number up however much a learner caught up on, while Catch up, which
+ * leaves a question never asked alone, could never bring it down.
+ * Cleared stays in beside Learnt: its reviews are what make it learnt.
+ */
+function onReview(it: Item, settings: Settings, items: Item[]): boolean {
+  const s = standing(cardStandings(it, settings, items));
+  return !!s && (s.status === "cleared" || s.status === "done");
+}
+
+/** Whether Catch up has something to ask of this card now: the one rule
+    the home screen's "ready to review" reads too, so the two agree. */
+export function dueForReview(it: Item, settings: Settings, items: Item[]): boolean {
+  return (
+    onReview(it, settings, items) &&
+    drillableUnits(it, settings).some(({ unit }) => askableTypes(unit, settings).some((t) => dueToCatchUp(stateOf(unit, t))))
+  );
 }
 
 /* What sort of card this is, for the order of questions: no more than two
@@ -5102,7 +5127,7 @@ export function buildSession({
       : mode === "weak"
       ? isWeak(it, settings)
       : mode === "catchup"
-      ? units(it).some(({ unit }) => typesOf(unit).length > 0)
+      ? onReview(it, settings, items) && units(it).some(({ unit }) => typesOf(unit).length > 0)
       : true
   );
   if (!pool.length) {
@@ -11164,8 +11189,13 @@ export default function ArabicTrainer() {
         drillableUnits(it, settings).some(({ unit }) =>
           laddered(unit, settings).some((t) => stateOf(unit, t).phase !== "new")
         );
-      /* Everything genuinely waiting, which is the honest half of the number. */
-      const met = pool.filter((it) => (everMet(it) ? waiting(it, true) : waiting(it, false))).length;
+      /* Ready to review: Cleared and Learnt cards with a question due — what
+         Catch up would ask, by the same rule (0.603). */
+      const reviewing = new Set(pool.filter((it) => dueForReview(it, settings, items)).map((it) => it.id));
+      /* The rest of what is genuinely waiting on cards already met: cards
+         still climbing, a level just opened, a card asked for by name. A
+         regular session deals them; Catch up does not. */
+      const climbing = pool.filter((it) => !reviewing.has(it.id) && (everMet(it) ? waiting(it, true) : waiting(it, false))).length;
       /* Plus as many never-met cards as the session mix has room for in
          this pool — the same reckoning buildSession does, so the two cannot
          come to disagree. None while the learner is catching up. */
@@ -11174,15 +11204,16 @@ export default function ArabicTrainer() {
       const pace = { at: now(), places: SESSION_SIZE / PER_UNIT, dayCards: (perDay || 0) / PER_UNIT };
       /* Behind only matters while there are new cards it is keeping out:
          the home line says so, and saying it with none waiting is noise. */
-      return { review: met, fresh: Math.min(fresh, roomForNewIn(mix, pace)), behind: fresh > 0 && isBehind(mix, pace) };
+      return { review: reviewing.size, climbing, fresh: Math.min(fresh, roomForNewIn(mix, pace)), behind: fresh > 0 && isBehind(mix, pace) };
     },
     [settings, items, perDay, systems]
   );
-  /* The two halves as one number, which is what decides whether there is
-     anything waiting at all. */
+  /* Everything a regular session would deal, as one number, which is what
+     decides whether there is anything waiting at all — not the review
+     count alone (0.603, the owner's 3a). */
   const countReady = useCallback((pool: Item[]) => {
     const r = readyOf(pool);
-    return r.review + r.fresh;
+    return r.review + r.climbing + r.fresh;
   }, [readyOf]);
 
   /*
@@ -11308,7 +11339,7 @@ export default function ArabicTrainer() {
      on the home screen, and what decides whether there is a session to
      start at all. */
   const homeWaiting = useMemo(() => readyOf(drillable), [drillable, readyOf]);
-  const readyCount = homeWaiting.review + homeWaiting.fresh;
+  const readyCount = homeWaiting.review + homeWaiting.climbing + homeWaiting.fresh;
   /* The prep the home screen offers a session for: one still to come, with
      cards in it not yet learnt. Past its day, or finished, it is Progress's
      to report and the learner's to clear. */
@@ -11453,7 +11484,7 @@ export default function ArabicTrainer() {
         built.reason === "no-mistakes"
           ? "Nothing to fix — none of those have gone wrong recently"
           : built.reason === "caught-up"
-          ? "You're all caught up — nothing in those cards is due yet"
+          ? "You're all caught up — no cleared or learnt card in those is due yet"
           : built.reason === "no-unseen"
           ? "You've practised all of those in the last few days, or they're already cleared"
           : built.reason === "none-due"
@@ -19298,23 +19329,25 @@ function AppPreferences({ settings, setSetting }: {
   );
 }
 
-/** What is waiting on the home screen: cards met before with something due,
-    new cards the next session would bring in, and whether new cards are
-    being held back for a pile of overdue reviews. */
-export type Ready = { review: number; fresh: number; behind: boolean };
+/** What is waiting on the home screen: Cleared and Learnt cards with a
+    review due, other cards already met with a question waiting (still
+    climbing), new cards the next session would bring in, and whether new
+    cards are being held back for a pile of overdue reviews. */
+export type Ready = { review: number; climbing: number; fresh: number; behind: boolean };
 
 /*
  * The one line above Start session. Every case ends somewhere the button
  * answers: there is always a session to start, so a learner who is caught
  * up is asked to practise rather than told when to come back.
  */
-export function homeLine({ review, fresh, behind }: Ready): string {
-  const more = fresh
+export function homeLine({ review, climbing, fresh, behind }: Ready): string {
+  const news = fresh
     ? ` · ${plural(fresh, "new word")} waiting`
     : behind
     ? " · new words wait until you've caught up"
     : "";
-  if (review) return `${plural(review, "card")} ready to review${more}`;
+  if (review) return `${plural(review, "card")} ready to review${climbing ? ` · ${climbing} in progress` : ""}${news}`;
+  if (climbing) return `Nothing to review — ${plural(climbing, "card")} in progress${news}`;
   if (fresh) return `Nothing to review — ready to learn ${fresh === 1 ? "a new word" : `${fresh} new words`}`;
   return "All caught up — a practice session now still helps them stick";
 }

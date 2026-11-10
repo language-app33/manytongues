@@ -7922,3 +7922,28 @@ Learning to another space reloads the app at its address, where the corner
 button changed the list in place. Someone in one space who only learns,
 in one language, has no line and keeps the space's name in the You menu.
 
+## "Ready to review" is Catch up's pool: Cleared and Learnt cards due (0.603)
+
+**10 November 2026** · `dueForReview` and `onReview` beside `buildSession`, `readyOf` and `homeLine` in `src/ArabicTrainer.tsx`
+
+The owner ran Catch up sessions over all their cards and the home screen's
+"ready to review" did not go down. The count took in every met card with
+anything askable ready, a level just opened included (see 0.450's "a met
+card with a newly opened level reads as waiting"); Catch up asks only
+questions already met and due, so it could never clear those, and each
+right answer on a climbing card opened the next level and kept it counted.
+
+The owner chose (1b, 2a, 3a, 4a) that both mean Cleared and Learnt cards
+with a question due — Cleared kept in because its two reviews are what
+make it Learnt, and a card on its top has nothing left to open, so the
+loop cannot happen. One predicate, `dueForReview`, is the count and Catch
+up's pool. Met cards still climbing with something waiting (and cards
+asked for by name that are not otherwise due) are counted apart as
+`climbing` and shown as "in progress". Start session, Keep going and the
+language switcher's order still read everything a regular session would
+deal (review + climbing + fresh), so a learner with only climbing work is
+never told there is nothing to do.
+
+Given up: a Learnt card that slips back below Cleared leaves Catch up until
+it is passed again; it still shows, as in progress, and a regular session
+deals it.

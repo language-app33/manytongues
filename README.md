@@ -278,9 +278,13 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   are not yet due.
 
   **Catch up** is the one mode that steps outside the mix. Its pool is the
-  chosen cards with a question due now — reviews come round and cards in
-  learning waiting for their next question — and it asks only those due
-  questions, longest waiting first. No new card comes in (a question never
+  chosen Cleared and Learnt cards with a question due now — reviews come
+  round — and it asks only those due questions, longest waiting first.
+  It is the home screen's "ready to review", by the same rule
+  (`dueForReview`), so a Catch up of everything always takes that number
+  to nought. Cards still climbing are left to a regular session, and the
+  home line counts them apart: "12 cards ready to review · 5 in progress".
+  No new card comes in (a question never
   yet asked is not something to catch up on), and nothing not yet due is
   brought forward to fill a short session: twenty questions with eight due
   is eight. Besides a count or minutes it offers "Everything due", which
