@@ -1302,8 +1302,8 @@ if (/Build a session/.test(document.body.textContent)) {
       .find((r) => /All cards/.test(r.textContent || ""))?.querySelector("input");
     const firstInBlock = cardsBlock?.querySelector(".at-tickrow, .at-field, .at-chooser");
     check("an All cards box heads the Cards section, above Decks",
-      !!allBox() && !!firstInBlock?.closest(".at-tickrow") && !allBox().checked);
-    const pickerOff = () => [...(cardsBlock?.querySelectorAll(".at-deckadd") || [])];
+      !!allBox() && !!firstInBlock?.closest(".at-tickrow") && !allBox()?.checked);
+    const pickerOff = () => /** @type {HTMLButtonElement[]} */ ([...(cardsBlock?.querySelectorAll(".at-deckadd") || [])]);
     const before = sessionPills().join("|");
     click(allBox());
     await sleep(80);
@@ -1316,7 +1316,7 @@ if (/Build a session/.test(document.body.textContent)) {
     click(allBox());
     await sleep(80);
     check("unticked, the pickers come back as they were",
-      pickerOff().every((b) => !b.disabled) && sessionPills().join("|") === before && !allBox().checked,
+      pickerOff().every((b) => !b.disabled) && sessionPills().join("|") === before && !allBox()?.checked,
       sessionPills().join("|"));
   }
 
