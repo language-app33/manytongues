@@ -590,6 +590,55 @@ export function IconButton({ icon, label, danger, ghost, className = "", ...rest
   );
 }
 
+/*
+ * A search field (0.599). Once anything is typed, a cross at its right end
+ * empties it, and the cursor stays in the box for the next search. Every
+ * box that narrows a list is one of these, so they all clear the same way.
+ *
+ * The browser's own clear button, which type="search" draws in some
+ * browsers only, is hidden: one cross, in the same place everywhere. It
+ * sits on the right whatever language is typed, as asked.
+ */
+export function SearchBox({ value, onChange, className = "", boxClassName = "", style, ...rest }: {
+  value: string;
+  onChange: (next: string) => void;
+  /** On the input itself, beside at-input. */
+  className?: string;
+  /** On the wrapper, where the box's place in a row or its margin is set. */
+  boxClassName?: string;
+  style?: React.CSSProperties;
+} & Omit<React.InputHTMLAttributes<HTMLInputElement>, "value" | "onChange" | "className" | "style">) {
+  const box = useRef<HTMLInputElement>(null);
+  return (
+    <div className={`at-searchbox${value ? " has" : ""}${boxClassName ? " " + boxClassName : ""}`} style={style}>
+      <input
+        ref={box}
+        type="search"
+        className={`at-input${className ? " " + className : ""}`}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        {...rest}
+      />
+      {value && (
+        <button
+          type="button"
+          className="at-searchclear"
+          aria-label="Clear the search"
+          title="Clear the search"
+          /* Kept from taking focus, so the keyboard on a phone stays up. */
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={() => {
+            onChange("");
+            box.current?.focus();
+          }}
+        >
+          <Icon name="close" size={18} />
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* --- Text ---------------------------------------------------------
    at-hint used to do eight jobs at once, so the helper text under a
    control could not be restyled without also restyling every empty
@@ -930,6 +979,15 @@ export function Segmented<T extends string | number | boolean | null>({
 export const DockContext = createContext<HTMLElement | null>(null);
 
 /**
+ * Where you are (0.601): the button at the top of every page that says
+ * which space, which mode and which languages, and opens the one sheet
+ * that changes them. The app builds it, because only the app knows; a
+ * tab's title shows it, wherever the tab is drawn. Nothing when there is
+ * nothing to choose.
+ */
+export const PlaceContext = createContext<Node>(null);
+
+/**
  * @param props  Each tab is [key, label, iconName].
  */
 export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock = false }: {
@@ -1032,18 +1090,23 @@ export function Field({ label, lede, hint, optional, htmlFor, children, classNam
    used inside Progress, held in place as the page scrolls (0.555). */
 export function TabTitle({ children }: { children?: Node }) {
   /* Held at the top while the page scrolls under it (0.555), with the
-     app's mark beside it and a rule beneath. */
+     app's mark beside it and a rule beneath. Where you are sits at its
+     right (0.601), for anyone with somewhere else to be. */
+  const place = useContext(PlaceContext);
   return (
     <div className="at-pagetitle">
       <img className="at-brandmark" src="/logo.svg" alt="" width={28} height={28} />
       <h2 className="at-sectionhead">{children}</h2>
+      {place}
     </div>
   );
 }
 
 export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, children }: {
   tabs: [string, string, string?][];
-  /** The space's name, heading each tab as "{space} · {tab}" (0.553). */
+  /** Which of Teaching, Admin or Super admin this is. Each tab is headed
+      with its own name (0.553); the mode itself is said by where you are,
+      at the title's right (0.601), so it no longer prefixes the name. */
   space?: string;
   tab?: string;
   onTab: (key: string) => void;
@@ -1083,7 +1146,7 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
           {/* The tab's own name at the top (0.553), in the words of the bar.
               A screen opened over the tab covers it, with its own title. */}
           {space && tabs.find((t) => t[0] === tab) ? (
-            <TabTitle>{`${space} · ${(tabs.find((t) => t[0] === tab) as [string, string])[1]}`}</TabTitle>
+            <TabTitle>{(tabs.find((t) => t[0] === tab) as [string, string])[1]}</TabTitle>
           ) : null}
           {children}
         </div>
@@ -2507,15 +2570,14 @@ export function ItemList<T>({
   }, []);
 
   const searchBox = (
-    <input
-      className="at-input at-search"
-      type="search"
+    <SearchBox
+      className="at-search"
       /* Cards are searched by typing the language they are written in,
          so the box has to lay itself out by what is in it. */
       dir="auto"
       placeholder={`Search ${plural || `${noun}s`}`}
       value={query}
-      onChange={(e) => setQuery(e.target.value)}
+      onChange={setQuery}
     />
   );
 
@@ -6061,13 +6123,13 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
           onClose={() => setOpen(false)}
         >
           {find && (
-            <input
-              className="at-input at-mb3"
+            <SearchBox
+              boxClassName="at-mb3"
               placeholder={find.placeholder}
               aria-label={find.placeholder}
               value={q}
               dir="auto"
-              onChange={(e) => setQ(e.target.value)}
+              onChange={setQ}
             />
           )}
           <div className="at-deckpicks">
