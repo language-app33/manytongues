@@ -429,7 +429,7 @@ same forty on a second device at its first launch. Twelve more given on
 the second device were on the first at its next launch. Nothing misfiled,
 nothing dropped. Finding 1 was reproduced there too: one answer recorded,
 a second marked "Correct!" on screen, the app put away and reopened — one
-answer recorded. The separate reading arrived at findings 1, 7, 9, 10, 12
+answer recorded. The separate reading arrived at findings 1, 7, 10, 12
 and 20 on its own, which is some evidence they are what the code does and
 not one reader's slip.
 
