@@ -15636,6 +15636,14 @@ function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings
  * ring above it is, so "Thursday's verbs · 40%" and the ring cannot be
  * counting different things. Pressing one starts it, which is what Start
  * does on the list; changing or forgetting one is the list's to do.
+ *
+ * Except a Catch up, which carries how many of its cards are due instead
+ * (0.604, the owner's 1a). Catch up only asks Cleared and Learnt cards, so
+ * the learnt share is mostly cards it never touches and barely moves for
+ * its work; what somebody wants before pressing it is whether anything is
+ * waiting. Counted by dueForReview, the rule Catch up asks by and the home
+ * screen's "ready to review" counts by, so all three agree. With nothing
+ * due the tile is dimmed but still pressable, and says so when pressed.
  */
 function SavedTiles({ sessions, items, settings, onStart }: {
   sessions: SavedSession[];
@@ -15649,31 +15657,54 @@ function SavedTiles({ sessions, items, settings, onStart }: {
       .sort((a, b) => (b.created || 0) - (a.created || 0))
       .map((s) => {
         const cards = cardsOfSaved(s, items);
-        return { s, alive: cards.length, pct: climbOf(cards, settings, items).pct };
+        if (s.mode === "catchup") {
+          return { s, alive: cards.length, due: cards.filter((it) => dueForReview(it, settings, items)).length, pct: 0 };
+        }
+        return { s, alive: cards.length, due: null, pct: climbOf(cards, settings, items).pct };
       });
   }, [sessions, items, settings]);
 
   if (!tiles.length) return null;
   return (
     <div className="at-savedtiles">
-      {tiles.map(({ s, alive, pct }) => (
-        <button
-          key={s.id}
-          className="at-savedtile"
-          disabled={!alive}
-          aria-label={`Start ${s.name}, ${pct}% learnt`}
-          onClick={() => onStart(s)}
-        >
-          <span className="nm">{s.name}</span>
-          <span className="pc" aria-hidden="true">
-            {pct}
-            <i>%</i>
-          </span>
-          <span className="bar" aria-hidden="true">
-            {pct > 0 && <i style={{ width: `${pct}%` }} />}
-          </span>
-        </button>
-      ))}
+      {tiles.map(({ s, alive, due, pct }) =>
+        due !== null ? (
+          <button
+            key={s.id}
+            className={`at-savedtile${due ? "" : " quiet"}`}
+            disabled={!alive}
+            aria-label={`Start ${s.name}, ${due ? `${due} ${due === 1 ? "card" : "cards"} due` : "nothing due"}`}
+            onClick={() => onStart(s)}
+          >
+            <span className="nm">{s.name}</span>
+            {due ? (
+              <span className="pc" aria-hidden="true">
+                {due}
+                <i className="due">due</i>
+              </span>
+            ) : (
+              <span className="pc none" aria-hidden="true">Nothing due</span>
+            )}
+          </button>
+        ) : (
+          <button
+            key={s.id}
+            className="at-savedtile"
+            disabled={!alive}
+            aria-label={`Start ${s.name}, ${pct}% learnt`}
+            onClick={() => onStart(s)}
+          >
+            <span className="nm">{s.name}</span>
+            <span className="pc" aria-hidden="true">
+              {pct}
+              <i>%</i>
+            </span>
+            <span className="bar" aria-hidden="true">
+              {pct > 0 && <i style={{ width: `${pct}%` }} />}
+            </span>
+          </button>
+        )
+      )}
     </div>
   );
 }

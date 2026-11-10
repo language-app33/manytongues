@@ -43,6 +43,21 @@ Checked and left alone:
 - "Two cats" asked from Arabic to English needs no gender: the Arabic
   shows which it is, and the answer was marked right.
 
+## 0.604 — 10 November 2026
+
+**A saved Catch up session's tile on the home screen now shows how many
+of its cards are due, not how much of them is learnt.** The learnt share
+was mostly made up of cards Catch up never asks, so it hardly moved
+however much you caught up on, and it didn't tell you whether there was
+anything to do.
+
+- **"12 due"** counts the same cards Catch up would ask and the home
+  screen's "ready to review" counts, so the three always agree, and the
+  number goes down as you work through them.
+- **"Nothing due"** shows on a dimmed tile when there is nothing to
+  catch up on. It can still be pressed and says you're all caught up.
+- **Every other saved session** still shows how much of it is learnt.
+
 ## 0.603 — 10 November 2026
 
 **"Ready to review" and Catch up now mean the same thing: Cleared and
