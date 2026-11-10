@@ -8,6 +8,33 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.603 — 10 November 2026
+
+**"Ready to review" and Catch up now mean the same thing: Cleared and
+Learnt cards that are due.** Before, the home screen also counted cards
+still being learnt, including ones where a harder question had just
+opened up. Catch up never asked those, and answering its questions well
+opened more of them, so after several Catch up sessions the number on the
+home screen barely moved.
+
+- **The home screen's "ready to review"** counts only Cleared and Learnt
+  cards with a review due.
+- **Cards still being learnt that have a question waiting** are shown
+  beside it: "12 cards ready to review · 5 in progress", or "Nothing to
+  review — 5 cards in progress" when no review is due.
+- **Catch up asks exactly what "ready to review" counts**, so a Catch up
+  over all your cards with "Everything due" brings the number to nought.
+  It no longer asks cards still being learnt; a regular session does.
+- **Start session and Keep going** still offer a session whenever a
+  regular session has anything to deal, reviews or not.
+
+Trade-off: a Learnt card you miss twice in a row on its hardest question
+can drop back to still being learnt, and then shows under "in progress" until
+it is passed again, rather than under "ready to review". To check by
+hand: run a Catch up of everything on all cards, then see the home
+screen's review number at nought, with anything left counted as in
+progress.
+
 ## 0.602 — 10 November 2026
 
 **Build a session can take every card in one tick.** The Cards section now
