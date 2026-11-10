@@ -570,13 +570,13 @@ export const EX: Record<string, ExerciseSpec> = {
     placeholder: "",
     promptField: "context",
     answerField: "ar",
-    /* The hint is what the phrase means, where it has a meaning written,
-       rather than its sitting on the screen from the start — see
-       hintPhrase. Only where it has none is the hint the pronunciation, and
-       then, as in English → {script}, it is the word itself said another
-       way and costs the mark. Never both at once: a learner reported being
-       shown two hints. */
-    hintPhrase: true,
+    /* What the phrase means is on the screen from the start (since 0.605),
+       as on ctx2pick. It was behind the nudge (hintPhrase), and free, but
+       a learner twice took the question for a test of remembering the
+       phrase: سيدي and بنتي both fitted its gap and nothing on the
+       screen said which. The hint is the word's pronunciation, which, as
+       in English → {script}, is the word itself said another way and
+       costs the mark. */
     hintField: "lat",
     hintLabel: "Show {translit}",
     hintHideLabel: "Hide {translit}",
@@ -1648,11 +1648,17 @@ export function spelledGrammar(
     const value = mine[dim.field];
     return value && value !== "na" && !(dim.short && dim.short[value] === "");
   });
+  /* A value that says little ("neutral") is tried last, so where anything
+     else tells the form apart that is what is said. Where nothing else
+     does, it is still said: it is all there is. */
+  const little = (dim: GrammarDim) => !!(dim.saysLittle && dim.saysLittle.includes(mine[dim.field]));
+  named.sort((a, b) => Number(little(a)) - Number(little(b)));
   const picked = fewestTelling(
     named.map((dim) => dim.field),
     theirs.map((t) => (field: string) => (t[field] || "") !== mine[field]),
   );
-  return picked
+  /* Said in the spoken order whichever was tried first. */
+  return dims.map((d) => d.field).filter((f) => picked.includes(f))
     .map((f) => {
       const dim = named.find((d) => d.field === f) as GrammarDim;
       const opt = dim.options.find(([v]) => v === mine[f]);
@@ -2426,6 +2432,10 @@ export const GRAMMAR: Record<string, GrammarDim> = {
       ["neutral", "neutral"],
     ],
     brief: { masculine: "m.", feminine: "f.", neutral: "n." },
+    /* وانتو beside وانتَ and وانتِ, all "And you?", was asked as
+       "neutral": true, and no help — a learner reported that it never said
+       plural. */
+    saysLittle: ["neutral"],
   },
   /* Whether a noun is a person, an animal or a thing. Not a way of telling
      its forms apart — nothing is ever asked "the person one" — but two

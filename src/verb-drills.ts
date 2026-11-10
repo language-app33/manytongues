@@ -101,6 +101,43 @@ export function lettersOf(text: unknown, lang: Lang | null | undefined): string 
 export const sameLetters = (a: Form | null | undefined, b: Form | null | undefined, lang: Lang | null | undefined): boolean =>
   !!a && !!b && lettersOf(a.ar, lang) === lettersOf(b.ar, lang);
 
+/*
+ * A form's letters each with the marks written on it — harakat, niqqud —
+ * in the order they stand. A mark is a combining character; a letter is
+ * anything else the language's fold keeps. Null where the language has no
+ * fold to count letters by.
+ */
+function markedLetters(text: unknown, lang: Lang | null | undefined): Set<string>[] | null {
+  const fold = lang && lang.letter;
+  if (!fold) return null;
+  const out: Set<string>[] = [];
+  for (const ch of Array.from(String(text || "").trim().normalize("NFD"))) {
+    if (/\p{Mn}/u.test(ch)) {
+      if (out.length) out[out.length - 1].add(ch);
+    } else {
+      for (let n = fold(ch, {}).length; n > 0; n--) out.push(new Set());
+    }
+  }
+  return out;
+}
+
+/**
+ * Whether a form could be the one on the screen, marks and all: the same
+ * letters, and no letter marked one way in one and another way in the
+ * other. عندِك is not عندَك — the kasra says *you (f)*, and a learner
+ * reported being marked wrong for reading it (0.605). A mark one of them
+ * leaves off is no disagreement: a form written bare could be either, and
+ * a shadda with its vowel is still the shadda.
+ */
+export function readsAs(a: Form | null | undefined, b: Form | null | undefined, lang: Lang | null | undefined): boolean {
+  if (!sameLetters(a, b, lang)) return false;
+  const x = markedLetters(a && a.ar, lang);
+  const y = markedLetters(b && b.ar, lang);
+  if (!x || !y || x.length !== y.length) return true;
+  const within = (s: Set<string>, t: Set<string>) => [...s].every((m) => t.has(m));
+  return x.every((m, i) => !m.size || !y[i].size || within(m, y[i]) || within(y[i], m));
+}
+
 /**
  * Whether a cell can be asked this verb practice.
  *
@@ -154,9 +191,11 @@ export function whoChoices(
   wanted: number,
 ): { right: VerbPerson[]; wrong: VerbPerson[] } {
   const mine = lettersOf(asked.ar, lang);
-  const right = tense.places.filter((p) => lettersOf(p.form.ar, lang) === mine).map((p) => p.person);
+  /* Read marks and all, so a person the marks on the screen rule out is a
+     wrong answer — and, spelt with the same letters, the nearest of them. */
+  const right = tense.places.filter((p) => readsAs(p.form, asked, lang)).map((p) => p.person);
   const wrong = tense.places
-    .filter((p) => lettersOf(p.form.ar, lang) !== mine)
+    .filter((p) => !readsAs(p.form, asked, lang))
     .map((p, i) => ({ p, d: distance(lettersOf(p.form.ar, lang), mine), i }))
     .sort((a, b) => a.d - b.d || a.i - b.i)
     .map((x) => x.p.person);
@@ -165,11 +204,11 @@ export function whoChoices(
 
 /**
  * Whether the person chosen is one of the right ones for the form asked:
- * their form in this tense reads the same.
+ * their form in this tense reads the same, marks and all — see readsAs.
  */
 export function whoIsRight(tense: Tense, asked: Form, personId: string, lang: Lang | null | undefined): boolean {
   const place = tense.places.find((p) => p.person.id === personId);
-  return !!place && sameLetters(place.form, asked, lang);
+  return !!place && readsAs(place.form, asked, lang);
 }
 
 /**
@@ -181,19 +220,51 @@ export function whoIsRight(tense: Tense, asked: Form, personId: string, lang: La
 export function whoAllRight(tense: Tense, asked: Form, personIds: string[], lang: Lang | null | undefined): boolean {
   const chosen = new Set(personIds);
   if (!chosen.size) return false;
-  return tense.places.every((p) => chosen.has(p.person.id) === sameLetters(p.form, asked, lang));
+  return tense.places.every((p) => chosen.has(p.person.id) === readsAs(p.form, asked, lang));
 }
 
 /** How the persons ticked travel as one answer: their labels, in the tense's order. */
 export const WHO_JOIN = " · ";
 
+/* English verbs said for *he* or *she* whose plain form is not the word
+   less its -s. */
+const PLAIN_VERB: Record<string, string> = { has: "have", does: "do", goes: "go" };
+/* Words ending in -s that are not a verb said for *he* or *she*. */
+const NOT_THIRD = new Set(["is", "was", "always", "sometimes", "yes", "less", "this", "his", "its", "us", "as", "plus", "news"]);
+
+/*
+ * An English verb said for *he* or *she* in its plain form: "lives" is
+ * "live", "has" is "have", "watches" is "watch". Anything else as it is.
+ */
+function plainVerb(word: string): string {
+  const low = word.toLowerCase();
+  let out = "";
+  if (PLAIN_VERB[low]) out = PLAIN_VERB[low];
+  else if (NOT_THIRD.has(low) || !/^[a-z]+s$/.test(low) || /(ss|us|is)$/.test(low)) return word;
+  else if (/ies$/.test(low) && low.length > 4) out = low.slice(0, -3) + "y";
+  else if (/(ch|sh|x|z|ss|o)es$/.test(low)) out = low.slice(0, -2);
+  else out = low.slice(0, -1);
+  return word[0] === word[0].toUpperCase() ? out[0].toUpperCase() + out.slice(1) : out;
+}
+
 /**
  * What a form means with who it is about taken off the front: "I keep"
- * is "keep", "She has" is "has". The question asks who; its meaning
- * with the person still on would be the answer. A meaning that does not
- * start with one of the persons' English is left as the teacher wrote it.
+ * is "keep", "She has" is "have". The question asks who; its meaning
+ * with the person still on would be the answer.
+ *
+ * And with its verb in the plain form, because "lives" says *he* as
+ * clearly as "he lives" does — a learner reported reading it so (0.605).
+ * An Arabic verb is filed under its *he*, so a card's own meaning is
+ * often written that way. Otherwise as the teacher wrote it.
  */
 export function meaningWithoutWho(en: unknown, persons: VerbPerson[]): string {
+  const text = withoutWho(en, persons);
+  if (!text) return "";
+  const [first, ...rest] = text.split(/\s+/);
+  return [plainVerb(first)].concat(rest).join(" ");
+}
+
+function withoutWho(en: unknown, persons: VerbPerson[]): string {
   const text = String(en || "").trim();
   if (!text) return "";
   const subjects = new Set(["i", "you", "he", "she", "it", "we", "they", "y'all", "you all"]);

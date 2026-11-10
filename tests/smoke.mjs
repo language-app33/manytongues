@@ -8629,13 +8629,14 @@ const openPronounTables = async () => {
   await sleep(300);
 }
 
-/* ---- a gap in a phrase comes with what the phrase means, when asked ----
+/* ---- a gap in a phrase comes with what the phrase means ----
 
    The missing word's own meaning is what the word's own questions already
    ask, and a learner said so: the gap question should give the whole
-   phrase in English and leave the missing word to be worked out. And then
-   another said the phrase's English all but names the word, so it waits
-   behind the nudge until it is asked for. */
+   phrase in English and leave the missing word to be worked out. It then
+   waited behind the nudge for a while, and a learner took the question for
+   a test of remembering the phrase, so since 0.605 it is up from the
+   start, and the nudge is the word's pronunciation. */
 {
   const frame = must(document.querySelector(".at-screen.bare"), "the teaching space's frame");
   const teachTabs = frameButtons(frame).filter((b) => /^Cards$/.test(b.textContent || ""));
@@ -8651,19 +8652,15 @@ const openPronounTables = async () => {
     [...document.querySelectorAll(".at-try")].map((b) => b.getAttribute("aria-label")).join(" | "));
   click(tryIt);
   await sleep(600);
-  const early = ((document.querySelector('[data-el="question-context-meaning"]') || {}).textContent || "").trim();
-  check("the phrase's English is not on the screen until asked for", !early, early);
-  const nudge = document.querySelector('[data-el="hint-button"]');
-  check("the nudge is there to ask with", !!nudge, "(no hint button)");
-  click(nudge);
-  await sleep(200);
   const means = ((document.querySelector('[data-el="question-context-meaning"]') || {}).textContent || "").trim();
-  check("and asked for, it gives the phrase's English, not the word's", means === "The book is big",
+  check("the phrase's English is on the screen from the start, not the word's", means === "The book is big",
     means || "(nothing said)");
-  /* Closed again before answering: what the phrase means is then given
-     with the answer, and the phrase is whole again. */
-  click(document.querySelector('[data-el="hint-button"]'));
-  await sleep(200);
+  const nudge = document.querySelector('[data-el="hint-button"]');
+  check("the nudge offers the pronunciation, not the meaning",
+    !!nudge && !/phrase means/.test(nudge.getAttribute("aria-label") || ""),
+    nudge ? nudge.getAttribute("aria-label") || "" : "(no hint button)");
+  /* Answered: what the phrase means is then given with the answer, and
+     the phrase is whole again. */
   click(buttonNamed(/^I don't know$/));
   await sleep(200);
   if (!document.querySelector('[data-el="verdict"]')) {

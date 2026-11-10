@@ -1316,6 +1316,15 @@ test("an exercise names grammar one way on every kind of card", () => {
   /* And one alone where one is enough. */
   const pair = { ...teacher, subs: [{ id: "t4", ar: "معلمات", en: "teachers", number: "plural", gender: "feminine" }] };
   assert.equal(askLabel(pair.subs[0], pair, ar), "feminine");
+  /* "Neutral" is said only where nothing else tells the form apart.
+     Reported: وانتو beside وانتَ and وانتِ, all "And you?", was asked as
+     "neutral", and never said plural. */
+  const you = { id: "y", ar: "وانتَ", en: "And you?", gender: "masculine", number: "singular",
+    subs: [{ id: "y2", ar: "وانتِ", en: "And you?", gender: "feminine", number: "singular" },
+      { id: "y3", ar: "وانتو", en: "And you?", gender: "neutral", number: "plural" }] };
+  assert.equal(askLabel(you.subs[1], you, ar), "plural");
+  const neuter = { ...you, subs: [{ id: "y4", ar: "x", en: "And you?", gender: "neutral", number: "singular" }] };
+  assert.equal(askLabel(neuter.subs[0], neuter, ar), "neutral", "where it is all there is, it is still said");
   /* A lone noun says nothing, and a person-or-thing never shows. */
   const book = { id: "b", ar: "كتاب", en: "book", number: "singular", gender: "masculine", human: "thing", subs: [] };
   assert.equal(askLabel(book, book, ar), "");
