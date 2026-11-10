@@ -568,6 +568,12 @@ button {
  * that.
  */
 .at-chooser.deckwrap { display:block; width:100%; }
+/* Greyed as a ticked-off row is (.at-tickrow.off): there, but not to be used
+   while something else stands in for it. */
+.at-chooser.deckwrap.off { opacity:.55; }
+.at-chooser.deckwrap.off button { cursor:not-allowed; }
+.at-chooser.deckwrap.off .at-deckadd:hover { border-color: var(--faint); color: var(--muted); }
+.at-chooser.deckwrap.off .at-deckdrop:hover { background:none; }
 .at-deckpills { display:flex; flex-wrap:wrap; align-items:center; gap:8px; }
 .at-deckpills > .at-hint { margin:0; }
 /* A pill whose name opens what it names: the name is the button. */
@@ -721,7 +727,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-screen.blanks .at-screeninner > .at-hint { margin:4px 0 12px; }
 .at-screen.blanks .at-screeninner > .at-input { width:100%; }
 
-.at-blanknew .at-input { flex:1 1 auto; min-width:0; }
+.at-blanknew .at-searchbox { flex:1 1 auto; min-width:0; }
 .at-blanknew .at-btn { flex:0 0 auto; }
 
 .at-idrow .at-input { flex:1 1 auto; min-width:0; }
@@ -1023,6 +1029,18 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-toolbar .at-btn { flex:0 0 auto; padding:0 16px; white-space:nowrap; font-weight:700; }
 .at-toolbar .at-btn:active:not(:disabled) { transform:none; }
 .at-toolbar .at-search { flex:1 1 0; min-width:0; padding:0 12px; }
+/* SearchBox: the field and, once something is typed, a cross at its right
+   end that empties it. The field keeps its own look; the wrapper only holds
+   the cross over it and takes the field's place in a row. */
+.at-searchbox { position:relative; display:block; }
+.at-toolbar .at-searchbox { flex:1 1 0; min-width:0; }
+.at-searchbox > .at-input::-webkit-search-cancel-button,
+.at-searchbox > .at-input::-webkit-search-decoration { -webkit-appearance:none; appearance:none; }
+.at-searchbox.has > .at-input { padding-right:44px; }
+.at-searchclear { position:absolute; right:6px; top:50%; transform:translateY(-50%);
+  display:inline-flex; align-items:center; justify-content:center; width:32px; height:32px;
+  padding:0; border:0; border-radius: var(--r-sm); background:transparent; color: var(--faint); cursor:pointer; }
+.at-searchclear:hover, .at-searchclear:focus-visible { color: var(--ink); background: var(--raised); }
 /* The second row: Select, then the menus. Three named buttons is more than a
    narrow phone has room for on one line, so this row wraps where the row
    above it must not — a search field that wrapped under its own New button
@@ -1390,25 +1408,13 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   .at-dockitem, .at-docktabs .at-tab2 { padding:0 4px; overflow:hidden;
     font-size: clamp(11px, 3.4vw, 14px); }
 }
-/* ---- which space and which languages ----
-   At the top of the menu behind your initial, for somebody with a choice
-   of either. */
-.at-place { padding:10px 10px 4px; }
+/* ---- which languages are in play ----
+   In the sheet behind where you are (0.601), under the places. */
+.at-place { padding:4px 0 0; }
 .at-place .at-eyebrow { margin:0 0 12px; }
 /* What switching a language off does, said under its heading, before the
    list it is about. */
 .at-place .at-hint { margin:-4px 0 12px; }
-/* The two parts are set apart by space rather than a rule. */
-.at-place .at-spacepick { margin-bottom:18px; }
-/* The spaces, side by side in the menu: a choice of one, the current one
-   lifted. */
-.at-spacepick { display:grid; grid-template-columns: repeat(auto-fit, minmax(0, 1fr)); gap:4px;
-  padding:4px; border-radius:14px; background: var(--well); border:1px solid var(--line); }
-.at-spacebtn { height:44px; border:1px solid transparent; border-radius:10px; cursor:pointer;
-  background:none; color: var(--muted); display:inline-flex; align-items:center;
-  justify-content:center; gap:7px; min-width:0; padding:0 13px;
-  font-family: var(--ui); font-size:13px; font-weight:800; }
-.at-spacebtn.on { background: var(--raised); color: var(--ink); border-color: var(--tab-stroke); }
 .at-cdot { width:9px; height:9px; border-radius:50%; background: var(--jade); flex-shrink:0; }
 .at-cdot.syncing { background: var(--brass); }
 .at-cdot.error, .at-cdot.off { background: var(--rose); }
@@ -1476,19 +1482,46 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-spaceline { display:flex; align-items:center; gap:10px; padding:8px 10px;
   font-family: var(--ui); font-size:14px; font-weight:700; color: var(--text-soft); min-width:0; }
 .at-spacename { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-/* One place per line: any number fits, a long name is cut short. */
-.at-places { display:flex; flex-direction:column; gap:2px; padding:0 0 2px; }
-.at-placeshead { margin:0; padding:6px 10px 4px; font-family: var(--ui); font-size:11px;
-  font-weight:800; letter-spacing:.06em; text-transform:uppercase; color: var(--muted); }
-.at-place-row { display:flex; align-items:center; gap:10px; width:100%; min-height:44px;
-  padding:6px 8px; border:0; border-radius:12px; background:none; cursor:pointer; text-align:left;
-  font-family: var(--ui); font-size:14px; font-weight:700; color: var(--text-soft); }
-.at-place-row:hover { background: var(--raised); color: var(--text); }
-.at-place-row.on { background: color-mix(in srgb, var(--jade) 14%, transparent); color: var(--text); font-weight:800; }
-.at-place-name { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .at-place-tag { flex:none; font-size:10px; font-weight:800; letter-spacing:.05em; text-transform:uppercase;
   color: var(--brass); border:1px solid var(--brass); border-radius:6px; padding:2px 5px; }
 .at-place-tick { flex:none; display:inline-flex; color: var(--jade); }
+/* ---- Where you are (0.601) ----
+   One button that says which place, which mode and which languages, at
+   the right of every tab's title and under the name on Learning's Home;
+   it opens the one sheet that changes them. A long place is cut short
+   rather than pushing the title off the line. */
+.at-placebtn { display:inline-flex; align-items:center; gap:8px; min-width:0; max-width:100%;
+  height:40px; padding:0 10px 0 5px; border:2px solid var(--line); border-radius:999px;
+  background: var(--surface); color: var(--text); cursor:pointer;
+  font-family: var(--ui); font-size:14px; font-weight:800; }
+.at-placebtn:hover { border-color: var(--jade); }
+.at-placebtn > svg { flex:none; color: var(--brass); }
+.at-placetext { display:flex; min-width:0; white-space:pre; }
+.at-placename, .at-placelangs { min-width:0; overflow:hidden; text-overflow:ellipsis; }
+.at-placemode { flex:none; }
+.at-placelangs { color: var(--muted); font-weight:700; }
+/* Tab names are short and stay whole; the button gives way, cutting its
+   place short before the name beside it. */
+.at-pagetitle .at-sectionhead { flex:none; white-space:nowrap; }
+.at-pagetitle .at-placebtn { margin-left:auto; flex:0 1 auto; }
+/* Home has no tab title: the button sits under the app's name, at its left. */
+.at-placecorner { display:flex; margin:-8px 0 18px; }
+/* The sheet: a place per row, the modes of the one you are in under it. */
+.at-where { display:flex; flex-direction:column; gap:8px; margin:4px 0 16px; }
+.at-whererow { display:flex; flex-direction:column; gap:6px; padding:6px; border:2px solid var(--line); border-radius:16px; }
+.at-whererow.on { border-color: var(--jade); background: color-mix(in srgb, var(--jade) 10%, transparent); }
+.at-wherehead { display:flex; align-items:center; gap:12px; width:100%; min-height:48px; padding:4px 6px;
+  border:0; border-radius:12px; background:none; cursor:pointer; text-align:left; color: var(--text); font-family: var(--ui); }
+.at-wherehead:hover { background: var(--press); }
+.at-wheretext { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.at-wheretext b { font-size:16px; font-weight:800; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.at-wheretext span { font-size:13px; font-weight:600; color: var(--muted); }
+.at-wheremodes { display:flex; flex-wrap:wrap; gap:6px; padding:0 6px 6px 46px; }
+.at-wheremode { display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 12px;
+  border:2px solid var(--line); border-radius:999px; background: var(--surface); color: var(--text);
+  cursor:pointer; font-family: var(--ui); font-size:13px; font-weight:800; }
+.at-wheremode:hover { border-color: var(--jade); }
+.at-wheremode.on { background: var(--jade); border-color: var(--jade); color: var(--onjade); }
 /* No space to open (0.578): only the panel and the You menu are left. */
 .at.stranded .at-wrap > :not(.at-strandedbox),
 .at.stranded .at-dockmain,
@@ -1501,19 +1534,6 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    the row under the name and wrap there rather than run off the edge. */
 .at-everyone .at-deckrow2 { flex-wrap:wrap; }
 .at-everyone .at-deckacts { flex-wrap:wrap; justify-content:flex-start; flex-basis:100%; }
-/* Learning's space button, in the top right corner (0.576). */
-/* Centred on the line beside it (0.579): the 40px tab title on Progress
-   and Cards, the 64px logo and name on Home. One above the chrome, so its
-   list opens over the logo and name rather than under them. */
-.at-learnspace { position:absolute; top:calc(10px + var(--banner-h, 0px)); right:12px; z-index: calc(var(--z-chrome) + 1); }
-.at.on-home .at-learnspace { top:calc(22px + var(--banner-h, 0px)); }
-.at-learnspacebtn { width:44px; height:44px; border-radius:999px; padding:0; cursor:pointer;
-  display:inline-flex; align-items:center; justify-content:center; border:2px solid var(--line);
-  background: var(--surface); color: var(--text-soft); font-family: var(--ui); font-size:13px; font-weight:800; }
-.at-learnspacebtn:hover { color: var(--text); }
-.at-learnspacebtn.open { border-color: var(--jade); color: var(--jade); }
-.at-learnspacebtn.on { background: var(--jade); border-color: var(--jade); color: var(--onjade); }
-.at-cmenu.at-learnspacemenu { bottom:auto; top:calc(100% + 8px); right:0; width:min(300px, calc(100vw - 24px)); }
 /* The version, at the foot of the menu. Quieter than the rows above it —
    it is a fact to look up, not somewhere to go — until the server turns out
    to be serving a newer build, when it becomes the one thing in the menu

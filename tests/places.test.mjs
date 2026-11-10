@@ -64,3 +64,83 @@ test("the App admin in an opened space: three places, three modes, the opened on
   assert.equal(r.placeNow, "c");
   assert.deepEqual(r.modes, ["learn", "teach", "admin"]);
 });
+
+/* ---- the line and the sheet (0.601) ---- */
+import { whereRows, langsSummary } from "../src/places.ts";
+const w = (/** @type {any} */ over) => whereRows({ ...base, filter: "", langs: 1, ...over });
+
+test("someone in one space who only learns, in one language, has no line", () => {
+  const r = w({});
+  assert.equal(r.shown, false);
+  assert.deepEqual(ids(r.rows), ["a"]);
+});
+
+test("one language more is enough for a line, naming the mode", () => {
+  const r = w({ langs: 2 });
+  assert.equal(r.shown, true);
+  assert.equal(r.label, "Learning");
+});
+
+test("a learner in two spaces: all of them, then each, and the line says which", () => {
+  const r = w({ mine: [A, B] });
+  assert.deepEqual(ids(r.rows), ["all", "a", "b"]);
+  assert.equal(r.now, "all");
+  assert.equal(r.label, "All your spaces · Learning");
+  assert.equal(w({ mine: [A, B], filter: "b" }).label, "Beta · Learning");
+  assert.equal(w({ mine: [A, B], filter: "gone" }).now, "all");
+});
+
+test("only the space here offers its modes; another space is a place to go", () => {
+  const r = w({ mine: [A, B], teaches: true, space: "teach" });
+  assert.deepEqual(r.rows.find((x) => x.id === "a")?.modes, ["learn", "teach"]);
+  assert.deepEqual(r.rows.find((x) => x.id === "b")?.modes, []);
+  assert.equal(r.now, "a");
+  assert.equal(r.label, "Alpha · Teaching");
+  assert.equal(r.rows.find((x) => x.id === "a")?.what, "You teach here.");
+});
+
+test("a space admin in one space: the space, its three modes, no place name", () => {
+  const r = w({ orgAdmin: true, space: "admin" });
+  assert.deepEqual(ids(r.rows), ["a"]);
+  assert.deepEqual(r.rows[0].modes, ["learn", "teach", "admin"]);
+  assert.equal(r.label, "Admin");
+  assert.equal(r.shown, true);
+});
+
+test("the super admin: Super admin first, and their space keeps its modes from there", () => {
+  const r = w({ admin: true, space: "super" });
+  assert.deepEqual(ids(r.rows), ["super", "a"]);
+  assert.equal(r.now, "super");
+  assert.equal(r.label, "Super admin");
+  assert.deepEqual(r.rows[1].modes, ["learn", "teach", "admin"]);
+});
+
+test("an opened space is marked and current, with every mode", () => {
+  const r = w({ admin: true, trying: true, opened: C, hereId: "c", space: "admin" });
+  assert.deepEqual(ids(r.rows), ["super", "a", "c"]);
+  const c = r.rows.find((x) => x.id === "c");
+  assert.equal(c?.opened, true);
+  assert.deepEqual(c?.modes, ["learn", "teach", "admin"]);
+  assert.equal(r.label, "Gamma · Admin");
+  assert.equal(r.multi, false);
+});
+
+test("the languages part of the line", () => {
+  assert.equal(langsSummary(["Arabic"], 1), "");
+  assert.equal(langsSummary(["Arabic", "Hebrew"], 2), "");
+  assert.equal(langsSummary(["Arabic"], 2), "Arabic only");
+  assert.equal(langsSummary(["Arabic", "Hebrew"], 3), "2 of 3 languages");
+});
+
+test("an account with no space named yet still has its modes, under Your space", () => {
+  const r = w({ mine: [], hereId: "", teaches: true });
+  assert.deepEqual(r.rows.map((x) => x.label), ["Your space"]);
+  assert.deepEqual(r.rows[0].modes, ["learn", "teach"]);
+  assert.equal(r.label, "Learning");
+});
+
+test("the line in two parts, so a long place gives way and the mode stays", () => {
+  assert.deepEqual(w({ mine: [A, B], teaches: true, space: "teach" }).parts, { place: "Alpha", mode: "Teaching" });
+  assert.deepEqual(w({ orgAdmin: true }).parts, { place: "", mode: "Learning" });
+  assert.deepEqual(w({ admin: true, space: "super" }).parts, { place: "Super admin", mode: "" });
+});
