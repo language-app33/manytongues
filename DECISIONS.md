@@ -6698,6 +6698,22 @@ a student is asked:
   fix alone would mend; sentences with both flaws are a fix of their own,
   since linking them alone, or teaching their words alone, adds nothing.
 
+**A blank nothing fills is a flawed sentence (0.600).** The owner's rule,
+9 November 2026. A sentence with a blank was well made as soon as it used
+no untaught word, because a blank stands in for the link a plain sentence
+needs. That let a sentence no student is ever shown earn its share of the
+10 points: one whose blank no card fits, or whose sentences review lets
+none of through. It is now a third flaw, read off the same lists the
+words part already reads (`shown` in `deckQuality`), with a fix of its own,
+"Fill the blank in N sentences", and a joint fix where the sentence also
+uses untaught words. Only a blank that was read is judged: a line picked
+from a sentence card of another deck is reviewed on that card and is left
+alone. A card with several versions is flawed only when none of its
+versions with a blank makes a sentence that is shown. The number of cards
+that fit a blank is still not scored on the sentence itself: it is worth
+what it gives the words, one sentence to each form it takes, which is the
+owner's answer to whether a sentence with a blank counts differently.
+
 ## Words with several answers, in sentences (0.468)
 
 **24 October 2026** · `answerWords`, `phraseAnswers` and `wordsOffered` in `src/context-index.ts`, `castContext` and `pickContext` in `src/ArabicTrainer.tsx`, `src/context-links.ts`, `src/sentence-words.ts`, `contextCoverage` in `src/languages.ts`, `heard` and `spelt` in `src/deck-quality.ts`

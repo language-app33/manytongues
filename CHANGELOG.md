@@ -8,6 +8,17 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.600 — 9 November 2026
+
+**A deck's score no longer counts a sentence with a blank that nothing
+fills.** A sentence whose blank no card fits, or whose sentences are none
+of them approved, is never shown to a student, but it still earned its
+part of the 10 points for well-made sentences. It now loses them, and the
+deck's suggestions say so: "Fill the blank in 2 sentences", with the
+sentences listed to open. Add cards that fill the blank, or approve the
+sentences it makes, and the points come back. Decks with such a sentence
+will score a little lower than yesterday; nothing changes for students.
+
 ## 0.599 — 9 November 2026
 
 **Every search box now has a cross to clear it.** As soon as something is

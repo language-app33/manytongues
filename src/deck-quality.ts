@@ -12,7 +12,10 @@
  *     the other half between them, and every card counts the same, so a
  *     verb of thirty forms does not outweigh thirty words.
  *   * **Sentences that are well made: 10 points** — linked to at least one
- *     word card, and using no word that no deck of the course teaches.
+ *     word card, using no word that no deck of the course teaches, and,
+ *     where it has a blank, making at least one sentence a student meets
+ *     (0.600): a blank no card fills, or whose sentences are none of them
+ *     approved, is a sentence nobody is ever shown.
  *   * **Seven smaller checks, 5 points each**: recordings, pictures,
  *     pronunciation written, sentences reviewed, no word on two cards, no
  *     overly long sentence, and a conversation or text in the deck.
@@ -396,6 +399,9 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
 
   /* A blank: every form it can take, in the sentences review lets through. */
   const parts: Map<string, PartSentences[]> = new Map();
+  /* Each sentence with a blank that was read, by the key it is said under,
+     and whether any sentence it makes reaches a student (0.600). */
+  const shown: Map<string, boolean> = new Map();
   for (const card of deck) {
     if (isDialog(card) && !practised(card)) continue;
     const holed = holedParts(card);
@@ -413,6 +419,8 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
       const at = (formsOf(card) as Held[]).indexOf(part);
       const key = line >= 0 ? `${card.id}#${line}` : at > 0 ? `${card.id}~${at}` : String(card.id);
       const own = ownSlot(part);
+      const sayKey = line >= 0 ? `${card.id}#${line}` : String(card.id);
+      shown.set(sayKey, !!shown.get(sayKey) || list.list.some((s) => passes(gate, s.key)));
       for (const s of list.list) {
         if (!passes(gate, s.key)) continue;
         for (const took of Object.values(s.took)) credit(took.card, took.word, key);
@@ -459,13 +467,22 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
   const unknownOf = (s: Said) => [...new Set(s.texts.flatMap((t) => unknownIn(t)))];
   const unlinked = said.filter((s) => !s.uses.length && !s.holed);
   const strange = said.filter((s) => unknownOf(s).length > 0);
-  const flawed = said.filter((s) => unlinked.includes(s) || strange.includes(s));
-  /* A sentence earns its share only once it has neither flaw, so each fix
-     is offered for the sentences it alone would mend, and those with both
+  /* A blank nothing fills (0.600, the owner's rule): no card fits it, or
+     review lets none of its sentences through, so no student is ever shown
+     it. Only a blank that was read is judged — a line picked from a
+     sentence card of another deck is reviewed on that card, and is left
+     alone here. A sentence with a blank is never unlinked, so the two
+     flaws do not meet. */
+  const starved = said.filter((s) => s.holed && shown.get(s.key) === false);
+  const flawed = said.filter((s) => unlinked.includes(s) || strange.includes(s) || starved.includes(s));
+  /* A sentence earns its share only once it has no flaw, so each fix is
+     offered for the sentences it alone would mend, and those with two
      flaws are a fix of their own. */
   const both = unlinked.filter((s) => strange.includes(s));
+  const starvedStrange = starved.filter((s) => strange.includes(s));
+  const onlyStarved = starved.filter((s) => !starvedStrange.includes(s));
   const onlyUnlinked = unlinked.filter((s) => !both.includes(s));
-  const onlyStrange = strange.filter((s) => !both.includes(s));
+  const onlyStrange = strange.filter((s) => !both.includes(s) && !starvedStrange.includes(s));
 
   /* ---- the smaller checks ---- */
   /* A word form is a unit; so is a sentence, all of its versions together,
@@ -606,6 +623,20 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
         `Link ${count(n, "sentence")} and teach ${n === 1 ? "its" : "their"} new words`,
         `Choose which words ${n === 1 ? "it practises" : "each practises"}, and add cards for: ${sampleOf(both)}.`,
         idsOf(both));
+    }
+    if (onlyStarved.length) {
+      const n = onlyStarved.length;
+      add("starved", worth("sentences") * (n / said.length),
+        `Fill the blank in ${count(n, "sentence")}`,
+        `Students never see ${n === 1 ? "this sentence" : "these sentences"}: no card fits the blank, or none of the sentences it makes is approved. Add cards that fill it, or approve its sentences.`,
+        idsOf(onlyStarved));
+    }
+    if (starvedStrange.length) {
+      const n = starvedStrange.length;
+      add("starved-unknown", worth("sentences") * (n / said.length),
+        `Fill the blank in ${count(n, "sentence")} and teach ${n === 1 ? "its" : "their"} new words`,
+        `Students never see ${n === 1 ? "this sentence" : "these sentences"}: nothing fills the blank. Add cards that fill it or approve its sentences, and add cards for: ${sampleOf(starvedStrange)}.`,
+        idsOf(starvedStrange));
     }
   } else if (words.length) {
     add("sentences", worth("sentences"), "Add sentences",
