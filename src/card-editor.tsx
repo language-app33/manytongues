@@ -77,6 +77,7 @@ import {
   Help,
   Icon,
   IconButton,
+  SearchBox,
   iconNode,
   KeysButton,
   RadioGroup,
@@ -2604,12 +2605,11 @@ function BlankNameBox({ label, placeholder, taken, onName, value, onType }: {
   };
   return (
     <div className="at-blanknew">
-      <input
-        className="at-input"
+      <SearchBox
         value={made}
         placeholder={placeholder}
         aria-label={label}
-        onChange={(e) => setMade(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24))}
+        onChange={(next) => setMade(next.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24))}
         onKeyDown={(e) => e.key === "Enter" && add()}
       />
       <Button variant="ghost" size="sm" disabled={!name || taken.includes(name)} onClick={add}>
@@ -3219,13 +3219,12 @@ function BlankScreen({ lang, offers, onPick, onClose, behindOf, start = null, ta
         A hole this sentence leaves, and the words that will stand in it.
       </p>
 
-      <input
-        className="at-input"
+      <SearchBox
         value={typed}
         autoFocus
         placeholder="Find a blank, or name a new one"
         aria-label="Find a blank, or name a new one"
-        onChange={(e) => setTyped(e.target.value)}
+        onChange={setTyped}
         onKeyDown={(e) => {
           if (e.key !== "Enter" || !name) return;
           /* The row's own name asks how it reads, as tapping it does. */
@@ -10187,13 +10186,12 @@ function SentencePicker({ lang, allCards, selfId, onPick, onClose }: {
         The sentence becomes the next line. Its words stay the sentence card&rsquo;s, so editing the
         card changes every scene it is in.
       </p>
-      <input
-        className="at-input"
+      <SearchBox
         value={typed}
         autoFocus
         placeholder="Find a sentence"
         aria-label="Find a sentence"
-        onChange={(e) => setTyped(e.target.value)}
+        onChange={setTyped}
       />
       <ul className="at-blanklist">
         {shown.map((c) => {

@@ -6698,6 +6698,22 @@ a student is asked:
   fix alone would mend; sentences with both flaws are a fix of their own,
   since linking them alone, or teaching their words alone, adds nothing.
 
+**A blank nothing fills is a flawed sentence (0.600).** The owner's rule,
+9 November 2026. A sentence with a blank was well made as soon as it used
+no untaught word, because a blank stands in for the link a plain sentence
+needs. That let a sentence no student is ever shown earn its share of the
+10 points: one whose blank no card fits, or whose sentences review lets
+none of through. It is now a third flaw, read off the same lists the
+words part already reads (`shown` in `deckQuality`), with a fix of its own,
+"Fill the blank in N sentences", and a joint fix where the sentence also
+uses untaught words. Only a blank that was read is judged: a line picked
+from a sentence card of another deck is reviewed on that card and is left
+alone. A card with several versions is flawed only when none of its
+versions with a blank makes a sentence that is shown. The number of cards
+that fit a blank is still not scored on the sentence itself: it is worth
+what it gives the words, one sentence to each form it takes, which is the
+owner's answer to whether a sentence with a blank counts differently.
+
 ## Words with several answers, in sentences (0.468)
 
 **24 October 2026** · `answerWords`, `phraseAnswers` and `wordsOffered` in `src/context-index.ts`, `castContext` and `pickContext` in `src/ArabicTrainer.tsx`, `src/context-links.ts`, `src/sentence-words.ts`, `contextCoverage` in `src/languages.ts`, `heard` and `spelt` in `src/deck-quality.ts`
@@ -7865,3 +7881,44 @@ The other callers of `DeckSwitch` keep the sheet: a course's decks, Prep
 mode's and Build a session's. In those places, making a deck isn't
 something being chosen, and a course's deck list saves each tap as it
 goes.
+
+---
+
+## Where you are is one line at the top of the page, and one sheet (0.601)
+
+**10 November 2026** · `src/places.ts` (`whereRows`, `langsSummary`), `src/ArabicTrainer.tsx` (`PlaceButton`, `WhereSheet`, `CornerMenu`), `src/shared.tsx` (`PlaceContext`, `TabTitle`)
+
+The owner found the app's choosers confusing, and they were four controls
+for one question. The space was chosen at the top of the You menu, and
+choosing one went to its address. Learning's corner button chose a space
+too, but only narrowed Learning. Learning, Teaching and Admin were a toggle
+at the foot of the same menu, with Super admin up among the spaces. The
+languages sat in its middle. Nothing on the page said which space you were
+in.
+
+Now the right of every tab's title, and the top of Home, holds one button
+that says where you are: "Lingua · Teaching · Arabic only". It opens one
+sheet. Super admin comes first, then "All your spaces" for someone
+learning in more than one, then each space with a line on what you do
+there, then the languages. The modes of the space you are in sit under
+its row, so a mode is one tap. The You menu keeps you and nothing about
+where. Settings no longer opens Super admin; the line is the one way in.
+
+**Why only the space you are in lists its modes.** Whether you teach in
+or run a space is worked out where you are: `my-courses` is of one space,
+and `orgAdmin` is the address's. Listing the modes of your other spaces
+would need the server to answer for all of them, and the owner asked for
+no change behind the screen. So another space is a place to go: the app
+picks its mode on arrival, as since 0.582, and from Learning it is gone to
+with `?open=learn`, to learn there.
+
+**Why choosing a space in Learning both narrows and goes (1a).** The
+corner button narrowed and the menu's list went, and the two looked alike;
+that likeness was the confusion. One action now does both. The space you
+are already in is narrowed to without reloading.
+
+**What it costs.** A line at the top of pages for anyone with a choice.
+Learning to another space reloads the app at its address, where the corner
+button changed the list in place. Someone in one space who only learns,
+in one language, has no line and keeps the space's name in the You menu.
+

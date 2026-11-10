@@ -43,11 +43,19 @@ flow goes through this: there is no second way to make one.
 form rather than putting buttons in the flow.
 
 ### `SpaceFrame` — 2 uses
-The Teaching and Admin shells. Full-bleed screen, pending dialog, error line,
-busy line, the app's name, contents; its tab strip goes to the bar at the
-foot of the window (`Tabs` with `dock`).
+The Teaching, Admin and Super admin shells. Full-bleed screen, pending
+dialog, error line, the tab's title, contents; its tab strip goes to the bar
+at the foot of the window (`Tabs` with `dock`).
 
-`tabs, tab, onTab, error, busy, label="Section", dialog, children`
+`tabs, tab, onTab, error, busy, label="Section", dialog, space, children`
+
+### `TabTitle` and `PlaceContext`
+`TabTitle` heads a tab with its name, held at the top as the page scrolls.
+At its right it shows whatever `PlaceContext` holds: the app's "where you
+are" button (0.601), which names the place, the mode and the languages and
+opens the sheet that changes them. The app provides it; nothing else
+should. Outside the app (the gallery) the context is empty and the title
+stands alone.
 
 ### `Section` — 7 uses
 A titled block. Replaces the hand-built eyebrow-plus-lede opener.
@@ -105,6 +113,15 @@ An icon-only button. `label` is **required** and becomes the accessible name.
 `ghost` is the same outline-without-fill as `Button`'s ghost variant. Use it
 when the icon stands in a row beside ghost `Button`s — the hint button next
 to "I don't know" — so the two read as the same weight.
+
+### `SearchBox` — 6 uses
+A search field. Once something is typed, a cross at its right end empties it
+and leaves the cursor in the box. Every box that narrows a list is one of
+these — ItemList's search included — so they all clear the same way. The
+browser's own clear button is hidden so there is only ever one cross.
+
+`value, onChange(next), className` (on the input), `boxClassName` (on the
+wrapper), `style`, plus anything an `<input>` takes.
 
 ### `Segmented` — 17 uses
 Pick one from a few. Reports `aria-pressed`.

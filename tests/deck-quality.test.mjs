@@ -212,6 +212,49 @@ test("a sentence loses its points for a word no deck of the course teaches, or f
   assert.ok(q.fixes.some((f) => f.key === "unlinked"));
 });
 
+test("a sentence whose blank nothing fills is no well-made sentence (0.600)", () => {
+  const sarah = { id: "sarah", lang: "ar-PS", category: "person", fills: ["name"], drill: false, created: 1,
+    forms: [{ id: "sarah", ar: "سارة", en: "Sarah", lat: "saara" }] };
+  const here = { id: "here", lang: "ar-PS", category: "adverb", forms: [{ ar: "هون", en: "here" }] };
+  const frame = (/** @type {any} */ review) => ({ id: "f", lang: "ar-PS", sentence: true, created: 9, ...(review ? { review } : {}),
+    forms: [{ id: "f", ar: "{{name}} هون", en: "{{name}} is here", lat: "{{name}} hoon" }] });
+  const fixOf = (/** @type {any} */ q) => q.fixes.find((/** @type {any} */ f) => f.key === "starved");
+
+  /* A card fits, and nobody has reviewed: asked as it always was. */
+  const fed = deckQuality([here, frame(null)], { lang: ar, pool: [sarah, here, frame(null)] });
+  assert.equal(checkOf(fed, "sentences").share, 1);
+  assert.equal(fixOf(fed), undefined);
+
+  /* No card says it fills the blank: no student is ever shown it. */
+  const empty = deckQuality([here, frame(null)], { lang: ar, pool: [here, frame(null)] });
+  assert.equal(checkOf(empty, "sentences").share, 0);
+  const fix = must(fixOf(empty), "the fix for a blank nothing fills");
+  assert.match(fix.title, /^Fill the blank in 1 sentence$/);
+  assert.deepEqual(fix.cards, ["f"]);
+  near(fix.gain, 10 * (95 / must(empty.checks.filter((/** @type {any} */ c) => c.applies && c.key !== "scene")
+    .reduce((/** @type {number} */ t, /** @type {any} */ c) => t + c.weight, 0), "weights")), "all of the sentences part");
+
+  /* A card fits, and review has let none of its sentences through. */
+  const struck = deckQuality([here, frame({ ok: [] })], { lang: ar, pool: [sarah, here, frame({ ok: [] })] });
+  assert.equal(checkOf(struck, "sentences").share, 0);
+  assert.ok(fixOf(struck));
+
+  /* A plain sentence beside it keeps its own share. */
+  const plain = { id: "p", lang: "ar-PS", sentence: true, uses: ["here"], forms: [{ ar: "هون", en: "here" }] };
+  const mixed = deckQuality([here, frame(null), plain], { lang: ar, pool: [here, frame(null), plain] });
+  near(checkOf(mixed, "sentences").share, 1 / 2);
+});
+
+test("a blank nothing fills, in a sentence with untaught words, is one fix and not two (0.600)", () => {
+  const frame = { id: "f", lang: "ar-PS", sentence: true,
+    forms: [{ id: "f", ar: "{{name}} في البيت", en: "{{name}} is at home" }] };
+  const q = deckQuality([frame], { lang: ar, pool: [frame] });
+  assert.equal(checkOf(q, "sentences").share, 0);
+  const keys = q.fixes.map((/** @type {any} */ f) => f.key);
+  assert.ok(keys.includes("starved-unknown"), keys.join(" "));
+  assert.ok(!keys.includes("starved") && !keys.includes("unknown"), keys.join(" "));
+});
+
 test("every sentence with untaught words is listed for the warning, with its words (0.586)", () => {
   const door = { id: "door", lang: "ar-PS", category: "noun", forms: [{ ar: "باب", en: "door" }] };
   const shut = { id: "shut", lang: "ar-PS", category: "verb", forms: [{ ar: "سكّر", en: "close" }] };

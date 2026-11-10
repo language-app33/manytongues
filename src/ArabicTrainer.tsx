@@ -43,6 +43,8 @@ import {
   serverCardId,
   SnackbarProvider,
   DockContext,
+  PlaceContext,
+  PickSheet,
   Stat,
   StickyFoot,
   Tabs,
@@ -132,7 +134,8 @@ function ChunkFallback() {
   return slow ? <Help>Loading…</Help> : null;
 }
 import * as API from "./courses-api.ts";
-import { placeRows } from "./places.ts";
+import { whereRows, langsSummary } from "./places.ts";
+import type { WhereRow } from "./places.ts";
 import {
   DEFAULT_LANGUAGE,
   EX,
@@ -9900,6 +9903,8 @@ export default function ArabicTrainer() {
        space you are trying, its Admin (0.574). */
     if (open === "super" && TRYING) return "admin";
     if (open === "admin" || open === "super") return open;
+    /* Going to another space from Learning, to learn there (0.601). */
+    if (open === "learn") return "learn";
     return loadTeaches() ? "teach" : "learn";
   });
   useEffect(() => {
@@ -9914,6 +9919,8 @@ export default function ArabicTrainer() {
      once it exists. */
   const [dockSlot, setDockSlot] = useState<HTMLElement | null>(null);
   const [screen, setScreen] = useState<string | null>(null); // null | "settings" | "guide"
+  /* The sheet behind where you are (0.601). */
+  const [whereOpen, setWhereOpen] = useState(false);
   /* Share feedback (0.552), open over whatever screen it was asked from. */
   const [sharing, setSharing] = useState(false);
   /* Remembered, because it decides whether the Teaching option exists at all.
@@ -13482,6 +13489,114 @@ export default function ArabicTrainer() {
     ? syncError || "Sync failed"
     : "Up to date";
 
+
+  /*
+   * Where you are (0.601): one line at the top of every page, and one sheet
+   * behind it. It replaces four controls that answered one question: the
+   * You menu's list of spaces, its toggle of modes and its language ticks,
+   * and Learning's corner button. What exists is still placeRows's; how
+   * the sheet lists it and what the line reads is whereRows's.
+   */
+  const iAmAppAdmin = !!(account && account.admin);
+  const hereId = iAmAppAdmin ? (addressSpace && addressSpace.id) || accountOrgId : accountOrgId;
+  const homeSlug = (accountOrg && typeof accountOrg === "object" && accountOrg.slug) || "";
+  const teachingLangs = space === "teach";
+  const langChoicesHere = space === "learn" ? langChoices : teachingLangs ? teachChoices : [];
+  const langsOffHere = teachingLangs ? teachLangsOff : langsOff;
+  const where = whereRows({
+    admin: iAmAppAdmin,
+    orgAdmin: !!(account && account.orgAdmin),
+    teaches,
+    trying: !!TRYING,
+    space,
+    mine: accountOrgs,
+    opened: TRYING && addressSpace ? addressSpace : null,
+    hereId,
+    filter: spaceFilter,
+    langs: langChoicesHere.length,
+  });
+  /* Arriving somewhere is arriving, not resuming: the card a trial was
+     asked about is reopened on the way back from that one question only. */
+  const arrive = () => {
+    setTrialBack(null);
+    if (tab === "courses") setTab(coursesBack);
+  };
+  /* Going to another space is going to its address, as it always was:
+     every screen then agrees about where you are. */
+  const goToSpace = (to: { id: string; slug: string }, open = "") => {
+    const then = open ? `?open=${open}` : "";
+    if (to.id === "super") {
+      /* Super admin is shown only at one of your own addresses: from a
+         tried space, go home first, and leave the trial behind. */
+      if (TRYING) {
+        API.dropTrial(TRYING);
+        window.location.assign(`/${homeSlug}?open=super`);
+        return;
+      }
+      arrive();
+      setSpace("super");
+      return;
+    }
+    if (TRYING && addressSpace && to.id === addressSpace.id) {
+      arrive();
+      setSpace(open || "admin");
+      return;
+    }
+    if (TRYING) {
+      API.dropTrial(TRYING);
+      window.location.assign(`/${to.slug}${then}`);
+      return;
+    }
+    if (to.id === hereId) {
+      arrive();
+      setSpace(open || "learn");
+      return;
+    }
+    API.rememberSpace(to.id);
+    window.location.assign(`/${to.slug}${then}`);
+  };
+  /* A row of the sheet. In Learning, a space narrows Learning to it, and
+     another of your spaces is gone to as well (1a). */
+  const pickWhere = (row: WhereRow) => {
+    setWhereOpen(false);
+    if (row.id === "all") {
+      arrive();
+      setSpace("learn");
+      setSpaceFilter("");
+      return;
+    }
+    if (row.id === "super") return goToSpace(row);
+    if (row.here) {
+      if (space === "super") return goToSpace(row);
+      if (space === "learn" && where.multi) setSpaceFilter(row.id);
+      return;
+    }
+    if (space === "learn" && where.multi) {
+      setSpaceFilter(row.id);
+      return goToSpace(row, "learn");
+    }
+    goToSpace(row);
+  };
+  /* A mode under the space here. Learning there is Learning narrowed to it. */
+  const pickMode = (row: WhereRow, mode: string) => {
+    setWhereOpen(false);
+    arrive();
+    setSpace(mode);
+    if (mode === "learn" && where.multi) setSpaceFilter(row.id);
+  };
+  const placeLangs = langsSummary(
+    langChoicesHere.filter((c) => !langsOffHere.includes(c.id)).map((c) => c.name),
+    langChoicesHere.length,
+  );
+  const placeButton = where.shown && !stranded ? (
+    <PlaceButton
+      row={where.rows.length > 1 ? where.rows.find((r) => r.id === where.now) || null : null}
+      mode={space}
+      parts={where.parts}
+      langs={placeLangs}
+      onOpen={() => setWhereOpen(true)}
+    />
+  ) : null;
   return (
     <div
       className={`at ${theme}${!inExercise && space === "learn" && tab === "home" ? " on-home" : ""}${
@@ -13511,6 +13626,7 @@ export default function ArabicTrainer() {
           which had no way to confirm a save. */}
       <SnackbarProvider show={snack.show}>
       <DockContext.Provider value={dockSlot}>
+      <PlaceContext.Provider value={placeButton}>
       {/* The band across the top for what must not be missed. First, so
           it is the first thing a screen reader comes to as well. */}
       <BannerHost />
@@ -13579,15 +13695,10 @@ export default function ArabicTrainer() {
               }}
             />
           )}
-          {/* Which of your spaces Learning shows, for someone in more than
-              one (memberships): all of them, or one. Every tab follows it,
-              and so does the session started from it. */}
-          {!inExercise && space === "learn" && !session && !stranded && learnSpaces.length > 1 && (
-            <LearnSpaceButton
-              spaces={learnSpaces}
-              value={spaceNow}
-              onChange={(id) => setSpaceFilter(id)}
-            />
+          {/* Where you are (0.601), in Home's top right corner, where the
+              space button was: the other tabs carry it in their title. */}
+          {!inExercise && space === "learn" && tab === "home" && !session && placeButton && (
+            <div className="at-placecorner">{placeButton}</div>
           )}
 
         {/* ============ STUDY ============ */}
@@ -15150,10 +15261,6 @@ export default function ArabicTrainer() {
                has to render. What it shows is nobody, not a half-account. */
             account={account || EMPTY_ACCOUNT}
             isAdmin={!!(account && account.admin)}
-            onOpenAdmin={() => {
-              setScreen(null);
-              setSpace("admin");
-            }}
             onCloseAccount={() => {
               setAccount(null);
               setSpace("learn");
@@ -15268,130 +15375,77 @@ export default function ArabicTrainer() {
           taken down during an exercise. Two halves: the space's own
           sections, and beside them what is true wherever you are — which
           space and which languages, and you. */}
-      {(() => {
-        /* Where you are, and the space's own modes (0.574). A space admin
-           sees Teaching, for the space's material (6a), and Admin, for its
-           people and courses (0.544). The App admin's Super admin is a
-           level above spaces: a place in "Where you are", not a mode. */
-        const iAmAppAdmin = !!(account && account.admin);
-        const hereId = iAmAppAdmin ? (addressSpace && addressSpace.id) || accountOrgId : accountOrgId;
-        const { places, placeNow, modes } = placeRows({
-          admin: iAmAppAdmin,
-          orgAdmin: !!(account && account.orgAdmin),
-          teaches,
-          trying: !!TRYING,
-          space,
-          mine: accountOrgs,
-          opened: TRYING && addressSpace ? addressSpace : null,
-          hereId,
-        });
-        const spaces: string[] = modes;
-        const homeSlug = (accountOrg && typeof accountOrg === "object" && accountOrg.slug) || "";
-        const choices = space === "learn" ? langChoices : space === "teach" || space === "mine" ? teachChoices : [];
-        return (
-          <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
-            {/* One bar: the space's sections, then the space and languages,
-                then you. The holders inside it draw nothing, so every item
-                is a sibling in the one row and they share it evenly. */}
-            <div className="at-dockbar">
-            <div className="at-dockmain" ref={setDockSlot} />
-            <div className="at-docksub">
-              <CornerMenu
-                spaceShown={shownSpace}
-                mySpaces={places}
-                placeNow={placeNow}
-                placesLabel={iAmAppAdmin ? "Where you are" : "Your spaces"}
-                onMySpace={(to) => {
-                  if (to.id === "super") {
-                    /* Super admin is shown only at one of your own
-                       addresses: from a tried space, go home first, and
-                       leave the trial behind. */
-                    if (TRYING) {
-                      API.dropTrial(TRYING);
-                      window.location.assign(`/${homeSlug}?open=super`);
-                      return;
-                    }
+      <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
+        {/* One bar: the space's sections, then you. The holders inside it
+            draw nothing, so every item is a sibling in the one row and they
+            share it evenly. Where you are is at the top of the page (0.601). */}
+        <div className="at-dockbar">
+        <div className="at-dockmain" ref={setDockSlot} />
+        <div className="at-docksub">
+          <CornerMenu
+            /* With nothing to choose there is no line at the top, so the
+               menu still names the space, as one quiet line (0.576). */
+            spaceShown={where.shown ? null : shownSpace}
+            account={account}
+            /* The dot stands for the whole action, so it stays lit until
+               every part of it is done — this device's cards, the courses,
+               and the spaces this person belongs to. */
+            syncState={
+              /* Trying a space (0.574): nothing syncs. */
+              TRYING || offline
+                ? "off"
+                : spacesBusy || (syncState === "idle" && courseBusy)
+                ? "syncing"
+                : syncState
+            }
+            /* Why, in words, rather than the one sentence that used to
+               stand for every way this can go wrong. */
+            syncNote={syncNote}
+            onSyncNow={syncEverything}
+            /* Only Learning: Teaching and Admin have Courses in their bar. */
+            onCourses={
+              space === "learn" && !stranded
+                ? () => {
                     setTrialBack(null);
-                    setSpace("super");
-                    return;
+                    setSession(null);
+                    openCourses();
                   }
-                  if (TRYING && addressSpace && to.id === addressSpace.id) {
-                    setSpace("admin");
-                    return;
-                  }
-                  if (TRYING) {
-                    API.dropTrial(TRYING);
-                    window.location.assign(`/${to.slug}`);
-                    return;
-                  }
-                  /* Back from Super admin to the space whose address this is. */
-                  if (to.id === hereId) {
-                    setTrialBack(null);
-                    setSpace("learn");
-                    return;
-                  }
-                  /* Going to another of your spaces is going to its address:
-                     every screen then agrees about where you are. */
-                  API.rememberSpace(to.id);
-                  window.location.assign(`/${to.slug}`);
-                }}
-                account={account}
-                /* The dot stands for the whole action, so it stays lit until
-                   every part of it is done — this device's cards, the courses,
-                   and the spaces this person belongs to. */
-                syncState={
-                  /* Trying a space (0.574): nothing syncs. */
-                  TRYING || offline
-                    ? "off"
-                    : spacesBusy || (syncState === "idle" && courseBusy)
-                    ? "syncing"
-                    : syncState
-                }
-                /* Why, in words, rather than the one sentence that used to
-                   stand for every way this can go wrong. */
-                syncNote={syncNote}
-                onSyncNow={syncEverything}
-                place={{
-                  space,
-                  spaces,
-                  /* Choosing a space is arriving at it, not resuming it: the
-                     card a trial was asked about is reopened on the way back
-                     from that one question and nowhere else. */
-                  onSpace: (to: string) => {
-                    setTrialBack(null);
-                    if (tab === "courses") setTab(coursesBack);
-                    setSpace(to);
-                  },
-                  choices,
-                  off: space === "teach" || space === "mine" ? teachLangsOff : langsOff,
-                  onLangs: (next) => setSetting(space === "teach" || space === "mine" ? "teachLangsOff" : "langsOff", next),
-                  note:
-                    space === "teach"
-                      ? "Select the languages you see in your courses, decks, and cards. This doesn't change anything for your students."
-                      : "Select the languages you see in your cards, progress, and anything you practice.",
-                }}
-                /* Only Learning: Teaching and Admin have Courses in their bar. */
-                onCourses={
-                  space === "learn" && !stranded
-                    ? () => {
-                        setTrialBack(null);
-                        setSession(null);
-                        openCourses();
-                      }
-                    : undefined
-                }
-                onSettings={() => setScreen("settings")}
-                onGuide={() => setScreen("guide")}
-                onFeedback={account ? () => setSharing(true) : undefined}
-              />
-            </div>
-            </div>
-          </nav>
-        );
-      })()}
+                : undefined
+            }
+            onSettings={() => setScreen("settings")}
+            onGuide={() => setScreen("guide")}
+            onFeedback={account ? () => setSharing(true) : undefined}
+          />
+        </div>
+        </div>
+      </nav>
+
+      {whereOpen && (
+        <WhereSheet
+          rows={where.rows}
+          now={where.now}
+          mode={space}
+          onRow={pickWhere}
+          onMode={pickMode}
+          onClose={() => setWhereOpen(false)}
+          langs={
+            <PlacePicker
+              choices={langChoicesHere}
+              off={langsOffHere}
+              onLangs={(next) => setSetting(teachingLangs ? "teachLangsOff" : "langsOff", next)}
+              note={
+                teachingLangs
+                  ? "Select the languages you see in your courses, decks, and cards. This doesn't change anything for your students."
+                  : "Select the languages you see in your cards, progress, and anything you practice."
+              }
+            />
+          }
+        />
+      )}
 
       {snack.node}
       <WorkingNote />
+      </PlaceContext.Provider>
       </DockContext.Provider>
       </SnackbarProvider>
     </div>
@@ -18390,36 +18444,29 @@ const SPACE_ICON: Record<string, string> = { learn: "cards", teach: "school", ad
 
 
 /*
- * Which space you are in, and which of its languages are in play: the top
- * of the menu behind your initial.
+ * Which languages are in play, in the sheet behind where you are (0.601).
+ * Until then it was the middle of the menu behind your initial, with the
+ * spaces at its foot.
  *
- * Each half is only there for somebody with a choice to make — more than
- * one space, or more than one language in this space. What the languages
- * decide holds everywhere in the space: the cards you can list, what
+ * Only there for somebody with more than one language here. What it
+ * decides holds everywhere in the mode: the cards you can list, what
  * Progress counts, what is ready, and what a session is dealt from.
  *
  * You cannot switch the last language off. An app with no languages in it
  * is a blank screen with no way of telling why, and the row says so rather
  * than just refusing.
  */
-function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part }: {
-  space: string;
-  spaces: string[];
-  /** Choosing a space keeps the menu open; the app changes behind it. */
-  onSpace: (space: string) => void;
+function PlacePicker({ choices, off, onLangs, note }: {
   choices: LangChoice[];
   off: LangId[];
   onLangs: (off: LangId[]) => void;
-  /* What switching one off does, in the space it is switched in. */
+  /* What switching one off does, in the mode it is switched in. */
   note: string;
-  /** The menu shows the languages at its top and the spaces at its foot. */
-  part?: "spaces" | "langs";
 }) {
-  const spacesToo = part !== "langs" && !!spaces && spaces.length > 1;
-  const langsToo = part !== "spaces" && !!choices && choices.length > 1;
-  if (!spacesToo && !langsToo) return null;
+  const langsToo = !!choices && choices.length > 1;
+  if (!langsToo) return null;
 
-  const on = langsToo ? choices.filter((c) => !off.includes(c.id)) : [];
+  const on = choices.filter((c) => !off.includes(c.id));
   const only = on.length === 1;
   const toggle = (id: LangId) => {
     const isOff = off.includes(id);
@@ -18429,25 +18476,6 @@ function PlacePicker({ space, spaces, onSpace, choices, off, onLangs, note, part
 
   return (
     <div className="at-place">
-      {spacesToo && (
-        <>
-          <div className="at-spacepick" role="radiogroup" aria-label="Space"
-            style={{ gridTemplateColumns: `repeat(${spaces.length}, minmax(0, 1fr))` }}>
-            {spaces.map((sp) => (
-              <button
-                key={sp}
-                role="radio"
-                aria-checked={space === sp}
-                className={`at-spacebtn${space === sp ? " on" : ""}`}
-                onClick={() => onSpace(sp)}
-              >
-                <Icon name={SPACE_ICON[sp]} size={18} />
-                {SPACE_LABEL[sp]}
-              </button>
-            ))}
-          </div>
-        </>
-      )}
       {langsToo && (
         <>
           <p className="at-eyebrow">Languages</p>
@@ -18610,28 +18638,16 @@ function AppVersion() {
   );
 }
 
-function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses, onSettings, onGuide, onFeedback, spaceShown, mySpaces, placeNow, placesLabel, onMySpace }: {
+function CornerMenu({ account, syncState, syncNote, onSyncNow, onCourses, onSettings, onGuide, onFeedback, spaceShown }: {
   account: User | null;
-  /** Where you can be (0.574): every space this account is in, when it is
-      in more than one (memberships); for the App admin, Super admin first,
-      then their spaces, then the space they opened. */
-  mySpaces?: { id: string; slug: string; label: string; logo?: string; logoData?: string; opened?: boolean }[];
-  /** Which of them is current: "super", or a space id. */
-  placeNow?: string;
-  /** "Your spaces", or "Where you are" for the App admin. */
-  placesLabel?: string;
-  onMySpace?: (space: { id: string; slug: string }) => void;
-  /** The space you are in, named at the top (0.543): its name, and its
-      logo as a data URL or a stored picture's hash. */
+  /** The space you are in, as one quiet line at the top (0.543, 0.576),
+      for somebody with no line at the top of the page to say it. */
   spaceShown?: { name: string; logoData?: string; logo?: string } | null;
   syncState?: string;
   /** What to say about it. Worked out by the app, which is the only thing
       that knows whether this was the connection or the passphrase. */
   syncNote?: string;
   onSyncNow: () => void;
-  /** Which space and which languages: at the top of the menu, for
-      somebody with a choice of either. */
-  place: React.ComponentProps<typeof PlacePicker>;
   /** The courses you are in, and joining another: Learning's Courses
       page, which has no section of its own in the bar. */
   onCourses?: () => void;
@@ -18659,23 +18675,11 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
 
       {open && (
         <Popover className="at-cmenu" onClose={() => setOpen(false)}>
-          {/* Where you are (0.576): a list under one heading when there is
-              a choice, else the space's name as one quiet line. */}
-          {mySpaces && mySpaces.length > 1 && onMySpace ? (
-            <div data-el="my-spaces">
-            <SpacePlaces
-              label={placesLabel || "Your spaces"}
-              places={mySpaces}
-              now={placeNow || ""}
-              onPick={(to) => {
-                if (to.id !== placeNow) onMySpace(to);
-              }}
-            />
-            </div>
-          ) : spaceShown ? (
-            <SpaceLine space={spaceShown} />
-          ) : null}
-          {(mySpaces && mySpaces.length > 1) || spaceShown ? <div className="at-crule" /> : null}
+          {/* The space's name as one quiet line, when nothing at the top of
+              the page says it (0.601). Choosing a space, a mode or the
+              languages is the line's, not this menu's. */}
+          {spaceShown ? <SpaceLine space={spaceShown} /> : null}
+          {spaceShown ? <div className="at-crule" /> : null}
           <div className="at-cwho">
             <span className="at-cavatar">{initialsOf(account && account.displayName)}</span>
             <span className="at-cwhotext">
@@ -18684,7 +18688,6 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
             </span>
           </div>
 
-          <PlacePicker {...place} part="langs" />
 
 
           {onCourses && (
@@ -18753,7 +18756,6 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, place, onCourses,
               Sync now
             </button>
           </div>
-          <PlacePicker {...place} part="spaces" />
         </Popover>
       )}
     </div>
@@ -18979,7 +18981,6 @@ function AccountSettings({
   onRename,
   onReset,
   isAdmin,
-  onOpenAdmin,
   onBecameAdmin,
   onCloseAccount,
   onLogOut,
@@ -18993,7 +18994,6 @@ function AccountSettings({
   onRename: (name: string) => void;
   onReset?: () => void;
   isAdmin?: boolean;
-  onOpenAdmin?: () => void;
   onBecameAdmin?: () => void;
   onCloseAccount: () => void;
   onLogOut: () => void;
@@ -19089,15 +19089,13 @@ function AccountSettings({
               label="Running this site"
               lede={
                 isAdmin
-                  ? "Where you can create courses, decide who teaches them, and can delete either."
+                  ? "You run this app. Super admin is listed at the top of every page, behind the line that says where you are."
                   : "Only needed by whoever runs this app."
               }
             >
-              {isAdmin ? (
-                <Button size="sm" onClick={onOpenAdmin}>
-                  Open administration
-                </Button>
-              ) : (
+              {/* One way into Super admin (0.601): the line at the top of
+                  the page. Settings keeps only the key that makes it so. */}
+              {isAdmin ? null : (
                 <React.Suspense fallback={<ChunkFallback />}>
                   <ClaimAdmin onDone={onBecameAdmin} />
                 </React.Suspense>
@@ -19403,82 +19401,106 @@ function StrandedPanel({ stranded, onJoined }: {
 }
 
 /*
- * A list of places to choose from, one per line (0.576): the You menu's
- * "Where you are" / "Your spaces", and the list behind Learning's space
- * button. One per line, so any number of spaces fits, and a long name is
- * cut short rather than pushing the menu wider.
+ * Where you are (0.601): the button at the top of every page. It names the
+ * place (a space, all of them, or Super admin) when there is more than one,
+ * the mode, and the languages once some are switched off, and opens the
+ * sheet that changes any of them. With one place, the mode's own icon
+ * stands where the space's badge would.
  */
-function SpacePlaces({ label, places, now, onPick }: {
-  label: string;
-  places: { id: string; label: string; logo?: string; logoData?: string; opened?: boolean; icon?: string }[];
-  now: string;
-  onPick: (place: any) => void;
+function PlaceButton({ row, mode, parts, langs, onOpen }: {
+  row: WhereRow | null;
+  mode: string;
+  parts: { place: string; mode: string };
+  langs: string;
+  onOpen: () => void;
 }) {
+  /* On a narrow phone a long space's name is what gives way, so the mode
+     beside it is never the part cut off. */
   return (
-    <div className="at-places" role="radiogroup" aria-label={label}>
-      <p className="at-placeshead">{label}</p>
-      {places.map((p) => {
-        const on = p.id === now;
-        return (
-          <button
-            key={p.id}
-            role="radio"
-            aria-checked={on}
-            className={`at-place-row${on ? " on" : ""}`}
-            onClick={() => onPick(p)}
-          >
-            <SpaceBadge
-              space={{ name: p.label, logo: p.logo, logoData: p.logoData }}
-              icon={p.icon || (p.id === "super" ? SPACE_ICON.super : undefined)}
-            />
-            <span className="at-place-name">{p.label}</span>
-            {p.opened && <span className="at-place-tag">Opened</span>}
-            {on && <span className="at-place-tick"><Icon name="check" size={18} /></span>}
-          </button>
-        );
-      })}
-    </div>
+    <button className="at-placebtn" data-el="where-you-are" aria-haspopup="dialog" onClick={onOpen}>
+      <WhereBadge row={row} mode={mode} />
+      <span className="at-placetext">
+        {parts.place ? <span className="at-placename">{parts.place}</span> : null}
+        {parts.mode ? <span className="at-placemode">{`${parts.place ? " · " : ""}${parts.mode}`}</span> : null}
+        {langs ? <span className="at-placelangs">{` · ${langs}`}</span> : null}
+      </span>
+      {row && row.opened ? <span className="at-place-tag">Opened</span> : null}
+      <Icon name="chevronDown" size={18} />
+    </button>
   );
 }
 
+/* A row's square: Super admin's key, all your spaces' layers, a space's
+   logo or initials; with no row, the mode's icon. */
+function WhereBadge({ row, mode }: { row: WhereRow | null; mode?: string }) {
+  if (!row) return <SpaceBadge icon={SPACE_ICON[mode || "learn"] || "cards"} />;
+  if (row.id === "super") return <SpaceBadge icon={SPACE_ICON.super} />;
+  if (row.id === "all") return <SpaceBadge icon="layers" />;
+  return <SpaceBadge space={{ name: row.label, logo: row.logo, logoData: row.logoData }} />;
+}
+
 /*
- * Which of your spaces Learning shows (0.576), as a button in the top
- * right corner instead of a row across the page: the row ran off the edge
- * with more than a few spaces. Showing all of them, the button carries the
- * layers icon; narrowed to one, it fills and carries that space's initials,
- * so a narrowed Learning never looks like the whole of it.
+ * The sheet behind where you are (0.601): every place you can be, one per
+ * row, with what you do there under its name; under the space you are in,
+ * its modes, so a mode there is one tap; then the languages. Super admin
+ * is first for the App admin, and "All your spaces" for someone learning
+ * in more than one.
+ *
+ * Only the space here lists its modes. What you may do in your other
+ * spaces is decided by that space and is not known until you are in it,
+ * so another space is a place to go: from Learning, to learn there.
  */
-function LearnSpaceButton({ spaces, value, onChange }: {
-  spaces: { id: string; name: string; logo?: string }[];
-  value: string;
-  onChange: (id: string) => void;
+function WhereSheet({ rows, now, mode, onRow, onMode, onClose, langs }: {
+  rows: WhereRow[];
+  now: string;
+  mode: string;
+  onRow: (row: WhereRow) => void;
+  onMode: (row: WhereRow, mode: string) => void;
+  onClose: () => void;
+  langs?: Node;
 }) {
-  const [open, setOpen] = useState(false);
-  const chosen = spaces.find((o) => o.id === value) || null;
+  const places = rows.length > 1 || rows.some((r) => r.modes.length > 0);
   return (
-    <div className="at-learnspace" onClick={(e) => e.stopPropagation()}>
-      <button
-        className={`at-learnspacebtn${chosen ? " on" : ""}${open ? " open" : ""}`}
-        aria-label={`Which space: ${chosen ? chosen.name : "all of them"}`}
-        aria-expanded={open}
-        data-el="space-filter"
-        onClick={() => setOpen((v) => !v)}
-      >
-        {chosen ? initialsOf(chosen.name) : <Icon name="layers" size={20} />}
-      </button>
-      {open && (
-        <Popover className="at-cmenu at-learnspacemenu" onClose={() => setOpen(false)}>
-          <SpacePlaces
-            label="Which space"
-            places={[{ id: "", label: "All your spaces", icon: "layers" }, ...spaces.map((o) => ({ id: o.id, label: o.name, logo: o.logo }))]}
-            now={value}
-            onPick={(p) => {
-              setOpen(false);
-              onChange(p.id);
-            }}
-          />
-        </Popover>
+    <PickSheet title="Where you are" className="at-wheresheet" onClose={onClose}>
+      {places && (
+        <div className="at-where">
+          {rows.map((r) => {
+            const on = r.id === now;
+            return (
+              <div key={r.id} className={`at-whererow${on ? " on" : ""}`}>
+                <button className="at-wherehead" aria-current={on ? "true" : undefined} data-el="where-place" onClick={() => onRow(r)}>
+                  <WhereBadge row={r} />
+                  <span className="at-wheretext">
+                    <b>{r.label}</b>
+                    <span>{r.what}</span>
+                  </span>
+                  {r.opened ? <span className="at-place-tag">Opened</span> : null}
+                  {on && !r.modes.length ? <span className="at-place-tick"><Icon name="check" size={18} /></span> : null}
+                </button>
+                {r.modes.length ? (
+                  <div className="at-wheremodes" role="group" aria-label={`In ${r.label}`}>
+                    {r.modes.map((m) => {
+                      const cur = on && mode === m;
+                      return (
+                        <button
+                          key={m}
+                          className={`at-wheremode${cur ? " on" : ""}`}
+                          aria-pressed={cur}
+                          onClick={() => onMode(r, m)}
+                        >
+                          <Icon name={SPACE_ICON[m]} size={16} />
+                          {SPACE_LABEL[m]}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
       )}
-    </div>
+      {langs}
+    </PickSheet>
   );
 }
