@@ -3,6 +3,14 @@
 **10 November 2026 · release 0.601, commit 62fe111, the tree on `origin/beta`.**
 Read-only: nothing in the app was changed by this audit.
 
+> **A second pass was made the same day**, by a separate reading of the
+> same paths and by running the built app in a real browser against the
+> real server. It confirmed the ordinary path and finding 1 there, and
+> added three findings — 23 to 25, under *A second pass* below. Finding 23
+> belongs with the high ones: a deck taken off a course and put back
+> leaves a student's other device without that deck's cards, and the
+> device does not ask for them again.
+
 The question was put as an absolute: at no point, anywhere in the app,
 should a student's progress fail to be saved or be saved improperly. So
 every path progress travels was read end to end, in four parts — the
@@ -405,6 +413,102 @@ server runs and logs a warning; with the data folder pointed somewhere
 that does not persist, it counts as durable. To check by hand: the
 start-up log should say the data folder came from the volume.
 
+## A second pass
+
+Made after the list above was written, and independently of it: the same
+paths were read again from the code before this document was opened, and
+then the built app was driven in a real browser (Chromium) against the
+real server on a scratch store — the first pass used a scripted browser,
+which cannot show what a real one does with storage, the network and a
+page being closed.
+
+**What it confirms.** In the real browser, one student practising on a
+phone: forty answers given, forty recorded, the same forty after closing
+and reopening, the same forty on the server a few seconds later, and the
+same forty on a second device at its first launch. Twelve more given on
+the second device were on the first at its next launch. Nothing misfiled,
+nothing dropped. Finding 1 was reproduced there too: one answer recorded,
+a second marked "Correct!" on screen, the app put away and reopened — one
+answer recorded. The separate reading arrived at findings 1, 7, 9, 10, 12
+and 20 on its own, which is some evidence they are what the code does and
+not one reader's slip.
+
+**What it adds.** Three findings, one of them high.
+
+**23. A deck taken off a course and put back leaves the student's other device without its cards — and that device never asks for them again.** *Reproduced in the real browser. High.*
+A student with a phone and a laptop, two decks in one course, six cards
+in each, practised on both. The laptop is closed. The teacher takes the
+second deck off the course by mistake; the phone, which is open, removes
+its six cards, sets their progress aside and syncs — all as designed. The
+phone is put away. The teacher puts the deck back a minute later. The
+student opens the laptop:
+
+- its sync brings the phone's deletions, and the six cards go;
+- its check for new material is answered "nothing has changed", because
+  as far as the server can tell nothing has: a deck taken off and put
+  back leaves the material's fingerprint exactly as it was;
+- so the home screen reads "0 of 6 cards learnt" — six cards, for a
+  student who has twelve — and goes on reading that at every launch. In the run it was opened three
+  times. The server, asked directly, listed both decks with six cards
+  each.
+
+It stays that way until the phone is next opened (which notices, fetches
+the deck, restores the progress and syncs it across) or until a teacher
+changes anything at all in the student's material. If the phone is never
+opened again — it was the old phone — only the teacher's next edit ends
+it. The progress itself is not destroyed: it is in the drawer, and came
+back whole in the run (21 repetitions before, 21 after). What a student
+sees in between is half their course and all their progress on it gone
+from the device they are holding, with nothing to say why and nothing
+they can press. Anything answered on that device and not yet synced is
+lost for good, which is finding 10.
+
+The same happens wherever the material comes back *exactly* as it was: a
+student taken off a course and added again, a student suspended in a
+space and reinstated, a deck's number parts switched off and on.
+
+The cause is one assumption: the device tells the server which version
+of the material it last received, and takes "unchanged" to mean "what
+you hold is right". That is true only while a refresh is the one thing
+that removes course cards. A merge removes them too.
+*Fix: when a merge — a sync, or another tab — removes a course card this
+device was holding, forget the version last received and ask for the
+material in full, there and then. With finding 10's fix beside it (set
+aside what the merge is about to delete) the cards and every answer are
+back before the student has seen them go. Moving the fingerprint on the
+server whenever a deck is attached would cover the deck and not the
+student who was removed, so it is the weaker of the two.*
+
+**24. On a shared device, the next person to sign in can be told there is nothing for them.** *The server's half reproduced; the app's half read only. Low.*
+The same assumption at another door. The version last received is kept
+for as long as the page is open, and logging out does not clear it. A
+classmate signing in on the same tablet without the page being reloaded
+asks with the previous person's version — and two students in the same
+courses have the same version, so the server answers "unchanged" (it did,
+in the run) and the app shows them no courses and no cards. Nothing is
+lost, and reopening the app puts it right; but it is a student who cannot
+practise, on exactly the classroom tablet finding 7 is about.
+*Fix: forget the version whenever the person signed in changes.*
+
+**25. A problem a learner has marked on a card is wiped by the next change to the material.** *Reproduced. Low.*
+Not practice, but the learner's own note on their own card — the mark
+that makes a reported card findable on the device afterwards. A refresh
+takes the card from the teacher's copy and keeps the schedules, the
+high-priority mark and the reset stamp; the report marks are not on that
+list, so the next refresh that finds anything changed clears them. The
+report sent to the teacher is unaffected.
+*Fix: keep them through the fold, as the high-priority mark is kept.*
+
+**And one more for finding 21's list of the known and deliberate.** *Read
+only.* A device that has been away answers from the picture it had. Two
+devices merge each question by whichever answered it last, whole — so an
+answer given on a tablet that has not synced for a month, to a card the
+phone has since taken to Learnt, replaces the phone's month with the
+tablet's one answer. Online this needs the answer to land in the second
+or two before the launch sync does; offline it needs only the tablet. It
+is the same rule that makes two devices safe in ordinary use, and is
+inherent in it.
+
 ## What to do, in order
 
 1. **Every door records** (findings 1, 4, 5, 6, 18): settle the question
@@ -417,7 +521,11 @@ start-up log should say the data folder came from the volume.
 4. **The hand-overs that never worked** (finding 3), with the one-time
    repair while the counting progress can still be recovered.
 5. **Merges and folds that keep what they are about to drop** (findings
-   9, 10, 11, 12, 17).
+   9, 10, 11, 12, 17, 25) — and, with finding 10, **a device that has
+   lost cards to a merge asks for its material again** (finding 23, and
+   24 by the same change). Finding 23 is worth doing early: it is small,
+   and it is the one a student with two devices will meet as "my progress
+   has gone".
 6. **Room on the device** (finding 8).
 7. **The server's rare ones** (findings 13 to 16) and the small device
    ones (20).
@@ -579,6 +687,38 @@ for an account whose key is not yet saved, after another screen. The
 **20.** `AT:11851`, `13272`, `13315`, `13329` pass `{ ...data, … }` to
 `persist`.
 
+**23.** `refreshCourses` sends `materialVersion.current` (`AT:11506-11511`),
+set from each answer (`AT:11515`) and seeded at launch whenever the
+document holds *any* course card (`AT:11630-11634`). The sync's adoption
+(`AT:10331-10339`) and the `storage` listener (`AT:10890-10896`) commit a
+merged document without touching it; `mergeData` drops tombstoned items
+(`src/sync.ts:231-233`). On the server `materialVersion`
+(`server/api/courses.js:980-998`) reads each course's count of decks and
+each deck's `version`, title, card count and parts; `attach-deck` /
+`detach-deck` (`courses.js:4594-4630`) change the course's list and the
+deck's links and neither the deck's `version` nor, once reattached, the
+count; the roster (`:4676-4700`) is not in the fingerprint at all, only
+in which courses are read. Reproduced with Playwright's Chromium, the
+built `dist/` and `server/index.js` on a scratch `DATA_DIR`: two decks of
+six, both devices at 45 repetitions; laptop page closed; `detach-deck`;
+phone reloaded → 0 cards of the deck, 6 tombstones, 5 drawer entries, the
+same on the server; phone closed; `attach-deck`; laptop opened → 6 items
+in all, none of the deck's, the same after two more launches, while
+`my-material` for the student lists both decks at six; phone opened → 6
+cards back, 21 repetitions on them as before; laptop's next launch → the
+same.
+
+**24.** `materialVersion` is a ref assigned only at the three places above;
+`onLogOut` (`AT:15269-15283`) clears the courses and decks on screen and
+not it, and `materialSeeded` is already true. Reproduced at the server: a
+second student of the same course asking `my-material` with the first
+student's version is answered `{ unchanged: true }`.
+
+**25.** `cardToItem` writes `flags: []` (`src/shared.tsx:5295`);
+`foldCourses` lays `priority`, `priorityAt`, `reset`, `forms` and `lines`
+over the fresh card (`shared.tsx:5762-5781`) and nothing else. Reproduced:
+one flag before the fold, none after.
+
 **Tests that do not exist and would have caught these:** a session left,
 timed out and re-dealt with a verdict up; a question whose card has gone;
 "too easy" below the working level; a grid overridden; a sync under a
@@ -589,4 +729,7 @@ device name; a merge where the later side lacks a form the other has
 answered; a merge that deletes a card the device has answered; a fold
 that replaces the last form; accepted answers reordered; settings changed
 on two devices; a zero-length record; a document with a null in its
-cards, stored and pushed; a save into a full store.
+cards, stored and pushed; a save into a full store. And from the second
+pass: a merge that removes course cards followed by a refresh the server
+answers "unchanged"; a second person signing in on the same page; a flag
+through a fold.
