@@ -45,6 +45,7 @@ import {
   endRowsOf,
   saysAboutPersons,
   untoldMeanings,
+  hasMarks,
 } from "./languages.ts";
 import { CONVERSATION, MAX_SPEAKERS, TEXT, isDialog, isText, namedPart, pickedFrom, pickedLine, proseOf, sceneKindOf, sideOf } from "./dialogs.ts";
 import type { SceneKind } from "./dialogs.ts";
@@ -7691,6 +7692,19 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
           onRemoveBlank={onRemoveBlank}
         />
       </Field>
+      {/* A word written without its vowel marks, in a language whose
+          students learn to read without them (0.608). Students see a word
+          with its marks while they learn what it means and bare once they
+          know it — so a word with none written is never seen vowelled.
+          Said rather than refused: some words need none. Not on a
+          sentence, which students are shown bare from the start. */}
+      {!blanks && lang.marks && String(f.ar || "").trim() && !hasMarks(String(f.ar), lang) && (
+        <p className="at-formneed unmet" data-el="editor-no-marks">
+          Written without {lang.marks.name}. Students see a word with its {lang.marks.name} while
+          they learn what it means, then without them — so with none written here, they never see
+          how it is vowelled.
+        </p>
+      )}
 
       <Field className={plain ? "at-softrule" : ""} label={plain ? undefined : <>English{required && !soundOrPicture(f) && <Req />}</>}>
         <Alternatives

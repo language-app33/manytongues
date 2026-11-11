@@ -210,7 +210,7 @@ test("a session deals a counting face as the number with a learnt noun, and cred
     assert.match(shown.unit.ar, new RegExp([noun.sg, noun.pl, noun.dual].join("|")), "the noun is in the phrase");
     assert.match(shown.unit.en, new RegExp(`^${ex.ask.value} `), "the meaning is the count and the thing");
     /* Asked from the figures, the phrase is in the ones English uses —
-       "5 sisters", never "٥ sisters" (0.606). */
+       "5 sisters", never "٥ sisters" (0.611). */
     if (unit.numeral) {
       assert.equal(shown.unit.numeral, shown.unit.en, "the figures English uses, with the thing counted");
       assert.doesNotMatch(shown.unit.numeral, /[٠-٩]/, "no Arabic figure beside an English noun");

@@ -638,6 +638,23 @@ export function gappedLine(card: Scene, gap: Gap, blank: string | null = GAP_BLA
     .join(" ");
 }
 
+/* The same sentence put back, in three pieces — what comes before the word,
+   the word, and what comes after — so the answer screen can mark the word
+   that went in. The pieces joined are gappedLine's whole sentence. */
+export function filledLine(card: Scene, gap: Gap): { before: string; word: string; after: string } | null {
+  const tokens = gapTokens(String((linesOf(card)[gap.line] || {}).ar || ""));
+  const t = tokens[gap.at];
+  if (!t || !t.word) return null;
+  const whole = (list: GapToken[]) => list.map((x) => `${x.lead}${x.word}${x.trail}`).join(" ");
+  const head = whole(tokens.slice(0, gap.at));
+  const tail = whole(tokens.slice(gap.at + 1));
+  return {
+    before: `${head}${head ? " " : ""}${t.lead}`,
+    word: t.word,
+    after: `${t.trail}${tail ? " " : ""}${tail}`,
+  };
+}
+
 
 /*
  * The words on offer for a gap.

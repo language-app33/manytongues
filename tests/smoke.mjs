@@ -4514,7 +4514,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   click(document.querySelector('[data-el="where-you-are"]'));
   await sleep(200);
   const toTeaching = [...document.querySelectorAll(".at-wheremode")]
-    .find((b) => /Teaching/i.test(b.textContent || ""));
+    .find((b) => /^Teach$/.test(b.textContent || ""));
   check("a teacher can reach the teaching space", !!toTeaching,
     [...document.querySelectorAll(".at-wheremode")].map((b) => b.textContent).join(",") || "no sheet");
   click(toTeaching);
@@ -10960,7 +10960,10 @@ const openPronounTables = async () => {
   };
   const chosen = await walk([textCard({ dlgwhole: { ...solid } })], async (host) => {
     await reach(host, /Which word is missing/);
-    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), verdict: "", after: "" };
+    const out = {
+      instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]),
+      verdict: "", after: "", filled: "", want: "", right: /** @type {string[]} */ ([]), wrong: 0, repeated: false,
+    };
     const choices = host.querySelector('[data-el="answer-choices"]');
     if (!choices) return out;
     const buttons = [...choices.querySelectorAll("button")];
@@ -10972,6 +10975,11 @@ const openPronounTables = async () => {
     await sleep(250);
     out.verdict = verdictOf(host);
     out.after = prompt(host);
+    out.filled = text(host.querySelector('[data-el="question-prompt-filled"]'));
+    out.want = want || "";
+    out.right = [...choices.querySelectorAll(".at-reply.right")].map((b) => text(b).replace(/^✓/, "").trim());
+    out.wrong = choices.querySelectorAll(".at-reply.wrong").length;
+    out.repeated = !!host.querySelector('[data-el="answer-value"]');
     return out;
   });
   check("a text already read asks for a word taken out of one of its sentences",
@@ -10991,19 +10999,24 @@ const openPronounTables = async () => {
   check("choosing the word that fits is marked right, and the sentence is shown whole",
     /Correct|Good job|Nicely done|Great/.test(chosen.verdict) && sentences.includes(chosen.after),
     `${chosen.verdict} / ${chosen.after}`);
+  check("with the word that went in highlighted in it, and the right option marked green and nothing red",
+    chosen.filled !== "" && chosen.filled === chosen.want && chosen.right.length === 1 && chosen.right[0] === chosen.want && chosen.wrong === 0,
+    JSON.stringify({ filled: chosen.filled, want: chosen.want, right: chosen.right, wrong: chosen.wrong }));
 
   const typed = await walk([textCard({ dlgwhole: { ...solid }, gap2pick: { ...solid } })], async (host, typeIn) => {
     await reach(host, /Fill the gap/);
-    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), choices: false, input: false, verdict: "" };
+    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), choices: false, input: false, verdict: "", filled: "", want: "" };
     out.choices = !!host.querySelector('[data-el="answer-choices"]');
     out.input = !!host.querySelector('[data-el="answer-input"]');
     if (!out.input) return out;
     const words = sentences.flatMap((s) => s.split(" "));
-    typeIn(fits(out.prompt, words));
+    out.want = fits(out.prompt, words) || "";
+    typeIn(out.want);
     await sleep(60);
     click(host.querySelector('[data-el="check-button"]'));
     await sleep(250);
     out.verdict = verdictOf(host);
+    out.filled = text(host.querySelector('[data-el="question-prompt-filled"]'));
     return out;
   });
   /* The same text with each sentence's meaning written beside it. */
@@ -11056,14 +11069,28 @@ const openPronounTables = async () => {
   );
   const chosenMeant = await walk([meantCard({ dlgwhole: { ...solid }, sen2en: { ...solid }, en2sen: { ...solid } })], async (host) => {
     await reach(host, /Which word is missing/);
-    const out = { instruction: text(host.querySelector(".at-instruction")), before: "", after: "", meaning: "", above: "" };
+    const out = {
+      instruction: text(host.querySelector(".at-instruction")), before: "", after: "", meaning: "", above: "",
+      wrongPick: false, pickRed: false, rightGreen: 0, filled: "", rightWord: "", repeated: false,
+    };
     const choices = host.querySelector('[data-el="answer-choices"]');
     if (!choices) return out;
     out.before = text(host.querySelector('[data-el="question-prompt-meaning"]'));
-    click(choices.querySelector("button"));
+    /* A wrong word, on purpose, where one can be told from the sentence. */
+    const tiles = [...choices.querySelectorAll("button")];
+    const blanked = prompt(host);
+    const want = fits(blanked, tiles.map((b) => text(b)));
+    const pick = tiles.find((b) => text(b) !== want) || tiles[0];
+    out.wrongPick = !!want && text(pick) !== want;
+    click(pick);
     await sleep(60);
     click(host.querySelector('[data-el="check-button"]'));
     await sleep(250);
+    out.pickRed = !!pick && pick.classList.contains("wrong") && !!pick.querySelector('[data-el="answer-choice-wrong"]');
+    out.rightGreen = choices.querySelectorAll(".at-reply.right").length;
+    out.rightWord = text(choices.querySelector(".at-reply.right")).replace(/^✓/, "").trim();
+    out.filled = text(host.querySelector('[data-el="question-prompt-filled"]'));
+    out.repeated = !!host.querySelector('[data-el="answer-value"]');
     out.after = prompt(host);
     out.meaning = text(host.querySelector('[data-el="answer-meaning"]'));
     out.above = text(host.querySelector('[data-el="question-prompt-meaning"]'));
@@ -11096,11 +11123,17 @@ const openPronounTables = async () => {
       sentences.includes(chosenMeant.after) && chosenMeant.meaning.includes(meaningOf(chosenMeant.after)) &&
       chosenMeant.meaning !== "" && chosenMeant.above === "",
     JSON.stringify(chosenMeant));
+  check("a wrong pick turns red, the right word green, and the right word is in the sentence, highlighted, and not written out again",
+    chosenMeant.wrongPick && chosenMeant.pickRed && chosenMeant.rightGreen === 1 &&
+      chosenMeant.filled === chosenMeant.rightWord && chosenMeant.filled !== "" && !chosenMeant.repeated,
+    JSON.stringify(chosenMeant));
   check("once choosing it is solid, the missing word is typed instead",
     /Fill the gap/.test(typed.instruction) && typed.input && !typed.choices && /____/.test(typed.prompt),
     JSON.stringify(typed));
   check("and typing the word that fits is marked right",
     /Correct|Good job|Nicely done|Great/.test(typed.verdict), typed.verdict);
+  check("and the typed word is highlighted in the sentence put back too",
+    typed.filled !== "" && typed.filled === typed.want, JSON.stringify({ filled: typed.filled, want: typed.want }));
   check("and nothing threw while the missing words were practised",
     errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
@@ -11271,7 +11304,7 @@ const openPronounTables = async () => {
   /* A teacher opens into Teaching; asked for it all the same, in case this
      device has not yet heard that they teach. */
   if (!host.querySelector(".at-screen.bare")) {
-    click(await spaceBtn(/Teaching/i));
+    click(await spaceBtn(/^Teach$/));
     await sleep(900);
   }
   const frame = () => host.querySelector(".at-screen.bare");
@@ -12090,6 +12123,151 @@ const openPronounTables = async () => {
   }
   for (const r of rests) clearTimeout(r.handle);
   delete anyWindow.AudioContext;
+}
+
+/* ---- reading without the harakat (0.608) ----
+   Five words written with their harakat. New, a word is asked with them
+   on: its meaning is still being learnt. Once that is done the same word
+   is shown bare — on the prompt, the options and the tiles — and "Show
+   the harakat" puts them back on the options, at the cost of a near miss.
+   On their own document, at the end, like the walks above. */
+{
+  const before = errors.length;
+  const HARAKA = /[ً-ْ]/;
+  const words = [
+    ["كِتاب", "book", "kitaab"], ["قَلَم", "pen", "qalam"], ["بَيْت", "house", "beet"],
+    ["شَمْس", "sun", "shams"], ["بَاب", "door", "baab"],
+  ];
+  const card = (/** @type {number} */ i, /** @type {any} */ s = {}) => ({
+    id: `hk${i}`, kind: "word", tags: ["Lesson 1"], created: 1, updated: Date.now(),
+    forms: [{ id: `hk${i}`, ar: words[i][0], en: words[i][1], lat: words[i][2], s }],
+  });
+  const solid = { phase: "review", reps: 4, interval: 9, ease: 2.5, due: Date.now() + 5 * 86400000,
+    right: 4, wrong: 0, hist: [1, 1, 1, 1], updated: Date.now() };
+  const meaningKnown = { ar2pick: { ...solid }, ar2en: { ...solid } };
+  const text = (/** @type {Element | null} */ el) => ((el && el.textContent) || "").trim();
+  /** @param {any[]} items */
+  const walk = async (items) => {
+    remoteDocs.clear();
+    localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items,
+    }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    for (let t = 0; t < 100 && !startBtn(); t++) await sleep(100);
+    click(startBtn());
+    for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
+    const met = {
+      promptsInScript: 0, promptsMarked: 0, promptsBare: 0, tip: false, tapped: false, tappedShows: false,
+      choiceSets: 0, choicesBare: 0, revealButton: false, revealed: false, nearMiss: false, nearVerdict: "",
+      afterMarked: false, tilesBare: false, asked: /** @type {string[]} */ ([]),
+    };
+    for (let n = 0; n < 30 && host.querySelector(".at-instruction"); n++) {
+      const promptEl = host.querySelector('[data-el="question-prompt-text"]');
+      const promptAr = promptEl && /[؀-ۿ]/.test(text(promptEl));
+      if (promptAr) {
+        met.promptsInScript += 1;
+        if (HARAKA.test(text(promptEl))) met.promptsMarked += 1;
+        const bare = host.querySelector('[data-el="word-bare"]');
+        if (bare) {
+          met.promptsBare += 1;
+          met.tip = met.tip || !!host.querySelector('[data-el="question-marks-tip"]');
+          if (!met.tapped) {
+            click(bare);
+            await sleep(60);
+            met.tapped = true;
+            met.tappedShows = !!host.querySelector('[data-el="word-marks-lent"]') && HARAKA.test(text(host.querySelector('[data-el="question-prompt-text"]')));
+          }
+        }
+      }
+      const choices = host.querySelector('[data-el="answer-choices"]');
+      const tiles = [...host.querySelectorAll('[data-el="match-word"]')];
+      if (tiles.length) met.tilesBare = met.tilesBare || tiles.every((t) => !HARAKA.test(text(t)));
+      if (choices && /[؀-ۿ]/.test(text(choices))) {
+        met.choiceSets += 1;
+        if (!HARAKA.test(text(choices))) met.choicesBare += 1;
+        const reveal = host.querySelector('[data-el="reveal-marks"]');
+        met.revealButton = met.revealButton || !!reveal;
+        /* The meaning asked, which the prompt may say with more round it. */
+        const ask = text(promptEl).toLowerCase();
+        const want = (words.find((w) => new RegExp(`\\b${w[1]}\\b`).test(ask)) || [""])[0];
+        met.asked.push(ask);
+        if (reveal && want && !met.nearMiss) {
+          click(reveal);
+          await sleep(60);
+          met.revealed = HARAKA.test(text(host.querySelector('[data-el="answer-choices"]')));
+          const unmark = (/** @type {string} */ t) => t.replace(/[\u064B-\u0652]/g, "");
+          const right = [...host.querySelectorAll('[data-el="answer-choices"] button')].find((b) => unmark(text(b)) === unmark(want));
+          click(right || null);
+          await sleep(60);
+          click(host.querySelector('[data-el="check-button"]'));
+          await sleep(250);
+          met.nearVerdict = text(host.querySelector('[data-el="verdict-marks-lent"]'));
+          met.nearMiss = !!met.nearVerdict;
+        } else {
+          click(choices.querySelector("button"));
+        }
+      } else if (host.querySelector('[data-el="answer-match"]')) {
+        await playGrid();
+      } else {
+        const dunno = [...host.querySelectorAll("button")].find((b) => /^I don't know$/.test((b.textContent || "").trim()));
+        click(dunno || null);
+      }
+      await sleep(120);
+      if (!host.querySelector('[data-el="verdict"]')) {
+        click(host.querySelector('[data-el="check-button"]'));
+        await sleep(200);
+      }
+      /* Once answered, a word's own prompt has its harakat back. */
+      const after = host.querySelector('[data-el="question-prompt-text"]');
+      if (after && /[؀-ۿ]/.test(text(after)) && HARAKA.test(text(after))) met.afterMarked = true;
+      click([...host.querySelectorAll("button")].find((b) => /^Continue$/.test((b.textContent || "").trim())));
+      await sleep(200);
+    }
+    r.unmount();
+    host.remove();
+    const KEY = "arabic-trainer:arabic-trainer-v3";
+    let was = localStorage.getItem(KEY);
+    for (let t = 0, still = 0; t < 40 && still < 4; t++) {
+      await sleep(100);
+      const now = localStorage.getItem(KEY);
+      still = now === was ? still + 1 : 0;
+      was = now;
+    }
+    return met;
+  };
+
+  materialQuiet = true;
+  /* The tap tip shows in a learner's first three sessions with a bare
+     word, counted on the device: none yet, whatever the walks above did. */
+  localStorage.removeItem("arabic-trainer-marks-tip");
+  const fresh = await walk([0, 1, 2, 3, 4].map((i) => card(i)));
+  const known = await walk([0, 1, 2, 3, 4].map((i) => card(i, meaningKnown)));
+  /* And past the third, it is not shown again. */
+  localStorage.setItem("arabic-trainer-marks-tip", "3");
+  const later = await walk([0, 1, 2, 3, 4].map((i) => card(i, meaningKnown)));
+  materialQuiet = false;
+  check("a new word is shown with its harakat while its meaning is learnt",
+    fresh.promptsInScript > 0 && fresh.promptsMarked === fresh.promptsInScript && fresh.promptsBare === 0, JSON.stringify(fresh));
+  /* Not every set: the walk answers the typed questions "I don't know",
+     and two misses running on the first level rightly give a word its
+     marks back. */
+  check("once its meaning is known, its options are shown without them",
+    known.choiceSets > 0 && known.choicesBare > 0, JSON.stringify(known));
+  check("with a button that puts them back on every option",
+    known.revealButton && known.revealed, JSON.stringify(known));
+  check("which makes a right answer a near miss, and says so",
+    known.nearMiss && /near miss/.test(known.nearVerdict), JSON.stringify(known));
+  if (known.promptsBare > 0) {
+    check("a bare word on the prompt says it can be tapped, and a tap puts its harakat back",
+      known.tip && known.tappedShows, JSON.stringify(known));
+  }
+  check("after three sessions the tip is not shown, and the tap still works",
+    later.promptsBare > 0 && !later.tip && later.tappedShows, JSON.stringify(later));
+  check("nothing went wrong on the way", errors.length === before, errors.slice(before).join("\n"));
 }
 
 report();

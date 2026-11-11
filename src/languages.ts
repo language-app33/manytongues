@@ -3930,6 +3930,11 @@ export const LANGUAGES: Record<LangId, Lang> = {
      * the words that carry them. ة and ه are not among them: since 0.295
      * one written for the other, either way round, is a misspelling.
      */
+    /* The harakat, which everyday Arabic is written without: shown while a
+       word is being learnt and taken away once it is — see readsBare. The
+       same class as TASHKEEL, written out because that is declared below
+       this pack and the pack is built first. */
+    marks: { pattern: /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/, name: "harakat" },
     marking: { tashkeel: "either", ignoreHamza: true },
     rules: [
       "Cards hold the Arabic script, an English meaning, and a transliteration. Any two of the three are enough to practice it.",
@@ -3939,6 +3944,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
       "Invisible characters that Arabic keyboards insert — right-to-left marks and zero-width joiners — are stripped before comparing, so an answer that looks correct is treated as correct.",
       "Words with several forms — plurals, feminines — are held on one card as separate forms. Each is learnt in its own right, and the card is not counted as learnt until all of them are.",
       "The on-screen keyboard follows the standard Arabic layout, with a separate row for harakat.",
+      "Students learn to read without harakat. A word is shown with them while its meaning is being learnt and without them once it is known; sentences are always shown without them. Tapping a word puts its harakat back for that question, which then counts as a near miss. Where the harakat are the only thing telling two of the student's words apart, they stay.",
     ],
   },
 
@@ -4196,6 +4202,10 @@ export const LANGUAGES: Record<LangId, Lang> = {
        off is a point left off whether it is one of them or all of them;
        and the ordinary shape of a letter is accepted at the end of a word
        for its final form, כ מ נ פ צ for ך ם ן ף ץ. */
+    /* The niqqud, which everyday Hebrew is written without — see the
+       harakat on the Arabic pack. The points and the dagesh and the shin
+       and sin dots; not the maqaf or sof pasuq, which are punctuation. */
+    marks: { pattern: /[\u0591-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]/, name: "niqqud" },
     marking: { niqqud: "either", foldFinals: true },
     rules: [
       "Cards hold the Hebrew, an English meaning, and a transliteration. Any two of the three are enough to practice it.",
@@ -4205,6 +4215,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
       "Invisible characters that Hebrew keyboards insert — right-to-left marks and zero-width joiners — are stripped before comparing, so an answer that looks correct is treated as correct.",
       "Words with several forms — plurals, feminines — are held on one card as separate forms. Each is learnt in its own right, and the card is not counted as learnt until all of them are.",
       "The on-screen keyboard follows the standard Israeli layout, with a separate row for niqqud.",
+      "Students learn to read without niqqud. A word is shown with them while its meaning is being learnt and without them once it is known; sentences are always shown without them. Tapping a word puts its niqqud back for that question, which then counts as a near miss. Where the niqqud are the only thing telling two of the student's words apart, they stay.",
     ],
   },
 };
@@ -4335,6 +4346,65 @@ export function exOf(named: string, lang: Lang = activeLang()) {
 export const cap = (s: string): string => (s ? s.charAt(0).toUpperCase() + s.slice(1) : s);
 
 export const TASHKEEL = /[\u0610-\u061A\u064B-\u065F\u0670\u06D6-\u06ED]/g;
+
+/* ------------------------------------------------------------------
+   Reading without the vowel marks (0.608)
+
+   Everyday Arabic and Hebrew are written without their harakat and
+   niqqud, and reading them that way is the goal \u2014 so the screen takes the
+   marks away. A word keeps them while what it means is being learnt and
+   loses them from the second level of its ladder (`readsBare` in the
+   scheduler); a sentence never has them. A learner who is stuck taps a
+   word, or presses "Show the harakat" over the choices, and it is put
+   back for that question, which then counts as a near miss.
+
+   Display only. What is stored, what is marked and what the answer screen
+   shows as the right answer all keep every mark the teacher wrote.
+   ------------------------------------------------------------------ */
+
+const MARKS_G: WeakMap<RegExp, RegExp> = new WeakMap();
+const marksG = (re: RegExp): RegExp => {
+  let g = MARKS_G.get(re);
+  if (!g) {
+    g = new RegExp(re.source, "g");
+    MARKS_G.set(re, g);
+  }
+  return g;
+};
+
+/** The text with the language's vowel marks taken out; as written where it has none. */
+export function withoutMarks(text: string | null | undefined, lang: Lang | null | undefined): string {
+  const s = String(text || "");
+  return lang && lang.marks ? s.replace(marksG(lang.marks.pattern), "") : s;
+}
+
+/** Whether the text carries any of the language's vowel marks at all. */
+export function hasMarks(text: string | null | undefined, lang: Lang | null | undefined): boolean {
+  return !!(lang && lang.marks && lang.marks.pattern.test(String(text || "")));
+}
+
+/**
+ * A text cut into its words and the spaces between them, each word with
+ * its bare spelling beside it \u2014 what a learner taps to have one word's
+ * marks put back. `key` is the bare word, so the same word tapped once is
+ * shown whole wherever it stands on the screen. Spaces are kept as their
+ * own pieces, so joining every `text` gives the text back exactly.
+ */
+export interface MarkedPiece {
+  text: string;
+  bare: string;
+  /** Empty for a space, or for a word with no marks to give back. */
+  key: string;
+}
+export function piecesOf(text: string | null | undefined, lang: Lang | null | undefined): MarkedPiece[] {
+  return String(text || "")
+    .split(/(\s+)/)
+    .filter((p) => p !== "")
+    .map((p) => {
+      const bare = withoutMarks(p, lang);
+      return { text: p, bare, key: /\S/.test(p) && bare !== p ? bare : "" };
+    });
+}
 
 export const TATWEEL = /\u0640/g;
 

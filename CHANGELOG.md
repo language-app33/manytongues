@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.606 — 11 November 2026
+## 0.611 — 11 November 2026
 
 **Writing a counted phrase in Arabic is asked from "5 sisters", not
 "٥ sisters".** The top question for a number before a noun showed the
@@ -38,6 +38,130 @@ Checked and left alone:
   "Who is it?", "lives", two right answers in "Choose the meaning", the
   phrase's meaning when typing the missing word, and "Two cats" were fixed
   or settled in 0.605.
+## 0.610 — 11 November 2026
+
+**"Where you are" is shorter, and every space has its buttons.**
+
+- **Each space's buttons now sit on the same line as its name**, as small
+  squares with the icon above a short word: Learn, Teach, Admin.
+- **Every one of your spaces shows them, not only the one you are in.**
+  Each shows only what you can do there: Teach where you teach or run the
+  space, Admin where you run it. Tapping one takes you straight there.
+  A space where you only learn shows no buttons; tapping its name takes
+  you to learn there, as before.
+- **The line of explanation under each place is gone** ("Learning across
+  every space you are in", "You teach here." and the rest).
+
+To check by hand: someone who teaches in one space and only learns in
+another sees Teach on the first only. Right after you are made a teacher
+in another space, Teach appears there once the app next refreshes your
+courses.
+
+## 0.609 — 11 November 2026
+
+**"Tap a word to see its harakat" shows only in your first three
+sessions.** After that it was just repeating itself; tapping a word still
+works the same.
+
+- It is counted on each device, so a new phone or tablet shows it for
+  three sessions again.
+- Hebrew's "Tap a word to see its niqqud" works the same way.
+
+To check by hand: after three sessions with bare words, the line under the
+word should no longer appear, and tapping a word should still bring back
+its harakat.
+
+## 0.608 — 11 November 2026
+
+**Students learn to read Arabic without harakat.** Everyday Arabic is
+written without them, so the app now takes them away as a student gets to
+know each word. Hebrew niqqud work the same way. Vietnamese is not
+affected.
+
+For students:
+
+- **A new word is shown with its harakat** while you learn what it means.
+- **Once you know what it means, it is shown without them**: in every
+  question, in the answer options, in matching tiles, and when an early
+  question about it comes back for review. Get its meaning wrong twice in
+  a row and the harakat come back until you have it again.
+- **Sentences are always shown without harakat**: conversations, texts,
+  phrases, example sentences and replies, from the first time you see
+  them.
+- **Stuck on a word? Tap it** to see its harakat for that question. A line
+  under the question says so. In a sentence only the word you tap gets its
+  harakat back. Where the options are buttons, "Show the harakat" puts
+  them back on all the options at once.
+- **Asking for the harakat makes the answer a near miss**, even if you then
+  get it right, and the word comes round again sooner. The answer screen
+  says so.
+- **Once you have answered, the harakat come back** on the word and on the
+  right answer, so you can check how it is said. Sentences stay without
+  them.
+- **Typing is unchanged**: answers are accepted with or without harakat,
+  and any you type must be right.
+
+One exception: **the harakat stay where they are all that tells two words
+apart**. For example, كَتَب "he wrote" and كُتُب "books", if you are
+learning both. The same goes for two persons of a verb that differ only in
+their vowels, which "Who is it?" asks about.
+
+For teachers:
+
+- **A word card written without harakat says so** under its Arabic, since
+  students then never see how it is vowelled. It is a note, not an error:
+  some words need none. Sentences don't get the note, because students see
+  them without harakat anyway.
+
+To check by hand: practise a Palestinian word you know the meaning of. Its
+options or tiles should have no harakat, "Show the harakat" should bring
+them back, and the verdict should then say "near miss". A brand-new word
+should still show its harakat. Also try a conversation: its lines should
+have no harakat, and tapping a word should bring back that word's harakat
+alone.
+
+## 0.607 — 11 November 2026
+
+**"Which word is missing?" shows the answer where you are already
+looking.** Once you've answered, the missing word is highlighted in green
+in the sentence, and the options show what was right.
+
+For students:
+
+- **The word that went in is highlighted** in the sentence at the top, so
+  you don't have to hunt for it. This also applies when you type the
+  missing word ("Fill the gap").
+- **When you choose, the options are marked.** The right word turns green
+  with a tick. If you picked a different word, yours turns red with a
+  cross. The sentence above always shows the right word, whichever you
+  picked.
+- **The right word is no longer written out again under "Not quite".** The
+  green option and the highlighted word already show it.
+- This applies to a missing word in a phrase and to a missing word in a
+  text or conversation.
+
+Unchanged: what the sentence means stays under the verdict, and how the
+whole sentence is pronounced stays in "Learn more".
+
+To check by hand: pick a wrong word in "Which word is missing?". Yours
+turns red, the right one green, and the right word appears highlighted in
+the sentence.
+
+## 0.606 — 11 November 2026
+
+**Pictures in questions take less of the screen.** A picture is never
+taller than a third of the screen, and never more than 240 pixels, so the
+answer stays in view.
+
+For students:
+
+- **The four picture choices fit in one glance.** On a tablet or computer
+  they used to fill the screen and push the buttons below out of sight; the
+  four of them together now take no more room than the picture you are
+  asked about.
+- **On a short phone the picture you are asked about shrinks** rather than
+  taking half the space above the keyboard.
+- Pictures are shrunk to fit, never cropped, so nothing in them is cut off.
 
 ## 0.605 — 10 November 2026
 

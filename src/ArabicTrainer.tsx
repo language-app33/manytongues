@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from "react";
 import type { OnboardingPlace } from "./spaces.tsx";
 import type {
   Course, DayMoves, Deck, Doc, ExerciseSpec, ExerciseState, FlagKind, FlagVerdict, Form, Item,
@@ -187,6 +187,9 @@ import {
   NUMBER_FALLBACK,
   normEn,
   supportsContext,
+  hasMarks,
+  piecesOf,
+  withoutMarks,
 } from "./languages.ts";
 import {
   agreedCell,
@@ -261,6 +264,7 @@ import {
   dueRank,
   inOrder,
   shuffled,
+  readsBare,
 } from "./scheduler.ts";
 import type { Move, Standing, Unit } from "./scheduler.ts";
 import { dueAt, isBehind, mixSession, roomForNew as roomForNewIn } from "./session-mix.ts";
@@ -308,6 +312,7 @@ import {
   setTaughtShort,
   taughtShortGaps,
   gappedLine,
+  filledLine,
   isDialog,
   meantAt,
   sentenceOptions,
@@ -2156,6 +2161,65 @@ function sentenceWaits(line: Form, held: WordsHeld, lang: Lang): boolean {
   return known < Math.ceil(hits.length * STRETCH_SHARE - 1e-9);
 }
 
+/* Whether a form is shown without its vowel marks — see readsBare in the
+   scheduler. Never in a language that has none to take off. */
+function formReadsBare(unit: Form | null | undefined, lang: Lang): boolean {
+  if (!unit || !lang.marks) return false;
+  return readsBare(availableTypes(unit, lang), (t) => statesOf(unit)[t]);
+}
+
+/*
+ * The bare spellings that stand for more than one word the learner holds,
+ * once the marks are off: كتب for كَتَب and كُتُب. Only spellings written
+ * with marks count — a word typed bare beside its own vowelled spelling is
+ * one word written twice, not two. Worked out once per collection.
+ */
+const TWINS: WeakMap<Item[], Map<string, Set<string>>> = new WeakMap();
+const NO_TWINS: Set<string> = new Set();
+function bareTwinsOf(items: Item[], lang: Lang): Set<string> {
+  if (!lang.marks) return NO_TWINS;
+  let byLang = TWINS.get(items);
+  if (!byLang) {
+    byLang = new Map();
+    TWINS.set(items, byLang);
+  }
+  const kept = byLang.get(lang.id);
+  if (kept) return kept;
+  const spelt: Map<string, Set<string>> = new Map();
+  for (const it of items) {
+    for (const { unit } of unitsOf(it)) {
+      for (const a of splitAlternatives(String(unit.ar || ""))) {
+        const marked = a.trim();
+        if (!marked || !hasMarks(marked, lang)) continue;
+        const bare = withoutMarks(marked, lang);
+        const set = spelt.get(bare) || new Set<string>();
+        set.add(marked);
+        spelt.set(bare, set);
+      }
+    }
+  }
+  const twins = new Set([...spelt].filter(([, set]) => set.size > 1).map(([bare]) => bare));
+  byLang.set(lang.id, twins);
+  return twins;
+}
+
+/* Whether any of these spellings is told from another only by its marks:
+   two of them alike once bare and different as written, or one that is a
+   twin in the learner's collection. */
+function spellingsNeedMarks(spellings: string[], lang: Lang, twins: Set<string>): boolean {
+  const seen: Map<string, string> = new Map();
+  for (const raw of spellings) {
+    const marked = raw.trim();
+    if (!marked) continue;
+    const bare = withoutMarks(marked, lang);
+    if (hasMarks(marked, lang) && twins.has(bare)) return true;
+    const was = seen.get(bare);
+    if (was !== undefined && was !== marked && hasMarks(was, lang) && hasMarks(marked, lang)) return true;
+    if (was === undefined) seen.set(bare, marked);
+  }
+  return false;
+}
+
 /* Whether every sentence of a text is cleared, at everything it is asked.
    Through availableTypes and not laddered, for the reason stretchOpen
    gives: laddered reads the quiet set this is in the middle of working out. */
@@ -3719,6 +3783,24 @@ function blankedPhrase(context: any, lang: Lang, blank: string = "____") {
     .map((t, i) => (i === context.slot ? gap : i > context.slot && i < context.slot + span ? null : t))
     .filter((t) => t !== null)
     .join(" ");
+}
+
+/* The phrase put back once answered, in three pieces — before the word,
+   the word, after it — so the answer screen can mark the word that went
+   in. What is glued to it stays outside the mark, as it stayed outside the
+   gap. Null where the gap cannot be found, and the phrase is shown plain. */
+function filledPhrase(context: any, lang: Lang): { before: string; word: string; after: string } | null {
+  const tokens = contextTokens(context.ar, lang);
+  const span = Math.max(1, context.span || 1);
+  if (context.slot < 0 || context.slot >= tokens.length) return null;
+  const SPLIT = "\u0000";
+  const [before, after = ""] = blankedPhrase(context, lang, SPLIT).split(SPLIT);
+  const token = tokens[context.slot];
+  const glued = span === 1 && context.word ? gluedTo(token, context.word, lang) : null;
+  const word = glued
+    ? Array.from(token).slice(Array.from(glued.before).length, Array.from(token).length - Array.from(glued.after).length).join("")
+    : tokens.slice(context.slot, context.slot + span).join(" ");
+  return word ? { before, word, after } : null;
 }
 
 /*
@@ -8305,9 +8387,101 @@ function caretBackspace(ref: React.RefObject<HTMLInputElement | HTMLTextAreaElem
    Small components
    ------------------------------------------------------------------ */
 
+/*
+ * What the question on the screen does with the language's vowel marks
+ * (0.608) — see withoutMarks in languages.ts for the rule.
+ *
+ * Handed down rather than passed to every drawing of the script, because
+ * the script is drawn in a dozen places on one question and every one of
+ * them has to agree: a single word, the options, the tiles of a grid and
+ * the lines of a scene. Outside a question nothing provides it, so a card
+ * list, the editor and the answer screen's own copies show what the
+ * teacher wrote.
+ */
+interface MarksView {
+  /** The language whose marks come off; null, and everything is as written. */
+  lang: Lang | null;
+  /** Whether a word — the prompt, an option, a tile — is bare. A sentence always is. */
+  words: boolean;
+  /** Words put back by the learner, by their bare spelling; CHOICES_LENT for every option. */
+  lent: Set<string>;
+  /** Puts a word back. Null where nothing may be: once the question is answered. */
+  lend: ((key: string) => void) | null;
+}
+const CHOICES_LENT = "\u0000choices";
+const NO_MARKS: MarksView = { lang: null, words: false, lent: new Set(), lend: null };
+const MarksShown = React.createContext<MarksView>(NO_MARKS);
+
+/**
+ * The script as this question shows it: bare or as written, and where it
+ * is bare, each word one tap from having its marks back.
+ *
+ * `run` says what the text is — a word, or a sentence, which is bare
+ * whatever the learner knows — and `inChoice` that it sits inside a
+ * button, where a word cannot be tapped on its own: there "Show the
+ * harakat" puts every option back at once.
+ */
+function useMarked(text: string, L: Lang, run: "word" | "sentence", inChoice: boolean): Node {
+  const view = useContext(MarksShown);
+  const taking = !!view.lang && view.lang.id === L.id && (run === "sentence" || view.words) && hasMarks(text, L);
+  if (!taking) return text;
+  if (inChoice) return view.lent.has(CHOICES_LENT) ? text : withoutMarks(text, L);
+  return piecesOf(text, L).map((p, i) => {
+    if (!p.key) return <React.Fragment key={i}>{p.text}</React.Fragment>;
+    if (view.lent.has(p.key)) {
+      return (
+        <span key={i} className="at-lentword" data-el="word-marks-lent">
+          {p.text}
+        </span>
+      );
+    }
+    if (!view.lend) return <React.Fragment key={i}>{p.bare}</React.Fragment>;
+    const lend = view.lend;
+    return (
+      <span
+        key={i}
+        className="at-bareword"
+        data-el="word-bare"
+        role="button"
+        tabIndex={0}
+        aria-label={`${p.bare} — show the ${L.marks ? L.marks.name : "marks"}`}
+        onClick={() => lend(p.key)}
+        onKeyDown={(e) => {
+          if (e.key !== "Enter" && e.key !== " ") return;
+          e.preventDefault();
+          lend(p.key);
+        }}
+      >
+        {p.bare}
+      </span>
+    );
+  });
+}
+
+/* The same, inline, for a piece of script set in a line of its own
+   making — a verb's table, the tiles of its row. */
+function Marked({ text, lang, run = "word", inChoice = false }: {
+  text: string;
+  lang: Lang;
+  run?: "word" | "sentence";
+  inChoice?: boolean;
+}) {
+  return <>{useMarked(text, lang, run, inChoice)}</>;
+}
+
 /* The target language's own script, however it is written. */
-function Arabic({ text, kind, lang, name }: { text?: string; kind?: string; lang?: Lang; name?: string }) {
+function Arabic({ text, kind, lang, name, run = "word", inChoice = false }: {
+  text?: string;
+  kind?: string;
+  lang?: Lang;
+  name?: string;
+  /** A sentence is shown without its vowel marks from the start; a word once it is known. */
+  run?: "word" | "sentence";
+  /** Inside a button: no word of it can be tapped on its own. */
+  inChoice?: boolean;
+}) {
   const L = lang || LANGUAGES[DEFAULT_LANGUAGE];
+  const shown = useMarked(shownAlternatives(text), L, run, inChoice);
   return (
     <p
       className={`at-arabic ${kind || "word"}`}
@@ -8316,7 +8490,7 @@ function Arabic({ text, kind, lang, name }: { text?: string; kind?: string; lang
       dir={L.direction}
       style={{ fontFamily: L.fontStack, direction: L.direction, ...scriptVars(L) }}
     >
-      {shownAlternatives(text)}
+      {shown}
     </p>
   );
 }
@@ -8358,6 +8532,40 @@ function Spelt({ runs, lang, name, className }: {
           <span key={i}>{run.text}</span>
         ),
       )}
+    </p>
+  );
+}
+
+/*
+ * A sentence once its missing word is back in it, with that word marked.
+ *
+ * The answer screen used to put the sentence back whole and leave the
+ * learner to find the word in it. Drawn as Arabic draws a phrase, with the
+ * word in a <mark> so the highlight reaches a screen reader too.
+ */
+function Filled({ parts, lang, name }: {
+  parts: { before: string; word: string; after: string };
+  lang?: Lang;
+  name?: string;
+}) {
+  const L = lang || LANGUAGES[DEFAULT_LANGUAGE];
+  /* The sentence round it bare, as it was asked; the word that went in is
+     the answer, and the answer keeps its marks (0.608). */
+  const before = useMarked(parts.before, L, "sentence", false);
+  const after = useMarked(parts.after, L, "sentence", false);
+  return (
+    <p
+      className="at-arabic phrase"
+      data-el={name}
+      lang={L.id}
+      dir={L.direction}
+      style={{ fontFamily: L.fontStack, direction: L.direction, ...scriptVars(L) }}
+    >
+      {before}
+      <mark className="at-filled" data-el="question-prompt-filled">
+        {parts.word}
+      </mark>
+      {after}
     </p>
   );
 }
@@ -8499,7 +8707,7 @@ function Scene({ card, lines, lang, blankId = null, meanings = false, said = fal
     const heard = lines.filter((l) => (l.recs || []).length > 0);
     return (
       <div className="at-scene prose" data-el="scene">
-        <Arabic text={join("ar")} kind="phrase" lang={lang} name="scene-text" />
+        <Arabic text={join("ar")} kind="phrase" lang={lang} name="scene-text" run="sentence" />
         {said && join("lat") && (
           <p className="at-scenemeaning" data-el="scene-text-said">
             {join("lat")}
@@ -8543,7 +8751,7 @@ function Scene({ card, lines, lang, blankId = null, meanings = false, said = fal
                   <span className="at-blankrule" />
                 </p>
               ) : (
-                <Arabic text={line.ar} kind="phrase" lang={lang} name="scene-line-text" />
+                <Arabic text={line.ar} kind="phrase" lang={lang} name="scene-line-text" run="sentence" />
               )}
               {said && line.lat && (
                 <p className="at-scenemeaning" data-el="scene-line-said">
@@ -8609,7 +8817,7 @@ function SceneOrder({ card, lang, value, onChange, disabled }: {
               <span className={`at-speaker s${(line.who || 0) % 4}`}>
                 {speakerName(card, line.who || 0)}
               </span>
-              <Arabic text={line.ar} kind="phrase" lang={lang} />
+              <Arabic text={line.ar} kind="phrase" lang={lang} run="sentence" inChoice />
             </span>
           </button>
         );
@@ -8948,7 +9156,7 @@ function MatchGrid({
                     <Icon name={sounding === w.id ? "pause" : "play"} />
                   </button>
                 ) : (
-                  <Arabic text={w.ar} kind="word" lang={lang} />
+                  <Arabic text={w.ar} kind="word" lang={lang} inChoice />
                 )}
                 {/* Which form of its card this is, where another form of
                     the same card is in the grid and nothing else would say
@@ -9031,7 +9239,7 @@ function MatchGrid({
                 /* The words in the script, as the word grid shows them on
                    its left — or the figures it writes numbers in. */
                 <span className={`at-matchword${lang.direction === "rtl" ? " rtl" : ""}`}>
-                  <Arabic text={m} kind="word" lang={lang} />
+                  <Arabic text={m} kind="word" lang={lang} inChoice />
                   {meaningTags[at] ? (
                     <span className="at-matchtag" data-el="match-form-tag">{meaningTags[at]}</span>
                   ) : null}
@@ -9059,8 +9267,11 @@ function MatchGrid({
  *   the meanings up, in the interface font — an English tile set in the
  *   script's size and direction is a sentence pretending to be a word.
  */
-function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase", field = "ar", multi = false }: {
+function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase", field = "ar", multi = false, rightId, run = "word" }: {
   options: any[];
+  /** Whether the options are words, bare once the word asked is known, or
+      sentences, bare always — see MarksShown. */
+  run?: "word" | "sentence";
   lang: Lang;
   value: string;
   onChange: (v: string) => void;
@@ -9069,6 +9280,9 @@ function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase"
   field?: string;
   /** Several may be ticked: the value is their texts, in the tiles' order, joined by WHO_JOIN. */
   multi?: boolean;
+  /** Once answered, the right option: it turns green, and a wrong pick red,
+      each with a tick or a cross so it is not colour alone that says so. */
+  rightId?: string;
 }) {
   const textOf = (option: any) => String((option && option[field]) || "");
   const ticked = multi ? value.split(WHO_JOIN).filter(Boolean) : [];
@@ -9082,18 +9296,29 @@ function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase"
     <div className={`at-replies${multi ? " multi" : ""}`} data-el="answer-choices" role={multi ? "group" : undefined}>
       {options.map((option) => {
         const text = textOf(option);
+        const mark = rightId === undefined ? "" : option.id === rightId ? "right" : isOn(text) ? "wrong" : "";
         return (
           <button
             type="button"
             key={option.id}
-            className={`at-reply${isOn(text) ? " on" : ""}${kind === "word" ? " word" : ""}${
-              field === "en" ? " en" : ""
-            }`}
+            className={`at-reply${isOn(text) && !mark ? " on" : ""}${mark ? ` ${mark}` : ""}${
+              kind === "word" ? " word" : ""
+            }${field === "en" ? " en" : ""}`}
             aria-pressed={isOn(text)}
             disabled={disabled}
             onClick={() => toggle(text)}
           >
-            {field === "en" ? asMeaning(text) : <Arabic text={text} kind={kind} lang={lang} />}
+            {mark === "right" && (
+              <span className="at-replymark" data-el="answer-choice-right" aria-label="Right answer">
+                ✓
+              </span>
+            )}
+            {mark === "wrong" && (
+              <span className="at-replymark" data-el="answer-choice-wrong" aria-label="Your answer">
+                ✗
+              </span>
+            )}
+            {field === "en" ? asMeaning(text) : <Arabic text={text} kind={kind} lang={lang} run={run} inChoice />}
           </button>
         );
       })}
@@ -9113,6 +9338,8 @@ interface VerbAt {
   at: string;
 }
 const NO_VERB_AT: VerbAt = { revealed: [], read: {}, placed: {}, at: "" };
+/* No words lent their marks — one array, so the view of them stays put. */
+const NO_KEYS: string[] = [];
 
 /*
  * One tense of one verb, laid out by person.
@@ -9153,7 +9380,7 @@ function VerbTable({ tense, lang, reading, checked }: {
           <li key={form.id} className="at-vrow">
             <span className="at-vperson">{person.label}</span>
             <span className="at-vform" lang={lang.id} dir={lang.direction} style={script}>
-              {String(form.ar || "")}
+              <Marked text={String(form.ar || "")} lang={lang} />
             </span>
             <span className="at-vsaid">
               {form.lat ? (
@@ -9247,7 +9474,7 @@ function VerbRowFill({ tense, lang, tiles, placed, at, onAt, onPlace, checked }:
                 onClick={() => (typeof tile === "number" ? onPlace(person.id, null) : onAt(person.id))}
               >
                 <span lang={lang.id} dir={lang.direction} style={script}>
-                  {text || "—"}
+                  {text ? <Marked text={text} lang={lang} inChoice /> : "—"}
                 </span>
               </button>
               {checked && !right && (
@@ -9272,7 +9499,7 @@ function VerbRowFill({ tense, lang, tiles, placed, at, onAt, onPlace, checked }:
                 style={script}
                 onClick={() => onPlace(at, i)}
               >
-                {text}
+                <Marked text={text} lang={lang} inChoice />
               </button>
             ),
           )}
@@ -9590,13 +9817,31 @@ function saveTeaches(yes: boolean) {
     /* private browsing; the next launch just asks again */
   }
 }
+/* Every space this person teaches in (0.610), so Where you are can offer
+   Teaching on a space other than the one here from the moment it opens. */
+const TEACHES_IN_KEY = "arabic-trainer-teaches-in";
+function loadTeachesIn(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(TEACHES_IN_KEY) || "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch (e) {
+    return [];
+  }
+}
+function saveTeachesIn(ids: string[]) {
+  try {
+    localStorage.setItem(TEACHES_IN_KEY, JSON.stringify(ids));
+  } catch (e) {
+    /* private browsing; the next pull says again */
+  }
+}
 /* Signing out forgets it for every space: the next person is not them. */
 function forgetTeaches() {
   try {
     const gone: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && (k.startsWith(TEACHES_PREFIX) || k === "arabic-trainer-teaches")) gone.push(k);
+      if (k && (k.startsWith(TEACHES_PREFIX) || k === "arabic-trainer-teaches" || k === TEACHES_IN_KEY)) gone.push(k);
     }
     for (const k of gone) localStorage.removeItem(k);
   } catch (e) {
@@ -9681,6 +9926,29 @@ function saveMaterial(
    last-writer-wins: a write here would stamp settingsUpdated and hand this
    device's theme, keyboard and exercise choices to every other one. */
 const LISTEN_OFF_KEY = "arabic-trainer-listen-off";
+
+/* How many sessions have shown "Tap a word to see its harakat" (0.609).
+   The owner's choice: the line teaches that the tap exists, and after the
+   first few sessions it is only repeating itself. Kept on the device, for
+   the reasons above — a new phone shows it a few times more, which is the
+   one place a reminder is no loss. */
+const MARKS_TIP_KEY = "arabic-trainer-marks-tip";
+export const MARKS_TIP_SESSIONS = 3;
+function loadMarksTip(): number {
+  try {
+    return Number(localStorage.getItem(MARKS_TIP_KEY)) || 0;
+  } catch (e) {
+    return 0;
+  }
+}
+function saveMarksTip(n: number) {
+  try {
+    localStorage.setItem(MARKS_TIP_KEY, String(n));
+  } catch (e) {
+    /* private browsing; it is shown again next time, which is harmless */
+  }
+}
+
 function loadListenOff() {
   try {
     return Number(localStorage.getItem(LISTEN_OFF_KEY)) || 0;
@@ -9950,6 +10218,8 @@ export default function ArabicTrainer() {
     if (open === "admin" || open === "super") return open;
     /* Going to another space from Learning, to learn there (0.601). */
     if (open === "learn") return "learn";
+    /* Or from Teach on another space's row (0.610). */
+    if (open === "teach") return "teach";
     return loadTeaches() ? "teach" : "learn";
   });
   useEffect(() => {
@@ -9972,6 +10242,7 @@ export default function ArabicTrainer() {
      Deriving it only from a fresh network call meant a slow or failed request
      took the space selector away, with no way back but signing out. */
   const [teaches, setTeaches] = useState(() => loadTeaches());
+  const [teachesIn, setTeachesIn] = useState<string[]>(() => loadTeachesIn());
   /* The learner's tabs scroll the page itself rather than a panel of their
      own, so this is the one that has to be put back. Space and tab
      together: moving from Teaching to Learning is arriving somewhere too.
@@ -10207,6 +10478,16 @@ export default function ArabicTrainer() {
   /* And whether it was up at the moment the answer went in, which is the
      only moment that bears on the mark. */
   const [hintAtAnswer, setHintAtAnswer] = useState(false);
+  /* The words whose vowel marks the learner has asked to see on this
+     question, by their bare spelling (0.608). Kept against the question
+     they were asked on rather than cleared by resetExercise, so no way onto
+     the next question can carry them over. */
+  const [lentFor, setLentFor] = useState<{ ex: unknown; keys: string[] }>({ ex: null, keys: [] });
+  /* Sessions that have shown the tap tip, and the session it was last
+     counted in — known by its first question, which stays put when later
+     questions are swapped out mid-session. */
+  const [marksTipShown, setMarksTipShown] = useState(loadMarksTip);
+  const marksTipFor = useRef<unknown>(null);
   /* What the reader has asked to see of a scene they are reading through.
      Two, because they are two different admissions — needing to hear it
      and needing to be told what it means — and a reader often wants one
@@ -11562,7 +11843,11 @@ export default function ArabicTrainer() {
         );
         setTeaches(r.teaches);
         /* Trying a space (0.574): its answer is not yours to keep. */
-        if (!TRYING) saveTeaches(r.teaches);
+        if (!TRYING) {
+          saveTeaches(r.teaches);
+          setTeachesIn(r.teachesIn);
+          saveTeachesIn(r.teachesIn);
+        }
         materialVersion.current = r.version || "";
         answered = true;
         if (r.unchanged) {
@@ -12457,6 +12742,116 @@ export default function ArabicTrainer() {
   }, [nothingToChoose, qi]);
 
   /*
+   * Reading without the vowel marks (0.608) — the owner's rules, settled in
+   * conversation:
+   *
+   * - A word keeps its harakat while its meaning is being learnt and is
+   *   bare once the first level is passed, on every question including the
+   *   first-level ones that come back (formReadsBare). The options and
+   *   tiles beside it follow it, so no option stands out by its marks.
+   * - A sentence — a scene, a phrase, an example, a reply — is bare from
+   *   the first time it is shown.
+   * - Once answered, the words get their marks back: that is the moment to
+   *   check how the word is said. A sentence stays bare.
+   * - Tapping a bare word puts its marks back for this question, and
+   *   "Show the harakat" does it for every option at once, which cannot be
+   *   tapped a word at a time. Either way the question counts as a near
+   *   miss — `marksLent`, folded into `leaned` below.
+   */
+  const lentKeys = lentFor.ex === exercise ? lentFor.keys : NO_KEYS;
+  const marksLent = lentKeys.length > 0;
+  /* Right, but with something on the screen that did part of it: the
+     transliteration that spelt the word, or the marks put back on a word
+     that was being read bare. Either is marked as a near miss. */
+  const marksLeaned = marksLent && answerStands && !toldAnswer;
+  const leaned = toldAnswer || marksLeaned;
+  /*
+   * And the one exception, which is the language's rather than the
+   * learner's: the marks stay, words and sentences alike, where they are
+   * all that tells apart two spellings on this question — the asked word
+   * and another the learner holds (كَتَب, *wrote*, and كُتُب, *books*), two
+   * of the options, or two persons of a verb's tense. "Who is it?" reads
+   * the marks by design (0.605), and a question nobody could answer bare
+   * is no practice in reading bare.
+   */
+  const markTwins = useMemo(() => bareTwinsOf(items, qLang), [items, qLang]);
+  const marksTell = useMemo(() => {
+    if (!qLang.marks || !item || !spec) return false;
+    const spellings: string[] = splitAlternatives(String(item.ar || ""));
+    if (spec.picks && spec.picks !== "meaning" && spec.picks !== "person" && spec.picks !== "image") {
+      for (const c of choices as Record<string, any>[]) spellings.push(...splitAlternatives(String((c && c.ar) || "")));
+    }
+    for (const w of grid.words) spellings.push(...splitAlternatives(String(w.ar || "")));
+    if (verbTense) for (const p of verbTense.places) spellings.push(String(p.form.ar || ""));
+    return spellingsNeedMarks(spellings, qLang, markTwins);
+  }, [qLang, item, spec, choices, grid, verbTense, markTwins]);
+  const wordsBare = !!qLang.marks && !marksTell && !checked && formReadsBare(item, qLang);
+  const marksView: MarksView = useMemo(
+    () =>
+      qLang.marks && !marksTell
+        ? {
+            lang: qLang,
+            words: wordsBare,
+            lent: new Set(lentKeys),
+            lend: checked
+              ? null
+              : (key: string) =>
+                  setLentFor((was) => {
+                    const keys = was.ex === exercise ? was.keys : [];
+                    return keys.includes(key) ? was : { ex: exercise, keys: keys.concat([key]) };
+                  }),
+          }
+        : NO_MARKS,
+    [qLang, marksTell, wordsBare, lentKeys, checked, exercise],
+  );
+  /* Whether the answer is chosen from options in the script that are bare
+     now — which is when "Show the harakat" is offered. A grid of
+     recordings against figures has no script in it, and nor do the
+     choices of a meaning, a person or a picture. */
+  const choicesRun: "word" | "sentence" =
+    spec && (spec.picks === "word" || spec.picks === "pair" || spec.answerMode === "vrow") ? "word" : "sentence";
+  const choicesInScript =
+    !!spec &&
+    (spec.answerMode === "order" ||
+      spec.answerMode === "vrow" ||
+      spec.picks === "word" ||
+      spec.picks === "reply" ||
+      spec.picks === "sentence" ||
+      (spec.picks === "pair" && (spec.tiles !== "audio" || spec.answerField === "ar")));
+  /* Whether the prompt itself has a word on it that can be tapped for its
+     marks — which is when the line saying so is shown under it. */
+  const promptSentence =
+    !!spec && ["scene", "gap", "sentence", "example", "context"].includes(spec.promptField || "") && spec.answerMode !== "order";
+  const promptWord = !!spec && ["ar", "shift", "tense"].includes(spec.promptField || "");
+  const promptText = !spec || !item
+    ? ""
+    : spec.promptField === "context"
+    ? String((context && context.ar) || "")
+    : spec.promptField === "scene" || spec.promptField === "gap"
+    ? (dialog ? linesOf(dialog).map((l) => String(l.ar || "")).join(" ") : "")
+    : spec.promptField === "shift"
+    ? String((verbCue && verbCue.form.ar) || "")
+    : spec.promptField === "tense"
+    ? (verbTense ? verbTense.places.map((p) => String(p.form.ar || "")).join(" ") : "")
+    : String(item.ar || "");
+  const promptBareNow =
+    !!qLang.marks && !marksTell && !checked && (promptSentence || (promptWord && wordsBare)) && hasMarks(promptText, qLang);
+  /* The tip under it, in the learner's first few sessions with a bare word
+     and not after (1b): counted once a session, the first time one shows. */
+  const sessionToken = session && session.exercises ? session.exercises[0] || null : null;
+  const promptBare = promptBareNow && (marksTipFor.current === sessionToken || marksTipShown < MARKS_TIP_SESSIONS);
+  useEffect(() => {
+    if (!promptBareNow || !sessionToken || marksTipFor.current === sessionToken) return;
+    if (marksTipShown >= MARKS_TIP_SESSIONS) return;
+    marksTipFor.current = sessionToken;
+    const n = marksTipShown + 1;
+    saveMarksTip(n);
+    setMarksTipShown(n);
+  }, [promptBareNow, sessionToken, marksTipShown]);
+  const choicesBare =
+    !!qLang.marks && !marksTell && !checked && choicesInScript && (choicesRun === "sentence" || wordsBare) && !lentKeys.includes(CHOICES_LENT);
+
+  /*
    * Whether the prompt has to say which form it wants.
    *
    * The card's other forms, and what else is on screen beside this one —
@@ -12602,8 +12997,24 @@ export default function ArabicTrainer() {
   /* Playing a part is the exception: the scene is already on the screen
      with every turn marked where it stands, so repeating it underneath
      would be the same conversation twice. */
+  /* The sentence of a "which word is missing?" question, put back once
+     answered, in pieces so the word that went in can be marked. */
+  const filledGap = !checked || !spec || !item
+    ? null
+    : spec.promptField === "gap"
+    ? (dialog && item.gap ? filledLine(dialog, item.gap) : null)
+    : spec.promptField === "context" && context
+    ? filledPhrase(context, qLang)
+    : null;
+  /* On choosing the missing word, the options themselves say what was
+     right once answered: the right one green, a wrong pick red. With that
+     and the word marked in the sentence, the right word written out again
+     under the verdict would be the third time it is on the screen. */
+  const marksChoices = !!checked && !!spec && spec.picks === "word" &&
+    (spec.promptField === "gap" || spec.promptField === "context");
   const answerRepeated =
     !!checked &&
+    !marksChoices &&
     (!answerRight || checked.reason === "bare" || checked.reason === "typo") &&
     !(spec && spec.answerMode === "part") &&
     /* Nor under a verb's tense, which shows each person's form where it
@@ -12627,7 +13038,7 @@ export default function ArabicTrainer() {
   /* A right answer written off the hint has a line under it saying so, so
      the praise is not the whole of what came back. Nor is it where the
      sentence's meaning follows it. */
-  const verdictAlone = answerRight && !answerRepeated && !toldAnswer && !answeredMeaning;
+  const verdictAlone = answerRight && !answerRepeated && !leaned && !answeredMeaning;
   /* Typed in figures and nothing else, on the phone's number pad. Its box
      is drawn for a few digits rather than a sentence. */
   const figures = !!exercise && answersInFigures(item, exercise.type);
@@ -12941,7 +13352,7 @@ export default function ArabicTrainer() {
     if (!checked) return "unanswered";
     if (skipped) return "skipped";
     if (toldAnswer) return "shown";
-    const { correct, near } = verdictOf({ checked, toldAnswer, overridden, skipped, hintAtAnswer });
+    const { correct, near } = verdictOf({ checked, toldAnswer: leaned, overridden, skipped, hintAtAnswer });
     return correct ? "right" : near ? "near" : "wrong";
   }
 
@@ -13228,7 +13639,7 @@ export default function ArabicTrainer() {
      * that is genuinely the screen's: which pieces of it were on when
      * Continue was pressed, and which words a grid put up.
      */
-    const how = { checked, toldAnswer, overridden, skipped, hintAtAnswer };
+    const how = { checked, toldAnswer: leaned, overridden, skipped, hintAtAnswer };
     const { correct, rating } = verdictOf(how);
     const marks = marksForAnswer({
       exercise,
@@ -13566,7 +13977,7 @@ export default function ArabicTrainer() {
     teaches,
     trying: !!TRYING,
     space,
-    mine: accountOrgs,
+    mine: accountOrgs.map((o) => ({ ...o, runs: !!o.runs, teaches: teachesIn.includes(o.id) })),
     opened: TRYING && addressSpace ? addressSpace : null,
     hereId,
     filter: spaceFilter,
@@ -13634,9 +14045,14 @@ export default function ArabicTrainer() {
     }
     goToSpace(row);
   };
-  /* A mode under the space here. Learning there is Learning narrowed to it. */
+  /* A mode beside a space. Learning there is Learning narrowed to it;
+     another space's mode is gone to at its address (0.610). */
   const pickMode = (row: WhereRow, mode: string) => {
     setWhereOpen(false);
+    if (!row.here) {
+      if (mode === "learn" && where.multi) setSpaceFilter(row.id);
+      return goToSpace(row, mode);
+    }
     arrive();
     setSpace(mode);
     if (mode === "learn" && where.multi) setSpaceFilter(row.id);
@@ -14077,6 +14493,7 @@ export default function ArabicTrainer() {
                     the exercise, and sizing that on the words would miss
                     two of the three. */}
                 <div className="at-exercise" data-el="card" data-card={parentItem ? parentItem.id : undefined}>
+                <MarksShown.Provider value={marksView}>
                   <p className="at-instruction" data-el="question-instruction">
                     {/* A text is read, not listened in on: its two
                         questions say so in their own words. */}
@@ -14260,12 +14677,16 @@ export default function ArabicTrainer() {
                          meaning, the meaning is under it as the clue —
                          the sentence alone often fits more than one word. */
                       <>
-                        <Field
-                          value={dialog && item.gap ? gappedLine(dialog, item.gap, checked ? null : undefined) : ""}
-                          field="ar"
-                          kind="phrase"
-                          name="question-prompt-text"
-                        />
+                        {checked && filledGap ? (
+                          <Filled parts={filledGap} lang={qLang} name="question-prompt-text" />
+                        ) : (
+                          <Field
+                            value={dialog && item.gap ? gappedLine(dialog, item.gap, checked ? null : undefined) : ""}
+                            field="ar"
+                            kind="phrase"
+                            name="question-prompt-text"
+                          />
+                        )}
                         {/* Once answered the sentence is whole again, and
                             what it means is said with the answer below —
                             see answeredMeaning — not left up here. */}
@@ -14279,6 +14700,9 @@ export default function ArabicTrainer() {
                       <Field value={item.ar} field="ar" kind="phrase" name="question-prompt-text" />
                     ) : spec.promptField === "sentenceMeaning" ? (
                       <Field value={item.en} field="en" kind="phrase" name="question-prompt-text" />
+                    ) : spec.promptField === "context" && checked && filledGap ? (
+                      /* Put back, with the word that went in marked. */
+                      <Filled parts={filledGap} lang={qLang} name="question-prompt-text" />
                     ) : spec.promptField === "context" ? (
                       <Field
                         /* The phrase can go between building the queue and
@@ -14379,6 +14803,13 @@ export default function ArabicTrainer() {
                         {asMeaning((spec.promptField === "context" && context.en) || item.en)}
                       </p>
                     )}
+                    {/* How to get the marks back, while there is a word up
+                        there without them (0.608). */}
+                    {promptBare && qLang.marks && (
+                      <p className="at-asktag" data-el="question-marks-tip">
+                        Tap a word to see its {qLang.marks.name}
+                      </p>
+                    )}
                   </div>
 
                   {hintShown && hintValue && (
@@ -14395,6 +14826,20 @@ export default function ArabicTrainer() {
                   {/* Two className attributes stood here and React kept the
                       second, so the at-mt4 gap was silently dropped and the
                       answer box sat hard against the hint button above it. */}
+                  {/* The options can't be tapped a word at a time — a tap
+                      on one chooses it — so their marks come back all at
+                      once, and the question counts as a near miss. */}
+                  {choicesBare && qLang.marks && marksView.lend && (
+                    <div className="at-row at-reveals">
+                      <Button
+                        size="sm"
+                        data-el="reveal-marks"
+                        onClick={() => marksView.lend && marksView.lend(CHOICES_LENT)}
+                      >
+                        Show the {qLang.marks.name}
+                      </Button>
+                    </div>
+                  )}
                   <div className="at-answerbox at-mt4" data-el="answer-box">
                     {spec.answerMode === "read" || spec.answerMode === "vread" || spec.answerMode === "vrow" ? null : spec.answerMode === "dial" ? (
                       /* The hands, dragged. What a learner does with a
@@ -14470,6 +14915,7 @@ export default function ArabicTrainer() {
                       <TextChoices
                         options={choices}
                         kind={spec.picks === "word" ? "word" : "phrase"}
+                        run={spec.picks === "word" ? "word" : "sentence"}
                         field={spec.picks === "meaning" || spec.picks === "person" ? "en" : "ar"}
                         lang={qLang}
                         value={typed}
@@ -14478,6 +14924,7 @@ export default function ArabicTrainer() {
                         /* Who a form is about: every person it could be is
                            ticked, so the tiles toggle rather than choose. */
                         multi={spec.picks === "person"}
+                        rightId={marksChoices && item ? item.id : undefined}
                       />
                     ) : spec.answerMode === "choice" ? (
                       <Segmented
@@ -14689,6 +15136,14 @@ export default function ArabicTrainer() {
                         <Help data-el="verdict-hinted">
                           Right — but the {String(qLang.translitLabel || "hint").toLowerCase()} was on
                           screen, so this one counts as a near miss and comes round again.
+                        </Help>
+                      )}
+                      {/* The same, for the vowel marks put back on a word
+                          that was being read without them (0.608). */}
+                      {marksLeaned && qLang.marks && (
+                        <Help data-el="verdict-marks-lent">
+                          Right — but the {qLang.marks.name} were shown, so this one counts as a near
+                          miss and comes round again.
                         </Help>
                       )}
                       {/* A right answer is already on screen in the box above,
@@ -15056,6 +15511,7 @@ export default function ArabicTrainer() {
                       </StickyFoot>
                     </>
                   )}
+                </MarksShown.Provider>
                 </div>
 
 
@@ -19548,6 +20004,10 @@ function WhereBadge({ row, mode }: { row: WhereRow | null; mode?: string }) {
   return <SpaceBadge space={{ name: row.label, logo: row.logo, logoData: row.logoData }} />;
 }
 
+/* The modes as the buttons beside a space call them (0.610): short, so
+   all three fit on the line with its name. */
+const MODE_SHORT: Record<string, string> = { learn: "Learn", teach: "Teach", admin: "Admin" };
+
 /*
  * The sheet behind where you are (0.601): every place you can be, one per
  * row, with what you do there under its name; under the space you are in,
@@ -19581,7 +20041,6 @@ function WhereSheet({ rows, now, mode, onRow, onMode, onClose, langs }: {
                   <WhereBadge row={r} />
                   <span className="at-wheretext">
                     <b>{r.label}</b>
-                    <span>{r.what}</span>
                   </span>
                   {r.opened ? <span className="at-place-tag">Opened</span> : null}
                   {on && !r.modes.length ? <span className="at-place-tick"><Icon name="check" size={18} /></span> : null}
@@ -19597,8 +20056,8 @@ function WhereSheet({ rows, now, mode, onRow, onMode, onClose, langs }: {
                           aria-pressed={cur}
                           onClick={() => onMode(r, m)}
                         >
-                          <Icon name={SPACE_ICON[m]} size={16} />
-                          {SPACE_LABEL[m]}
+                          <Icon name={SPACE_ICON[m]} size={18} />
+                          <span>{MODE_SHORT[m]}</span>
                         </button>
                       );
                     })}

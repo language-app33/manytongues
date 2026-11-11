@@ -674,6 +674,19 @@ export interface Lang {
    * highlighted.
    */
   letter?: (ch: string, settings?: any) => string;
+  /**
+   * The vowel marks a reader of this language learns to do without —
+   * Arabic's harakat, Hebrew's niqqud — where it has them (0.608).
+   *
+   * Everyday text is written without them, so the app takes them away: a
+   * word keeps its marks while what it means is being learnt and is shown
+   * bare from the second level of its ladder; a sentence is bare from the
+   * first time it is shown. See `withoutMarks` and `readsBare`. `name` is
+   * what the screen calls them ("Show the harakat"). A language whose
+   * marks are part of every word as written — Vietnamese's tones — has
+   * none, and is shown as written.
+   */
+  marks?: { pattern: RegExp; name: string };
   marking: LangMarking;
   rules: string[];
   /**
@@ -817,7 +830,7 @@ export interface User {
    * and `lastTaughtIn` per space; none of those is ever sent, like the
    * key's digest.
    */
-  orgs?: { id: string; slug: string; name: string; logo: string; colour: string }[];
+  orgs?: { id: string; slug: string; name: string; logo: string; colour: string; runs?: boolean }[];
   /** False until the person has ticked that their key is saved (0.544). Absent: saved. */
   keySaved?: boolean;
   /** While suspended: when, by whom, why, and the courses to put back (0.544). */
