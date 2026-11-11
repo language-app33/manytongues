@@ -230,7 +230,7 @@ import {
   seeded,
 } from "./numbers/range.ts";
 import type { Asking, SystemSet } from "./numbers/generate.ts";
-import { askingsKnown, askKnown, cardsOfToken, faceAsk, fillerCards, homeStretch, isFromSystem, inOwnFigures, isNumeralCard, isRangeSkill, numeralId, stretchBefore, systemFor, systemIdOf, systemOfId } from "./numbers/generate.ts";
+import { askingsKnown, askKnown, cardsOfToken, faceAsk, faceFits, fillerCards, homeStretch, isFromSystem, inOwnFigures, isNumeralCard, isRangeSkill, numeralId, stretchBefore, systemFor, systemIdOf, systemOfId } from "./numbers/generate.ts";
 import { nounsByLanguage, setsGiven } from "./numbers/nouns.ts";
 import { ClockDial, ClockFace } from "./clock.tsx";
 import {
@@ -4862,6 +4862,10 @@ interface KnownNumbers {
       seed — the number with one of the learner's nouns — or null where no
       noun can stand beside it yet. See faceAsk. */
   face: (card: Item, unit: Form, seed: string) => Ask | null;
+  /** The nouns a counting face could be asked with now, and every noun
+      its system can count — for a learner's report, which says what the
+      app had to choose from. See faceFits. */
+  faceNouns: (card: Item, unit: Form) => { could: string[]; all: string[] };
 }
 
 /* The askings each range can put, kept against the system they were read
@@ -4965,6 +4969,19 @@ function knownNumbers(items: Item[], settings: Settings, sets: SystemSet[]): Kno
       if (!set || !values.length || typeof unit.col !== "string") return null;
       const slot = String(((card.source || {}) as { slot?: unknown }).slot || "");
       return faceAsk(slot, unit.col as FormKey, values, seed, set, ids, knows);
+    },
+    faceNouns: (card, unit) => {
+      const set = setOf(card);
+      const values = (unit.countedAt || []) as number[];
+      if (!set || !values.length || typeof unit.col !== "string") return { could: [], all: [] };
+      const slot = String(((card.source || {}) as { slot?: unknown }).slot || "");
+      const nouns = set.sys.nouns || [];
+      const nameOf = (id: string) => {
+        const n = nouns.find((x) => x.id === id);
+        return n ? n.enPl || n.en || n.id : id;
+      };
+      const could = faceFits(slot, unit.col as FormKey, values, set, ids, knows).map((a) => nameOf(String(a.nounId || "")));
+      return { could: [...new Set(could)], all: nouns.map((n) => nameOf(n.id)) };
     },
   };
 }
@@ -13372,6 +13389,45 @@ export default function ArabicTrainer() {
    * stopping a session over, so the menu closes either way and the pill
    * says which of the two happened.
    */
+  /* The parts of a report that say what the learner was looking at —
+     see flagCurrent. Each is left out where it says nothing new. */
+  function reportExtras(): Partial<API.FlagReport> {
+    const out: Partial<API.FlagReport> = {};
+    if (!item || !spec) return out;
+    const prompt = String(item.ar || "");
+    const field = spec.promptField;
+    const shown =
+      field === "context"
+        ? context
+          ? blankedPhrase(context, qLang)
+          : String(item.en || "")
+        : field === "audio"
+          ? "a recording, with nothing written"
+          : String((item as any)[field] || "");
+    if (shown && shown !== prompt) out.shown = shown.slice(0, 300);
+    const line = dialog && item.gap ? linesOf(dialog)[item.gap.line] : null;
+    const phrase = context || line;
+    if (phrase && phrase.ar) {
+      const lat = String(phrase.lat || "").trim();
+      out.phrase = [String(phrase.ar), String(phrase.en || "").trim() || "(no meaning written)", lat || "(no pronunciation written)"]
+        .join(" — ")
+        .slice(0, 400);
+    }
+    if (spec.picks && spec.picks !== "pair" && choices.length) {
+      const said = choices
+        .map((c: any) => String(c[spec.answerField] || c.en || c.ar || c.id || "").trim())
+        .filter(Boolean);
+      if (said.length) out.options = said.join(" | ").slice(0, 400);
+    }
+    if (parentItem && item.countedAt) {
+      const { could, all } = knownNumbers(items, settings, systems).faceNouns(parentItem, item);
+      if (all.length) {
+        out.nouns = `could use ${could.length ? could.join(", ") : "none"} (learnt in the shape this number needs), of ${all.length} it can count: ${all.join(", ")}`.slice(0, 400);
+      }
+    }
+    return out;
+  }
+
   function flagCurrent(kind: FlagKind, note?: string) {
     if (!parentItem || !exercise) return;
     const said = String(note || "").slice(0, FLAG_NOTE_MAX);
@@ -13461,6 +13517,13 @@ export default function ArabicTrainer() {
       /* Which filled sentence this was, where the card is a frame — so the
          teacher reading the report can strike exactly this one. */
       ...(item && (item as any).reviewKey ? { sentence: String((item as any).reviewKey) } : null),
+      /* What the question put on the screen, the phrase it stood in, the
+         answers it offered, and for a counted phrase the nouns it had to
+         choose from (0.612). Four reports in one batch could not be
+         answered without them: "٥ Sisters" was on the screen where the
+         report said only أربع أخوات, and "sisters every time" turns on
+         whether sisters was the only noun to hand. */
+      ...reportExtras(),
     };
 
     /*

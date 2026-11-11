@@ -2382,6 +2382,14 @@ async function handle(req) {
            fingerprint its review is kept in, so a teacher reading this can
            strike that one sentence and nothing else. See review.ts. */
         ...(isSentenceKey(body.sentence) ? { sentence: body.sentence } : {}),
+        /* What the learner was looking at (0.612): the question as shown,
+           the phrase, the answers offered, the nouns a counted number had
+           to choose from. Plain text, kept only where sent. */
+        ...Object.fromEntries(
+          ["shown", "phrase", "options", "nouns"]
+            .map((k) => [k, String(body[k] || "").slice(0, 400)])
+            .filter(([, v]) => v),
+        ),
         at: Date.now(),
       };
       await writeJson(store, K.flag(flag.id), flag);

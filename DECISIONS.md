@@ -8089,3 +8089,26 @@ Left alone in the same batch: the noun rotates only among those learnt in
 the plural (the owner's rule from 7 October, kept), and the whole phrase's
 pronunciation after a gap is shown where the phrase has one written
 (since 0.583), which the reported phrase did not.
+
+## A report says what the learner was looking at (0.612)
+
+**11 November 2026** · `src/ArabicTrainer.tsx` (`reportExtras`, `KnownNumbers.faceNouns`), `src/numbers/generate.ts` (`faceFits`), `server/api/courses.js` (`report-flag`), `src/flag-export.ts`, `src/types.ts` (`Flag`)
+
+Four reports in one batch (0.611) could not be answered from the export:
+"Asked" is the word the question was about, which on a counted number is
+أربع أخوات while the screen said "٤ Sisters"; a report on a phrase's
+pronunciation needed to know whether the phrase had one written; "two
+meanings in the proposed answers" needed the answers; and "sisters every
+time" turned on which nouns the app had to choose from. The owner asked
+for reports to carry what was needed next time.
+
+So a report now carries four optional plain-text lines, each sent only
+where it says something: `shown` (the prompt as on the screen, where it
+differs from the word), `phrase` (script — meaning — pronunciation, saying
+"no … written" where a part is missing, since its absence is usually the
+answer), `options` (the choices offered, not a matching grid's), and
+`nouns` (for a counting face: the nouns `faceFits` finds now, the same
+list `faceAsk` draws from, and every noun the system counts). Text rather
+than structure because the export is plain text and nothing else reads
+them. The server stores each only when sent, at most 400 characters, so an
+older build's report reads exactly as before.

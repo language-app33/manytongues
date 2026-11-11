@@ -30,7 +30,7 @@ Math.random = () => {
 const here = path.dirname(new URL(import.meta.url).pathname);
 const built = await buildOnce(["ArabicTrainer.tsx"]);
 const { buildSession, installIndexes, resolveQuestion } = await import(path.join(built, "ArabicTrainer.js"));
-const { generate, faceAsk, componentId } = await import(path.join(here, "..", "src", "numbers", "generate.ts"));
+const { generate, faceAsk, faceFits, componentId } = await import(path.join(here, "..", "src", "numbers", "generate.ts"));
 const { arComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.ts"));
 const { heComposer } = await import(path.join(here, "..", "src", "numbers", "he-IL.ts"));
 const { canAsk, COUNTED_FACE_TYPES } = await import(path.join(here, "..", "src", "offers.ts"));
@@ -130,6 +130,18 @@ test("only a noun the learner has cleared, in the shape the number puts it in", 
     assert.notEqual(ask.nounId, "book");
   }
   assert.equal(faceAsk("unit.3", "construct.m", [3], "x", SET, new Set(), () => false), null, "no noun, no question");
+});
+
+test("the nouns a report lists are the ones the question is drawn from", () => {
+  const knows = (/** @type {string} */ id, /** @type {any} */ t) =>
+    !(id === "book" && t && t.text === AR.nouns.find((/** @type {any} */ n) => n.id === "book").pl);
+  const fits = faceFits("unit.3", "construct.m", [3], SET, new Set(), knows);
+  const could = new Set(fits.map((/** @type {any} */ a) => a.nounId));
+  assert.ok(!could.has("book"), "not a noun whose plural is not learnt");
+  for (let turn = 0; turn < 20; turn += 1) {
+    const ask = must(faceAsk("unit.3", "construct.m", [3], String(turn), SET, new Set(), knows), "an asking");
+    assert.ok(could.has(ask.nounId), ask.nounId);
+  }
 });
 
 test("twenty-two waits on twenty too, but not on the face being practised", () => {

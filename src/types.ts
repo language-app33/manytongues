@@ -1970,6 +1970,21 @@ export interface Flag {
    * this says which sentence, in the terms the card's review is kept in.
    */
   sentence?: string;
+  /**
+   * What the learner was looking at (0.612), each absent where it says
+   * nothing new and on every report sent before this:
+   *   shown    the question as it was on the screen, where that is not
+   *            the word itself — "٥ Sisters", a phrase with its gap
+   *   phrase   the phrase or line the word stood in: script — meaning —
+   *            pronunciation, saying so where one was not written
+   *   options  the answers offered, where there was a choice
+   *   nouns    for a number counted with a noun, the nouns the app could
+   *            have used and every noun the system can count
+   */
+  shown?: string;
+  phrase?: string;
+  options?: string;
+  nouns?: string;
   /** Which build of the app they were on: release, then commit. */
   release?: string;
   /** Added when the report is read, never stored. */

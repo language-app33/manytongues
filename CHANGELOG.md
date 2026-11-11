@@ -8,6 +8,31 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.612 — 11 November 2026
+
+**A reported problem now says what the learner was looking at.** Copied
+out of Admin, each report used to give the word the question was about,
+but not always what was on the screen. So some reports could not be
+answered without guessing. From this release a report also carries:
+
+- **On screen**: the question as it was shown, where that isn't the word
+  itself. For example "5 sisters" for a number written from figures, or a
+  phrase with its gap.
+- **Phrase**: the phrase or line the word stood in, its meaning, and its
+  pronunciation, or "no pronunciation written" where there isn't one.
+- **Offered**: the answers on offer, where the question was a choice.
+- **Nouns**: for a number with a noun, which nouns the app could have
+  used (those the learner has learnt in that shape) and every noun the
+  number system can count. It shows straight away why a learner always
+  gets "sisters".
+
+Reports sent before this, or from a phone still on an older version, don't
+have these lines; nothing is shown empty.
+
+To check by hand: report a "Write this number in Arabic" question on a
+number with a noun, then copy the reports out of Admin. The report should
+have "On screen" and "Nouns" lines.
+
 ## 0.611 — 11 November 2026
 
 **Writing a counted phrase in Arabic is asked from "5 sisters", not

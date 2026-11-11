@@ -280,3 +280,29 @@ test("a conversation card is written out by its lines, not by its empty word", (
   assert.match(out, /line 1 *مرحبا — hello — marhaba/);
   assert.match(out, /line 2 *أهلا — hi — ahlan/);
 });
+
+/* ---- what the learner was looking at (0.612) ---- */
+
+test("a report says what was on the screen, the phrase, the answers offered and the nouns", () => {
+  const text = flagsToText(
+    [
+      flag({
+        prompt: "خمس أخوات",
+        shown: "5 sisters",
+        phrase: "عندي كمبيوتر — I have a computer — (no pronunciation written)",
+        options: "Sad | Upset | Tired | Happy",
+        nouns: "could use sisters (learnt in the shape this number needs), of 3 it can count: sisters, books, cats",
+      }),
+    ],
+    { names, at: 2000 },
+  );
+  assert.match(text, /On screen: {3}5 sisters/);
+  assert.match(text, /Phrase: {6}عندي كمبيوتر — I have a computer — \(no pronunciation written\)/);
+  assert.match(text, /Offered: {5}Sad \| Upset \| Tired \| Happy/);
+  assert.match(text, /Nouns: {7}could use sisters/);
+});
+
+test("a report sent before those were recorded has no empty lines for them", () => {
+  const text = flagsToText([flag()], { names, at: 2000 });
+  for (const label of ["On screen:", "Phrase:", "Offered:", "Nouns:"]) assert.ok(!text.includes(label), label);
+});

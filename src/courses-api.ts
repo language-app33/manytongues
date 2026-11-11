@@ -331,6 +331,10 @@ export type FlagReport = Pick<
   | "expected"
   | "release"
   | "sentence"
+  | "shown"
+  | "phrase"
+  | "options"
+  | "nouns"
 > & {
   language: LangId;
 };
