@@ -434,6 +434,14 @@ export interface GrammarDim {
   /** What a new or unreadable value becomes. */
   default?: string;
   /**
+   * Values that tell a form apart without telling a learner anything:
+   * "neutral" beside a masculine and a feminine is only "neither of
+   * those". Where a form has one of these and something else would tell
+   * it apart, a question names the something else — "plural", not
+   * "neutral". See spelledGrammar.
+   */
+  saysLittle?: string[];
+  /**
    * Whether the axis is a fact about the card rather than about one of its
    * accepted answers.
    *

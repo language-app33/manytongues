@@ -7947,3 +7947,44 @@ never told there is nothing to do.
 Given up: a Learnt card that slips back below Cleared leaves Catch up until
 it is passed again; it still shows, as in progress, and a regular session
 deals it.
+
+---
+
+## Five fixes from a learner's 8 reports (0.605)
+
+**10 November 2026** · `src/languages.ts` (`spelledGrammar`, `saysLittle`, `ctx2ar`), `src/verb-drills.ts` (`readsAs`, `meaningWithoutWho`), `src/ArabicTrainer.tsx` (`meansOtherThan`)
+
+The owner read the reports and chose each fix.
+
+**"Neutral" is said last.** A question names the fewest grammar labels that
+tell its form from the card's others, gender first. وانتو (neutral plural)
+beside وانتَ and وانتِ was told apart by gender alone, so the question said
+"neutral" and never "plural". The owner chose, over naming every label,
+that a value marked `saysLittle` on its axis is tried after the others: it
+is still said where nothing else tells the form apart.
+
+**"Who is it?" reads marks.** Persons were compared by bare letters, so
+عندِك wanted *you (m)* as well as *you (f)*. The owner chose to count the
+marks on the screen rather than to hide them. A person is right where the
+letters match and no letter is marked differently in the two; a mark one of
+them leaves off is no disagreement. So a masculine written bare, عندك, still
+counts beside عندِك: the app has nothing to rule it out by. Only "who is
+it?" reads marks; everything else that compares a verb's cells, such as
+whether a tense has anything to ask, still goes by letters.
+
+**"Who is it?" puts its verb in the plain form.** An Arabic verb is filed
+under its *he*, so a card's meaning is often written "lives", which reads
+as *he*. The first word of the meaning loses its -s by plain English rules,
+with a short list of exceptions. No owner choice: it is what 0.586's "says
+nothing about who" meant.
+
+**"Choose the meaning" never offers a second right answer.** A wrong
+meaning is refused where any meaning written on it is also written on the
+asked form, from the asked form's own card or any other. A form of the same
+card with a different meaning (a plural) still stands.
+
+**Typed "fill the gap" shows the phrase's meaning from the start.** It was
+behind the hint, and free, but two reports took the question for a test of
+remembering the phrase. The owner chose to show it, as "choose the missing
+word" has since 0.586. The hint is the word's pronunciation again, and
+costs the mark. `hintPhrase` is kept for any question that wants it back.

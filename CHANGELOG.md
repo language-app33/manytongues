@@ -8,6 +8,56 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.605 — 10 November 2026
+
+**Fixes from a learner's 8 reports.** Questions say more clearly what they
+want, and two answers marked wrong are now right.
+
+For students:
+
+- **A question asking for the plural says "plural".** "And you?" has three
+  forms, and the one for several people was asked as "neutral", which told
+  you nothing. "Neutral" is now said only where nothing else tells the
+  forms apart.
+- **"Who is it?" goes by the vowel marks it shows.** عندِك, with the
+  kasra, is *you (f)* alone; before, you also had to tick *you (m)*. Where
+  the other person's form is written without marks, the app can't rule it
+  out and still counts it.
+- **"Who is it?" says what the verb means without pointing at anyone.**
+  "live", not "lives", which reads as *he*.
+- **"Choose the meaning" never offers a second right answer.** A word that
+  means both "sad" and "upset" is not asked beside "upset" as a wrong one.
+- **Typing the missing word in a phrase shows what the phrase means from
+  the start**, as choosing it already did. Two reports took the question
+  for a test of remembering the phrase. The hint button now gives the
+  word's pronunciation, which costs the mark.
+
+Trade-off: typing the missing word is a little easier, since the meaning
+no longer has to be asked for.
+
+To check by hand: a "Who is it?" on عندِك, ticking only *you (f)*, is
+right; a card with a neutral plural asked from English says "plural".
+
+Checked and left alone:
+
+- "Two cats" asked from Arabic to English needs no gender: the Arabic
+  shows which it is, and the answer was marked right.
+
+## 0.604 — 10 November 2026
+
+**A saved Catch up session's tile on the home screen now shows how many
+of its cards are due, not how much of them is learnt.** The learnt share
+was mostly made up of cards Catch up never asks, so it hardly moved
+however much you caught up on, and it didn't tell you whether there was
+anything to do.
+
+- **"12 due"** counts the same cards Catch up would ask and the home
+  screen's "ready to review" counts, so the three always agree, and the
+  number goes down as you work through them.
+- **"Nothing due"** shows on a dimmed tile when there is nothing to
+  catch up on. It can still be pressed and says you're all caught up.
+- **Every other saved session** still shows how much of it is learnt.
+
 ## 0.603 — 10 November 2026
 
 **"Ready to review" and Catch up now mean the same thing: Cleared and

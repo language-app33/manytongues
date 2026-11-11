@@ -6032,6 +6032,23 @@ export function pickChoices({
   });
 }
 
+/**
+ * Whether a word may stand as a wrong meaning beside the one asked.
+ *
+ * Not where anything it means is something the asked word means too:
+ * زعلانة written "Sad" and "upset" and asked as "Sad", beside a tile
+ * reading "Upset", offers two right answers, and a learner reported two meanings
+ * of one card among the four. Read off both words as written, before
+ * either was narrowed to the one meaning its tile shows. A form of the
+ * asked word's own card is held to the same test, so its plural — "cats"
+ * beside "cat" — still stands, where its other meaning does not.
+ */
+export function meansOtherThan(asked: Form, cand: Form): boolean {
+  const meanings = (u: Form) => splitAlternatives(String(u.en || "")).map(normEn).filter(Boolean);
+  const mine = new Set(meanings(asked));
+  return !meanings(cand).some((m) => mine.has(m));
+}
+
 /* The numbers worth confusing with this one, as answers to choose from:
    in figures written the way the card writes its own, or in words said
    by the number system the card came from. A card with no system to say
@@ -11987,12 +12004,15 @@ export default function ArabicTrainer() {
   }, [verbTense, spec, item && item.id]);
   const verbPlace = placeInTense(verbTense, item);
   /* What the verb means on "who is it?", with nobody in it: the card's
-     own meaning where it has one, else the form's with its person taken
-     off the front. */
+     own meaning where it has one, else the form's, with any person taken
+     off the front and the verb in its plain form — "live", not "lives",
+     which says *he*. See meaningWithoutWho. */
   const whoMeaning =
     spec && spec.picks === "person" && item
-      ? String((parentItem && parentItem.forms[0] && parentItem.forms[0].id !== item.id && parentItem.forms[0].en) || "").trim() ||
-        meaningWithoutWho(item.en, verbTense ? verbTense.places.map((p) => p.person) : [])
+      ? meaningWithoutWho(
+          String((parentItem && parentItem.forms[0] && parentItem.forms[0].id !== item.id && parentItem.forms[0].en) || "").trim() || item.en,
+          verbTense ? verbTense.places.map((p) => p.person) : [],
+        )
       : "";
 
   /*
@@ -12382,12 +12402,15 @@ export default function ArabicTrainer() {
        the same way, upstream in castMeaning. */
     if (spec.picks === "meaning") {
       const reps = (statesOf(item)[(exercise && exercise.type) || ""] || {}).reps || 0;
+      /* The asked word as written, every meaning on it — see meansOtherThan. */
+      const written = (parentItem && unitsOf(parentItem).map((u) => u.unit).find((u) => u.id === item.id)) || item;
       return pickChoices({
         item,
         parentItem,
         picks: "meaning",
         pool: wordPool(companyOf(asking, exercise), settings, qLang.id, item)
-          .filter((u) => u.en && !twins.some((t) => t.id === u.id) && !ofSibling(u))
+          .filter((u) => u.en && !twins.some((t) => t.id === u.id) && !ofSibling(u)
+            && meansOtherThan(written, u) && meansOtherThan(item, u))
           .map((u) => oneOf(u, exercise ? exercise.type : "")),
         seed: `${item.id} meaning ${reps}`,
         systems,
@@ -15613,6 +15636,14 @@ function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings
  * ring above it is, so "Thursday's verbs · 40%" and the ring cannot be
  * counting different things. Pressing one starts it, which is what Start
  * does on the list; changing or forgetting one is the list's to do.
+ *
+ * Except a Catch up, which carries how many of its cards are due instead
+ * (0.604, the owner's 1a). Catch up only asks Cleared and Learnt cards, so
+ * the learnt share is mostly cards it never touches and barely moves for
+ * its work; what somebody wants before pressing it is whether anything is
+ * waiting. Counted by dueForReview, the rule Catch up asks by and the home
+ * screen's "ready to review" counts by, so all three agree. With nothing
+ * due the tile is dimmed but still pressable, and says so when pressed.
  */
 function SavedTiles({ sessions, items, settings, onStart }: {
   sessions: SavedSession[];
@@ -15626,31 +15657,54 @@ function SavedTiles({ sessions, items, settings, onStart }: {
       .sort((a, b) => (b.created || 0) - (a.created || 0))
       .map((s) => {
         const cards = cardsOfSaved(s, items);
-        return { s, alive: cards.length, pct: climbOf(cards, settings, items).pct };
+        if (s.mode === "catchup") {
+          return { s, alive: cards.length, due: cards.filter((it) => dueForReview(it, settings, items)).length, pct: 0 };
+        }
+        return { s, alive: cards.length, due: null, pct: climbOf(cards, settings, items).pct };
       });
   }, [sessions, items, settings]);
 
   if (!tiles.length) return null;
   return (
     <div className="at-savedtiles">
-      {tiles.map(({ s, alive, pct }) => (
-        <button
-          key={s.id}
-          className="at-savedtile"
-          disabled={!alive}
-          aria-label={`Start ${s.name}, ${pct}% learnt`}
-          onClick={() => onStart(s)}
-        >
-          <span className="nm">{s.name}</span>
-          <span className="pc" aria-hidden="true">
-            {pct}
-            <i>%</i>
-          </span>
-          <span className="bar" aria-hidden="true">
-            {pct > 0 && <i style={{ width: `${pct}%` }} />}
-          </span>
-        </button>
-      ))}
+      {tiles.map(({ s, alive, due, pct }) =>
+        due !== null ? (
+          <button
+            key={s.id}
+            className={`at-savedtile${due ? "" : " quiet"}`}
+            disabled={!alive}
+            aria-label={`Start ${s.name}, ${due ? `${due} ${due === 1 ? "card" : "cards"} due` : "nothing due"}`}
+            onClick={() => onStart(s)}
+          >
+            <span className="nm">{s.name}</span>
+            {due ? (
+              <span className="pc" aria-hidden="true">
+                {due}
+                <i className="due">due</i>
+              </span>
+            ) : (
+              <span className="pc none" aria-hidden="true">Nothing due</span>
+            )}
+          </button>
+        ) : (
+          <button
+            key={s.id}
+            className="at-savedtile"
+            disabled={!alive}
+            aria-label={`Start ${s.name}, ${pct}% learnt`}
+            onClick={() => onStart(s)}
+          >
+            <span className="nm">{s.name}</span>
+            <span className="pc" aria-hidden="true">
+              {pct}
+              <i>%</i>
+            </span>
+            <span className="bar" aria-hidden="true">
+              {pct > 0 && <i style={{ width: `${pct}%` }} />}
+            </span>
+          </button>
+        )
+      )}
     </div>
   );
 }

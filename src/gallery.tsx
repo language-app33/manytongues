@@ -143,7 +143,7 @@ const PLACES: Record<string, [string, string]> = {
   MatchGrid: [LEARN, "A practice session · matching pairs"],
   ManualSessionSheet: [LEARN, "Building a session by hand"],
   SavedSessionsSheet: [LEARN, "The sessions you kept"],
-  SavedTiles: [LEARN, "The home screen · the sessions you kept, with how much of each is learnt"],
+  SavedTiles: [LEARN, "The home screen · the sessions you kept, with how much of each is learnt, or for a Catch up how much is due"],
   ItemsTab: [LEARN, "The Cards tab"],
   ItemSheet: [LEARN, "The Cards tab · one card's details"],
   CardScreen: [LEARN, "Opening a card from a tile"],

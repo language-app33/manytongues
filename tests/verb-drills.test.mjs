@@ -150,10 +150,43 @@ test("who a form is about: every right person is to be ticked, and only they (0.
 test("the meaning on 'who is it?' says nothing about who", () => {
   const persons = [{ id: "i", label: "I" }, { id: "you-m", label: "you (m)" }, { id: "she", label: "she" }];
   assert.equal(meaningWithoutWho("I keep", persons), "keep");
-  assert.equal(meaningWithoutWho("She has", persons), "has");
+  assert.equal(meaningWithoutWho("She has", persons), "have");
   assert.equal(meaningWithoutWho("you speak", persons), "speak");
   assert.equal(meaningWithoutWho("live", persons), "live", "nobody on the front: as written");
   assert.equal(meaningWithoutWho("I", persons), "I", "a meaning that is only the person is left alone");
+  /* Reported: "lives" over ساكن read as *he*, which is one of three. */
+  assert.equal(meaningWithoutWho("lives", persons), "live");
+  assert.equal(meaningWithoutWho("He lives here", persons), "live here");
+  assert.equal(meaningWithoutWho("Watches", persons), "Watch");
+  assert.equal(meaningWithoutWho("studies", persons), "study");
+  assert.equal(meaningWithoutWho("goes out", persons), "go out");
+  assert.equal(meaningWithoutWho("misses", persons), "miss");
+  assert.equal(meaningWithoutWho("is tired", persons), "is tired", "not every -s is a verb for he");
+  assert.equal(meaningWithoutWho("to live", persons), "to live");
+});
+
+test("'who is it?' reads the marks on the screen", () => {
+  /* Reported: عندِك, the kasra saying *you (f)*, wanted *you (m)* too. */
+  const places = [
+    { person: { id: "you-m", label: "you (m)" }, form: { id: "m", ar: "عندَك", en: "" } },
+    { person: { id: "you-f", label: "you (f)" }, form: { id: "f", ar: "عندِك", en: "" } },
+    { person: { id: "he", label: "he" }, form: { id: "h", ar: "عنده", en: "" } },
+  ];
+  const tense = /** @type {any} */ ({ tense: { id: "present", label: "present" }, places });
+  const asked = /** @type {any} */ (places[1].form);
+  assert.equal(whoAllRight(tense, asked, ["you-f"], AR), true, "the feminine alone");
+  assert.equal(whoAllRight(tense, asked, ["you-f", "you-m"], AR), false, "the masculine the kasra rules out");
+  assert.equal(whoIsRight(tense, asked, "you-m", AR), false);
+  const { right, wrong } = whoChoices(tense, asked, AR, () => 0, 4);
+  assert.deepEqual(right.map((p) => p.id), ["you-f"]);
+  assert.ok(wrong.some((p) => p.id === "you-m"), "the masculine is on offer as a wrong one");
+  /* A form written bare could be either, and still counts. */
+  const bare = /** @type {any} */ ({ ...tense, places: [{ ...places[0], form: { id: "m", ar: "عندك", en: "" } }, places[1], places[2]] });
+  assert.equal(whoAllRight(bare, asked, ["you-f", "you-m"], AR), true);
+  /* And a shadda with its vowel beside the shadda alone is no disagreement. */
+  const sh = /** @type {any} */ ({ ...tense, places: [{ ...places[0], form: { id: "m", ar: "بحبّ", en: "" } },
+    { ...places[1], form: { id: "f", ar: "بحبَّ", en: "" } }, places[2]] });
+  assert.equal(whoIsRight(sh, sh.places[1].form, "you-m", AR), true);
 });
 
 test("filling the row: a tile spelt like the right one is right in either place", () => {

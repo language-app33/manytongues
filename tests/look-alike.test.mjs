@@ -26,7 +26,7 @@ Math.random = () => {
 
 const here = path.dirname(new URL(import.meta.url).pathname);
 const built = await buildOnce(["ArabicTrainer.tsx"]);
-const { buildSession, installIndexes, pickChoices, resolveQuestion, shapeOfUnit } = await import(path.join(built, "ArabicTrainer.js"));
+const { buildSession, installIndexes, meansOtherThan, pickChoices, resolveQuestion, shapeOfUnit } = await import(path.join(built, "ArabicTrainer.js"));
 const { generate } = await import(path.join(here, "..", "src", "numbers", "generate.ts"));
 const { arComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.ts"));
 const { arTimeComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.time.ts"));
@@ -128,6 +128,16 @@ test("every choice question dealt puts up four answers of one shape", () => {
     if (made.length) shapes.add("number");
     assert.equal(shapes.size, 1, `${q.type} on ${r.unit.ar}: ${shown.join(" / ")}`);
   }
+});
+
+/* Reported: two meanings of one card among the four. A wrong meaning is
+   never one the asked word has too, whichever card it comes from. */
+test("a wrong meaning is never something the asked word also means", () => {
+  const sad = { id: "f", ar: "زعلانة", en: "Sad\u001Fupset" }; // two meanings, one to a box
+  assert.equal(meansOtherThan(sad, { id: "m", ar: "زعلان", en: "Upset\u001Fsad" }), false, "its own masculine's other meaning");
+  assert.equal(meansOtherThan(sad, { id: "o", ar: "متضايق", en: "Upset" }), false, "another card meaning one of its meanings");
+  assert.equal(meansOtherThan(sad, { id: "h", ar: "مبسوط", en: "Happy" }), true);
+  assert.equal(meansOtherThan({ id: "c", ar: "بسة", en: "cat" }, { id: "c2", ar: "بسس", en: "cats" }), true, "its plural still stands");
 });
 
 /* ---- numbers ---- */
