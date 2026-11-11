@@ -2,6 +2,7 @@ import type { Doc, ExerciseState, Form, Item, Parked, WireDoc } from "./types.ts
 import { mergeMet } from "./variables.ts";
 import { formsOf } from "./cards.ts";
 import { isTenseForm } from "./tense-skills.ts";
+import { mergeReached } from "./path.ts";
 /*
  * Sync client.
  *
@@ -283,6 +284,15 @@ export function mergeData(local: Doc, remote: WireDoc | null, now: number = Date
     (local.settingsUpdated || 0) >= (remote.settingsUpdated || 0)
       ? local.settings
       : remote.settings;
+  /* --- but a course path's reached units, by union (0.613) ---
+     The one exception to last-writer-wins: a unit that has opened for a
+     learner must never lock again, and a device that last synced before
+     it opened would otherwise take it back. Only where either side has
+     one, so a document with no path merges exactly as before. See
+     mergeReached in path.ts. */
+  const localReached = local.settings && local.settings.pathReached;
+  const remoteReached = remote.settings && remote.settings.pathReached;
+  const reachedNow = localReached || remoteReached ? { pathReached: mergeReached(localReached, remoteReached) } : null;
 
   return {
     ...local,
@@ -292,7 +302,7 @@ export function mergeData(local: Doc, remote: WireDoc | null, now: number = Date
     log,
     prepLog,
     moves,
-    settings: { ...local.settings, ...settings },
+    settings: { ...local.settings, ...settings, ...reachedNow },
     settingsUpdated: Math.max(local.settingsUpdated || 0, remote.settingsUpdated || 0),
   };
 }

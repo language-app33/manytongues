@@ -8120,3 +8120,25 @@ A unit is always on the path of every course that holds it (A1), so
 `attach-deck` puts it at the end as a draft there and there is no separate
 "unpublish" (A4): a unit is withdrawn by removing it, as a deck is.
 
+**0.613: one setting merged by union, on the device and the server.**
+Settings sync whole and last-writer-wins, which is right for a theme and
+wrong for the units a learner has reached: a phone that last synced
+before unit 3 opened would hand back a list without it, and if unit 2 had
+since slipped below finished, unit 3 would lock again — the one thing R25
+forbids. So `pathReached` alone is joined by `mergeReached` wherever
+settings meet: in `mergeData`, which both the app and a restore use, and
+in the sync endpoint before it writes, because an older build that does
+not know the field uploads its own settings whole. That costs the server
+one more read of the document per upload; reading it against the ETag
+the client sent keeps it exact, since any other version makes the write
+a conflict anyway. Writing a newly reached unit does not stamp
+`settingsUpdated`: the union carries it, and a stamp would hand this
+device's other choices to the learner's other devices.
+
+**What is held, and where.** Only never-met cards, and only at the places
+a card is first met: the session's pool, the home count (which must equal
+it), and a grid's spare tiles, since a spare tile is marked like any
+other. Every kind of session is covered by the first, saved sessions,
+prep and Ultimate included (A5). Blanks are not filtered: a word fills a
+blank only once cleared, wherever it was cleared (R13).
+

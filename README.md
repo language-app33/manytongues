@@ -1202,8 +1202,29 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   judges published cards only; `my-material` sends a unit only through a
   course that publishes it, and the course's path goes into
   `materialVersion` only when there is one, so nothing changes for a course
-  without units. Tests: `tests/path.test.mjs`, `tests/path-server.test.mjs`;
-  why: DECISIONS.md, "Units: a course's path".
+  without units.
+
+  **A device follows the path (0.613).** `pathIndexOf` in the trainer
+  builds, from the courses and decks last downloaded and the learner's own
+  progress, which decks each item is in (from each deck's `cardIds`, never
+  `source.deckId` or the tags; a number or time item from the `deckIds`
+  `fileIntoDecks` now records beside its tags), each unit's items
+  (`unitItems`, the one way to find them), each course's rows and the
+  units open somewhere. `pathHolds` is `cardHeld` for a never-met item
+  (`everMet`, the one test the mix, the home count and the path share),
+  applied where `buildSession` makes its pool, where the home screen
+  counts, and to a grid's spare tiles, which are marked and so would meet
+  a held word. `buildSession`'s `pathUnit` lets one unit's new cards
+  through, for "Practise this unit". A unit is finished when every item of
+  it but its text or conversation, and anything that can never be asked,
+  is cleared. What `pathRows` finds reached is written to
+  `settings.pathReached` by an effect, only when it holds something new;
+  `mergeData` joins two devices' lists by union rather than taking the
+  newer settings, and the sync endpoint does the same against what it
+  holds before it writes. `installIndexes` takes the courses and decks, so
+  a test can deal a session with a path. Tests: `tests/path.test.mjs`,
+  `tests/path-server.test.mjs`, `tests/path-device.test.mjs`; why:
+  DECISIONS.md, "Units: a course's path".
 - **Word sets: lists every language has, written once (0.569).** Numbers
   and pronouns so far, months and days of the week to come. The app knows
   the list; the teacher writes the words once for the language, and a deck

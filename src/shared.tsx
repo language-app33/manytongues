@@ -5500,7 +5500,7 @@ export async function pullCourses(
        arrive the way every other card does — see fileIntoDecks. A deck in
        another language holds none of this system's. */
     const holding = decksForSystem(decks, set.numbers.languageId, set.numbers.id)
-      .map((d: Deck) => ({ title: String(d.title || ""), parts: d.parts || [] }));
+      .map((d: Deck) => ({ id: d.id, title: String(d.title || ""), parts: d.parts || [] }));
     const filed = fileIntoDecks(handed, { composer, sys: set.numbers, timeComposer, timeSys: set.times }, holding);
     for (const item of filed) {
       if (at.has(item.id)) continue;

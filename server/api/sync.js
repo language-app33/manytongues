@@ -2,6 +2,7 @@ import { getStore } from "../store.js";
 import { createHash } from "node:crypto";
 import { formsOf } from "../../src/cards.ts";
 import { mergeData } from "../../src/sync.ts";
+import { mergeReached, reachesFurther } from "../../src/path.ts";
 
 /*
  * Sync endpoint.
@@ -408,6 +409,33 @@ export default async (req) => {
         }
       }
 
+      /*
+       * A course path's reached units are merged by union, never written
+       * over (0.613): a device on an older build, or one that last synced
+       * before a unit opened, would otherwise take back a unit that had
+       * opened, and it must never lock again. Read against the version the
+       * client says it merged with; if that is not what is held, the write
+       * below is refused as a conflict anyway and the client merges again.
+       */
+      if (body.etag) {
+        const held = await store.getWithMetadata(key, { type: "text", consistency: "strong" }).catch(() => null);
+        if (held && held.data != null && held.etag === body.etag) {
+          /** @type {any} */
+          let current = null;
+          try {
+            current = JSON.parse(String(held.data));
+          } catch (e) {
+            current = null;
+          }
+          const had = current && current.settings && current.settings.pathReached;
+          const sent = body.data.settings && body.data.settings.pathReached;
+          if (had && reachesFurther(sent, had)) {
+            body.data.settings = { ...(body.data.settings || {}), pathReached: mergeReached(sent, had) };
+          }
+        }
+      }
+      const toWrite = JSON.stringify(body.data);
+
       /* Refuse the write if the document moved since the client read it.
 
          No fallback to a plain write: the only thing a failed conditional
@@ -415,7 +443,7 @@ export default async (req) => {
          condition would be exactly the stale overwrite the ETag exists to
          prevent. The client treats a 5xx as "try again next time". */
       const opts = body.etag ? { onlyIfMatch: body.etag } : { onlyIfNew: true };
-      const result = await store.set(key, payload, opts);
+      const result = await store.set(key, toWrite, opts);
       if (result && result.modified === false) return json({ error: "conflict" }, 409);
 
       // set() reports the new ETag itself; no second round trip needed.

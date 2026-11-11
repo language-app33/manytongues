@@ -8,6 +8,32 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.613 — 11 November 2026
+
+**Units, step three: a student's device follows the path. Still nothing
+on screen, and nothing changes for anyone whose courses have no units.**
+
+- **New words come in path order.** A word that has never come up is held
+  back while every place it lives is a unit the student has not reached.
+  A word that is also in an ordinary deck, or in a unit already open in
+  any of their courses, arrives as today. This holds in every kind of
+  session — regular, saved, prep and Ultimate — and the home screen's
+  count of what is waiting follows the same rule, so the two never
+  disagree.
+- **Words already met are never held back.** They come back for review
+  wherever they live, as today.
+- **Numbers and times in a unit wait with it**: a number part's skill, its
+  words and the figures arrive when the unit opens, and count toward
+  finishing it. A part also held by an ordinary deck arrives as today.
+- **A unit that has opened never closes again**, on any of the student's
+  devices: which units each student has reached is kept with their
+  settings and joined, never written over, when devices sync — also on the
+  server, so a phone still on an older version cannot take a unit back.
+- Trade-off: the server now reads a student's saved progress once more
+  each time a device uploads it, to make that join.
+- An older version of the app that receives a course with units shows
+  them as ordinary decks, in no order. Updating fixes it.
+
 ## 0.612 — 11 November 2026
 
 **Units, step two: the server keeps a course's path, and checks a unit

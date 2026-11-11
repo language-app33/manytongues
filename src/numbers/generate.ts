@@ -1133,6 +1133,10 @@ function anyOfKind(
 
 /** A deck as far as filing numbers goes: its name, and the parts it holds. */
 export interface DeckParts {
+  /** The deck's id, recorded on each item it holds as `deckIds` (0.613): a
+      title is not enough to tell a course's path which deck an item is
+      in, since two decks may share one. Absent from an older caller. */
+  id?: string;
   title: string;
   parts: string[];
 }
@@ -1163,9 +1167,12 @@ export function fileIntoDecks(
   if (!holding.length) return [];
   const ids = new Set(items.map((it) => it.id));
   const tags = new Map<string, Set<string>>();
-  const file = (id: string, title: string) => {
+  const deckIds = new Map<string, Set<string>>();
+  const file = (id: string, title: string, deckId?: string) => {
     if (!tags.has(id)) tags.set(id, new Set());
     (tags.get(id) as Set<string>).add(title);
+    if (!deckIds.has(id)) deckIds.set(id, new Set());
+    if (deckId) (deckIds.get(id) as Set<string>).add(deckId);
   };
   const words = new Map<string, Set<string>>();
   for (const it of items) {
@@ -1173,23 +1180,28 @@ export function fileIntoDecks(
     if (!range) continue;
     for (const deck of holding) {
       if (!deck.parts.includes(range.id)) continue;
-      file(it.id, deck.title);
+      file(it.id, deck.title, deck.id);
       if (!words.has(range.id)) words.set(range.id, wordsOfRange(range, set, ids));
-      for (const id of words.get(range.id) as Set<string>) file(id, deck.title);
+      for (const id of words.get(range.id) as Set<string>) file(id, deck.title, deck.id);
     }
   }
   /* The ten figures go wherever any part of the system does: every number
      and every clock is written in them. */
   const titles = new Set([...tags.values()].flatMap((t) => [...t]));
+  const allDecks = new Set([...deckIds.values()].flatMap((d) => [...d]));
   for (const it of items) {
     if (!isNumeralCard(it)) continue;
     for (const title of titles) file(it.id, title);
+    for (const deckId of allDecks) (deckIds.get(it.id) as Set<string>).add(deckId);
   }
   return items
     .filter((it) => tags.has(it.id))
     .map((it) => ({
       ...it,
       tags: [...new Set(it.tags.concat([...(tags.get(it.id) as Set<string>)]))],
+      /* And the ids of the decks that hold it, which the path reads —
+         where the caller said them. */
+      ...((deckIds.get(it.id) as Set<string>).size ? { deckIds: [...(deckIds.get(it.id) as Set<string>)] } : null),
       /* And the words a part is made of, on the part itself: what the
          learner's progress on numbers is read against — a part is learnt
          only once every one of them is — and what its questions are

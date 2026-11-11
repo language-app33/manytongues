@@ -346,6 +346,8 @@ import { asMeaning, cellEnglish, fieldsLost, fillForm, fillsOf, hasSlots, lentBy
 import type { Value } from "./variables.ts";
 import { agreeTook, countTook, finishTook, leadsOf, lineGate, passes, reviewOf, sentenceKey, SCAN_LIMIT } from "./review.ts";
 import { castFill as castScene, filledScene, hasCast } from "./cast.ts";
+import { cardHeld, isPathUnit, mergeReached, pathRows, reachesFurther } from "./path.ts";
+import type { PathCourse, PathDeck, PathRow } from "./path.ts";
 import type { Review } from "./review.ts";
 import { liftSubtypeTagsIn } from "./subtype-tags.ts";
 import { tickCapitals } from "./capitals.ts";
@@ -1816,6 +1818,180 @@ function tenseHeld(unit: Form | null | undefined): { card: Item; spec: VerbSpec;
 }
 
 /* ------------------------------------------------------------------
+   A course's path (0.613)
+
+   A course may set its units in order, each opening when the one before
+   it is finished — see src/path.ts, where every rule is. The one thing the
+   path does to a session is hold back a never-met card while every deck it
+   lives in is a unit this learner has not reached (R22); it does not touch
+   the levels, the mix, review or how blanks are filled. So this is an
+   index like the ones above, built from the courses and decks last
+   downloaded and the learner's own progress, and read at the two places a
+   pool is made: buildSession, and the home screen's count of what is
+   waiting, which must agree.
+
+   A card's decks are worked out from each deck's `cardIds` — a card's
+   `source.deckId` names only one of them, and its tags are titles — and a
+   number or time item's from its `deckIds` (fileIntoDecks). Nothing here
+   is written to the cards; whether a unit is finished is read off them
+   each time, so a card cleared in another deck or course counts (R4).
+   ------------------------------------------------------------------ */
+
+export interface PathIndex {
+  /** Every downloaded deck each item is in, by item id. */
+  decksOfCard: Map<string, string[]>;
+  /** The downloaded decks that are path units. */
+  unitIds: Set<string>;
+  /** Each unit's items, by deck id: course cards and word-set items both. */
+  unitItemIds: Map<string, string[]>;
+  /** Where the learner stands on each course's path, by course id. */
+  rows: Map<string, PathRow[]>;
+  /** The units finished or open in at least one course. */
+  openUnits: Set<string>;
+  /** What pathRows returned to remember, by course id. */
+  reached: Record<string, string[]>;
+  /** Whether a unit's cards and sentences are all cleared now. */
+  finished: Map<string, boolean>;
+}
+
+const NO_PATH: PathIndex = {
+  decksOfCard: new Map(),
+  unitIds: new Set(),
+  unitItemIds: new Map(),
+  rows: new Map(),
+  openUnits: new Set(),
+  reached: {},
+  finished: new Map(),
+};
+
+let PATH_INDEX: PathIndex = NO_PATH;
+
+/* Exported for the reason setValueIndex is. Nothing a form can be asked
+   depends on it, so no cache is thrown away. */
+export function setPathIndex(next: PathIndex | null | undefined) {
+  PATH_INDEX = next || NO_PATH;
+}
+
+/** The learner's reached units, by course id, as stored. */
+export function pathReachedOf(settings: Settings | null | undefined): Record<string, string[]> {
+  const p = settings && settings.pathReached;
+  return p && typeof p === "object" && !Array.isArray(p) ? mergeReached(p, undefined) : {};
+}
+
+/**
+ * Met at all: anything on it ever answered, over the whole ladder. The one
+ * test of a never-met card — the mix's `fresh`, the home screen's count and
+ * the path's hold all read it. `units` narrows the forms looked at where a
+ * caller has already narrowed them.
+ */
+export function everMet(
+  it: Item,
+  settings: Settings,
+  units: { unit: Form }[] = drillableUnits(it, settings),
+): boolean {
+  return units.some(({ unit }) => laddered(unit, settings).some((t) => stateOf(unit, t).phase !== "new"));
+}
+
+/** Every downloaded deck an item is in. */
+function decksOfItem(it: Item, byCard: Map<string, string[]>): string[] {
+  const src = (it as { source?: Record<string, unknown> }).source;
+  if (src && typeof src.cardId === "string") return byCard.get(src.cardId) || [];
+  if (isFromSystem(it)) return Array.isArray(it.deckIds) ? it.deckIds : [];
+  return [];
+}
+
+/**
+ * The path index, from the courses and decks last downloaded, the items
+ * and the learner's settings. Pure: it reads progress and writes nothing —
+ * what it found reached is handed back in `reached`, for the caller to
+ * remember.
+ */
+export function pathIndexOf(
+  items: Item[],
+  courses: PathCourse[] | null | undefined,
+  decks: (PathDeck & { title?: string })[] | null | undefined,
+  settings: Settings,
+): PathIndex {
+  const units = (decks || []).filter(isPathUnit);
+  if (!units.length) return NO_PATH;
+  const unitIds = new Set(units.map((d) => d.id));
+  const byCard: Map<string, string[]> = new Map();
+  for (const d of decks || []) {
+    for (const id of d.cardIds || []) byCard.set(id, (byCard.get(id) || []).concat([d.id]));
+  }
+  const decksOfCard: Map<string, string[]> = new Map();
+  const unitItemIds: Map<string, string[]> = new Map(units.map((d) => [d.id, [] as string[]]));
+  const byId: Map<string, Item> = new Map();
+  for (const it of items) {
+    const ids = decksOfItem(it, byCard);
+    if (!ids.length) continue;
+    decksOfCard.set(it.id, ids);
+    byId.set(it.id, it);
+    for (const d of ids) if (unitIds.has(d)) (unitItemIds.get(d) as string[]).push(it.id);
+  }
+  /* A unit is finished when every word and sentence of it that can be
+     asked is cleared — its text or conversation not needed (R20), and a
+     card that can never be asked not counted. None left: finished. */
+  const clearedOf: Map<string, boolean> = new Map();
+  const isCleared = (it: Item) => {
+    const had = clearedOf.get(it.id);
+    if (had !== undefined) return had;
+    const at = towardsLearnt(it, settings, items);
+    const ok = !at || at.at.status === "cleared" || at.at.status === "done";
+    clearedOf.set(it.id, ok);
+    return ok;
+  };
+  const finished: Map<string, boolean> = new Map();
+  const finishedNow = (deckId: string) => {
+    const had = finished.get(deckId);
+    if (had !== undefined) return had;
+    const ok = (unitItemIds.get(deckId) || [])
+      .map((id) => byId.get(id) as Item)
+      .filter((it) => it && !isDialog(it))
+      .every(isCleared);
+    finished.set(deckId, ok);
+    return ok;
+  };
+  const stored = pathReachedOf(settings);
+  const rows: Map<string, PathRow[]> = new Map();
+  const reached: Record<string, string[]> = {};
+  const openUnits: Set<string> = new Set();
+  for (const course of courses || []) {
+    if (!course || !Array.isArray(course.path) || !course.path.length) continue;
+    const got = pathRows(course, units, finishedNow, stored[course.id] || []);
+    rows.set(course.id, got.rows);
+    reached[course.id] = got.reached;
+    for (const r of got.rows) if (r.state !== "locked") openUnits.add(r.id);
+  }
+  return { decksOfCard, unitIds, unitItemIds, rows, openUnits, reached, finished };
+}
+
+/**
+ * Whether a card is held out of sessions by the path: never met, and every
+ * deck it lives in a unit this learner has not reached in any course (R22).
+ * `pathUnit` is the one exception — "Practise this unit" on a unit opened
+ * early brings in that unit's new cards (R24).
+ */
+export function pathHolds(it: Item, settings: Settings, pathUnit?: string | null): boolean {
+  const idx = PATH_INDEX;
+  if (!idx.unitIds.size || !(it as { source?: unknown }).source) return false;
+  const decks = idx.decksOfCard.get(it.id) || [];
+  if (pathUnit && decks.includes(pathUnit)) return false;
+  if (!cardHeld(decks, (d) => idx.unitIds.has(d), idx.openUnits)) return false;
+  return !everMet(it, settings);
+}
+
+/** A unit's items: the course cards in its `cardIds` and the word-set items
+    filed under it. Every reader of a unit's items goes through here. */
+export function unitItems(deckId: string, items: Item[]): Item[] {
+  const ids = new Set(PATH_INDEX.unitItemIds.get(deckId) || []);
+  return ids.size ? items.filter((it) => ids.has(it.id)) : [];
+}
+
+/** The path as the index holds it, for the screens. */
+export const pathIndexNow = (): PathIndex => PATH_INDEX;
+
+/* ------------------------------------------------------------------
    Which card a verb's cell is on
 
    The practices of a tense ask about the rest of the tense — the persons
@@ -2653,7 +2829,12 @@ export function valueReachOf(
  * untestable: `buildSession` is a plain function of its arguments and
  * always was, and this is the rest of what it reads.
  */
-export function installIndexes(items: Item[], settings: Settings, systems: SystemSet[] = []): void {
+export function installIndexes(
+  items: Item[],
+  settings: Settings,
+  systems: SystemSet[] = [],
+  path: { courses?: PathCourse[]; decks?: PathDeck[] } = {},
+): void {
   setActiveLang(settings.language || DEFAULT_LANGUAGE);
   setContextIndex(contextIndexOf(items, settings));
   setDialogIndex(buildDialogIndex(items));
@@ -2688,6 +2869,9 @@ export function installIndexes(items: Item[], settings: Settings, systems: Syste
   setQuietUnits(withFacesWaiting(quiet, items, settings, systems));
   setEasedUnits(easedUnits(items, settings));
   setSkillCaps(skillCapsOf(items, settings));
+  /* And the path, last: it reads where each card stands, which the setters
+     above decide. */
+  setPathIndex(pathIndexOf(items, path.courses || [], path.decks || [], settings));
 }
 
 /* ------------------------------------------------------------------
@@ -4472,22 +4656,18 @@ export function mixCardsOf(
     if (!units.length) continue;
     const dues: number[] = [];
     let lastSeen = 0;
-    let fresh = true;
     for (const { unit } of units) {
       for (const t of typesOf(unit)) {
         const st = stateOf(unit, t);
         dues.push(st.due || 0);
       }
-      /* Met and last seen over the whole ladder, not only what can be
-         asked now: a form on its top is asked its top alone, and a top
-         not answered yet is a card in learning that has just climbed,
-         not a new one. */
-      for (const t of laddered(unit, settings)) {
-        const st = stateOf(unit, t);
-        lastSeen = Math.max(lastSeen, st.updated || 0);
-        if (st.phase !== "new") fresh = false;
-      }
+      /* Last seen over the whole ladder, not only what can be asked now. */
+      for (const t of laddered(unit, settings)) lastSeen = Math.max(lastSeen, stateOf(unit, t).updated || 0);
     }
+    /* Met over the whole ladder too: a form on its top is asked its top
+       alone, and a top not answered yet is a card in learning that has
+       just climbed, not a new one. The one test — see everMet. */
+    const fresh = !everMet(it, settings, units);
     const held = fresh ? null : standing(cardStandings(it, settings, items));
     /* A question never asked on a card already met — a level that has just
        opened — is waiting from the moment it exists, so it reads as due now
@@ -5145,11 +5325,19 @@ export function buildSession({
   perDay,
   systems,
   mode = "regular",
+  pathUnit,
 }: {
   items: Item[];
   settings: Settings;
   /** The pool: the cards this session may draw from. */
   inDeck: (it: Item) => boolean;
+  /**
+   * A path unit whose new cards this session may bring in although the
+   * learner has not reached it: "Practise this unit" on a unit the teacher
+   * opened early (R24). Every other never-met card the path holds stays
+   * out — see pathHolds.
+   */
+  pathUnit?: string | null;
   /**
    * Deal everything in the pool, by due date, without the mix. Nothing the
    * learner can open does this; tests and the pace simulation use it to
@@ -5178,7 +5366,8 @@ export function buildSession({
   const sets = systems || [];
   const numbers = knownNumbers(items, settings, sets);
   const drillable = items
-    .filter((it) => inDeck(it) && isDrillable(it, settings))
+    /* And not held back by a course's path — see pathHolds. */
+    .filter((it) => inDeck(it) && isDrillable(it, settings) && !pathHolds(it, settings, pathUnit))
     /* A skill whose system this device no longer holds — a course left,
        a teacher's language dropped — is a schedule with nothing behind
        it. Left in the collection, so the work comes back if the material
@@ -5508,6 +5697,9 @@ function withGrids(
       for (const card of items) {
         if (!isDrillable(card, settings) || langIdOf(card, settings) !== lang) continue;
         if (isDialog(card) || hasSlots(card)) continue;
+        /* A spare tile is marked like any other, so a card the path holds
+           back would be met here — see pathHolds. */
+        if (pathHolds(card, settings)) continue;
         for (const { unit, isSub } of unitsOf(card)) {
           if (!unit.ar || !gridOther(type, unit) || mine.has(unit.id)) continue;
           /* A word on the left of the grid of recordings is a play button,
@@ -11320,6 +11512,17 @@ export default function ArabicTrainer() {
   );
   setValueIndex(valueIndex);
 
+  /* And where the learner stands on each course's path, which decides the
+     never-met cards a session may bring in — see pathHolds. Built from the
+     courses and decks last downloaded, so it works with no connection.
+     Computes only: what it finds reached is remembered by the effect
+     below, never from in here. */
+  const pathIndex = useMemo(
+    () => pathIndexOf(items, myCourses as PathCourse[], courseDecks as PathDeck[], settings),
+    [items, myCourses, courseDecks, settings],
+  );
+  setPathIndex(pathIndex);
+
   /* And which sentences a teacher has approved, on the cards they have
      reviewed. Rebuilt with the cards, which is when a review can change. */
   const reviewGate = useMemo(() => reviewGateOf(asking), [asking]);
@@ -11437,9 +11640,30 @@ export default function ArabicTrainer() {
      languages to choose between has to be the whole of them, or switching
      one off would take it out of the list that switched it off. */
   const drillableAll = useMemo(
-    () => items.filter((it) => inDeck(it) && isDrillable(it, settings)),
-    [items, settings, inDeck]
+    /* Held back by a path exactly as buildSession holds them, so the count
+       here and the session it promises cannot disagree. pathIndex is what
+       pathHolds reads. */
+    () => items.filter((it) => inDeck(it) && isDrillable(it, settings) && !pathHolds(it, settings)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, settings, inDeck, pathIndex]
   );
+
+  /*
+   * Remember every unit the path has reached, so that one that has opened
+   * never locks again (R25), on this device or any other: written only
+   * when there is an id the settings do not hold yet, so a render that
+   * finds nothing new writes nothing. Not stamped as a settings change —
+   * the union in mergeData carries it to the learner's other devices, and
+   * a stamp would hand this device's other choices to them too.
+   */
+  useEffect(() => {
+    if (!reachesFurther(pathReachedOf(settings), pathIndex.reached)) return;
+    persist((cur) => {
+      const had = pathReachedOf(cur.settings);
+      if (!reachesFurther(had, pathIndex.reached)) return null;
+      return { ...cur, settings: { ...cur.settings, pathReached: mergeReached(had, pathIndex.reached) } };
+    });
+  }, [pathIndex, settings, persist]);
 
   /*
    * How much is actually waiting — the number under "Cards ready to
@@ -11483,21 +11707,18 @@ export default function ArabicTrainer() {
       /* Met at all: anything on it ever answered. A level that has just
          opened on a card already met is that card waiting, as the session
          mix reads it — not a new card. */
-      const everMet = (it: Item) =>
-        drillableUnits(it, settings).some(({ unit }) =>
-          laddered(unit, settings).some((t) => stateOf(unit, t).phase !== "new")
-        );
+      const met = (it: Item) => everMet(it, settings);
       /* Ready to review: Cleared and Learnt cards with a question due — what
          Catch up would ask, by the same rule (0.603). */
       const reviewing = new Set(pool.filter((it) => dueForReview(it, settings, items)).map((it) => it.id));
       /* The rest of what is genuinely waiting on cards already met: cards
          still climbing, a level just opened, a card asked for by name. A
          regular session deals them; Catch up does not. */
-      const climbing = pool.filter((it) => !reviewing.has(it.id) && (everMet(it) ? waiting(it, true) : waiting(it, false))).length;
+      const climbing = pool.filter((it) => !reviewing.has(it.id) && (met(it) ? waiting(it, true) : waiting(it, false))).length;
       /* Plus as many never-met cards as the session mix has room for in
          this pool — the same reckoning buildSession does, so the two cannot
          come to disagree. None while the learner is catching up. */
-      const fresh = pool.filter((it) => !everMet(it) && !waiting(it, false) && waiting(it, true)).length;
+      const fresh = pool.filter((it) => !met(it) && !waiting(it, false) && waiting(it, true)).length;
       const mix = mixCardsOf(pool, items, settings);
       const pace = { at: now(), places: SESSION_SIZE / PER_UNIT, dayCards: (perDay || 0) / PER_UNIT };
       /* Behind only matters while there are new cards it is keeping out:

@@ -305,3 +305,32 @@ test("only a teacher of the course or someone who runs the space works on its pa
   const noTitle = await post("create-unit", teacher.key, { courseId: course.id, title: " " });
   assert.equal(noTitle.status, 400);
 });
+
+/* ---- the units reached survive an upload that does not know them (0.613) ---- */
+
+/** @param {string} token @param {{ method?: string, body?: unknown }} [o] */
+const syncCall = async (token, { method = "GET", body } = {}) => {
+  const res = await fetch(`${origin}/api/sync`, {
+    method, headers: { "content-type": "application/json", "x-sync-token": token },
+    body: body === undefined ? undefined : JSON.stringify(body),
+  });
+  return { status: res.status, json: await res.json() };
+};
+
+test("an upload with an older list of units reached keeps the units the server holds", async () => {
+  const token = "ab".repeat(32);
+  const item = { id: "w1", tags: [], forms: [{ id: "w1", ar: "x", en: "x", s: {} }] };
+  const first = await syncCall(token, { method: "POST", body: { data: { items: [item], settings: { pathReached: { A: ["u1", "u2", "u3"] } } } } });
+  assert.equal(first.status, 200, JSON.stringify(first.json));
+  /* A device on an older build: it read the document, then sends settings
+     of its own with only the first unit, and a different theme. */
+  const read = await syncCall(token);
+  const older = await syncCall(token, {
+    method: "POST",
+    body: { etag: read.json.etag, data: { items: [item], settings: { theme: "dark", pathReached: { A: ["u1"] } } } },
+  });
+  assert.equal(older.status, 200, JSON.stringify(older.json));
+  const after = await syncCall(token);
+  assert.deepEqual(after.json.data.settings.pathReached, { A: ["u1", "u2", "u3"] });
+  assert.equal(after.json.data.settings.theme, "dark", "every other setting is still the upload's");
+});

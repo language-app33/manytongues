@@ -1626,6 +1626,13 @@ export type Line = Form & {
  */
 export type Item = {
   id: string;
+  /**
+   * For an item made from a number or time system: the ids of the decks
+   * that hold its part (0.613), beside the deck titles in `tags`. What a
+   * course's path reads to know which decks it is in — a course card is
+   * found through each deck's `cardIds` instead. See fileIntoDecks.
+   */
+  deckIds?: string[];
   /** Which language it is in. A device holds more than one. */
   lang?: LangId;
   kind?: string;
