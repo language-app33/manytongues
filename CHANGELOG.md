@@ -8,6 +8,20 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.609 — 11 November 2026
+
+**"Tap a word to see its harakat" shows only in your first three
+sessions.** After that it was just repeating itself; tapping a word still
+works the same.
+
+- It is counted on each device, so a new phone or tablet shows it for
+  three sessions again.
+- Hebrew's "Tap a word to see its niqqud" works the same way.
+
+To check by hand: after three sessions with bare words, the line under the
+word should no longer appear, and tapping a word should still bring back
+its harakat.
+
 ## 0.608 — 11 November 2026
 
 **Students learn to read Arabic without harakat.** Everyday Arabic is

@@ -309,7 +309,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   its ladder (`readsBare` in the scheduler); a sentence never has them.
   A learner taps a bare word to have its marks back for that question, or
   presses "Show the harakat" over options, and the question counts as a
-  near miss. The answer screen puts a word's marks back. Display only: the
+  near miss; a line saying so is under a bare prompt in the learner's
+  first three sessions with one. The answer screen puts a word's marks back. Display only: the
   stored card, the marking and the typing are unchanged. One exception:
   where the marks are all that tells two spellings on the question apart —
   two of the learner's words, two options, two persons of a verb — they

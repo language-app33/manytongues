@@ -57,7 +57,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["scene-text-recordings", "A button for each sentence of the text that has a recording. Absent where none has.", ""],
     ["scene-turn", "The gap where your turn goes, on the question that asks for it.", ""],
     ["answer-order", "The scrambled lines, on the question that asks for the scene in order. Tap them into place.", ""],
-    ["question-marks-tip", "Under a word or sentence shown without its harakat: says that tapping a word puts them back.", "Tap a word to see its harakat"],
+    ["question-marks-tip", "Under a word or sentence shown without its harakat, in the learner's first three sessions with one: says that tapping a word puts them back.", "Tap a word to see its harakat"],
     ["word-bare", "A word shown without its harakat, once its meaning is known, or in any sentence. Tapping it puts them back for this question, which then counts as a near miss.", "كتاب"],
     ["word-marks-lent", "A word whose harakat were put back by tapping it. They stay for the rest of the question.", "كِتاب"],
     ["reveal-marks", "Over options that are shown without their harakat: puts them back on every option at once, and the question counts as a near miss.", "Show the harakat"],

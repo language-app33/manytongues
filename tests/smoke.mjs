@@ -12241,8 +12241,14 @@ const openPronounTables = async () => {
   };
 
   materialQuiet = true;
+  /* The tap tip shows in a learner's first three sessions with a bare
+     word, counted on the device: none yet, whatever the walks above did. */
+  localStorage.removeItem("arabic-trainer-marks-tip");
   const fresh = await walk([0, 1, 2, 3, 4].map((i) => card(i)));
   const known = await walk([0, 1, 2, 3, 4].map((i) => card(i, meaningKnown)));
+  /* And past the third, it is not shown again. */
+  localStorage.setItem("arabic-trainer-marks-tip", "3");
+  const later = await walk([0, 1, 2, 3, 4].map((i) => card(i, meaningKnown)));
   materialQuiet = false;
   check("a new word is shown with its harakat while its meaning is learnt",
     fresh.promptsInScript > 0 && fresh.promptsMarked === fresh.promptsInScript && fresh.promptsBare === 0, JSON.stringify(fresh));
@@ -12259,6 +12265,8 @@ const openPronounTables = async () => {
     check("a bare word on the prompt says it can be tapped, and a tap puts its harakat back",
       known.tip && known.tappedShows, JSON.stringify(known));
   }
+  check("after three sessions the tip is not shown, and the tap still works",
+    later.promptsBare > 0 && !later.tip && later.tappedShows, JSON.stringify(later));
   check("nothing went wrong on the way", errors.length === before, errors.slice(before).join("\n"));
 }
 

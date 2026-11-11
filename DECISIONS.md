@@ -8052,3 +8052,13 @@ Given up: a word whose harakat are its only difference from another the
 student holds is never practised bare. The tip under a bare prompt ("Tap a
 word to see its harakat") is on every such question, which some may find
 repetitive; it is how a student finds out the tap exists.
+
+**0.609: the tip is shown in the first three sessions only.** The owner
+chose (1b) to keep it while it teaches and drop it once it repeats. Counted
+on the device, like the listening pause, rather than in the synced
+document: a count of how often a line was seen is not learning, and a
+write to the synced settings would stamp them and hand this device's other
+choices to every other one. A session counts once, known by its first
+question, so a queue rearranged mid-session is not a second session. The
+cost is that a new device shows it three times more. The owner also chose
+(2a) to keep the exception for spellings told apart only by their marks.
