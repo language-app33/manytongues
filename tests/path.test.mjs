@@ -177,3 +177,163 @@ test("neverAskedAlone: practice switched off, or a name kind", () => {
   assert.equal(neverAskedAlone({}), false);
 });
 
+/* ---- phase 2: the checklist a unit must clear to be published ---- */
+
+import { countingCards, heldFillers, MIN_FILLERS, MIN_SENTENCES, unitProblems } from "../src/path.ts";
+import { sentencesOf, holedParts } from "../src/review.ts";
+import { LANGUAGES } from "../src/languages.ts";
+
+const vi = LANGUAGES["vi"];
+
+/** A word that fills `{{food}}`. @param {string} id @param {string} word @param {Record<string, any>} [over] */
+const food = (id, word, over = {}) => ({
+  id, lang: "vi", category: "noun", fills: ["food"],
+  forms: [{ id, ar: word, en: `${word} (en)`, lat: "" }], ...over,
+});
+/** A sentence with one blank. @param {string} id @param {string} verb */
+const frame = (id, verb) => ({
+  id, lang: "vi", forms: [{ id, ar: `tôi ${verb} {{food}}`, en: `I ${verb} {{food}}`, lat: "" }],
+});
+/** A sentence with no blank. @param {string} id */
+const plain = (id) => ({ id, lang: "vi", forms: [{ id, ar: `xin chào ${id}`, en: `hello ${id}`, lat: "" }] });
+
+/**
+ * The card with its review approving exactly the sentences whose blank is
+ * filled by one of `ids`, out of `pool`.
+ * @param {any} card @param {any[]} pool @param {string[]} ids
+ */
+const approving = (card, pool, ids) => {
+  const ok = holedParts(card).flatMap((part) =>
+    sentencesOf(card, part, pool, vi).list.filter((s) => ids.includes(s.took.food.card)).map((s) => s.key));
+  return { ...card, review: { ok, no: [] } };
+};
+
+const five = ["pho", "com", "banh", "bun", "che"].map((id) => food(id, id));
+/** Five frames approving every food in `pool`. @param {any[]} pool */
+const fiveFrames = (pool, ids = pool.filter((c) => c.fills).map((c) => c.id)) =>
+  ["an", "nau", "mua", "thich", "ghet"].map((v, i) => approving(frame(`s${i}`, v), pool, ids));
+
+test("the checklist's thresholds are the owner's five and five", () => {
+  assert.equal(MIN_SENTENCES, 5);
+  assert.equal(MIN_FILLERS, 5);
+});
+
+test("a unit that satisfies everything has nothing to fix", () => {
+  const frames = fiveFrames(five);
+  const cards = [...five, ...frames];
+  assert.deepEqual(unitProblems({ cards, counting: cards, lang: vi }), []);
+});
+
+test("four sentences with a blank: one more is wanted", () => {
+  const frames = fiveFrames(five).slice(0, 4);
+  const cards = [...five, ...frames];
+  const p = unitProblems({ cards, counting: cards, lang: vi });
+  assert.deepEqual(p.filter((x) => x.kind === "few-sentences"), [{ kind: "few-sentences", have: 4, need: 5 }]);
+});
+
+test("a sentence with no blank does not count toward the five", () => {
+  const frames = fiveFrames(five).slice(0, 4);
+  const cards = [...five, ...frames, plain("hi")];
+  const p = unitProblems({ cards, counting: cards, lang: vi });
+  assert.ok(p.some((x) => x.kind === "few-sentences" && x.have === 4));
+});
+
+test("a blank with five fitting cards but three approved is short", () => {
+  const frames = fiveFrames(five);
+  frames[0] = approving(frame("s0", "an"), five, ["pho", "com", "banh"]);
+  const cards = [...five, ...frames];
+  const p = unitProblems({ cards, counting: cards, lang: vi });
+  assert.deepEqual(p, [{ kind: "blank-short", cardId: "s0", partId: "s0", slot: "food", have: 3, need: 5 }]);
+});
+
+test("a blank's five may come from an earlier unit, or from names kept anywhere", () => {
+  const mine = five.slice(0, 3);
+  const earlier = five.slice(3);
+  const pool = [...mine, ...earlier];
+  const frames = fiveFrames(pool);
+  assert.deepEqual(unitProblems({ cards: [...mine, ...frames], counting: [...pool, ...frames], lang: vi }), []);
+
+  const names = [food("an-name", "Lan", { category: "name", drill: false }), food("minh", "Minh", { category: "person" })];
+  const withNames = [...mine, ...names];
+  const framesN = fiveFrames(withNames);
+  const course = { id: "c", decks: ["u1"], path: ["u1"], pathLive: {} };
+  const counting = countingCards({
+    course, decks: [unit("u1")], unitId: "u1",
+    cards: [...mine.map((c) => ({ ...c, decks: ["u1"] })), ...names.map((c) => ({ ...c, decks: [] })), ...framesN.map((c) => ({ ...c, decks: ["u1"] }))],
+    deckIdsOf: (c) => c.decks,
+  });
+  assert.deepEqual(unitProblems({ cards: [...mine, ...framesN], counting, lang: vi }), [],
+    "two names in no deck make up the five");
+});
+
+test("a word only in a later unit is not counted, even in an approved sentence", () => {
+  const units = ["u1", "u2", "u3"].map(unit);
+  const course = { id: "c", decks: ["u1", "u2", "u3"], path: ["u1", "u2", "u3"], pathLive: { u1: 1, u2: 1, u3: 1 } };
+  const inUnit = (/** @type {any} */ c, /** @type {string} */ u) => ({ ...c, decks: [u] });
+  const all = [...five.slice(0, 4).map((c) => inUnit(c, "u2")), inUnit(five[4], "u3")];
+  const frames = fiveFrames(all).map((c) => inUnit(c, "u2"));
+  const counting = countingCards({ course, decks: units, unitId: "u2", cards: [...all, ...frames], deckIdsOf: (c) => c.decks });
+  assert.ok(!counting.some((c) => c.id === five[4].id), "the later unit's word is not among what counts");
+  const p = unitProblems({ cards: [...all.slice(0, 4), ...frames], counting, lang: vi });
+  assert.equal(p.filter((x) => x.kind === "blank-short").length, 5);
+  assert.ok(p.every((x) => x.kind !== "blank-short" || x.have === 4));
+});
+
+test("a sentence card with no review has nothing approved", () => {
+  const frames = fiveFrames(five);
+  const { review: _r, ...bare } = frames[0];
+  frames[0] = bare;
+  const cards = [...five, ...frames];
+  const p = unitProblems({ cards, counting: cards, lang: vi });
+  assert.deepEqual(p.map((x) => x.kind), ["blank-short"]);
+  assert.equal(/** @type {any} */ (p[0]).have, 0);
+});
+
+test("a word that fills no approved sentence of its own unit is unused; a name never is", () => {
+  const extra = food("lau", "lau", { fills: ["soup"] });
+  const name = food("hoa", "Hoa", { category: "name", fills: ["who"] });
+  const frames = fiveFrames(five);
+  const cards = [...five, ...frames, extra, name];
+  const p = unitProblems({ cards, counting: cards, lang: vi });
+  assert.deepEqual(p, [{ kind: "word-unused", cardId: "lau" }]);
+});
+
+test("two texts in one unit are one too many", () => {
+  const text = (/** @type {string} */ id) => ({
+    id, lang: "vi", sceneKind: "text", speakers: [], ar: "", en: id,
+    lines: [{ id: `${id}-1`, ar: "tôi ăn phở", en: "I eat pho" }],
+  });
+  const frames = fiveFrames(five);
+  const cards = [...five, ...frames, text("t1"), text("t2")];
+  const p = unitProblems({ cards, counting: cards, lang: vi });
+  assert.deepEqual(p, [{ kind: "two-finals", have: 2 }]);
+});
+
+test("numbers count toward a blank when a unit up to this one holds their part", () => {
+  const num = (/** @type {number} */ n) => ({
+    id: `num-${n}`, lang: "vi", kind: "phrase", fills: ["count"], drill: false, tags: [],
+    forms: [{ id: `num-${n}-f0`, ar: `số ${n}`, en: String(n), lat: "" }],
+    source: { systemId: "sys", slot: "fill:numbers:0-9" },
+  });
+  const fillers = [1, 2, 3, 4, 5].map(num);
+  const counter = (/** @type {string} */ id, /** @type {string} */ v) => ({
+    id, lang: "vi", forms: [{ id, ar: `tôi ${v} {{count}}`, en: `I ${v} {{count}}`, lat: "" }],
+  });
+  const approve = (/** @type {any} */ c) => {
+    const ok = holedParts(c).flatMap((part) => sentencesOf(c, part, fillers, vi).list.map((s) => s.key));
+    return { ...c, review: { ok, no: [] }, decks: ["u2"] };
+  };
+  const frames = ["dem", "co", "mua", "ban", "lay"].map((v, i) => approve(counter(`n${i}`, v)));
+  const course = { id: "c", decks: ["u1", "u2"], path: ["u1", "u2"], pathLive: { u1: 1 } };
+  const build = (/** @type {string[]} */ parts) => countingCards({
+    course, decks: [{ ...unit("u1"), parts }, unit("u2")], unitId: "u2",
+    cards: frames, deckIdsOf: (c) => c.decks || [], fillers,
+  });
+  const held = build(["numbers:0-9"]);
+  assert.deepEqual(unitProblems({ cards: frames, counting: held, lang: vi }), []);
+  const none = build([]);
+  assert.equal(heldFillers(fillers, new Set()).length, 0);
+  const p = unitProblems({ cards: frames, counting: none, lang: vi });
+  assert.equal(p.length, 5);
+  assert.ok(p.every((x) => x.kind === "blank-short" && x.have === 0));
+});

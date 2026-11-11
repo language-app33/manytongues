@@ -8102,3 +8102,21 @@ already gives "cards before sentences" without a second rule.
 a card a unit (`unitsOf`, `quietUnits`). Renaming either would touch
 hundreds of lines for nothing; the new thing is a *path unit* in code.
 
+**0.612: the checklist counts what the path has taught, and only what a
+teacher approved.** A blank needs five different cards (R10), and a card
+counts only where a teacher approved a sentence it fills (R11) and it
+comes from this unit, an earlier published unit, or is never asked on its
+own (R12). Counting by passing review alone would have counted every card
+with no review at all, which is the card nobody has read. The pool handed
+to `sentencesOf` is the counting cards themselves, so every sentence
+counted is made only of words allowed to count; the approval keys are the
+ordinary review fingerprints, so nothing about review changes. This is a
+rule for the checklist only (R13): a device fills blanks exactly as before,
+so a word from a later unit already cleared elsewhere can still appear.
+The server judges published cards, as students get them, and may be
+stricter than the teacher's screen; the screen says so when it is.
+
+A unit is always on the path of every course that holds it (A1), so
+`attach-deck` puts it at the end as a draft there and there is no separate
+"unpublish" (A4): a unit is withdrawn by removing it, as a deck is.
+

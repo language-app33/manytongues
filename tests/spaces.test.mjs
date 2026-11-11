@@ -229,6 +229,11 @@ test("admin actions refuse another space's people, courses and reports", async (
     ["assign-student", { courseId: b.course.id, handle: main.student.handle }],
     ["assign-teacher", { courseId: main.course.id, handle: b.teacher.handle }],
     ["remove-member", { courseId: b.course.id, handle: b.student.handle, role: "student" }],
+    /* A course's path (0.612): another space's course is not found. */
+    ["create-unit", { courseId: b.course.id, title: "x" }],
+    ["move-unit", { courseId: b.course.id, deckId: b.deck.id, to: 0 }],
+    ["publish-unit", { courseId: b.course.id, deckId: b.deck.id }],
+    ["open-unit", { courseId: b.course.id, deckId: b.deck.id, open: true }],
   ];
   for (const [action, body] of probes) {
     const res = await api(/** @type {string} */ (action), { key: admin.key, body });
@@ -263,6 +268,7 @@ const PLACED = {
     "admin-new-code", "admin-card", "admin-delete-flags", "assign-student", "assign-teacher",
     "remove-member", "export-plan", "export-chunk", "create-course", "create-deck", "report-flag",
     "admin-create-user", "admin-create-org", "join-space",
+    "create-unit", "move-unit", "publish-unit", "open-unit",
   ],
   /* The App admin's tools for spaces themselves (stage 3), tried below. */
   spaces: [

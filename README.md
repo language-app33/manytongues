@@ -1183,8 +1183,27 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   inserting. `cardHeld` is the one thing the path does to a session: a
   never-met card is held only while every deck it lives in is a unit not
   yet reached, so a word also in an ordinary deck, or in an open unit,
-  arrives as it always did. Tests: `tests/path.test.mjs`; why:
-  DECISIONS.md, "Units: a course's path".
+  arrives as it always did.
+
+  **A unit is published per course, once its checklist is clear (0.612).**
+  `create-unit`, `move-unit`, `publish-unit` and `open-unit` in
+  `server/api/courses.js`; `attach-deck` puts an existing unit at the end
+  of another course's path as a draft, and `detach-deck` and `delete-deck`
+  take it off. `unitProblems` in `src/path.ts` is the checklist: at least
+  `MIN_SENTENCES` sentences with a blank, every word card of the unit in an
+  approved sentence of it, and each blank with `MIN_FILLERS` different
+  cards approved in it — approved meaning on the card's `review.ok`, not
+  merely passing, since a card with no review has approved nothing. What
+  may count toward a blank's five is `countingCards`: this unit's cards,
+  those of the units before it published in that course (`drawsFrom`),
+  every card never asked on its own (`neverAskedAlone`, the quality score's
+  own test), and the number values of the parts those units hold. Finals —
+  a text or conversation, one at most — are not examined. The server
+  judges published cards only; `my-material` sends a unit only through a
+  course that publishes it, and the course's path goes into
+  `materialVersion` only when there is one, so nothing changes for a course
+  without units. Tests: `tests/path.test.mjs`, `tests/path-server.test.mjs`;
+  why: DECISIONS.md, "Units: a course's path".
 - **Word sets: lists every language has, written once (0.569).** Numbers
   and pronouns so far, months and days of the week to come. The app knows
   the list; the teacher writes the words once for the language, and a deck

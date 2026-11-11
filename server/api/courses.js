@@ -34,6 +34,12 @@ import { partsNow } from "../../src/numbers/types.ts";
 import { migrateCards } from "../../src/numbers/migrate.ts";
 import { liftSubtypeTagsIn } from "../../src/subtype-tags.ts";
 import { tickCapitals } from "../../src/capitals.ts";
+/* A course's path (0.611): every rule of it is in path.ts, read here the
+   way the app reads it. */
+import { countingCards, drawsFrom, isLiveIn, neverAskedAlone, unitProblems } from "../../src/path.ts";
+import { LANGUAGES } from "../../src/languages.ts";
+import { fillerCards } from "../../src/numbers/generate.ts";
+import { countedNouns, withNouns } from "../../src/numbers/nouns.ts";
 
 /* Locking a deck is set aside for now: a locked deck's flag is kept, but
    nothing is refused because of it. Turn back on to bring locks back. */
@@ -924,13 +930,44 @@ async function withLinks(store, decks, courses) {
  */
 async function dropFromCourses(store, deckId) {
   for (const c of await everyCourse(store)) {
-    if (!(c.decks || []).includes(deckId)) continue;
+    if (!(c.decks || []).includes(deckId) && !onPath(c, deckId)) continue;
     await updateJson(store, K.course(c.id), (/** @type {Course | null} */ fresh) =>
-      fresh && (fresh.decks || []).includes(deckId)
-        ? { ...fresh, decks: fresh.decks.filter((x) => x !== deckId) }
+      fresh && ((fresh.decks || []).includes(deckId) || onPath(fresh, deckId))
+        ? offPath({ ...fresh, decks: (fresh.decks || []).filter((x) => x !== deckId) }, deckId)
         : null
     );
   }
+}
+
+/**
+ * Whether a course has a deck anywhere on its path: in its order, among
+ * what is published there, or among what is opened early (0.611).
+ * @param {Course} course
+ * @param {string} deckId
+ */
+function onPath(course, deckId) {
+  return (course.path || []).includes(deckId) || isLiveIn(course, deckId) || (course.opened || []).includes(deckId);
+}
+
+/**
+ * The course with a unit taken off its path: out of its order, its
+ * publication there and its opening early, and nothing else. Fields left
+ * empty are dropped, so a course with no units stores what it always did.
+ * @param {Course} course
+ * @param {string} deckId
+ * @returns {Course}
+ */
+function offPath(course, deckId) {
+  const { path, pathLive, opened, ...rest } = course;
+  const nextPath = (path || []).filter((x) => x !== deckId);
+  const nextLive = Object.fromEntries(Object.entries(pathLive || {}).filter(([k]) => k !== deckId));
+  const nextOpened = (opened || []).filter((x) => x !== deckId);
+  return {
+    ...rest,
+    ...(nextPath.length ? { path: nextPath } : {}),
+    ...(Object.keys(nextLive).length ? { pathLive: nextLive } : {}),
+    ...(nextOpened.length ? { opened: nextOpened } : {}),
+  };
 }
 
 /* Who may change a deck.
@@ -979,10 +1016,24 @@ async function readManyJson(store, keys, opts) {
  */
 function materialVersion(courses, decks, fills = [], systems = []) {
   const summary = {
-    courses: courses.map((c) => [c.id, c.title, c.language || "", (c.decks || []).length]),
+    /* With its path, where it has one (0.611): an order changed, a unit
+       published or opened early moves nothing else a device compares.
+       Added only when there is something on it, so the version of a
+       course with no units is what it always was. */
+    courses: courses.map((c) => {
+      const row = [c.id, c.title, c.language || "", (c.decks || []).length];
+      const live = Object.keys(c.pathLive || {}).sort();
+      const path = c.path || [];
+      const opened = c.opened || [];
+      return path.length || live.length || opened.length ? row.concat([path.join(","), live.join(","), opened.join(",")]) : row;
+    }),
     /* With the parts of the numbers it holds, which are not cards and so
-       move neither its version nor its count — see set-deck-parts. */
-    decks: decks.map((d) => [d.id, d.version || 1, d.title, (d.cardIds || []).length, (d.parts || []).join(",")]),
+       move neither its version nor its count — see set-deck-parts. And
+       whether it is a path unit, only where it is one. */
+    decks: decks.map((d) => {
+      const row = [d.id, d.version || 1, d.title, (d.cardIds || []).length, (d.parts || []).join(",")];
+      return d.unit ? row.concat(["unit"]) : row;
+    }),
     /* The values a teacher has written are material too, and the only
        material that moves without a deck moving: a card that fills a
        variable is in no deck. Sorted, so two reads of the same site agree
@@ -1935,7 +1986,23 @@ async function restoreOne(store, key, value, ctx) {
         return growOnly(store, key, (cur) => {
           const more = missingFrom(cur.decks, obj.decks);
           const base = (fromBefore && placeHere(cur)) || cur;
-          return more.length || base !== cur ? { ...base, decks: (base.decks || []).concat(more) } : null;
+          /* And the units among them back on its path, where the course has
+             lost them (0.611): a unit is on the path of every course that
+             holds it. Published where the copy says so; never opened early
+             by a restore. */
+          const decks = (base.decks || []).concat(more);
+          const lostPath = (Array.isArray(obj.path) ? obj.path : []).filter(
+            (/** @type {string} */ id) => decks.includes(id) && !(base.path || []).includes(id),
+          );
+          const live = obj.pathLive && typeof obj.pathLive === "object" ? obj.pathLive : {};
+          const lostLive = Object.entries(live).filter(([id]) => lostPath.includes(id));
+          if (!more.length && base === cur && !lostPath.length) return null;
+          return {
+            ...base,
+            decks,
+            ...(lostPath.length ? { path: (base.path || []).concat(lostPath) } : {}),
+            ...(lostLive.length ? { pathLive: { ...(base.pathLive || {}), ...Object.fromEntries(lostLive) } } : {}),
+          };
         }, obj);
       }
       const org = orgOf(obj);
@@ -4526,8 +4593,11 @@ async function handle(req) {
         await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).concat([newDeck]));
       }
       for (const c of courses) {
+        /* A path unit goes onto the path as well, as a draft (A1). */
         await updateJson(store, K.course(c.id), (/** @type {any} */ fresh) =>
-          fresh && !(fresh.decks || []).includes(landed.id) ? { ...fresh, decks: (fresh.decks || []).concat([landed.id]) } : null
+          fresh && !(fresh.decks || []).includes(landed.id)
+            ? { ...fresh, decks: (fresh.decks || []).concat([landed.id]), ...(landed.unit ? { path: (fresh.path || []).concat([landed.id]) } : {}) }
+            : null
         );
       }
       await taught();
@@ -4613,11 +4683,23 @@ async function handle(req) {
       const nextCourse = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) => {
         if (!fresh) return null;
         held = (fresh.decks || []).includes(deck.id);
-        if (adding === held) return null;
-        return {
-          ...fresh,
-          decks: adding ? (fresh.decks || []).concat([deck.id]) : fresh.decks.filter((d) => d !== deck.id),
-        };
+        if (adding === held) {
+          /* A unit the course holds but whose path lost it is put back at
+             the end; one taken out leaves nothing of itself on the path. */
+          if (deck.unit && adding && !(fresh.path || []).includes(deck.id)) return { ...fresh, path: (fresh.path || []).concat([deck.id]) };
+          if (!adding && onPath(fresh, deck.id)) return offPath(fresh, deck.id);
+          return null;
+        }
+        /* A path unit is always on the path of every course it is in (A1),
+           and starts there as a draft; taken away, it leaves that course's
+           path, publication and opening early, and no other course's. */
+        if (adding) {
+          const decks = (fresh.decks || []).concat([deck.id]);
+          return deck.unit
+            ? { ...fresh, decks, path: (fresh.path || []).filter((x) => x !== deck.id).concat([deck.id]) }
+            : { ...fresh, decks };
+        }
+        return offPath({ ...fresh, decks: fresh.decks.filter((d) => d !== deck.id) }, deck.id);
       });
       if (!nextCourse) return json({ error: "not-found" }, 404);
       const now = Date.now();
@@ -4636,6 +4718,170 @@ async function handle(req) {
       await taught();
       const [shown] = await withLinks(store, [nextDeck]);
       return json({ ok: true, deck: shown, course: nextCourse });
+    }
+
+    /* ================= a course's path (0.611) =================
+
+       A path unit is a deck with `unit: true`, on the path of every course
+       that holds it. Everything about the path is per course — its order,
+       which units are published there and which are opened early — and
+       every rule is in src/path.ts. Each of these changes the course as it
+       stands when the write lands (updateJson), so two teachers at once
+       cannot write over each other. */
+
+    /** The course, if this person teaches it or runs the space; else an answer to send. */
+    async function pathCourse() {
+      const course = await readCourse(store, String(body.courseId || ""));
+      if (!course) return { refused: json({ error: "not-found" }, 404) };
+      if (!isTeacher(course, mine) && !iManage) return { refused: json({ error: "not-teaching" }, 403) };
+      return { course };
+    }
+
+    if (action === "create-unit") {
+      const { course, refused } = await pathCourse();
+      if (refused) return refused;
+      const title = String(body.title || "").trim().slice(0, 60);
+      if (!title) return json({ error: "title-required" }, 400);
+      const id = `d${randomBytes(6).toString("hex")}`;
+      const now = Date.now();
+      const deck = {
+        id,
+        org: orgOf(course),
+        owner: mine,
+        title,
+        description: "",
+        lang: course.language || "",
+        unit: true,
+        version: 1,
+        courses: [{ courseId: course.id, addedAt: now }],
+        cardIds: [],
+        updated: now,
+      };
+      await writeJson(store, K.deck(id), deck);
+      await indexAdd(store, "decks", id);
+      const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) =>
+        fresh ? { ...fresh, decks: (fresh.decks || []).concat([id]), path: (fresh.path || []).concat([id]) } : null
+      );
+      await taught();
+      return json({ ok: true, deck, course: next });
+    }
+
+    if (action === "move-unit") {
+      const { course, refused } = await pathCourse();
+      if (refused) return refused;
+      const deckId = String(body.deckId || "");
+      if (!(course.path || []).includes(deckId)) return json({ error: "not-on-path" }, 404);
+      const to = Math.floor(Number(body.to));
+      if (!Number.isFinite(to)) return json({ error: "bad-position" }, 400);
+      const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) => {
+        if (!fresh || !(fresh.path || []).includes(deckId)) return null;
+        const rest = (fresh.path || []).filter((x) => x !== deckId);
+        const at = Math.max(0, Math.min(rest.length, to));
+        const path = rest.slice(0, at).concat([deckId], rest.slice(at));
+        return path.join() === (fresh.path || []).join() ? null : { ...fresh, path };
+      });
+      await taught();
+      return json({ ok: true, course: next || (await readCourse(store, course.id)) });
+    }
+
+    if (action === "publish-unit") {
+      const { course, refused } = await pathCourse();
+      if (refused) return refused;
+      const deckId = String(body.deckId || "");
+      if (!(course.path || []).includes(deckId)) return json({ error: "not-on-path" }, 404);
+      if (isLiveIn(course, deckId)) return json({ ok: true, course });
+      const problems = await unitCheck(course, deckId);
+      if (problems.length) return json({ error: "unit-not-ready", problems }, 409);
+      const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) =>
+        fresh && (fresh.path || []).includes(deckId) && !isLiveIn(fresh, deckId)
+          ? { ...fresh, pathLive: { ...(fresh.pathLive || {}), [deckId]: Date.now() } }
+          : null
+      );
+      await taught();
+      return json({ ok: true, course: next || (await readCourse(store, course.id)) });
+    }
+
+    if (action === "open-unit") {
+      const { course, refused } = await pathCourse();
+      if (refused) return refused;
+      const deckId = String(body.deckId || "");
+      if (!isLiveIn(course, deckId)) return json({ error: "unit-draft" }, 409);
+      const open = body.open === true;
+      const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) => {
+        if (!fresh) return null;
+        const was = fresh.opened || [];
+        if (open === was.includes(deckId)) return null;
+        const opened = open ? was.concat([deckId]) : was.filter((x) => x !== deckId);
+        const { opened: _o, ...rest } = fresh;
+        return opened.length ? { ...rest, opened } : rest;
+      });
+      await taught();
+      return json({ ok: true, course: next || (await readCourse(store, course.id)) });
+    }
+
+    /**
+     * The publishing checklist of one unit in one course, judged on what
+     * its students would actually receive: published cards only, as they
+     * are sent. What may count toward a blank's five is the cards of this
+     * unit and the published units before it here, every card never asked
+     * on its own in the libraries of the unit's owner and the course's
+     * teachers, and the number values of the parts those units hold — see
+     * countingCards in path.ts.
+     * @param {Course} course
+     * @param {string} deckId
+     */
+    async function unitCheck(course, deckId) {
+      const decks = (await readManyJson(store, (course.path || []).map((id) => K.deck(id)))).filter(Boolean);
+      const unitDeck = decks.find((d) => d.id === deckId);
+      if (!unitDeck) return [{ kind: "few-sentences", have: 0, need: 5 }];
+      const from = drawsFrom(course, decks, deckId);
+      /** @type {Map<string, string[]>} */
+      const decksOf = new Map();
+      for (const d of decks) {
+        if (!from.has(d.id)) continue;
+        for (const id of await deckCardIds(d)) decksOf.set(id, (decksOf.get(id) || []).concat([d.id]));
+      }
+      const ids = [...decksOf.keys()];
+      const rows = await readManyJson(store, ids.map((id) => K.card(id)));
+      /** @type {Map<string, any>} */
+      const byId = new Map();
+      rows.forEach((c, i) => {
+        if (c && inScope(c) && isPublished(c)) byId.set(ids[i], studentView(c));
+      });
+      const owners = [...new Set([unitDeck.owner, ...(course.teachers || [])])].filter(Boolean);
+      for (const owner of owners) {
+        /** @type {string[]} */
+        const lib = (await readJson(store, K.myCards(owner))) || [];
+        const libRows = await readManyJson(store, lib.filter((id) => !byId.has(id)).map((id) => K.card(id)));
+        for (const c of libRows) {
+          if (c && inScope(c) && isPublished(c) && neverAskedAlone(c) && !byId.has(c.id)) byId.set(c.id, studentView(c));
+        }
+      }
+      const lang = LANGUAGES[/** @type {import("../../src/types.ts").LangId} */ (unitDeck.lang || course.language || "")] || null;
+      /* The number values a blank may be filled with, from the system the
+         unit's numbers come from — counted with that teacher's nouns, as
+         the teacher's own screen counts them. */
+      const numLang = unitDeck.lang || course.language || "";
+      const numOwner = unitDeck.numbersFrom || unitDeck.owner;
+      const index = await systemIndex(numOwner);
+      const sysRow = index.numbers[numLang] ? await readJson(store, K.numSys(index.numbers[numLang])) : null;
+      const sys = sysRow ? readNumberSystem(sysRow) : null;
+      /** @type {any[]} */
+      let fillers = [];
+      if (sys) {
+        /** @type {string[]} */
+        const lib = (await readJson(store, K.myCards(numOwner))) || [];
+        const nounRows = (await readManyJson(store, lib.map((id) => K.card(id)))).filter((c) => c && inScope(c));
+        fillers = fillerCards(composerFor(numLang), withNouns(sys, countedNouns(nounRows, numLang)));
+      }
+      const all = [...byId.values()];
+      const counting = countingCards({
+        course, decks, unitId: deckId, cards: all,
+        deckIdsOf: (c) => decksOf.get(String(c.id)) || [],
+        fillers,
+      });
+      const own = (await deckCardIds(unitDeck)).map((id) => byId.get(id)).filter(Boolean);
+      return unitProblems({ cards: own, counting, lang });
     }
 
     /* ================= courses ================= */
@@ -4950,10 +5196,20 @@ async function handle(req) {
       for (const c of courseRows) for (const did of c.decks || []) {
         if (!deckToCourse.has(did)) deckToCourse.set(did, c);
       }
-      const deckIds = [...deckToCourse.keys()];
-      const deckRows = (await readManyJson(store, deckIds.map((id) => K.deck(id)), EVENTUAL)).filter(
+      let deckRows = (await readManyJson(store, [...deckToCourse.keys()].map((id) => K.deck(id)), EVENTUAL)).filter(
         Boolean
       );
+      /* A path unit reaches a student only through a course where it is
+         published (0.611, R26): a draft is invisible, its cards, its number
+         parts and all. Where it is published in several of their courses,
+         the first of those is the one it is sent under. */
+      for (const d of deckRows) {
+        if (!d.unit) continue;
+        const live = courseRows.find((c) => (c.decks || []).includes(d.id) && isLiveIn(c, d.id));
+        if (live) deckToCourse.set(d.id, live);
+        else deckToCourse.delete(d.id);
+      }
+      deckRows = deckRows.filter((d) => deckToCourse.has(d.id));
 
       /* Whose values can reach this person: whoever owns a deck they hold,
          and whoever teaches a course they are in — the same two lists the

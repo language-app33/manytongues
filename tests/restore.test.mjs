@@ -512,6 +512,28 @@ test("restoring a site's file into a site that has it all changes nothing at all
 
 /* -------------------------------------- A6.9: clear everything, then restore */
 
+test("a course's path and its units survive a backup and restore (0.611)", async () => {
+  const unit = await api("create-unit", { key: roomB.teacher.key, org: B, body: { courseId: roomB.course.id, title: "Unit B" } });
+  assert.equal(unit.status, 200, unit.text);
+  const unitId = unit.json.deck.id;
+  /* Published and opened early as a teacher would leave it; written
+     straight to the course, since publishing needs a checklist this room's
+     cards do not clear. */
+  const courseKey = `course:${roomB.course.id}`;
+  const had = await raw(courseKey);
+  await store.set(courseKey, JSON.stringify({ ...had, pathLive: { [unitId]: 5 }, opened: [unitId] }));
+  const file = await takeBackup();
+  const cleared = await api("admin-clear", { key: admin.key, body: { adminKey: ADMIN_KEY, parts: ["courses", "decks"] } });
+  assert.equal(cleared.status, 200, cleared.text);
+  assert.equal(await raw(courseKey), null);
+  await restore(file);
+  const back = await raw(courseKey);
+  assert.deepEqual(back.path, [unitId]);
+  assert.deepEqual(back.pathLive, { [unitId]: 5 });
+  assert.deepEqual(back.opened, [unitId]);
+  assert.equal((await raw(`deck:${unitId}`)).unit, true);
+});
+
 test("a whole site cleared and restored has everyone, everything and all practice back", async () => {
   const file = await takeBackup();
   const parts = ["spaces", "people", "courses", "decks", "cards", "flags", "clips", "progress"];

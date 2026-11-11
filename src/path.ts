@@ -32,7 +32,13 @@
  * both import it. See README.md, "A course's path", and DECISIONS.md,
  * "Units: a course's path".
  */
-import { NAME_KINDS } from "./deck-quality.ts";
+import type { Lang } from "./types.ts";
+import { deckQuality, NAME_KINDS } from "./deck-quality.ts";
+import { isDialog } from "./dialogs.ts";
+import { holedParts, reviewOf, sentencesOf } from "./review.ts";
+import type { Review } from "./review.ts";
+import { isSentence, slotsOf } from "./variables.ts";
+import { ownSlot } from "./verbs.ts";
 
 type Held = Record<string, any>;
 
@@ -226,3 +232,167 @@ export function neverAskedAlone(card: Held | null | undefined): boolean {
   return NAME_KINDS.includes(String(card.category || "").trim());
 }
 
+/* ------------------------------------------------------------------
+   Publishing: the checklist a unit must clear in a course (R7, R9, R10)
+   ------------------------------------------------------------------ */
+
+/** Sentences with a blank a unit needs (R7). */
+export const MIN_SENTENCES = 5;
+/** Different approved cards each blank needs (R10). */
+export const MIN_FILLERS = 5;
+
+export type UnitProblem =
+  /** `have`: sentences with a blank now. `need`: MIN_SENTENCES. The screen shows need − have. */
+  | { kind: "few-sentences"; have: number; need: number }
+  /** `cardId` is the sentence card; the screen looks up its text to show it. */
+  | { kind: "blank-short"; cardId: string; partId: string; slot: string; have: number; need: number }
+  /** `cardId` is the word card; the screen looks up its text to show it. */
+  | { kind: "word-unused"; cardId: string }
+  | { kind: "two-finals"; have: number };
+
+/** Whether a sentence a review lists was approved by a teacher: on `ok`
+    and not on `no`. Not `passes`, which lets a card with no review through
+    — and a card with no review has nothing approved. */
+export function approvedIn(review: Review | null | undefined, key: string): boolean {
+  if (!review) return false;
+  const ok = Array.isArray(review.ok) ? review.ok : [];
+  const no = Array.isArray(review.no) ? review.no : [];
+  return ok.includes(key) && !no.includes(key);
+}
+
+/** One blank of one sentence part, and the different cards approved in it. */
+export interface BlankFill {
+  cardId: string;
+  partId: string;
+  slot: string;
+  /** The ids of the cards that fill it in an approved sentence. */
+  cards: string[];
+}
+
+/**
+ * Every blank of a unit's sentences, with the cards that fill it in a
+ * sentence a teacher approved, drawn from `counting` alone. Finals (a text
+ * or conversation) are left out (R14). The checklist reads it, and so does
+ * the advice on forms under the quality score.
+ */
+export function blankFills(cards: Held[], counting: Held[], lang: Lang | null | undefined): BlankFill[] {
+  const out: BlankFill[] = [];
+  for (const card of (cards || []).filter(Boolean)) {
+    if (isDialog(card) || !isSentence(card)) continue;
+    const review = reviewOf(card);
+    for (const part of holedParts(card)) {
+      const own = ownSlot(part);
+      const drawn = slotsOf(part).filter((s) => s !== own);
+      if (!drawn.length) continue;
+      const listed = sentencesOf(card, part, counting || [], lang);
+      const approved = listed.list.filter((s) => approvedIn(review, s.key));
+      for (const slot of drawn) {
+        const ids = new Set<string>();
+        for (const s of approved) {
+          const took = s.took[slot];
+          if (took && took.card) ids.add(String(took.card));
+        }
+        out.push({ cardId: String(card.id), partId: String(part.id || ""), slot, cards: [...ids] });
+      }
+    }
+  }
+  return out;
+}
+
+/**
+ * What stands between a unit and publishing it in one course.
+ *
+ * `cards` is the unit's own cards. `counting` is the cards that may count
+ * toward the five (R12, A3): the unit's own cards; the cards of the earlier
+ * units in drawsFrom(...); every card for which neverAskedAlone is true;
+ * and the number values (see fillerCards) whose part is held, in
+ * deck.parts, by this unit or by one of the earlier units in drawsFrom(...)
+ * — `heldFillers` picks those.
+ *
+ * The approvals are the teacher's ordinary ones: a sentence's key is a
+ * fingerprint of the filled text, so what was approved on the review
+ * screen is what is found here. This judges, and changes nothing about
+ * how blanks are filled anywhere (R13).
+ */
+export function unitProblems(input: { cards: Held[]; counting: Held[]; lang: Lang | null | undefined }): UnitProblem[] {
+  const { lang } = input;
+  const cards = (input.cards || []).filter(Boolean);
+  const counting = (input.counting || []).filter(Boolean);
+  const problems: UnitProblem[] = [];
+
+  /* 1–2. Finals: a text or conversation, at most one, not examined further. */
+  const finals = cards.filter((c) => isDialog(c));
+  if (finals.length > 1) problems.push({ kind: "two-finals", have: finals.length });
+
+  /* 3. Sentences with a blank (R7, R8). */
+  const sentences = cards.filter((c) => !isDialog(c) && isSentence(c));
+  const counts = (card: Held) =>
+    holedParts(card).some((part) => {
+      const own = ownSlot(part);
+      return slotsOf(part).some((s) => s !== own);
+    });
+  const have = sentences.filter(counts).length;
+  if (have < MIN_SENTENCES) problems.push({ kind: "few-sentences", have, need: MIN_SENTENCES });
+
+  /* 4. Five approved cards per blank (R10, R11, R12). */
+  for (const b of blankFills(sentences, counting, lang)) {
+    if (b.cards.length < MIN_FILLERS) {
+      problems.push({ kind: "blank-short", cardId: b.cardId, partId: b.partId, slot: b.slot, have: b.cards.length, need: MIN_FILLERS });
+    }
+  }
+
+  /* 5. Every word used (R9). Cards the quality score does not ask to be in
+     sentences — names, cards never asked on their own — are not checked. */
+  const q = deckQuality(cards, { lang, pool: counting, known: counting });
+  for (const w of q.words) {
+    if (!w.forms.some((f) => f.met > 0)) problems.push({ kind: "word-unused", cardId: w.id });
+  }
+  return problems;
+}
+
+/** The number parts held, in deck.parts, by any of these decks. */
+export function heldParts(decks: { id: string; parts?: string[] }[], ids: Set<string>): Set<string> {
+  const out = new Set<string>();
+  for (const d of decks || []) if (d && ids.has(d.id)) for (const p of d.parts || []) out.add(String(p));
+  return out;
+}
+
+/** The number values whose part is among `parts` (A3): each says which part
+    it comes from in `source.slot`, as `fill:<part id>`. */
+export function heldFillers<T extends Held>(fillers: T[], parts: Set<string>): T[] {
+  return (fillers || []).filter((f) => {
+    const slot = f && f.source && typeof f.source.slot === "string" ? f.source.slot : "";
+    return slot.startsWith("fill:") && parts.has(slot.slice(5));
+  });
+}
+
+/**
+ * The cards that may count toward a unit's five, in one course: those of
+ * the decks `drawsFrom` names, every card never asked on its own, and the
+ * number values of the parts those decks hold. `deckIdsOf` says which decks
+ * a card is in. The teacher's screen and the server build it the same way.
+ */
+export function countingCards<T extends Held>(o: {
+  course: PathCourse;
+  decks: (PathDeck & { parts?: string[] })[];
+  unitId: string;
+  cards: T[];
+  deckIdsOf: (card: T) => string[];
+  fillers?: T[];
+}): T[] {
+  const from = drawsFrom(o.course, o.decks, o.unitId);
+  const out: T[] = [];
+  const seen = new Set<string>();
+  const add = (c: T) => {
+    const id = String(c.id);
+    if (seen.has(id)) return;
+    seen.add(id);
+    out.push(c);
+  };
+  for (const c of o.cards || []) {
+    if (!c) continue;
+    if (neverAskedAlone(c) || o.deckIdsOf(c).some((d) => from.has(d))) add(c);
+  }
+  for (const f of heldFillers(o.fillers || [], heldParts(o.decks, from))) add(f);
+  return out;
+}

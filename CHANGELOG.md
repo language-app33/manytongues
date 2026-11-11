@@ -8,6 +8,26 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.612 — 11 November 2026
+
+**Units, step two: the server keeps a course's path, and checks a unit
+before it is published. Still nothing on screen.**
+
+- **A unit is made in a course, ordered on its path, published there and
+  opened early there**, each per course: the same unit can be in several
+  courses, a draft in one and published in another.
+- **A unit is published only once it is ready**, checked in that course:
+  at least five sentences with a blank; every word in the unit used in at
+  least one of them; and each blank with at least five different words a
+  teacher has approved in it, from this unit, the published units before
+  it, or names kept anywhere. Numbers count where a unit up to this one
+  holds their part. Only published cards are counted.
+- **A unit that is a draft in a course reaches none of its students**,
+  numbers and all. Once published there, it is sent like any deck.
+- **Removing a unit from a course, or deleting it, takes it off the path
+  too.** Backups keep units and paths.
+- A course with no units sends and stores exactly what it did before.
+
 ## 0.611 — 11 November 2026
 
 **Units, step one: the rules of a course's path. Nothing changes on
