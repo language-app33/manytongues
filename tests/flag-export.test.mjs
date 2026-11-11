@@ -284,7 +284,7 @@ test("a conversation card is written out by its lines, not by its empty word", (
 /* ---- what the learner was looking at (0.612) ---- */
 
 test("a report says what was on the screen, the phrase, the answers offered and the nouns", () => {
-  const text = flagsToText(
+  const out = text(
     [
       flag({
         prompt: "خمس أخوات",
@@ -294,15 +294,15 @@ test("a report says what was on the screen, the phrase, the answers offered and 
         nouns: "could use sisters (learnt in the shape this number needs), of 3 it can count: sisters, books, cats",
       }),
     ],
-    { names, at: 2000 },
+    {},
   );
-  assert.match(text, /On screen: {3}5 sisters/);
-  assert.match(text, /Phrase: {6}عندي كمبيوتر — I have a computer — \(no pronunciation written\)/);
-  assert.match(text, /Offered: {5}Sad \| Upset \| Tired \| Happy/);
-  assert.match(text, /Nouns: {7}could use sisters/);
+  assert.match(out, /On screen: {3}5 sisters/);
+  assert.match(out, /Phrase: {6}عندي كمبيوتر — I have a computer — \(no pronunciation written\)/);
+  assert.match(out, /Offered: {5}Sad \| Upset \| Tired \| Happy/);
+  assert.match(out, /Nouns: {7}could use sisters/);
 });
 
 test("a report sent before those were recorded has no empty lines for them", () => {
-  const text = flagsToText([flag()], { names, at: 2000 });
-  for (const label of ["On screen:", "Phrase:", "Offered:", "Nouns:"]) assert.ok(!text.includes(label), label);
+  const out = text([flag()], {});
+  for (const label of ["On screen:", "Phrase:", "Offered:", "Nouns:"]) assert.ok(!out.includes(label), label);
 });
