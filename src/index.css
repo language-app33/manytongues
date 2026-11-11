@@ -697,13 +697,22 @@ button {
 /* ---- pictures in practice ----
    The prompt: large enough to recognise the thing at a glance, its own
    shape inside a frame the height of a phrase prompt's worth of room. The
-   choices: four square tiles, two to a row, each a button. */
+   choices: four square tiles, two to a row, each a button.
+   Neither is taller than --pic-cap: a third of the screen, and never more
+   than 240px, so a picture cannot push the answer off a short phone or
+   grow into a wall on a wide screen. The frames narrow to keep their
+   shape; a picture is shrunk to fit them, never cropped. */
+:root { --pic-cap: min(33vh, 240px); }
+@supports (height: 1svh) { :root { --pic-cap: min(33svh, 240px); } }
 .at-picture { display:block; max-width:100%; border-radius: var(--r-sm); background: var(--well); }
-.at-picture.prompt { width:min(100%, 320px); aspect-ratio:4/3; object-fit:contain; margin:0 auto; }
+.at-picture.prompt { width:min(100%, 320px, var(--pic-cap) * 4 / 3); aspect-ratio:4/3; object-fit:contain; margin:0 auto; }
 .at-picture.answer { width:min(100%, 200px); aspect-ratio:4/3; object-fit:contain; }
 span.at-picture { display:flex; align-items:center; justify-content:center; color: var(--muted);
   font-size:14px; text-align:center; padding:12px; }
-.at-picchoices { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+/* Square tiles two to a row: the grid is as tall as it is wide, so capping
+   its width caps its height. */
+.at-picchoices { display:grid; grid-template-columns:1fr 1fr; gap:10px;
+  width:100%; max-width:var(--pic-cap); margin-inline:auto; }
 .at-picchoice { padding:0; aspect-ratio:1; border:3px solid var(--line); border-radius: var(--r-sm);
   background: var(--well); overflow:hidden; cursor:pointer; }
 .at-picchoice > .at-picture { width:100%; height:100%; object-fit:contain; border-radius:0; }

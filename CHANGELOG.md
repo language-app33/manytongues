@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.606 — 11 November 2026
+## 0.607 — 11 November 2026
 
 **"Which word is missing?" shows the answer where you are already
 looking.** Once you've answered, the missing word is highlighted in green
@@ -34,6 +34,22 @@ whole sentence is pronounced stays in "Learn more".
 To check by hand: pick a wrong word in "Which word is missing?". Yours
 turns red, the right one green, and the right word appears highlighted in
 the sentence.
+
+## 0.606 — 11 November 2026
+
+**Pictures in questions take less of the screen.** A picture is never
+taller than a third of the screen, and never more than 240 pixels, so the
+answer stays in view.
+
+For students:
+
+- **The four picture choices fit in one glance.** On a tablet or computer
+  they used to fill the screen and push the buttons below out of sight; the
+  four of them together now take no more room than the picture you are
+  asked about.
+- **On a short phone the picture you are asked about shrinks** rather than
+  taking half the space above the keyboard.
+- Pictures are shrunk to fit, never cropped, so nothing in them is cut off.
 
 ## 0.605 — 10 November 2026
 
