@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.606 — 11 November 2026
+
+**Pictures in questions take less of the screen.** A picture is never
+taller than a third of the screen, and never more than 240 pixels, so the
+answer stays in view.
+
+For students:
+
+- **The four picture choices fit in one glance.** On a tablet or computer
+  they used to fill the screen and push the buttons below out of sight; the
+  four of them together now take no more room than the picture you are
+  asked about.
+- **On a short phone the picture you are asked about shrinks** rather than
+  taking half the space above the keyboard.
+- Pictures are shrunk to fit, never cropped, so nothing in them is cut off.
+
 ## 0.605 — 10 November 2026
 
 **Fixes from a learner's 8 reports.** Questions say more clearly what they
