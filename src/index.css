@@ -1516,7 +1516,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* Home has no tab title: the button sits under the app's name, at its left. */
 .at-placecorner { display:flex; margin:-8px 0 18px; }
 /* The sheet: a place per row, with what you can do there on the same line
-   as its name (0.609): each mode a small square, its icon over its word. */
+   as its name (0.610): each mode a small square, its icon over its word. */
 .at-where { display:flex; flex-direction:column; gap:8px; margin:4px 0 16px; }
 .at-whererow { display:flex; flex-direction:row; align-items:center; gap:6px; padding:6px; border:2px solid var(--line); border-radius:16px; }
 .at-whererow.on { border-color: var(--jade); background: color-mix(in srgb, var(--jade) 10%, transparent); }

@@ -9814,7 +9814,7 @@ function saveTeaches(yes: boolean) {
     /* private browsing; the next launch just asks again */
   }
 }
-/* Every space this person teaches in (0.609), so Where you are can offer
+/* Every space this person teaches in (0.610), so Where you are can offer
    Teaching on a space other than the one here from the moment it opens. */
 const TEACHES_IN_KEY = "arabic-trainer-teaches-in";
 function loadTeachesIn(): string[] {
@@ -9923,6 +9923,29 @@ function saveMaterial(
    last-writer-wins: a write here would stamp settingsUpdated and hand this
    device's theme, keyboard and exercise choices to every other one. */
 const LISTEN_OFF_KEY = "arabic-trainer-listen-off";
+
+/* How many sessions have shown "Tap a word to see its harakat" (0.609).
+   The owner's choice: the line teaches that the tap exists, and after the
+   first few sessions it is only repeating itself. Kept on the device, for
+   the reasons above — a new phone shows it a few times more, which is the
+   one place a reminder is no loss. */
+const MARKS_TIP_KEY = "arabic-trainer-marks-tip";
+export const MARKS_TIP_SESSIONS = 3;
+function loadMarksTip(): number {
+  try {
+    return Number(localStorage.getItem(MARKS_TIP_KEY)) || 0;
+  } catch (e) {
+    return 0;
+  }
+}
+function saveMarksTip(n: number) {
+  try {
+    localStorage.setItem(MARKS_TIP_KEY, String(n));
+  } catch (e) {
+    /* private browsing; it is shown again next time, which is harmless */
+  }
+}
+
 function loadListenOff() {
   try {
     return Number(localStorage.getItem(LISTEN_OFF_KEY)) || 0;
@@ -10192,7 +10215,7 @@ export default function ArabicTrainer() {
     if (open === "admin" || open === "super") return open;
     /* Going to another space from Learning, to learn there (0.601). */
     if (open === "learn") return "learn";
-    /* Or from Teach on another space's row (0.609). */
+    /* Or from Teach on another space's row (0.610). */
     if (open === "teach") return "teach";
     return loadTeaches() ? "teach" : "learn";
   });
@@ -10457,6 +10480,11 @@ export default function ArabicTrainer() {
      they were asked on rather than cleared by resetExercise, so no way onto
      the next question can carry them over. */
   const [lentFor, setLentFor] = useState<{ ex: unknown; keys: string[] }>({ ex: null, keys: [] });
+  /* Sessions that have shown the tap tip, and the session it was last
+     counted in — known by its first question, which stays put when later
+     questions are swapped out mid-session. */
+  const [marksTipShown, setMarksTipShown] = useState(loadMarksTip);
+  const marksTipFor = useRef<unknown>(null);
   /* What the reader has asked to see of a scene they are reading through.
      Two, because they are two different admissions — needing to hear it
      and needing to be told what it means — and a reader often wants one
@@ -12803,8 +12831,20 @@ export default function ArabicTrainer() {
     : spec.promptField === "tense"
     ? (verbTense ? verbTense.places.map((p) => String(p.form.ar || "")).join(" ") : "")
     : String(item.ar || "");
-  const promptBare =
+  const promptBareNow =
     !!qLang.marks && !marksTell && !checked && (promptSentence || (promptWord && wordsBare)) && hasMarks(promptText, qLang);
+  /* The tip under it, in the learner's first few sessions with a bare word
+     and not after (1b): counted once a session, the first time one shows. */
+  const sessionToken = session && session.exercises ? session.exercises[0] || null : null;
+  const promptBare = promptBareNow && (marksTipFor.current === sessionToken || marksTipShown < MARKS_TIP_SESSIONS);
+  useEffect(() => {
+    if (!promptBareNow || !sessionToken || marksTipFor.current === sessionToken) return;
+    if (marksTipShown >= MARKS_TIP_SESSIONS) return;
+    marksTipFor.current = sessionToken;
+    const n = marksTipShown + 1;
+    saveMarksTip(n);
+    setMarksTipShown(n);
+  }, [promptBareNow, sessionToken, marksTipShown]);
   const choicesBare =
     !!qLang.marks && !marksTell && !checked && choicesInScript && (choicesRun === "sentence" || wordsBare) && !lentKeys.includes(CHOICES_LENT);
 
@@ -14003,7 +14043,7 @@ export default function ArabicTrainer() {
     goToSpace(row);
   };
   /* A mode beside a space. Learning there is Learning narrowed to it;
-     another space's mode is gone to at its address (0.609). */
+     another space's mode is gone to at its address (0.610). */
   const pickMode = (row: WhereRow, mode: string) => {
     setWhereOpen(false);
     if (!row.here) {
@@ -19960,7 +20000,7 @@ function WhereBadge({ row, mode }: { row: WhereRow | null; mode?: string }) {
   return <SpaceBadge space={{ name: row.label, logo: row.logo, logoData: row.logoData }} />;
 }
 
-/* The modes as the buttons beside a space call them (0.609): short, so
+/* The modes as the buttons beside a space call them (0.610): short, so
    all three fit on the line with its name. */
 const MODE_SHORT: Record<string, string> = { learn: "Learn", teach: "Teach", admin: "Admin" };
 

@@ -21,9 +21,9 @@ export interface PlaceSpace {
   /** A stored picture's hash, or a data URL from the address (0.576). */
   logo?: string;
   logoData?: string;
-  /** Whether this account runs it, as whoami said (0.609). */
+  /** Whether this account runs it, as whoami said (0.610). */
   runs?: boolean;
-  /** Whether it teaches there, as the last pull said (0.609). */
+  /** Whether it teaches there, as the last pull said (0.610). */
   teaches?: boolean;
 }
 
@@ -110,7 +110,7 @@ export interface WhereRow {
   opened?: boolean;
   /** The space at the address. */
   here?: boolean;
-  /** What you can do there, offered beside its name (0.609): for every
+  /** What you can do there, offered beside its name (0.610): for every
       space, from what whoami and the last pull said of each. Empty for a
       row that is one place only, or where you can only learn: the name
       itself is the way to learn there (2a). */
@@ -155,7 +155,7 @@ export function whereRows(o: Parameters<typeof placeRows>[0] & {
        modes, and they need a row to sit under. */
     else if (modesHere.length > 1) spaces = [{ id: o.hereId, slug: "", label: "Your space" }];
   }
-  /* What you can do in another of your spaces (0.609): the App admin
+  /* What you can do in another of your spaces (0.610): the App admin
      anything; anyone else what that space has made them. */
   const modesThere = (id: string): Mode[] => {
     const s = o.mine.find((m) => m.id === id);

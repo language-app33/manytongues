@@ -2198,7 +2198,7 @@ async function handle(req) {
           suspended: undefined,
           org: org ? orgCard(org) : { id: MAIN, slug: MAIN, name: "Main", logo: "", colour: "" },
           orgAdmin: !!org && (org.admins || []).includes(me.handle),
-          /* Whether they run each space too (0.609), so Where you are can
+          /* Whether they run each space too (0.610), so Where you are can
              offer Admin on a space other than the one here. */
           orgs: shown
             .map((id) => orgDocs.get(id))
@@ -4937,7 +4937,7 @@ async function handle(req) {
          teacher in one space and a learner in another sees Teaching where
          they teach. */
       const teaches = allCourses.filter((c) => orgOf(c) === acting).some((c) => isTeacher(c, mine));
-      /* And every space they teach in (0.609): this action reads across
+      /* And every space they teach in (0.610): this action reads across
          all of them, so Where you are can offer Teaching on each. */
       const teachesIn = [...new Set(allCourses.filter((c) => isTeacher(c, mine)).map((c) => orgOf(c)))];
 

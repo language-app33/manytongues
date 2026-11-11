@@ -90,7 +90,7 @@ test("a learner in two spaces: all of them, then each, and the line says which",
   assert.equal(w({ mine: [A, B], filter: "gone" }).now, "all");
 });
 
-test("every space offers what you can do there, beside its name (0.609)", () => {
+test("every space offers what you can do there, beside its name (0.610)", () => {
   const r = w({ mine: [A, B], teaches: true, space: "teach" });
   assert.deepEqual(r.rows.find((x) => x.id === "a")?.modes, ["learn", "teach"]);
   /* Only learning in Beta: its name is the way to learn there, no buttons. */

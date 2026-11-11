@@ -27,7 +27,7 @@ export interface OrgCard {
   name: string;
   logo: string;
   colour: string;
-  /** Whether this account runs it (0.609). Only on whoami's list of yours. */
+  /** Whether this account runs it (0.610). Only on whoami's list of yours. */
   runs?: boolean;
 }
 

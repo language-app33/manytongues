@@ -5360,7 +5360,7 @@ export interface CoursesUnchanged {
   unchanged: true;
   version: string;
   teaches: boolean;
-  /** Every space this person teaches in (0.609). */
+  /** Every space this person teaches in (0.610). */
   teachesIn: string[];
 }
 
