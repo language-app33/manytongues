@@ -138,7 +138,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
   ]],
   [SPACES, [
     ["where-you-are", "The button at the right of every tab's title, and under the app's name on Home (0.601): the place, the mode and the languages once some are off. It opens the sheet that changes them. Not there for someone with nothing to choose.", "Lingua · Teaching · Arabic only"],
-    ["where-place", "A row of the sheet behind where you are: Super admin, All your spaces, or one of your spaces, with what you do there. The space you are in has its modes under it; another space is gone to, and from Learning, learnt in.", "Main · You teach here."],
+    ["where-place", "A row of the sheet behind where you are: Super admin, All your spaces, or one of your spaces. Beside each space's name, Learn, Teach and Admin, as far as you can do each there; a space where you only learn has none, and its name takes you to learn there.", "Main · Learn Teach"],
     ["stranded", "The page someone sees when they have no space to open: suspended in, removed from or gone from each of theirs, with a box for an invitation link or a course code.", "You're suspended in Lingua."],
   ]],
 ];

@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.609 — 11 November 2026
+
+**"Where you are" is shorter, and every space has its buttons.**
+
+- **Each space's buttons now sit on the same line as its name**, as small
+  squares with the icon above a short word: Learn, Teach, Admin.
+- **Every one of your spaces shows them, not only the one you are in.**
+  Each shows only what you can do there: Teach where you teach or run the
+  space, Admin where you run it. Tapping one takes you straight there.
+  A space where you only learn shows no buttons; tapping its name takes
+  you to learn there, as before.
+- **The line of explanation under each place is gone** ("Learning across
+  every space you are in", "You teach here." and the rest).
+
+To check by hand: someone who teaches in one space and only learns in
+another sees Teach on the first only. Right after you are made a teacher
+in another space, Teach appears there once the app next refreshes your
+courses.
+
 ## 0.608 — 11 November 2026
 
 **Students learn to read Arabic without harakat.** Everyday Arabic is

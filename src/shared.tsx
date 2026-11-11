@@ -5360,6 +5360,8 @@ export interface CoursesUnchanged {
   unchanged: true;
   version: string;
   teaches: boolean;
+  /** Every space this person teaches in (0.609). */
+  teachesIn: string[];
 }
 
 /* What folding the incoming material into what is here came to. */
@@ -5387,10 +5389,14 @@ export type CoursesPulled = Folded & {
   fold: (current: Item[], parked?: Record<string, Parked>) => Folded;
   version: string;
   teaches: boolean;
+  teachesIn: string[];
   /* The recordings and pictures in this material the server does not hold. */
   missingClips: string[];
   missingImages: string[];
 };
+
+/* A list of ids from the server, whatever came. */
+const idsOf = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []);
 
 export async function pullCourses(
   items: Item[],
@@ -5400,7 +5406,7 @@ export async function pullCourses(
 ): Promise<CoursesUnchanged | CoursesPulled> {
   const r = await API.myMaterial(knownVersion || "");
   if (r.unchanged) {
-    return { unchanged: true, version: r.version || "", teaches: !!r.teaches };
+    return { unchanged: true, version: r.version || "", teaches: !!r.teaches, teachesIn: idsOf(r.teachesIn) };
   }
   const enrolled = r.courses || [];
   const decks = r.decks || [];
@@ -5515,6 +5521,7 @@ export async function pullCourses(
       foldCourses(current, incoming, drawer),
     version: r.version || "",
     teaches: !!r.teaches,
+    teachesIn: idsOf(r.teachesIn),
     missingClips: Array.isArray(r.missingClips) ? r.missingClips.filter((h: unknown) => typeof h === "string") : [],
     missingImages: Array.isArray(r.missingImages) ? r.missingImages.filter((h: unknown) => typeof h === "string") : [],
   };

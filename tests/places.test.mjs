@@ -90,13 +90,23 @@ test("a learner in two spaces: all of them, then each, and the line says which",
   assert.equal(w({ mine: [A, B], filter: "gone" }).now, "all");
 });
 
-test("only the space here offers its modes; another space is a place to go", () => {
+test("every space offers what you can do there, beside its name (0.609)", () => {
   const r = w({ mine: [A, B], teaches: true, space: "teach" });
   assert.deepEqual(r.rows.find((x) => x.id === "a")?.modes, ["learn", "teach"]);
+  /* Only learning in Beta: its name is the way to learn there, no buttons. */
   assert.deepEqual(r.rows.find((x) => x.id === "b")?.modes, []);
   assert.equal(r.now, "a");
   assert.equal(r.label, "Alpha · Teaching");
-  assert.equal(r.rows.find((x) => x.id === "a")?.what, "You teach here.");
+  assert.equal("what" in (r.rows[0] || {}), false);
+  const t = w({ mine: [A, { ...B, teaches: true }] });
+  assert.deepEqual(t.rows.find((x) => x.id === "b")?.modes, ["learn", "teach"]);
+  const ru = w({ mine: [A, { ...B, runs: true }] });
+  assert.deepEqual(ru.rows.find((x) => x.id === "b")?.modes, ["learn", "teach", "admin"]);
+});
+
+test("the super admin is offered every mode in each of their spaces", () => {
+  const r = w({ admin: true, mine: [A, B], space: "super" });
+  assert.deepEqual(r.rows.find((x) => x.id === "b")?.modes, ["learn", "teach", "admin"]);
 });
 
 test("a space admin in one space: the space, its three modes, no place name", () => {

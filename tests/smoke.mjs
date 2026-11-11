@@ -4514,7 +4514,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   click(document.querySelector('[data-el="where-you-are"]'));
   await sleep(200);
   const toTeaching = [...document.querySelectorAll(".at-wheremode")]
-    .find((b) => /Teaching/i.test(b.textContent || ""));
+    .find((b) => /^Teach$/.test(b.textContent || ""));
   check("a teacher can reach the teaching space", !!toTeaching,
     [...document.querySelectorAll(".at-wheremode")].map((b) => b.textContent).join(",") || "no sheet");
   click(toTeaching);
@@ -11304,7 +11304,7 @@ const openPronounTables = async () => {
   /* A teacher opens into Teaching; asked for it all the same, in case this
      device has not yet heard that they teach. */
   if (!host.querySelector(".at-screen.bare")) {
-    click(await spaceBtn(/Teaching/i));
+    click(await spaceBtn(/^Teach$/));
     await sleep(900);
   }
   const frame = () => host.querySelector(".at-screen.bare");

@@ -9814,13 +9814,31 @@ function saveTeaches(yes: boolean) {
     /* private browsing; the next launch just asks again */
   }
 }
+/* Every space this person teaches in (0.609), so Where you are can offer
+   Teaching on a space other than the one here from the moment it opens. */
+const TEACHES_IN_KEY = "arabic-trainer-teaches-in";
+function loadTeachesIn(): string[] {
+  try {
+    const v = JSON.parse(localStorage.getItem(TEACHES_IN_KEY) || "[]");
+    return Array.isArray(v) ? v.filter((x) => typeof x === "string") : [];
+  } catch (e) {
+    return [];
+  }
+}
+function saveTeachesIn(ids: string[]) {
+  try {
+    localStorage.setItem(TEACHES_IN_KEY, JSON.stringify(ids));
+  } catch (e) {
+    /* private browsing; the next pull says again */
+  }
+}
 /* Signing out forgets it for every space: the next person is not them. */
 function forgetTeaches() {
   try {
     const gone: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
-      if (k && (k.startsWith(TEACHES_PREFIX) || k === "arabic-trainer-teaches")) gone.push(k);
+      if (k && (k.startsWith(TEACHES_PREFIX) || k === "arabic-trainer-teaches" || k === TEACHES_IN_KEY)) gone.push(k);
     }
     for (const k of gone) localStorage.removeItem(k);
   } catch (e) {
@@ -10174,6 +10192,8 @@ export default function ArabicTrainer() {
     if (open === "admin" || open === "super") return open;
     /* Going to another space from Learning, to learn there (0.601). */
     if (open === "learn") return "learn";
+    /* Or from Teach on another space's row (0.609). */
+    if (open === "teach") return "teach";
     return loadTeaches() ? "teach" : "learn";
   });
   useEffect(() => {
@@ -10196,6 +10216,7 @@ export default function ArabicTrainer() {
      Deriving it only from a fresh network call meant a slow or failed request
      took the space selector away, with no way back but signing out. */
   const [teaches, setTeaches] = useState(() => loadTeaches());
+  const [teachesIn, setTeachesIn] = useState<string[]>(() => loadTeachesIn());
   /* The learner's tabs scroll the page itself rather than a panel of their
      own, so this is the one that has to be put back. Space and tab
      together: moving from Teaching to Learning is arriving somewhere too.
@@ -11791,7 +11812,11 @@ export default function ArabicTrainer() {
         );
         setTeaches(r.teaches);
         /* Trying a space (0.574): its answer is not yours to keep. */
-        if (!TRYING) saveTeaches(r.teaches);
+        if (!TRYING) {
+          saveTeaches(r.teaches);
+          setTeachesIn(r.teachesIn);
+          saveTeachesIn(r.teachesIn);
+        }
         materialVersion.current = r.version || "";
         answered = true;
         if (r.unchanged) {
@@ -13909,7 +13934,7 @@ export default function ArabicTrainer() {
     teaches,
     trying: !!TRYING,
     space,
-    mine: accountOrgs,
+    mine: accountOrgs.map((o) => ({ ...o, runs: !!o.runs, teaches: teachesIn.includes(o.id) })),
     opened: TRYING && addressSpace ? addressSpace : null,
     hereId,
     filter: spaceFilter,
@@ -13977,9 +14002,14 @@ export default function ArabicTrainer() {
     }
     goToSpace(row);
   };
-  /* A mode under the space here. Learning there is Learning narrowed to it. */
+  /* A mode beside a space. Learning there is Learning narrowed to it;
+     another space's mode is gone to at its address (0.609). */
   const pickMode = (row: WhereRow, mode: string) => {
     setWhereOpen(false);
+    if (!row.here) {
+      if (mode === "learn" && where.multi) setSpaceFilter(row.id);
+      return goToSpace(row, mode);
+    }
     arrive();
     setSpace(mode);
     if (mode === "learn" && where.multi) setSpaceFilter(row.id);
@@ -19930,6 +19960,10 @@ function WhereBadge({ row, mode }: { row: WhereRow | null; mode?: string }) {
   return <SpaceBadge space={{ name: row.label, logo: row.logo, logoData: row.logoData }} />;
 }
 
+/* The modes as the buttons beside a space call them (0.609): short, so
+   all three fit on the line with its name. */
+const MODE_SHORT: Record<string, string> = { learn: "Learn", teach: "Teach", admin: "Admin" };
+
 /*
  * The sheet behind where you are (0.601): every place you can be, one per
  * row, with what you do there under its name; under the space you are in,
@@ -19963,7 +19997,6 @@ function WhereSheet({ rows, now, mode, onRow, onMode, onClose, langs }: {
                   <WhereBadge row={r} />
                   <span className="at-wheretext">
                     <b>{r.label}</b>
-                    <span>{r.what}</span>
                   </span>
                   {r.opened ? <span className="at-place-tag">Opened</span> : null}
                   {on && !r.modes.length ? <span className="at-place-tick"><Icon name="check" size={18} /></span> : null}
@@ -19979,8 +20012,8 @@ function WhereSheet({ rows, now, mode, onRow, onMode, onClose, langs }: {
                           aria-pressed={cur}
                           onClick={() => onMode(r, m)}
                         >
-                          <Icon name={SPACE_ICON[m]} size={16} />
-                          {SPACE_LABEL[m]}
+                          <Icon name={SPACE_ICON[m]} size={18} />
+                          <span>{MODE_SHORT[m]}</span>
                         </button>
                       );
                     })}

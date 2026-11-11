@@ -830,7 +830,7 @@ export interface User {
    * and `lastTaughtIn` per space; none of those is ever sent, like the
    * key's digest.
    */
-  orgs?: { id: string; slug: string; name: string; logo: string; colour: string }[];
+  orgs?: { id: string; slug: string; name: string; logo: string; colour: string; runs?: boolean }[];
   /** False until the person has ticked that their key is saved (0.544). Absent: saved. */
   keySaved?: boolean;
   /** While suspended: when, by whom, why, and the courses to put back (0.544). */
