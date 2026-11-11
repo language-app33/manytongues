@@ -209,6 +209,12 @@ test("a session deals a counting face as the number with a learnt noun, and cred
     assert.notEqual(shown.unit.ar, unit.ar, "not the bare word");
     assert.match(shown.unit.ar, new RegExp([noun.sg, noun.pl, noun.dual].join("|")), "the noun is in the phrase");
     assert.match(shown.unit.en, new RegExp(`^${ex.ask.value} `), "the meaning is the count and the thing");
+    /* Asked from the figures, the phrase is in the ones English uses —
+       "5 sisters", never "٥ sisters" (0.606). */
+    if (unit.numeral) {
+      assert.equal(shown.unit.numeral, shown.unit.en, "the figures English uses, with the thing counted");
+      assert.doesNotMatch(shown.unit.numeral, /[٠-٩]/, "no Arabic figure beside an English noun");
+    }
     assert.equal(shown.unit.id, unit.id, "marked on the face itself");
     assert.ok(shown.unit.tokens.some((/** @type {any} */ t) => t.noun === noun.id), "the noun is credited");
     assert.ok(

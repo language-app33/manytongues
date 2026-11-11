@@ -3452,15 +3452,18 @@ function castFace(
   if (!said.text) return resolved;
   const slot = String(((resolved.parent.source || {}) as { slot?: unknown }).slot || "");
   const col = String(resolved.unit.col || "");
-  const lang = LANGUAGES[set.numbers.languageId];
-  const figures = resolved.unit.numeral ? ownFigures(lang, said.digits) : "";
   const unit: Form = {
     ...resolved.unit,
     ar: said.text,
     en: said.en,
-    /* The number in the language's own figures, with the thing counted
-       beside it, for the question asked from those figures. */
-    ...(figures ? { numeral: `${figures} ${said.en.slice(said.digits.length).trim()}`.trim() } : null),
+    /* The top question, asked from the figures, shows the phrase in the
+       figures English uses — "5 sisters", not "٥ sisters". The language's
+       own figure beside an English noun read as a muddle (a learner's
+       report), and reading ٥ is already the plain number card's job. The
+       key stays the same, so passes made from ٥ still count: the Arabic
+       written is the same either way. See DECISIONS.md, "A counting
+       phrase is asked in the figures English uses". */
+    ...(resolved.unit.numeral ? { numeral: said.en } : null),
     /* Nobody recorded or transliterated the phrase whole. */
     recs: [],
     clips: [],
@@ -14900,6 +14903,7 @@ export default function ArabicTrainer() {
                             exercises call them, "Arabic numerals". */}
                         {spec.promptField === "numeral" &&
                           item.numeral &&
+                          item.numeral !== item.en &&
                           /[0-9]/.test(String(item.en || "")) && (
                           <div className="at-answeralso" data-el="also-figures">
                             <p className="at-alsolabel" data-el="also-figures-label">

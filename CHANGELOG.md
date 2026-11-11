@@ -8,6 +8,37 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.606 — 11 November 2026
+
+**Writing a counted phrase in Arabic is asked from "5 sisters", not
+"٥ sisters".** The top question for a number before a noun showed the
+Arabic numeral beside an English word, and a learner reported the mix as
+confusing. It now shows the phrase in the figures English uses. Reading
+the Arabic numerals is still asked where it is the point: on the plain
+number cards, ٥ on its own.
+
+- **Progress already made on these questions is kept.** The Arabic
+  written is the same either way; only the figure in the question changes.
+- **Reading a counted phrase is unchanged**: خمس أخوات, written in English
+  as "5 sisters".
+
+To check by hand: a "Write this number in Arabic" question on a number
+with a noun shows "5 sisters" (or whichever), and its answer screen does
+not repeat it under "In Arabic numerals".
+
+Checked and left alone:
+
+- **The noun in counting questions is "sisters" every time.** The app
+  rotates among the nouns a learner has already learnt in the plural, so
+  more variety arrives as more nouns are learnt.
+- **The whole phrase's pronunciation after "choose the missing word"**
+  already shows where the phrase has one written; the phrase reported has
+  none.
+- Reports sent before 0.605 on "neutral" and "plural", vowel marks in
+  "Who is it?", "lives", two right answers in "Choose the meaning", the
+  phrase's meaning when typing the missing word, and "Two cats" were fixed
+  or settled in 0.605.
+
 ## 0.605 — 10 November 2026
 
 **Fixes from a learner's 8 reports.** Questions say more clearly what they

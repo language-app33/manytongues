@@ -7988,3 +7988,31 @@ behind the hint, and free, but two reports took the question for a test of
 remembering the phrase. The owner chose to show it, as "choose the missing
 word" has since 0.586. The hint is the word's pronunciation again, and
 costs the mark. `hintPhrase` is kept for any question that wants it back.
+
+## A counting phrase is asked in the figures English uses (0.606)
+
+**11 November 2026** · `src/ArabicTrainer.tsx` (`castFace`, the answer
+screen's `also-figures`), `tests/numbers-counted-faces.test.mjs`
+
+A counting face's top question (`own2ar`) showed the phrase as "٥ Sisters":
+the language's own figure beside an English noun. A learner reported it as
+a muddle. The owner chose to show the phrase in the figures English uses,
+"5 sisters", and keep the language's own figures for the plain number
+cards, which already ask ٥ alone. This reverses 4 October's "shows the
+language's own and nothing else" for counted phrases only; that rule is
+about reading a number, and a counted phrase is about the word a number
+takes before a noun.
+
+The owner also chose to keep the key, so passes made from ٥ still count:
+the Arabic written is the same either way. The owner considered and turned
+down an Arabic → English question showing ٥ in the phrase: beside the
+words it gives the number away, and in place of them it no longer asks the
+word the face is about.
+
+The answer screen's "In Arabic numerals" line is skipped where the prompt
+already is the English figures, so it does not say "5 sisters" twice.
+
+Left alone in the same batch: the noun rotates only among those learnt in
+the plural (the owner's rule from 7 October, kept), and the whole phrase's
+pronunciation after a gap is shown where the phrase has one written
+(since 0.583), which the reported phrase did not.
