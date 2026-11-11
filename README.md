@@ -1160,6 +1160,31 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   the language's context, a lookup rather than a comparison per word, which
   is what lets every deck in the list be scored at once. Tests:
   `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
+- **A course's path: units, in order (0.611).** A course holds a second
+  kind of element beside its decks: the **unit**. Underneath, a unit is a
+  deck with `unit: true`; a course lists its units in `path`, in order,
+  drafts included, and everything else about the path is per course too,
+  because one unit can be in several courses. Two principles govern it:
+  **cards are free objects** — a card can be in any number of units, decks
+  and courses, and nothing about where it already is may block adding it
+  somewhere else — and **progress belongs to the card**, so a card cleared
+  anywhere is cleared everywhere and nothing about the path stores
+  progress of its own. The word *unit* alone is taken in the code (`Unit`,
+  `unitsOf`, `quietUnits` mean one form of a card that can be asked), so
+  the thing here is a *path unit* in code and "Unit" only on screen.
+
+  Every rule lives in `src/path.ts`, which is pure and read by the app and
+  the server alike. `pathRows` says where a learner stands: the first unit
+  is open; a unit opens when every unit before it is finished — every word
+  and sentence card cleared, the text or conversation at the end not
+  needed; and a unit once reached is reached for good, so the list of
+  reached units only grows (`mergeReached` joins two devices' lists by
+  union). Nobody is sent back by a teacher adding, reordering or
+  inserting. `cardHeld` is the one thing the path does to a session: a
+  never-met card is held only while every deck it lives in is a unit not
+  yet reached, so a word also in an ordinary deck, or in an open unit,
+  arrives as it always did. Tests: `tests/path.test.mjs`; why:
+  DECISIONS.md, "Units: a course's path".
 - **Word sets: lists every language has, written once (0.569).** Numbers
   and pronouns so far, months and days of the week to come. The app knows
   the list; the teacher writes the words once for the language, and a deck

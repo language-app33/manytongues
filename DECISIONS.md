@@ -8062,3 +8062,43 @@ choices to every other one. A session counts once, known by its first
 question, so a queue rearranged mid-session is not a second session. The
 cost is that a new device shows it three times more. The owner also chose
 (2a) to keep the exception for spellings told apart only by their marks.
+
+---
+
+## Units: a course's path
+
+**11 November 2026** · `src/path.ts`, `src/types.ts` (0.611 onward)
+
+A course gains a second kind of element beside decks: the unit, one step
+of a path a class walks in order. The owner's plan settled the rules
+(R1–R37, A1–A7); this entry is why they are shaped the way they are.
+
+**A unit is a deck with a flag, not a new record.** A unit holds cards
+exactly as a deck does, joins courses as a deck does, and is sent to
+students as a deck is. Making it a deck with `unit: true` meant every piece
+of that — saving cards into it, the number parts it holds, backup and
+restore, the student's download — already worked. What is new lives on the
+course (`path`, `pathLive`, `opened`), because a unit can be in several
+courses and each gives it its own place, publishes it separately and opens
+it early separately.
+
+**Progress belongs to the card, so the path stores almost nothing.**
+Whether a unit is finished is read off its cards each time: every word
+and sentence card cleared. A card cleared through another deck or course
+counts. The one thing remembered is which units were ever *reached*,
+because "nobody is ever sent back" (R25) cannot be read off the cards: a
+card that slips after its unit was finished would otherwise lock every
+unit after it again.
+
+**Held means held everywhere it lives, or not at all.** A never-met card
+is kept out of sessions only while every deck it is in is a unit the
+learner has not reached (`cardHeld`). A teacher who puts a word in unit 5
+and in an ordinary deck has said it may come now, and it does. This is
+also why the path never filters which words fill a blank: a word stands in
+a blank once the learner has cleared it, wherever it was cleared, which
+already gives "cards before sentences" without a second rule.
+
+**Named apart from `Unit`.** The trainer already calls one askable form of
+a card a unit (`unitsOf`, `quietUnits`). Renaming either would touch
+hundreds of lines for nothing; the new thing is a *path unit* in code.
+

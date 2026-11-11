@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.611 — 11 November 2026
+
+**Units, step one: the rules of a course's path. Nothing changes on
+screen yet.**
+
+A course is getting a second kind of element beside its decks: the
+**unit**. Units sit in a fixed order, the path, and each opens when the
+one before it is finished. This release writes down the rules the rest of
+the work will follow, with tests, and nothing a teacher or student can see
+uses them yet:
+
+- **A unit opens when every word and sentence of the one before it is
+  cleared.** The first is always open. A text or conversation at the end
+  does not have to be done first.
+- **Nobody is ever sent back.** A unit that has opened for a student stays
+  open, whatever a teacher adds, reorders or inserts later, and even if
+  cards of an earlier unit slip back.
+- **A new word is held back only while every place it lives is a unit the
+  student has not reached.** A word that is also in an ordinary deck, or in
+  a unit already open, arrives as it does today.
+
 ## 0.610 — 11 November 2026
 
 **"Where you are" is shorter, and every space has its buttons.**

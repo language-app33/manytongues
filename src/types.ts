@@ -766,7 +766,16 @@ export interface Lang {
  * listed here. `language` is the one every reader relies on, and the one
  * worth naming.
  */
-export type Settings = { language?: LangId } & Record<string, any>;
+export type Settings = {
+  language?: LangId;
+  /**
+   * By course id: the path units that have ever been open for this learner
+   * there (0.611). Merged across devices by union (mergeReached in
+   * src/path.ts), never overwritten — the one setting that is not
+   * last-writer-wins. Read it through pathReachedOf in the app.
+   */
+  pathReached?: Record<string, string[]>;
+} & Record<string, any>;
 
 /**
  * A session built by hand on the Build screen and kept.
@@ -1293,6 +1302,13 @@ export interface Deck {
    * partsWaiting in server/api/courses.js.
    */
   partsWaiting?: string[];
+  /**
+   * Present means the deck is a path unit, in every course that holds it:
+   * one step of a course's path, opened in order (0.611). See src/path.ts.
+   * Not to be confused with `Unit` in the trainer, which is one form of a
+   * card that can be asked.
+   */
+  unit?: true;
 }
 
 export interface Course {
@@ -1312,6 +1328,13 @@ export interface Course {
   /** Gives authority over the material. */
   teacherCode?: string;
   created?: Millis;
+  /* The path (0.611): everything about it is per course. See src/path.ts. */
+  /** The ids of its path units, in order. Drafts included. */
+  path?: string[];
+  /** The path units published in THIS course, by deck id, with when. */
+  pathLive?: Record<string, Millis>;
+  /** The ids of the path units a teacher has opened early for this course's class. */
+  opened?: string[];
 }
 
 /**
