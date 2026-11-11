@@ -1869,6 +1869,15 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 .at-arabic.word { font-size:calc(54px * var(--sscale, 1)); }
 .at-arabic.phrase { font-size:calc(40px * var(--sscale, 1)); }
 .at-arabic.sentence { font-size:calc(30px * var(--sscale, 1)); line-height:calc(1.85 * var(--sleading, 1)); }
+/* A word shown without its harakat, one tap from having them back (0.608).
+   Nothing drawn under it — a line under Arabic runs through the dots
+   below the letters — so a press shows it, and a keyboard's focus ring. */
+.at-bareword { cursor:pointer; border-radius:6px; -webkit-tap-highlight-color:transparent; }
+.at-bareword:hover { background: var(--wash); }
+.at-bareword:active { background: var(--press); }
+.at-bareword:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+/* And put back: the colour says it was asked for. */
+.at-lentword { color: var(--brass-shade); }
 .at-latin { font-family: var(--ui); font-size:calc(19px * var(--lscale, 1)); font-weight:600; color: var(--muted); margin:8px 0; word-break:break-word; }
 /* A hint is the same kind of thing whichever field it comes from — a look
    at part of the answer before committing — so it is set at one size. Left

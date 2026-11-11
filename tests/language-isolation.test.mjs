@@ -167,8 +167,9 @@ const ALLOWED_SCRIPT = {
      of "to eat" — the form a dictionary lists a verb under, which is what a
      card with a name of its own is named instead of. */
   gallery: ["كِتَاب", "كُتُب", "أكل"],
-  /* Examples of what each element holds, which are the point of the list. */
-  "screen-elements": ["كِتاب", "الكتاب كبير", "كُتُب", "السَّلامُ عَلَيْكُم", "٤٧", "٠١٢٣٤٥٦٧٨٩", "أنا بالشغل"],
+  /* Examples of what each element holds, which are the point of the list —
+     a word bare and with its harakat among them (0.608). */
+  "screen-elements": ["كِتاب", "كتاب", "الكتاب كبير", "كُتُب", "السَّلامُ عَلَيْكُم", "٤٧", "٠١٢٣٤٥٦٧٨٩", "أنا بالشغل"],
   /* Specimens of each text style, on the admin screen that lists them. */
   "text-styles": ["كِتَاب", "الكِتَاب كَبِير", "اسْمِي لَيْلَى وَأَنَا مِن فِلَسْطِين"],
 };

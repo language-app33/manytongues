@@ -8,6 +8,55 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.608 — 11 November 2026
+
+**Students learn to read Arabic without harakat.** Everyday Arabic is
+written without them, so the app now takes them away as a student gets to
+know each word. Hebrew niqqud work the same way. Vietnamese is not
+affected.
+
+For students:
+
+- **A new word is shown with its harakat** while you learn what it means.
+- **Once you know what it means, it is shown without them**: in every
+  question, in the answer options, in matching tiles, and when an early
+  question about it comes back for review. Get its meaning wrong twice in
+  a row and the harakat come back until you have it again.
+- **Sentences are always shown without harakat**: conversations, texts,
+  phrases, example sentences and replies, from the first time you see
+  them.
+- **Stuck on a word? Tap it** to see its harakat for that question. A line
+  under the question says so. In a sentence only the word you tap gets its
+  harakat back. Where the options are buttons, "Show the harakat" puts
+  them back on all the options at once.
+- **Asking for the harakat makes the answer a near miss**, even if you then
+  get it right, and the word comes round again sooner. The answer screen
+  says so.
+- **Once you have answered, the harakat come back** on the word and on the
+  right answer, so you can check how it is said. Sentences stay without
+  them.
+- **Typing is unchanged**: answers are accepted with or without harakat,
+  and any you type must be right.
+
+One exception: **the harakat stay where they are all that tells two words
+apart**. For example, كَتَب "he wrote" and كُتُب "books", if you are
+learning both. The same goes for two persons of a verb that differ only in
+their vowels, which "Who is it?" asks about.
+
+For teachers:
+
+- **A word card written without harakat says so** under its Arabic, since
+  students then never see how it is vowelled. It is a note, not an error:
+  some words need none. Sentences don't get the note, because students see
+  them without harakat anyway.
+
+To check by hand: practise a Palestinian word you know the meaning of. Its
+options or tiles should have no harakat, "Show the harakat" should bring
+them back, and the verdict should then say "near miss". A brand-new word
+should still show its harakat. Also try a conversation: its lines should
+have no harakat, and tapping a word should bring back that word's harakat
+alone.
+
 ## 0.607 — 11 November 2026
 
 **"Which word is missing?" shows the answer where you are already

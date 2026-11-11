@@ -12125,6 +12125,143 @@ const openPronounTables = async () => {
   delete anyWindow.AudioContext;
 }
 
+/* ---- reading without the harakat (0.608) ----
+   Five words written with their harakat. New, a word is asked with them
+   on: its meaning is still being learnt. Once that is done the same word
+   is shown bare — on the prompt, the options and the tiles — and "Show
+   the harakat" puts them back on the options, at the cost of a near miss.
+   On their own document, at the end, like the walks above. */
+{
+  const before = errors.length;
+  const HARAKA = /[ً-ْ]/;
+  const words = [
+    ["كِتاب", "book", "kitaab"], ["قَلَم", "pen", "qalam"], ["بَيْت", "house", "beet"],
+    ["شَمْس", "sun", "shams"], ["بَاب", "door", "baab"],
+  ];
+  const card = (/** @type {number} */ i, /** @type {any} */ s = {}) => ({
+    id: `hk${i}`, kind: "word", tags: ["Lesson 1"], created: 1, updated: Date.now(),
+    forms: [{ id: `hk${i}`, ar: words[i][0], en: words[i][1], lat: words[i][2], s }],
+  });
+  const solid = { phase: "review", reps: 4, interval: 9, ease: 2.5, due: Date.now() + 5 * 86400000,
+    right: 4, wrong: 0, hist: [1, 1, 1, 1], updated: Date.now() };
+  const meaningKnown = { ar2pick: { ...solid }, ar2en: { ...solid } };
+  const text = (/** @type {Element | null} */ el) => ((el && el.textContent) || "").trim();
+  /** @param {any[]} items */
+  const walk = async (items) => {
+    remoteDocs.clear();
+    localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items,
+    }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    for (let t = 0; t < 100 && !startBtn(); t++) await sleep(100);
+    click(startBtn());
+    for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
+    const met = {
+      promptsInScript: 0, promptsMarked: 0, promptsBare: 0, tip: false, tapped: false, tappedShows: false,
+      choiceSets: 0, choicesBare: 0, revealButton: false, revealed: false, nearMiss: false, nearVerdict: "",
+      afterMarked: false, tilesBare: false, asked: /** @type {string[]} */ ([]),
+    };
+    for (let n = 0; n < 30 && host.querySelector(".at-instruction"); n++) {
+      const promptEl = host.querySelector('[data-el="question-prompt-text"]');
+      const promptAr = promptEl && /[؀-ۿ]/.test(text(promptEl));
+      if (promptAr) {
+        met.promptsInScript += 1;
+        if (HARAKA.test(text(promptEl))) met.promptsMarked += 1;
+        const bare = host.querySelector('[data-el="word-bare"]');
+        if (bare) {
+          met.promptsBare += 1;
+          met.tip = met.tip || !!host.querySelector('[data-el="question-marks-tip"]');
+          if (!met.tapped) {
+            click(bare);
+            await sleep(60);
+            met.tapped = true;
+            met.tappedShows = !!host.querySelector('[data-el="word-marks-lent"]') && HARAKA.test(text(host.querySelector('[data-el="question-prompt-text"]')));
+          }
+        }
+      }
+      const choices = host.querySelector('[data-el="answer-choices"]');
+      const tiles = [...host.querySelectorAll('[data-el="match-word"]')];
+      if (tiles.length) met.tilesBare = met.tilesBare || tiles.every((t) => !HARAKA.test(text(t)));
+      if (choices && /[؀-ۿ]/.test(text(choices))) {
+        met.choiceSets += 1;
+        if (!HARAKA.test(text(choices))) met.choicesBare += 1;
+        const reveal = host.querySelector('[data-el="reveal-marks"]');
+        met.revealButton = met.revealButton || !!reveal;
+        /* The meaning asked, which the prompt may say with more round it. */
+        const ask = text(promptEl).toLowerCase();
+        const want = (words.find((w) => new RegExp(`\\b${w[1]}\\b`).test(ask)) || [""])[0];
+        met.asked.push(ask);
+        if (reveal && want && !met.nearMiss) {
+          click(reveal);
+          await sleep(60);
+          met.revealed = HARAKA.test(text(host.querySelector('[data-el="answer-choices"]')));
+          const unmark = (/** @type {string} */ t) => t.replace(/[\u064B-\u0652]/g, "");
+          const right = [...host.querySelectorAll('[data-el="answer-choices"] button')].find((b) => unmark(text(b)) === unmark(want));
+          click(right || null);
+          await sleep(60);
+          click(host.querySelector('[data-el="check-button"]'));
+          await sleep(250);
+          met.nearVerdict = text(host.querySelector('[data-el="verdict-marks-lent"]'));
+          met.nearMiss = !!met.nearVerdict;
+        } else {
+          click(choices.querySelector("button"));
+        }
+      } else if (host.querySelector('[data-el="answer-match"]')) {
+        await playGrid();
+      } else {
+        const dunno = [...host.querySelectorAll("button")].find((b) => /^I don't know$/.test((b.textContent || "").trim()));
+        click(dunno || null);
+      }
+      await sleep(120);
+      if (!host.querySelector('[data-el="verdict"]')) {
+        click(host.querySelector('[data-el="check-button"]'));
+        await sleep(200);
+      }
+      /* Once answered, a word's own prompt has its harakat back. */
+      const after = host.querySelector('[data-el="question-prompt-text"]');
+      if (after && /[؀-ۿ]/.test(text(after)) && HARAKA.test(text(after))) met.afterMarked = true;
+      click([...host.querySelectorAll("button")].find((b) => /^Continue$/.test((b.textContent || "").trim())));
+      await sleep(200);
+    }
+    r.unmount();
+    host.remove();
+    const KEY = "arabic-trainer:arabic-trainer-v3";
+    let was = localStorage.getItem(KEY);
+    for (let t = 0, still = 0; t < 40 && still < 4; t++) {
+      await sleep(100);
+      const now = localStorage.getItem(KEY);
+      still = now === was ? still + 1 : 0;
+      was = now;
+    }
+    return met;
+  };
+
+  materialQuiet = true;
+  const fresh = await walk([0, 1, 2, 3, 4].map((i) => card(i)));
+  const known = await walk([0, 1, 2, 3, 4].map((i) => card(i, meaningKnown)));
+  materialQuiet = false;
+  check("a new word is shown with its harakat while its meaning is learnt",
+    fresh.promptsInScript > 0 && fresh.promptsMarked === fresh.promptsInScript && fresh.promptsBare === 0, JSON.stringify(fresh));
+  /* Not every set: the walk answers the typed questions "I don't know",
+     and two misses running on the first level rightly give a word its
+     marks back. */
+  check("once its meaning is known, its options are shown without them",
+    known.choiceSets > 0 && known.choicesBare > 0, JSON.stringify(known));
+  check("with a button that puts them back on every option",
+    known.revealButton && known.revealed, JSON.stringify(known));
+  check("which makes a right answer a near miss, and says so",
+    known.nearMiss && /near miss/.test(known.nearVerdict), JSON.stringify(known));
+  if (known.promptsBare > 0) {
+    check("a bare word on the prompt says it can be tapped, and a tap puts its harakat back",
+      known.tip && known.tappedShows, JSON.stringify(known));
+  }
+  check("nothing went wrong on the way", errors.length === before, errors.slice(before).join("\n"));
+}
+
 report();
 console.log("\nrequests:", calls.join("\n          "));
 exitWhenWritten(results.some((r) => r.startsWith("FAIL")) ? 1 : 0);

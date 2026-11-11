@@ -723,6 +723,21 @@ export function reachedLevel(
     });
 }
 
+/**
+ * Whether a form is shown without its vowel marks (0.608) — Arabic's
+ * harakat, Hebrew's niqqud. The level that has to be reached first, and
+ * the test: the owner's rule is that a word is met with its marks while
+ * what it means is being learnt, and read bare from the moment that is
+ * done — the second level open, on the same reading `reachedLevel` makes
+ * for a word inside a sentence. Two misses running on the first level put
+ * the marks back until it is recovered, as they shut the level above.
+ */
+export const BARE_FROM_LEVEL = 2;
+export const readsBare = (
+  types: string[],
+  stateOf: (type: string) => ExerciseState | null | undefined,
+): boolean => types.length > 0 && reachedLevel(types, stateOf, BARE_FROM_LEVEL);
+
 /* ------------------------------------------------------------------
    Cleared, and then learnt
 

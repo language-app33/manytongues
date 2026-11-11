@@ -303,6 +303,18 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   pack states it in `marking` and nobody is asked to rule on harakat
   before they can read one.
 
+- **Words are learnt to be read without their vowel marks.** Arabic's
+  harakat and Hebrew's niqqud, declared by the pack as `marks`, are on a
+  word while its meaning is being learnt and off from the second level of
+  its ladder (`readsBare` in the scheduler); a sentence never has them.
+  A learner taps a bare word to have its marks back for that question, or
+  presses "Show the harakat" over options, and the question counts as a
+  near miss. The answer screen puts a word's marks back. Display only: the
+  stored card, the marking and the typing are unchanged. One exception:
+  where the marks are all that tells two spellings on the question apart —
+  two of the learner's words, two options, two persons of a verb — they
+  stay. See DECISIONS.md, "Students learn to read without harakat".
+
 - **What keeps going wrong can be practised on its own.** *Weak spots*,
   under Start session on the home screen, deals nothing but the exercises
   that have been missed — wrong twice running, which is the app's own
