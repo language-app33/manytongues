@@ -10960,7 +10960,10 @@ const openPronounTables = async () => {
   };
   const chosen = await walk([textCard({ dlgwhole: { ...solid } })], async (host) => {
     await reach(host, /Which word is missing/);
-    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), verdict: "", after: "" };
+    const out = {
+      instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]),
+      verdict: "", after: "", filled: "", want: "", right: /** @type {string[]} */ ([]), wrong: 0, repeated: false,
+    };
     const choices = host.querySelector('[data-el="answer-choices"]');
     if (!choices) return out;
     const buttons = [...choices.querySelectorAll("button")];
@@ -10972,6 +10975,11 @@ const openPronounTables = async () => {
     await sleep(250);
     out.verdict = verdictOf(host);
     out.after = prompt(host);
+    out.filled = text(host.querySelector('[data-el="question-prompt-filled"]'));
+    out.want = want || "";
+    out.right = [...choices.querySelectorAll(".at-reply.right")].map((b) => text(b).replace(/^✓/, "").trim());
+    out.wrong = choices.querySelectorAll(".at-reply.wrong").length;
+    out.repeated = !!host.querySelector('[data-el="answer-value"]');
     return out;
   });
   check("a text already read asks for a word taken out of one of its sentences",
@@ -10991,19 +10999,24 @@ const openPronounTables = async () => {
   check("choosing the word that fits is marked right, and the sentence is shown whole",
     /Correct|Good job|Nicely done|Great/.test(chosen.verdict) && sentences.includes(chosen.after),
     `${chosen.verdict} / ${chosen.after}`);
+  check("with the word that went in highlighted in it, and the right option marked green and nothing red",
+    chosen.filled !== "" && chosen.filled === chosen.want && chosen.right.length === 1 && chosen.right[0] === chosen.want && chosen.wrong === 0,
+    JSON.stringify({ filled: chosen.filled, want: chosen.want, right: chosen.right, wrong: chosen.wrong }));
 
   const typed = await walk([textCard({ dlgwhole: { ...solid }, gap2pick: { ...solid } })], async (host, typeIn) => {
     await reach(host, /Fill the gap/);
-    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), choices: false, input: false, verdict: "" };
+    const out = { instruction: text(host.querySelector(".at-instruction")), prompt: prompt(host), choices: false, input: false, verdict: "", filled: "", want: "" };
     out.choices = !!host.querySelector('[data-el="answer-choices"]');
     out.input = !!host.querySelector('[data-el="answer-input"]');
     if (!out.input) return out;
     const words = sentences.flatMap((s) => s.split(" "));
-    typeIn(fits(out.prompt, words));
+    out.want = fits(out.prompt, words) || "";
+    typeIn(out.want);
     await sleep(60);
     click(host.querySelector('[data-el="check-button"]'));
     await sleep(250);
     out.verdict = verdictOf(host);
+    out.filled = text(host.querySelector('[data-el="question-prompt-filled"]'));
     return out;
   });
   /* The same text with each sentence's meaning written beside it. */
@@ -11056,14 +11069,28 @@ const openPronounTables = async () => {
   );
   const chosenMeant = await walk([meantCard({ dlgwhole: { ...solid }, sen2en: { ...solid }, en2sen: { ...solid } })], async (host) => {
     await reach(host, /Which word is missing/);
-    const out = { instruction: text(host.querySelector(".at-instruction")), before: "", after: "", meaning: "", above: "" };
+    const out = {
+      instruction: text(host.querySelector(".at-instruction")), before: "", after: "", meaning: "", above: "",
+      wrongPick: false, pickRed: false, rightGreen: 0, filled: "", rightWord: "", repeated: false,
+    };
     const choices = host.querySelector('[data-el="answer-choices"]');
     if (!choices) return out;
     out.before = text(host.querySelector('[data-el="question-prompt-meaning"]'));
-    click(choices.querySelector("button"));
+    /* A wrong word, on purpose, where one can be told from the sentence. */
+    const tiles = [...choices.querySelectorAll("button")];
+    const blanked = prompt(host);
+    const want = fits(blanked, tiles.map((b) => text(b)));
+    const pick = tiles.find((b) => text(b) !== want) || tiles[0];
+    out.wrongPick = !!want && text(pick) !== want;
+    click(pick);
     await sleep(60);
     click(host.querySelector('[data-el="check-button"]'));
     await sleep(250);
+    out.pickRed = !!pick && pick.classList.contains("wrong") && !!pick.querySelector('[data-el="answer-choice-wrong"]');
+    out.rightGreen = choices.querySelectorAll(".at-reply.right").length;
+    out.rightWord = text(choices.querySelector(".at-reply.right")).replace(/^✓/, "").trim();
+    out.filled = text(host.querySelector('[data-el="question-prompt-filled"]'));
+    out.repeated = !!host.querySelector('[data-el="answer-value"]');
     out.after = prompt(host);
     out.meaning = text(host.querySelector('[data-el="answer-meaning"]'));
     out.above = text(host.querySelector('[data-el="question-prompt-meaning"]'));
@@ -11096,11 +11123,17 @@ const openPronounTables = async () => {
       sentences.includes(chosenMeant.after) && chosenMeant.meaning.includes(meaningOf(chosenMeant.after)) &&
       chosenMeant.meaning !== "" && chosenMeant.above === "",
     JSON.stringify(chosenMeant));
+  check("a wrong pick turns red, the right word green, and the right word is in the sentence, highlighted, and not written out again",
+    chosenMeant.wrongPick && chosenMeant.pickRed && chosenMeant.rightGreen === 1 &&
+      chosenMeant.filled === chosenMeant.rightWord && chosenMeant.filled !== "" && !chosenMeant.repeated,
+    JSON.stringify(chosenMeant));
   check("once choosing it is solid, the missing word is typed instead",
     /Fill the gap/.test(typed.instruction) && typed.input && !typed.choices && /____/.test(typed.prompt),
     JSON.stringify(typed));
   check("and typing the word that fits is marked right",
     /Correct|Good job|Nicely done|Great/.test(typed.verdict), typed.verdict);
+  check("and the typed word is highlighted in the sentence put back too",
+    typed.filled !== "" && typed.filled === typed.want, JSON.stringify({ filled: typed.filled, want: typed.want }));
   check("and nothing threw while the missing words were practised",
     errors.length === before, errors.slice(before, before + 3).join(" | "));
 }

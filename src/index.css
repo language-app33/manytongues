@@ -3100,6 +3100,18 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
   color: var(--text); }
 .at-reply.on { border-color: var(--jade-soft); background: var(--jade-bg); }
 .at-reply:disabled { cursor:default; }
+/* Once a missing word is answered: the right option green, a wrong pick
+   red, each with a tick or a cross so colour is not all that says so. */
+.at-reply.right, .at-reply.wrong { display:flex; align-items:center; gap:10px; }
+.at-reply.right { border-color: var(--jade); background: var(--jade-bg); }
+.at-reply.wrong { border-color: var(--rose); background: rgba(223,95,114,.08); }
+.at-replymark { flex:0 0 auto; font-family: var(--ui); font-size:16px; font-weight:800; line-height:1; }
+.at-reply.right .at-replymark { color: var(--jade); }
+.at-reply.wrong .at-replymark { color: var(--rose); }
+.at-reply.right .at-arabic, .at-reply.wrong .at-arabic { flex:1 1 auto; min-width:0; }
+/* The word that went in, in the sentence put back. The same green as the
+   right option below it, so the two read as one answer. */
+.at-filled { background: var(--jade-soft); color: var(--text); border-radius:5px; padding:0 .12em; }
 /* Tiles where more than one may be ticked ("who is it?") wear a box, so
    a tap that leaves the others on reads as ticking, not as a slip. */
 .at-replies.multi .at-reply::before { content:""; display:inline-block; box-sizing:border-box;

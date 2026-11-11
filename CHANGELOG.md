@@ -8,6 +8,33 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.606 — 11 November 2026
+
+**"Which word is missing?" shows the answer where you are already
+looking.** Once you've answered, the missing word is highlighted in green
+in the sentence, and the options show what was right.
+
+For students:
+
+- **The word that went in is highlighted** in the sentence at the top, so
+  you don't have to hunt for it. This also applies when you type the
+  missing word ("Fill the gap").
+- **When you choose, the options are marked.** The right word turns green
+  with a tick. If you picked a different word, yours turns red with a
+  cross. The sentence above always shows the right word, whichever you
+  picked.
+- **The right word is no longer written out again under "Not quite".** The
+  green option and the highlighted word already show it.
+- This applies to a missing word in a phrase and to a missing word in a
+  text or conversation.
+
+Unchanged: what the sentence means stays under the verdict, and how the
+whole sentence is pronounced stays in "Learn more".
+
+To check by hand: pick a wrong word in "Which word is missing?". Yours
+turns red, the right one green, and the right word appears highlighted in
+the sentence.
+
 ## 0.605 — 10 November 2026
 
 **Fixes from a learner's 8 reports.** Questions say more clearly what they

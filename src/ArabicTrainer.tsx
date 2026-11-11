@@ -308,6 +308,7 @@ import {
   setTaughtShort,
   taughtShortGaps,
   gappedLine,
+  filledLine,
   isDialog,
   meantAt,
   sentenceOptions,
@@ -3716,6 +3717,24 @@ function blankedPhrase(context: any, lang: Lang, blank: string = "____") {
     .map((t, i) => (i === context.slot ? gap : i > context.slot && i < context.slot + span ? null : t))
     .filter((t) => t !== null)
     .join(" ");
+}
+
+/* The phrase put back once answered, in three pieces — before the word,
+   the word, after it — so the answer screen can mark the word that went
+   in. What is glued to it stays outside the mark, as it stayed outside the
+   gap. Null where the gap cannot be found, and the phrase is shown plain. */
+function filledPhrase(context: any, lang: Lang): { before: string; word: string; after: string } | null {
+  const tokens = contextTokens(context.ar, lang);
+  const span = Math.max(1, context.span || 1);
+  if (context.slot < 0 || context.slot >= tokens.length) return null;
+  const SPLIT = "\u0000";
+  const [before, after = ""] = blankedPhrase(context, lang, SPLIT).split(SPLIT);
+  const token = tokens[context.slot];
+  const glued = span === 1 && context.word ? gluedTo(token, context.word, lang) : null;
+  const word = glued
+    ? Array.from(token).slice(Array.from(glued.before).length, Array.from(token).length - Array.from(glued.after).length).join("")
+    : tokens.slice(context.slot, context.slot + span).join(" ");
+  return word ? { before, word, after } : null;
 }
 
 /*
@@ -8359,6 +8378,36 @@ function Spelt({ runs, lang, name, className }: {
   );
 }
 
+/*
+ * A sentence once its missing word is back in it, with that word marked.
+ *
+ * The answer screen used to put the sentence back whole and leave the
+ * learner to find the word in it. Drawn as Arabic draws a phrase, with the
+ * word in a <mark> so the highlight reaches a screen reader too.
+ */
+function Filled({ parts, lang, name }: {
+  parts: { before: string; word: string; after: string };
+  lang?: Lang;
+  name?: string;
+}) {
+  const L = lang || LANGUAGES[DEFAULT_LANGUAGE];
+  return (
+    <p
+      className="at-arabic phrase"
+      data-el={name}
+      lang={L.id}
+      dir={L.direction}
+      style={{ fontFamily: L.fontStack, direction: L.direction, ...scriptVars(L) }}
+    >
+      {parts.before}
+      <mark className="at-filled" data-el="question-prompt-filled">
+        {parts.word}
+      </mark>
+      {parts.after}
+    </p>
+  );
+}
+
 /* One shared empty array, so a card with no recordings hands the player
    the same value every render and does not restart it. */
 const NO_RECS: any[] = [];
@@ -9056,7 +9105,7 @@ function MatchGrid({
  *   the meanings up, in the interface font — an English tile set in the
  *   script's size and direction is a sentence pretending to be a word.
  */
-function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase", field = "ar", multi = false }: {
+function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase", field = "ar", multi = false, rightId }: {
   options: any[];
   lang: Lang;
   value: string;
@@ -9066,6 +9115,9 @@ function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase"
   field?: string;
   /** Several may be ticked: the value is their texts, in the tiles' order, joined by WHO_JOIN. */
   multi?: boolean;
+  /** Once answered, the right option: it turns green, and a wrong pick red,
+      each with a tick or a cross so it is not colour alone that says so. */
+  rightId?: string;
 }) {
   const textOf = (option: any) => String((option && option[field]) || "");
   const ticked = multi ? value.split(WHO_JOIN).filter(Boolean) : [];
@@ -9079,17 +9131,28 @@ function TextChoices({ options, lang, value, onChange, disabled, kind = "phrase"
     <div className={`at-replies${multi ? " multi" : ""}`} data-el="answer-choices" role={multi ? "group" : undefined}>
       {options.map((option) => {
         const text = textOf(option);
+        const mark = rightId === undefined ? "" : option.id === rightId ? "right" : isOn(text) ? "wrong" : "";
         return (
           <button
             type="button"
             key={option.id}
-            className={`at-reply${isOn(text) ? " on" : ""}${kind === "word" ? " word" : ""}${
-              field === "en" ? " en" : ""
-            }`}
+            className={`at-reply${isOn(text) && !mark ? " on" : ""}${mark ? ` ${mark}` : ""}${
+              kind === "word" ? " word" : ""
+            }${field === "en" ? " en" : ""}`}
             aria-pressed={isOn(text)}
             disabled={disabled}
             onClick={() => toggle(text)}
           >
+            {mark === "right" && (
+              <span className="at-replymark" data-el="answer-choice-right" aria-label="Right answer">
+                ✓
+              </span>
+            )}
+            {mark === "wrong" && (
+              <span className="at-replymark" data-el="answer-choice-wrong" aria-label="Your answer">
+                ✗
+              </span>
+            )}
             {field === "en" ? asMeaning(text) : <Arabic text={text} kind={kind} lang={lang} />}
           </button>
         );
@@ -12599,8 +12662,24 @@ export default function ArabicTrainer() {
   /* Playing a part is the exception: the scene is already on the screen
      with every turn marked where it stands, so repeating it underneath
      would be the same conversation twice. */
+  /* The sentence of a "which word is missing?" question, put back once
+     answered, in pieces so the word that went in can be marked. */
+  const filledGap = !checked || !spec || !item
+    ? null
+    : spec.promptField === "gap"
+    ? (dialog && item.gap ? filledLine(dialog, item.gap) : null)
+    : spec.promptField === "context" && context
+    ? filledPhrase(context, qLang)
+    : null;
+  /* On choosing the missing word, the options themselves say what was
+     right once answered: the right one green, a wrong pick red. With that
+     and the word marked in the sentence, the right word written out again
+     under the verdict would be the third time it is on the screen. */
+  const marksChoices = !!checked && !!spec && spec.picks === "word" &&
+    (spec.promptField === "gap" || spec.promptField === "context");
   const answerRepeated =
     !!checked &&
+    !marksChoices &&
     (!answerRight || checked.reason === "bare" || checked.reason === "typo") &&
     !(spec && spec.answerMode === "part") &&
     /* Nor under a verb's tense, which shows each person's form where it
@@ -14257,12 +14336,16 @@ export default function ArabicTrainer() {
                          meaning, the meaning is under it as the clue —
                          the sentence alone often fits more than one word. */
                       <>
-                        <Field
-                          value={dialog && item.gap ? gappedLine(dialog, item.gap, checked ? null : undefined) : ""}
-                          field="ar"
-                          kind="phrase"
-                          name="question-prompt-text"
-                        />
+                        {checked && filledGap ? (
+                          <Filled parts={filledGap} lang={qLang} name="question-prompt-text" />
+                        ) : (
+                          <Field
+                            value={dialog && item.gap ? gappedLine(dialog, item.gap, checked ? null : undefined) : ""}
+                            field="ar"
+                            kind="phrase"
+                            name="question-prompt-text"
+                          />
+                        )}
                         {/* Once answered the sentence is whole again, and
                             what it means is said with the answer below —
                             see answeredMeaning — not left up here. */}
@@ -14276,6 +14359,9 @@ export default function ArabicTrainer() {
                       <Field value={item.ar} field="ar" kind="phrase" name="question-prompt-text" />
                     ) : spec.promptField === "sentenceMeaning" ? (
                       <Field value={item.en} field="en" kind="phrase" name="question-prompt-text" />
+                    ) : spec.promptField === "context" && checked && filledGap ? (
+                      /* Put back, with the word that went in marked. */
+                      <Filled parts={filledGap} lang={qLang} name="question-prompt-text" />
                     ) : spec.promptField === "context" ? (
                       <Field
                         /* The phrase can go between building the queue and
@@ -14475,6 +14561,7 @@ export default function ArabicTrainer() {
                         /* Who a form is about: every person it could be is
                            ticked, so the tiles toggle rather than choose. */
                         multi={spec.picks === "person"}
+                        rightId={marksChoices && item ? item.id : undefined}
                       />
                     ) : spec.answerMode === "choice" ? (
                       <Segmented
