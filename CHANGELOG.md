@@ -8,6 +8,49 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.614 — 11 November 2026
+
+**Units, step four: teachers can build a course's path.** Students see
+nothing of it yet; that comes next.
+
+For teachers, on a course's page:
+
+- **A Path section above the decks** lists the course's units in order,
+  each with its number, whether it is a draft or published in this
+  course, its quality score, and "Needs attention" when it is published
+  but something has since left its checklist unclear. It stays live for
+  students while it is fixed.
+- **New unit** and **Add an existing unit** (one already in another
+  course) put a unit at the end of the path, as a draft here. **Move up**
+  and **Move down** reorder it. **Open for the class** lets the whole
+  class practise a published unit early; **Close for the class** takes
+  that back without taking anyone's progress. **Remove from this course**
+  and **Delete unit** work as they do for a deck; deleting says so when
+  the unit is in other courses too.
+- **Units are no longer listed among the course's ordinary decks.**
+
+On a unit's page — the deck page, headed "Unit 3 · its title":
+
+- **A checklist** says what is missing before it can be published in
+  this course: sentences with a blank still needed, blanks with fewer than
+  five approved words from this unit or earlier ones, words not used in
+  any of its sentences, a second text or conversation. **Publish unit**
+  works once it is clear. Cards still in draft are not counted, and the
+  checklist says how many there are.
+- **The quality score counts a word as untaught** if only a later unit
+  teaches it.
+- **Advice on forms**: blanks whose approved words all share one gender
+  or number are listed under the score. Advice only: no points, and it
+  never stops publishing.
+- Adding, editing and reviewing cards work exactly as on a deck, including
+  adding a card that is already in other decks or units.
+
+To check by hand: make a course with three units, reorder, remove and
+delete one; fill unit 1 until its checklist clears and publish it; add
+unit 1 to a second course and see it there as a draft with its own
+checklist; take an approved word out of a published unit's blank and see
+"Needs attention" while it stays published.
+
 ## 0.613 — 11 November 2026
 
 **Units, step three: a student's device follows the path. Still nothing

@@ -442,6 +442,17 @@ export const attachDeck = (deckId: string, courseId: string) =>
 export const detachDeck = (deckId: string, courseId: string) =>
   call("detach-deck", { body: { deckId, courseId } });
 
+/* ---- a course's path (0.614): units, in order, per course ---- */
+export const createUnit = (courseId: string, title: string) =>
+  call("create-unit", { body: { courseId, title } });
+export const moveUnit = (courseId: string, deckId: string, to: number) =>
+  call("move-unit", { body: { courseId, deckId, to } });
+/** Refused with "unit-not-ready" and the server's `problems` on the error's `data`. */
+export const publishUnit = (courseId: string, deckId: string) =>
+  call("publish-unit", { body: { courseId, deckId } });
+export const openUnit = (courseId: string, deckId: string, open: boolean) =>
+  call("open-unit", { body: { courseId, deckId, open } });
+
 /* ---- clips ---- */
 /* ---- a language's numbers, and its clock ----
 
@@ -675,6 +686,9 @@ export function explain(err: unknown): string {
       "not-teaching": "You aren't teaching that course.",
       "no-deck": "That deck no longer exists.",
       "deck-locked": "That deck is locked. Unlock it in its settings first.",
+      "unit-draft": "This unit isn't published in this course yet",
+      "unit-not-ready": "This unit isn't ready to publish yet. The checklist says what is missing.",
+      "not-on-path": "That unit is no longer on this course's path.",
       "no-user": "No account with that handle.",
       "no-card": "That card no longer exists.",
       "stale-system":

@@ -8142,3 +8142,16 @@ other. Every kind of session is covered by the first, saved sessions,
 prep and Ultimate included (A5). Blanks are not filtered: a word fills a
 blank only once cleared, wherever it was cleared (R13).
 
+**0.614: the teacher's screens reuse the deck's.** A unit's page is the
+deck page with a heading, a checklist and a Publish button, because a
+unit is a deck underneath (R1) and every way of adding, editing and
+reviewing cards should be the one teachers already know. The checklist is
+judged in the course the page was opened from, since a unit can be ready
+in one course and not in another. The screen reads every card, drafts
+included, and says how many drafts there are; the server reads published
+cards only and is the one that decides, and when it refuses, its own list
+replaces the screen's. "Needs attention" is the same checklist on a unit
+already published (R17): it never takes the unit away from students. The
+advice on forms reads only the grammar the language declares, and is
+advice only (A6), so a language without gender or number shows nothing.
+

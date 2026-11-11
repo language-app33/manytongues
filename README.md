@@ -1222,8 +1222,23 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   `mergeData` joins two devices' lists by union rather than taking the
   newer settings, and the sync endpoint does the same against what it
   holds before it writes. `installIndexes` takes the courses and decks, so
-  a test can deal a session with a path. Tests: `tests/path.test.mjs`,
-  `tests/path-server.test.mjs`, `tests/path-device.test.mjs`; why:
+  a test can deal a session with a path.
+
+  **A teacher builds the path on the course's page (0.614).** `PathSection`
+  in `src/spaces.tsx` lists a course's units in path order above its decks
+  — which no longer list units — and calls the four path actions,
+  `attach-deck`, `detach-deck` and `delete-deck`, putting what the server
+  answered on screen rather than fetching everything again. A unit opens
+  on the deck page, headed with its number in the course it was opened
+  from, with `UnitChecklist` above its cards: `unitProblems` over
+  `countingFor` — `countingCards` over the teacher's whole collection and
+  its number values — in the words of `problemLine`. The checklist and the
+  quality score's `known` are the only things that read it; the card
+  editor and the review screens are handed the pools they always were.
+  Under the score, `sameFormBlanks` lists blanks whose approved words share
+  every grammar field the language declares (`dimsOf`), as advice. Tests:
+  `tests/path.test.mjs`, `tests/path-server.test.mjs`,
+  `tests/path-device.test.mjs`, and a walk in `tests/smoke.mjs`; why:
   DECISIONS.md, "Units: a course's path".
 - **Word sets: lists every language has, written once (0.569).** Numbers
   and pronouns so far, months and days of the week to come. The app knows

@@ -357,6 +357,10 @@ export function heldParts(decks: { id: string; parts?: string[] }[], ids: Set<st
   return out;
 }
 
+/** Whether a card is a number value made for blanks (see fillerCards). */
+const isFillerOf = (c: Held): boolean =>
+  !!c && !!c.source && typeof c.source.slot === "string" && c.source.slot.startsWith("fill:");
+
 /** The number values whose part is among `parts` (A3): each says which part
     it comes from in `source.slot`, as `fill:<part id>`. */
 export function heldFillers<T extends Held>(fillers: T[], parts: Set<string>): T[] {
@@ -391,8 +395,65 @@ export function countingCards<T extends Held>(o: {
   };
   for (const c of o.cards || []) {
     if (!c) continue;
+    /* A number value is never asked on its own either, but it counts only
+       through the part it comes from — below. */
+    if (isFillerOf(c)) continue;
     if (neverAskedAlone(c) || o.deckIdsOf(c).some((d) => from.has(d))) add(c);
   }
   for (const f of heldFillers(o.fillers || [], heldParts(o.decks, from))) add(f);
   return out;
+}
+
+/* ------------------------------------------------------------------
+   The checklist, in the words the teacher reads (the plan's section 9)
+   ------------------------------------------------------------------ */
+
+/**
+ * One line of the checklist. `textOf` gives a card's text by id: the
+ * sentence with the short blank, or the word not used.
+ */
+export function problemLine(p: UnitProblem, textOf: (cardId: string) => string): string {
+  switch (p.kind) {
+    case "few-sentences": {
+      const more = Math.max(0, p.need - p.have);
+      return more === 1
+        ? `Add 1 more sentence with a blank (${p.have} of ${p.need})`
+        : `Add ${more} more sentences with a blank (${p.have} of ${p.need})`;
+    }
+    case "blank-short":
+      return `"${textOf(p.cardId)}": the blank ${p.slot} has ${p.have} of ${p.need} approved cards from this unit or earlier ones`;
+    case "word-unused":
+      return `"${textOf(p.cardId)}" is not used in any sentence of this unit`;
+    case "two-finals":
+      return "A unit can have only one text or conversation";
+  }
+}
+
+/** The line under the checklist about cards the server does not count. */
+export const draftsLine = (n: number): string =>
+  n === 1 ? "1 card is still a draft and is not counted" : `${n} cards are still drafts and are not counted`;
+
+/** The warning on deleting a unit that other courses hold too. */
+export const deleteUnitLine = (others: number): string =>
+  others === 1
+    ? "This unit is also in 1 other course. Deleting it removes it from both."
+    : `This unit is also in ${others} other courses. Deleting it removes it from all of them.`;
+
+/**
+ * The blanks whose approved cards all share one form (A6): advice under
+ * the quality score, never points and never a reason not to publish. Read
+ * off the grammar fields the language declares; a language that declares
+ * none has nothing to say here.
+ */
+export function sameFormBlanks(fills: BlankFill[], byId: (id: string) => Held | undefined, fields: string[]): BlankFill[] {
+  if (!fields.length) return [];
+  const valueOf = (card: Held, field: string): string => {
+    const lead = Array.isArray(card.forms) && card.forms[0] ? card.forms[0] : card;
+    return String((lead && lead[field]) ?? card[field] ?? "");
+  };
+  return fills.filter((b) => {
+    const cards = b.cards.map(byId).filter(Boolean) as Held[];
+    if (cards.length < 2) return false;
+    return !fields.some((f) => new Set(cards.map((c) => valueOf(c, f))).size > 1);
+  });
 }

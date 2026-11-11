@@ -279,6 +279,9 @@ const viTeach = {
   forms: [], updated: 1,
 };
 let teachesTwo = false;
+/* A course with a path (0.614): two units, the first published, served
+   to the teacher's screens only while a walk below sets it. */
+let withPath = false;
 const rafa = nameCard("k555555555555", "رافائيل", "Raphael", "rafaa'iil");
 const viktor = nameCard("k666666666666", "فيكتور", "Victor", "fiktoor");
 let materialHits = 0;
@@ -443,6 +446,25 @@ const fakeFetch = async (input, opts = {}) => {
        course hands out, which is what makes them worth trying an exercise
        on: one has a recording and one does not, and one is a phrase that
        teaches the other. */
+    if (action === "my-courses" && withPath) {
+      return json({
+        ok: true,
+        courses: [
+          { id: "c1", title: "Arabic 101", language: "ar-PS", decks: ["d1", "u1", "u2"], path: ["u1", "u2"], pathLive: { u1: 1 },
+            students: [], teachers: [account.handle], role: "teacher" },
+        ],
+      });
+    }
+    if (action === "my-decks" && withPath) {
+      return json({
+        ok: true,
+        decks: [
+          { id: "d1", title: "Lesson 1", owner: account.handle, lang: "ar-PS", cardIds: [card.id, phrase.id], cardCount: 2, courses: [{ courseId: "c1", addedAt: 1 }] },
+          { id: "u1", unit: true, title: "Greetings unit", owner: account.handle, lang: "ar-PS", cardIds: [card.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 2 }] },
+          { id: "u2", unit: true, title: "Family unit", owner: account.handle, lang: "ar-PS", cardIds: [], cardCount: 0, courses: [{ courseId: "c1", addedAt: 3 }] },
+        ],
+      });
+    }
     if (action === "my-courses") {
       return json({
         ok: true,
@@ -12268,6 +12290,62 @@ const openPronounTables = async () => {
   check("after three sessions the tip is not shown, and the tap still works",
     later.promptsBare > 0 && !later.tip && later.tappedShows, JSON.stringify(later));
   check("nothing went wrong on the way", errors.length === before, errors.slice(before).join("\n"));
+}
+
+/* ---- a course's path, in Teaching (0.614) ----
+   A course with two units, the first published there: its page shows the
+   path above its decks, each unit with its number and whether it is
+   published, and a unit is not among the ordinary decks. Opened, a unit
+   is headed with its number and shows its checklist. */
+{
+  const before = errors.length;
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+  }));
+  teachesTwo = false;
+  withPath = true;
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1500);
+  if (!host.querySelector(".at-screen.bare")) {
+    click(host.querySelector('[data-el="where-you-are"]'));
+    await sleep(200);
+    click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+    await sleep(900);
+  }
+  const frame = () => host.querySelector(".at-screen.bare") || host;
+  const tab = [...host.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
+    .filter((b) => /^Courses$/.test((b.textContent || "").trim())).pop();
+  click(tab || null);
+  await sleep(500);
+  const courseTile = [...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || ""));
+  check("the teacher's course is listed", !!courseTile, "no Arabic 101 tile");
+  click(courseTile || null);
+  await sleep(500);
+  const pathBlock = [...document.querySelectorAll('[data-el="course-path"]')].pop();
+  const rows = pathBlock ? [...pathBlock.querySelectorAll('[data-el="path-unit"]')].map((x) => (x.textContent || "").replace(/\s+/g, " ")) : [];
+  check("a course page shows its path above its decks, in order, each published or a draft",
+    rows.length === 2 && /^1\. Greetings unit/.test(rows[0]) && /Published/.test(rows[0]) && /^2\. Family unit/.test(rows[1]) && /Draft/.test(rows[1]),
+    rows.join(" | ") || "no path section");
+  check("a published unit can be opened for the class; a draft cannot",
+    /Open for the class/.test(rows[0] || "") && !/Open for the class/.test(rows[1] || ""), rows.join(" | "));
+  const screenText = ((pathBlock && pathBlock.closest(".at-screen")) || document.body).textContent || "";
+  const decksPart = screenText.slice(screenText.lastIndexOf("Decks"));
+  check("a unit is not among the course's ordinary decks", /Lesson 1/.test(decksPart) && !/Greetings unit|Family unit/.test(decksPart),
+    decksPart.replace(/\s+/g, " ").slice(0, 200));
+  click(pathBlock ? pathBlock.querySelector('[data-el="path-unit"] button') : null);
+  await sleep(600);
+  const unitScreen = [...document.querySelectorAll(".at-screen.cardform")].pop();
+  const unitText = unitScreen ? (unitScreen.textContent || "").replace(/\s+/g, " ") : "";
+  check("a unit's page is headed with its number and shows its checklist",
+    /Unit 1 · Greetings unit/.test(unitText) && /Checklist/.test(unitText) && /Add 5 more sentences with a blank \(0 of 5\)/.test(unitText),
+    unitText.slice(0, 300));
+  withPath = false;
+  r.unmount();
+  host.remove();
+  check("and nothing threw on the path's screens", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
 report();

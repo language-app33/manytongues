@@ -337,3 +337,79 @@ test("numbers count toward a blank when a unit up to this one holds their part",
   assert.equal(p.length, 5);
   assert.ok(p.every((x) => x.kind === "blank-short" && x.have === 0));
 });
+
+/* ---- phase 4: the teacher's screens ---- */
+
+import { problemLine, draftsLine, deleteUnitLine, sameFormBlanks, blankFills } from "../src/path.ts";
+import { cardSentences } from "../src/review.ts";
+
+test("what counts toward unit 2: unit 1's words and names anywhere, not unit 3's", () => {
+  const course = { id: "c", decks: ["u1", "u2", "u3"], path: ["u1", "u2", "u3"], pathLive: { u1: 1, u2: 1, u3: 1 } };
+  const units = ["u1", "u2", "u3"].map(unit);
+  const cards = [
+    food("early", "early", { decks: ["u1"] }),
+    food("mine", "mine", { decks: ["u2"] }),
+    food("later", "later", { decks: ["u3"] }),
+    food("lan", "Lan", { decks: [], category: "name" }),
+    food("loose", "loose", { decks: [] }),
+  ];
+  const ids = countingCards({ course, decks: units, unitId: "u2", cards, deckIdsOf: (/** @type {any} */ c) => c.decks, fillers: cards })
+    .map((c) => c.id).sort();
+  assert.deepEqual(ids, ["early", "lan", "mine"]);
+});
+
+test("the same unit in two courses can be clear in one and short in the other", () => {
+  const units = ["u1", "u2"].map(unit);
+  const inU = (/** @type {any} */ c, /** @type {string} */ u) => ({ ...c, decks: [u] });
+  const words = [...five.slice(0, 3).map((c) => inU(c, "u2")), ...five.slice(3).map((c) => inU(c, "u1"))];
+  const frames = fiveFrames(words).map((c) => inU(c, "u2"));
+  const all = [...words, ...frames];
+  const own = all.filter((c) => c.decks.includes("u2"));
+  /* In A, unit 1 is published before it; in B it is a draft there. */
+  const a = { id: "a", decks: ["u1", "u2"], path: ["u1", "u2"], pathLive: { u1: 1 } };
+  const b = { id: "b", decks: ["u1", "u2"], path: ["u1", "u2"], pathLive: {} };
+  const judge = (/** @type {any} */ course) => unitProblems({
+    cards: own, lang: vi,
+    counting: countingCards({ course, decks: units, unitId: "u2", cards: all, deckIdsOf: (c) => c.decks }),
+  });
+  assert.deepEqual(judge(a), []);
+  assert.ok(judge(b).some((p) => p.kind === "blank-short"));
+});
+
+test("the checklist is said in the owner's words", () => {
+  const text = (/** @type {string} */ id) => ({ s1: "tôi ăn {{food}}", w1: "phở" })[id] || id;
+  assert.equal(problemLine({ kind: "few-sentences", have: 4, need: 5 }, text), "Add 1 more sentence with a blank (4 of 5)");
+  assert.equal(problemLine({ kind: "few-sentences", have: 2, need: 5 }, text), "Add 3 more sentences with a blank (2 of 5)");
+  assert.equal(problemLine({ kind: "blank-short", cardId: "s1", partId: "s1", slot: "food", have: 3, need: 5 }, text),
+    '"tôi ăn {{food}}": the blank food has 3 of 5 approved cards from this unit or earlier ones');
+  assert.equal(problemLine({ kind: "word-unused", cardId: "w1" }, text), '"phở" is not used in any sentence of this unit');
+  assert.equal(problemLine({ kind: "two-finals", have: 2 }, text), "A unit can have only one text or conversation");
+  assert.equal(draftsLine(1), "1 card is still a draft and is not counted");
+  assert.equal(draftsLine(3), "3 cards are still drafts and are not counted");
+  assert.equal(deleteUnitLine(1), "This unit is also in 1 other course. Deleting it removes it from both.");
+  assert.equal(deleteUnitLine(2), "This unit is also in 2 other courses. Deleting it removes it from all of them.");
+});
+
+test("the review screen's sentences are not narrowed by the path", () => {
+  /* A sentence in unit 1 and a word only in a later unit: the teacher's
+     review list still offers it, exactly as before units existed. */
+  const later = food("later", "later");
+  const s = frame("s", "an");
+  const listed = cardSentences(s, [...five, later], vi).flatMap((p) => p.list.map((x) => x.took.food.card));
+  assert.ok(listed.includes("later"));
+});
+
+test("advice on forms lists a blank whose approved cards all share one form", () => {
+  const ar = LANGUAGES["ar-PS"];
+  const noun = (/** @type {string} */ id, /** @type {string} */ gender) => ({ id, forms: [{ id, ar: id, gender, number: "singular" }] });
+  /** @type {Map<string, any>} */
+  const byId = new Map([["a", noun("a", "m")], ["b", noun("b", "m")], ["c", noun("c", "f")]]);
+  const fills = [
+    { cardId: "s1", partId: "s1", slot: "x", cards: ["a", "b"] },
+    { cardId: "s2", partId: "s2", slot: "y", cards: ["a", "c"] },
+  ];
+  const fields = (ar.grammar || []);
+  assert.deepEqual(sameFormBlanks(fills, (id) => byId.get(id), fields).map((b) => b.cardId), ["s1"]);
+  assert.deepEqual(sameFormBlanks(fills, (id) => byId.get(id), []), [], "a language with no grammar says nothing");
+  assert.ok(Array.isArray(blankFills([], [], vi)));
+});
