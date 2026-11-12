@@ -12351,6 +12351,8 @@ const openPronounTables = async () => {
   const openPage = document.querySelector('[data-el="unit-page"]');
   check("the Home line opens its unit, which offers Practise this unit",
     !!openPage && /Practise this unit/.test(openPage.textContent || ""), openPage ? openPage.textContent || "" : "no page");
+  check("and, being open, offers Mark as cleared", !!openPage && /Mark as cleared/.test(openPage.textContent || ""),
+    openPage ? openPage.textContent || "" : "no page");
   backOut();
   await sleep(300);
   const tabsNow = () => [...document.querySelectorAll("[role=tab]")];
@@ -12369,7 +12371,7 @@ const openPronounTables = async () => {
   const page = document.querySelector('[data-el="unit-page"]');
   const pageText = page ? (page.closest(".at-screen") || page).textContent || "" : "";
   check("a locked unit opens read-only, says what opens it, and offers no practice",
-    /Finish unit 1 to open this one/.test(pageText) && !/Practise this unit/.test(pageText), pageText.replace(/\s+/g, " ").slice(0, 200));
+    /Finish unit 1 to open this one/.test(pageText) && !/Practise this unit|Mark as cleared/.test(pageText), pageText.replace(/\s+/g, " ").slice(0, 200));
   backOut();
   studentPath = false;
   r.unmount();

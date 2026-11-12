@@ -1249,7 +1249,15 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   opens on `UnitScreen` — `DeckScreen`, fed by `unitItems`, with its state
   and stages above — locked ones too, read only; one open for the learner,
   or opened early, offers "Practise this unit", which is `begin` with the
-  unit's items as the pool and `pathUnit` set. Tests:
+  unit's items as the pool and `pathUnit` set.
+  **And a learner may mark an open unit as cleared (0.616).**
+  `clearPathUnit`, modelled on `creditNumbers`, writes through `liftLevel`
+  from a key on each form's top level — every form `drillableUnits` gives,
+  and a part's own skill — over the unit's items but its text or
+  conversation. `liftLevel` gives no passes and leaves solid keys alone,
+  so nothing becomes learnt and what is already cleared is untouched; the
+  cards come back a day later as ordinary reviews. Shown on a unit that is
+  open or opened early, behind a confirmation, with no undo. Tests:
   `tests/path.test.mjs`, `tests/path-server.test.mjs`,
   `tests/path-device.test.mjs`, and a walk in `tests/smoke.mjs`; why:
   DECISIONS.md, "Units: a course's path".

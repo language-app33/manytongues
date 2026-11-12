@@ -1991,6 +1991,55 @@ export function unitItems(deckId: string, items: Item[]): Item[] {
 /** The path as the index holds it, for the screens. */
 export const pathIndexNow = (): PathIndex => PATH_INDEX;
 
+/**
+ * A unit marked as cleared by the learner (R32–R36): every word and
+ * sentence of it — word-set items included — written as having been up
+ * every level it has, as "This was too easy" writes a form at its top.
+ * Modelled on creditNumbers: the list back with the new states in, or the
+ * same list where nothing changed; the caller saves it.
+ *
+ * liftLevel and nothing else does the writing. It gives no passes, so
+ * nothing becomes learnt (R33); it leaves solid keys alone, so what is
+ * already cleared or learnt is untouched, and a second call writes nothing
+ * (A7); and a key not yet in review goes into review a day out, so the
+ * cards come back as ordinary reviews, where two misses at the top drop
+ * one back by the existing rule. The unit's text or conversation is left
+ * as it was (A7).
+ */
+export function clearPathUnit(items: Item[], settings: Settings, deckId: string): Item[] {
+  const ids = new Set(
+    unitItems(deckId, items).filter((it) => !isDialog(it) && isDrillable(it, settings)).map((it) => it.id),
+  );
+  if (!ids.size) return items;
+  let out: Item[] | null = null;
+  const at = Date.now();
+  items.forEach((it, i) => {
+    if (!ids.has(it.id)) return;
+    const lifts: Map<string, Record<string, ExerciseState>> = new Map();
+    const lift = (form: Form) => {
+      let keys = laddered(form, settings);
+      if (!keys.length) keys = ladderedOnceOpen(form, settings);
+      if (!keys.length) return;
+      const top = topLevelOf(keys);
+      const key = keys.find((k) => levelOf(k) === top) as string;
+      const lifted = liftLevel(keys, (k) => statesOf(form)[k], key);
+      if (Object.keys(lifted).length) lifts.set(form.id, { ...(lifts.get(form.id) || {}), ...lifted });
+    };
+    for (const { unit } of drillableUnits(it, settings)) lift(unit);
+    /* A part's skill reads as cleared only once the part itself is, not
+       only its words — as creditNumbers lifts it. */
+    if (isRangeSkill(it)) lift(leadOf(it));
+    if (!lifts.size) return;
+    const forms = formsOf(it).map((f) => {
+      const add = lifts.get(f.id);
+      return add ? { ...f, s: { ...f.s, ...add }, updated: at } : f;
+    });
+    if (!out) out = items.slice();
+    out[i] = { ...it, forms, updated: at };
+  });
+  return out || items;
+}
+
 /** How far a unit has got, in the three stages a learner is shown. */
 export interface UnitStages {
   /** Word cards and word-set items together: a part's skill, its words, the figures. */
@@ -15938,6 +15987,15 @@ export default function ArabicTrainer() {
                 setTab("home");
                 begin(false, (it) => ids.has(it.id), row.id);
               }}
+              onMarkCleared={() => {
+                /* Saved as "This was too easy" saves: the cards with their
+                   new states, through persist. No undo (R36). */
+                persist((cur) => {
+                  const next = clearPathUnit(cur.items, cur.settings, row.id);
+                  return next === cur.items ? null : { ...cur, items: next };
+                });
+                flash(`Unit ${row.number} marked as cleared`);
+              }}
             />
           );
         })()}
@@ -18613,7 +18671,7 @@ function PathHomeLine({ line, items, settings, onOpen }: {
  * this unit" where it is open for the learner. The deck page, fed by
  * unitItems.
  */
-function UnitScreen({ line, row, items, settings, perDay, onBack, onPractise }: {
+function UnitScreen({ line, row, items, settings, perDay, onBack, onPractise, onMarkCleared }: {
   line: PathLine;
   row: PathLine["rows"][number];
   items: Item[];
@@ -18621,8 +18679,14 @@ function UnitScreen({ line, row, items, settings, perDay, onBack, onPractise }: 
   perDay: number;
   onBack: () => void;
   onPractise: () => void;
+  /** Marks every word and sentence of it cleared — see clearPathUnit. */
+  onMarkCleared: () => void;
 }) {
   const [viewing, setViewing] = useState<Item | null>(null);
+  const [marking, setMarking] = useState(false);
+  /* Only a unit open for the learner: reached, or opened early by the
+     teacher (R34); never one locked or already finished. */
+  const markable = row.state === "open" || (row.state === "locked" && row.openedEarly);
   const cards = useMemo(() => unitItems(row.id, items), [row.id, items]);
   const progress = useMemo(() => {
     const at: Map<string, Standing | null> = new Map();
@@ -18658,12 +18722,26 @@ function UnitScreen({ line, row, items, settings, perDay, onBack, onPractise }: 
             {open ? (
               <div className="at-row">
                 <Button variant="primary" onClick={onPractise}>Practise this unit</Button>
+                {markable ? <Button variant="ghost" onClick={() => setMarking(true)}>Mark as cleared</Button> : null}
               </div>
             ) : null}
           </div>
         }
       />
       {viewing && <CardScreen card={viewing} items={items} settings={settings} onBack={() => setViewing(null)} />}
+      {marking && (
+        <ConfirmModal
+          title={`Mark unit ${row.number} as cleared?`}
+          body={<p>Every word and sentence in it will count as cleared and come back as reviews. This can't be undone.</p>}
+          confirmLabel="Mark as cleared"
+          danger={false}
+          onCancel={() => setMarking(false)}
+          onConfirm={() => {
+            setMarking(false);
+            onMarkCleared();
+          }}
+        />
+      )}
     </>
   );
 }

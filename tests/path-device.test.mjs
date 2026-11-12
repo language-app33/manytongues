@@ -25,9 +25,11 @@ Math.random = () => {
 const here = path.dirname(new URL(import.meta.url).pathname);
 const built = await buildOnce(["ArabicTrainer.tsx"]);
 const T = await import(path.join(built, "ArabicTrainer.js"));
-const { buildSession, installIndexes, pathHolds, pathIndexNow, pathIndexOf, unitItems, everMet, unitStages, pathStateWord, stageWords } = T;
+const { buildSession, installIndexes, pathHolds, pathIndexNow, pathIndexOf, unitItems, everMet, unitStages, pathStateWord, stageWords, clearPathUnit, towardsLearnt, laddered } = T;
 const { TYPES, LANGUAGES } = await import(path.join(here, "..", "src", "languages.ts"));
-const { freshState } = await import(path.join(here, "..", "src", "scheduler.ts"));
+const LEVELS = await import(path.join(here, "..", "src", "languages.ts"));
+const { freshState, topLevelOf } = await import(path.join(here, "..", "src", "scheduler.ts"));
+const { markedState } = await import(path.join(here, "..", "src", "grade.ts"));
 const { mergeData } = await import(path.join(here, "..", "src", "sync.ts"));
 const { mergeReached, reachesFurther } = await import(path.join(here, "..", "src", "path.ts"));
 const { generate, fileIntoDecks, isRangeSkill, isNumeralCard } = await import(path.join(here, "..", "src", "numbers", "generate.ts"));
@@ -298,3 +300,112 @@ test("each unit's row says where it stands in the owner's words", () => {
   assert.equal(pathStateWord(row({ state: "locked", openedEarly: true })), "Opened by your teacher");
 });
 
+/* ---- phase 6: marking a unit as cleared ---- */
+
+/** Where a card stands, by status. @param {any} it @param {any[]} items */
+const statusOf = (it, items) => {
+  const at = towardsLearnt(it, settings, items);
+  return at ? at.at.status : null;
+};
+const isCleared = (/** @type {string | null} */ st) => st === "cleared" || st === "done";
+
+/** A unit of three new words, a new sentence and a text; and a word learnt already. */
+const marked = () => {
+  const learntWord = word(4, () => state({ phase: "review", interval: 30, due: NOW + 30 * DAY, reps: 4, right: 4, hist: [1, 1, 1, 1], passes: 2, updated: NOW - DAY }));
+  const items = [word(1), word(2), word(3), learntWord, sentence(11), text(20), word(30)];
+  const courses = [course("A", ["u1", "u2"])];
+  const decks = [unit("u1", [1, 2, 3, 4, 11, 20]), unit("u2", [3, 30])];
+  install(items, courses, decks);
+  return { items, courses, decks };
+};
+
+test("marking a unit cleared clears every word and sentence of it, and the unit reads as finished", () => {
+  const { items, courses, decks } = marked();
+  const after = clearPathUnit(items, settings, "u1");
+  for (const id of ["srvk1", "srvk2", "srvk3", "srvk4", "srvk11"]) {
+    assert.ok(isCleared(statusOf(after.find((/** @type {any} */ it) => it.id === id), after)), `${id} is ${statusOf(after.find((/** @type {any} */ it) => it.id === id), after)}`);
+  }
+  const idx = pathIndexOf(after, courses, decks, settings);
+  assert.equal(idx.finished.get("u1"), true);
+  assert.equal(idx.rows.get("A")[1].state, "open", "and the next unit opens");
+});
+
+test("marking makes nothing learnt, and leaves a learnt word and the text exactly as they were", () => {
+  const { items } = marked();
+  const after = clearPathUnit(items, settings, "u1");
+  for (const id of ["srvk1", "srvk2", "srvk3", "srvk11"]) assert.notEqual(statusOf(after.find((/** @type {any} */ it) => it.id === id), after), "done");
+  assert.deepEqual(after.find((/** @type {any} */ it) => it.id === "srvk4"), items.find((/** @type {any} */ it) => it.id === "srvk4"), "the learnt word was rewritten");
+  assert.deepEqual(after.find((/** @type {any} */ it) => it.id === "srvk20"), items.find((/** @type {any} */ it) => it.id === "srvk20"), "the text was touched");
+  assert.equal(after.find((/** @type {any} */ it) => it.id === "srvk30"), items.find((/** @type {any} */ it) => it.id === "srvk30"), "a card of another unit was touched");
+});
+
+test("marking twice is marking once", () => {
+  const { items } = marked();
+  const once = clearPathUnit(items, settings, "u1");
+  const twice = clearPathUnit(once, settings, "u1");
+  assert.equal(twice, once, "the second marking wrote something");
+});
+
+test("a card in the marked unit and another counts as cleared in both", () => {
+  const { items, courses, decks } = marked();
+  const after = clearPathUnit(items, settings, "u1");
+  /* Unit 2 holds word 3 and word 30: word 3 now counts toward it. */
+  install(after, courses, decks);
+  assert.deepEqual(unitStages("u2", after, settings).words, { done: 1, all: 2 });
+});
+
+test("each state written is a review a day out, not due at once", () => {
+  const { items } = marked();
+  const after = clearPathUnit(items, settings, "u1");
+  const f = after.find((/** @type {any} */ it) => it.id === "srvk1").forms[0];
+  const states = Object.values(f.s);
+  assert.ok(states.length > 0);
+  for (const st of states) {
+    assert.equal(st.phase, "review");
+    assert.ok(st.due > NOW + 0.5 * DAY && st.due < NOW + 2 * DAY, `due in ${(st.due - NOW) / DAY} days`);
+  }
+});
+
+test("a marked card missed twice at its top is no longer cleared, by the existing rule", () => {
+  const { items } = marked();
+  const after = clearPathUnit(items, settings, "u1");
+  const one = after.find((/** @type {any} */ it) => it.id === "srvk1");
+  const f = one.forms[0];
+  const keys = laddered(f, settings);
+  const top = topLevelOf(keys);
+  const { levelOf } = LEVELS;
+  const missed = { ...f.s };
+  const miss = (/** @type {any} */ st) => markedState(st, { rating: "again", correct: false, advance: true });
+  for (const k of keys.filter((/** @type {string} */ k) => levelOf(k) === top)) missed[k] = miss(miss(missed[k]));
+  const slipped = { ...one, forms: [{ ...f, s: missed }] };
+  const list = after.map((/** @type {any} */ it) => (it.id === one.id ? slipped : it));
+  assert.ok(!isCleared(statusOf(slipped, list)), `still ${statusOf(slipped, list)}`);
+});
+
+test("marking a unit that holds 0 to 9 clears its words and figures; the part itself gains its figure questions", () => {
+  /*
+   * Where the plan says to stop and ask (phase 6): clearing the figures is
+   * what gives the part its questions in figures, so the part reads as
+   * cleared only once those are answered — or the unit is marked again.
+   * Pinned here as it is built until the owner decides; see the summary
+   * of 0.616 in CHANGELOG.md.
+   */
+  const nums = fileIntoDecks(generated.items, SET, [{ id: "u1", title: "Unit u1", parts: ["numbers:0-9"] }]);
+  const items = [word(1), ...nums];
+  const courses = [course("A", ["u1", "u2"])];
+  const decks = [{ ...unit("u1", [1]), parts: ["numbers:0-9"] }, unit("u2", [])];
+  const sets = [{ numbers: SYS, times: TIME }];
+  installIndexes(items, settings, sets, { courses, decks });
+  const after = clearPathUnit(items, settings, "u1");
+  installIndexes(after, settings, sets, { courses, decks });
+  for (const it of unitItems("u1", after)) {
+    if (isRangeSkill(it)) continue;
+    const st = statusOf(it, after);
+    if (st !== null) assert.ok(isCleared(st), `${it.id} is ${st}`);
+  }
+  const again = clearPathUnit(after, settings, "u1");
+  installIndexes(again, settings, sets, { courses, decks });
+  const skill = again.find((/** @type {any} */ it) => isRangeSkill(it) && it.range.id === "numbers:0-9");
+  assert.ok(isCleared(statusOf(skill, again)), `marked again, the part is ${statusOf(skill, again)}`);
+  assert.equal(pathIndexNow().finished.get("u1"), true);
+});

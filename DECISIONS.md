@@ -8165,3 +8165,20 @@ share, nor through a card's `source.deckId`, which names one deck of
 several. The fifth state — open, and not the current unit, because an
 earlier unit slipped after this one opened — is shown as "Open"; the plan
 named four, and none of them was true of it.
+
+**0.616: marking a unit cleared reuses "This was too easy".** No new
+write: `liftLevel` from a top-level key, as `creditNumbers` does it, which
+already means "up every level, no passes, a review a day out". So marking
+never makes a card learnt (R33), never touches one already cleared or
+learnt (A7), and a card missed twice afterwards drops back by the rule
+every card follows. Only a unit open for the learner can be marked (R34),
+because marking is a way past what the learner has in front of them, not
+a way to jump the path; there is no undo (R36) because the cards' own
+states are what was written, and there is nothing else to take back.
+
+One case the plan said to stop at, and the owner has not yet answered: a
+number part's questions in figures open only once the ten figures are
+cleared, and marking clears the figures in the same write that lifts the
+part. So the part reads below cleared afterwards, with new questions, and
+the unit is not finished until they are answered or it is marked again.
+Left as built rather than adding a second way to clear a part.

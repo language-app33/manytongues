@@ -8,6 +8,31 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.616 — 12 November 2026
+
+**Units, step six: a student can mark a unit as cleared.**
+
+- **"Mark as cleared"** is on the page of a unit that is open for the
+  student — reached, or opened early by the teacher. Not on a locked or a
+  finished one. The app asks first, and there is no undo.
+- **Every word and sentence in it then counts as cleared**, everywhere it
+  appears, and comes back as ordinary reviews a day later, asked at its
+  top level. Nothing becomes learnt this way, and a card missed twice drops
+  back to be relearnt, as any card does. Cards already cleared or learnt,
+  and the unit's text or conversation, are left as they were.
+- The unit then shows as finished and the next one opens. To skip several
+  units, mark each in turn. Teachers cannot switch this off.
+- **One thing for the owner to decide (see the summary of this work):** a
+  unit holding numbers clears their words and the figures, but the number
+  part itself then gains its questions in figures, which only open once
+  the figures are cleared. So such a unit is not finished until those are
+  answered, or the unit is marked a second time.
+
+To check by hand: mark unit 2 as cleared and see the confirmation, then
+unit 2 finished and unit 3 open; the next sessions bring unit 2's cards
+back as reviews, at their top level; a unit 3 sentence can now use unit
+2's words in its blanks; and all of it after a sync to a second device.
+
 ## 0.615 — 12 November 2026
 
 **Units, step five: students see their course's path.** Nothing changes
