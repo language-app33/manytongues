@@ -8244,3 +8244,13 @@ words into unit order among the units already open, and scoring the
 variety of forms. Each would change what the owner decided above; none
 was needed for the path to work. Which of them are wanted later is the
 owner's to say, and they go to BACKLOG.md when they do.
+
+**0.620: one press clears a number part whole.** The owner answered the
+question above with 1b: marking a unit that holds numbers also clears
+the part's questions in figures, so the unit is finished in one press.
+Still `liftLevel` and nothing else: `clearPathUnit` lifts once, reads the
+ten figures as cleared the way the app will read them from the saved
+cards, and lifts the part's skill again against the ladder that gives
+it, putting the figures index back as it was. No second way to clear a
+part was added; a second press writes nothing.
+

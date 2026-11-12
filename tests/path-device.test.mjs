@@ -382,14 +382,9 @@ test("a marked card missed twice at its top is no longer cleared, by the existin
   assert.ok(!isCleared(statusOf(slipped, list)), `still ${statusOf(slipped, list)}`);
 });
 
-test("marking a unit that holds 0 to 9 clears its words and figures; the part itself gains its figure questions", () => {
-  /*
-   * Where the plan says to stop and ask (phase 6): clearing the figures is
-   * what gives the part its questions in figures, so the part reads as
-   * cleared only once those are answered — or the unit is marked again.
-   * Pinned here as it is built until the owner decides; see the summary
-   * of 0.618 in CHANGELOG.md.
-   */
+test("marking a unit that holds 0 to 9 clears the part, its words, its figures and the unit in one press", () => {
+  /* The owner's 1b: the part's questions in figures, which open only once
+     the figures are cleared, are cleared in the same press. */
   const nums = fileIntoDecks(generated.items, SET, [{ id: "u1", title: "Unit u1", parts: ["numbers:0-9"] }]);
   const items = [word(1), ...nums];
   const courses = [course("A", ["u1", "u2"])];
@@ -399,13 +394,12 @@ test("marking a unit that holds 0 to 9 clears its words and figures; the part it
   const after = clearPathUnit(items, settings, "u1");
   installIndexes(after, settings, sets, { courses, decks });
   for (const it of unitItems("u1", after)) {
-    if (isRangeSkill(it)) continue;
     const st = statusOf(it, after);
     if (st !== null) assert.ok(isCleared(st), `${it.id} is ${st}`);
   }
-  const again = clearPathUnit(after, settings, "u1");
-  installIndexes(again, settings, sets, { courses, decks });
-  const skill = again.find((/** @type {any} */ it) => isRangeSkill(it) && it.range.id === "numbers:0-9");
-  assert.ok(isCleared(statusOf(skill, again)), `marked again, the part is ${statusOf(skill, again)}`);
+  const skill = after.find((/** @type {any} */ it) => isRangeSkill(it) && it.range.id === "numbers:0-9");
+  assert.ok(isCleared(statusOf(skill, after)), `the part is ${statusOf(skill, after)}`);
   assert.equal(pathIndexNow().finished.get("u1"), true);
+  /* And a second press writes nothing more. */
+  assert.equal(clearPathUnit(after, settings, "u1"), after, "marking again wrote something");
 });

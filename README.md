@@ -1255,6 +1255,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   editor and the review screens are handed the pools they always were.
   Under the score, `sameFormBlanks` lists blanks whose approved words share
   every grammar field the language declares (`dimsOf`), as advice.
+
   **A learner sees the path (0.617).** `pathLinesOf` gives each course's
   rows with their titles, for the courses of the space and languages
   shown. `PathHomeLine` puts one above Start session per course — the
@@ -1268,14 +1269,19 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   and stages above — locked ones too, read only; one open for the learner,
   or opened early, offers "Practise this unit", which is `begin` with the
   unit's items as the pool and `pathUnit` set.
+
   **And a learner may mark an open unit as cleared (0.618).**
   `clearPathUnit`, modelled on `creditNumbers`, writes through `liftLevel`
   from a key on each form's top level — every form `drillableUnits` gives,
   and a part's own skill — over the unit's items but its text or
   conversation. `liftLevel` gives no passes and leaves solid keys alone,
   so nothing becomes learnt and what is already cleared is untouched; the
-  cards come back a day later as ordinary reviews. Shown on a unit that is
-  open or opened early, behind a confirmation, with no undo. Tests:
+  cards come back a day later as ordinary reviews. A number part's
+  questions in figures open only once its figures are cleared, so for a
+  unit holding a part the skills are lifted a second time against the
+  figures as the same press left them (0.620): one press clears the part
+  whole. Shown on a unit that is open or opened early, behind a
+  confirmation, with no undo. Tests:
   `tests/path.test.mjs`, `tests/path-server.test.mjs`,
   `tests/path-device.test.mjs`, and a walk in `tests/smoke.mjs`; why:
   DECISIONS.md, "Units: a course's path".

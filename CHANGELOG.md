@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.620 — 12 November 2026
+
+**Marking a unit cleared now clears its numbers whole, in one press.**
+Until now a unit holding a number part was left with the part's
+questions in figures to answer, since those only open once the figures
+are cleared; it now counts as finished straight away and the next unit
+opens. Nothing else about marking changes: no undo, nothing becomes
+learnt, and the cards come back as reviews a day later.
+
+To check by hand: as a student, mark a unit that holds numbers 0 to 9 as
+cleared; it should read as finished at once, with the next unit open.
+
 ## 0.619 — 12 November 2026
 
 **Units, written down.** Nothing changes in the app. The README now has

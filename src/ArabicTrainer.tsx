@@ -2011,33 +2011,54 @@ export function clearPathUnit(items: Item[], settings: Settings, deckId: string)
     unitItems(deckId, items).filter((it) => !isDialog(it) && isDrillable(it, settings)).map((it) => it.id),
   );
   if (!ids.size) return items;
-  let out: Item[] | null = null;
   const at = Date.now();
-  items.forEach((it, i) => {
-    if (!ids.has(it.id)) return;
-    const lifts: Map<string, Record<string, ExerciseState>> = new Map();
-    const lift = (form: Form) => {
-      let keys = laddered(form, settings);
-      if (!keys.length) keys = ladderedOnceOpen(form, settings);
-      if (!keys.length) return;
-      const top = topLevelOf(keys);
-      const key = keys.find((k) => levelOf(k) === top) as string;
-      const lifted = liftLevel(keys, (k) => statesOf(form)[k], key);
-      if (Object.keys(lifted).length) lifts.set(form.id, { ...(lifts.get(form.id) || {}), ...lifted });
-    };
-    for (const { unit } of drillableUnits(it, settings)) lift(unit);
-    /* A part's skill reads as cleared only once the part itself is, not
-       only its words — as creditNumbers lifts it. */
-    if (isRangeSkill(it)) lift(leadOf(it));
-    if (!lifts.size) return;
-    const forms = formsOf(it).map((f) => {
-      const add = lifts.get(f.id);
-      return add ? { ...f, s: { ...f.s, ...add }, updated: at } : f;
+  const liftAll = (list: Item[]): Item[] => {
+    let out: Item[] | null = null;
+    list.forEach((it, i) => {
+      if (!ids.has(it.id)) return;
+      const lifts: Map<string, Record<string, ExerciseState>> = new Map();
+      const lift = (form: Form) => {
+        let keys = laddered(form, settings);
+        if (!keys.length) keys = ladderedOnceOpen(form, settings);
+        if (!keys.length) return;
+        const top = topLevelOf(keys);
+        const key = keys.find((k) => levelOf(k) === top) as string;
+        const lifted = liftLevel(keys, (k) => statesOf(form)[k], key);
+        if (Object.keys(lifted).length) lifts.set(form.id, { ...(lifts.get(form.id) || {}), ...lifted });
+      };
+      for (const { unit } of drillableUnits(it, settings)) lift(unit);
+      /* A part's skill reads as cleared only once the part itself is, not
+         only its words — as creditNumbers lifts it. */
+      if (isRangeSkill(it)) lift(leadOf(it));
+      if (!lifts.size) return;
+      const forms = formsOf(it).map((f) => {
+        const add = lifts.get(f.id);
+        return add ? { ...f, s: { ...f.s, ...add }, updated: at } : f;
+      });
+      if (!out) out = list.slice();
+      out[i] = { ...it, forms, updated: at };
     });
-    if (!out) out = items.slice();
-    out[i] = { ...it, forms, updated: at };
-  });
-  return out || items;
+    return out || list;
+  };
+  const once = liftAll(items);
+  /*
+   * A number part's questions in figures open only once its ten figures
+   * are cleared — and the pass above is what cleared them. So one press
+   * clears the part whole (the owner's 1b): the figures are read as the
+   * app will read them from now on, and the part's skills are lifted again
+   * against the ladder that gives them. The figures index is put back as
+   * it was afterwards; the app installs it afresh from the saved cards.
+   */
+  const parts = once.filter((it) => ids.has(it.id) && isRangeSkill(it));
+  if (!parts.length) return once;
+  const before = NUMERALS_KNOWN;
+  try {
+    setNumeralsKnown(numeralsKnownOf(once, settings));
+    const twice = liftAll(once);
+    return twice;
+  } finally {
+    setNumeralsKnown(before);
+  }
 }
 
 /** How far a unit has got, in the three stages a learner is shown. */
