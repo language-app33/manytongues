@@ -8112,3 +8112,145 @@ list `faceAsk` draws from, and every noun the system counts). Text rather
 than structure because the export is plain text and nothing else reads
 them. The server stores each only when sent, at most 400 characters, so an
 older build's report reads exactly as before.
+
+---
+
+## Units: a course's path
+
+**11 November 2026** · `src/path.ts`, `src/types.ts` (0.613 onward)
+
+A course gains a second kind of element beside decks: the unit, one step
+of a path a class walks in order. The owner's plan settled the rules
+(R1–R37, A1–A7); this entry is why they are shaped the way they are.
+
+**A unit is a deck with a flag, not a new record.** A unit holds cards
+exactly as a deck does, joins courses as a deck does, and is sent to
+students as a deck is. Making it a deck with `unit: true` meant every piece
+of that — saving cards into it, the number parts it holds, backup and
+restore, the student's download — already worked. What is new lives on the
+course (`path`, `pathLive`, `opened`), because a unit can be in several
+courses and each gives it its own place, publishes it separately and opens
+it early separately.
+
+**Progress belongs to the card, so the path stores almost nothing.**
+Whether a unit is finished is read off its cards each time: every word
+and sentence card cleared. A card cleared through another deck or course
+counts. The one thing remembered is which units were ever *reached*,
+because "nobody is ever sent back" (R25) cannot be read off the cards: a
+card that slips after its unit was finished would otherwise lock every
+unit after it again.
+
+**Held means held everywhere it lives, or not at all.** A never-met card
+is kept out of sessions only while every deck it is in is a unit the
+learner has not reached (`cardHeld`). A teacher who puts a word in unit 5
+and in an ordinary deck has said it may come now, and it does. This is
+also why the path never filters which words fill a blank: a word stands in
+a blank once the learner has cleared it, wherever it was cleared, which
+already gives "cards before sentences" without a second rule.
+
+**Named apart from `Unit`.** The trainer already calls one askable form of
+a card a unit (`unitsOf`, `quietUnits`). Renaming either would touch
+hundreds of lines for nothing; the new thing is a *path unit* in code.
+
+**0.614: the checklist counts what the path has taught, and only what a
+teacher approved.** A blank needs five different cards (R10), and a card
+counts only where a teacher approved a sentence it fills (R11) and it
+comes from this unit, an earlier published unit, or is never asked on its
+own (R12). Counting by passing review alone would have counted every card
+with no review at all, which is the card nobody has read. The pool handed
+to `sentencesOf` is the counting cards themselves, so every sentence
+counted is made only of words allowed to count; the approval keys are the
+ordinary review fingerprints, so nothing about review changes. This is a
+rule for the checklist only (R13): a device fills blanks exactly as before,
+so a word from a later unit already cleared elsewhere can still appear.
+The server judges published cards, as students get them, and may be
+stricter than the teacher's screen; the screen says so when it is.
+
+A unit is always on the path of every course that holds it (A1), so
+`attach-deck` puts it at the end as a draft there and there is no separate
+"unpublish" (A4): a unit is withdrawn by removing it, as a deck is.
+
+**0.615: one setting merged by union, on the device and the server.**
+Settings sync whole and last-writer-wins, which is right for a theme and
+wrong for the units a learner has reached: a phone that last synced
+before unit 3 opened would hand back a list without it, and if unit 2 had
+since slipped below finished, unit 3 would lock again — the one thing R25
+forbids. So `pathReached` alone is joined by `mergeReached` wherever
+settings meet: in `mergeData`, which both the app and a restore use, and
+in the sync endpoint before it writes, because an older build that does
+not know the field uploads its own settings whole. That costs the server
+one more read of the document per upload; reading it against the ETag
+the client sent keeps it exact, since any other version makes the write
+a conflict anyway. Writing a newly reached unit does not stamp
+`settingsUpdated`: the union carries it, and a stamp would hand this
+device's other choices to the learner's other devices.
+
+**What is held, and where.** Only never-met cards, and only at the places
+a card is first met: the session's pool, the home count (which must equal
+it), and a grid's spare tiles, since a spare tile is marked like any
+other. Every kind of session is covered by the first, saved sessions,
+prep and Ultimate included (A5). Blanks are not filtered: a word fills a
+blank only once cleared, wherever it was cleared (R13).
+
+**0.616: the teacher's screens reuse the deck's.** A unit's page is the
+deck page with a heading, a checklist and a Publish button, because a
+unit is a deck underneath (R1) and every way of adding, editing and
+reviewing cards should be the one teachers already know. The checklist is
+judged in the course the page was opened from, since a unit can be ready
+in one course and not in another. The screen reads every card, drafts
+included, and says how many drafts there are; the server reads published
+cards only and is the one that decides, and when it refuses, its own list
+replaces the screen's. "Needs attention" is the same checklist on a unit
+already published (R17): it never takes the unit away from students. The
+advice on forms reads only the grammar the language declares, and is
+advice only (A6), so a language without gender or number shows nothing.
+
+**0.617: what a learner is shown is counted the way the path counts.**
+The stages on Home and a unit's page are worked out by one function
+(`unitStages`) that reads the same items as "finished" (`unitItems`), the
+same cleared test, and leaves out what can never be asked and the text or
+conversation, so Words and Sentences both full is exactly a finished unit.
+A unit's items are never found through its title, which two decks can
+share, nor through a card's `source.deckId`, which names one deck of
+several. The fifth state — open, and not the current unit, because an
+earlier unit slipped after this one opened — is shown as "Open"; the plan
+named four, and none of them was true of it.
+
+**0.618: marking a unit cleared reuses "This was too easy".** No new
+write: `liftLevel` from a top-level key, as `creditNumbers` does it, which
+already means "up every level, no passes, a review a day out". So marking
+never makes a card learnt (R33), never touches one already cleared or
+learnt (A7), and a card missed twice afterwards drops back by the rule
+every card follows. Only a unit open for the learner can be marked (R34),
+because marking is a way past what the learner has in front of them, not
+a way to jump the path; there is no undo (R36) because the cards' own
+states are what was written, and there is nothing else to take back.
+
+One case the plan said to stop at, and the owner has not yet answered: a
+number part's questions in figures open only once the ten figures are
+cleared, and marking clears the figures in the same write that lifts the
+part. So the part reads below cleared afterwards, with new questions, and
+the unit is not finished until they are answered or it is marked again.
+Left as built rather than adding a second way to clear a part.
+
+**What was weighed and left out of the first version.** A class view of
+who is on which unit, a goal line per unit, turning a deck into a unit,
+a teacher's switch for "Mark as cleared", undoing a marking, marking a
+locked unit or several at once, units in a learner's own space, any
+change to how word sets are written or to the stretch rule, any filter on
+what fills a blank, any rule refusing to put a card somewhere because of
+where else it is, any new exercise, level or scheduling rule, forcing new
+words into unit order among the units already open, and scoring the
+variety of forms. Each would change what the owner decided above; none
+was needed for the path to work. Which of them are wanted later is the
+owner's to say, and they go to BACKLOG.md when they do.
+
+**0.620: one press clears a number part whole.** The owner answered the
+question above with 1b: marking a unit that holds numbers also clears
+the part's questions in figures, so the unit is finished in one press.
+Still `liftLevel` and nothing else: `clearPathUnit` lifts once, reads the
+ten figures as cleared the way the app will read them from the saved
+cards, and lifts the part's skill again against the ladder that gives
+it, putting the figures index back as it was. No second way to clear a
+part was added; a second press writes nothing.
+

@@ -342,10 +342,12 @@ import {
   withAnswer as oneAnswer,
   fillerVariants,
 } from "./answers.ts";
-import { asMeaning, cellEnglish, fieldsLost, fillForm, fillsOf, hasSlots, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
+import { asMeaning, cellEnglish, fieldsLost, fillForm, fillsOf, hasSlots, isSentence, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
 import type { Value } from "./variables.ts";
 import { agreeTook, countTook, finishTook, leadsOf, lineGate, passes, reviewOf, sentenceKey, SCAN_LIMIT } from "./review.ts";
 import { castFill as castScene, filledScene, hasCast } from "./cast.ts";
+import { cardHeld, isPathUnit, mergeReached, pathRows, reachesFurther } from "./path.ts";
+import type { PathCourse, PathDeck, PathRow } from "./path.ts";
 import type { Review } from "./review.ts";
 import { liftSubtypeTagsIn } from "./subtype-tags.ts";
 import { tickCapitals } from "./capitals.ts";
@@ -1816,6 +1818,322 @@ function tenseHeld(unit: Form | null | undefined): { card: Item; spec: VerbSpec;
 }
 
 /* ------------------------------------------------------------------
+   A course's path (0.615)
+
+   A course may set its units in order, each opening when the one before
+   it is finished — see src/path.ts, where every rule is. The one thing the
+   path does to a session is hold back a never-met card while every deck it
+   lives in is a unit this learner has not reached (R22); it does not touch
+   the levels, the mix, review or how blanks are filled. So this is an
+   index like the ones above, built from the courses and decks last
+   downloaded and the learner's own progress, and read at the two places a
+   pool is made: buildSession, and the home screen's count of what is
+   waiting, which must agree.
+
+   A card's decks are worked out from each deck's `cardIds` — a card's
+   `source.deckId` names only one of them, and its tags are titles — and a
+   number or time item's from its `deckIds` (fileIntoDecks). Nothing here
+   is written to the cards; whether a unit is finished is read off them
+   each time, so a card cleared in another deck or course counts (R4).
+   ------------------------------------------------------------------ */
+
+export interface PathIndex {
+  /** Every downloaded deck each item is in, by item id. */
+  decksOfCard: Map<string, string[]>;
+  /** The downloaded decks that are path units. */
+  unitIds: Set<string>;
+  /** Each unit's items, by deck id: course cards and word-set items both. */
+  unitItemIds: Map<string, string[]>;
+  /** Where the learner stands on each course's path, by course id. */
+  rows: Map<string, PathRow[]>;
+  /** The units finished or open in at least one course. */
+  openUnits: Set<string>;
+  /** What pathRows returned to remember, by course id. */
+  reached: Record<string, string[]>;
+  /** Whether a unit's cards and sentences are all cleared now. */
+  finished: Map<string, boolean>;
+}
+
+const NO_PATH: PathIndex = {
+  decksOfCard: new Map(),
+  unitIds: new Set(),
+  unitItemIds: new Map(),
+  rows: new Map(),
+  openUnits: new Set(),
+  reached: {},
+  finished: new Map(),
+};
+
+let PATH_INDEX: PathIndex = NO_PATH;
+
+/* Exported for the reason setValueIndex is. Nothing a form can be asked
+   depends on it, so no cache is thrown away. */
+export function setPathIndex(next: PathIndex | null | undefined) {
+  PATH_INDEX = next || NO_PATH;
+}
+
+/** The learner's reached units, by course id, as stored. */
+export function pathReachedOf(settings: Settings | null | undefined): Record<string, string[]> {
+  const p = settings && settings.pathReached;
+  return p && typeof p === "object" && !Array.isArray(p) ? mergeReached(p, undefined) : {};
+}
+
+/**
+ * Met at all: anything on it ever answered, over the whole ladder. The one
+ * test of a never-met card — the mix's `fresh`, the home screen's count and
+ * the path's hold all read it. `units` narrows the forms looked at where a
+ * caller has already narrowed them.
+ */
+export function everMet(
+  it: Item,
+  settings: Settings,
+  units: { unit: Form }[] = drillableUnits(it, settings),
+): boolean {
+  return units.some(({ unit }) => laddered(unit, settings).some((t) => stateOf(unit, t).phase !== "new"));
+}
+
+/** Every downloaded deck an item is in. */
+function decksOfItem(it: Item, byCard: Map<string, string[]>): string[] {
+  const src = (it as { source?: Record<string, unknown> }).source;
+  if (src && typeof src.cardId === "string") return byCard.get(src.cardId) || [];
+  if (isFromSystem(it)) return Array.isArray(it.deckIds) ? it.deckIds : [];
+  return [];
+}
+
+/**
+ * The path index, from the courses and decks last downloaded, the items
+ * and the learner's settings. Pure: it reads progress and writes nothing —
+ * what it found reached is handed back in `reached`, for the caller to
+ * remember.
+ */
+export function pathIndexOf(
+  items: Item[],
+  courses: PathCourse[] | null | undefined,
+  decks: (PathDeck & { title?: string })[] | null | undefined,
+  settings: Settings,
+): PathIndex {
+  const units = (decks || []).filter(isPathUnit);
+  if (!units.length) return NO_PATH;
+  const unitIds = new Set(units.map((d) => d.id));
+  const byCard: Map<string, string[]> = new Map();
+  for (const d of decks || []) {
+    for (const id of d.cardIds || []) byCard.set(id, (byCard.get(id) || []).concat([d.id]));
+  }
+  const decksOfCard: Map<string, string[]> = new Map();
+  const unitItemIds: Map<string, string[]> = new Map(units.map((d) => [d.id, [] as string[]]));
+  const byId: Map<string, Item> = new Map();
+  for (const it of items) {
+    const ids = decksOfItem(it, byCard);
+    if (!ids.length) continue;
+    decksOfCard.set(it.id, ids);
+    byId.set(it.id, it);
+    for (const d of ids) if (unitIds.has(d)) (unitItemIds.get(d) as string[]).push(it.id);
+  }
+  /* A unit is finished when every word and sentence of it that can be
+     asked is cleared — its text or conversation not needed (R20), and a
+     card that can never be asked not counted. None left: finished. */
+  const clearedOf: Map<string, boolean> = new Map();
+  const isCleared = (it: Item) => {
+    const had = clearedOf.get(it.id);
+    if (had !== undefined) return had;
+    const at = towardsLearnt(it, settings, items);
+    const ok = !at || at.at.status === "cleared" || at.at.status === "done";
+    clearedOf.set(it.id, ok);
+    return ok;
+  };
+  const finished: Map<string, boolean> = new Map();
+  const finishedNow = (deckId: string) => {
+    const had = finished.get(deckId);
+    if (had !== undefined) return had;
+    const ok = (unitItemIds.get(deckId) || [])
+      .map((id) => byId.get(id) as Item)
+      .filter((it) => it && !isDialog(it))
+      .every(isCleared);
+    finished.set(deckId, ok);
+    return ok;
+  };
+  const stored = pathReachedOf(settings);
+  const rows: Map<string, PathRow[]> = new Map();
+  const reached: Record<string, string[]> = {};
+  const openUnits: Set<string> = new Set();
+  for (const course of courses || []) {
+    if (!course || !Array.isArray(course.path) || !course.path.length) continue;
+    const got = pathRows(course, units, finishedNow, stored[course.id] || []);
+    rows.set(course.id, got.rows);
+    reached[course.id] = got.reached;
+    for (const r of got.rows) if (r.state !== "locked") openUnits.add(r.id);
+  }
+  return { decksOfCard, unitIds, unitItemIds, rows, openUnits, reached, finished };
+}
+
+/**
+ * Whether a card is held out of sessions by the path: never met, and every
+ * deck it lives in a unit this learner has not reached in any course (R22).
+ * `pathUnit` is the one exception — "Practise this unit" on a unit opened
+ * early brings in that unit's new cards (R24).
+ */
+export function pathHolds(it: Item, settings: Settings, pathUnit?: string | null): boolean {
+  const idx = PATH_INDEX;
+  if (!idx.unitIds.size || !(it as { source?: unknown }).source) return false;
+  const decks = idx.decksOfCard.get(it.id) || [];
+  if (pathUnit && decks.includes(pathUnit)) return false;
+  if (!cardHeld(decks, (d) => idx.unitIds.has(d), idx.openUnits)) return false;
+  return !everMet(it, settings);
+}
+
+/** A unit's items: the course cards in its `cardIds` and the word-set items
+    filed under it. Every reader of a unit's items goes through here. */
+export function unitItems(deckId: string, items: Item[]): Item[] {
+  const ids = new Set(PATH_INDEX.unitItemIds.get(deckId) || []);
+  return ids.size ? items.filter((it) => ids.has(it.id)) : [];
+}
+
+/** The path as the index holds it, for the screens. */
+export const pathIndexNow = (): PathIndex => PATH_INDEX;
+
+/**
+ * A unit marked as cleared by the learner (R32–R36): every word and
+ * sentence of it — word-set items included — written as having been up
+ * every level it has, as "This was too easy" writes a form at its top.
+ * Modelled on creditNumbers: the list back with the new states in, or the
+ * same list where nothing changed; the caller saves it.
+ *
+ * liftLevel and nothing else does the writing. It gives no passes, so
+ * nothing becomes learnt (R33); it leaves solid keys alone, so what is
+ * already cleared or learnt is untouched, and a second call writes nothing
+ * (A7); and a key not yet in review goes into review a day out, so the
+ * cards come back as ordinary reviews, where two misses at the top drop
+ * one back by the existing rule. The unit's text or conversation is left
+ * as it was (A7).
+ */
+export function clearPathUnit(items: Item[], settings: Settings, deckId: string): Item[] {
+  const ids = new Set(
+    unitItems(deckId, items).filter((it) => !isDialog(it) && isDrillable(it, settings)).map((it) => it.id),
+  );
+  if (!ids.size) return items;
+  const at = Date.now();
+  const liftAll = (list: Item[]): Item[] => {
+    let out: Item[] | null = null;
+    list.forEach((it, i) => {
+      if (!ids.has(it.id)) return;
+      const lifts: Map<string, Record<string, ExerciseState>> = new Map();
+      const lift = (form: Form) => {
+        let keys = laddered(form, settings);
+        if (!keys.length) keys = ladderedOnceOpen(form, settings);
+        if (!keys.length) return;
+        const top = topLevelOf(keys);
+        const key = keys.find((k) => levelOf(k) === top) as string;
+        const lifted = liftLevel(keys, (k) => statesOf(form)[k], key);
+        if (Object.keys(lifted).length) lifts.set(form.id, { ...(lifts.get(form.id) || {}), ...lifted });
+      };
+      for (const { unit } of drillableUnits(it, settings)) lift(unit);
+      /* A part's skill reads as cleared only once the part itself is, not
+         only its words — as creditNumbers lifts it. */
+      if (isRangeSkill(it)) lift(leadOf(it));
+      if (!lifts.size) return;
+      const forms = formsOf(it).map((f) => {
+        const add = lifts.get(f.id);
+        return add ? { ...f, s: { ...f.s, ...add }, updated: at } : f;
+      });
+      if (!out) out = list.slice();
+      out[i] = { ...it, forms, updated: at };
+    });
+    return out || list;
+  };
+  const once = liftAll(items);
+  /*
+   * A number part's questions in figures open only once its ten figures
+   * are cleared — and the pass above is what cleared them. So one press
+   * clears the part whole (the owner's 1b): the figures are read as the
+   * app will read them from now on, and the part's skills are lifted again
+   * against the ladder that gives them. The figures index is put back as
+   * it was afterwards; the app installs it afresh from the saved cards.
+   */
+  const parts = once.filter((it) => ids.has(it.id) && isRangeSkill(it));
+  if (!parts.length) return once;
+  const before = NUMERALS_KNOWN;
+  try {
+    setNumeralsKnown(numeralsKnownOf(once, settings));
+    const twice = liftAll(once);
+    return twice;
+  } finally {
+    setNumeralsKnown(before);
+  }
+}
+
+/** How far a unit has got, in the three stages a learner is shown. */
+export interface UnitStages {
+  /** Word cards and word-set items together: a part's skill, its words, the figures. */
+  words: { done: number; all: number };
+  sentences: { done: number; all: number };
+  /** Its text or conversation, where it has one. */
+  final: { kind: "text" | "conversation"; done: boolean } | null;
+  /** Every item of it learnt — the quieter mark beside Finished (R31). */
+  learnt: boolean;
+}
+
+/**
+ * A unit's stages, counted the one way Home and Progress both show them:
+ * only items that can be asked (towardsLearnt not null), each cleared when
+ * it has been up every level it has. When Words and Sentences are both
+ * full, the unit is finished — the same reading as the path's.
+ */
+export function unitStages(deckId: string, items: Item[], settings: Settings): UnitStages {
+  const out: UnitStages = { words: { done: 0, all: 0 }, sentences: { done: 0, all: 0 }, final: null, learnt: true };
+  let any = false;
+  for (const it of unitItems(deckId, items)) {
+    const at = towardsLearnt(it, settings, items);
+    if (!at) continue;
+    any = true;
+    const done = at.at.status === "cleared" || at.at.status === "done";
+    if (at.at.status !== "done") out.learnt = false;
+    if (isDialog(it)) {
+      out.final = { kind: isText(it) ? "text" : "conversation", done: done && (!out.final || out.final.done) };
+      continue;
+    }
+    const stage = !isFromSystem(it) && isSentence(it) ? out.sentences : out.words;
+    stage.all += 1;
+    if (done) stage.done += 1;
+  }
+  if (!any) out.learnt = false;
+  return out;
+}
+
+/** A course's path as a learner's screens show it: each published unit's row with its title. */
+export interface PathLine {
+  courseId: string;
+  courseTitle: string;
+  rows: (PathRow & { title: string })[];
+}
+
+/** The paths of these courses, in their order, from the index. */
+export function pathLinesOf(courses: { id: string; title?: string }[], decks: { id: string; title?: string }[]): PathLine[] {
+  const titleOf = new Map(decks.map((d) => [d.id, String(d.title || "")]));
+  const out: PathLine[] = [];
+  for (const c of courses) {
+    const rows = PATH_INDEX.rows.get(c.id);
+    if (!rows || !rows.length) continue;
+    out.push({ courseId: c.id, courseTitle: String(c.title || ""), rows: rows.map((r) => ({ ...r, title: titleOf.get(r.id) || "" })) });
+  }
+  return out;
+}
+
+/** What a unit's row says on Progress (R28). */
+export function pathStateWord(r: PathRow): string {
+  if (r.state === "finished") return "Finished";
+  if (r.current) return "Current";
+  if (r.state === "open") return "Open";
+  return r.openedEarly ? "Opened by your teacher" : "Locked";
+}
+
+/** A unit's stages as Home lists them, in the owner's words. */
+export function stageWords(st: UnitStages): string[] {
+  const out = [`Words ${st.words.done}/${st.words.all}`, `Sentences ${st.sentences.done}/${st.sentences.all}`];
+  if (st.final) out.push(`${st.final.kind === "text" ? "Text" : "Conversation"}: ${st.final.done ? "done" : "not yet"}`);
+  return out;
+}
+
+/* ------------------------------------------------------------------
    Which card a verb's cell is on
 
    The practices of a tense ask about the rest of the tense — the persons
@@ -2653,7 +2971,12 @@ export function valueReachOf(
  * untestable: `buildSession` is a plain function of its arguments and
  * always was, and this is the rest of what it reads.
  */
-export function installIndexes(items: Item[], settings: Settings, systems: SystemSet[] = []): void {
+export function installIndexes(
+  items: Item[],
+  settings: Settings,
+  systems: SystemSet[] = [],
+  path: { courses?: PathCourse[]; decks?: PathDeck[] } = {},
+): void {
   setActiveLang(settings.language || DEFAULT_LANGUAGE);
   setContextIndex(contextIndexOf(items, settings));
   setDialogIndex(buildDialogIndex(items));
@@ -2688,6 +3011,9 @@ export function installIndexes(items: Item[], settings: Settings, systems: Syste
   setQuietUnits(withFacesWaiting(quiet, items, settings, systems));
   setEasedUnits(easedUnits(items, settings));
   setSkillCaps(skillCapsOf(items, settings));
+  /* And the path, last: it reads where each card stands, which the setters
+     above decide. */
+  setPathIndex(pathIndexOf(items, path.courses || [], path.decks || [], settings));
 }
 
 /* ------------------------------------------------------------------
@@ -4475,22 +4801,18 @@ export function mixCardsOf(
     if (!units.length) continue;
     const dues: number[] = [];
     let lastSeen = 0;
-    let fresh = true;
     for (const { unit } of units) {
       for (const t of typesOf(unit)) {
         const st = stateOf(unit, t);
         dues.push(st.due || 0);
       }
-      /* Met and last seen over the whole ladder, not only what can be
-         asked now: a form on its top is asked its top alone, and a top
-         not answered yet is a card in learning that has just climbed,
-         not a new one. */
-      for (const t of laddered(unit, settings)) {
-        const st = stateOf(unit, t);
-        lastSeen = Math.max(lastSeen, st.updated || 0);
-        if (st.phase !== "new") fresh = false;
-      }
+      /* Last seen over the whole ladder, not only what can be asked now. */
+      for (const t of laddered(unit, settings)) lastSeen = Math.max(lastSeen, stateOf(unit, t).updated || 0);
     }
+    /* Met over the whole ladder too: a form on its top is asked its top
+       alone, and a top not answered yet is a card in learning that has
+       just climbed, not a new one. The one test — see everMet. */
+    const fresh = !everMet(it, settings, units);
     const held = fresh ? null : standing(cardStandings(it, settings, items));
     /* A question never asked on a card already met — a level that has just
        opened — is waiting from the moment it exists, so it reads as due now
@@ -5165,11 +5487,19 @@ export function buildSession({
   perDay,
   systems,
   mode = "regular",
+  pathUnit,
 }: {
   items: Item[];
   settings: Settings;
   /** The pool: the cards this session may draw from. */
   inDeck: (it: Item) => boolean;
+  /**
+   * A path unit whose new cards this session may bring in although the
+   * learner has not reached it: "Practise this unit" on a unit the teacher
+   * opened early (R24). Every other never-met card the path holds stays
+   * out — see pathHolds.
+   */
+  pathUnit?: string | null;
   /**
    * Deal everything in the pool, by due date, without the mix. Nothing the
    * learner can open does this; tests and the pace simulation use it to
@@ -5198,7 +5528,8 @@ export function buildSession({
   const sets = systems || [];
   const numbers = knownNumbers(items, settings, sets);
   const drillable = items
-    .filter((it) => inDeck(it) && isDrillable(it, settings))
+    /* And not held back by a course's path — see pathHolds. */
+    .filter((it) => inDeck(it) && isDrillable(it, settings) && !pathHolds(it, settings, pathUnit))
     /* A skill whose system this device no longer holds — a course left,
        a teacher's language dropped — is a schedule with nothing behind
        it. Left in the collection, so the work comes back if the material
@@ -5528,6 +5859,9 @@ function withGrids(
       for (const card of items) {
         if (!isDrillable(card, settings) || langIdOf(card, settings) !== lang) continue;
         if (isDialog(card) || hasSlots(card)) continue;
+        /* A spare tile is marked like any other, so a card the path holds
+           back would be met here — see pathHolds. */
+        if (pathHolds(card, settings)) continue;
         for (const { unit, isSub } of unitsOf(card)) {
           if (!unit.ar || !gridOther(type, unit) || mine.has(unit.id)) continue;
           /* A word on the left of the grid of recordings is a play button,
@@ -10360,6 +10694,8 @@ export default function ArabicTrainer() {
   );
   const [courseBusy, setCourseBusy] = useState(false);
   const [courseError, setCourseError] = useState("");
+  /* The unit a learner has open from Home or Progress (0.617). */
+  const [unitOpen, setUnitOpen] = useState<{ courseId: string; deckId: string } | null>(null);
 
   /* Teaching is a role on a course, so it has to be asked about — and the
      material request answers it, so it is no longer asked twice. */
@@ -11342,6 +11678,17 @@ export default function ArabicTrainer() {
   );
   setValueIndex(valueIndex);
 
+  /* And where the learner stands on each course's path, which decides the
+     never-met cards a session may bring in — see pathHolds. Built from the
+     courses and decks last downloaded, so it works with no connection.
+     Computes only: what it finds reached is remembered by the effect
+     below, never from in here. */
+  const pathIndex = useMemo(
+    () => pathIndexOf(items, myCourses as PathCourse[], courseDecks as PathDeck[], settings),
+    [items, myCourses, courseDecks, settings],
+  );
+  setPathIndex(pathIndex);
+
   /* And which sentences a teacher has approved, on the cards they have
      reviewed. Rebuilt with the cards, which is when a review can change. */
   const reviewGate = useMemo(() => reviewGateOf(asking), [asking]);
@@ -11459,9 +11806,30 @@ export default function ArabicTrainer() {
      languages to choose between has to be the whole of them, or switching
      one off would take it out of the list that switched it off. */
   const drillableAll = useMemo(
-    () => items.filter((it) => inDeck(it) && isDrillable(it, settings)),
-    [items, settings, inDeck]
+    /* Held back by a path exactly as buildSession holds them, so the count
+       here and the session it promises cannot disagree. pathIndex is what
+       pathHolds reads. */
+    () => items.filter((it) => inDeck(it) && isDrillable(it, settings) && !pathHolds(it, settings)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, settings, inDeck, pathIndex]
   );
+
+  /*
+   * Remember every unit the path has reached, so that one that has opened
+   * never locks again (R25), on this device or any other: written only
+   * when there is an id the settings do not hold yet, so a render that
+   * finds nothing new writes nothing. Not stamped as a settings change —
+   * the union in mergeData carries it to the learner's other devices, and
+   * a stamp would hand this device's other choices to them too.
+   */
+  useEffect(() => {
+    if (!reachesFurther(pathReachedOf(settings), pathIndex.reached)) return;
+    persist((cur) => {
+      const had = pathReachedOf(cur.settings);
+      if (!reachesFurther(had, pathIndex.reached)) return null;
+      return { ...cur, settings: { ...cur.settings, pathReached: mergeReached(had, pathIndex.reached) } };
+    });
+  }, [pathIndex, settings, persist]);
 
   /*
    * How much is actually waiting — the number under "Cards ready to
@@ -11505,21 +11873,18 @@ export default function ArabicTrainer() {
       /* Met at all: anything on it ever answered. A level that has just
          opened on a card already met is that card waiting, as the session
          mix reads it — not a new card. */
-      const everMet = (it: Item) =>
-        drillableUnits(it, settings).some(({ unit }) =>
-          laddered(unit, settings).some((t) => stateOf(unit, t).phase !== "new")
-        );
+      const met = (it: Item) => everMet(it, settings);
       /* Ready to review: Cleared and Learnt cards with a question due — what
          Catch up would ask, by the same rule (0.603). */
       const reviewing = new Set(pool.filter((it) => dueForReview(it, settings, items)).map((it) => it.id));
       /* The rest of what is genuinely waiting on cards already met: cards
          still climbing, a level just opened, a card asked for by name. A
          regular session deals them; Catch up does not. */
-      const climbing = pool.filter((it) => !reviewing.has(it.id) && (everMet(it) ? waiting(it, true) : waiting(it, false))).length;
+      const climbing = pool.filter((it) => !reviewing.has(it.id) && (met(it) ? waiting(it, true) : waiting(it, false))).length;
       /* Plus as many never-met cards as the session mix has room for in
          this pool — the same reckoning buildSession does, so the two cannot
          come to disagree. None while the learner is catching up. */
-      const fresh = pool.filter((it) => !everMet(it) && !waiting(it, false) && waiting(it, true)).length;
+      const fresh = pool.filter((it) => !met(it) && !waiting(it, false) && waiting(it, true)).length;
       const mix = mixCardsOf(pool, items, settings);
       const pace = { at: now(), places: SESSION_SIZE / PER_UNIT, dayCards: (perDay || 0) / PER_UNIT };
       /* Behind only matters while there are new cards it is keeping out:
@@ -11654,6 +12019,20 @@ export default function ArabicTrainer() {
     () => (spaceNow ? courseDecks.filter((d: any) => orgOfCourse.get(d.courseId) === spaceNow) : courseDecks),
     [courseDecks, spaceNow, orgOfCourse]
   );
+  /* Each course's path, for Home and Progress (0.617): the courses of the
+     space and languages shown, in the order they are listed elsewhere. */
+  const pathLines = useMemo(
+    () => pathLinesOf(learnCourses.filter((c) => !langsOff.includes(c.language)), courseDecks),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [learnCourses, langsOff, courseDecks, pathIndex],
+  );
+  /* The names of the downloaded units, which are on the path and not
+     among the deck tiles or the decks a saved session or a prep picks. */
+  const unitTitles = useMemo(
+    () => new Set(courseDecks.filter((d) => isPathUnit(d as PathDeck)).map((d) => String(d.title || ""))),
+    [courseDecks],
+  );
+  const deckTags = useMemo(() => allTags.filter((t) => !unitTitles.has(t)), [allTags, unitTitles]);
 
   /* How much is waiting, in the languages that are switched on: the number
      on the home screen, and what decides whether there is a session to
@@ -12128,10 +12507,12 @@ export default function ArabicTrainer() {
     if (built.catchingUp) flash("Catching up first — new cards wait until your reviews are back in hand");
   }
 
-  function begin(practice?: boolean, only?: (it: Item) => boolean) {
+  function begin(practice?: boolean, only?: (it: Item) => boolean, pathUnit?: string) {
     /* `only` narrows the session to some cards — a prep's decks — in place
-       of the deck chosen on the home screen. */
-    const built = buildSession({ items: shown, settings, inDeck: only || inDeck, practice, perDay, systems });
+       of the deck chosen on the home screen. `pathUnit` lets that unit's
+       new cards in although the path has not reached it: "Practise this
+       unit" (R30, R24). */
+    const built = buildSession({ items: shown, settings, inDeck: only || inDeck, practice, perDay, systems, pathUnit });
     if (!built.exercises.length) {
       /* This used to return in silence, which reads as a broken button. It
          mattered little when the only way to get here was a card list that
@@ -14360,6 +14741,13 @@ export default function ArabicTrainer() {
                     <p className="at-homeline">{homeLine(homeWaiting)}</p>
                   )}
 
+                  {/* Each course's path, one line each, above the one
+                      Start session (R27). */}
+                  {pathLines.map((p) => (
+                    <PathHomeLine key={p.courseId} line={p} items={shown} settings={settings}
+                      onOpen={(deckId) => setUnitOpen({ courseId: p.courseId, deckId })} />
+                  ))}
+
                   <div className="at-row">
                     {/* Always live while there is anything to drill. Being
                         due decides what a session leads with, not whether
@@ -15658,6 +16046,9 @@ export default function ArabicTrainer() {
         {!stranded && tab === "progress" && (
           <ProgressTab
             items={shown}
+            paths={pathLines}
+            unitTitles={unitTitles}
+            onUnit={(courseId, deckId) => setUnitOpen({ courseId, deckId })}
             myCourses={learnCourses}
             spaceOf={!spaceNow && learnSpaces.length > 1 ? spaceOfItem : undefined}
             spaceNames={!spaceNow && learnSpaces.length > 1 ? spaceNameOf : undefined}
@@ -15669,12 +16060,44 @@ export default function ArabicTrainer() {
           />
         )}
 
+        {/* A unit's page, opened from Home or Progress (0.617). */}
+        {unitOpen && (() => {
+          const line = pathLines.find((p) => p.courseId === unitOpen.courseId);
+          const row = line && line.rows.find((r) => r.id === unitOpen.deckId);
+          if (!line || !row) return null;
+          return (
+            <UnitScreen
+              line={line}
+              row={row}
+              items={shown}
+              settings={settings}
+              perDay={perDay}
+              onBack={() => setUnitOpen(null)}
+              onPractise={() => {
+                const ids = new Set(unitItems(row.id, shown).map((it) => it.id));
+                setUnitOpen(null);
+                setTab("home");
+                begin(false, (it) => ids.has(it.id), row.id);
+              }}
+              onMarkCleared={() => {
+                /* Saved as "This was too easy" saves: the cards with their
+                   new states, through persist. No undo (R36). */
+                persist((cur) => {
+                  const next = clearPathUnit(cur.items, cur.settings, row.id);
+                  return next === cur.items ? null : { ...cur, items: next };
+                });
+                flash(`Unit ${row.number} marked as cleared`);
+              }}
+            />
+          );
+        })()}
+
         {/* ============ SETTINGS ============ */}
 
         {building && (
           <ManualSessionSheet
             items={shown}
-            allTags={allTags}
+            allTags={deckTags}
             settings={settings}
             onStart={beginManual}
             onSave={keepSession}
@@ -15701,7 +16124,7 @@ export default function ArabicTrainer() {
         {editingSaved && (
           <ManualSessionSheet
             items={shown}
-            allTags={allTags}
+            allTags={deckTags}
             settings={settings}
             editing={editingSaved}
             onStart={beginManual}
@@ -18208,7 +18631,10 @@ function DeckScreen({
   perDay,
   onBack,
   onCard,
+  head,
 }: {
+  /** Above the deck's own figures: a unit's stages, its state and what it offers (0.617). */
+  head?: Node;
   name: string;
   cards: Item[];
   progressOf: Map<string, Standing | null>;
@@ -18239,6 +18665,7 @@ function DeckScreen({
   const when = (t: Millis | null) => `learnt by ${forecastWords(t)}`;
   return (
     <Screen title={name} onBack={onBack}>
+      {head}
       <div className="at-deckhead">
         <p className="at-deckstatnote">
           {learnt} of {plural(shown.length, "card")} fully learnt
@@ -18304,8 +18731,118 @@ function DeckScreen({
   );
 }
 
+/*
+ * One course's line on Home (R27): the course, its current unit and that
+ * unit's stages — or that the path is complete. Tapping it opens the unit.
+ */
+function PathHomeLine({ line, items, settings, onOpen }: {
+  line: PathLine;
+  items: Item[];
+  settings: Settings;
+  onOpen: (deckId: string) => void;
+}) {
+  const current = line.rows.find((r) => r.current);
+  if (!current) {
+    if (!line.rows.length || line.rows.some((r) => r.state !== "finished")) return null;
+    return <p className="at-pathhome" data-el="path-home">{`${line.courseTitle} · Path complete`}</p>;
+  }
+  const st = unitStages(current.id, items, settings);
+  return (
+    <button type="button" className="at-pathhome" data-el="path-home" onClick={() => onOpen(current.id)}>
+      <span className="at-pathhomehead">{`${line.courseTitle} · Unit ${current.number} of ${line.rows.length} · ${current.title}`}</span>
+      <span className="at-pathhomestages">
+        {stageWords(st).map((w) => <span key={w}>{w}</span>)}
+      </span>
+    </button>
+  );
+}
+
+/*
+ * A unit's page (R29–R31): its words, sentences and text or conversation,
+ * read only, for every published unit, locked ones too; with "Practise
+ * this unit" where it is open for the learner. The deck page, fed by
+ * unitItems.
+ */
+function UnitScreen({ line, row, items, settings, perDay, onBack, onPractise, onMarkCleared }: {
+  line: PathLine;
+  row: PathLine["rows"][number];
+  items: Item[];
+  settings: Settings;
+  perDay: number;
+  onBack: () => void;
+  onPractise: () => void;
+  /** Marks every word and sentence of it cleared — see clearPathUnit. */
+  onMarkCleared: () => void;
+}) {
+  const [viewing, setViewing] = useState<Item | null>(null);
+  const [marking, setMarking] = useState(false);
+  /* Only a unit open for the learner: reached, or opened early by the
+     teacher (R34); never one locked or already finished. */
+  const markable = row.state === "open" || (row.state === "locked" && row.openedEarly);
+  const cards = useMemo(() => unitItems(row.id, items), [row.id, items]);
+  const progress = useMemo(() => {
+    const at: Map<string, Standing | null> = new Map();
+    const toward: Map<string, { at: Standing; share: number } | null> = new Map();
+    for (const it of cards) {
+      at.set(it.id, standing(cardStandings(it, settings, items)));
+      toward.set(it.id, towardsLearnt(it, settings, items));
+    }
+    return { at, toward };
+  }, [cards, items, settings]);
+  const st = useMemo(() => unitStages(row.id, items, settings), [row.id, items, settings]);
+  const open = row.state !== "locked" || row.openedEarly;
+  const before = line.rows.find((r) => r.number === row.number - 1);
+  return (
+    <>
+      <DeckScreen
+        name={`Unit ${row.number} · ${row.title}`}
+        cards={cards}
+        progressOf={progress.at}
+        towardOf={progress.toward}
+        settings={settings}
+        perDay={perDay}
+        onBack={onBack}
+        onCard={(it) => setViewing(it)}
+        head={
+          <div className="at-unithead" data-el="unit-page">
+            <p className="at-pathunitstate">
+              {pathStateWord(row)}
+              {row.state === "finished" && st.learnt ? <i>{" · Learnt"}</i> : null}
+            </p>
+            <p className="at-pathhomestages">{stageWords(st).map((w) => <span key={w}>{w}</span>)}</p>
+            {row.state === "locked" && before ? <Help>{`Finish unit ${before.number} to open this one`}</Help> : null}
+            {open ? (
+              <div className="at-row">
+                <Button variant="primary" onClick={onPractise}>Practise this unit</Button>
+                {markable ? <Button variant="ghost" onClick={() => setMarking(true)}>Mark as cleared</Button> : null}
+              </div>
+            ) : null}
+          </div>
+        }
+      />
+      {viewing && <CardScreen card={viewing} items={items} settings={settings} onBack={() => setViewing(null)} />}
+      {marking && (
+        <ConfirmModal
+          title={`Mark unit ${row.number} as cleared?`}
+          body={<p>Every word and sentence in it will count as cleared and come back as reviews. This can't be undone.</p>}
+          confirmLabel="Mark as cleared"
+          danger={false}
+          onCancel={() => setMarking(false)}
+          onConfirm={() => {
+            setMarking(false);
+            onMarkCleared();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 function ProgressTab({
   items,
+  paths = [],
+  unitTitles,
+  onUnit,
   myCourses = [],
   settings,
   moves,
@@ -18316,6 +18853,11 @@ function ProgressTab({
   spaceNames,
 }: {
   items: Item[];
+  /** Each course's path, shown above the deck tiles (0.617). */
+  paths?: PathLine[];
+  /** The titles of the downloaded units, which are not deck tiles. */
+  unitTitles?: Set<string>;
+  onUnit?: (courseId: string, deckId: string) => void;
   myCourses?: Course[];
   /** A card's space, and every space's name, when Learning shows more than
       one (memberships): two decks of one name in two spaces are then two
@@ -18467,6 +19009,8 @@ function ProgressTab({
       if (!toward) continue;
       const space = (spaceNames && spaceOf && spaceOf(it)) || "";
       for (const deck of it.tags || []) {
+        /* A unit is on the path above, not a tile here. */
+        if (unitTitles && unitTitles.has(deck)) continue;
         const key = `${space}|${deck}`;
         const row = held.get(key) || { name: deck, space, n: 0, learnt: 0, got: 0 };
         row.n++;
@@ -18486,7 +19030,7 @@ function ProgressTab({
         pct: deckPercent({ n, learnt, got }),
       }))
       .sort((a, b) => b.pct - a.pct || a.name.localeCompare(b.name));
-  }, [counted, progress, spaceOf, spaceNames]);
+  }, [counted, progress, spaceOf, spaceNames, unitTitles]);
   const deckOpenRow = deckRows.find((d) => d.key === deckOpen) || null;
 
   /* Where the prep stands, for the line beside the button. */
@@ -18651,6 +19195,25 @@ function ProgressTab({
           deck of thirty and a deck of three hundred are not comparable by
           how many are left, and a bar beside it because a number alone is
           read and a bar is seen. */}
+      {/* Each course's path, whole and in order, above the decks (R28):
+          every published unit, locked ones too, can be opened (R29). */}
+      {paths.map((p) => (
+        <Section head key={p.courseId} title={p.courseTitle}>
+          <h4 className="at-sectionhead">Path</h4>
+          <div className="at-pathlist" data-el="progress-path">
+            {p.rows.map((r) => (
+              <button type="button" key={r.id} className={`at-pathunit ${r.state}${r.current ? " current" : ""}`}
+                aria-haspopup="dialog" onClick={() => onUnit && onUnit(p.courseId, r.id)}>
+                <span className="at-pathunitname">{`${r.number}. ${r.title}`}</span>
+                <span className="at-pathunitstate">
+                  {pathStateWord(r)}
+                  {r.state === "finished" && unitStages(r.id, items, settings).learnt ? <i>{" · Learnt"}</i> : null}
+                </span>
+              </button>
+            ))}
+          </div>
+        </Section>
+      ))}
       {deckRows.length > 0 && (
         <Section head title="Decks" lede="How you're doing on each deck you're studying.">
           <div className="at-deckprog">

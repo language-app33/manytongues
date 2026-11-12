@@ -79,7 +79,7 @@ export const FIXES_SHOWN = 3;
 
 /* Kinds of word that name somebody or somewhere: there to fill a blank,
    not to be learnt inside one. */
-const NAME_KINDS = ["person", "place", "name"];
+export const NAME_KINDS = ["person", "place", "name"];
 
 export type CheckKey =
   | "words" | "sentences" | "recordings" | "pictures" | "pronunciation"

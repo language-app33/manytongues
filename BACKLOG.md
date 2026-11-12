@@ -116,3 +116,22 @@ the rule that tells two people with one handle apart (`created` differs)
 applied to every handle, a way to choose a new handle for the person who
 collides, and rewriting every roster, owner and list that names the old
 one. Declined for now: nobody has asked to move a space between servers.
+
+## A class view of who is on which unit
+
+Wanted later (the owner's 2b, 12 November 2026). A teacher sees a
+course's path and each unit's checklist, but not where the class is on
+it: how many students are on each unit, and who marked one as cleared.
+Left out of the first version of units (0.613–0.619); see DECISIONS.md,
+"Units: a course's path". Waits on the server knowing a learner's path,
+which today lives only in their synced settings.
+
+## Turning an existing deck into a unit
+
+Wanted later (2b, 12 November 2026). A unit is a deck with `unit: true`,
+so a teacher with a deck already written could make it a step of a path
+instead of copying its cards into a new unit. Left out of the first
+version; waits on deciding what happens to the courses that already hold
+the deck as an ordinary one, since a unit is on the path of every course
+it is in (A1).
+

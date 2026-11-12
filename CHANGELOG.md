@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.613 — 12 November 2026
+## 0.621 — 12 November 2026
 
 **A picture question's picture shrinks once you have answered it.** After
 you answer, the picture asked about (or the grid of pictures you chose
@@ -20,6 +20,197 @@ animation.
 To check by hand: on a phone, answer a "Which picture is…" question and a
 question that shows a picture; each picture should shrink to half once
 the answer is checked, and come back full size on the next question.
+## 0.620 — 12 November 2026
+
+**Marking a unit cleared now clears its numbers whole, in one press.**
+Until now a unit holding a number part was left with the part's
+questions in figures to answer, since those only open once the figures
+are cleared; it now counts as finished straight away and the next unit
+opens. Nothing else about marking changes: no undo, nothing becomes
+learnt, and the cards come back as reviews a day later.
+
+To check by hand: as a student, mark a unit that holds numbers 0 to 9 as
+cleared; it should read as finished at once, with the next unit open.
+
+## 0.619 — 12 November 2026
+
+**Units, written down.** Nothing changes in the app. The README now has
+the whole of how a course's path works, in one place, and the decisions
+file says why each rule is shaped as it is and what was weighed and left
+out of this first version: a class view of who is on which unit, a goal
+per unit, turning a deck into a unit, a teacher's switch for "Mark as
+cleared", undoing a marking, marking several units at once, and units in
+a learner's own space, among others. Which of those are wanted later is
+still to be said.
+
+## 0.618 — 12 November 2026
+
+**Units, step six: a student can mark a unit as cleared.**
+
+- **"Mark as cleared"** is on the page of a unit that is open for the
+  student — reached, or opened early by the teacher. Not on a locked or a
+  finished one. The app asks first, and there is no undo.
+- **Every word and sentence in it then counts as cleared**, everywhere it
+  appears, and comes back as ordinary reviews a day later, asked at its
+  top level. Nothing becomes learnt this way, and a card missed twice drops
+  back to be relearnt, as any card does. Cards already cleared or learnt,
+  and the unit's text or conversation, are left as they were.
+- The unit then shows as finished and the next one opens. To skip several
+  units, mark each in turn. Teachers cannot switch this off.
+- **One thing for the owner to decide (see the summary of this work):** a
+  unit holding numbers clears their words and the figures, but the number
+  part itself then gains its questions in figures, which only open once
+  the figures are cleared. So such a unit is not finished until those are
+  answered, or the unit is marked a second time.
+
+To check by hand: mark unit 2 as cleared and see the confirmation, then
+unit 2 finished and unit 3 open; the next sessions bring unit 2's cards
+back as reviews, at their top level; a unit 3 sentence can now use unit
+2's words in its blanks; and all of it after a sync to a second device.
+
+## 0.617 — 12 November 2026
+
+**Units, step five: students see their course's path.** Nothing changes
+for anyone whose courses have no units.
+
+- **Home shows a line for each course with a path**, above Start session:
+  the course, "Unit 3 of 8" and the unit's name, then how far it has got —
+  words, sentences, and its text or conversation if it has one. When every
+  unit is finished it says "Path complete". Tapping the line opens the
+  unit. There is still one Start session, and it still draws from all of
+  the student's courses at once.
+- **Progress shows the whole path above the deck tiles**, each unit as
+  Finished, Current, Locked or Opened by your teacher. A finished unit
+  whose every card is also learnt says so, more quietly. Units are no
+  longer among the deck tiles, nor among the decks a saved session or a
+  prep picks from.
+- **Any unit can be opened, locked ones too**: its words, sentences and
+  text or conversation, to read. A locked unit says which unit to finish
+  first.
+- **Practise this unit**, on a unit that is open — or one the teacher
+  opened early — starts a session of that unit alone, bringing in its new
+  words. Ordinary sessions keep bringing new words from the student's own
+  place on the path.
+- An open unit that an earlier unit has since slipped behind is shown as
+  "Open": the plan named four states, and this fifth case needed a word.
+
+To check by hand: as a student in a course with units, Home shows unit 1
+and Progress shows it current with the rest locked; a locked unit lists
+its cards with no button; clearing every word and sentence of unit 1 opens
+unit 2 without the text being read; a unit the teacher opens shows as
+opened by your teacher, and Practise this unit brings its new words while
+an ordinary session still brings unit 2's; all of it works offline after
+one download.
+
+## 0.616 — 11 November 2026
+
+**Units, step four: teachers can build a course's path.** Students see
+nothing of it yet; that comes next.
+
+For teachers, on a course's page:
+
+- **A Path section above the decks** lists the course's units in order,
+  each with its number, whether it is a draft or published in this
+  course, its quality score, and "Needs attention" when it is published
+  but something has since left its checklist unclear. It stays live for
+  students while it is fixed.
+- **New unit** and **Add an existing unit** (one already in another
+  course) put a unit at the end of the path, as a draft here. **Move up**
+  and **Move down** reorder it. **Open for the class** lets the whole
+  class practise a published unit early; **Close for the class** takes
+  that back without taking anyone's progress. **Remove from this course**
+  and **Delete unit** work as they do for a deck; deleting says so when
+  the unit is in other courses too.
+- **Units are no longer listed among the course's ordinary decks.**
+
+On a unit's page — the deck page, headed "Unit 3 · its title":
+
+- **A checklist** says what is missing before it can be published in
+  this course: sentences with a blank still needed, blanks with fewer than
+  five approved words from this unit or earlier ones, words not used in
+  any of its sentences, a second text or conversation. **Publish unit**
+  works once it is clear. Cards still in draft are not counted, and the
+  checklist says how many there are.
+- **The quality score counts a word as untaught** if only a later unit
+  teaches it.
+- **Advice on forms**: blanks whose approved words all share one gender
+  or number are listed under the score. Advice only: no points, and it
+  never stops publishing.
+- Adding, editing and reviewing cards work exactly as on a deck, including
+  adding a card that is already in other decks or units.
+
+To check by hand: make a course with three units, reorder, remove and
+delete one; fill unit 1 until its checklist clears and publish it; add
+unit 1 to a second course and see it there as a draft with its own
+checklist; take an approved word out of a published unit's blank and see
+"Needs attention" while it stays published.
+
+## 0.615 — 11 November 2026
+
+**Units, step three: a student's device follows the path. Still nothing
+on screen, and nothing changes for anyone whose courses have no units.**
+
+- **New words come in path order.** A word that has never come up is held
+  back while every place it lives is a unit the student has not reached.
+  A word that is also in an ordinary deck, or in a unit already open in
+  any of their courses, arrives as today. This holds in every kind of
+  session — regular, saved, prep and Ultimate — and the home screen's
+  count of what is waiting follows the same rule, so the two never
+  disagree.
+- **Words already met are never held back.** They come back for review
+  wherever they live, as today.
+- **Numbers and times in a unit wait with it**: a number part's skill, its
+  words and the figures arrive when the unit opens, and count toward
+  finishing it. A part also held by an ordinary deck arrives as today.
+- **A unit that has opened never closes again**, on any of the student's
+  devices: which units each student has reached is kept with their
+  settings and joined, never written over, when devices sync — also on the
+  server, so a phone still on an older version cannot take a unit back.
+- Trade-off: the server now reads a student's saved progress once more
+  each time a device uploads it, to make that join.
+- An older version of the app that receives a course with units shows
+  them as ordinary decks, in no order. Updating fixes it.
+
+## 0.614 — 11 November 2026
+
+**Units, step two: the server keeps a course's path, and checks a unit
+before it is published. Still nothing on screen.**
+
+- **A unit is made in a course, ordered on its path, published there and
+  opened early there**, each per course: the same unit can be in several
+  courses, a draft in one and published in another.
+- **A unit is published only once it is ready**, checked in that course:
+  at least five sentences with a blank; every word in the unit used in at
+  least one of them; and each blank with at least five different words a
+  teacher has approved in it, from this unit, the published units before
+  it, or names kept anywhere. Numbers count where a unit up to this one
+  holds their part. Only published cards are counted.
+- **A unit that is a draft in a course reaches none of its students**,
+  numbers and all. Once published there, it is sent like any deck.
+- **Removing a unit from a course, or deleting it, takes it off the path
+  too.** Backups keep units and paths.
+- A course with no units sends and stores exactly what it did before.
+
+## 0.613 — 11 November 2026
+
+**Units, step one: the rules of a course's path. Nothing changes on
+screen yet.**
+
+A course is getting a second kind of element beside its decks: the
+**unit**. Units sit in a fixed order, the path, and each opens when the
+one before it is finished. This release writes down the rules the rest of
+the work will follow, with tests, and nothing a teacher or student can see
+uses them yet:
+
+- **A unit opens when every word and sentence of the one before it is
+  cleared.** The first is always open. A text or conversation at the end
+  does not have to be done first.
+- **Nobody is ever sent back.** A unit that has opened for a student stays
+  open, whatever a teacher adds, reorders or inserts later, and even if
+  cards of an earlier unit slip back.
+- **A new word is held back only while every place it lives is a unit the
+  student has not reached.** A word that is also in an ordinary deck, or in
+  a unit already open, arrives as it does today.
 
 ## 0.612 — 11 November 2026
 

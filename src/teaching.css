@@ -1070,3 +1070,10 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
   .at-dimname { font-size:10px; letter-spacing:.03em; }
   .at-dimpicks { gap:10px; }
 }
+
+/* A course's path (0.616): each unit a row to open, with its moves under
+   it, and a unit's checklist as a plain list. */
+.at-pathrow { margin-bottom:12px; }
+.at-pathacts { flex-wrap:wrap; gap:4px; margin-top:4px; }
+.at-checklist { margin:0 0 12px; padding-left:20px; line-height:1.45; }
+.at-checklist li { margin-bottom:4px; }

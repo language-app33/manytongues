@@ -1160,6 +1160,131 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   the language's context, a lookup rather than a comparison per word, which
   is what lets every deck in the list be scored at once. Tests:
   `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
+- **A course's path: units, in order (0.613).** A course holds a second
+  kind of element beside its decks: the **unit**. Underneath, a unit is a
+  deck with `unit: true`; a course lists its units in `path`, in order,
+  drafts included, and everything else about the path is per course too,
+  because one unit can be in several courses. Two principles govern it:
+  **cards are free objects** — a card can be in any number of units, decks
+  and courses, and nothing about where it already is may block adding it
+  somewhere else — and **progress belongs to the card**, so a card cleared
+  anywhere is cleared everywhere and nothing about the path stores
+  progress of its own. The word *unit* alone is taken in the code (`Unit`,
+  `unitsOf`, `quietUnits` mean one form of a card that can be asked), so
+  the thing here is a *path unit* in code and "Unit" only on screen.
+
+  **The rules, in brief (the owner's, R1–R37 and A1–A7 in the plan).** A
+  unit holds word cards, at least five sentences with a blank, and at most
+  one text or conversation at the end. Each blank needs five different
+  words a teacher approved in it, from this unit, the published units
+  before it on that course's path, or names kept anywhere; every word of
+  the unit is in one of its sentences, numbers excepted. A unit is
+  published per course once that holds, and stays live with a warning if
+  an edit breaks it later. Units open in order: the first always, the next
+  once every word and sentence of the one before is cleared — the text
+  need not be read — and once open, never closed again. A teacher may open
+  any published unit early for the class. A new word comes as soon as any
+  place it lives is open; a word already met is never held. A learner can
+  look inside any unit, practise an open one alone, and mark an open one
+  as cleared, which clears its words and sentences everywhere and makes
+  nothing learnt. Word sets in a unit — pronouns, number and time parts —
+  wait for it, count toward it and are cleared with it. Ordinary decks are
+  unchanged and always open.
+
+  Every rule lives in `src/path.ts`, which is pure and read by the app and
+  the server alike. `pathRows` says where a learner stands: the first unit
+  is open; a unit opens when every unit before it is finished — every word
+  and sentence card cleared, the text or conversation at the end not
+  needed; and a unit once reached is reached for good, so the list of
+  reached units only grows (`mergeReached` joins two devices' lists by
+  union). Nobody is sent back by a teacher adding, reordering or
+  inserting. `cardHeld` is the one thing the path does to a session: a
+  never-met card is held only while every deck it lives in is a unit not
+  yet reached, so a word also in an ordinary deck, or in an open unit,
+  arrives as it always did.
+
+  **A unit is published per course, once its checklist is clear (0.614).**
+  `create-unit`, `move-unit`, `publish-unit` and `open-unit` in
+  `server/api/courses.js`; `attach-deck` puts an existing unit at the end
+  of another course's path as a draft, and `detach-deck` and `delete-deck`
+  take it off. `unitProblems` in `src/path.ts` is the checklist: at least
+  `MIN_SENTENCES` sentences with a blank, every word card of the unit in an
+  approved sentence of it, and each blank with `MIN_FILLERS` different
+  cards approved in it — approved meaning on the card's `review.ok`, not
+  merely passing, since a card with no review has approved nothing. What
+  may count toward a blank's five is `countingCards`: this unit's cards,
+  those of the units before it published in that course (`drawsFrom`),
+  every card never asked on its own (`neverAskedAlone`, the quality score's
+  own test), and the number values of the parts those units hold. Finals —
+  a text or conversation, one at most — are not examined. The server
+  judges published cards only; `my-material` sends a unit only through a
+  course that publishes it, and the course's path goes into
+  `materialVersion` only when there is one, so nothing changes for a course
+  without units.
+
+  **A device follows the path (0.615).** `pathIndexOf` in the trainer
+  builds, from the courses and decks last downloaded and the learner's own
+  progress, which decks each item is in (from each deck's `cardIds`, never
+  `source.deckId` or the tags; a number or time item from the `deckIds`
+  `fileIntoDecks` now records beside its tags), each unit's items
+  (`unitItems`, the one way to find them), each course's rows and the
+  units open somewhere. `pathHolds` is `cardHeld` for a never-met item
+  (`everMet`, the one test the mix, the home count and the path share),
+  applied where `buildSession` makes its pool, where the home screen
+  counts, and to a grid's spare tiles, which are marked and so would meet
+  a held word. `buildSession`'s `pathUnit` lets one unit's new cards
+  through, for "Practise this unit". A unit is finished when every item of
+  it but its text or conversation, and anything that can never be asked,
+  is cleared. What `pathRows` finds reached is written to
+  `settings.pathReached` by an effect, only when it holds something new;
+  `mergeData` joins two devices' lists by union rather than taking the
+  newer settings, and the sync endpoint does the same against what it
+  holds before it writes. `installIndexes` takes the courses and decks, so
+  a test can deal a session with a path.
+
+  **A teacher builds the path on the course's page (0.616).** `PathSection`
+  in `src/spaces.tsx` lists a course's units in path order above its decks
+  — which no longer list units — and calls the four path actions,
+  `attach-deck`, `detach-deck` and `delete-deck`, putting what the server
+  answered on screen rather than fetching everything again. A unit opens
+  on the deck page, headed with its number in the course it was opened
+  from, with `UnitChecklist` above its cards: `unitProblems` over
+  `countingFor` — `countingCards` over the teacher's whole collection and
+  its number values — in the words of `problemLine`. The checklist and the
+  quality score's `known` are the only things that read it; the card
+  editor and the review screens are handed the pools they always were.
+  Under the score, `sameFormBlanks` lists blanks whose approved words share
+  every grammar field the language declares (`dimsOf`), as advice.
+
+  **A learner sees the path (0.617).** `pathLinesOf` gives each course's
+  rows with their titles, for the courses of the space and languages
+  shown. `PathHomeLine` puts one above Start session per course — the
+  current unit, "Unit 3 of 8", and `unitStages`: words (word-set items
+  among them), sentences, and the text or conversation, counting only
+  what can be asked, so that both stages full is exactly the path's
+  "finished". Progress lists every published unit in order with
+  `pathStateWord`, and leaves the units' titles out of the deck tiles and
+  out of the decks a saved session or a prep picks (`deckTags`). A unit
+  opens on `UnitScreen` — `DeckScreen`, fed by `unitItems`, with its state
+  and stages above — locked ones too, read only; one open for the learner,
+  or opened early, offers "Practise this unit", which is `begin` with the
+  unit's items as the pool and `pathUnit` set.
+
+  **And a learner may mark an open unit as cleared (0.618).**
+  `clearPathUnit`, modelled on `creditNumbers`, writes through `liftLevel`
+  from a key on each form's top level — every form `drillableUnits` gives,
+  and a part's own skill — over the unit's items but its text or
+  conversation. `liftLevel` gives no passes and leaves solid keys alone,
+  so nothing becomes learnt and what is already cleared is untouched; the
+  cards come back a day later as ordinary reviews. A number part's
+  questions in figures open only once its figures are cleared, so for a
+  unit holding a part the skills are lifted a second time against the
+  figures as the same press left them (0.620): one press clears the part
+  whole. Shown on a unit that is open or opened early, behind a
+  confirmation, with no undo. Tests:
+  `tests/path.test.mjs`, `tests/path-server.test.mjs`,
+  `tests/path-device.test.mjs`, and a walk in `tests/smoke.mjs`; why:
+  DECISIONS.md, "Units: a course's path".
 - **Word sets: lists every language has, written once (0.569).** Numbers
   and pronouns so far, months and days of the week to come. The app knows
   the list; the teacher writes the words once for the language, and a deck
