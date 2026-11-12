@@ -9540,7 +9540,9 @@ function PictureChoices({ options, value, onChange, disabled }: {
   disabled?: boolean;
 }) {
   return (
-    <div className="at-picchoices" data-el="answer-choices">
+    /* Answered, the tiles shrink to half, as the prompt picture does, so
+       the verdict fits on the screen without scrolling. */
+    <div className={`at-picchoices${disabled ? " settled" : ""}`} data-el="answer-choices">
       {options.map((option, i) => {
         const hash = String((option && Array.isArray(option.images) && option.images[0]) || "");
         return (
@@ -14715,7 +14717,9 @@ export default function ArabicTrainer() {
                          with, and it is the one the tiles use too. */
                       <CardPicture
                         hash={(Array.isArray(item.images) && item.images[0]) || ""}
-                        className="prompt"
+                        /* Once answered it shrinks to half, so the verdict
+                           and what comes with it fit without scrolling. */
+                        className={checked ? "prompt settled" : "prompt"}
                       />
                     ) : spec.promptField === "audio" ? (
                       /* A context question plays the whole phrase, not the

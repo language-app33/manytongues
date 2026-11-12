@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.613 — 12 November 2026
+
+**A picture question's picture shrinks once you have answered it.** After
+you answer, the picture asked about (or the grid of pictures you chose
+from) eases down to half its size, so the verdict, the right answer and
+the button to go on fit on the screen without scrolling. Anyone whose
+device is set to reduce motion sees it shrink straight away, without the
+animation.
+
+To check by hand: on a phone, answer a "Which picture is…" question and a
+question that shows a picture; each picture should shrink to half once
+the answer is checked, and come back full size on the next question.
+
 ## 0.612 — 11 November 2026
 
 **A reported problem now says what the learner was looking at.** Copied

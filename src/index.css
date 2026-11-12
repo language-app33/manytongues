@@ -719,6 +719,13 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-picchoice:hover:not(:disabled), .at-picchoice:focus-visible { border-color: var(--brass); }
 .at-picchoice.on { border-color: var(--accent); box-shadow:0 0 0 3px var(--accent); }
 .at-picchoice:disabled { cursor:default; }
+/* Once a picture question is answered, its picture (or its grid of tiles)
+   eases down to half its width, and so half its height, so the verdict and
+   whatever is shown with it fit on the screen without scrolling. */
+.at-picture.prompt, .at-picchoices { transition: width .35s ease, max-width .35s ease; }
+.at-picture.prompt.settled { width:calc(min(100%, 320px, var(--pic-cap) * 4 / 3) / 2); }
+.at-picchoices.settled { max-width:calc(var(--pic-cap) / 2); }
+@media (prefers-reduced-motion: reduce) { .at-picture.prompt, .at-picchoices { transition:none; } }
 
 .at-imgtile > .at-icon { position:absolute; top:6px; inset-inline-end:6px; flex:none;
   width:40px; min-height:40px; padding:0; }
