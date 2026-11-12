@@ -7988,3 +7988,127 @@ behind the hint, and free, but two reports took the question for a test of
 remembering the phrase. The owner chose to show it, as "choose the missing
 word" has since 0.586. The hint is the word's pronunciation again, and
 costs the mark. `hintPhrase` is kept for any question that wants it back.
+
+---
+
+## Students learn to read without harakat (0.608)
+
+**11 November 2026** · `withoutMarks`, `piecesOf` and each pack's `marks` in `src/languages.ts`, `readsBare` in `src/scheduler.ts`, `MarksShown`, `useMarked`, `formReadsBare` and `bareTwinsOf` in `src/ArabicTrainer.tsx`
+
+The owner's goal is students who read Arabic without harakat, as it is
+written everywhere outside a textbook. Until now the app only ever showed
+a word as the teacher wrote it, so a student who learnt from vowelled
+cards never practised without the vowels. The owner chose, in
+conversation (1a, 2a, 3a, 4a, 5a, 6a, then 1a, 2a, 3a, 4a, 5a, then 1a):
+
+**A word goes bare when the first level is passed.** Its harakat are on
+while what it means is being learnt and off from the second level of its
+ladder, on every question including first-level ones that come back. The
+test is `reachedLevel(…, 2)`, the same one a word inside a sentence is
+measured on, so two misses running on the first level put the marks back
+until it is recovered. Options and tiles follow the asked word, so no
+option stands out by its marks.
+
+**A sentence is bare from the start.** The owner did not want sentences
+to be met vowelled first. Scenes, texts, phrases, examples, replies and
+sentence cards are bare whatever the student knows of their words.
+
+**No new exercise.** "Read the bare word" was first proposed as picking
+the right vowelling from several; the owner wanted the existing exercises
+without harakat instead. Nothing is scheduled twice: the bare word is not
+a separate thing to learn (1a, over a bare twin of every reading question).
+
+**Help is a tap, and costs a near miss.** A word not inside a button is
+tapped for its marks, and only that word; options and tiles, which a tap
+would choose, have one "Show the harakat" for all of them. Either marks
+the question as `toldAnswer` does, graded "hard". The words lent are kept
+against the question they were lent on, not cleared by `resetExercise`, so
+no path to the next question can carry them over.
+
+**The answer keeps its marks.** Once answered, words are shown as written
+(the answer line, the prompt, the options); a sentence stays bare, except
+the word that filled its gap, which is the answer.
+
+**Display only.** What is stored, what is marked as right and what is
+typed are unchanged. A context is provided around the question and read by
+the one component that draws the script, so card lists, the editor and
+anything outside a question show what the teacher wrote.
+
+**One exception, not asked for, made for the build's sake.** Bare, two
+spellings can become one: كَتَب and كُتُب are both كتب. A question showing
+two spellings that differ only in their marks — the asked word and
+another card the student holds, two options, or two persons of a verb's
+tense — keeps every mark. Without this, "Who is it?", which reads the marks
+by design (0.605), would ask a question with no right answer, and "Choose
+the word" could offer two options that look the same. Only spellings
+written with marks count as twins, so a word typed once bare and once
+vowelled is not one.
+
+**Teachers are told** under a word card's script when it has no marks at
+all: the student then never sees it vowelled. A note rather than a refusal,
+because some words need none; not on sentences, which are bare anyway.
+
+Given up: a word whose harakat are its only difference from another the
+student holds is never practised bare. The tip under a bare prompt ("Tap a
+word to see its harakat") is on every such question, which some may find
+repetitive; it is how a student finds out the tap exists.
+
+**0.609: the tip is shown in the first three sessions only.** The owner
+chose (1b) to keep it while it teaches and drop it once it repeats. Counted
+on the device, like the listening pause, rather than in the synced
+document: a count of how often a line was seen is not learning, and a
+write to the synced settings would stamp them and hand this device's other
+choices to every other one. A session counts once, known by its first
+question, so a queue rearranged mid-session is not a second session. The
+cost is that a new device shows it three times more. The owner also chose
+(2a) to keep the exception for spellings told apart only by their marks.
+## A counting phrase is asked in the figures English uses (0.611)
+
+**11 November 2026** · `src/ArabicTrainer.tsx` (`castFace`, the answer
+screen's `also-figures`), `tests/numbers-counted-faces.test.mjs`
+
+A counting face's top question (`own2ar`) showed the phrase as "٥ Sisters":
+the language's own figure beside an English noun. A learner reported it as
+a muddle. The owner chose to show the phrase in the figures English uses,
+"5 sisters", and keep the language's own figures for the plain number
+cards, which already ask ٥ alone. This reverses 4 October's "shows the
+language's own and nothing else" for counted phrases only; that rule is
+about reading a number, and a counted phrase is about the word a number
+takes before a noun.
+
+The owner also chose to keep the key, so passes made from ٥ still count:
+the Arabic written is the same either way. The owner considered and turned
+down an Arabic → English question showing ٥ in the phrase: beside the
+words it gives the number away, and in place of them it no longer asks the
+word the face is about.
+
+The answer screen's "In Arabic numerals" line is skipped where the prompt
+already is the English figures, so it does not say "5 sisters" twice.
+
+Left alone in the same batch: the noun rotates only among those learnt in
+the plural (the owner's rule from 7 October, kept), and the whole phrase's
+pronunciation after a gap is shown where the phrase has one written
+(since 0.583), which the reported phrase did not.
+
+## A report says what the learner was looking at (0.612)
+
+**11 November 2026** · `src/ArabicTrainer.tsx` (`reportExtras`, `KnownNumbers.faceNouns`), `src/numbers/generate.ts` (`faceFits`), `server/api/courses.js` (`report-flag`), `src/flag-export.ts`, `src/types.ts` (`Flag`)
+
+Four reports in one batch (0.611) could not be answered from the export:
+"Asked" is the word the question was about, which on a counted number is
+أربع أخوات while the screen said "٤ Sisters"; a report on a phrase's
+pronunciation needed to know whether the phrase had one written; "two
+meanings in the proposed answers" needed the answers; and "sisters every
+time" turned on which nouns the app had to choose from. The owner asked
+for reports to carry what was needed next time.
+
+So a report now carries four optional plain-text lines, each sent only
+where it says something: `shown` (the prompt as on the screen, where it
+differs from the word), `phrase` (script — meaning — pronunciation, saying
+"no … written" where a part is missing, since its absence is usually the
+answer), `options` (the choices offered, not a matching grid's), and
+`nouns` (for a counting face: the nouns `faceFits` finds now, the same
+list `faceAsk` draws from, and every noun the system counts). Text rather
+than structure because the export is plain text and nothing else reads
+them. The server stores each only when sent, at most 400 characters, so an
+older build's report reads exactly as before.

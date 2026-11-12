@@ -240,6 +240,16 @@ function block(flag: Flag, n: number, of: number, opts: FlagExportOptions): stri
     ...row("Language", flag.language),
     ...row("Asked", flag.prompt),
     ...row("Meaning", flag.meaning),
+    /* What was on the screen, where that is not the word itself: the
+       figures and English a counted number was asked from, a phrase with
+       its gap. "Asked" is the word the question was about. */
+    ...row("On screen", flag.shown),
+    /* The phrase the word stood in, and whether it had a pronunciation
+       written — which is what a report about the phrase's turns on. */
+    ...row("Phrase", flag.phrase),
+    ...row("Offered", flag.options),
+    /* For a number counted with a noun: which nouns it could have used. */
+    ...row("Nouns", flag.nouns),
     /* Quoted, because the whole value of keeping it is the trailing space
        or the missing letter, and unquoted those are invisible. */
     ...row("They put", flag.answer ? `"${flag.answer}"` : ""),

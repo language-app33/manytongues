@@ -2198,7 +2198,12 @@ async function handle(req) {
           suspended: undefined,
           org: org ? orgCard(org) : { id: MAIN, slug: MAIN, name: "Main", logo: "", colour: "" },
           orgAdmin: !!org && (org.admins || []).includes(me.handle),
-          orgs: shown.map((id) => orgDocs.get(id)).filter(Boolean).map(orgCard),
+          /* Whether they run each space too (0.610), so Where you are can
+             offer Admin on a space other than the one here. */
+          orgs: shown
+            .map((id) => orgDocs.get(id))
+            .filter(Boolean)
+            .map((o) => ({ ...orgCard(o), runs: (o.admins || []).includes(me.handle) })),
         },
       });
     }
@@ -2377,6 +2382,14 @@ async function handle(req) {
            fingerprint its review is kept in, so a teacher reading this can
            strike that one sentence and nothing else. See review.ts. */
         ...(isSentenceKey(body.sentence) ? { sentence: body.sentence } : {}),
+        /* What the learner was looking at (0.612): the question as shown,
+           the phrase, the answers offered, the nouns a counted number had
+           to choose from. Plain text, kept only where sent. */
+        ...Object.fromEntries(
+          ["shown", "phrase", "options", "nouns"]
+            .map((k) => [k, String(body[k] || "").slice(0, 400)])
+            .filter(([, v]) => v),
+        ),
         at: Date.now(),
       };
       await writeJson(store, K.flag(flag.id), flag);
@@ -4932,6 +4945,9 @@ async function handle(req) {
          teacher in one space and a learner in another sees Teaching where
          they teach. */
       const teaches = allCourses.filter((c) => orgOf(c) === acting).some((c) => isTeacher(c, mine));
+      /* And every space they teach in (0.610): this action reads across
+         all of them, so Where you are can offer Teaching on each. */
+      const teachesIn = [...new Set(allCourses.filter((c) => isTeacher(c, mine)).map((c) => orgOf(c)))];
 
       /* My space is no longer practised in Learning (0.550, 8b): nothing of
          it is sent here. */
@@ -5028,7 +5044,7 @@ async function handle(req) {
         teaching: isTeacher(c, mine),
         studying: true,
       }));
-      if (known && known === version) return json({ ok: true, unchanged: true, version, teaches });
+      if (known && known === version) return json({ ok: true, unchanged: true, version, teaches, teachesIn });
 
       const ownerHandles = [...new Set(deckRows.map((d) => d.owner))];
       const owners = await readManyJson(store, ownerHandles.map((h) => K.user(h)), EVENTUAL);
@@ -5230,7 +5246,7 @@ async function handle(req) {
         bundled.flatMap((b) => b.cards.flatMap((/** @type {any} */ c) => formsOf(c).flatMap((/** @type {Record<string, any>} */ f) => (Array.isArray(f.images) ? f.images : [])))),
         "image",
       );
-      return json({ ok: true, version, teaches, courses, decks, cards: bundled, systems, missingClips, missingImages });
+      return json({ ok: true, version, teaches, teachesIn, courses, decks, cards: bundled, systems, missingClips, missingImages });
     }
 
     /* Everything in a course is visible to everyone in it. */

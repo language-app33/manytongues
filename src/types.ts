@@ -674,6 +674,19 @@ export interface Lang {
    * highlighted.
    */
   letter?: (ch: string, settings?: any) => string;
+  /**
+   * The vowel marks a reader of this language learns to do without —
+   * Arabic's harakat, Hebrew's niqqud — where it has them (0.608).
+   *
+   * Everyday text is written without them, so the app takes them away: a
+   * word keeps its marks while what it means is being learnt and is shown
+   * bare from the second level of its ladder; a sentence is bare from the
+   * first time it is shown. See `withoutMarks` and `readsBare`. `name` is
+   * what the screen calls them ("Show the harakat"). A language whose
+   * marks are part of every word as written — Vietnamese's tones — has
+   * none, and is shown as written.
+   */
+  marks?: { pattern: RegExp; name: string };
   marking: LangMarking;
   rules: string[];
   /**
@@ -817,7 +830,7 @@ export interface User {
    * and `lastTaughtIn` per space; none of those is ever sent, like the
    * key's digest.
    */
-  orgs?: { id: string; slug: string; name: string; logo: string; colour: string }[];
+  orgs?: { id: string; slug: string; name: string; logo: string; colour: string; runs?: boolean }[];
   /** False until the person has ticked that their key is saved (0.544). Absent: saved. */
   keySaved?: boolean;
   /** While suspended: when, by whom, why, and the courses to put back (0.544). */
@@ -1957,6 +1970,21 @@ export interface Flag {
    * this says which sentence, in the terms the card's review is kept in.
    */
   sentence?: string;
+  /**
+   * What the learner was looking at (0.612), each absent where it says
+   * nothing new and on every report sent before this:
+   *   shown    the question as it was on the screen, where that is not
+   *            the word itself — "٥ Sisters", a phrase with its gap
+   *   phrase   the phrase or line the word stood in: script — meaning —
+   *            pronunciation, saying so where one was not written
+   *   options  the answers offered, where there was a choice
+   *   nouns    for a number counted with a noun, the nouns the app could
+   *            have used and every noun the system can count
+   */
+  shown?: string;
+  phrase?: string;
+  options?: string;
+  nouns?: string;
   /** Which build of the app they were on: release, then commit. */
   release?: string;
   /** Added when the report is read, never stored. */

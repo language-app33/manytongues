@@ -2069,6 +2069,26 @@ test("a report on a question the app made from numbers says so, with what it exp
   assert.equal(mine.expected, "10 Bookses");
 });
 
+test("a report keeps what the learner was looking at, and stores nothing for what was not sent", async () => {
+  const admin = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rana" } });
+  const key = admin.json.key;
+  await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
+  const sent = await api("/api/courses?action=report-flag", {
+    method: "POST",
+    key,
+    body: { kind: "other", note: "always sisters", cardId: "sys:n1:unit.5", exercise: "own2ar", shown: "5 sisters", nouns: "could use sisters" },
+  });
+  assert.equal(sent.status, 200, sent.text);
+  const mine = must(
+    overviewOf(await api("/api/courses?action=admin-overview", { key }))
+      .flags.find((f) => f.id === sent.json.id),
+    "the report just sent"
+  );
+  assert.equal(mine.shown, "5 sisters");
+  assert.equal(mine.nouns, "could use sisters");
+  assert.ok(!("phrase" in mine) && !("options" in mine), "nothing stored for what was not sent");
+});
+
 test("a flag nobody could act on is refused, and only an administrator reads them", async () => {
   const student = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Layla" } });
   const key = student.json.key;

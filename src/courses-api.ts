@@ -27,6 +27,8 @@ export interface OrgCard {
   name: string;
   logo: string;
   colour: string;
+  /** Whether this account runs it (0.610). Only on whoami's list of yours. */
+  runs?: boolean;
 }
 
 /* The account as stored, parsed once and kept current by loadAccount,
@@ -329,6 +331,10 @@ export type FlagReport = Pick<
   | "expected"
   | "release"
   | "sentence"
+  | "shown"
+  | "phrase"
+  | "options"
+  | "nouns"
 > & {
   language: LangId;
 };
