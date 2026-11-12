@@ -1160,7 +1160,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   the language's context, a lookup rather than a comparison per word, which
   is what lets every deck in the list be scored at once. Tests:
   `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
-- **A course's path: units, in order (0.611).** A course holds a second
+- **A course's path: units, in order (0.613).** A course holds a second
   kind of element beside its decks: the **unit**. Underneath, a unit is a
   deck with `unit: true`; a course lists its units in `path`, in order,
   drafts included, and everything else about the path is per course too,
@@ -1203,7 +1203,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   yet reached, so a word also in an ordinary deck, or in an open unit,
   arrives as it always did.
 
-  **A unit is published per course, once its checklist is clear (0.612).**
+  **A unit is published per course, once its checklist is clear (0.614).**
   `create-unit`, `move-unit`, `publish-unit` and `open-unit` in
   `server/api/courses.js`; `attach-deck` puts an existing unit at the end
   of another course's path as a draft, and `detach-deck` and `delete-deck`
@@ -1222,7 +1222,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   `materialVersion` only when there is one, so nothing changes for a course
   without units.
 
-  **A device follows the path (0.613).** `pathIndexOf` in the trainer
+  **A device follows the path (0.615).** `pathIndexOf` in the trainer
   builds, from the courses and decks last downloaded and the learner's own
   progress, which decks each item is in (from each deck's `cardIds`, never
   `source.deckId` or the tags; a number or time item from the `deckIds`
@@ -1242,7 +1242,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   holds before it writes. `installIndexes` takes the courses and decks, so
   a test can deal a session with a path.
 
-  **A teacher builds the path on the course's page (0.614).** `PathSection`
+  **A teacher builds the path on the course's page (0.616).** `PathSection`
   in `src/spaces.tsx` lists a course's units in path order above its decks
   — which no longer list units — and calls the four path actions,
   `attach-deck`, `detach-deck` and `delete-deck`, putting what the server
@@ -1255,7 +1255,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   editor and the review screens are handed the pools they always were.
   Under the score, `sameFormBlanks` lists blanks whose approved words share
   every grammar field the language declares (`dimsOf`), as advice.
-  **A learner sees the path (0.615).** `pathLinesOf` gives each course's
+  **A learner sees the path (0.617).** `pathLinesOf` gives each course's
   rows with their titles, for the courses of the space and languages
   shown. `PathHomeLine` puts one above Start session per course — the
   current unit, "Unit 3 of 8", and `unitStages`: words (word-set items
@@ -1268,7 +1268,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   and stages above — locked ones too, read only; one open for the learner,
   or opened early, offers "Practise this unit", which is `begin` with the
   unit's items as the pool and `pathUnit` set.
-  **And a learner may mark an open unit as cleared (0.616).**
+  **And a learner may mark an open unit as cleared (0.618).**
   `clearPathUnit`, modelled on `creditNumbers`, writes through `liftLevel`
   from a key on each form's top level — every form `drillableUnits` gives,
   and a part's own skill — over the unit's items but its text or

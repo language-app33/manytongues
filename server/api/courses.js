@@ -34,7 +34,7 @@ import { partsNow } from "../../src/numbers/types.ts";
 import { migrateCards } from "../../src/numbers/migrate.ts";
 import { liftSubtypeTagsIn } from "../../src/subtype-tags.ts";
 import { tickCapitals } from "../../src/capitals.ts";
-/* A course's path (0.611): every rule of it is in path.ts, read here the
+/* A course's path (0.613): every rule of it is in path.ts, read here the
    way the app reads it. */
 import { countingCards, drawsFrom, isLiveIn, neverAskedAlone, unitProblems } from "../../src/path.ts";
 import { LANGUAGES } from "../../src/languages.ts";
@@ -941,7 +941,7 @@ async function dropFromCourses(store, deckId) {
 
 /**
  * Whether a course has a deck anywhere on its path: in its order, among
- * what is published there, or among what is opened early (0.611).
+ * what is published there, or among what is opened early (0.613).
  * @param {Course} course
  * @param {string} deckId
  */
@@ -1016,7 +1016,7 @@ async function readManyJson(store, keys, opts) {
  */
 function materialVersion(courses, decks, fills = [], systems = []) {
   const summary = {
-    /* With its path, where it has one (0.611): an order changed, a unit
+    /* With its path, where it has one (0.613): an order changed, a unit
        published or opened early moves nothing else a device compares.
        Added only when there is something on it, so the version of a
        course with no units is what it always was. */
@@ -1987,7 +1987,7 @@ async function restoreOne(store, key, value, ctx) {
           const more = missingFrom(cur.decks, obj.decks);
           const base = (fromBefore && placeHere(cur)) || cur;
           /* And the units among them back on its path, where the course has
-             lost them (0.611): a unit is on the path of every course that
+             lost them (0.613): a unit is on the path of every course that
              holds it. Published where the copy says so; never opened early
              by a restore. */
           const decks = (base.decks || []).concat(more);
@@ -2449,6 +2449,14 @@ async function handle(req) {
            fingerprint its review is kept in, so a teacher reading this can
            strike that one sentence and nothing else. See review.ts. */
         ...(isSentenceKey(body.sentence) ? { sentence: body.sentence } : {}),
+        /* What the learner was looking at (0.612): the question as shown,
+           the phrase, the answers offered, the nouns a counted number had
+           to choose from. Plain text, kept only where sent. */
+        ...Object.fromEntries(
+          ["shown", "phrase", "options", "nouns"]
+            .map((k) => [k, String(body[k] || "").slice(0, 400)])
+            .filter(([, v]) => v),
+        ),
         at: Date.now(),
       };
       await writeJson(store, K.flag(flag.id), flag);
@@ -4720,7 +4728,7 @@ async function handle(req) {
       return json({ ok: true, deck: shown, course: nextCourse });
     }
 
-    /* ================= a course's path (0.611) =================
+    /* ================= a course's path (0.613) =================
 
        A path unit is a deck with `unit: true`, on the path of every course
        that holds it. Everything about the path is per course — its order,
@@ -5200,7 +5208,7 @@ async function handle(req) {
         Boolean
       );
       /* A path unit reaches a student only through a course where it is
-         published (0.611, R26): a draft is invisible, its cards, its number
+         published (0.613, R26): a draft is invisible, its cards, its number
          parts and all. Where it is published in several of their courses,
          the first of those is the one it is sent under. */
       for (const d of deckRows) {

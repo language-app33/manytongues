@@ -1,6 +1,6 @@
 // @ts-check
 /*
- * A course's path on the learner's device (0.613): which never-met cards a
+ * A course's path on the learner's device (0.615): which never-met cards a
  * session may bring in, what counts a unit as finished, and how the units
  * reached are kept across devices. The rules themselves are in
  * src/path.ts and tests/path.test.mjs; this is the trainer obeying them.
@@ -388,7 +388,7 @@ test("marking a unit that holds 0 to 9 clears its words and figures; the part it
    * what gives the part its questions in figures, so the part reads as
    * cleared only once those are answered — or the unit is marked again.
    * Pinned here as it is built until the owner decides; see the summary
-   * of 0.616 in CHANGELOG.md.
+   * of 0.618 in CHANGELOG.md.
    */
   const nums = fileIntoDecks(generated.items, SET, [{ id: "u1", title: "Unit u1", parts: ["numbers:0-9"] }]);
   const items = [word(1), ...nums];

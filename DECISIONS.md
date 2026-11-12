@@ -8062,12 +8062,62 @@ choices to every other one. A session counts once, known by its first
 question, so a queue rearranged mid-session is not a second session. The
 cost is that a new device shows it three times more. The owner also chose
 (2a) to keep the exception for spellings told apart only by their marks.
+## A counting phrase is asked in the figures English uses (0.611)
+
+**11 November 2026** · `src/ArabicTrainer.tsx` (`castFace`, the answer
+screen's `also-figures`), `tests/numbers-counted-faces.test.mjs`
+
+A counting face's top question (`own2ar`) showed the phrase as "٥ Sisters":
+the language's own figure beside an English noun. A learner reported it as
+a muddle. The owner chose to show the phrase in the figures English uses,
+"5 sisters", and keep the language's own figures for the plain number
+cards, which already ask ٥ alone. This reverses 4 October's "shows the
+language's own and nothing else" for counted phrases only; that rule is
+about reading a number, and a counted phrase is about the word a number
+takes before a noun.
+
+The owner also chose to keep the key, so passes made from ٥ still count:
+the Arabic written is the same either way. The owner considered and turned
+down an Arabic → English question showing ٥ in the phrase: beside the
+words it gives the number away, and in place of them it no longer asks the
+word the face is about.
+
+The answer screen's "In Arabic numerals" line is skipped where the prompt
+already is the English figures, so it does not say "5 sisters" twice.
+
+Left alone in the same batch: the noun rotates only among those learnt in
+the plural (the owner's rule from 7 October, kept), and the whole phrase's
+pronunciation after a gap is shown where the phrase has one written
+(since 0.583), which the reported phrase did not.
+
+## A report says what the learner was looking at (0.612)
+
+**11 November 2026** · `src/ArabicTrainer.tsx` (`reportExtras`, `KnownNumbers.faceNouns`), `src/numbers/generate.ts` (`faceFits`), `server/api/courses.js` (`report-flag`), `src/flag-export.ts`, `src/types.ts` (`Flag`)
+
+Four reports in one batch (0.611) could not be answered from the export:
+"Asked" is the word the question was about, which on a counted number is
+أربع أخوات while the screen said "٤ Sisters"; a report on a phrase's
+pronunciation needed to know whether the phrase had one written; "two
+meanings in the proposed answers" needed the answers; and "sisters every
+time" turned on which nouns the app had to choose from. The owner asked
+for reports to carry what was needed next time.
+
+So a report now carries four optional plain-text lines, each sent only
+where it says something: `shown` (the prompt as on the screen, where it
+differs from the word), `phrase` (script — meaning — pronunciation, saying
+"no … written" where a part is missing, since its absence is usually the
+answer), `options` (the choices offered, not a matching grid's), and
+`nouns` (for a counting face: the nouns `faceFits` finds now, the same
+list `faceAsk` draws from, and every noun the system counts). Text rather
+than structure because the export is plain text and nothing else reads
+them. The server stores each only when sent, at most 400 characters, so an
+older build's report reads exactly as before.
 
 ---
 
 ## Units: a course's path
 
-**11 November 2026** · `src/path.ts`, `src/types.ts` (0.611 onward)
+**11 November 2026** · `src/path.ts`, `src/types.ts` (0.613 onward)
 
 A course gains a second kind of element beside decks: the unit, one step
 of a path a class walks in order. The owner's plan settled the rules
@@ -8102,7 +8152,7 @@ already gives "cards before sentences" without a second rule.
 a card a unit (`unitsOf`, `quietUnits`). Renaming either would touch
 hundreds of lines for nothing; the new thing is a *path unit* in code.
 
-**0.612: the checklist counts what the path has taught, and only what a
+**0.614: the checklist counts what the path has taught, and only what a
 teacher approved.** A blank needs five different cards (R10), and a card
 counts only where a teacher approved a sentence it fills (R11) and it
 comes from this unit, an earlier published unit, or is never asked on its
@@ -8120,7 +8170,7 @@ A unit is always on the path of every course that holds it (A1), so
 `attach-deck` puts it at the end as a draft there and there is no separate
 "unpublish" (A4): a unit is withdrawn by removing it, as a deck is.
 
-**0.613: one setting merged by union, on the device and the server.**
+**0.615: one setting merged by union, on the device and the server.**
 Settings sync whole and last-writer-wins, which is right for a theme and
 wrong for the units a learner has reached: a phone that last synced
 before unit 3 opened would hand back a list without it, and if unit 2 had
@@ -8142,7 +8192,7 @@ other. Every kind of session is covered by the first, saved sessions,
 prep and Ultimate included (A5). Blanks are not filtered: a word fills a
 blank only once cleared, wherever it was cleared (R13).
 
-**0.614: the teacher's screens reuse the deck's.** A unit's page is the
+**0.616: the teacher's screens reuse the deck's.** A unit's page is the
 deck page with a heading, a checklist and a Publish button, because a
 unit is a deck underneath (R1) and every way of adding, editing and
 reviewing cards should be the one teachers already know. The checklist is
@@ -8155,7 +8205,7 @@ already published (R17): it never takes the unit away from students. The
 advice on forms reads only the grammar the language declares, and is
 advice only (A6), so a language without gender or number shows nothing.
 
-**0.615: what a learner is shown is counted the way the path counts.**
+**0.617: what a learner is shown is counted the way the path counts.**
 The stages on Home and a unit's page are worked out by one function
 (`unitStages`) that reads the same items as "finished" (`unitItems`), the
 same cleared test, and leaves out what can never be asked and the text or
@@ -8166,7 +8216,7 @@ several. The fifth state — open, and not the current unit, because an
 earlier unit slipped after this one opened — is shown as "Open"; the plan
 named four, and none of them was true of it.
 
-**0.616: marking a unit cleared reuses "This was too easy".** No new
+**0.618: marking a unit cleared reuses "This was too easy".** No new
 write: `liftLevel` from a top-level key, as `creditNumbers` does it, which
 already means "up every level, no passes, a review a day out". So marking
 never makes a card learnt (R33), never touches one already cleared or

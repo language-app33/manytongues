@@ -3557,7 +3557,7 @@ fieldset.at-cardlock:disabled .at-field { margin-bottom:16px; }
 .at-formrole .at-formline { display:block; }
 
 
-/* A course's path, as a learner sees it (0.615): on Home, a line per
+/* A course's path, as a learner sees it (0.617): on Home, a line per
    course above Start session; on Progress, every unit in order; and a
    unit's own page, its state and stages above its cards. */
 .at-pathhome { display:flex; flex-direction:column; gap:4px; width:100%; text-align:start;

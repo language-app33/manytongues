@@ -229,7 +229,7 @@ test("admin actions refuse another space's people, courses and reports", async (
     ["assign-student", { courseId: b.course.id, handle: main.student.handle }],
     ["assign-teacher", { courseId: main.course.id, handle: b.teacher.handle }],
     ["remove-member", { courseId: b.course.id, handle: b.student.handle, role: "student" }],
-    /* A course's path (0.612): another space's course is not found. */
+    /* A course's path (0.614): another space's course is not found. */
     ["create-unit", { courseId: b.course.id, title: "x" }],
     ["move-unit", { courseId: b.course.id, deckId: b.deck.id, to: 0 }],
     ["publish-unit", { courseId: b.course.id, deckId: b.deck.id }],

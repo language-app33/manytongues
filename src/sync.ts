@@ -284,7 +284,7 @@ export function mergeData(local: Doc, remote: WireDoc | null, now: number = Date
     (local.settingsUpdated || 0) >= (remote.settingsUpdated || 0)
       ? local.settings
       : remote.settings;
-  /* --- but a course path's reached units, by union (0.613) ---
+  /* --- but a course path's reached units, by union (0.615) ---
      The one exception to last-writer-wins: a unit that has opened for a
      learner must never lock again, and a device that last synced before
      it opened would otherwise take it back. Only where either side has

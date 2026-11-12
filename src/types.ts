@@ -770,7 +770,7 @@ export type Settings = {
   language?: LangId;
   /**
    * By course id: the path units that have ever been open for this learner
-   * there (0.611). Merged across devices by union (mergeReached in
+   * there (0.613). Merged across devices by union (mergeReached in
    * src/path.ts), never overwritten — the one setting that is not
    * last-writer-wins. Read it through pathReachedOf in the app.
    */
@@ -1304,7 +1304,7 @@ export interface Deck {
   partsWaiting?: string[];
   /**
    * Present means the deck is a path unit, in every course that holds it:
-   * one step of a course's path, opened in order (0.611). See src/path.ts.
+   * one step of a course's path, opened in order (0.613). See src/path.ts.
    * Not to be confused with `Unit` in the trainer, which is one form of a
    * card that can be asked.
    */
@@ -1328,7 +1328,7 @@ export interface Course {
   /** Gives authority over the material. */
   teacherCode?: string;
   created?: Millis;
-  /* The path (0.611): everything about it is per course. See src/path.ts. */
+  /* The path (0.613): everything about it is per course. See src/path.ts. */
   /** The ids of its path units, in order. Drafts included. */
   path?: string[];
   /** The path units published in THIS course, by deck id, with when. */
@@ -1628,7 +1628,7 @@ export type Item = {
   id: string;
   /**
    * For an item made from a number or time system: the ids of the decks
-   * that hold its part (0.613), beside the deck titles in `tags`. What a
+   * that hold its part (0.615), beside the deck titles in `tags`. What a
    * course's path reads to know which decks it is in — a course card is
    * found through each deck's `cardIds` instead. See fileIntoDecks.
    */
@@ -2000,6 +2000,21 @@ export interface Flag {
    * this says which sentence, in the terms the card's review is kept in.
    */
   sentence?: string;
+  /**
+   * What the learner was looking at (0.612), each absent where it says
+   * nothing new and on every report sent before this:
+   *   shown    the question as it was on the screen, where that is not
+   *            the word itself — "٥ Sisters", a phrase with its gap
+   *   phrase   the phrase or line the word stood in: script — meaning —
+   *            pronunciation, saying so where one was not written
+   *   options  the answers offered, where there was a choice
+   *   nouns    for a number counted with a noun, the nouns the app could
+   *            have used and every noun the system can count
+   */
+  shown?: string;
+  phrase?: string;
+  options?: string;
+  nouns?: string;
   /** Which build of the app they were on: release, then commit. */
   release?: string;
   /** Added when the report is read, never stored. */

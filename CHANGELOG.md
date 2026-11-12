@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.617 — 12 November 2026
+## 0.619 — 12 November 2026
 
 **Units, written down.** Nothing changes in the app. The README now has
 the whole of how a course's path works, in one place, and the decisions
@@ -19,7 +19,7 @@ cleared", undoing a marking, marking several units at once, and units in
 a learner's own space, among others. Which of those are wanted later is
 still to be said.
 
-## 0.616 — 12 November 2026
+## 0.618 — 12 November 2026
 
 **Units, step six: a student can mark a unit as cleared.**
 
@@ -44,7 +44,7 @@ unit 2 finished and unit 3 open; the next sessions bring unit 2's cards
 back as reviews, at their top level; a unit 3 sentence can now use unit
 2's words in its blanks; and all of it after a sync to a second device.
 
-## 0.615 — 12 November 2026
+## 0.617 — 12 November 2026
 
 **Units, step five: students see their course's path.** Nothing changes
 for anyone whose courses have no units.
@@ -78,7 +78,7 @@ opened by your teacher, and Practise this unit brings its new words while
 an ordinary session still brings unit 2's; all of it works offline after
 one download.
 
-## 0.614 — 11 November 2026
+## 0.616 — 11 November 2026
 
 **Units, step four: teachers can build a course's path.** Students see
 nothing of it yet; that comes next.
@@ -121,7 +121,7 @@ unit 1 to a second course and see it there as a draft with its own
 checklist; take an approved word out of a published unit's blank and see
 "Needs attention" while it stays published.
 
-## 0.613 — 11 November 2026
+## 0.615 — 11 November 2026
 
 **Units, step three: a student's device follows the path. Still nothing
 on screen, and nothing changes for anyone whose courses have no units.**
@@ -147,7 +147,7 @@ on screen, and nothing changes for anyone whose courses have no units.**
 - An older version of the app that receives a course with units shows
   them as ordinary decks, in no order. Updating fixes it.
 
-## 0.612 — 11 November 2026
+## 0.614 — 11 November 2026
 
 **Units, step two: the server keeps a course's path, and checks a unit
 before it is published. Still nothing on screen.**
@@ -167,7 +167,7 @@ before it is published. Still nothing on screen.**
   too.** Backups keep units and paths.
 - A course with no units sends and stores exactly what it did before.
 
-## 0.611 — 11 November 2026
+## 0.613 — 11 November 2026
 
 **Units, step one: the rules of a course's path. Nothing changes on
 screen yet.**
@@ -188,6 +188,61 @@ uses them yet:
   student has not reached.** A word that is also in an ordinary deck, or in
   a unit already open, arrives as it does today.
 
+## 0.612 — 11 November 2026
+
+**A reported problem now says what the learner was looking at.** Copied
+out of Admin, each report used to give the word the question was about,
+but not always what was on the screen. So some reports could not be
+answered without guessing. From this release a report also carries:
+
+- **On screen**: the question as it was shown, where that isn't the word
+  itself. For example "5 sisters" for a number written from figures, or a
+  phrase with its gap.
+- **Phrase**: the phrase or line the word stood in, its meaning, and its
+  pronunciation, or "no pronunciation written" where there isn't one.
+- **Offered**: the answers on offer, where the question was a choice.
+- **Nouns**: for a number with a noun, which nouns the app could have
+  used (those the learner has learnt in that shape) and every noun the
+  number system can count. It shows straight away why a learner always
+  gets "sisters".
+
+Reports sent before this, or from a phone still on an older version, don't
+have these lines; nothing is shown empty.
+
+To check by hand: report a "Write this number in Arabic" question on a
+number with a noun, then copy the reports out of Admin. The report should
+have "On screen" and "Nouns" lines.
+
+## 0.611 — 11 November 2026
+
+**Writing a counted phrase in Arabic is asked from "5 sisters", not
+"٥ sisters".** The top question for a number before a noun showed the
+Arabic numeral beside an English word, and a learner reported the mix as
+confusing. It now shows the phrase in the figures English uses. Reading
+the Arabic numerals is still asked where it is the point: on the plain
+number cards, ٥ on its own.
+
+- **Progress already made on these questions is kept.** The Arabic
+  written is the same either way; only the figure in the question changes.
+- **Reading a counted phrase is unchanged**: خمس أخوات, written in English
+  as "5 sisters".
+
+To check by hand: a "Write this number in Arabic" question on a number
+with a noun shows "5 sisters" (or whichever), and its answer screen does
+not repeat it under "In Arabic numerals".
+
+Checked and left alone:
+
+- **The noun in counting questions is "sisters" every time.** The app
+  rotates among the nouns a learner has already learnt in the plural, so
+  more variety arrives as more nouns are learnt.
+- **The whole phrase's pronunciation after "choose the missing word"**
+  already shows where the phrase has one written; the phrase reported has
+  none.
+- Reports sent before 0.605 on "neutral" and "plural", vowel marks in
+  "Who is it?", "lives", two right answers in "Choose the meaning", the
+  phrase's meaning when typing the missing word, and "Two cats" were fixed
+  or settled in 0.605.
 ## 0.610 — 11 November 2026
 
 **"Where you are" is shorter, and every space has its buttons.**

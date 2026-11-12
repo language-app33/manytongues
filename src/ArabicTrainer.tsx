@@ -230,7 +230,7 @@ import {
   seeded,
 } from "./numbers/range.ts";
 import type { Asking, SystemSet } from "./numbers/generate.ts";
-import { askingsKnown, askKnown, cardsOfToken, faceAsk, fillerCards, homeStretch, isFromSystem, inOwnFigures, isNumeralCard, isRangeSkill, numeralId, stretchBefore, systemFor, systemIdOf, systemOfId } from "./numbers/generate.ts";
+import { askingsKnown, askKnown, cardsOfToken, faceAsk, faceFits, fillerCards, homeStretch, isFromSystem, inOwnFigures, isNumeralCard, isRangeSkill, numeralId, stretchBefore, systemFor, systemIdOf, systemOfId } from "./numbers/generate.ts";
 import { nounsByLanguage, setsGiven } from "./numbers/nouns.ts";
 import { ClockDial, ClockFace } from "./clock.tsx";
 import {
@@ -1818,7 +1818,7 @@ function tenseHeld(unit: Form | null | undefined): { card: Item; spec: VerbSpec;
 }
 
 /* ------------------------------------------------------------------
-   A course's path (0.613)
+   A course's path (0.615)
 
    A course may set its units in order, each opening when the one before
    it is finished — see src/path.ts, where every rule is. The one thing the
@@ -3821,15 +3821,18 @@ function castFace(
   if (!said.text) return resolved;
   const slot = String(((resolved.parent.source || {}) as { slot?: unknown }).slot || "");
   const col = String(resolved.unit.col || "");
-  const lang = LANGUAGES[set.numbers.languageId];
-  const figures = resolved.unit.numeral ? ownFigures(lang, said.digits) : "";
   const unit: Form = {
     ...resolved.unit,
     ar: said.text,
     en: said.en,
-    /* The number in the language's own figures, with the thing counted
-       beside it, for the question asked from those figures. */
-    ...(figures ? { numeral: `${figures} ${said.en.slice(said.digits.length).trim()}`.trim() } : null),
+    /* The top question, asked from the figures, shows the phrase in the
+       figures English uses — "5 sisters", not "٥ sisters". The language's
+       own figure beside an English noun read as a muddle (a learner's
+       report), and reading ٥ is already the plain number card's job. The
+       key stays the same, so passes made from ٥ still count: the Arabic
+       written is the same either way. See DECISIONS.md, "A counting
+       phrase is asked in the figures English uses". */
+    ...(resolved.unit.numeral ? { numeral: said.en } : null),
     /* Nobody recorded or transliterated the phrase whole. */
     recs: [],
     clips: [],
@@ -5160,6 +5163,10 @@ interface KnownNumbers {
       seed — the number with one of the learner's nouns — or null where no
       noun can stand beside it yet. See faceAsk. */
   face: (card: Item, unit: Form, seed: string) => Ask | null;
+  /** The nouns a counting face could be asked with now, and every noun
+      its system can count — for a learner's report, which says what the
+      app had to choose from. See faceFits. */
+  faceNouns: (card: Item, unit: Form) => { could: string[]; all: string[] };
 }
 
 /* The askings each range can put, kept against the system they were read
@@ -5263,6 +5270,19 @@ function knownNumbers(items: Item[], settings: Settings, sets: SystemSet[]): Kno
       if (!set || !values.length || typeof unit.col !== "string") return null;
       const slot = String(((card.source || {}) as { slot?: unknown }).slot || "");
       return faceAsk(slot, unit.col as FormKey, values, seed, set, ids, knows);
+    },
+    faceNouns: (card, unit) => {
+      const set = setOf(card);
+      const values = (unit.countedAt || []) as number[];
+      if (!set || !values.length || typeof unit.col !== "string") return { could: [], all: [] };
+      const slot = String(((card.source || {}) as { slot?: unknown }).slot || "");
+      const nouns = set.sys.nouns || [];
+      const nameOf = (id: string) => {
+        const n = nouns.find((x) => x.id === id);
+        return n ? n.enPl || n.en || n.id : id;
+      };
+      const could = faceFits(slot, unit.col as FormKey, values, set, ids, knows).map((a) => nameOf(String(a.nounId || "")));
+      return { could: [...new Set(could)], all: nouns.map((n) => nameOf(n.id)) };
     },
   };
 }
@@ -10651,7 +10671,7 @@ export default function ArabicTrainer() {
   );
   const [courseBusy, setCourseBusy] = useState(false);
   const [courseError, setCourseError] = useState("");
-  /* The unit a learner has open from Home or Progress (0.615). */
+  /* The unit a learner has open from Home or Progress (0.617). */
   const [unitOpen, setUnitOpen] = useState<{ courseId: string; deckId: string } | null>(null);
 
   /* Teaching is a role on a course, so it has to be asked about — and the
@@ -11976,7 +11996,7 @@ export default function ArabicTrainer() {
     () => (spaceNow ? courseDecks.filter((d: any) => orgOfCourse.get(d.courseId) === spaceNow) : courseDecks),
     [courseDecks, spaceNow, orgOfCourse]
   );
-  /* Each course's path, for Home and Progress (0.615): the courses of the
+  /* Each course's path, for Home and Progress (0.617): the courses of the
      space and languages shown, in the order they are listed elsewhere. */
   const pathLines = useMemo(
     () => pathLinesOf(learnCourses.filter((c) => !langsOff.includes(c.language)), courseDecks),
@@ -13729,6 +13749,45 @@ export default function ArabicTrainer() {
    * stopping a session over, so the menu closes either way and the pill
    * says which of the two happened.
    */
+  /* The parts of a report that say what the learner was looking at —
+     see flagCurrent. Each is left out where it says nothing new. */
+  function reportExtras(): Partial<API.FlagReport> {
+    const out: Partial<API.FlagReport> = {};
+    if (!item || !spec) return out;
+    const prompt = String(item.ar || "");
+    const field = spec.promptField;
+    const shown =
+      field === "context"
+        ? context
+          ? blankedPhrase(context, qLang)
+          : String(item.en || "")
+        : field === "audio"
+          ? "a recording, with nothing written"
+          : String((item as any)[field] || "");
+    if (shown && shown !== prompt) out.shown = shown.slice(0, 300);
+    const line = dialog && item.gap ? linesOf(dialog)[item.gap.line] : null;
+    const phrase = context || line;
+    if (phrase && phrase.ar) {
+      const lat = String(phrase.lat || "").trim();
+      out.phrase = [String(phrase.ar), String(phrase.en || "").trim() || "(no meaning written)", lat || "(no pronunciation written)"]
+        .join(" — ")
+        .slice(0, 400);
+    }
+    if (spec.picks && spec.picks !== "pair" && choices.length) {
+      const said = choices
+        .map((c: any) => String(c[spec.answerField] || c.en || c.ar || c.id || "").trim())
+        .filter(Boolean);
+      if (said.length) out.options = said.join(" | ").slice(0, 400);
+    }
+    if (parentItem && item.countedAt) {
+      const { could, all } = knownNumbers(items, settings, systems).faceNouns(parentItem, item);
+      if (all.length) {
+        out.nouns = `could use ${could.length ? could.join(", ") : "none"} (learnt in the shape this number needs), of ${all.length} it can count: ${all.join(", ")}`.slice(0, 400);
+      }
+    }
+    return out;
+  }
+
   function flagCurrent(kind: FlagKind, note?: string) {
     if (!parentItem || !exercise) return;
     const said = String(note || "").slice(0, FLAG_NOTE_MAX);
@@ -13818,6 +13877,13 @@ export default function ArabicTrainer() {
       /* Which filled sentence this was, where the card is a frame — so the
          teacher reading the report can strike exactly this one. */
       ...(item && (item as any).reviewKey ? { sentence: String((item as any).reviewKey) } : null),
+      /* What the question put on the screen, the phrase it stood in, the
+         answers it offered, and for a counted phrase the nouns it had to
+         choose from (0.612). Four reports in one batch could not be
+         answered without them: "٥ Sisters" was on the screen where the
+         report said only أربع أخوات, and "sisters every time" turns on
+         whether sisters was the only noun to hand. */
+      ...reportExtras(),
     };
 
     /*
@@ -15722,6 +15788,7 @@ export default function ArabicTrainer() {
                             exercises call them, "Arabic numerals". */}
                         {spec.promptField === "numeral" &&
                           item.numeral &&
+                          item.numeral !== item.en &&
                           /[0-9]/.test(String(item.en || "")) && (
                           <div className="at-answeralso" data-el="also-figures">
                             <p className="at-alsolabel" data-el="also-figures-label">
@@ -15968,7 +16035,7 @@ export default function ArabicTrainer() {
           />
         )}
 
-        {/* A unit's page, opened from Home or Progress (0.615). */}
+        {/* A unit's page, opened from Home or Progress (0.617). */}
         {unitOpen && (() => {
           const line = pathLines.find((p) => p.courseId === unitOpen.courseId);
           const row = line && line.rows.find((r) => r.id === unitOpen.deckId);
@@ -18541,7 +18608,7 @@ function DeckScreen({
   onCard,
   head,
 }: {
-  /** Above the deck's own figures: a unit's stages, its state and what it offers (0.615). */
+  /** Above the deck's own figures: a unit's stages, its state and what it offers (0.617). */
   head?: Node;
   name: string;
   cards: Item[];
@@ -18761,7 +18828,7 @@ function ProgressTab({
   spaceNames,
 }: {
   items: Item[];
-  /** Each course's path, shown above the deck tiles (0.615). */
+  /** Each course's path, shown above the deck tiles (0.617). */
   paths?: PathLine[];
   /** The titles of the downloaded units, which are not deck tiles. */
   unitTitles?: Set<string>;

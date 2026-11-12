@@ -5096,7 +5096,7 @@ function QualityMark({ quality }: { quality?: Quality | null }) {
 }
 
 /* ------------------------------------------------------------------
-   A course's path (0.614)
+   A course's path (0.616)
 
    Above a course's decks: its units, in order, drafts included — each with
    whether it is published in this course, a warning where it is published
@@ -5235,7 +5235,7 @@ function PathSection({ course, units, problemsOf, qualityOf, spare, othersOf, bu
 }
 
 /*
- * A unit's checklist in one course (0.614): what stands between it and
+ * A unit's checklist in one course (0.616): what stands between it and
  * publishing there, in the teacher's words, and the button. The server
  * judges published cards only, so it can be stricter than this; what it
  * answered is shown in place of this screen's own reading when it does.
@@ -5904,7 +5904,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   });
 
   const [courseView, setCourseView] = useState<any | null>(null);
-  /* The course a unit's page was opened from (0.614): its checklist, its
+  /* The course a unit's page was opened from (0.616): its checklist, its
      number and its Publish are that course's. And what the server last
      answered when publishing was refused, which may be stricter than this
      screen's reading — it judges published cards only. */
@@ -6349,7 +6349,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
    * review already worked out.
    */
   /*
-   * A course's path (0.614). What may count toward a unit's five, in one
+   * A course's path (0.616). What may count toward a unit's five, in one
    * course: the cards of the units drawsFrom names, every card never asked
    * on its own, and the number values of the parts those units hold —
    * countingCards in path.ts, the server's rule too. For the checklist and
@@ -8864,7 +8864,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         </Screen>
       );
     }
-    /* A path unit (0.614): its page is a deck's, headed with its number on
+    /* A path unit (0.616): its page is a deck's, headed with its number on
        the path of the course it was opened from, with that course's
        checklist and Publish above its cards. */
     const unitIn = isPathUnit(d) ? courseOfUnit(d.id) : null;

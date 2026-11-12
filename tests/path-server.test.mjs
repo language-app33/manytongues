@@ -1,6 +1,6 @@
 // @ts-check
 /*
- * A course's path on the server (0.611): making units, ordering them,
+ * A course's path on the server (0.613): making units, ordering them,
  * publishing one in a course once its checklist is clear, opening one
  * early, and what reaches a student. Over a socket, through the same
  * routing, with nothing stubbed — the way tests/server.test.mjs does it.
@@ -306,7 +306,7 @@ test("only a teacher of the course or someone who runs the space works on its pa
   assert.equal(noTitle.status, 400);
 });
 
-/* ---- the units reached survive an upload that does not know them (0.613) ---- */
+/* ---- the units reached survive an upload that does not know them (0.615) ---- */
 
 /** @param {string} token @param {{ method?: string, body?: unknown }} [o] */
 const syncCall = async (token, { method = "GET", body } = {}) => {

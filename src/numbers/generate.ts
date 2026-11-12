@@ -370,8 +370,28 @@ export function faceAsk(
   ids: Set<string>,
   knows: Knows,
 ): Ask | null {
+  const rangeId = `face:${slot}|${key}`;
+  const fits = faceFits(slot, key, values, set, ids, knows);
+  if (!fits.length) return null;
+  return fits[Math.floor(seeded(`${rangeId} ${seed}`)() * fits.length)];
+}
+
+/**
+ * Every pairing a counting face could be asked as now — see faceAsk, which
+ * draws one of them. Also read by a learner's report, which says which
+ * nouns the app had to choose from: "sisters every time" is answered by
+ * whether sisters was the only one.
+ */
+export function faceFits(
+  slot: string,
+  key: FormKey,
+  values: number[],
+  set: { composer: Composer | null; sys: NumberSystem },
+  ids: Set<string>,
+  knows: Knows,
+): Ask[] {
   const { composer, sys } = set;
-  if (!composer || !values.length) return null;
+  if (!composer || !values.length) return [];
   const rangeId = `face:${slot}|${key}`;
   const fits: Ask[] = [];
   for (const value of values) {
@@ -383,8 +403,7 @@ export function faceAsk(
       fits.push({ rangeId, kind: "numbers", value, nounId: noun.id });
     }
   }
-  if (!fits.length) return null;
-  return fits[Math.floor(seeded(`${rangeId} ${seed}`)() * fits.length)];
+  return fits;
 }
 
 /* ---- the whole set ---- */
@@ -1133,7 +1152,7 @@ function anyOfKind(
 
 /** A deck as far as filing numbers goes: its name, and the parts it holds. */
 export interface DeckParts {
-  /** The deck's id, recorded on each item it holds as `deckIds` (0.613): a
+  /** The deck's id, recorded on each item it holds as `deckIds` (0.615): a
       title is not enough to tell a course's path which deck an item is
       in, since two decks may share one. Absent from an older caller. */
   id?: string;

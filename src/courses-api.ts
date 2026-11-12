@@ -331,6 +331,10 @@ export type FlagReport = Pick<
   | "expected"
   | "release"
   | "sentence"
+  | "shown"
+  | "phrase"
+  | "options"
+  | "nouns"
 > & {
   language: LangId;
 };
@@ -442,7 +446,7 @@ export const attachDeck = (deckId: string, courseId: string) =>
 export const detachDeck = (deckId: string, courseId: string) =>
   call("detach-deck", { body: { deckId, courseId } });
 
-/* ---- a course's path (0.614): units, in order, per course ---- */
+/* ---- a course's path (0.616): units, in order, per course ---- */
 export const createUnit = (courseId: string, title: string) =>
   call("create-unit", { body: { courseId, title } });
 export const moveUnit = (courseId: string, deckId: string, to: number) =>

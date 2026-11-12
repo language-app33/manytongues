@@ -512,7 +512,7 @@ test("restoring a site's file into a site that has it all changes nothing at all
 
 /* -------------------------------------- A6.9: clear everything, then restore */
 
-test("a course's path and its units survive a backup and restore (0.611)", async () => {
+test("a course's path and its units survive a backup and restore (0.613)", async () => {
   const unit = await api("create-unit", { key: roomB.teacher.key, org: B, body: { courseId: roomB.course.id, title: "Unit B" } });
   assert.equal(unit.status, 200, unit.text);
   const unitId = unit.json.deck.id;

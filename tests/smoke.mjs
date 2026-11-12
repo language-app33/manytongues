@@ -279,7 +279,7 @@ const viTeach = {
   forms: [], updated: 1,
 };
 let teachesTwo = false;
-/* A course with a path (0.614): two units, the first published, served
+/* A course with a path (0.616): two units, the first published, served
    to the teacher's screens only while a walk below sets it. */
 let withPath = false;
 /* And a learner's course with a path: two published units. */
@@ -12307,7 +12307,7 @@ const openPronounTables = async () => {
   check("nothing went wrong on the way", errors.length === before, errors.slice(before).join("\n"));
 }
 
-/* ---- a course's path, for a learner (0.615) ----
+/* ---- a course's path, for a learner (0.617) ----
    Home shows the course's current unit above Start session, with its
    stages; Progress shows the whole path above the deck tiles, where the
    units are not; a locked unit opens read-only, with no button. And a
@@ -12380,7 +12380,7 @@ const openPronounTables = async () => {
   check("and nothing threw on a learner's path", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
-/* ---- a course's path, in Teaching (0.614) ----
+/* ---- a course's path, in Teaching (0.616) ----
    A course with two units, the first published there: its page shows the
    path above its decks, each unit with its number and whether it is
    published, and a unit is not among the ordinary decks. Opened, a unit

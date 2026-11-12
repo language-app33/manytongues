@@ -411,7 +411,7 @@ export default async (req) => {
 
       /*
        * A course path's reached units are merged by union, never written
-       * over (0.613): a device on an older build, or one that last synced
+       * over (0.615): a device on an older build, or one that last synced
        * before a unit opened, would otherwise take back a unit that had
        * opened, and it must never lock again. Read against the version the
        * client says it merged with; if that is not what is held, the write

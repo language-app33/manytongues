@@ -1071,7 +1071,7 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
   .at-dimpicks { gap:10px; }
 }
 
-/* A course's path (0.614): each unit a row to open, with its moves under
+/* A course's path (0.616): each unit a row to open, with its moves under
    it, and a unit's checklist as a plain list. */
 .at-pathrow { margin-bottom:12px; }
 .at-pathacts { flex-wrap:wrap; gap:4px; margin-top:4px; }

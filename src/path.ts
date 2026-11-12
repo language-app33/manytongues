@@ -1,6 +1,6 @@
 /*
  * The path: a course's units, in order, each opening when the one before it
- * is finished (0.611).
+ * is finished (0.613).
  *
  * A **path unit** is a deck with `unit: true`. A course lists its units in
  * `path`, in order, drafts included; publishes each in `pathLive`; and may
