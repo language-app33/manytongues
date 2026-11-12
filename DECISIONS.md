@@ -8182,3 +8182,15 @@ cleared, and marking clears the figures in the same write that lifts the
 part. So the part reads below cleared afterwards, with new questions, and
 the unit is not finished until they are answered or it is marked again.
 Left as built rather than adding a second way to clear a part.
+
+**What was weighed and left out of the first version.** A class view of
+who is on which unit, a goal line per unit, turning a deck into a unit,
+a teacher's switch for "Mark as cleared", undoing a marking, marking a
+locked unit or several at once, units in a learner's own space, any
+change to how word sets are written or to the stretch rule, any filter on
+what fills a blank, any rule refusing to put a card somewhere because of
+where else it is, any new exercise, level or scheduling rule, forcing new
+words into unit order among the units already open, and scoring the
+variety of forms. Each would change what the owner decided above; none
+was needed for the path to work. Which of them are wanted later is the
+owner's to say, and they go to BACKLOG.md when they do.

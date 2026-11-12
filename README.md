@@ -1173,6 +1173,24 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   `unitsOf`, `quietUnits` mean one form of a card that can be asked), so
   the thing here is a *path unit* in code and "Unit" only on screen.
 
+  **The rules, in brief (the owner's, R1–R37 and A1–A7 in the plan).** A
+  unit holds word cards, at least five sentences with a blank, and at most
+  one text or conversation at the end. Each blank needs five different
+  words a teacher approved in it, from this unit, the published units
+  before it on that course's path, or names kept anywhere; every word of
+  the unit is in one of its sentences, numbers excepted. A unit is
+  published per course once that holds, and stays live with a warning if
+  an edit breaks it later. Units open in order: the first always, the next
+  once every word and sentence of the one before is cleared — the text
+  need not be read — and once open, never closed again. A teacher may open
+  any published unit early for the class. A new word comes as soon as any
+  place it lives is open; a word already met is never held. A learner can
+  look inside any unit, practise an open one alone, and mark an open one
+  as cleared, which clears its words and sentences everywhere and makes
+  nothing learnt. Word sets in a unit — pronouns, number and time parts —
+  wait for it, count toward it and are cleared with it. Ordinary decks are
+  unchanged and always open.
+
   Every rule lives in `src/path.ts`, which is pure and read by the app and
   the server alike. `pathRows` says where a learner stands: the first unit
   is open; a unit opens when every unit before it is finished — every word

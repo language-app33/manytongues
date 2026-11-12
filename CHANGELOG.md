@@ -8,6 +8,17 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.617 — 12 November 2026
+
+**Units, written down.** Nothing changes in the app. The README now has
+the whole of how a course's path works, in one place, and the decisions
+file says why each rule is shaped as it is and what was weighed and left
+out of this first version: a class view of who is on which unit, a goal
+per unit, turning a deck into a unit, a teacher's switch for "Mark as
+cleared", undoing a marking, marking several units at once, and units in
+a learner's own space, among others. Which of those are wanted later is
+still to be said.
+
 ## 0.616 — 12 November 2026
 
 **Units, step six: a student can mark a unit as cleared.**
