@@ -342,7 +342,7 @@ import {
   withAnswer as oneAnswer,
   fillerVariants,
 } from "./answers.ts";
-import { asMeaning, cellEnglish, fieldsLost, fillForm, fillsOf, hasSlots, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
+import { asMeaning, cellEnglish, fieldsLost, fillForm, fillsOf, hasSlots, isSentence, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
 import type { Value } from "./variables.ts";
 import { agreeTook, countTook, finishTook, leadsOf, lineGate, passes, reviewOf, sentenceKey, SCAN_LIMIT } from "./review.ts";
 import { castFill as castScene, filledScene, hasCast } from "./cast.ts";
@@ -1990,6 +1990,78 @@ export function unitItems(deckId: string, items: Item[]): Item[] {
 
 /** The path as the index holds it, for the screens. */
 export const pathIndexNow = (): PathIndex => PATH_INDEX;
+
+/** How far a unit has got, in the three stages a learner is shown. */
+export interface UnitStages {
+  /** Word cards and word-set items together: a part's skill, its words, the figures. */
+  words: { done: number; all: number };
+  sentences: { done: number; all: number };
+  /** Its text or conversation, where it has one. */
+  final: { kind: "text" | "conversation"; done: boolean } | null;
+  /** Every item of it learnt — the quieter mark beside Finished (R31). */
+  learnt: boolean;
+}
+
+/**
+ * A unit's stages, counted the one way Home and Progress both show them:
+ * only items that can be asked (towardsLearnt not null), each cleared when
+ * it has been up every level it has. When Words and Sentences are both
+ * full, the unit is finished — the same reading as the path's.
+ */
+export function unitStages(deckId: string, items: Item[], settings: Settings): UnitStages {
+  const out: UnitStages = { words: { done: 0, all: 0 }, sentences: { done: 0, all: 0 }, final: null, learnt: true };
+  let any = false;
+  for (const it of unitItems(deckId, items)) {
+    const at = towardsLearnt(it, settings, items);
+    if (!at) continue;
+    any = true;
+    const done = at.at.status === "cleared" || at.at.status === "done";
+    if (at.at.status !== "done") out.learnt = false;
+    if (isDialog(it)) {
+      out.final = { kind: isText(it) ? "text" : "conversation", done: done && (!out.final || out.final.done) };
+      continue;
+    }
+    const stage = !isFromSystem(it) && isSentence(it) ? out.sentences : out.words;
+    stage.all += 1;
+    if (done) stage.done += 1;
+  }
+  if (!any) out.learnt = false;
+  return out;
+}
+
+/** A course's path as a learner's screens show it: each published unit's row with its title. */
+export interface PathLine {
+  courseId: string;
+  courseTitle: string;
+  rows: (PathRow & { title: string })[];
+}
+
+/** The paths of these courses, in their order, from the index. */
+export function pathLinesOf(courses: { id: string; title?: string }[], decks: { id: string; title?: string }[]): PathLine[] {
+  const titleOf = new Map(decks.map((d) => [d.id, String(d.title || "")]));
+  const out: PathLine[] = [];
+  for (const c of courses) {
+    const rows = PATH_INDEX.rows.get(c.id);
+    if (!rows || !rows.length) continue;
+    out.push({ courseId: c.id, courseTitle: String(c.title || ""), rows: rows.map((r) => ({ ...r, title: titleOf.get(r.id) || "" })) });
+  }
+  return out;
+}
+
+/** What a unit's row says on Progress (R28). */
+export function pathStateWord(r: PathRow): string {
+  if (r.state === "finished") return "Finished";
+  if (r.current) return "Current";
+  if (r.state === "open") return "Open";
+  return r.openedEarly ? "Opened by your teacher" : "Locked";
+}
+
+/** A unit's stages as Home lists them, in the owner's words. */
+export function stageWords(st: UnitStages): string[] {
+  const out = [`Words ${st.words.done}/${st.words.all}`, `Sentences ${st.sentences.done}/${st.sentences.all}`];
+  if (st.final) out.push(`${st.final.kind === "text" ? "Text" : "Conversation"}: ${st.final.done ? "done" : "not yet"}`);
+  return out;
+}
 
 /* ------------------------------------------------------------------
    Which card a verb's cell is on
@@ -10530,6 +10602,8 @@ export default function ArabicTrainer() {
   );
   const [courseBusy, setCourseBusy] = useState(false);
   const [courseError, setCourseError] = useState("");
+  /* The unit a learner has open from Home or Progress (0.615). */
+  const [unitOpen, setUnitOpen] = useState<{ courseId: string; deckId: string } | null>(null);
 
   /* Teaching is a role on a course, so it has to be asked about — and the
      material request answers it, so it is no longer asked twice. */
@@ -11853,6 +11927,20 @@ export default function ArabicTrainer() {
     () => (spaceNow ? courseDecks.filter((d: any) => orgOfCourse.get(d.courseId) === spaceNow) : courseDecks),
     [courseDecks, spaceNow, orgOfCourse]
   );
+  /* Each course's path, for Home and Progress (0.615): the courses of the
+     space and languages shown, in the order they are listed elsewhere. */
+  const pathLines = useMemo(
+    () => pathLinesOf(learnCourses.filter((c) => !langsOff.includes(c.language)), courseDecks),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [learnCourses, langsOff, courseDecks, pathIndex],
+  );
+  /* The names of the downloaded units, which are on the path and not
+     among the deck tiles or the decks a saved session or a prep picks. */
+  const unitTitles = useMemo(
+    () => new Set(courseDecks.filter((d) => isPathUnit(d as PathDeck)).map((d) => String(d.title || ""))),
+    [courseDecks],
+  );
+  const deckTags = useMemo(() => allTags.filter((t) => !unitTitles.has(t)), [allTags, unitTitles]);
 
   /* How much is waiting, in the languages that are switched on: the number
      on the home screen, and what decides whether there is a session to
@@ -12327,10 +12415,12 @@ export default function ArabicTrainer() {
     if (built.catchingUp) flash("Catching up first — new cards wait until your reviews are back in hand");
   }
 
-  function begin(practice?: boolean, only?: (it: Item) => boolean) {
+  function begin(practice?: boolean, only?: (it: Item) => boolean, pathUnit?: string) {
     /* `only` narrows the session to some cards — a prep's decks — in place
-       of the deck chosen on the home screen. */
-    const built = buildSession({ items: shown, settings, inDeck: only || inDeck, practice, perDay, systems });
+       of the deck chosen on the home screen. `pathUnit` lets that unit's
+       new cards in although the path has not reached it: "Practise this
+       unit" (R30, R24). */
+    const built = buildSession({ items: shown, settings, inDeck: only || inDeck, practice, perDay, systems, pathUnit });
     if (!built.exercises.length) {
       /* This used to return in silence, which reads as a broken button. It
          mattered little when the only way to get here was a card list that
@@ -14513,6 +14603,13 @@ export default function ArabicTrainer() {
                     <p className="at-homeline">{homeLine(homeWaiting)}</p>
                   )}
 
+                  {/* Each course's path, one line each, above the one
+                      Start session (R27). */}
+                  {pathLines.map((p) => (
+                    <PathHomeLine key={p.courseId} line={p} items={shown} settings={settings}
+                      onOpen={(deckId) => setUnitOpen({ courseId: p.courseId, deckId })} />
+                  ))}
+
                   <div className="at-row">
                     {/* Always live while there is anything to drill. Being
                         due decides what a session leads with, not whether
@@ -15808,6 +15905,9 @@ export default function ArabicTrainer() {
         {!stranded && tab === "progress" && (
           <ProgressTab
             items={shown}
+            paths={pathLines}
+            unitTitles={unitTitles}
+            onUnit={(courseId, deckId) => setUnitOpen({ courseId, deckId })}
             myCourses={learnCourses}
             spaceOf={!spaceNow && learnSpaces.length > 1 ? spaceOfItem : undefined}
             spaceNames={!spaceNow && learnSpaces.length > 1 ? spaceNameOf : undefined}
@@ -15819,12 +15919,35 @@ export default function ArabicTrainer() {
           />
         )}
 
+        {/* A unit's page, opened from Home or Progress (0.615). */}
+        {unitOpen && (() => {
+          const line = pathLines.find((p) => p.courseId === unitOpen.courseId);
+          const row = line && line.rows.find((r) => r.id === unitOpen.deckId);
+          if (!line || !row) return null;
+          return (
+            <UnitScreen
+              line={line}
+              row={row}
+              items={shown}
+              settings={settings}
+              perDay={perDay}
+              onBack={() => setUnitOpen(null)}
+              onPractise={() => {
+                const ids = new Set(unitItems(row.id, shown).map((it) => it.id));
+                setUnitOpen(null);
+                setTab("home");
+                begin(false, (it) => ids.has(it.id), row.id);
+              }}
+            />
+          );
+        })()}
+
         {/* ============ SETTINGS ============ */}
 
         {building && (
           <ManualSessionSheet
             items={shown}
-            allTags={allTags}
+            allTags={deckTags}
             settings={settings}
             onStart={beginManual}
             onSave={keepSession}
@@ -15851,7 +15974,7 @@ export default function ArabicTrainer() {
         {editingSaved && (
           <ManualSessionSheet
             items={shown}
-            allTags={allTags}
+            allTags={deckTags}
             settings={settings}
             editing={editingSaved}
             onStart={beginManual}
@@ -18358,7 +18481,10 @@ function DeckScreen({
   perDay,
   onBack,
   onCard,
+  head,
 }: {
+  /** Above the deck's own figures: a unit's stages, its state and what it offers (0.615). */
+  head?: Node;
   name: string;
   cards: Item[];
   progressOf: Map<string, Standing | null>;
@@ -18389,6 +18515,7 @@ function DeckScreen({
   const when = (t: Millis | null) => `learnt by ${forecastWords(t)}`;
   return (
     <Screen title={name} onBack={onBack}>
+      {head}
       <div className="at-deckhead">
         <p className="at-deckstatnote">
           {learnt} of {plural(shown.length, "card")} fully learnt
@@ -18454,8 +18581,98 @@ function DeckScreen({
   );
 }
 
+/*
+ * One course's line on Home (R27): the course, its current unit and that
+ * unit's stages — or that the path is complete. Tapping it opens the unit.
+ */
+function PathHomeLine({ line, items, settings, onOpen }: {
+  line: PathLine;
+  items: Item[];
+  settings: Settings;
+  onOpen: (deckId: string) => void;
+}) {
+  const current = line.rows.find((r) => r.current);
+  if (!current) {
+    if (!line.rows.length || line.rows.some((r) => r.state !== "finished")) return null;
+    return <p className="at-pathhome" data-el="path-home">{`${line.courseTitle} · Path complete`}</p>;
+  }
+  const st = unitStages(current.id, items, settings);
+  return (
+    <button type="button" className="at-pathhome" data-el="path-home" onClick={() => onOpen(current.id)}>
+      <span className="at-pathhomehead">{`${line.courseTitle} · Unit ${current.number} of ${line.rows.length} · ${current.title}`}</span>
+      <span className="at-pathhomestages">
+        {stageWords(st).map((w) => <span key={w}>{w}</span>)}
+      </span>
+    </button>
+  );
+}
+
+/*
+ * A unit's page (R29–R31): its words, sentences and text or conversation,
+ * read only, for every published unit, locked ones too; with "Practise
+ * this unit" where it is open for the learner. The deck page, fed by
+ * unitItems.
+ */
+function UnitScreen({ line, row, items, settings, perDay, onBack, onPractise }: {
+  line: PathLine;
+  row: PathLine["rows"][number];
+  items: Item[];
+  settings: Settings;
+  perDay: number;
+  onBack: () => void;
+  onPractise: () => void;
+}) {
+  const [viewing, setViewing] = useState<Item | null>(null);
+  const cards = useMemo(() => unitItems(row.id, items), [row.id, items]);
+  const progress = useMemo(() => {
+    const at: Map<string, Standing | null> = new Map();
+    const toward: Map<string, { at: Standing; share: number } | null> = new Map();
+    for (const it of cards) {
+      at.set(it.id, standing(cardStandings(it, settings, items)));
+      toward.set(it.id, towardsLearnt(it, settings, items));
+    }
+    return { at, toward };
+  }, [cards, items, settings]);
+  const st = useMemo(() => unitStages(row.id, items, settings), [row.id, items, settings]);
+  const open = row.state !== "locked" || row.openedEarly;
+  const before = line.rows.find((r) => r.number === row.number - 1);
+  return (
+    <>
+      <DeckScreen
+        name={`Unit ${row.number} · ${row.title}`}
+        cards={cards}
+        progressOf={progress.at}
+        towardOf={progress.toward}
+        settings={settings}
+        perDay={perDay}
+        onBack={onBack}
+        onCard={(it) => setViewing(it)}
+        head={
+          <div className="at-unithead" data-el="unit-page">
+            <p className="at-pathunitstate">
+              {pathStateWord(row)}
+              {row.state === "finished" && st.learnt ? <i>{" · Learnt"}</i> : null}
+            </p>
+            <p className="at-pathhomestages">{stageWords(st).map((w) => <span key={w}>{w}</span>)}</p>
+            {row.state === "locked" && before ? <Help>{`Finish unit ${before.number} to open this one`}</Help> : null}
+            {open ? (
+              <div className="at-row">
+                <Button variant="primary" onClick={onPractise}>Practise this unit</Button>
+              </div>
+            ) : null}
+          </div>
+        }
+      />
+      {viewing && <CardScreen card={viewing} items={items} settings={settings} onBack={() => setViewing(null)} />}
+    </>
+  );
+}
+
 function ProgressTab({
   items,
+  paths = [],
+  unitTitles,
+  onUnit,
   myCourses = [],
   settings,
   moves,
@@ -18466,6 +18683,11 @@ function ProgressTab({
   spaceNames,
 }: {
   items: Item[];
+  /** Each course's path, shown above the deck tiles (0.615). */
+  paths?: PathLine[];
+  /** The titles of the downloaded units, which are not deck tiles. */
+  unitTitles?: Set<string>;
+  onUnit?: (courseId: string, deckId: string) => void;
   myCourses?: Course[];
   /** A card's space, and every space's name, when Learning shows more than
       one (memberships): two decks of one name in two spaces are then two
@@ -18617,6 +18839,8 @@ function ProgressTab({
       if (!toward) continue;
       const space = (spaceNames && spaceOf && spaceOf(it)) || "";
       for (const deck of it.tags || []) {
+        /* A unit is on the path above, not a tile here. */
+        if (unitTitles && unitTitles.has(deck)) continue;
         const key = `${space}|${deck}`;
         const row = held.get(key) || { name: deck, space, n: 0, learnt: 0, got: 0 };
         row.n++;
@@ -18636,7 +18860,7 @@ function ProgressTab({
         pct: deckPercent({ n, learnt, got }),
       }))
       .sort((a, b) => b.pct - a.pct || a.name.localeCompare(b.name));
-  }, [counted, progress, spaceOf, spaceNames]);
+  }, [counted, progress, spaceOf, spaceNames, unitTitles]);
   const deckOpenRow = deckRows.find((d) => d.key === deckOpen) || null;
 
   /* Where the prep stands, for the line beside the button. */
@@ -18801,6 +19025,25 @@ function ProgressTab({
           deck of thirty and a deck of three hundred are not comparable by
           how many are left, and a bar beside it because a number alone is
           read and a bar is seen. */}
+      {/* Each course's path, whole and in order, above the decks (R28):
+          every published unit, locked ones too, can be opened (R29). */}
+      {paths.map((p) => (
+        <Section head key={p.courseId} title={p.courseTitle}>
+          <h4 className="at-sectionhead">Path</h4>
+          <div className="at-pathlist" data-el="progress-path">
+            {p.rows.map((r) => (
+              <button type="button" key={r.id} className={`at-pathunit ${r.state}${r.current ? " current" : ""}`}
+                aria-haspopup="dialog" onClick={() => onUnit && onUnit(p.courseId, r.id)}>
+                <span className="at-pathunitname">{`${r.number}. ${r.title}`}</span>
+                <span className="at-pathunitstate">
+                  {pathStateWord(r)}
+                  {r.state === "finished" && unitStages(r.id, items, settings).learnt ? <i>{" · Learnt"}</i> : null}
+                </span>
+              </button>
+            ))}
+          </div>
+        </Section>
+      ))}
       {deckRows.length > 0 && (
         <Section head title="Decks" lede="How you're doing on each deck you're studying.">
           <div className="at-deckprog">

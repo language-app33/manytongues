@@ -282,6 +282,8 @@ let teachesTwo = false;
 /* A course with a path (0.614): two units, the first published, served
    to the teacher's screens only while a walk below sets it. */
 let withPath = false;
+/* And a learner's course with a path: two published units. */
+let studentPath = false;
 const rafa = nameCard("k555555555555", "رافائيل", "Raphael", "rafaa'iil");
 const viktor = nameCard("k666666666666", "فيكتور", "Victor", "fiktoor");
 let materialHits = 0;
@@ -402,6 +404,19 @@ const fakeFetch = async (input, opts = {}) => {
             { id: "d9", title: "Lesson 1", owner: "t-9", cardIds: [lingua.id], cardCount: 1, courseId: "c9", courseTitle: "Lingua Arabic", courseLanguage: "ar-PS", courses: [{ courseId: "c9", addedAt: 1 }], version: 1 },
           ],
           cards: [{ deckId: "d1", cards: [card, phrase] }, { deckId: "d9", cards: [lingua] }],
+          systems: [],
+        });
+      }
+      if (studentPath) {
+        return json({
+          ok: true, version: "v-path", teaches: false,
+          courses: [{ id: "c1", org: "main", title: "Arabic 101", language: "ar-PS", decks: ["u1", "u2"], path: ["u1", "u2"], pathLive: { u1: 1, u2: 1 },
+            role: "student", studying: true, teaching: false }],
+          decks: [
+            { id: "u1", unit: true, title: "Greetings unit", owner: "t-1", cardIds: [card.id], cardCount: 1, courseId: "c1", courseTitle: "Arabic 101", courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: 1 }], version: 1 },
+            { id: "u2", unit: true, title: "Family unit", owner: "t-1", cardIds: [phrase.id], cardCount: 1, courseId: "c1", courseTitle: "Arabic 101", courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: 2 }], version: 1 },
+          ],
+          cards: [{ deckId: "u1", cards: [card] }, { deckId: "u2", cards: [phrase] }],
           systems: [],
         });
       }
@@ -12290,6 +12305,77 @@ const openPronounTables = async () => {
   check("after three sessions the tip is not shown, and the tap still works",
     later.promptsBare > 0 && !later.tip && later.tappedShows, JSON.stringify(later));
   check("nothing went wrong on the way", errors.length === before, errors.slice(before).join("\n"));
+}
+
+/* ---- a course's path, for a learner (0.615) ----
+   Home shows the course's current unit above Start session, with its
+   stages; Progress shows the whole path above the deck tiles, where the
+   units are not; a locked unit opens read-only, with no button. And a
+   learner with no path is shown none of it. */
+{
+  const before = errors.length;
+  const KEY = "arabic-trainer:arabic-trainer-v3";
+  const mount = async () => {
+    localStorage.setItem(KEY, JSON.stringify({ version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [] }));
+    localStorage.removeItem("arabic-trainer:material");
+    /* This account teaches too, and a teacher opens into Teaching; asked
+       for Learning, as the space's own Learn button asks. */
+    window.history.replaceState(null, "", `${window.location.pathname}?open=learn`);
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    await sleep(1800);
+    return { host, r };
+  };
+  /* Last in the file: the app the walks above share is put away, so the
+     tab bar on screen is this one's. */
+  root.unmount();
+  await sleep(200);
+  const plain = await mount();
+  check("a learner with no path has no path line on Home",
+    !plain.host.querySelector('[data-el="path-home"]'), "a path line with no path");
+  plain.r.unmount();
+  plain.host.remove();
+
+  studentPath = true;
+  const { host, r } = await mount();
+  const homeLine = host.querySelector('[data-el="path-home"]');
+  const said = homeLine ? (homeLine.textContent || "").replace(/\s+/g, " ") : "";
+  check("Home shows the course's current unit, with its stages, above Start session",
+    /Arabic 101 · Unit 1 of 2 · Greetings unit/.test(said) && /Words 0\/1/.test(said) && /Sentences 0\/0/.test(said),
+    said || "no path line");
+  /* The current unit, opened from its line on Home. */
+  click(/** @type {any} */ (homeLine));
+  await sleep(500);
+  const openPage = document.querySelector('[data-el="unit-page"]');
+  check("the Home line opens its unit, which offers Practise this unit",
+    !!openPage && /Practise this unit/.test(openPage.textContent || ""), openPage ? openPage.textContent || "" : "no page");
+  backOut();
+  await sleep(300);
+  const tabsNow = () => [...document.querySelectorAll("[role=tab]")];
+  const progressTab = tabsNow().find((b) => /^Progress$/.test((b.textContent || "").trim()) && host.contains(b))
+    || tabsNow().find((b) => /^Progress$/.test((b.textContent || "").trim()));
+  click(progressTab || null);
+  await sleep(900);
+  const pathRows = [...host.querySelectorAll('[data-el="progress-path"] button')].map((b) => (b.textContent || "").replace(/\s+/g, " "));
+  check("Progress shows the path in order, current then locked",
+    pathRows.length === 2 && /1\. Greetings unit.*Current/.test(pathRows[0]) && /2\. Family unit.*Locked/.test(pathRows[1]),
+    pathRows.join(" | ") || `no path on Progress; bare: ${!!host.querySelector(".at-screen.bare")}; tabs: ${tabsNow().map((b) => `${(b.textContent || "").trim()}:${host.contains(b)}`).join(",")}; modes: ${[...document.querySelectorAll(".at-wheremode")].map((b) => b.textContent).join(",")}`);
+  const tiles = [...host.querySelectorAll(".at-deckstatname")].map((t) => t.textContent || "");
+  check("a unit is not among the deck tiles", !tiles.some((t) => /Greetings unit|Family unit/.test(t)), tiles.join(" | "));
+  click([...host.querySelectorAll('[data-el="progress-path"] button')][1] || null);
+  await sleep(500);
+  const page = document.querySelector('[data-el="unit-page"]');
+  const pageText = page ? (page.closest(".at-screen") || page).textContent || "" : "";
+  check("a locked unit opens read-only, says what opens it, and offers no practice",
+    /Finish unit 1 to open this one/.test(pageText) && !/Practise this unit/.test(pageText), pageText.replace(/\s+/g, " ").slice(0, 200));
+  backOut();
+  studentPath = false;
+  r.unmount();
+  host.remove();
+  localStorage.removeItem("arabic-trainer:material");
+  check("and nothing threw on a learner's path", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
 /* ---- a course's path, in Teaching (0.614) ----

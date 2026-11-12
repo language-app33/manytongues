@@ -8155,3 +8155,13 @@ already published (R17): it never takes the unit away from students. The
 advice on forms reads only the grammar the language declares, and is
 advice only (A6), so a language without gender or number shows nothing.
 
+**0.615: what a learner is shown is counted the way the path counts.**
+The stages on Home and a unit's page are worked out by one function
+(`unitStages`) that reads the same items as "finished" (`unitItems`), the
+same cleared test, and leaves out what can never be asked and the text or
+conversation, so Words and Sentences both full is exactly a finished unit.
+A unit's items are never found through its title, which two decks can
+share, nor through a card's `source.deckId`, which names one deck of
+several. The fifth state — open, and not the current unit, because an
+earlier unit slipped after this one opened — is shown as "Open"; the plan
+named four, and none of them was true of it.

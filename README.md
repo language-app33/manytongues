@@ -1236,7 +1236,20 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   quality score's `known` are the only things that read it; the card
   editor and the review screens are handed the pools they always were.
   Under the score, `sameFormBlanks` lists blanks whose approved words share
-  every grammar field the language declares (`dimsOf`), as advice. Tests:
+  every grammar field the language declares (`dimsOf`), as advice.
+  **A learner sees the path (0.615).** `pathLinesOf` gives each course's
+  rows with their titles, for the courses of the space and languages
+  shown. `PathHomeLine` puts one above Start session per course — the
+  current unit, "Unit 3 of 8", and `unitStages`: words (word-set items
+  among them), sentences, and the text or conversation, counting only
+  what can be asked, so that both stages full is exactly the path's
+  "finished". Progress lists every published unit in order with
+  `pathStateWord`, and leaves the units' titles out of the deck tiles and
+  out of the decks a saved session or a prep picks (`deckTags`). A unit
+  opens on `UnitScreen` — `DeckScreen`, fed by `unitItems`, with its state
+  and stages above — locked ones too, read only; one open for the learner,
+  or opened early, offers "Practise this unit", which is `begin` with the
+  unit's items as the pool and `pathUnit` set. Tests:
   `tests/path.test.mjs`, `tests/path-server.test.mjs`,
   `tests/path-device.test.mjs`, and a walk in `tests/smoke.mjs`; why:
   DECISIONS.md, "Units: a course's path".

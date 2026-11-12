@@ -152,6 +152,8 @@ const PLACES: Record<string, [string, string]> = {
   ProgressTab: [LEARN, "The Progress tab"],
   Lately: [LEARN, "The Progress tab · what moved today and this week"],
   DeckScreen: [LEARN, "The Progress tab · one deck, with when it could be learnt"],
+  UnitScreen: [LEARN, "A course's path · one unit, its words and sentences"],
+  PathHomeLine: [LEARN, "Home · a course's current unit"],
   PrepScreen: [LEARN, "The Progress tab · Prep mode, getting decks learnt by a date"],
   PrepLine: [LEARN, "The home screen · how long is left to prep, and whether your pace gets you there"],
   ReviewItem: [LEARN, "The Progress tab · one card"],

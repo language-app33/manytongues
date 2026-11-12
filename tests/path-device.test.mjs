@@ -25,7 +25,7 @@ Math.random = () => {
 const here = path.dirname(new URL(import.meta.url).pathname);
 const built = await buildOnce(["ArabicTrainer.tsx"]);
 const T = await import(path.join(built, "ArabicTrainer.js"));
-const { buildSession, installIndexes, pathHolds, pathIndexNow, pathIndexOf, unitItems, everMet } = T;
+const { buildSession, installIndexes, pathHolds, pathIndexNow, pathIndexOf, unitItems, everMet, unitStages, pathStateWord, stageWords } = T;
 const { TYPES, LANGUAGES } = await import(path.join(here, "..", "src", "languages.ts"));
 const { freshState } = await import(path.join(here, "..", "src", "scheduler.ts"));
 const { mergeData } = await import(path.join(here, "..", "src", "sync.ts"));
@@ -242,3 +242,59 @@ test("remembering what was reached is written once: the next build finds nothing
   const second = pathIndexOf(items, courses, decks, written);
   assert.equal(reachesFurther(written.pathReached, second.reached), false, "and nothing the second");
 });
+
+/* ---- phase 5: what a learner is shown of a unit ---- */
+
+/** A sentence card from server card `k<i>`. @param {number} i @param {(() => any) | null} [s] */
+const sentence = (i, s = null) => ({ ...word(i, s), kind: "phrase", sentence: true,
+  forms: [{ ...word(i, s).forms[0], ar: `جملة رقم ${i} هون`, en: `sentence ${i} here` }] });
+/** A text from server card `k<i>`. @param {number} i */
+const text = (i) => ({
+  id: `srvk${i}`, tags: ["Deck"], created: i, lang: "ar-PS", sceneKind: "text", speakers: [],
+  source: { courseId: "A", deckId: "u1", cardId: `k${i}`, rev: 1 },
+  forms: [{ id: `srvk${i}`, ar: "", en: `text ${i}` }],
+  lines: [{ id: `srvk${i}-l1`, ar: "الكتاب كبير كتير", en: "the book is very big", lat: "il-ktaab kbiir ktiir", s: {} },
+    { id: `srvk${i}-l2`, ar: "البيت صغير", en: "the house is small", lat: "il-beet zghiir", s: {} }],
+});
+
+test("a unit's stages: words, sentences and its text, counted as cleared of all", () => {
+  const items = [
+    ...[1, 2, 3, 4].map((i) => word(i, cleared)), word(5), word(6),
+    sentence(11, cleared), ...[12, 13, 14, 15].map((i) => sentence(i)),
+    text(20),
+  ];
+  install(items, [course("A", ["u1"])], [unit("u1", [1, 2, 3, 4, 5, 6, 11, 12, 13, 14, 15, 20])]);
+  const st = unitStages("u1", items, settings);
+  assert.deepEqual(st.words, { done: 4, all: 6 });
+  assert.deepEqual(st.sentences, { done: 1, all: 5 });
+  assert.deepEqual(st.final, { kind: "text", done: false });
+  assert.equal(st.learnt, false);
+  assert.deepEqual(stageWords(st), ["Words 4/6", "Sentences 1/5", "Text: not yet"]);
+});
+
+test("a card in two units counts in both; one that can never be asked counts in neither", () => {
+  const never = { ...word(9), drill: false, forms: [{ ...word(9).forms[0], ask: false }] };
+  const items = [word(1, cleared), word(2), never];
+  install(items, [course("A", ["u1", "u2"])], [unit("u1", [1, 9]), unit("u2", [1, 2, 9])]);
+  assert.deepEqual(unitStages("u1", items, settings).words, { done: 1, all: 1 });
+  assert.deepEqual(unitStages("u2", items, settings).words, { done: 1, all: 2 });
+});
+
+test("a unit holding 0 to 9 counts the part's skill and words under Words, and is not finished till they are cleared", () => {
+  const nums = fileIntoDecks(generated.items, SET, [{ id: "u1", title: "Unit u1", parts: ["numbers:0-9"] }]);
+  const items = [word(1, cleared), ...nums];
+  install(items, [course("A", ["u1", "u2"])], [{ ...unit("u1", [1]), parts: ["numbers:0-9"] }, unit("u2", [])]);
+  const st = unitStages("u1", items, settings);
+  assert.ok(st.words.all > 1, `only ${st.words.all} under Words`);
+  assert.ok(st.words.done < st.words.all);
+  assert.equal(pathIndexNow().finished.get("u1"), false);
+});
+
+test("each unit's row says where it stands in the owner's words", () => {
+  const row = (/** @type {Record<string, any>} */ o) => ({ id: "u", number: 1, state: "open", openedEarly: false, current: false, ...o });
+  assert.equal(pathStateWord(row({ state: "finished" })), "Finished");
+  assert.equal(pathStateWord(row({ current: true })), "Current");
+  assert.equal(pathStateWord(row({ state: "locked" })), "Locked");
+  assert.equal(pathStateWord(row({ state: "locked", openedEarly: true })), "Opened by your teacher");
+});
+

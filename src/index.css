@@ -3556,3 +3556,24 @@ fieldset.at-cardlock:disabled .at-field { margin-bottom:16px; }
    cards that don't reach students yet, on its screen and its tile. */
 .at-formrole .at-formline { display:block; }
 
+
+/* A course's path, as a learner sees it (0.615): on Home, a line per
+   course above Start session; on Progress, every unit in order; and a
+   unit's own page, its state and stages above its cards. */
+.at-pathhome { display:flex; flex-direction:column; gap:4px; width:100%; text-align:start;
+  border:2px solid var(--line); border-radius: var(--r); background: var(--surface);
+  padding:12px 14px; margin:0 0 12px; font: inherit; color: var(--text); cursor:pointer; }
+p.at-pathhome { cursor:default; font-weight:700; }
+.at-pathhomehead { font-family: var(--ui); font-weight:800; font-size:14px; overflow-wrap:anywhere; }
+.at-pathhomestages { display:flex; flex-wrap:wrap; gap:4px 12px; margin:0; color: var(--muted);
+  font-size:13px; font-variant-numeric: tabular-nums; }
+.at-pathlist { display:flex; flex-direction:column; gap:8px; }
+.at-pathunit { display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+  border:2px solid var(--line); border-radius: var(--r); background: var(--surface);
+  padding:12px 14px; font: inherit; color: var(--text); text-align:start; cursor:pointer; min-width:0; }
+.at-pathunit.current { border-color: var(--brass); }
+.at-pathunit.locked { color: var(--muted); }
+.at-pathunitname { font-family: var(--ui); font-weight:800; font-size:14px; overflow-wrap:anywhere; min-width:0; }
+.at-pathunitstate { margin:0; color: var(--muted); font-size:13px; white-space:nowrap; }
+.at-pathunitstate i { font-style:normal; opacity:.75; }
+.at-unithead { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }

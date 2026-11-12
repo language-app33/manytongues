@@ -8,6 +8,40 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.615 — 12 November 2026
+
+**Units, step five: students see their course's path.** Nothing changes
+for anyone whose courses have no units.
+
+- **Home shows a line for each course with a path**, above Start session:
+  the course, "Unit 3 of 8" and the unit's name, then how far it has got —
+  words, sentences, and its text or conversation if it has one. When every
+  unit is finished it says "Path complete". Tapping the line opens the
+  unit. There is still one Start session, and it still draws from all of
+  the student's courses at once.
+- **Progress shows the whole path above the deck tiles**, each unit as
+  Finished, Current, Locked or Opened by your teacher. A finished unit
+  whose every card is also learnt says so, more quietly. Units are no
+  longer among the deck tiles, nor among the decks a saved session or a
+  prep picks from.
+- **Any unit can be opened, locked ones too**: its words, sentences and
+  text or conversation, to read. A locked unit says which unit to finish
+  first.
+- **Practise this unit**, on a unit that is open — or one the teacher
+  opened early — starts a session of that unit alone, bringing in its new
+  words. Ordinary sessions keep bringing new words from the student's own
+  place on the path.
+- An open unit that an earlier unit has since slipped behind is shown as
+  "Open": the plan named four states, and this fifth case needed a word.
+
+To check by hand: as a student in a course with units, Home shows unit 1
+and Progress shows it current with the rest locked; a locked unit lists
+its cards with no button; clearing every word and sentence of unit 1 opens
+unit 2 without the text being read; a unit the teacher opens shows as
+opened by your teacher, and Practise this unit brings its new words while
+an ordinary session still brings unit 2's; all of it works offline after
+one download.
+
 ## 0.614 — 11 November 2026
 
 **Units, step four: teachers can build a course's path.** Students see
