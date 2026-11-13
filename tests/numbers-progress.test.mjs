@@ -256,7 +256,7 @@ test("a slip below a stretch keeps what the numbers above it had earned", () => 
      counts towards most, so the shortfall here is words never learnt.) */
   const zeroToNine = must(filed.find((/** @type {any} */ it) => it.range && it.range.id === "numbers:0-9"), "0 to 9");
   const unlearnt = (zeroToNine.parts || []).filter((/** @type {string} */ id) => id !== four)
-    .slice(0, (zeroToNine.parts || []).length - Math.ceil((zeroToNine.parts || []).length * 0.8) + 1);
+    .slice(0, (zeroToNine.parts || []).length - Math.ceil((zeroToNine.parts || []).length * 0.6) + 1);
   const items = allLearntBut([four, zeroToNine.id, ...unlearnt]).map((/** @type {any} */ it) =>
     (it.id === four || it.id === zeroToNine.id ? slipped(it) : it));
   installIndexes(items, settings);
@@ -295,8 +295,9 @@ test("a stretch opens once the words below it are cleared, before the stretch be
   const asked = cardStandings(must(items.find((/** @type {any} */ it) => it.id === tenToNineteen.id), "10 to 19"), settings, items);
   assert.ok(asked.length > 0, "10 to 19 is still waiting on 0 to 9's own questions");
 
-  /* Since 0.416, most of them is enough: a word or two short, it opens. */
-  const need = Math.ceil(below.size * 0.8);
+  /* Since 0.416, most of them is enough — six in ten since 0.622: a few
+     words short, it opens. */
+  const need = Math.ceil(below.size * 0.6);
   const missing = (/** @type {number} */ n) => {
     const out = new Set([...below].slice(0, n));
     return items.map((/** @type {any} */ it) => (out.has(it.id) ? filed.find((/** @type {any} */ f) => f.id === it.id) : it));

@@ -8254,3 +8254,22 @@ cards, and lifts the part's skill again against the ladder that gives
 it, putting the figures index back as it was. No second way to clear a
 part was added; a second press writes nothing.
 
+
+## A stretch of the number line opens on six in ten of its words (0.622)
+
+**13 November 2026** · `STRETCH_SHARE` in `src/ArabicTrainer.tsx`,
+`tests/numbers-progress.test.mjs`
+
+The owner lowered the word route through a stretch from 80% to 60%,
+rounded up as before: six of ten for 0 to 9 and for 10 to 19, two of
+three, both of two. Seen on a learner with seven of 10 to 19's words
+learnt and three climbing, and twenty cards waiting on one more.
+
+The sentence gate (`sentenceWaits`) had read the same constant since it
+was written. It keeps 80% under a constant of its own, `SENTENCE_SHARE`,
+because the owner asked about stretches and a sentence is read whole.
+
+Safe for the reason 0.416 gave: each number is still asked only once
+every word in it is cleared (askingsKnown). What opens sooner is the
+words of the stretch above, which enter through the session mix's
+learning share and the limit of 20 in learning like any new card.

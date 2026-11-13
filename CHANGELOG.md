@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.622 — 13 November 2026
+
+**The next numbers open sooner.** A stretch of numbers, like 20 to 99,
+used to wait until 8 of the 10 words in the stretch below were learnt. It
+now waits for 6 of 10. A learner with 11, 12, 14 and 16 to 19 learnt, and
+10, 13 and 15 still climbing, now has twenty, thirty and the rest to start
+on, where before all of them waited on one more word.
+
+Nothing is asked before it can be: a number like 47 is still only asked
+once the words in it are learnt. The new words come in as new cards
+usually do, a few at a time.
+
+Sentences in a text are unchanged: one still waits until 8 in 10 of its
+words are known.
+
+To check by hand: with 6 of the 10 words for 10 to 19 learnt, the words
+for 20, 30 and so on should no longer show "Opens later".
+
 ## 0.621 — 12 November 2026
 
 **A picture question's picture shrinks once you have answered it.** After

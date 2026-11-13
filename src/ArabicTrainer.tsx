@@ -2355,17 +2355,31 @@ function stretchCleared(stretch: Item, lang: Lang): boolean {
 
 /*
  * The share of a stretch's words that lets the stretch above through:
- * eight of ten for 0 to 9. Rounded up, so a stretch of three or fewer
- * words still wants every one.
+ * six of ten for 0 to 9. Rounded up, so a stretch of two words wants
+ * both and one of three wants two.
  *
  * Until 0.416 it was every word, at every exercise, in every face, and
  * read afresh — so a learner who knew nine of the ten digits had nothing
  * above them to practise, and one slip on one digit shut everything over
- * it again. Nothing is asked early for this: a number is only ever asked
- * once each word in it is cleared (see askingsKnown), so 47 still waits
- * on *seven* however open 20 to 99 is.
+ * it again. From 0.416 to 0.621 it was eight in ten, and a learner with
+ * seven of 10 to 19's words learnt and the other three climbing had
+ * twenty cards waiting on one word (0.622, the owner's call).
+ *
+ * Nothing is asked early for this: a number is only ever asked once each
+ * word in it is cleared (see askingsKnown), so 47 still waits on *seven*
+ * however open 20 to 99 is. What opens sooner is the new words above —
+ * twenty, thirty — which come in through the learning share like any
+ * other new card.
  */
-const STRETCH_SHARE = 0.8;
+const STRETCH_SHARE = 0.6;
+
+/*
+ * The share of a sentence's words a learner must know before it is met:
+ * eight in ten — see sentenceWaits. The number line's share was the same
+ * until 0.622, when it was lowered and this was not: a sentence is read
+ * whole, and two unknown words in ten is already a lot to read past.
+ */
+const SENTENCE_SHARE = 0.8;
 
 /* An exercise the learner has been through once: cleared now, or out of
    its first learning and into review at some point, which a slip back to
@@ -2425,8 +2439,7 @@ function withFacesWaiting(quiet: Set<string>, items: Item[], settings: Settings,
  * follow, so a sentence is not met until the learner can say what most of
  * the words in it mean: eight in ten of the word cards it was found to
  * contain, rounded up, so a sentence with three or fewer of them wants
- * every one — the share a stretch of the number line asks of its words
- * (STRETCH_SHARE). A word counts once the bottom level of its own ladder
+ * every one (SENTENCE_SHARE). A word counts once the bottom level of its own ladder
  * is cleared: reading a sentence asks for its words to be understood, not
  * written. A word with no card is not counted, since nothing could ever
  * make it known; the editor tells the teacher which words those are.
@@ -2476,7 +2489,7 @@ function sentenceWaits(line: Form, held: WordsHeld, lang: Lang): boolean {
     const types = availableTypes(unit, lang);
     return !types.length || reachedLevel(types, (t) => statesOf(unit)[t], 2);
   }).length;
-  return known < Math.ceil(hits.length * STRETCH_SHARE - 1e-9);
+  return known < Math.ceil(hits.length * SENTENCE_SHARE - 1e-9);
 }
 
 /* Whether a form is shown without its vowel marks — see readsBare in the
