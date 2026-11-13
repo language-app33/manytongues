@@ -261,8 +261,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   partner cards come from the pool, most overdue first.
 
   **Being due settles priority, not whether there is a session.** A learner
-  who is up to date is dealt the cards nearest to coming round rather than
-  an empty screen, and what makes that safe is in the scheduler: **an
+  who is up to date is dealt the cards seen longest ago rather than an
+  empty screen, and what makes that safe is in the scheduler: **an
   answer given before a card is due is counted and moves nothing**, so the
   card comes back exactly when it was always going to. Getting it *wrong*
   early still pulls it back, because forgetting is news whenever it

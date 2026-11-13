@@ -8273,3 +8273,17 @@ Safe for the reason 0.416 gave: each number is still asked only once
 every word in it is cleared (askingsKnown). What opens sooner is the
 words of the stretch above, which enter through the session mix's
 learning share and the limit of 20 in learning like any new card.
+
+## A session tops up with the card seen longest ago (0.623)
+
+**13 November 2026** · `mixSession` in `src/session-mix.ts`,
+`tests/session-mix.test.mjs`
+
+When the shares left places empty, cards not yet due (`ahead`) filled them
+nearest due first. An answer before a card is due moves nothing, so a
+learner who sat several times a day was topped up with the same handful
+every sitting, as long as they were out of the last three hours' window.
+`ahead` is now sorted by `lastSeen` ascending, then by due. The `recent`
+list (practised in the last three hours) keeps its order: due first, then
+nearest due. This is stage 1 of the plan to organise practice by skill,
+agreed with the owner on 13 November; it stands on its own.

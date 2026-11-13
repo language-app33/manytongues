@@ -15,7 +15,8 @@
  * - **Three shares.** 40% cards in learning, 30% Cleared cards due for
  *   review, 30% Learnt cards due for review.
  * - **Empty places** go, in this order, to overdue Cleared cards, overdue
- *   Learnt cards, cards in learning, then cards not yet due.
+ *   Learnt cards, cards in learning, then cards not yet due, the one seen
+ *   longest ago first.
  * - **Cards practised in the last three hours are left out**, unless a
  *   review on them was already overdue. They come last, so that a pool with
  *   nothing else in it still gives a session rather than an empty screen.
@@ -192,11 +193,16 @@ export function mixSession<T>(pool: MixCard<T>[], o: MixOptions): Mix<T> {
   }
   const placed = chosen.length;
 
-  /* Then cards not yet due, nearest first, if the shares left places
-     empty; and behind everything else, enough to top a short session up:
-     what is left of the groups, and the cards practised in the last three
-     hours. No new card comes in this way. */
-  const ahead = ready.filter((c) => isReview(c) && !dueAt(c, at)).sort(byDue);
+  /* Then cards not yet due, the one seen longest ago first and nearest due
+     among equals, if the shares left places empty; and behind everything
+     else, enough to top a short session up: what is left of the groups,
+     and the cards practised in the last three hours. No new card comes in
+     this way. Longest unseen first because a right answer before a card is
+     due does not move its date: sorted nearest due, the same few cards came
+     back every sitting. */
+  const ahead = ready
+    .filter((c) => isReview(c) && !dueAt(c, at))
+    .sort((a, b) => a.lastSeen - b.lastSeen || byDue(a, b));
   const recent = open
     .filter((c) => isRecent(c, at) && c.standing !== "new")
     .sort((a, b) => Number(dueAt(b, at)) - Number(dueAt(a, at)) || byDue(a, b) || a.lastSeen - b.lastSeen);
