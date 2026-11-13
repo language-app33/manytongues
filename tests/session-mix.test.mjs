@@ -123,7 +123,7 @@ test("two sittings in a row with right answers between them top up with differen
   const later = AT + 4 * HOUR;
   const second = mixSession(pool, { ...opts, at: later }).cards.slice(0, 2).map((/** @type {any} */ c) => c.id);
   assert.equal(second.length, 2);
-  assert.ok(!second.some((id) => first.includes(id)), `the same cards came back: ${first} then ${second}`);
+  assert.ok(!second.some((/** @type {string} */ id) => first.includes(id)), `the same cards came back: ${first} then ${second}`);
 });
 
 test("new cards come in only to fill the learning share's gap", () => {
