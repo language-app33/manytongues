@@ -15,8 +15,8 @@
  * - **Three shares.** 40% cards in learning, 30% Cleared cards due for
  *   review, 30% Learnt cards due for review.
  * - **Empty places** go, in this order, to overdue Cleared cards, overdue
- *   Learnt cards, cards in learning, then cards not yet due, the one seen
- *   longest ago first.
+ *   Learnt cards, cards in learning, then cards not yet due, the one
+ *   furthest through its wait first.
  * - **Cards practised in the last three hours are left out**, unless a
  *   review on them was already overdue. They come last, so that a pool with
  *   nothing else in it still gives a session rather than an empty screen.
@@ -193,16 +193,24 @@ export function mixSession<T>(pool: MixCard<T>[], o: MixOptions): Mix<T> {
   }
   const placed = chosen.length;
 
-  /* Then cards not yet due, the one seen longest ago first and nearest due
-     among equals, if the shares left places empty; and behind everything
-     else, enough to top a short session up: what is left of the groups,
-     and the cards practised in the last three hours. No new card comes in
-     this way. Longest unseen first because a right answer before a card is
-     due does not move its date: sorted nearest due, the same few cards came
-     back every sitting. */
+  /* Then cards not yet due, if the shares left places empty: the one
+     furthest through its wait first — the time since it was last answered
+     over the gap from then to its due date — and nearest due among equals.
+     And behind everything else, enough to top a short session up: what is
+     left of the groups, and the cards practised in the last three hours. No
+     new card comes in this way.
+
+     A right answer before a card is due moves no date, so sorted nearest
+     due the same few cards came back every sitting. Furthest through its
+     wait puts a card just answered at the back, and still leans to weak
+     cards, whose waits are short; longest unseen first rotated as well but
+     leaned to strong cards, and a learner of fifteen sittings a day kept
+     about five words fewer a month on (DECISIONS.md, 0.623). */
+  const throughWait = (c: MixCard<T>) =>
+    !c.lastSeen ? 1 : c.due > c.lastSeen ? (at - c.lastSeen) / (c.due - c.lastSeen) : 1;
   const ahead = ready
     .filter((c) => isReview(c) && !dueAt(c, at))
-    .sort((a, b) => a.lastSeen - b.lastSeen || byDue(a, b));
+    .sort((a, b) => throughWait(b) - throughWait(a) || byDue(a, b));
   const recent = open
     .filter((c) => isRecent(c, at) && c.standing !== "new")
     .sort((a, b) => Number(dueAt(b, at)) - Number(dueAt(a, at)) || byDue(a, b) || a.lastSeen - b.lastSeen);

@@ -10,13 +10,14 @@ and moves once per batch of work you would notice, not once per commit.
 
 ## 0.623 — 13 November 2026
 
-**A short session tops up with cards you haven't seen for longest.** When
+**A short session no longer tops up with the same cards every time.** When
 a session has places left after the cards due and the cards being learnt,
 it fills them with Cleared and Learnt cards that are not due yet. It used
 to pick those nearest to falling due. A right answer before a card is due
 doesn't move its date, so the same few cards came back every sitting. It
-now picks the ones you haven't seen for longest, so each extra sitting
-reaches round to different cards.
+now picks the cards that have waited the largest share of their gap since
+you last answered them. A card you have just answered goes to the back,
+and weaker cards, which come round more often, still come first.
 
 Nothing else changes: cards that are due still come first, and cards
 practised in the last three hours still come last.

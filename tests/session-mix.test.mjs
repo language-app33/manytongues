@@ -96,15 +96,18 @@ test("cards not yet due come after everything that is", () => {
   assert.ok(mix.cards.some((/** @type {any} */ c) => c.id.startsWith("a")), "and they still fill the session");
 });
 
-test("among cards not yet due, the one seen longest ago comes first", () => {
-  /* Seen longest ago beats due soonest: a card due tomorrow but answered an
-     hour ago gives way to one due in a month and not seen for three weeks. */
+test("among cards not yet due, the one furthest through its wait comes first", () => {
+  /* How far through its wait: the time since it was answered over the gap
+     from then to its due date. A weak card answered three days ago and due
+     tomorrow is three quarters through; a strong one unseen for three
+     weeks and due in a month is two fifths; one answered four hours ago
+     and due tomorrow has barely started, so it goes last. */
   const pool = [
     row("soon", "cleared", { due: AT + DAY, lastSeen: AT - 4 * HOUR }),
-    row("long", "learnt", { due: AT + 30 * DAY, lastSeen: AT - 21 * DAY }),
-    row("mid", "cleared", { due: AT + 2 * DAY, lastSeen: AT - 5 * DAY }),
+    row("strong", "learnt", { due: AT + 30 * DAY, lastSeen: AT - 21 * DAY }),
+    row("weak", "cleared", { due: AT + DAY, lastSeen: AT - 3 * DAY }),
   ];
-  assert.deepEqual(mixSession(pool, OPTS).cards.map((/** @type {any} */ c) => c.id), ["long", "mid", "soon"]);
+  assert.deepEqual(mixSession(pool, OPTS).cards.map((/** @type {any} */ c) => c.id), ["weak", "strong", "soon"]);
   /* Seen at the same moment, the nearer due comes first. */
   const tied = [row("far", "cleared", { due: AT + 9 * DAY }), row("near", "cleared", { due: AT + 2 * DAY })];
   assert.deepEqual(mixSession(tied, OPTS).cards.map((/** @type {any} */ c) => c.id), ["near", "far"]);

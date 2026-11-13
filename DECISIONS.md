@@ -8274,7 +8274,7 @@ every word in it is cleared (askingsKnown). What opens sooner is the
 words of the stretch above, which enter through the session mix's
 learning share and the limit of 20 in learning like any new card.
 
-## A session tops up with the card seen longest ago (0.623)
+## A session tops up with the card furthest through its wait (0.623)
 
 **13 November 2026** · `mixSession` in `src/session-mix.ts`,
 `tests/session-mix.test.mjs`
@@ -8283,7 +8283,22 @@ When the shares left places empty, cards not yet due (`ahead`) filled them
 nearest due first. An answer before a card is due moves nothing, so a
 learner who sat several times a day was topped up with the same handful
 every sitting, as long as they were out of the last three hours' window.
-`ahead` is now sorted by `lastSeen` ascending, then by due. The `recent`
-list (practised in the last three hours) keeps its order: due first, then
-nearest due. This is stage 1 of the plan to organise practice by skill,
-agreed with the owner on 13 November; it stands on its own.
+`ahead` is now sorted by how far each card is through its wait, (now −
+lastSeen) / (due − lastSeen), highest first, then by due. The `recent`
+list (practised in the last three hours) keeps its order. This is stage 1
+of the plan to organise practice by skill, agreed with the owner on 13
+November; it stands on its own.
+
+**Why not longest unseen first, as the plan said.** Measured over ten
+seeds of the forgetting learner (`forgetter`, 200 mixed cards), old rule
+against longest unseen against furthest through its wait, words known a
+month on: 1 a day 32.9 / 32.7 / 31.8; 3 a day 121.8 / 120.7 / 121.5;
+3 a day struggling 28.9 / 29.8 / 31.5; 15 a day 193.6 / 188.8 / 193.3.
+Longest unseen cost the keen learner about five words, worse in every
+seed: the cards unseen longest are the strong ones, spaced furthest, and
+the old rule had (by accident) kept returning to weak ones. Furthest
+through its wait sends a card just answered to the back and still leans to
+short waits. On the keen 400-card life each card was dealt 3.95 times a
+day under the old rule, 1.01 longest unseen, 1.58 furthest through. The
+once-a-day learner's 1.1 fewer is within the spread between seeds, though
+seven seeds of ten came out lower. The owner chose this on 13 November.
