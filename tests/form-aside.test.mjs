@@ -125,3 +125,39 @@ test("a form brought back after the card was sent to the beginning gets nothing 
   const out = foldCourses(had, [card("srvk1", [form("srvk1"), form("srvk1-f~pl")])], parked);
   assert.equal(formOf(out.items[0], "srvk1-f~pl").s.ar2en, undefined);
 });
+
+/* ---------------- 0.625: no inheriting by place ---------------- */
+
+test("a new form put where a removed one was starts fresh, and the removed one's work is set aside", () => {
+  const had = [card("srvk4", [form("srvk4", { ar2en: answered(1) }), form("srvk4-f~x", { ar2en: answered(7) })])];
+  const fresh = [card("srvk4", [form("srvk4"), form("srvk4-f~y")])];
+  const out = foldCourses(had, fresh, {});
+  assert.equal(formOf(out.items[0], "srvk4-f~y").s.ar2en, undefined, "Y does not take X's schedule");
+  assert.equal(out.parked.srvk4.forms["srvk4-f~x"].s.ar2en.reps, 7, "X's schedule is in the drawer");
+});
+
+test("a card whose forms have no names still matches them by place", () => {
+  const had = [card("srvk5", [form("srvk5", { ar2en: answered(1) }), { ...form("old-a", { ar2en: answered(4) }), id: "srvk5-f0" }])];
+  /* The same form, still unnamed, arriving under another place-name. */
+  const fresh = [card("srvk5", [form("srvk5"), { ...form("srvk5-f9"), id: "srvk5-f9" }])];
+  const out = foldCourses(had, fresh, {});
+  assert.equal(out.items[0].forms[1].s.ar2en.reps, 4);
+  assert.equal(out.parked.srvk5, undefined, "and nothing is set aside");
+});
+
+test("a card whose unnamed forms are given names by the teacher's next save keeps them by place", () => {
+  /* The release that named forms renames every form of a card on the
+     teacher's next save; it is the same card in the same order. */
+  const had = [card("srvk6", [form("srvk6"), { ...form("a", { ar2en: answered(3) }), id: "srvk6-f0" }, { ...form("b", { ar2en: answered(8) }), id: "srvk6-f1" }])];
+  const fresh = [card("srvk6", [form("srvk6"), form("srvk6-f~p"), form("srvk6-f~q")])];
+  const out = foldCourses(had, fresh, {});
+  assert.equal(formOf(out.items[0], "srvk6-f~p").s.ar2en.reps, 3);
+  assert.equal(formOf(out.items[0], "srvk6-f~q").s.ar2en.reps, 8);
+});
+
+test("a line put where a removed one was starts fresh", () => {
+  const had = [card("srvk7", [form("srvk7")], [form("srvk7-l~a", { line: answered(2) })])];
+  const out = foldCourses(had, [card("srvk7", [form("srvk7")], [form("srvk7-l~z")])], {});
+  assert.equal(must(out.items[0].lines[0], "line z").s.line, undefined);
+  assert.equal(out.parked.srvk7.lines["srvk7-l~a"].s.line.reps, 2);
+});

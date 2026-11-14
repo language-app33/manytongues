@@ -5593,6 +5593,11 @@ type FormsAside = Parked["forms"];
    wire use. */
 const hasWork = (f: Form) => Object.keys(compactStates(f.s)).length > 0;
 
+/* Whether a form or a line carries a name of its own — a teacher's name
+   after the tilde, a tense's, or a number face's — rather than its place
+   in the list. */
+const named = (f: Form | null | undefined) => !!f && /-[flt]~/.test(String(f.id || ""));
+
 /* Two sets of schedules for one form, each exercise from whichever side
    answered it last — the rule sync merges by. */
 function newerStates(a: Record<string, ExerciseState> = {}, b: Record<string, ExerciseState> = {}) {
@@ -5660,7 +5665,14 @@ function foldForms<T extends Form>(
        handOnCounting. Under the learner's own schedules, never over one,
        and never stored itself. */
     const { carried, ...f } = one;
-    const mate = matched[i] || (taken.has(i) ? null : had[i]);
+    /* By place only where one of the two has no name of its own to be
+       matched by (0.625): the legacy case the fallback was written for,
+       including a teacher's next save naming every form of an old card at
+       once. Two named forms that did not match by name are two different
+       forms — one removed, one added — and the new one starts fresh while
+       the old one's work goes into the drawer. */
+    const placed = taken.has(i) || !had[i] || (named(had[i]) && named(one)) ? null : had[i];
+    const mate = matched[i] || placed;
     if (mate) used.add(mate);
     if (!mate) return (carried ? { ...f, s: { ...carried, ...(f.s || {}) } } : f) as T;
     /*

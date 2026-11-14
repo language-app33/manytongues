@@ -8324,3 +8324,20 @@ it does not carry, so a whole card coming back without one of its forms
 keeps that form's work set aside rather than losing it. And a card that
 leaves a course joins its own progress to whatever was already set aside
 for it, rather than writing over it.
+
+## Two named forms are never matched by place (0.625)
+
+**14 November 2026** · `foldForms` in `src/shared.tsx`,
+`tests/form-aside.test.mjs`
+
+`foldForms` fell back to matching an unmatched fresh form with the old
+form in the same position, so a named form put where a removed named form
+was inherited its schedules. The fallback now applies only where at least
+one of the two has no name (`-f~`, `-l~` or `-t~` in its id).
+
+The plan said "only when both have no name". That would break the case
+the fallback still serves every day: an old card's forms carry place-ids
+(`-f0`) on devices until a teacher next saves it, and that save names all
+of them at once (`-f~x`). Under "both", every such save would start every
+sub-form afresh. So the rule refuses the place match only when both forms
+are named, which is exactly the removed-and-replaced case.

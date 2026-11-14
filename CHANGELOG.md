@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.625 — 14 November 2026
+
+**A new form no longer picks up a removed form's progress.** When a
+teacher deleted a form from a card and added a different one in the same
+place, the new form arrived on students' phones carrying the old one's
+progress, as if it were the same word. It now starts fresh, and the
+removed form's progress is set aside (see 0.624) in case it comes back.
+
+Cards made before forms had names of their own are matched by place as
+before, including the first time a teacher saves such a card and its
+forms are given names. Nothing a student has already got changes.
+
+To check by hand: on a practised card, delete a form and add another in
+its place. On the student's phone the new form should show as not
+started.
+
 ## 0.624 — 14 November 2026
 
 **A form or a line a teacher removes no longer takes students' progress
