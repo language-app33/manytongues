@@ -8,6 +8,20 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.626 — 14 November 2026
+
+**Getting ready for new kinds of question.** Coming releases add new
+exercises, and each keeps its own progress. Until now, a phone or laptop
+that had not updated would quietly throw that progress away each time it
+opened the app, and could wipe it from your other devices. From this
+release, the app keeps any progress it doesn't recognise, untouched, and
+takes no notice of it: nothing you see or are asked changes.
+
+This is out on its own, before any new exercise, so that it has reached
+your devices first. A device that hasn't been opened since will still
+drop such progress from its own copy until it updates; the copy kept
+online is unaffected.
+
 ## 0.625 — 14 November 2026
 
 **A new form no longer picks up a removed form's progress.** When a

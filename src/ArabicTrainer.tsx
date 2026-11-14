@@ -7420,6 +7420,22 @@ export function liftStates(old: Record<string, any> = {}): Record<string, Exerci
     if (!TYPES.includes(typeOf(key))) continue;
     s[key] = liftState(st);
   }
+  /*
+   * And every other key, carried untouched (0.626).
+   *
+   * A record for an exercise this release does not know is a later
+   * release's work, synced here from the learner's other device, or one
+   * for an exercise retired since. It used to be dropped on every load, so
+   * a device that replaced the server's copy took it with it. Carried as
+   * it is — not lifted, so nothing is written for it that was not already
+   * there, which is what the `newKey in s` guard above protects — and read
+   * by nothing: every reader asks of the types this release knows. Only the
+   * oldest shape's names, lifted above to their own, are left behind.
+   */
+  for (const [key, st] of Object.entries(old)) {
+    if (key in s || !st || key in V2_MAP) continue;
+    s[key] = st;
+  }
   return s;
 }
 

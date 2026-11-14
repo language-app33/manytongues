@@ -8341,3 +8341,39 @@ the fallback still serves every day: an old card's forms carry place-ids
 of them at once (`-f~x`). Under "both", every such save would start every
 sub-form afresh. So the rule refuses the place match only when both forms
 are named, which is exactly the removed-and-replaced case.
+
+## A device carries progress it does not know (0.626)
+
+**14 November 2026** · `liftStates` in `src/ArabicTrainer.tsx`,
+`checkAnswer` in `src/languages.ts`, `src/tense-skills.ts`,
+`tests/unknown-exercises.test.mjs`, `tests/stored-shape.test.mjs`
+
+`liftStates` rebuilt each form's `s` from `TYPES` on every load, sync and
+restore, so a record for an exercise this release does not know (a later
+release's, or a retired one's) was dropped from the device's copy and lost
+for good if that copy ever replaced the server's. It now carries every
+other key as it is, unlifted, except the two pre-v2 names (`mean`,
+`write`) that are lifted into `ar2en` and `en2ar`. Its comment's worry — a
+stale mapping writing a fresh state for a retired type — does not return:
+nothing is written for such a key that was not already there.
+
+Nothing reads those records. Every reader asks of `TYPES`; the few that
+walked a form's whole `s` (the tense skills' seeding, `shaky`, `rightAt`)
+now skip names outside `TYPES`, and `checkAnswer` marks an unknown name
+wrong instead of throwing. The test runs standings, next review, weak
+spots, the workload, the climb, the ladder and both session builders with
+and without such records and requires the same answers.
+
+`tests/stored-shape.test.mjs` guards the places older devices drop things
+from (the plan's D2 to D5): the document's top-level fields, the setting
+names the app reads, what a course refresh keeps of the learner's on a
+card, and that every progress write stamps `updated`. Each fails when a
+change adds to that list, so the change has to say why older devices will
+not erase it.
+
+One existing test changed, because its sentence is no longer the agreed
+behaviour: `tests/cards.test.mjs`, "a card's second accepted spelling
+keeps its schedule across a load", asserted that a key naming an exercise
+that does not exist is dropped. It now asserts that it is carried as it is.
+
+Shipped alone, before any exercise is added, so it reaches devices first.
