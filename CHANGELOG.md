@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.624 — 14 November 2026
+
+**A form or a line a teacher removes no longer takes students' progress
+with it.** When a teacher took a form off a card (a plural, say) or a
+line out of a conversation, every student's progress on it was thrown
+away on their next refresh, on all their devices. It is now set aside,
+the way a whole card's progress already is when it leaves a course. If
+the teacher puts the form or line back, under the same name, its progress
+comes back with it. What is never put back is cleared after six months,
+as before.
+
+Nothing changes for cards whose forms stay as they are, and a whole card
+leaving and returning works as it did.
+
+To check by hand: on a card a student has practised, remove one of its
+forms, let the student's app refresh, then put the form back. Its
+progress should return.
+
 ## 0.623 — 13 November 2026
 
 **A short session no longer tops up with the same cards every time.** When

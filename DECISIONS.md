@@ -8302,3 +8302,25 @@ short waits. On the keen 400-card life each card was dealt 3.95 times a
 day under the old rule, 1.01 longest unseen, 1.58 furthest through. The
 once-a-day learner's 1.1 fewer is within the spread between seeds, though
 seven seeds of ten came out lower. The owner chose this on 13 November.
+
+## A form the teacher removes is set aside, not dropped (0.624)
+
+**14 November 2026** · `foldForms` and `foldCourses` in `src/shared.tsx`,
+`tests/form-aside.test.mjs`
+
+`foldForms` built the learner's forms from the teacher's fresh copy, so a
+form or line the fresh copy did not have was dropped with its schedules,
+and the loss spread by sync. It now also returns the learner's forms that
+found no mate and carry work, and `foldCourses` keeps them in the existing
+`parked` drawer under the card's id, by form id (`forms`, and `lines` for
+a conversation's turns). A fresh form whose id is in the drawer and which
+has no work of its own is given the drawer's schedules (none answered
+before the card's `reset`), and the entry goes. Nothing new is stored: the
+drawer already syncs, merges by its `at`, and ages out after 180 days.
+
+Two things the plan did not say. A card still here used to have its
+drawer entry deleted on every refresh; it now keeps the entries for forms
+it does not carry, so a whole card coming back without one of its forms
+keeps that form's work set aside rather than losing it. And a card that
+leaves a course joins its own progress to whatever was already set aside
+for it, rather than writing over it.

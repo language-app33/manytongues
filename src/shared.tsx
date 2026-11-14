@@ -5576,7 +5576,48 @@ export function pairSystems(raw: unknown[]): SystemSet[] {
  * match by name, the new form finds its place taken, and starts fresh —
  * which is what it is.
  */
-function foldForms<T extends Form>(had: T[], fresh: T[]): T[] {
+/*
+ * And what the teacher's fresh copy no longer has.
+ *
+ * A form or a conversation line the teacher removed used to be dropped
+ * here with whatever the learner had earned on it, and the loss spread
+ * through sync to every device they own (0.624). The fold now says which
+ * of the learner's forms found no place in the fresh copy and carry work,
+ * so foldCourses can set that work aside in the drawer a whole card's
+ * progress goes into when the card leaves a course — and, where a form of
+ * that name comes back with nothing of its own, hand it back.
+ */
+type FormsAside = Parked["forms"];
+
+/* Whether a schedule says anything — the same reading the drawer and the
+   wire use. */
+const hasWork = (f: Form) => Object.keys(compactStates(f.s)).length > 0;
+
+/* Two sets of schedules for one form, each exercise from whichever side
+   answered it last — the rule sync merges by. */
+function newerStates(a: Record<string, ExerciseState> = {}, b: Record<string, ExerciseState> = {}) {
+  const out: Record<string, ExerciseState> = { ...a };
+  for (const [t, st] of Object.entries(b)) {
+    if (!out[t] || (st && (st.updated || 0) > (out[t].updated || 0))) out[t] = st;
+  }
+  return out;
+}
+
+/* One form's entry in the drawer, from what it carries. */
+const asideOf = (f: Form): FormsAside[string] => {
+  const s = compactStates(f.s);
+  return { ...(Object.keys(s).length ? { s } : null), ...(f.met ? { met: f.met } : null) };
+};
+
+function foldForms<T extends Form>(
+  had: T[],
+  fresh: T[],
+  /* What the drawer already holds for this card's forms, by name. */
+  drawer: FormsAside = {},
+  /* When the card was last sent back to the beginning: nothing answered
+     before it comes back out of the drawer. */
+  reset = 0,
+): { forms: T[]; aside: FormsAside } {
   const byId = new Map(had.filter((f) => f && f.id).map((f) => [f.id, f]));
   const taken: Set<number> = new Set();
   const matched: (T | null)[] = fresh.map((f) => {
@@ -5586,12 +5627,41 @@ function foldForms<T extends Form>(had: T[], fresh: T[]): T[] {
     if (at >= 0) taken.add(at);
     return mate;
   });
-  return fresh.map((one, i) => {
+  const used: Set<T> = new Set();
+  const forms = fresh.map((one, i) => {
+    const folded = foldOne(one, i);
+    return restored(folded);
+  });
+  /* The learner's forms that found no place, with work on them. A form
+     with no name cannot be found again, so it cannot be set aside. */
+  const aside: FormsAside = {};
+  for (const f of had) {
+    if (!f || !f.id || used.has(f) || (!hasWork(f) && !f.met)) continue;
+    aside[f.id] = asideOf(f);
+  }
+  return { forms, aside };
+
+  /* A form with nothing of its own, given back what the drawer held for
+     it — under anything it does have, never over it. */
+  function restored(f: T): T {
+    const saved = f && f.id ? drawer[f.id] : null;
+    if (!saved || hasWork(f)) return f;
+    const s: Record<string, ExerciseState> = {};
+    for (const [t, st] of Object.entries(saved.s || {})) {
+      if (!reset || (st && (st.updated || 0) >= reset)) s[t] = st;
+    }
+    if (!Object.keys(s).length && !saved.met) return f;
+    const met = reset ? f.met : mergeMet(f.met, saved.met);
+    return { ...f, s: { ...(f.s || {}), ...s }, ...(met ? { met } : null) } as T;
+  }
+
+  function foldOne(one: T, i: number): T {
     /* What a card no longer made handed on to this one — see
        handOnCounting. Under the learner's own schedules, never over one,
        and never stored itself. */
     const { carried, ...f } = one;
     const mate = matched[i] || (taken.has(i) ? null : had[i]);
+    if (mate) used.add(mate);
     if (!mate) return (carried ? { ...f, s: { ...carried, ...(f.s || {}) } } : f) as T;
     /*
      * The schedule, and the other thing a form carries that the learner
@@ -5608,8 +5678,29 @@ function foldForms<T extends Form>(had: T[], fresh: T[]): T[] {
     const met = mergeMet(f.met, mate.met);
     const s = mate.s || f.s;
     return { ...f, s: carried ? { ...carried, ...(s || {}) } : s, ...(met ? { met } : null) } as T;
-  });
+  }
 }
+
+/* Two drawers' worth of forms for one card, put together: each form's
+   schedules by the newer answer, its record of words met by the larger. */
+function joinAside(a: FormsAside = {}, b: FormsAside = {}): FormsAside {
+  const out: FormsAside = { ...a };
+  for (const [id, saved] of Object.entries(b)) {
+    const had = out[id];
+    if (!had) {
+      out[id] = saved;
+      continue;
+    }
+    const s = newerStates(had.s, saved.s);
+    const met = mergeMet(had.met, saved.met);
+    out[id] = { ...(Object.keys(s).length ? { s } : null), ...(met ? { met } : null) };
+  }
+  return out;
+}
+
+/* A drawer's forms without the ones named here. */
+const without = (from: FormsAside = {}, ids: Set<string>): FormsAside =>
+  Object.fromEntries(Object.entries(from).filter(([id]) => !ids.has(id)));
 
 /**
  * What a card's forms have earned, as the drawer keeps it.
@@ -5740,6 +5831,9 @@ const unjoined = (item: Item): Item =>
 export function foldCourses(items: Item[], incoming: Item[], parked: Record<string, Parked> = {}) {
   const byId = new Map(items.map((i) => [i.id, i]));
   const kept: Item[] = [];
+  /* What each card still here had on forms and lines the teacher's copy no
+     longer has — see foldForms. */
+  const asideBy: Map<string, { forms: FormsAside; lines: FormsAside }> = new Map();
   for (const joined of incoming) {
     /* With its tenses, where they are skills, so the fold below finds them
        by name the way it finds every other form — see tense-skills.ts. */
@@ -5766,6 +5860,11 @@ export function foldCourses(items: Item[], incoming: Item[], parked: Record<stri
          never-answered on the next refresh. They fold by the same rule the
          forms do; a line has carried a name of its own since it was
          written. */
+      const drawer = parked[fresh.id];
+      const reset = Number(existing.reset) || 0;
+      const foldedForms = foldForms(formsOf(existing), formsOf(fresh), drawer && drawer.forms, reset);
+      const foldedLines = foldForms(existing.lines || [], fresh.lines || [], drawer && drawer.lines, reset);
+      asideBy.set(fresh.id, { forms: foldedForms.aside, lines: foldedLines.aside });
       kept.push(withTenses({
         ...fresh,
         /* Whatever the learner last said about wanting this card next,
@@ -5783,8 +5882,8 @@ export function foldCourses(items: Item[], incoming: Item[], parked: Record<stri
             }
           : null),
         ...(existing.reset ? { reset: existing.reset } : null),
-        forms: foldForms(formsOf(existing), formsOf(fresh)),
-        ...(fresh.lines ? { lines: foldForms(existing.lines || [], fresh.lines) } : null),
+        forms: foldedForms.forms,
+        ...(fresh.lines ? { lines: foldedLines.forms } : null),
       }, lang));
     } else {
       /* A card the device has never held — or one that went away and has
@@ -5828,11 +5927,44 @@ export function foldCourses(items: Item[], incoming: Item[], parked: Record<stri
       saved.priorityAt ||
       saved.priority
     ) {
-      nextParked[it.id] = saved;
+      /* Beside whatever was already set aside for forms the card had lost
+         before it left (0.624), which the card itself no longer carries. */
+      const prev = parked[it.id];
+      const lines = joinAside(prev && prev.lines, saved.lines);
+      nextParked[it.id] = {
+        ...saved,
+        forms: joinAside(prev && prev.forms, saved.forms),
+        ...(Object.keys(lines).length ? { lines } : null),
+      };
     }
   }
-  /* A card that is here again has nothing left to keep aside. */
-  for (const id of incomingIds) delete nextParked[id];
+  /*
+   * A card that is here again has nothing left to keep aside — except for
+   * forms and lines it does not have (0.624).
+   *
+   * What the drawer held for a form the card carries has been handed back
+   * by now, or was not needed because the form had work of its own; either
+   * way it is done with. What it held for a form the card does not carry
+   * stays until that form comes back or the entry ages out, and what this
+   * refresh found on forms the teacher removed joins it, stamped now.
+   */
+  for (const it of kept) {
+    const prev = parked[it.id];
+    const here = new Set([...formsOf(it), ...(it.lines || [])].map((f) => f && f.id).filter(Boolean) as string[]);
+    const found = asideBy.get(it.id);
+    const forms = joinAside(without(prev && prev.forms, here), found && found.forms);
+    const lines = joinAside(without(prev && prev.lines, here), found && found.lines);
+    if (!Object.keys(forms).length && !Object.keys(lines).length) {
+      delete nextParked[it.id];
+      continue;
+    }
+    const fresher = !!found && (Object.keys(found.forms).length > 0 || Object.keys(found.lines).length > 0);
+    nextParked[it.id] = {
+      at: fresher || !prev ? Date.now() : prev.at,
+      forms,
+      ...(Object.keys(lines).length ? { lines } : null),
+    };
+  }
 
   return {
     parked: nextParked,
