@@ -230,6 +230,7 @@ const PLACES: Record<string, [string, string]> = {
   StoredImage: [TEACH, "Editing a card · a picture on a form"],
   DeckQuality: [TEACH, "A deck · its quality, and what would raise it"],
   PathSection: [TEACH, "A course · its path of units"],
+  PracticeSection: [TEACH, "A course · which exercises its students are asked"],
   UnitChecklist: [TEACH, "A unit · what it needs before it is published"],
   PronounsEditor: [TEACH, "A language's pronouns, written once"],
   NumberSystemEditor: [TEACH, "A language's number system"],

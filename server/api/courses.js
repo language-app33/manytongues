@@ -1025,7 +1025,10 @@ function materialVersion(courses, decks, fills = [], systems = []) {
       const live = Object.keys(c.pathLive || {}).sort();
       const path = c.path || [];
       const opened = c.opened || [];
-      return path.length || live.length || opened.length ? row.concat([path.join(","), live.join(","), opened.join(",")]) : row;
+      const withPath = path.length || live.length || opened.length ? row.concat([path.join(","), live.join(","), opened.join(",")]) : row;
+      /* And its switches, where it has any (0.627): a teacher changing what
+         is asked moves nothing else a device compares. */
+      return c.practice ? withPath.concat([JSON.stringify(c.practice)]) : withPath;
     }),
     /* With the parts of the numbers it holds, which are not cards and so
        move neither its version nor its count — see set-deck-parts. And
@@ -4926,6 +4929,31 @@ async function handle(req) {
       await writeJson(store, K.code(teacherCode), id);
       await indexAdd(store, "courses", id);
       return json({ ok: true, course });
+    }
+
+    /*
+     * A course's switches (0.627): which exercises its students are asked —
+     * see src/course-practice.ts. One record on the course, `practice`,
+     * written whole by the course page and never taken away once set: a
+     * course going back to With translation keeps one saying so, which is
+     * what keeps every student's cards where they stood (see standingKeys in
+     * the app). No other write to a course touches it — each of them spreads
+     * the course as it stands — and it is in the material version, so
+     * students' devices fetch it when it changes.
+     */
+    if (action === "set-course-practice") {
+      const course = await readCourse(store, String(body.courseId || ""));
+      if (!course) return json({ error: "not-found" }, 404);
+      if (!isTeacher(course, mine) && !iManage) return json({ error: "not-teaching" }, 403);
+      const raw = body.practice && typeof body.practice === "object" ? body.practice : {};
+      const mode = ["with", "little", "none", "custom"].includes(raw.mode) ? raw.mode : "with";
+      const off = Array.isArray(raw.off)
+        ? [...new Set(raw.off.map((/** @type {unknown} */ t) => String(t || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 24)).filter(Boolean))].slice(0, 120)
+        : [];
+      const practice = { mode, off };
+      const next = await updateJson(store, K.course(course.id), (/** @type {any} */ c) => (c ? { ...c, practice } : null));
+      if (!next) return json({ error: "not-found" }, 404);
+      return json({ ok: true, course: next });
     }
 
     /* Teaching a course and studying it are separate memberships, and someone

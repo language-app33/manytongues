@@ -88,6 +88,8 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["verdict-typo", "Says a right answer in English was one letter out, above the spelling it should have had.", "One letter out — counted as right. It is spelt:"],
     ["verdict-usual", "Says a right answer was written the textbook's way where people usually say it another way — in Palestinian Arabic, \"in\" or \"at\" before \"the\" — and gives the everyday form.", "Right. People usually say أنا بالشغل."],
     ["verdict-hinted", "Says so when a right answer was written with the nudge up, on the questions whose nudge is the answer said another way.", "Right — but the transliteration was on screen, so this one counts as a near miss and comes round again."],
+    ["verdict-meaning-lent", "Says so when a right answer's meaning was opened on the answer, in a course with little translation: it counts as a near miss.", "Right — but the meaning was shown, so this one counts as a near miss and comes round again."],
+    ["reveal-answer-meaning", "In a course with little translation, the English meaning on the answer is behind this tap. Opening it makes a right answer a near miss.", "Show the meaning"],
     ["verdict-marks-lent", "Says so when a right answer was given after putting back the harakat on a word being read without them.", "Right — but the harakat were shown, so this one counts as a near miss and comes round again."],
     ["answer-value", "The right answer. Shown only when you got it wrong or asked to see it — except on choosing a missing word, where the options themselves show it.", ""],
     ["question-prompt-filled", "On a missing word once answered: the word put back in the sentence, highlighted in green.", ""],

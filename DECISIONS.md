@@ -8377,3 +8377,59 @@ keeps its schedule across a load", asserted that a key naming an exercise
 that does not exist is dropped. It now asserts that it is carried as it is.
 
 Shipped alone, before any exercise is added, so it reaches devices first.
+
+## A course's switches (0.627)
+
+**14 November 2026** · `src/course-practice.ts`, `availableTypes`,
+`practiceIndexOf`, `standingKeys` and `englishModeFor` in
+`src/ArabicTrainer.tsx`, `set-course-practice` in
+`server/api/courses.js`, the Exercises section of the course page in
+`src/spaces.tsx`, `tests/course-practice*.test.mjs`
+
+A course carries one record, `practice: { mode, off }` — a shortcut
+(`with`, `little`, `none`, `custom`) and the exercises switched off by hand.
+Absent is everything on. It lives on the course record only (never in a
+learner's settings, which older devices overwrite whole), is written
+whole by `set-course-practice` (a teacher of the course, or an admin),
+survives every other course write because each spreads the stored course,
+and is part of `materialVersion`, so devices fetch it when it changes.
+
+**One door.** `allowedTypes(practices, supported)` decides, and it is
+applied once, inside `availableTypes`, before the answer is cached. The
+practices come from `practiceIndexOf(courses, decks)`: for each course
+card, the switches of every course whose decks list it (null for a course
+without any). A question is asked if any of them allows it; a card in no
+course — the learner's own, or a value a deck borrows — allows all.
+`ENGLISH_TYPES` lists the exercises that use English; number and time
+exercises write figures in the English field and are not among them.
+
+**No translation and "nothing but English".** A form that had a meaning
+in English and is left with no exercise needing a picture, recording,
+phrase or scene is asked nothing. A recording counts (it gives "write what
+you hear"), as the plan lists it among the things that can teach without
+English.
+
+**Keeping status across a flip, without storing anything.** What a form is
+asked is what Cleared and Learnt are read over, so a flip could demote a
+card. `standingKeys` is laddered with two corrections, applied only to
+cards whose courses have switches: a question the form has not yet shown
+(not solid, never wrong twice running) does not hold back a form that has
+made a pass on anything; and a question switched off on a level above
+everything the form is now asked, with passes on it, still counts. The
+readers that say where a card stands (`cardStandings`, the value reach,
+path units, "not seen lately", the next pass) read `standingKeys`; what is
+dealt reads `laddered`. A course's record is never removed once set — going
+back to With translation keeps one — because removing it would end the
+first correction. The plan's D6 is the same idea for the skill rules.
+
+**English on screen.** `englishModeFor(card)` reads the most English any of
+the card's courses allows: shown, behind a tap (Little), or hidden (None).
+Hidden removes the meaning lines on questions, on the answer and on scenes.
+Behind a tap applies to the meaning on the answer; opening it is folded
+into `leaned` like the marks put back on a bare word, so a right answer
+becomes a near miss. Questions that are themselves about English are
+already switched off by the same shortcuts.
+
+**The teacher's counts** (`untaughtWithoutEnglish`, `withoutQuestions`)
+read the teacher's cards, never a student's device: a rough reading of what
+a word card can be asked from what it holds. Word cards only.

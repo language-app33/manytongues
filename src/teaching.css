@@ -1077,3 +1077,16 @@ fieldset.at-cardlock:disabled .at-answerpair.headed > .at-answerabout.inline {
 .at-pathacts { flex-wrap:wrap; gap:4px; margin-top:4px; }
 .at-checklist { margin:0 0 12px; padding-left:20px; line-height:1.45; }
 .at-checklist li { margin-bottom:4px; }
+
+/* A course's exercises (0.627): the four shortcuts, then a row per
+   exercise under its level. A row a shortcut has locked is greyed and
+   reads what the shortcut set. */
+.at-practice-modes > [role="group"] { display:grid; grid-template-columns:1fr 1fr; }
+.at-practice-warn { margin:8px 0 0; color: var(--rose); font-size:14px; font-weight:600; }
+.at-practice-untaught { margin:6px 0 0; padding-left:20px; font-size:14px; }
+.at-practice-level { margin-top:14px; }
+.at-practice-levelname { font-size:13px; font-weight:700; color: var(--muted); margin-bottom:4px; }
+.at-practice-row { display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--line); }
+.at-practice-eng { margin-left:8px; }
+.at-practice-row.locked { opacity:.55; }
+.at-practice-lockword { font-size:13px; font-weight:700; color: var(--muted); }

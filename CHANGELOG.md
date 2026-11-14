@@ -8,6 +8,43 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.627 — 14 November 2026
+
+**Teachers can run a course with less English, or none.** A course's
+page has a new section, Exercises, with four choices at the top:
+
+- **With translation** — everything is asked, as before.
+- **Little translation** — an exercise that uses English is dropped
+  wherever the same word has one without English on the same level (a
+  picture instead of the English, say). On the answer, the English meaning
+  is behind a "Show the meaning" tap; opening it makes a right answer count
+  as a near miss.
+- **No translation** — no exercise that uses English is asked, and English
+  isn't shown on the question or the answer. A word with nothing but
+  English to teach it (no picture, recording or phrase) isn't asked at
+  all; the page says how many such words there are and lists them.
+- **Custom** — every exercise is yours to switch on or off.
+
+Under the choices, every exercise is listed by level with its own switch.
+The first three choices set the English ones for you and show them
+greyed; the others are yours. A change that would leave cards with no
+question at all says how many first and asks.
+
+A card that is in two courses is asked whatever either course allows. A
+student's own cards are never affected. Switching never deletes anything:
+a switched-off exercise just isn't asked, and its progress is still there
+if it's switched back on. No card loses its Cleared or Learnt status when
+a teacher changes these, either way round; a question switched back on
+joins the card's reviews.
+
+Phones on an older version of the app ignore the switches and keep asking
+everything until they update.
+
+To check by hand: set a course to each of the four choices in turn and
+practise as a student of it. In No translation, no English should appear
+anywhere on a question or its answer; in Little translation, the meaning
+on the answer should need a tap.
+
 ## 0.626 — 14 November 2026
 
 **Getting ready for new kinds of question.** Coming releases add new

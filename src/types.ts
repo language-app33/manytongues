@@ -1314,6 +1314,12 @@ export interface Deck {
 export interface Course {
   /** Its space (0.542); absent: Main. */
   org?: string;
+  /**
+   * Which exercises its students are asked (0.627): a shortcut and the
+   * switches turned off by hand — see src/course-practice.ts. Absent is
+   * everything on, which every course was before.
+   */
+  practice?: { mode: string; off: string[] };
   /** The "My space" group in Learning (0.545), made on the fly and never stored. */
   personal?: boolean;
   id: string;

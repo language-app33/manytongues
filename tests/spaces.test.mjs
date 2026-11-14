@@ -152,6 +152,7 @@ const crossing = () => /** @type {[string, any][]} */ ([
   ["delete-deck", { body: { deckId: b.deck.id } }],
   ["attach-deck", { body: { deckId: b.deck.id, courseId: main.course.id } }],
   ["detach-deck", { body: { deckId: b.deck.id, courseId: b.course.id } }],
+  ["set-course-practice", { body: { courseId: b.course.id, practice: { mode: "none", off: [] } } }],
   ["save-card", { body: { card: { ...b.card, forms: [{ ar: "x", en: "x", lat: "x" }] }, decks: [] } }],
   ["card-status", { body: { cardId: b.card.id, to: "draft" } }],
   ["review-card", { body: { cardId: b.card.id, ok: [] } }],
@@ -269,6 +270,8 @@ const PLACED = {
     "remove-member", "export-plan", "export-chunk", "create-course", "create-deck", "report-flag",
     "admin-create-user", "admin-create-org", "join-space",
     "create-unit", "move-unit", "publish-unit", "open-unit",
+    /* 0.627: a course's switches. */
+    "set-course-practice",
   ],
   /* The App admin's tools for spaces themselves (stage 3), tried below. */
   spaces: [

@@ -63,7 +63,17 @@ import {
   LEVEL_NAME,
   scriptVars,
   dimsOf,
+  TYPES,
   verbOf } from "./languages.ts";
+import {
+  PRACTICE_MODES,
+  readPractice,
+  switchOf,
+  untaughtWithoutEnglish,
+  usesEnglish,
+  withoutQuestions,
+} from "./course-practice.ts";
+import type { CoursePractice, PracticeMode } from "./course-practice.ts";
 import { isDialog, linesOf, sceneKindOf } from "./dialogs.ts";
 import { asMeaning, cardRef, droppedIn, fillNames, hasSlots, isSentence, MAX_FILLS, refClash, renamedIn, slotName, slotsOf, taggedIn } from "./variables.ts";
 import { fillersFor, groupPronouns, isPronounCard, isPronounGroup, pickedCardIds } from "./card-facts.ts";
@@ -1720,6 +1730,139 @@ function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole }: {
         {role("teacher", "teach", "Teacher", teaching)}
         {role("student", "study", "Student", studying)}
       </span>
+    </div>
+  );
+}
+
+/*
+ * Which exercises a course's students are asked (0.627) — see
+ * course-practice.ts. The four shortcuts at the top set and lock the
+ * switches of the exercises that use English; every other switch is the
+ * teacher's, and Custom unlocks the lot. Saved as it is tapped, like the
+ * decks below it; a change that would leave cards with no question at all
+ * says how many first and asks.
+ */
+const MODE_LABEL: Record<PracticeMode, string> = {
+  with: "With translation",
+  little: "Little translation",
+  none: "No translation",
+  custom: "Custom",
+};
+
+function PracticeSection({ course, cards, lang, busy, onSave }: {
+  course: Course;
+  /** The cards of the course's decks, as the teacher's lists hold them. */
+  cards: Card[];
+  lang: Lang | null;
+  busy?: boolean;
+  onSave: (next: CoursePractice) => void;
+}) {
+  const now: CoursePractice = readPractice(course.practice) || { mode: "with", off: [] };
+  const [asking, setAsking] = useState<{ next: CoursePractice; n: number } | null>(null);
+  const [showUntaught, setShowUntaught] = useState(false);
+  const untaught = useMemo(() => untaughtWithoutEnglish(cards), [cards]);
+  /* The exercises this course's language words, by level. A type the pack
+     has no wording for is not one its cards can be asked. */
+  const byLevel = useMemo(() => {
+    const out: Map<number, string[]> = new Map();
+    for (const t of TYPES) {
+      const spec = lang ? exOf(t, lang) : null;
+      if (!spec || spec.retired) continue;
+      const l = levelOf(t);
+      out.set(l, (out.get(l) || []).concat([t]));
+    }
+    return [...out.entries()].sort((a, b) => a[0] - b[0]);
+  }, [lang]);
+  const ask = (next: CoursePractice) => {
+    const n = withoutQuestions(cards, next);
+    if (n > withoutQuestions(cards, now)) setAsking({ next, n });
+    else onSave(next);
+  };
+  const flip = (type: string, on: boolean) => {
+    const off = on ? now.off.filter((t) => t !== type) : [...new Set(now.off.concat([type]))];
+    ask({ mode: now.mode, off });
+  };
+  const word = (c: Card) => {
+    const f = (c.forms || [])[0] || ({} as Record<string, any>);
+    return `${f.ar || ""}${f.en ? ` — ${f.en}` : ""}`;
+  };
+  return (
+    <div className="at-formblock">
+      <div className="at-formhead">
+        <span className="at-formnum">Exercises</span>
+        <span className="at-formrole">
+          What students in this course are asked. Phones on an older version of the app ask everything until they update.
+        </span>
+      </div>
+      <div className="at-practice-modes">
+      <Segmented
+        size={null}
+        label="How much English"
+        disabled={busy}
+        options={PRACTICE_MODES.map((m) => ({ value: m, label: MODE_LABEL[m] }))}
+        value={now.mode}
+        onChange={(mode) => mode !== now.mode && ask({ mode, off: now.off })}
+      />
+      </div>
+      {now.mode !== "custom" ? (
+        <Help>English exercises are switched off by this choice. The others are yours to set.</Help>
+      ) : (
+        <Help>Every exercise is yours to set.</Help>
+      )}
+      {now.mode === "none" && untaught.length > 0 && (
+        <p className="at-practice-warn">
+          {plural(untaught.length, "word")} cannot be taught without English.{" "}
+          <button type="button" className="at-linkbtn" onClick={() => setShowUntaught((v) => !v)}>
+            {showUntaught ? "Hide them" : "See them"}
+          </button>
+        </p>
+      )}
+      {now.mode === "none" && showUntaught && untaught.length > 0 && (
+        <ul className="at-practice-untaught">
+          {untaught.map((c) => <li key={c.id}>{word(c)}</li>)}
+        </ul>
+      )}
+      {byLevel.map(([level, types]) => (
+        <div key={level} className="at-practice-level">
+          <div className="at-practice-levelname">{LEVEL_NAME[level] || `Level ${level}`}</div>
+          {types.map((t) => {
+            const s = switchOf(now, t);
+            const locked = now.mode !== "custom" && usesEnglish(t);
+            const spec = lang ? exOf(t, lang) : null;
+            return (
+              <div key={t} className={`at-practice-row${locked ? " locked" : ""}`}>
+                <span className="grow">
+                  {(spec && spec.label) || t}
+                  {usesEnglish(t) && <span className="at-tag sm at-practice-eng">English</span>}
+                </span>
+                {locked ? (
+                  <span className="at-practice-lockword">{s === "on" ? "On" : s === "off" ? "Off" : "Where needed"}</span>
+                ) : (
+                  <Segmented
+                    label={(spec && spec.label) || t}
+                    disabled={busy}
+                    options={[{ value: "off", label: "Off" }, { value: "on", label: "On" }]}
+                    value={s === "off" ? "off" : "on"}
+                    onChange={(v) => flip(t, v === "on")}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {asking && (
+        <ConfirmModal
+          title={`${plural(asking.n, "card")} would have no questions`}
+          body={<p>Students would not be asked {asking.n === 1 ? "it" : "them"} at all in this course until you change this back. Their progress is kept.</p>}
+          confirmLabel="Change it anyway"
+          onCancel={() => setAsking(null)}
+          onConfirm={() => {
+            onSave(asking.next);
+            setAsking(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -3996,6 +4139,11 @@ function RestoreResult({ report }: { report: RestoreReport }) {
         );
       })}
       {report.skippedMore ? <Help>And {report.skippedMore} more not listed.</Help> : null}
+      {/* A course already here is left as it is, switches and all (0.627):
+          the backup's choice of exercises is not put back over it. */}
+      {report.skipped.some((x) => x.key.startsWith("course:")) ? (
+        <Help>A course that was already here keeps its own choice of exercises; the backup&rsquo;s is not put back.</Help>
+      ) : null}
     </div>
   );
 }
@@ -9387,6 +9535,20 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               {people("Teachers", c.teachers, "Nobody yet.")}
               {people("Students", c.students, "Nobody has joined yet. Share the student code above.")}
             </div>
+
+            <PracticeSection
+              course={c}
+              cards={cards.filter((k) => (k.decks || []).some((d) => (c.decks || []).includes(d)))}
+              lang={languages[c.language as LangId] || null}
+              busy={busy}
+              onSave={(next) =>
+                run(async () => {
+                  const r: any = await API.setCoursePractice(c.id, next);
+                  const saved = r && r.course && r.course.practice;
+                  if (saved) setCourses((prev) => prev.map((x) => (x.id === c.id ? { ...x, practice: saved } : x)));
+                }, `${c.title} now asks ${next.mode === "custom" ? "the exercises you chose" : next.mode === "none" ? "no English" : next.mode === "little" ? "little English" : "everything, with translation"}`)
+              }
+            />
 
             {pathSection}
 

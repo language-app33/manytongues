@@ -41,6 +41,7 @@ import {
   Segmented,
   fromDeck,
   serverCardId,
+  localIdFor,
   SnackbarProvider,
   DockContext,
   PlaceContext,
@@ -347,6 +348,8 @@ import type { Value } from "./variables.ts";
 import { agreeTook, countTook, finishTook, leadsOf, lineGate, passes, reviewOf, sentenceKey, SCAN_LIMIT } from "./review.ts";
 import { castFill as castScene, filledScene, hasCast } from "./cast.ts";
 import { cardHeld, isPathUnit, mergeReached, pathRows, reachesFurther } from "./path.ts";
+import { allowedTypes, englishShown, readPractice } from "./course-practice.ts";
+import type { CoursePractice } from "./course-practice.ts";
 import type { PathCourse, PathDeck, PathRow } from "./path.ts";
 import type { Review } from "./review.ts";
 import { liftSubtypeTagsIn } from "./subtype-tags.ts";
@@ -396,7 +399,7 @@ export const cardStandings = (
   it: Item,
   settings: Settings,
   among?: Item[],
-  keys: (unit: Form, settings: Settings) => string[] = laddered,
+  keys: (unit: Form, settings: Settings) => string[] = standingKeys,
 ): Standing[] => {
   /* A verb whose tenses are skills stands where the tense furthest behind
      stands, of the ones it can be asked; each tense, counted as a card of
@@ -1285,7 +1288,7 @@ let VALUE_INDEX: Map<string, Value[]> = new Map();
  * answered replaces, so a stale entry cannot outlive the form it is about
  * even between the clearings.
  */
-let TYPE_CACHE: WeakMap<Form, { lang: LangId; types: string[] }> = new WeakMap();
+let TYPE_CACHE: WeakMap<Form, { lang: LangId; types: string[]; raw: string[] }> = new WeakMap();
 /* And each scene's casting, filled whole — see sceneFill. Forgotten with the
    types, because it reads the same indexes they do. */
 let SCENE_FILLS: WeakMap<Item, Map<string, Record<string, Record<string, Value>> | null>> = new WeakMap();
@@ -2930,7 +2933,7 @@ export function valueReachOf(
     /* A person of a tense held as a skill stands once its tense is cleared
        and it has not gone wrong lately — see heldStands. */
     if (card && isHeld(form)) return heldStands(card, form, settings);
-    return cleared(laddered(form, settings), (key: string) => statesOf(form)[key]);
+    return cleared(standingKeys(form, settings), (key: string) => statesOf(form)[key]);
   };
   for (const it of items) {
     const langId = langIdOf(it, settings);
@@ -2991,6 +2994,9 @@ export function installIndexes(
   path: { courses?: PathCourse[]; decks?: PathDeck[] } = {},
 ): void {
   setActiveLang(settings.language || DEFAULT_LANGUAGE);
+  /* The courses' switches first: everything below reads what a form can be
+     asked, and this changes it — see setPracticeIndex. */
+  setPracticeIndex(practiceIndexOf(path.courses || [], path.decks || []));
   setContextIndex(contextIndexOf(items, settings));
   setDialogIndex(buildDialogIndex(items));
   setTaughtShortIndex(taughtShortOf(items, settings));
@@ -4521,7 +4527,8 @@ function availableTypes(
   if (tense) {
     const can = new Set(tense.tense.places.flatMap((p) => availableTypes(p.form, lang)));
     const types = TYPES.filter((t) => can.has(t));
-    if (own) TYPE_CACHE.set(it, { lang: lang.id, types });
+    const rawCan = new Set(tense.tense.places.flatMap((p) => supportedRaw(p.form, lang)));
+    if (own) TYPE_CACHE.set(it, { lang: lang.id, types, raw: TYPES.filter((t) => rawCan.has(t)) });
     return types;
   }
   /* What its variables can be filled with, if it has any: a hole with
@@ -4546,9 +4553,84 @@ function availableTypes(
          too is asked on that card — see siblingStateOf. */
       && !(WORD_LEFT.has(it.id) && onlyAboutWord(EX[t]))
   );
-  if (own) TYPE_CACHE.set(it, { lang: lang.id, types });
-  return types;
+  /* And of those, the ones the courses the card came through allow — see
+     course-practice.ts. The one place that is decided (0.627). */
+  const allowed = allowedTypes(practicesOf(it), types);
+  if (own) TYPE_CACHE.set(it, { lang: lang.id, types: allowed, raw: types });
+  return allowed;
 }
+
+/*
+ * What a form supports before its courses' switches: what availableTypes
+ * says with every exercise switched on. Read only to keep a card's standing
+ * across a switch — see standingKeys — never to deal a question.
+ */
+function supportedRaw(it: Form, lang: Lang = activeLang()): string[] {
+  availableTypes(it, lang);
+  const held = TYPE_CACHE.get(it);
+  return held && held.lang === lang.id ? held.raw : availableTypes(it, lang);
+}
+
+/* ------------------------------------------------------------------
+   A course's switches (0.627)
+
+   Which courses each course card came through, with each one's switches
+   (null for a course that has none, which allows everything). A card of the
+   learner's own, or a value borrowed by a deck, is in none of them and is
+   asked everything — see allowedTypes. Held here for the reason the counts
+   are: availableTypes is a function of a unit and cannot be handed the
+   courses as well.
+   ------------------------------------------------------------------ */
+
+let PRACTICE: Map<string, (CoursePractice | null)[]> = new Map();
+
+export function setPracticeIndex(next: Map<string, (CoursePractice | null)[]>) {
+  if (next === PRACTICE) return;
+  PRACTICE = next;
+  forgetTypes();
+}
+
+/** By card, the switches of every course it reaches the learner through —
+    only for cards where at least one of those courses has any. */
+export function practiceIndexOf(
+  courses: { id: string; decks?: string[]; practice?: unknown }[],
+  decks: { id: string; cardIds?: string[] }[],
+): Map<string, (CoursePractice | null)[]> {
+  const cardsOf = new Map(decks.map((d) => [d.id, d.cardIds || []]));
+  const by: Map<string, (CoursePractice | null)[]> = new Map();
+  for (const c of courses || []) {
+    const p = readPractice(c.practice);
+    const seen = new Set<string>();
+    for (const d of c.decks || []) {
+      for (const id of cardsOf.get(d) || []) {
+        const local = localIdFor(id);
+        if (seen.has(local)) continue;
+        seen.add(local);
+        by.set(local, (by.get(local) || []).concat([p]));
+      }
+    }
+  }
+  for (const [id, list] of by) if (!list.some(Boolean)) by.delete(id);
+  return by.size ? by : PRACTICE.size ? new Map() : PRACTICE;
+}
+
+/* The card a form is on, by the form's id: a card's own word answers to
+   the card's id, and every other form, line and tense is named after it. */
+const cardIdOfUnit = (id: string): string => {
+  const m = /^(.*?)-[flt](?:~|\d)/.exec(String(id || ""));
+  return m ? m[1] : String(id || "");
+};
+
+const practicesOf = (it: Form): (CoursePractice | null)[] =>
+  PRACTICE.size ? PRACTICE.get(cardIdOfUnit(it.id)) || [] : [];
+
+/** The switches of every course a card came through. */
+export const practicesOfCard = (it: Item): (CoursePractice | null)[] => practicesOf(leadOf(it));
+
+/** How much English a card's questions may show: plainly, behind a tap
+    (Little translation) or not at all (No translation) — see englishShown. */
+export const englishModeFor = (cardId: string): "shown" | "tap" | "hidden" =>
+  englishShown(PRACTICE.size ? PRACTICE.get(cardIdOfUnit(cardId)) || [] : []);
 
 /*
  * Which exercises a form supports, read in the language the form is
@@ -4609,6 +4691,49 @@ const specOf = (key: string) => EX[typeOf(key)];
 export function laddered(it: Form, settings: Settings): string[] {
   if (isQuiet(it)) return [];
   return ladderedOnceOpen(it, settings);
+}
+
+/*
+ * The keys a form's standing is read from: laddered, kept true to what the
+ * learner has shown across a course's switches (0.627).
+ *
+ * A switch changes what a form is asked, and what is asked is what Cleared
+ * and Learnt are read over — so without this a teacher flipping a switch
+ * could take a card's status away. Two ways, both corrected here and only
+ * for a card whose courses have switches at all; every other card reads
+ * laddered exactly as before.
+ *
+ *   * A question switched on that the form has not shown yet does not hold
+ *     back a form that has been cleared before (it has a pass to show for
+ *     it). It joins the form's reviews and is dealt as one; it counts once
+ *     it is solid, or once it has gone wrong twice running — a slip, which
+ *     takes the card back as a slip anywhere does.
+ *   * A question switched off on a level above everything the form is now
+ *     asked, that has passes on it, still counts towards its standing: a
+ *     word learnt by writing it from its English stays learnt when English
+ *     is switched off. It is never dealt — dealing reads laddered.
+ *
+ * Nothing is stored for either: both read the records as they are. See
+ * DECISIONS.md, "A course's switches".
+ */
+function standingKeys(it: Form, settings: Settings): string[] {
+  const keys = laddered(it, settings);
+  if (!practicesOf(it).some(Boolean) || !keys.length) return keys;
+  const st = statesOf(it);
+  const all = supportedRaw(it, langOf(settingsFor(settings, it))).flatMap((t) => keysFor(it, t));
+  const shown = all.some((k) => ((st[k] && st[k].passes) || 0) > 0);
+  if (!shown) return keys;
+  const counted = keys.filter((k) => {
+    const s = st[k];
+    if (s && solid(s)) return true;
+    const h = (s && s.hist) || [];
+    return h.some((x, i) => i > 0 && !x && !h[i - 1]);
+  });
+  const top = topLevelOf(keys);
+  const off = all.filter(
+    (k) => !keys.includes(k) && levelOf(k) > top && ((st[k] && st[k].passes) || 0) > 0,
+  );
+  return counted.concat(off);
 }
 
 /*
@@ -5050,7 +5175,7 @@ const UNSEEN_DAYS = 3;
  */
 function notSeenLately(unit: Form, settings: Settings) {
   const st = (t: string) => stateOf(unit, t);
-  if (cleared(laddered(unit, settings), st)) return false;
+  if (cleared(standingKeys(unit, settings), st)) return false;
   const last = Math.max(0, ...Object.values(statesOf(unit)).map((x) => (x && x.updated) || 0));
   return now() - last >= UNSEEN_DAYS * 86400000;
 }
@@ -5230,7 +5355,7 @@ function knownNumbers(items: Item[], settings: Settings, sets: SystemSet[]): Kno
     let ok: boolean;
     if (!isAsked(form)) ok = true;
     else {
-      const keys = laddered(form, settings);
+      const keys = standingKeys(form, settings);
       ok = keys.length ? cleared(keys, (t) => statesOf(form)[t]) : !isQuiet(form);
     }
     done.set(at, ok);
@@ -9066,6 +9191,17 @@ const sideClass = (card: any, line: any) => {
  *   words — what it means and how it sounds. Separate, because reading a
  *   scene through takes them one at a time and on request.
  */
+/* The English meaning behind a tap, on the answer to a question in a Little
+   translation course (0.627). Opening it makes a right answer a near miss
+   — see meaningLeaned. */
+function MeaningTap({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button type="button" className="at-linkbtn" data-el="reveal-answer-meaning" onClick={onOpen}>
+      Show the meaning
+    </button>
+  );
+}
+
 function Scene({ card, lines, lang, blankId = null, meanings = false, said = false, numbers }: {
   card: any;
   lines: any[];
@@ -9093,7 +9229,7 @@ function Scene({ card, lines, lang, blankId = null, meanings = false, said = fal
             {join("lat")}
           </p>
         )}
-        {meanings && join("en") && (
+        {meanings && join("en") && englishModeFor(card.id) !== "hidden" && (
           <p className="at-scenemeaning" data-el="scene-text-meaning">
             {join("en")}
           </p>
@@ -9138,7 +9274,7 @@ function Scene({ card, lines, lang, blankId = null, meanings = false, said = fal
                   {line.lat}
                 </p>
               )}
-              {meanings && line.en && (
+              {meanings && line.en && englishModeFor(card.id) !== "hidden" && (
                 <p className="at-scenemeaning" data-el="scene-line-meaning">
                   {asMeaning(line.en)}
                 </p>
@@ -10867,6 +11003,10 @@ export default function ArabicTrainer() {
      they were asked on rather than cleared by resetExercise, so no way onto
      the next question can carry them over. */
   const [lentFor, setLentFor] = useState<{ ex: unknown; keys: string[] }>({ ex: null, keys: [] });
+  /* The question whose English the learner opened on the answer, in a
+     Little translation course (0.627): a right answer then counts as a
+     near miss, as one written with the marks put back does. */
+  const [meaningFor, setMeaningFor] = useState<unknown>(null);
   /* Sessions that have shown the tap tip, and the session it was last
      counted in — known by its first question, which stays put when later
      questions are swapped out mid-session. */
@@ -11668,6 +11808,11 @@ export default function ArabicTrainer() {
   // Keep the module-level pointer in step, for the pure helpers that have no
   // settings to hand. Derived from state, so it cannot drift.
   setActiveLang(settings.language || DEFAULT_LANGUAGE);
+  /* And which courses each card came through, with their switches — what
+     each form may be asked (0.627). First of the indexes, because the rest
+     read what a form can be asked and this changes it. */
+  const practiceIndex = useMemo(() => practiceIndexOf(myCourses, courseDecks), [myCourses, courseDecks]);
+  setPracticeIndex(practiceIndex);
 
   /* And the same for where each word turns up. Rebuilt only when the cards
      change: it walks every phrase against every word it claims to teach,
@@ -13193,7 +13338,12 @@ export default function ArabicTrainer() {
      transliteration that spelt the word, or the marks put back on a word
      that was being read bare. Either is marked as a near miss. */
   const marksLeaned = marksLent && answerStands && !toldAnswer;
-  const leaned = toldAnswer || marksLeaned;
+  /* And how much English this card's courses let a question show — see
+     course-practice.ts. Opened behind its tap, it leans the same way. */
+  const englishMode = englishModeFor(exercise ? String(exercise.id || "") : "");
+  const meaningOpened = englishMode !== "tap" || meaningFor === exercise;
+  const meaningLeaned = englishMode === "tap" && meaningFor === exercise && answerStands && !toldAnswer && !marksLeaned;
+  const leaned = toldAnswer || marksLeaned || meaningLeaned;
   /*
    * And the one exception, which is the language's rather than the
    * learner's: the marks stay, words and sentences alike, where they are
@@ -15052,7 +15202,7 @@ export default function ArabicTrainer() {
                       verbCue && verbPlace ? (
                         <>
                           <Field value={verbCue.form.ar} field="ar" kind={item.kind} name="question-prompt-text" />
-                          {verbCue.form.en ? (
+                          {verbCue.form.en && englishMode !== "hidden" ? (
                             <p className="at-ctxmeaning" data-el="question-prompt-meaning">
                               {asMeaning(String(verbCue.form.en))}
                             </p>
@@ -15104,13 +15254,15 @@ export default function ArabicTrainer() {
                               >
                                 {showSaid ? "Hide" : "Show"} the {qLang.translitLabel.toLowerCase()}
                               </Button>
+                              {englishMode !== "hidden" && (
                               <Button
-                                size="sm"
-                                data-el="reveal-meaning"
-                                onClick={() => setShowMeaning((v) => !v)}
-                              >
-                                {showMeaning ? "Hide" : "Show"} the meaning
-                              </Button>
+                                  size="sm"
+                                  data-el="reveal-meaning"
+                                  onClick={() => setShowMeaning((v) => !v)}
+                                >
+                                  {showMeaning ? "Hide" : "Show"} the meaning
+                                </Button>
+                              )}
                             </div>
                           )}
                         </>
@@ -15174,7 +15326,7 @@ export default function ArabicTrainer() {
                         {/* Once answered the sentence is whole again, and
                             what it means is said with the answer below —
                             see answeredMeaning — not left up here. */}
-                        {spec.answerMode === "ar" && !checked && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
+                        {spec.answerMode === "ar" && !checked && englishMode !== "hidden" && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
                           <p className="at-ctxmeaning" data-el="question-prompt-meaning">
                             {asMeaning(String(linesOf(dialog)[item.gap.line].en))}
                           </p>
@@ -15236,7 +15388,7 @@ export default function ArabicTrainer() {
                         anything saying what it meant. The verb's own
                         meaning ("to keep"), not the form's ("I keep"),
                         which would be the answer. */}
-                    {spec.picks === "person" && whoMeaning && (
+                    {spec.picks === "person" && whoMeaning && englishMode !== "hidden" && (
                       <p className="at-ctxmeaning" data-el="question-verb-meaning">
                         {asMeaning(whoMeaning)}
                       </p>
@@ -15282,7 +15434,7 @@ export default function ArabicTrainer() {
                         a gap all but names the word. Once answered, the
                         phrase's English is said with the answer below
                         instead — see answeredMeaning. */}
-                    {context && (!phraseHint || hintShown) && !(checked && answeredMeaning) && (
+                    {context && (!phraseHint || hintShown) && !(checked && answeredMeaning) && englishMode !== "hidden" && (
                       <p className="at-ctxmeaning" data-el="question-context-meaning">
                         {asMeaning((spec.promptField === "context" && context.en) || item.en)}
                       </p>
@@ -15624,6 +15776,12 @@ export default function ArabicTrainer() {
                       )}
                       {/* The same, for the vowel marks put back on a word
                           that was being read without them (0.608). */}
+                      {meaningLeaned && (
+                        <Help data-el="verdict-meaning-lent">
+                          Right — but the meaning was shown, so this one counts as a near miss and
+                          comes round again.
+                        </Help>
+                      )}
                       {marksLeaned && qLang.marks && (
                         <Help data-el="verdict-marks-lent">
                           Right — but the {qLang.marks.name} were shown, so this one counts as a near
@@ -15739,11 +15897,13 @@ export default function ArabicTrainer() {
                       {checked.reason === "bare" && (
                         <Help data-el="bare-note">{verdictWord(qLang, "bare")}</Help>
                       )}
-                      {answeredMeaning && (
+                      {answeredMeaning && englishMode !== "hidden" && (meaningOpened ? (
                         <p className="at-ctxmeaning" data-el="answer-meaning">
                           {asMeaning(answeredMeaning)}
                         </p>
-                      )}
+                      ) : (
+                        <MeaningTap onOpen={() => setMeaningFor(exercise)} />
+                      ))}
 
                       {/* Everything after the answer is a second thing worth
                           noticing, so each says what it is, they are set
@@ -15791,9 +15951,13 @@ export default function ArabicTrainer() {
                                 name="also-context-said"
                               />
                             ) : null}
-                            <p className="at-ctxmeaning" data-el="also-context-meaning">
-                              {asMeaning((context || alsoContext).en)}
-                            </p>
+                            {englishMode === "hidden" ? null : meaningOpened ? (
+                              <p className="at-ctxmeaning" data-el="also-context-meaning">
+                                {asMeaning((context || alsoContext).en)}
+                              </p>
+                            ) : (
+                              <MeaningTap onOpen={() => setMeaningFor(exercise)} />
+                            )}
                           </div>
                         )}
                         {/* The whole phrase, said, once a gap in it has
@@ -15864,7 +16028,7 @@ export default function ArabicTrainer() {
                             still what is shown; where it names none, the
                             field neither the prompt nor the answer used
                             is the one worth having. */}
-                        {alsoField && item[alsoField] && (
+                        {alsoField && item[alsoField] && !(alsoField === "en" && englishMode === "hidden") && (
                           <div className="at-answeralso" data-el="also-hint">
                             <p className="at-alsolabel" data-el="also-hint-label">
                               {alsoField === "lat"
@@ -15873,12 +16037,16 @@ export default function ArabicTrainer() {
                                 ? "How it's written"
                                 : "This is what it means"}
                             </p>
-                            <Field
-                              value={item[alsoField]}
-                              field={alsoField}
-                              kind={item.kind}
-                              name="also-hint-text"
-                            />
+                            {alsoField === "en" && !meaningOpened ? (
+                              <MeaningTap onOpen={() => setMeaningFor(exercise)} />
+                            ) : (
+                              <Field
+                                value={item[alsoField]}
+                                field={alsoField}
+                                kind={item.kind}
+                                name="also-hint-text"
+                              />
+                            )}
                           </div>
                         )}
                         {/* Was below the notes, which put it three blocks
@@ -18041,7 +18209,7 @@ export function nextPassAt(it: Item, settings: Settings): Millis {
  */
 export function nextPass(it: Item, settings: Settings): { at: Millis; retry: boolean } {
   const forms = unitsOf(it)
-    .map(({ unit }) => ({ unit, keys: laddered(unit, settings) }))
+    .map(({ unit }) => ({ unit, keys: standingKeys(unit, settings) }))
     .filter(({ keys }) => keys.length);
   if (!forms.length) return { at: 0, retry: false };
   const made = Math.min(

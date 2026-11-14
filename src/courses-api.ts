@@ -357,6 +357,9 @@ export const assignTeacher = (courseId: string, handle: string) =>
 export const removeMember = (courseId: string, handle: string, role: "teacher" | "student") =>
   call("remove-member", { body: { courseId, handle, role } });
 export const joinCourse = (code: string) => call("join-course", { body: { code } });
+/* A course's switches (0.627) — see course-practice.ts. Written whole. */
+export const setCoursePractice = (courseId: string, practice: { mode: string; off: string[] }) =>
+  call("set-course-practice", { body: { courseId, practice } });
 /* A space's invitation, followed while signed in: adds the space to this
    account (memberships). */
 export const joinSpace = (code: string) => call("join-space", { body: { code } });

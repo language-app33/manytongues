@@ -215,6 +215,15 @@ function forgetter({ memory = 1, seed = 1 } = {}) {
  *
  * @returns the cards as they stand afterwards.
  */
+/* The courses the simulated cards came through, with their switches
+   (0.627): none by default, so every life below is the one it always was.
+   A measurement of a course with less English sets them. */
+/** @type {{ courses?: any[], decks?: any[] }} */
+let simCourses = {};
+const setSimCourses = (/** @type {{ courses?: any[], decks?: any[] }} */ next) => {
+  simCourses = next || {};
+};
+
 function sitDown(
   /** @type {any[]} */ items,
   /** @type {number} */ at,
@@ -223,7 +232,7 @@ function sitDown(
   /** @type {ReturnType<typeof forgetter> | null} */ learner = null,
 ) {
   const clock = { now: () => at, random: () => 0.5 };
-  installIndexes(items, settings);
+  installIndexes(items, settings, [], simCourses);
   /* Read off the learner's own log, as the app reads it, so how much they
      practise sizes how much they may hold. */
   const perDay = typicalDay(log, clock);
@@ -445,6 +454,7 @@ function liveKeeping(/** @type {{ cards: any[], days: number, budget?: number, s
    ------------------------------------------------------------------ */
 
 export {
+  setSimCourses,
   DAY,
   FLOOR,
   GROWTH,
