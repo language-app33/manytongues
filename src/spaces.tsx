@@ -74,6 +74,9 @@ import {
   withoutQuestions,
 } from "./course-practice.ts";
 import type { CoursePractice, PracticeMode } from "./course-practice.ts";
+/* Personal sets (0.632): the teacher's section reads and checks the set. */
+import { emptySet, pairText, readSet, setGaps } from "./sets.ts";
+import type { SetConfig } from "./sets.ts";
 import { isDialog, linesOf, sceneKindOf } from "./dialogs.ts";
 import { asMeaning, cardRef, droppedIn, fillNames, hasSlots, isSentence, MAX_FILLS, refClash, renamedIn, slotName, slotsOf, taggedIn } from "./variables.ts";
 import { fillersFor, groupPronouns, isPronounCard, isPronounGroup, pickedCardIds } from "./card-facts.ts";
@@ -1748,6 +1751,194 @@ const MODE_LABEL: Record<PracticeMode, string> = {
   none: "No translation",
   custom: "Custom",
 };
+
+/*
+ * A deck as a personal set (0.632): off, or on with its wording, its word
+ * lists (other decks of the same courses), the words said with the name,
+ * and what is asked. The deck's cards with a picture are the set's
+ * pictures, edited as any deck's cards are; nothing here touches them.
+ * Its own draft, saved whole through save-set — see src/sets.ts.
+ */
+const SET_WORDING: [keyof SetConfig["wording"], string, string][] = [
+  ["question", "The question", "Asked once for each picture."],
+  ["none", "The doesn't-apply button", "Leaves that picture out for that student."],
+  ["askName", "Asking the name", "In practice, when the picture's name is the answer."],
+  ["askWord", "Asking their word", "In practice, when the student's own word is the answer."],
+  ["askBoth", "Asking both", "In practice, when the answer is their word with the name."],
+];
+
+function SetSection({ deck, decks, cards, busy, onSave }: {
+  deck: Deck;
+  /** Every deck the teacher can see, for the lists to be chosen from. */
+  decks: Deck[];
+  cards: Card[];
+  busy?: boolean;
+  onSave: (next: SetConfig | null) => void;
+}) {
+  const saved = readSet(deck.set, deck.id);
+  const [draft, setDraft] = useState<SetConfig | null>(saved);
+  const [picking, setPicking] = useState(false);
+  const [askingOff, setAskingOff] = useState(false);
+  /* A save elsewhere — another teacher, this one on another device —
+     starts the draft again from what is stored. */
+  const savedKey = JSON.stringify(saved);
+  useEffect(() => {
+    setDraft(readSet(deck.set, deck.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedKey, deck.id]);
+  const courseIds = (deck.courses || []).map((l) => l.courseId);
+  const offered = decks.filter((d) => d.id !== deck.id && !d.set && !d.personal
+    && (d.courses || []).some((l) => courseIds.includes(l.courseId)));
+  const wordsOf = (deckId: string) => cards.filter((c) => (c.decks || []).includes(deckId)
+    && !isSentence(c) && !isDialog(c) && !!(formsOf(c)[0] || {}).ar && !!(formsOf(c)[0] || {}).en);
+  const own = cards.filter((c) => (c.decks || []).includes(deck.id));
+  const pictured = (c: Card) => Array.isArray((formsOf(c)[0] || {}).images) && ((formsOf(c)[0] || {}).images || []).length > 0;
+  const titleOf = (id: string) => (decks.find((d) => d.id === id) || { title: "A deck you can't see" }).title;
+  const changed = JSON.stringify(draft) !== savedKey;
+  const edit = (patch: Partial<SetConfig>) => draft && setDraft({ ...draft, ...patch });
+
+  const head = (
+    <div className="at-formhead">
+      <span className="at-formnum">Personal set</span>
+      <span className="at-formrole">
+        Each student answers a question about each picture once, and is then asked with their own word.
+      </span>
+    </div>
+  );
+  const onOff = (
+    <Segmented
+      label="Personal set"
+      disabled={busy}
+      options={[{ value: "off", label: "Off" }, { value: "on", label: "On" }]}
+      value={draft ? "on" : "off"}
+      onChange={(v) => {
+        if (v === "on") setDraft(draft || saved || emptySet());
+        else if (saved) setAskingOff(true);
+        else setDraft(null);
+      }}
+    />
+  );
+  if (!draft) {
+    return (
+      <div className="at-formblock" data-el="set-section">
+        {head}
+        {onOff}
+      </div>
+    );
+  }
+  if (picking) {
+    return (
+      <DeckPickScreen
+        title="Word lists"
+        decks={offered.map((d) => ({ id: d.id, title: d.title, locked: d.locked, cardCount: d.cardCount }))}
+        chosen={draft.lists}
+        onToggle={(id, wasOn) => edit({ lists: wasOn ? draft.lists.filter((x) => x !== id) : draft.lists.concat([id]) })}
+        confirm="Done"
+        onConfirm={() => setPicking(false)}
+        onCancel={() => setPicking(false)}
+        empty="No other deck is in this deck's courses yet. Make a deck of words, add it to the course, and choose it here."
+      />
+    );
+  }
+  const lists = draft.lists.map((id) => ({ id, title: titleOf(id), cards: wordsOf(id) }));
+  const firstPicture = own.find(pictured);
+  const firstWord = lists.length && lists[0].cards.length ? formsOf(lists[0].cards[0])[0] : null;
+  const sampleName = (firstPicture && formsOf(firstPicture)[0].ar) || "Lan";
+  const sampleWord = (firstWord && firstWord.ar) || "…";
+  const gaps = setGaps(draft, lists.map((l) => ({ title: l.title, words: l.cards.map((c) => ({ en: formsOf(c)[0].en || "" })) })),
+    own.map((c) => ({ picture: pictured(c) })));
+  return (
+    <div className="at-formblock" data-el="set-section">
+      {head}
+      {onOff}
+      <Help>Its pictures are this deck&rsquo;s cards that have a picture. Add and record them as on any deck.</Help>
+
+      {SET_WORDING.map(([key, label, lede]) => (
+        <Field key={key} label={label} lede={lede}>
+          <input
+            className="at-input"
+            aria-label={label}
+            maxLength={120}
+            value={draft.wording[key]}
+            disabled={busy}
+            onChange={(e) => edit({ wording: { ...draft.wording, [key]: e.target.value } })}
+          />
+        </Field>
+      ))}
+
+      <Field label="Word lists" lede="Other decks of this course, each an ordinary deck of words. With two or more, each student picks one.">
+        {lists.map((l) => (
+          <Tile
+            key={l.id}
+            title={l.title}
+            meta={plural(l.cards.length, "word")}
+            actions={<IconButton icon="close" label={`Remove ${l.title}`} disabled={busy}
+              onClick={() => edit({ lists: draft.lists.filter((x) => x !== l.id), named: draft.named.filter((n) => !l.cards.some((c) => c.id === n)) })} />}
+          />
+        ))}
+        <div className="at-chips">
+          <Button size="sm" icon="add" disabled={busy} onClick={() => setPicking(true)}>Add a list</Button>
+        </div>
+      </Field>
+
+      {lists.length > 0 && (
+        <Field label="Said with the name" lede="Tick the words that are said together with a person's name.">
+          {lists.map((l) => (
+            <div key={l.id}>
+              <p className="at-eyebrow">{l.title}</p>
+              <CheckList
+                options={l.cards.map((c) => ({ id: String(c.id), title: formsOf(c)[0].ar, note: formsOf(c)[0].en }))}
+                chosen={draft.named}
+                onToggle={(id, wasOn) => edit({ named: wasOn ? draft.named.filter((x) => x !== id) : draft.named.concat([id]) })}
+                empty="No words in this deck yet."
+              />
+            </div>
+          ))}
+        </Field>
+      )}
+
+      <Field label="What is asked" lede="Each picture takes turns between these.">
+        <CheckList
+          options={[
+            { id: "name", title: "The name", note: sampleName },
+            { id: "word", title: "Their word", note: sampleWord },
+            { id: "both", title: "Both together", note: pairText(draft, sampleWord, sampleName) },
+          ]}
+          chosen={(["name", "word", "both"] as const).filter((k) => draft.asks[k])}
+          onToggle={(id, wasOn) => edit({ asks: { ...draft.asks, [id]: !wasOn } })}
+        />
+        <Segmented
+          label="The word goes"
+          disabled={busy}
+          options={[{ value: "before", label: "Before the name" }, { value: "after", label: "After the name" }]}
+          value={draft.order}
+          onChange={(v) => edit({ order: v })}
+        />
+      </Field>
+
+      {gaps.map((g) => <Notice key={g} kind="warn">{g}</Notice>)}
+
+      <Help>You won&rsquo;t see what each student chose. It is included only in a problem report a student sends.</Help>
+      <div className="at-chips at-mt3">
+        <Button variant="primary" icon="save" disabled={busy || !changed} onClick={() => onSave(readSet(draft, deck.id))}>Save</Button>
+      </div>
+
+      {askingOff && (
+        <ConfirmModal
+          title="Make this an ordinary deck again?"
+          body={<p>Its wording, lists and ticks are removed. Students&rsquo; answers are kept with their progress, and used again if you switch it back on.</p>}
+          confirmLabel="Switch it off"
+          onCancel={() => setAskingOff(false)}
+          onConfirm={() => {
+            setAskingOff(false);
+            setDraft(null);
+            onSave(null);
+          }}
+        />
+      )}
+    </div>
+  );
+}
 
 function PracticeSection({ course, cards, lang, busy, onSave }: {
   course: Course;
@@ -6005,7 +6196,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   /* Told which languages this space holds, so that switch has something to
      offer; told nothing is held on the way out. */
   onLangChoices?: (choices: LangChoice[]) => void;
-  onTry?: (plan: { items: any[], exercise: any, back: any }) => void;
+  onTry?: (plan: { items: any[], exercise: any, back: any, decks?: Deck[] }) => void;
   resume?: { cardId?: string; tab?: string; deckId?: string | null } | null;
   /* Sends a recording the server lacks from this device, where the device
      still has it. True when it went up. */
@@ -6069,6 +6260,15 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      change have been saved, said on the button. */
   const [applying, setApplying] = useState<{ done: number; total: number } | null>(null);
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
+  /* The personal sets, and the decks they name as lists, with the cards
+     each holds — what a trial of a set's picture is set up from (0.632). */
+  const setDecksForTrial = (): Deck[] => {
+    const sets = decks.filter((d) => d.set);
+    const wanted = new Set(sets.flatMap((d) => [d.id, ...((d.set && d.set.lists) || [])]));
+    return decks
+      .filter((d) => wanted.has(d.id))
+      .map((d) => ({ ...d, cardIds: allCards.filter((c) => (c.decks || []).includes(d.id)).map((c) => String(c.id)) }));
+  };
   const [allCards, setCards] = useState<Card[]>(last ? last.cards : []);
   const cards = useMemo(() => allCards.filter((c) => !!c.personal === mineSide), [allCards, mineSide]);
   /* Which recordings those cards name that the server does not hold, told
@@ -7679,7 +7879,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               card={editing.card}
               cards={lendable}
               lang={editLang || undefined}
-              onTry={onTry}
+              /* With the personal sets and their lists, each with its
+                 cards, so a set's picture is tried as a student meets it
+                 — with a stand-in answer, a teacher having none (0.632). */
+              onTry={onTry ? (plan) => onTry({ ...plan, decks: setDecksForTrial() }) : undefined}
             />
           ) : null
         }
@@ -9231,6 +9434,28 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               </Field>
             </div>
 
+            {/* Whether this deck is a personal set, and how (0.632). Not
+                for a deck in My space: a set is a course's. */}
+            {!d.personal && (
+              <SetSection
+                deck={d}
+                decks={decks}
+                cards={allCards}
+                busy={!!busy}
+                onSave={(next) =>
+                  run(async () => {
+                    const r: any = await API.saveSet(d.id, next);
+                    const set = r && r.deck ? r.deck.set : undefined;
+                    setDecks((prev) => prev.map((x) => {
+                      if (x.id !== d.id) return x;
+                      const { set: _was, ...rest } = x;
+                      return set ? { ...rest, set } : rest;
+                    }));
+                  }, next ? `${d.title} is a personal set` : `${d.title} is an ordinary deck again`)
+                }
+              />
+            )}
+
             {unitIn && (
               <div className="at-formblock" data-el="unit-checklist-block">
                 <div className="at-formhead">
@@ -10274,6 +10499,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                             {d.practise !== false ? "Practised in your Learning" : "Not practised"}
                           </TileNote>
                         ) : (
+                        <>
+                        {d.set ? <TileNote live={live}>Personal set</TileNote> : null}
                         <TileNote live={live}>
                           {live ? (
                             <>
@@ -10285,6 +10512,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                             <>Not in a course yet — nobody can see it</>
                           )}
                         </TileNote>
+                        </>
                         )
                       }
                     />

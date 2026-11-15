@@ -8,6 +8,77 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.632 — 15 November 2026
+
+**Personal sets: a deck of pictures each student answers once, then
+practises with their own word.** Think of a family's photos: a student
+says once who each person is to them, and is then asked with the word
+they would use — *cô*, *bà* — rather than one word for everybody.
+
+For teachers, any deck's screen has a new section, **Personal set**, off
+until you switch it on. Switched on, the deck's cards that have a picture
+are the set's pictures, added, photographed and recorded as on any deck.
+The section holds the wording (the question, the "doesn't apply" button
+and the three practice questions), the **word lists** (other decks of the
+same course, each an ordinary deck of words; with two or more, each
+student picks one), which words are **said with the name**, and **what is
+asked**: the name, their word, both together, and whether the word goes
+before or after the name. Warnings say what is missing, and never stop a
+save. You won't see what each student chose; it is sent only in a problem
+report a student makes. In your list of decks a set says "Personal set".
+
+The recording screen, on every card, now asks **"Who is speaking?"**. A
+recording made or uploaded while it holds a name is saved with that name,
+which then shows beside the recording and under the play button.
+
+For students, as in the earlier steps: Home says how many pictures are
+waiting; before a session with new pictures they choose a list (if there
+are several) and answer the question for each, with a skip and a "doesn't
+apply"; in practice each picture takes turns between its name, their word
+and both together, from the picture or a recording; and Settings lists
+their answers and lets them change any of them, which starts that picture
+— or, for the list, the set — again.
+
+A phone that hasn't updated sees a set as an ordinary deck: it asks each
+picture's name and teaches the words of every list.
+
+To check by hand:
+
+- A teacher switches Personal set on for a deck, picks two lists, and every
+  part of the section saves and comes back after a reload.
+- Changing the wording changes every screen the student sees: the
+  question, the doesn't-apply button, the practice questions, Home,
+  Settings.
+- Two students of one course, answering differently, are each asked their
+  own word.
+- Each picture takes turns between name, word and both, from the picture
+  and from recordings.
+- Wrong choices are always of the same kind, and never from the list the
+  student did not choose.
+- With one list nobody is asked to choose; with two each student is asked
+  once, and is not taught the other list's words.
+- A skipped picture is asked its name only, and Home says how many are
+  waiting.
+- "Doesn't apply" removes the picture; changing it back brings it back
+  with its progress.
+- Changing an answer warns and starts that one picture again; changing
+  list warns and starts the set again.
+- Answers made on a phone are there on a laptop, and are still there after
+  Reset scheduling.
+- Signed in as an ordinary teacher, nothing shows a student's answers; a
+  report from a picture shows the answer to the admin.
+- A recording made with "Who is speaking?" filled in shows that name
+  wherever it is listed and under the play button.
+- "Both together", heard, plays one voice when one person recorded both,
+  and names two voices otherwise.
+- Hear it, pick the picture never offers two pictures the student calls by
+  the same word.
+- A person with three photos is shown a different one after each right
+  answer and the same one after a miss; so is an ordinary card with
+  several pictures.
+- A phone that has not updated since before 0.629 still opens, keeps its
+  progress, and treats the set as an ordinary deck.
+
 ## 0.631 — 15 November 2026
 
 **A card with several pictures now shows a different one each time you get

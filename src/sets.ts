@@ -325,3 +325,40 @@ export function answerLine(set: SetConfig, pictureName: string, answer: SetAnswe
   const from = listName ? ` (${listName})` : "";
   return `Their answer for ${pictureName}: ${said}${from}`.slice(0, 200);
 }
+
+/* ------------------------------------------------------------------
+   What the teacher is told (0.632)
+   ------------------------------------------------------------------ */
+
+/**
+ * Warnings for the teacher, worded plainly, never blocking a save: no
+ * list; a list too short to choose between; a meaning one list has and
+ * another lacks; cards in the deck with no picture, which are not part of
+ * the set. `cards` is the set's own deck's, each saying whether it has a
+ * picture.
+ */
+export function setGaps(
+  set: SetConfig,
+  lists: { title: string; words: { en: string }[] }[],
+  cards: { picture: boolean }[] = [],
+): string[] {
+  const out: string[] = [];
+  if (!set.lists.length) out.push("No word list is chosen yet, so students have nothing to answer with.");
+  for (const l of lists) {
+    if (l.words.length < 4) {
+      out.push(`${l.title} has ${l.words.length === 1 ? "only 1 word" : `only ${l.words.length} words`}. Four or more give the choices something to choose between.`);
+    }
+  }
+  for (const a of lists) {
+    for (const b of lists) {
+      if (a === b) continue;
+      const missing = a.words.find((w) => w.en && !b.words.some((x) => same(x.en, w.en)));
+      if (missing) {
+        out.push(`${a.title} has a word for "${missing.en.trim()}" and ${b.title} doesn't. A student on ${b.title} who chose it is asked again.`);
+      }
+    }
+  }
+  const bare = cards.filter((c) => !c.picture).length;
+  if (bare) out.push(`${bare === 1 ? "1 card" : `${bare} cards`} in this deck ${bare === 1 ? "has" : "have"} no picture, so ${bare === 1 ? "it is" : "they are"} not part of the set.`);
+  return out;
+}

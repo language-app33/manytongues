@@ -8546,3 +8546,64 @@ picture prompt and answer, and each picture choice its own next photo;
 which card a tile is stays keyed on its first. Cost: a picture prompt is no
 longer always the teacher's first photo.
 
+## Personal sets, stage 4: the teacher's side, and the choices behind sets (0.632)
+
+**15 November 2026** · `SetSection`, `setDecksForTrial` in
+`src/spaces.tsx`; `RecordingScreen` in `src/card-editor.tsx`; `setGaps` in
+`src/sets.ts`; `standInSets` and the trial index in
+`src/ArabicTrainer.tsx`; `tests/sets.test.mjs`, `tests/smoke.mjs`
+
+The fourth phase of `docs/PLAN-personal-sets.md`, which makes sets
+visible. The choices that were not obvious, across the four releases:
+
+**A set is a deck, and its lists are decks.** The teacher's only new data
+is the deck's `set` and a form's `voices`; creating, attaching, backing up
+and deleting are the deck's. Cost: a list's name is its deck's title, and
+the picker offers only decks already in the same course.
+
+**The answer lives in `s` under a key that is not an exercise, and is
+carried across a reset.** Progress records already sync, back up and
+delete, and since 0.626 every device carries an unknown key untouched; so
+no new storage, no server action, no privacy question. Reset scheduling
+keeps it, re-stamped with the reset's time, because the merge drops what is
+older. Cost: an admin clearing a student's progress clears their answers,
+and a device older than 0.626 may drop them, after which the student is
+asked again.
+
+**An answer is matched across lists by its English.** A student chooses a
+meaning, so changing list keeps every answer that the new list also has a
+word for; one it lacks becomes waiting and is asked again. Cost: two words
+with the same English in one list cannot be told apart.
+
+**One picture takes turns between kinds instead of keeping progress per
+kind.** The kind is `turnOf` on the question's own schedule, so a miss
+comes back the same. Cost: name, word and both share one ladder, and a
+real change of answer starts the picture again.
+
+**Who is speaking is kept per form, and a pair is played as two
+recordings.** `voices` names each recording hash; "both together" plays
+the word's recording then the name's through the existing `recSeq`,
+choosing one person who recorded both where there is one. On the editor
+the names are the form's even where the recordings are an accepted
+answer's: the recording screen hands the form all the names of its
+answers' recordings at once.
+
+**A card with several pictures takes turns between them everywhere.** The
+prompt, its answer and each picture choice show `images[turn % count]`;
+which card a tile is stays keyed on the first. Cost: the teacher's first
+photo is no longer always the one shown.
+
+**A device that has not updated sees ordinary decks.** It asks each
+picture's name and teaches every list's words; nothing it stores is lost.
+
+**On the teacher's screens:** the Personal set section sits on the deck
+screen of any deck not in My space, with its own draft saved whole through
+`save-set`; switching a saved set off asks first and saves null at once.
+The plan put a "Personal set" note in "the course's list of decks"; the
+course page lists decks as chips, which carry no notes, so the note is on
+the deck's tile in the teacher's list of decks instead. The deck screen's
+headings are now This deck, Personal set, Cards, and the walk that checks
+them says so. A teacher trying a set's picture has no answers, so the
+trial gets a stand-in: the first list, and every picture answered with
+that list's first word (`standInSets`); with no list, the name alone.
+

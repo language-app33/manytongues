@@ -135,3 +135,34 @@ version; waits on deciding what happens to the courses that already hold
 the deck as an ordinary one, since a unit is on the path of every course
 it is in (A1).
 
+## Sentences that use each student's word in a personal set
+
+Left out of personal sets (0.629–0.632). Sentences with the right *I* and *you* for each student's answer, so a set's words are practised in use. The owner chose pictures and words first (15 November 2026); waits on deciding how a sentence names a picture's person.
+
+## Typed answers, or more than one answer per picture, in a personal set
+
+Left out of personal sets (0.629–0.632). Every answer is chosen from a list today, so it can be marked. A typed answer, or two words for one person, waits on a way to mark what nobody listed.
+
+## Copying a word list
+
+Left out of personal sets (0.629–0.632). A list is an ordinary deck; a second list is a new deck, and its words can be pasted or imported into it. A Copy button waits on someone asking for one.
+
+## Joining a word and a name where the language changes them
+
+Left out of personal sets (0.629–0.632). "Both together" puts the two side by side with one space. Languages that join or change them wait on a rule per language.
+
+## Progress kept separately for name, word and both
+
+Left out of personal sets (0.629–0.632). One picture takes turns between the three, and changing an answer starts it again. Separate progress per kind waits on a reason the turns are not enough.
+
+## A teacher seeing or correcting students' answers in a personal set
+
+Left out of personal sets (0.629–0.632). The owner chose that teachers do not see them (15 November 2026). An answer reaches a teacher only in a problem report a student sends.
+
+## A count of recordings per voice
+
+Left out of personal sets (0.629–0.632). The deck check lists what is missing a recording; nothing more was needed for personal sets.
+
+## Personal sets in someone's own space
+
+Left out of personal sets (0.629–0.632). Only courses a teacher runs; a deck in My space is refused. Waits on someone asking for a set of their own.

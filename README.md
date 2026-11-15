@@ -1285,6 +1285,29 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   `tests/path.test.mjs`, `tests/path-server.test.mjs`,
   `tests/path-device.test.mjs`, and a walk in `tests/smoke.mjs`; why:
   DECISIONS.md, "Units: a course's path".
+- **Personal sets: a picture asked with each student's own word
+  (0.629–0.632).** A personal set is an ordinary deck with a `set` field,
+  switched on in the deck screen's Personal set section. Its pictures are
+  its cards whose lead form has a picture; its word lists are other,
+  ordinary decks of the same course, named in `set.lists`; its wording —
+  the question asked once, the doesn't-apply button and the three practice
+  questions — is the teacher's, as is which words are said with the name
+  and what is asked. Each student answers the question once per picture,
+  choosing a list first where there are several, and is then asked the
+  picture taking turns between its name, their word and both together,
+  from the picture or from a recording. The seven rules: a set is a deck;
+  everything taught is a card in an ordinary deck, so a device that knows
+  nothing of sets sees ordinary decks; an answer is a progress record,
+  `s["set-answer"]` (`SET_KEY`) on the picture's lead form — not an
+  exercise, carried untouched by every device since 0.626, so syncing,
+  backup, deletion and privacy are the practice document's, and Reset
+  scheduling keeps it, re-stamped; a picture is asked only through
+  `img2pick`, `img2ar`, `rec2img` and `rec2ar`; what one asking shows is
+  worked out when it is shown, by `turnOf`; progress stays on the picture;
+  and every word a student reads is the set's wording. Who is speaking on a
+  recording is `voices` on a form, a name per recording hash, asked on the
+  recording screen of every card. Every rule is in `src/sets.ts`; the plan
+  is `docs/PLAN-personal-sets.md`; why: DECISIONS.md, "Personal sets".
 - **Word sets: lists every language has, written once (0.569).** Numbers
   and pronouns so far, months and days of the week to come. The app knows
   the list; the teacher writes the words once for the language, and a deck
@@ -1909,6 +1932,12 @@ src/
   flag-export.ts   reported problems written out as text to paste elsewhere,
                    each with the card it is about. Pure: the clock, the
                    locale and every name it cannot work out are passed in.
+  sets.ts          personal sets (0.629–0.632): a deck's `set`, read and
+                   narrowed; a student's answer under `SET_KEY` in a
+                   picture's progress; which list is chosen, what is still to
+                   ask, which kinds a picture takes turns between, the pair
+                   of word and name, and the teacher's warnings. Pure, and
+                   read by the server as well as the app.
   imports.ts       a teacher's import read against what they already have:
                    which cards are new, already theirs, or the same word as
                    one of theirs, and which decks they have; and a pasted

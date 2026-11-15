@@ -1638,14 +1638,29 @@ function Recordings({ form, onOpen }: {
  * going back to look. Named by the caller, which is the one that knows what
  * the word is: an accepted answer, a line of a scene, a cell of a table.
  */
-export function RecordingScreen({ name, form, onChange, onClose }: {
+export function RecordingScreen({ name, form, onChange, onClose, voices }: {
   /** The word these recordings are of, as written on the card. */
   name: string;
   form: { clips?: string[], slowClips?: string[] };
-  onChange: (next: { clips: string[], slowClips: string[] }) => void;
+  /** With `voices` where the caller keeps who is speaking (0.632). */
+  onChange: (next: { clips: string[], slowClips: string[], voices?: Record<string, string> }) => void;
   onClose: () => void;
+  /**
+   * Who is speaking on each recording, by hash, where the caller keeps it:
+   * the screen then asks "Who is speaking?" and saves the name with each
+   * recording made while the box holds one (0.632). Absent: not asked.
+   */
+  voices?: Record<string, string>;
 }) {
   const [recording, setRecording] = useState<"clips" | "slowClips" | "">("");
+  /* Who is speaking: the name on the most recent recording, to start. */
+  const named = voices || {};
+  const heardNow = [...(form.clips || []), ...(form.slowClips || [])];
+  const [who, setWho] = useState(() => {
+    for (let i = heardNow.length - 1; i >= 0; i--) if (named[heardNow[i]]) return named[heardNow[i]];
+    return "";
+  });
+  const usedNames = [...new Set(heardNow.map((h) => named[h]).filter(Boolean))];
   /* Opened from a card being read: the takes, to listen to, and nothing
      that makes or removes one. */
   const locked = useContext(Locked);
@@ -1660,11 +1675,24 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
   }, []);
 
   const listOf = (key: "clips" | "slowClips"): string[] => form[key] || [];
-  const put = (key: "clips" | "slowClips", next: string[]) =>
-    onChange({
-      clips: key === "clips" ? next : form.clips || [],
-      slowClips: key === "slowClips" ? next : form.slowClips || [],
-    });
+  /* The names follow the recordings: one removed takes its name with it,
+     one made while the box holds a name is saved with that name. */
+  const put = (key: "clips" | "slowClips", next: string[], added: string[] = []) => {
+    const clips = key === "clips" ? next : form.clips || [];
+    const slowClips = key === "slowClips" ? next : form.slowClips || [];
+    if (!voices) {
+      onChange({ clips, slowClips });
+      return;
+    }
+    const name = who.trim().slice(0, 40);
+    const kept: Record<string, string> = {};
+    for (const h of [...clips, ...slowClips]) {
+      if (added.includes(h)) {
+        if (name) kept[h] = name;
+      } else if (named[h]) kept[h] = named[h];
+    }
+    onChange({ clips, slowClips, voices: kept });
+  };
 
   /* Several at once, from a drop or a multiple pick, are saved one after
      another and added in a single change: adding each as it landed would
@@ -1691,7 +1719,7 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
     } catch (e) {
       setError(API.explain(e));
     } finally {
-      if (added.length) put(key, listOf(key).concat(added));
+      if (added.length) put(key, listOf(key).concat(added), added);
       setBusy("");
     }
   }
@@ -1753,6 +1781,19 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
       )}
       <Notice kind="error">{error}</Notice>
 
+      {voices && !locked && (
+        <Field label="Who is speaking?" lede="Saved with each recording you make or upload while a name is here.">
+          <input className="at-input" value={who} maxLength={40} onChange={(e) => setWho(e.target.value)} aria-label="Who is speaking?" />
+          {usedNames.length > 0 && (
+            <div className="at-chips at-mt3">
+              {usedNames.map((n) => (
+                <Button key={n} size="sm" variant="ghost" onClick={() => setWho(n)}>{n}</Button>
+              ))}
+            </div>
+          )}
+        </Field>
+      )}
+
       {CLIP_KINDS.map((kind) => {
         const list = listOf(kind.key);
         const mine = recording === kind.key;
@@ -1764,7 +1805,7 @@ export function RecordingScreen({ name, form, onChange, onClose }: {
             {/* Numbered takes rather than named speeds: which speed these
                 are is the heading directly above them. */}
             <ClipList
-              clips={list.map((id, i) => ({ id, label: `Take ${i + 1}` }))}
+              clips={list.map((id, i) => ({ id, label: named[id] ? `Take ${i + 1} · Recorded by ${named[id]}` : `Take ${i + 1}` }))}
               onChange={locked ? undefined : (next) =>
                 put(kind.key, next.map((c) => (typeof c === "string" ? c : c.id)))
               }
@@ -7786,7 +7827,21 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
       <RecordingScreen
         name={String(rows[heard].text || "")}
         form={rows[heard] as { clips?: string[]; slowClips?: string[] }}
-        onChange={(next) => edit(heard, next)}
+        /* Who is speaking is the form's, kept beside the recordings it
+           names (0.632). */
+        voices={(f.voices as Record<string, string>) || {}}
+        onChange={({ voices: said, ...next }) => {
+          const rowsNext = rows.map((r, j) => (j === heard ? { ...r, ...next } : r));
+          setRows(rowsNext);
+          const packed = packAnswers(rowsNext, fields);
+          sent.current = `${packed.ar}\u0000${packed.lat}`;
+          /* Every name of every answer's recordings: this answer's from the
+             screen, the others' as they were. */
+          const others = rowsNext.filter((_r, j) => j !== heard).flatMap((r) => [...((r as Answer).clips || []), ...((r as Answer).slowClips || [])]);
+          const was = (f.voices as Record<string, string>) || {};
+          const all: Record<string, string> = { ...Object.fromEntries(others.filter((h) => was[h]).map((h) => [h, was[h]])), ...(said || {}) };
+          onChange({ ...packed, voices: all });
+        }}
         onClose={() => setHeard(null)}
       />
     )}
@@ -9426,6 +9481,7 @@ function RecordingOverlays({ word, talk }: { word: WordDraft; talk: SceneDraft }
       <RecordingScreen
         name={String(lines[recordingLine].ar || "") || `line ${recordingLine + 1}`}
         form={lines[recordingLine]}
+        voices={(lines[recordingLine] as { voices?: Record<string, string> }).voices || {}}
         onChange={(next) => setLine(recordingLine, { ...lines[recordingLine], ...next })}
         onClose={() => setRecordingLine(null)}
       />

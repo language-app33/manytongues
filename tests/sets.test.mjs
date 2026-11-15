@@ -263,3 +263,55 @@ test("a report's line says the answer, the doesn't-apply wording, or that there 
   assert.equal(S.answerLine(set, "Lan", null, "Hanoi"), "Their answer for Lan: not answered yet (Hanoi)");
   assert.ok(S.answerLine(set, "x".repeat(300), null, "").length <= 200);
 });
+
+/* ------------------------------------------------------------------
+   What the teacher is told (0.632)
+   ------------------------------------------------------------------ */
+
+const words = (/** @type {string[]} */ ens) => ens.map((en) => ({ en }));
+
+test("a set with no list says so", () => {
+  assert.match(S.setGaps(S.emptySet(), []).join(" "), /No word list is chosen yet/);
+});
+
+test("a list with fewer than four words says so", () => {
+  const set = { ...S.emptySet(), lists: ["dA"] };
+  assert.match(S.setGaps(set, [{ title: "Hanoi", words: words(["aunt", "uncle"]) }]).join(" "), /Hanoi has only 2 words/);
+  assert.deepEqual(S.setGaps(set, [{ title: "Hanoi", words: words(["a", "b", "c", "d"]) }]), []);
+});
+
+test("a meaning one list has and another lacks says so, naming both", () => {
+  const set = { ...S.emptySet(), lists: ["dA", "dB"] };
+  const gaps = S.setGaps(set, [
+    { title: "Hanoi", words: words(["aunt", "uncle", "mother", "father"]) },
+    { title: "Saigon", words: words(["Aunt ", "uncle", "mother", "grandfather"]) },
+  ]);
+  assert.ok(gaps.includes('Hanoi has a word for "father" and Saigon doesn\'t. A student on Saigon who chose it is asked again.'), gaps.join(" | "));
+  assert.ok(gaps.some((/** @type {string} */ g) => /Saigon has a word for "grandfather"/.test(g)));
+  assert.ok(!gaps.some((/** @type {string} */ g) => /"aunt"/i.test(g)), "the same meaning in any case is the same");
+});
+
+test("cards in the deck with no picture say they are not part of the set", () => {
+  const set = { ...S.emptySet(), lists: ["dA"] };
+  const four = [{ title: "Hanoi", words: words(["a", "b", "c", "d"]) }];
+  assert.deepEqual(S.setGaps(set, four, [{ picture: true }, { picture: false }]), ["1 card in this deck has no picture, so it is not part of the set."]);
+});
+
+test("the deck check counts a set's pictures and its lists' words without a recording, as on any deck", async () => {
+  const { deckQuality } = await import(path.join(here, "..", "src", "deck-quality.ts"));
+  const { LANGUAGES } = await import(path.join(here, "..", "src", "languages.ts"));
+  const ar = LANGUAGES["ar-PS"];
+  const recordings = (/** @type {any} */ q) => q.checks.find((/** @type {any} */ c) => c.key === "recordings");
+  const pictures = [
+    { id: "p1", lang: "ar-PS", category: "person", forms: [{ ar: "لان", en: "", images: ["i1"], clips: ["c1"] }] },
+    { id: "p2", lang: "ar-PS", category: "person", forms: [{ ar: "مين", en: "", images: ["i2"] }] },
+  ];
+  const list = [
+    { id: "w1", lang: "ar-PS", category: "noun", forms: [{ ar: "عمة", en: "aunt", lat: "amma", clips: ["c2"] }] },
+    { id: "w2", lang: "ar-PS", category: "noun", forms: [{ ar: "جدة", en: "grandmother", lat: "jidda" }] },
+  ];
+  const ofList = recordings(deckQuality(list, { lang: ar, pool: list }));
+  assert.equal(ofList.share, 0.5, "half the list's words are recorded");
+  const ofSet = deckQuality(pictures, { lang: ar, pool: pictures });
+  assert.deepEqual(ofSet, deckQuality(pictures.map((p) => ({ ...p })), { lang: ar, pool: pictures }), "a set is scored on its cards, as any deck");
+});

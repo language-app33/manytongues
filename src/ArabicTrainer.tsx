@@ -1993,6 +1993,22 @@ export function pathIndexOf(
    is in sets.ts; this only finds them among what the device holds.
    ------------------------------------------------------------------ */
 
+/**
+ * The sets as a teacher trying them meets them: the first list chosen, and
+ * every picture answered with that list's first word. With no list, each
+ * picture is tried as its name alone (0.632).
+ */
+export function standInSets(views: HeldSet[]): HeldSet[] {
+  return views.map((v) => {
+    const first = v.lists[0];
+    const meaning = first && first.words[0] ? first.words[0].en : "";
+    return {
+      ...v,
+      pictures: v.pictures.map((p) => ({ ...p, answer: first && meaning ? { updated: 0, list: first.id, meaning } : null })),
+    };
+  });
+}
+
 /** Which session a set's questions were asked before, to start after. */
 type SetStart =
   | { kind: "begin"; practice?: boolean; only?: (it: Item) => boolean; pathUnit?: string }
@@ -12401,6 +12417,7 @@ export default function ArabicTrainer() {
    * has to be able to find the phrases that word turns up in.
    */
   const [preview, setPreview] = useState<Item[]>([]);
+  const [previewDecks, setPreviewDecks] = useState<Deck[]>([]);
   /* And where to put the teacher back down afterwards: the card they
      pressed the button on, and the screen they were looking at it from. */
   const [trialBack, setTrialBack] = useState<any>(null);
@@ -12814,7 +12831,13 @@ export default function ArabicTrainer() {
   /* And what they mean for practice: which items are pictures, how each
      is asked, and which are out of play (0.631). */
   const setIndex = useMemo(() => setIndexOf(items, courseDecks, heldSets), [items, courseDecks, heldSets]);
-  setSetIndex(setIndex);
+  /* A teacher trying a set's picture has no answers: a stand-in does, the
+     first word of the first list for every picture (0.632). */
+  const trialSets = useMemo(
+    () => (preview.length && previewDecks.length ? setIndexOf(preview, previewDecks, standInSets(setViewsOf(preview, previewDecks))) : null),
+    [preview, previewDecks],
+  );
+  setSetIndex(trialSets || setIndex);
   const inPlay = useCallback(
     (it: Item) => {
       if (langsOff.includes(langIdOf(it, settings))) return false;
@@ -12910,12 +12933,15 @@ export default function ArabicTrainer() {
    * progress is written when it is answered, and leaving asks nothing,
    * because there is nothing to lose.
    */
-  function tryExercise({ items: material, exercise, back }: {
+  function tryExercise({ items: material, exercise, back, decks: setDecks }: {
     items: Item[];
     exercise: Question;
     back?: any;
+    /** The personal sets and their lists, where a teacher has any (0.632). */
+    decks?: Deck[];
   }) {
     setPreview(material || []);
+    setPreviewDecks(setDecks || []);
     /* Where the teacher was standing when they pressed it. The teaching
        space is unmounted while the question is up — it is a different
        screen, not a layer over this one — so getting back to the card

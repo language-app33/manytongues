@@ -59,6 +59,8 @@ const out = await buildOnce(
     /* And the review screens, reached from a card's page and a toolbar
        button this walk does not press — driven on their own at the foot. */
     "review-sheet.tsx",
+    /* And the recording screen, driven on its own at the foot (0.632). */
+    "card-editor.tsx",
   ],
   {
     splitting: true,
@@ -318,6 +320,11 @@ let materialDecks = [];
 /* What the deck screen's Numbers and pronouns asked the server to keep. */
 /** @type {any[]} */
 const savedParts = [];
+/* What save-set was sent, and a third deck in the course for a set's
+   second list, while the walk at the foot asks for it (0.632). */
+/** @type {any[]} */
+const savedSets = [];
+let teacherSets = false;
 /* What the deck screen's Lock asked the server to do. */
 /** @type {any[]} */
 const lockedDecks = [];
@@ -527,6 +534,7 @@ const fakeFetch = async (input, opts = {}) => {
         decks: [
           { id: "d1", title: "Lesson 1", owner: account.handle, lang: "ar-PS", cardIds: [card.id, phrase.id], cardCount: 2, courses: [{ courseId: "c1", addedAt: 1 }] },
           { id: "d2", title: "Introductions", owner: account.handle, lang: "ar-PS", cardIds: [frameCard.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 2 }] },
+          ...(teacherSets ? [{ id: "d4", title: "Family words", owner: account.handle, lang: "ar-PS", cardIds: [card.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 4 }] }] : []),
         ],
       });
     }
@@ -534,7 +542,7 @@ const fakeFetch = async (input, opts = {}) => {
       return json({
         ok: true,
         cards: [
-          { ...card, decks: ["d1"] },
+          { ...card, decks: teacherSets ? ["d1", "d4"] : ["d1"] },
           { ...phrase, decks: ["d1"] },
           { ...talk, decks: [] },
           { ...frameCard, decks: ["d2"] },
@@ -558,6 +566,12 @@ const fakeFetch = async (input, opts = {}) => {
     }
     /* Whose numbers a deck uses (0.541): nobody here has any. */
     if (action === "number-sources") return json({ ok: true, sources: [], chosen: "" });
+    if (action === "save-set") {
+      const body = JSON.parse(opts.body || "{}");
+      savedSets.push(body);
+      return json({ ok: true, deck: { id: body.deckId, title: "Lesson 1", ...(body.set ? { set: body.set } : null) } });
+    }
+    if (action === "put-clip") return json({ ok: true });
     if (action === "set-deck-parts") {
       const body = JSON.parse(opts.body || "{}");
       savedParts.push(body);
@@ -9152,8 +9166,8 @@ const openPronounTables = async () => {
     const deckHeads = deckSheet
       ? [...deckSheet.querySelectorAll(".at-formnum, .at-section > .at-sectiontop > .at-eyebrow")].map((h) => (h.textContent || "").trim())
       : [];
-    check("an open deck is headed like a card's screen, This deck to Cards",
-      deckHeads.join(" | ") === "This deck | Cards",
+    check("an open deck is headed like a card's screen, This deck, then Personal set (0.632), to Cards",
+      deckHeads.join(" | ") === "This deck | Personal set | Cards",
       deckHeads.join(" | ") || "(not laid out like the card editor)");
     const thisDeck = deckSheet && deckSheet.querySelector(".at-formblock");
     const labels = thisDeck ? [...thisDeck.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : [];
@@ -12533,6 +12547,158 @@ const openPronounTables = async () => {
   r.unmount();
   host.remove();
   check("and nothing threw on the path's screens", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- a deck made a personal set, by its teacher (0.632) ----
+   The deck screen's Personal set section: switched on, the question
+   changed, two lists added, a word ticked, the word put after the name,
+   saved; then switched off. What save-set was sent is what is checked. */
+{
+  const before = errors.length;
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+  }));
+  teacherSets = true;
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1500);
+  if (!host.querySelector(".at-screen.bare")) {
+    click(host.querySelector('[data-el="where-you-are"]'));
+    await sleep(200);
+    click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+    await sleep(900);
+  }
+  const frame = () => host.querySelector(".at-screen.bare") || host;
+  const tab = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
+    .filter((b) => re.test((b.textContent || "").trim())).pop();
+  click(tab(/^Material$/) || null);
+  await sleep(400);
+  click(tab(/^Decks$/) || null);
+  await sleep(500);
+  click([...frame().querySelectorAll(".at-deckcard, .at-minicard, .at-tile")].find((t) => /Lesson 1/.test(t.textContent || "")) || null);
+  await sleep(600);
+  const section = () => /** @type {HTMLElement | null} */ ([...document.querySelectorAll('[data-el="set-section"]')].pop() || null);
+  check("an open deck has a Personal set section, off", !!section() && /Personal set/.test(section()?.textContent || ""), section() ? "" : "no section");
+  const segment = (/** @type {RegExp} */ re) => [...(section() || document).querySelectorAll(".at-segmented button")].find((b) => re.test((b.textContent || "").trim()));
+  click(segment(/^On$/) || null);
+  await sleep(300);
+  const box = /** @type {HTMLInputElement | null} */ ((section() || document).querySelector('input[aria-label="The question"]'));
+  check("switched on, it shows the wording, starting at the defaults", !!box && box.value === "Who is this person to you?", box ? box.value : "no box");
+  if (box) {
+    must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(box, "Who is she to you?");
+    box.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(150);
+  }
+  click(buttonNamed(/^Add a list$/));
+  await sleep(400);
+  const pickRow = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-tickrow")].find((row) => re.test(row.textContent || ""));
+  check("the lists offered are the other decks of the course", !!pickRow(/Introductions/) && !!pickRow(/Family words/) && !pickRow(/Lesson 1/),
+    [...document.querySelectorAll(".at-tickrow")].map((x) => x.textContent).join(" | "));
+  click(pickRow(/Introductions/)?.querySelector("input"));
+  await sleep(150);
+  click(pickRow(/Family words/)?.querySelector("input"));
+  await sleep(150);
+  click(buttonNamed(/^Done$/));
+  await sleep(400);
+  const wordRow = [...(section() || document).querySelectorAll(".at-tickrow")].find((row) => /book/.test(row.textContent || ""));
+  check("its lists' words can be ticked as said with the name", !!wordRow, (section()?.textContent || "").slice(0, 300));
+  click(wordRow?.querySelector("input"));
+  await sleep(150);
+  click(segment(/^After the name$/) || null);
+  await sleep(150);
+  click([...(section() || document).querySelectorAll("button")].find((b) => /^Save$/.test((b.textContent || "").trim())) || null);
+  await sleep(600);
+  const sent = savedSets[savedSets.length - 1];
+  check("Save sends the whole set to save-set",
+    !!sent && sent.deckId === "d1" && sent.set && sent.set.wording.question === "Who is she to you?"
+      && JSON.stringify(sent.set.lists) === JSON.stringify(["d2", "d4"]) && sent.set.named.includes(card.id) && sent.set.order === "after",
+    JSON.stringify(sent));
+  click(segment(/^Off$/) || null);
+  await sleep(300);
+  click(buttonNamed(/^Switch it off$/));
+  await sleep(600);
+  const off = savedSets[savedSets.length - 1];
+  check("switched off, after asking, it sends null", savedSets.length >= 2 && off.set === null, JSON.stringify(off));
+  teacherSets = false;
+  r.unmount();
+  host.remove();
+  check("and nothing threw on a deck's Personal set section", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- who is speaking, on a recording (0.632) ----
+   The recording screen, mounted on its own: a recording uploaded while
+   "Who is speaking?" holds a name is saved with it; one uploaded with the
+   box empty is saved with none. */
+{
+  const before = errors.length;
+  const { RecordingScreen } = await import(path.join(out, "card-editor.js"));
+  /* The screen reads an upload with a FileReader, which this walk's
+     globals do not carry; lent from the page for the walk. */
+  const hadReader = /** @type {any} */ (globalThis).FileReader;
+  /** @type {any} */ (globalThis).FileReader = w.FileReader;
+  /** @type {any[]} */
+  const changes = [];
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  /** @type {any} */
+  let form = { clips: [], slowClips: [] };
+  /** @type {Record<string, string>} */
+  let voices = {};
+  const draw = () => r.render(React.createElement(RecordingScreen, {
+    name: "book", form, voices,
+    onChange: (/** @type {any} */ next) => {
+      changes.push(next);
+      form = { clips: next.clips, slowClips: next.slowClips };
+      voices = next.voices || {};
+      draw();
+    },
+    onClose: () => {},
+  }));
+  draw();
+  await sleep(300);
+  /* A screen sits over the whole app, so it is found in the document. */
+  const scr = () => [...document.querySelectorAll(".at-screen")].find((el) => /Recording for book/.test(el.textContent || "")) || host;
+  const who = /** @type {HTMLInputElement | null} */ (scr().querySelector('input[aria-label="Who is speaking?"]'));
+  check("the recording screen asks who is speaking", !!who, (scr().textContent || "").slice(0, 200));
+  const upload = async (/** @type {string} */ content) => {
+    const input = /** @type {HTMLInputElement | null} */ (scr().querySelector('input[type="file"]'));
+    const file = new w.File([content], "take.webm", { type: "audio/webm" });
+    /* jsdom's files cannot be read as bytes; this one can. */
+    Object.defineProperty(file, "arrayBuffer", { value: async () => new TextEncoder().encode(content).buffer });
+    if (input) {
+      Object.defineProperty(input, "files", { value: [file], configurable: true });
+      input.dispatchEvent(new w.Event("change", { bubbles: true }));
+    }
+    await sleep(600);
+  };
+  if (who) {
+    must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(who, "Layla");
+    who.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(150);
+  }
+  await upload("first take");
+  const first = changes[changes.length - 1];
+  const firstHash = first && first.clips && first.clips[0];
+  check("a recording made with a name is saved with it", !!firstHash && first.voices && first.voices[firstHash] === "Layla", JSON.stringify(first));
+  const box = /** @type {HTMLInputElement | null} */ (scr().querySelector('input[aria-label="Who is speaking?"]'));
+  if (box) {
+    must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(box, "");
+    box.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(150);
+  }
+  await upload("second take");
+  const second = changes[changes.length - 1];
+  const secondHash = second && second.clips && second.clips[1];
+  check("one made with the box empty is saved with no name, and the first keeps its own",
+    !!secondHash && second.voices && !(secondHash in second.voices) && second.voices[firstHash] === "Layla", JSON.stringify(second));
+  check("and the list says who recorded the first", /Recorded by Layla/.test(scr().textContent || ""), (scr().textContent || "").slice(0, 300));
+  r.unmount();
+  host.remove();
+  /** @type {any} */ (globalThis).FileReader = hadReader;
+  check("and nothing threw recording with a name", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
 report();
