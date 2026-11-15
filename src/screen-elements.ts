@@ -37,6 +37,8 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["question-form-tag", "Which form is being asked, only where the question could not otherwise say — written from its meaning, or with another form of the card among the tiles: only what tells it from the others, in whole words.", "feminine plural"],
     ["question-clue", "Which card the question means, where another card the learner studies shows the same word or the same meaning: the teacher's clue, or the other card's answer ruled out.", "not patience"],
     ["question-fill-tag", "What a word dropped into a sentence is, where its English could be more than one form of it. Only then; nothing on most sentences.", "Your name: plural"],
+    ["set-caption", "Under a personal set's picture, when the question asks for the learner's own word for it (0.631): the name of whoever is in the picture.", "Lan"],
+    ["set-voice", "Under the play button, where the teacher said who is speaking on the recording (0.631): one name, or two where a word and a name were recorded by different people.", "Recorded by Mai"],
     ["question-prompt", "The block being asked about. A word, a phrase with a gap in it, a play button, or a conversation, depending on the exercise.", ""],
     ["question-prompt-text", "The words inside it, when it is words. One size in every exercise.", "كِتاب"],
     ["question-prompt-meaning", "Under a scene's sentence with a word missing: what the sentence means, as the clue, when the word is to be typed — until it is answered. Only where the sentence has its English.", "I went to school today"],

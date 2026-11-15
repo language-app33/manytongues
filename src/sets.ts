@@ -251,3 +251,77 @@ export function keptAcrossReset(s: Record<string, unknown> | undefined, at: Mill
   const was = readAnswer(s && s[SET_KEY]);
   return was ? { [SET_KEY]: { ...was, updated: at } } : {};
 }
+
+/* ------------------------------------------------------------------
+   Practising a picture (0.631)
+   ------------------------------------------------------------------ */
+
+/**
+ * The kinds a picture takes turns between: its name, if asked; and, only
+ * where the answer resolves to a word, the word if asked, and both
+ * together if asked and the word is ticked "said with the name".
+ */
+export function kindsFor(set: SetConfig, ok: boolean, named: boolean): TurnKind[] {
+  const out: TurnKind[] = [];
+  if (set.asks.name) out.push("name");
+  if (ok && set.asks.word) out.push("word");
+  if (ok && named && set.asks.both) out.push("both");
+  return out;
+}
+
+/** The word and the name, side by side, in the set's order. */
+export const pairText = (set: SetConfig, word: string, name: string): string =>
+  (set.order === "after" ? [name, word] : [word, name]).map((x) => x.trim()).filter(Boolean).join(" ");
+
+type Heard = { recs?: { id: string }[]; clips?: string[]; slowClips?: string[]; voices?: Record<string, string> };
+
+/* A form's recordings, in its own order: a device's form lists them as
+   `recs`, a teacher's card as `clips` then `slowClips`. */
+export const heardOf = (f: Heard | null | undefined): string[] =>
+  !f ? [] : Array.isArray(f.recs) && f.recs.length ? f.recs.map((r) => r.id).filter(Boolean) : [...(f.clips || []), ...(f.slowClips || [])];
+
+/**
+ * What "both together" plays: the word's recording and the name's, as two
+ * groups in the set's order. In one voice where one person recorded both
+ * — the first such, in the word's order — and that voice named; otherwise
+ * the first recording of each, with both names. Null where either has none.
+ */
+export function pairClips(set: SetConfig, wordForm: Heard, nameForm: Heard): { groups: string[][]; voices: string[] } | null {
+  const word = heardOf(wordForm);
+  const name = heardOf(nameForm);
+  if (!word.length || !name.length) return null;
+  const wv = wordForm.voices || {};
+  const nv = nameForm.voices || {};
+  const order = (w: string, n: string) => (set.order === "after" ? [[n], [w]] : [[w], [n]]);
+  for (const w of word) {
+    const who = (wv[w] || "").trim();
+    if (!who) continue;
+    const n = name.find((h) => (nv[h] || "").trim().toLowerCase() === who.toLowerCase());
+    if (n) return { groups: order(w, n), voices: [who] };
+  }
+  const voices = (set.order === "after" ? [nv[name[0]], wv[word[0]]] : [wv[word[0]], nv[name[0]]])
+    .map((v) => (v || "").trim())
+    .filter(Boolean);
+  return { groups: order(word[0], name[0]), voices: [...new Set(voices)] };
+}
+
+/** Whether a confirmed change starts a picture again: both answers name a
+    meaning, and the meanings differ. */
+export function isRealChange(before: SetAnswer | null | undefined, after: SetAnswer | null | undefined): boolean {
+  if (!before || !after || !before.meaning || !after.meaning || before.none || after.none) return false;
+  return !same(before.meaning, after.meaning);
+}
+
+/** One line for a problem report about a picture: the student's answer
+    for it, which the teacher sees nowhere else. */
+export function answerLine(set: SetConfig, pictureName: string, answer: SetAnswer | null | undefined, listName: string): string {
+  const said = !answer
+    ? "not answered yet"
+    : answer.none
+    ? `"${set.wording.none}"`
+    : answer.meaning
+    ? `"${answer.meaning}"`
+    : "not answered yet";
+  const from = listName ? ` (${listName})` : "";
+  return `Their answer for ${pictureName}: ${said}${from}`.slice(0, 200);
+}

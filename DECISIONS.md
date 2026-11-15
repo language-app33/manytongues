@@ -8510,3 +8510,39 @@ Cost: one small CSS rule for the row of other photos on the question
 screen (`at-picthumbs`). The screens are dark until a teacher can make a
 set (stage 4).
 
+## Personal sets, stage 3: practising a picture (0.631)
+
+**15 November 2026** · `kindsFor`, `pairText`, `pairClips`, `isRealChange`,
+`answerLine` in `src/sets.ts`; `setIndexOf`, `setSetIndex`, `setTypes`,
+`castSet`, `setChoicePool`, `setReportLine`, `restartItem`, `voiceLineOf`
+and the `imageAt` turn in `castFill`, in `src/ArabicTrainer.tsx`;
+`tests/sets-ask.test.mjs`
+
+The third phase of `docs/PLAN-personal-sets.md`. A module-level set index,
+set from `installIndexes` and from the app's render as the path index is,
+says which items are pictures, how each stands, what word its answer
+resolves to and which kinds it takes turns between, and which items are
+out of play. A picture's lead form offers only the two picture exercises
+and the two listening ones (`setTypes`, inside `availableTypes` before the
+course switches); its other forms offer nothing. `castSet`, first in
+`castFill`, chooses the kind by `turnOf` on the question's own schedule, as
+everything else that varies between askings does, and keeps the picture's
+id and progress, so progress stays on the picture: one picture takes turns
+rather than keeping progress per kind, and a real change to an answer
+starts it again (`restartItem`, from Settings only).
+
+Wrong choices are of the asking's kind (`setChoicePool`): other names,
+other words of the chosen list, or the learner's own pairs and this name
+with other ticked words. "Both together", heard, is played as two
+recordings through the existing `recSeq`, in one voice where one person
+recorded both. Out of play — a picture that doesn't apply, a word held only
+in a list not chosen — goes through `inPlay`, so Home, the counts and every
+session read it; a hand-built Ultimate or Weak session reads all items and
+could still take such a card if it was saved in a session earlier, which is
+left as it is.
+
+Every card with several pictures now shows `images[turn % count]` on its
+picture prompt and answer, and each picture choice its own next photo;
+which card a tile is stays keyed on its first. Cost: a picture prompt is no
+longer always the teacher's first photo.
+

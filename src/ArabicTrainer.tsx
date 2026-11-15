@@ -75,8 +75,11 @@ import {
 } from "./shared.tsx";
 import { renameLangIds } from "./lang-ids.ts";
 /* Personal sets (0.629): every rule of them is in sets.ts. */
-import { chosenOf, keptAcrossReset, pictureState, readAnswer, readSet, SET_KEY, stepsToAsk, withAnswer } from "./sets.ts";
-import type { SetAnswer, SetStep, SetView } from "./sets.ts";
+import {
+  answerLine, chosenOf, isRealChange, keptAcrossReset, kindsFor, pairClips, pairText, pictureState, readAnswer, readSet, resolve, SET_KEY,
+  stepsToAsk, withAnswer,
+} from "./sets.ts";
+import type { PictureState, SetAnswer, SetStep, SetView, TurnKind } from "./sets.ts";
 
 /* The onboarding, teaching, admin and course screens are their own chunk,
    fetched on the first tap that opens one of them. A student drilling cards
@@ -2039,6 +2042,229 @@ export function setViewsOf(
   return out;
 }
 
+/* ------------------------------------------------------------------
+   Personal sets in practice (0.631)
+
+   Which items are a set's pictures, where each stands for this learner,
+   the word its answer resolves to, and the kinds it takes turns between;
+   and which items are out of play — a picture that doesn't apply, and a
+   word held only in a list the learner did not choose. Held at module
+   level, as the path is, because availableTypes is a function of a form
+   and cannot be handed the sets. Nothing in it is stored.
+   ------------------------------------------------------------------ */
+
+export type SetEntry = {
+  view: HeldSet;
+  picture: SetPicture;
+  state: PictureState;
+  /** The word card its answer resolves to in the chosen list, if it does. */
+  word: { item: Item; form: Form } | null;
+  kinds: TurnKind[];
+};
+type SetIndex = { pictures: Map<string, SetEntry>; out: Set<string>; byItem: Map<string, Item> };
+const NO_SETS: SetIndex = { pictures: new Map(), out: new Set(), byItem: new Map() };
+let SET_INDEX: SetIndex = NO_SETS;
+
+export function setSetIndex(next: SetIndex | null | undefined) {
+  const n = next || NO_SETS;
+  if (n === SET_INDEX) return;
+  SET_INDEX = n;
+  forgetTypes();
+}
+
+export function setIndexOf(
+  items: Item[],
+  decks: { id: string; cardIds?: string[] }[] | null | undefined,
+  views: HeldSet[],
+): SetIndex {
+  if (!views.length) return NO_SETS;
+  const byItem: Map<string, Item> = new Map(items.map((it) => [it.id, it]));
+  const pictures: Map<string, SetEntry> = new Map();
+  /* A list deck is in play where it is the chosen list of a set that
+     names it; one that is only ever a list not chosen is not. */
+  const lists: Set<string> = new Set();
+  const chosenLists: Set<string> = new Set();
+  for (const v of views) {
+    const chosen = chosenOf(v);
+    for (const l of v.lists) lists.add(l.id);
+    if (chosen) chosenLists.add(chosen.id);
+    for (const p of v.pictures) {
+      /* A card in two sets is the first's, in course order. */
+      if (pictures.has(p.id)) continue;
+      const state = pictureState(p.answer, chosen ? chosen.words : null);
+      const w = state === "ok" && chosen ? resolve(chosen.words, p.answer) : null;
+      const wordItem = w ? byItem.get(w.id) || null : null;
+      const word = wordItem ? { item: wordItem, form: leadOf(wordItem) } : null;
+      const named = !!wordItem && v.set.named.includes(serverCardId(wordItem));
+      pictures.set(p.id, { view: v, picture: p, state, word, kinds: kindsFor(v.set, !!word, named) });
+    }
+  }
+  const out: Set<string> = new Set();
+  for (const [id, e] of pictures) if (e.state === "none") out.add(id);
+  const byCard: Map<string, string[]> = new Map();
+  for (const d of decks || []) for (const id of d.cardIds || []) byCard.set(id, (byCard.get(id) || []).concat([d.id]));
+  for (const it of items) {
+    const src = (it as { source?: Record<string, unknown> }).source;
+    if (!src || typeof src.cardId !== "string") continue;
+    const held = byCard.get(src.cardId) || [];
+    if (held.length && held.every((d) => lists.has(d) && !chosenLists.has(d))) out.add(it.id);
+  }
+  return { pictures, out, byItem };
+}
+
+/** Whether a set leaves this item out of play: a picture that doesn't
+    apply, or a word in no list the learner chose. Kept, not deleted. */
+export const setHolds = (it: Item): boolean => SET_INDEX.out.has(it.id);
+
+/** The set a form is the picture of — only its card's own word; null for
+    any other form of such a card; undefined for a form in no set. */
+function setEntryOfUnit(it: Form): SetEntry | null | undefined {
+  if (!SET_INDEX.pictures.size) return undefined;
+  const card = cardIdOfUnit(it.id);
+  const e = SET_INDEX.pictures.get(card);
+  if (!e) return undefined;
+  return it.id === card ? e : null;
+}
+
+/** What one kind of asking plays: the recordings, and whose voices. */
+function setHeard(e: SetEntry, kind: TurnKind): { recs: any[]; seq?: string[][]; voices: string[] } | null {
+  const own = e.view.pictures.length ? (SET_INDEX.byItem.get(e.picture.id) ? leadOf(SET_INDEX.byItem.get(e.picture.id) as Item) : null) : null;
+  const voicesOf = (f: Form | null, recs: any[]) =>
+    [...new Set(recs.map((r) => ((f && f.voices) || {})[r.id]).filter((v): v is string => !!v))];
+  if (kind === "name") {
+    const recs = (own && own.recs) || [];
+    return recs.length ? { recs, voices: voicesOf(own, recs.slice(0, 1)) } : null;
+  }
+  if (!e.word) return null;
+  if (kind === "word") {
+    const recs = e.word.form.recs || [];
+    return recs.length ? { recs, voices: voicesOf(e.word.form, recs.slice(0, 1)) } : null;
+  }
+  if (!own) return null;
+  const pair = pairClips(e.view.set, e.word.form, own);
+  return pair ? { recs: [{ id: pair.groups[0][0], label: "", speed: "" }], seq: pair.groups, voices: pair.voices } : null;
+}
+
+/* The forms a picture's wrong choices are drawn from, for one kind. */
+function setPoolFor(e: SetEntry, kind: TurnKind): Form[] {
+  const v = e.view;
+  const others = v.pictures.filter((p) => p.id !== e.picture.id);
+  const leadOfId = (id: string) => {
+    const it = SET_INDEX.byItem.get(id);
+    return it ? leadOf(it) : null;
+  };
+  if (kind === "name") return others.map((p) => leadOfId(p.id)).filter((f): f is Form => !!f && !!f.ar);
+  const chosen = chosenOf(v);
+  const words = chosen ? chosen.words : [];
+  const right = e.word ? e.word.item.id : "";
+  if (kind === "word") return words.filter((w) => w.id !== right).map((w) => leadOfId(w.id)).filter((f): f is Form => !!f && !!f.ar);
+  /* Both: the learner's own pairs for the other pictures, then this
+     picture's name with the other ticked words — made up in memory. */
+  const name = e.picture.name;
+  const pairs: Form[] = [];
+  for (const p of others) {
+    const pe = SET_INDEX.pictures.get(p.id);
+    if (pe && pe.word) pairs.push({ id: `set:${p.id}`, ar: pairText(v.set, pe.word.form.ar, p.name), en: "", lat: "" } as Form);
+  }
+  for (const w of words) {
+    if (w.id === right) continue;
+    const it = SET_INDEX.byItem.get(w.id);
+    if (!it || !v.set.named.includes(serverCardId(it))) continue;
+    pairs.push({ id: `set:${e.picture.id}:${w.id}`, ar: pairText(v.set, w.ar, name), en: "", lat: "" } as Form);
+  }
+  return pairs;
+}
+
+/* The pictures a listening question offers beside the right one: the
+   set's others, never one the learner calls by the same word, nor one with
+   the same name. */
+function setPicturePool(e: SetEntry): Form[] {
+  const mine = e.word ? e.word.form.ar.trim() : "";
+  const name = e.picture.name.trim();
+  return e.view.pictures.flatMap((p) => {
+    if (p.id === e.picture.id || p.name.trim() === name) return [];
+    const pe = SET_INDEX.pictures.get(p.id);
+    if (mine && pe && pe.word && pe.word.form.ar.trim() === mine) return [];
+    const it = SET_INDEX.byItem.get(p.id);
+    return it ? [leadOf(it)] : [];
+  });
+}
+
+/* Which exercises a set's picture offers: the two that show its picture
+   while some kind is on, and the two that play a recording while some
+   kind has one. A choice is dropped where there are too few wrong
+   answers to fill it. */
+function setTypes(e: SetEntry | null): string[] {
+  if (!e || !e.kinds.length) return [];
+  const enough = (pool: Form[]) => new Set(pool.map((f) => f.ar)).size >= PICK_OPTIONS - 1;
+  const out: string[] = [];
+  for (const t of TYPES) {
+    const spec = EX[t];
+    if (!spec) continue;
+    if (spec.promptField === "image") {
+      if (spec.answerMode === "choice" && !e.kinds.every((k) => enough(setPoolFor(e, k)))) continue;
+      out.push(t);
+    } else if (t === "rec2ar" || t === "rec2img") {
+      if (!e.kinds.some((k) => setHeard(e, k))) continue;
+      if (t === "rec2img" && setPicturePool(e).length < PICK_OPTIONS - 1) continue;
+      out.push(t);
+    }
+  }
+  return out;
+}
+
+/**
+ * One asking of a set's picture, as it is shown: its name, the learner's
+ * word, or both, by the question's own turn — so a miss comes back the
+ * same — with the set's wording for the question. Keeps the picture's id,
+ * progress and pictures, so the answer is credited to the picture. Nothing
+ * here is stored.
+ */
+function castSet(resolved: { unit: Form; parent: Item; isSub: boolean } | null, type: string) {
+  if (!resolved || resolved.isSub) return resolved;
+  const e = setEntryOfUnit(resolved.unit);
+  if (!e) return resolved;
+  const listening = isListening(typeOf(type));
+  const kinds = listening ? e.kinds.filter((k) => setHeard(e, k)) : e.kinds;
+  if (!kinds.length) return resolved;
+  const kind = kinds[turnOf(statesOf(resolved.unit)[type]) % kinds.length];
+  const w = e.word ? e.word.form : null;
+  const wording = e.view.set.wording;
+  const said =
+    kind === "word" && w
+      ? { ar: w.ar, lat: w.lat || "", en: w.en || "", answers: w.answers }
+      : kind === "both" && w
+      ? { ar: pairText(e.view.set, w.ar, resolved.unit.ar), lat: pairText(e.view.set, w.lat || "", resolved.unit.lat || ""), en: "", answers: undefined }
+      : null;
+  const heard = listening ? setHeard(e, kind) : null;
+  const unit: Form = {
+    ...resolved.unit,
+    ...(said || {}),
+    setKind: kind,
+    setAsk: kind === "name" ? wording.askName : kind === "word" ? wording.askWord : wording.askBoth,
+    ...(kind === "word" ? { setCaption: resolved.unit.ar } : null),
+    ...(heard ? { recs: heard.recs, setVoices: heard.voices, ...(heard.seq ? { recSeq: heard.seq } : null) } : null),
+  };
+  return { ...resolved, unit, parent: withLead(resolved.parent, unit) };
+}
+
+/** The wrong choices for one asking of a set's picture, or null for a
+    question that is not about one. Exported for the tests. */
+export function setChoicePool(unit: Form, picks: string): Form[] | null {
+  const e = setEntryOfUnit({ ...unit, id: unit.id } as Form);
+  if (!e || !unit.setKind) return null;
+  return picks === "image" ? setPicturePool(e) : setPoolFor(e, unit.setKind as TurnKind);
+}
+
+/** The line a problem report about a set's picture carries: the learner's
+    answer for it. Empty for any other card. */
+export function setReportLine(itemId: string): string {
+  const e = SET_INDEX.pictures.get(itemId);
+  if (!e) return "";
+  const chosen = chosenOf(e.view);
+  return answerLine(e.view.set, e.picture.name, e.picture.answer, chosen ? chosen.title : "");
+}
+
 /**
  * Whether a card is held out of sessions by the path: never met, and every
  * deck it lives in a unit this learner has not reached in any course (R22).
@@ -3060,11 +3286,15 @@ export function installIndexes(
   settings: Settings,
   systems: SystemSet[] = [],
   path: { courses?: PathCourse[]; decks?: PathDeck[] } = {},
+  /* The personal sets held, as setViewsOf finds them (0.631). */
+  sets: HeldSet[] = [],
 ): void {
   setActiveLang(settings.language || DEFAULT_LANGUAGE);
   /* The courses' switches first: everything below reads what a form can be
      asked, and this changes it — see setPracticeIndex. */
   setPracticeIndex(practiceIndexOf(path.courses || [], path.decks || []));
+  /* And the personal sets, which change it too. */
+  setSetIndex(setIndexOf(items, path.decks || [], sets));
   setContextIndex(contextIndexOf(items, settings));
   setDialogIndex(buildDialogIndex(items));
   setTaughtShortIndex(taughtShortOf(items, settings));
@@ -3749,7 +3979,27 @@ function sceneFill(scene: Item, preview: boolean): Record<string, Record<string,
   return took;
 }
 
+/*
+ * A question, filled: a personal set's picture cast as the kind of asking
+ * it is on (0.631), then its holes filled — and, where it has several
+ * pictures, which of them this asking shows: the next after each right
+ * answer, the same after a miss, by the turn the question is on. Nothing
+ * of it is stored.
+ */
 function castFill(
+  resolved: { unit: Form, parent: Item, isSub: boolean } | null,
+  type: string,
+  preview = false,
+) {
+  const r = castFillOnly(castSet(resolved, type), type, preview);
+  if (!r) return r;
+  const images = Array.isArray(r.unit.images) ? r.unit.images : [];
+  if (images.length < 2) return r;
+  const unit = { ...r.unit, imageAt: turnOf(statesOf(r.unit)[type]) % images.length };
+  return { ...r, unit, parent: r.isSub ? r.parent : withLead(r.parent, unit) };
+}
+
+function castFillOnly(
   resolved: { unit: Form, parent: Item, isSub: boolean } | null,
   type: string,
   preview = false,
@@ -4851,6 +5101,15 @@ function availableTypes(
    */
   const held = own ? TYPE_CACHE.get(it) : null;
   if (held && held.lang === lang.id) return held.types;
+  /* A personal set's picture is asked only from its picture or its
+     recordings, by its own rules (0.631); the card's other forms, never. */
+  const setAt = setEntryOfUnit(it);
+  if (setAt !== undefined) {
+    const raw = setTypes(setAt);
+    const allowed = allowedTypes(practicesOf(it), raw);
+    if (own) TYPE_CACHE.set(it, { lang: lang.id, types: allowed, raw });
+    return allowed;
+  }
   /* A tense held as a skill can be asked whatever one of its persons can:
      each question about it is asked of a person — see drawPerson. */
   const tense = tenseHeld(it);
@@ -7861,6 +8120,18 @@ function liftState(s: Record<string, any> | null | undefined): ExerciseState {
  * set's answer kept, stamped with the reset's time so the merge between
  * devices, which drops what is older than a reset, keeps it too (0.630).
  */
+/** One item started again: every form and turn reset as Reset scheduling
+    resets them, and stamped so the reset holds across devices (0.631). */
+export function restartItem(it: Item, at: Millis): Item {
+  return {
+    ...it,
+    forms: formsOf(it).map((f) => resetForm(f, at)),
+    ...(it.lines ? { lines: linesOf(it).map((f) => resetForm(f, at)) } : null),
+    reset: at,
+    updated: at,
+  };
+}
+
 export function resetForm<T extends Form>(f: T, at: Millis): T {
   const { met: _forgotten, ...rest } = f;
   return { ...rest, s: { ...freshStates(), ...(keptAcrossReset(f.s, at) as unknown as Record<string, ExerciseState>) } } as T;
@@ -9476,6 +9747,19 @@ function audibleOf(unit: Form): any[] {
   return first ? [{ id: first, label: "", speed: "" }] : NO_RECS;
 }
 
+/* Who is speaking on what a question plays, where the teacher said: a
+   personal set's pair names one voice or two; any other card, the voice of
+   the recording it starts with (0.631). */
+export function voiceLineOf(unit: Form): string {
+  const set = (unit as Record<string, any>).setVoices as string[] | undefined;
+  const names = set && set.length ? set : (() => {
+    const first = audibleOf(unit)[0];
+    const v = first && unit.voices ? unit.voices[first.id] : "";
+    return v ? [v] : [];
+  })();
+  return names.length ? `Recorded by ${names.join(" and ")}` : "";
+}
+
 function chainOf(unit: Form): string[] {
   const seq = (unit as Record<string, any>).recSeq as string[][] | undefined;
   if (!seq || seq.length < 2) return [];
@@ -10384,11 +10668,14 @@ function VerbRowFill({ tense, lang, tiles, placed, at, onAt, onPlace, checked }:
  * Named by position for a screen reader, since naming them by what they
  * show would be reading the answer out.
  */
-function PictureChoices({ options, value, onChange, disabled }: {
+function PictureChoices({ options, value, onChange, disabled, turn = 0 }: {
   options: any[];
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
+  /** The question's turn: a card with several pictures shows the next of
+      them each time (0.631). Which card a tile is stays its first. */
+  turn?: number;
 }) {
   return (
     /* Answered, the tiles shrink to half, as the prompt picture does, so
@@ -10396,6 +10683,8 @@ function PictureChoices({ options, value, onChange, disabled }: {
     <div className={`at-picchoices${disabled ? " settled" : ""}`} data-el="answer-choices">
       {options.map((option, i) => {
         const hash = String((option && Array.isArray(option.images) && option.images[0]) || "");
+        const count = option && Array.isArray(option.images) ? option.images.length : 0;
+        const shown = count > 1 ? String(option.images[(turn + i) % count] || hash) : hash;
         return (
           <button
             type="button"
@@ -10406,7 +10695,7 @@ function PictureChoices({ options, value, onChange, disabled }: {
             disabled={disabled}
             onClick={() => onChange(hash)}
           >
-            <CardPicture hash={hash} alt="" />
+            <CardPicture hash={shown} alt="" />
           </button>
         );
       })}
@@ -12518,19 +12807,26 @@ export default function ArabicTrainer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [learnSpaces.map((o) => `${o.id}:${o.name}`).join(" ")]);
   const spaceNow = learnSpaces.length > 1 && learnSpaces.some((o) => o.id === spaceFilter) ? spaceFilter : "";
-  const inPlay = useCallback(
-    (it: Item) => {
-      if (langsOff.includes(langIdOf(it, settings))) return false;
-      if (!spaceNow) return true;
-      const at = spaceOfItem(it);
-      return at === null || at === spaceNow;
-    },
-    [langsOff, settings, spaceNow, spaceOfItem]
-  );
   /* The personal sets held, in the languages in play, and what is still
      to ask in them (0.630). */
   const heldSets = useMemo(() => setViewsOf(items, courseDecks, langsOff), [items, courseDecks, langsOff]);
   const setSteps = useMemo(() => stepsToAsk(heldSets), [heldSets]);
+  /* And what they mean for practice: which items are pictures, how each
+     is asked, and which are out of play (0.631). */
+  const setIndex = useMemo(() => setIndexOf(items, courseDecks, heldSets), [items, courseDecks, heldSets]);
+  setSetIndex(setIndex);
+  const inPlay = useCallback(
+    (it: Item) => {
+      if (langsOff.includes(langIdOf(it, settings))) return false;
+      /* A picture that doesn't apply, or a word in a list not chosen: kept,
+         and not asked (0.631). */
+      if (setIndex.out.has(it.id)) return false;
+      if (!spaceNow) return true;
+      const at = spaceOfItem(it);
+      return at === null || at === spaceNow;
+    },
+    [langsOff, settings, spaceNow, spaceOfItem, setIndex]
+  );
   const [setAsk, setSetAsk] = useState<null | { steps?: SetStep[]; openSet?: string; start?: SetStart }>(null);
   const [setStartNow, setSetStartNow] = useState<SetStart | null>(null);
   const passSets = useRef(false);
@@ -12543,7 +12839,7 @@ export default function ArabicTrainer() {
     const more = bySet.size - 1;
     return `${n === 1 ? "1 picture" : `${n} pictures`} in ${first.title}${more ? ` and ${more} more ${more === 1 ? "set" : "sets"}` : ""} ${n === 1 && !more ? "is" : "are"} waiting for your answer.`;
   }, [setSteps, heldSets]);
-  const narrowed = langsOff.length > 0 || !!spaceNow;
+  const narrowed = langsOff.length > 0 || !!spaceNow || setIndex.out.size > 0;
   const shown = useMemo(
     () => (narrowed ? items.filter(inPlay) : items),
     [items, narrowed, inPlay]
@@ -12731,11 +13027,27 @@ export default function ArabicTrainer() {
   }, [setStartNow]);
   /* Every answer goes out through here, stamped and saved as a graded
      answer is — see withAnswer. */
-  const writeAnswers = (ids: string[], change: Partial<Omit<SetAnswer, "updated">>) => {
+  /* `restart`, from Settings, where a change is confirmed: a picture whose
+     answer moves from one meaning to another — or every picture, on a
+     change of list — starts again, as Reset scheduling would start it, and
+     the new answer is written with the same time (0.631). A first answer,
+     one after a skip, and anything about "doesn't apply" start nothing. */
+  const writeAnswers = (ids: string[], change: Partial<Omit<SetAnswer, "updated">>, restart = false) => {
     const want = new Set(ids);
     if (!want.size) return;
     const at = now();
-    persist((cur) => ({ ...cur, items: cur.items.map((it) => (want.has(it.id) ? withAnswer(it, change, at) : it)) }));
+    persist((cur) => ({
+      ...cur,
+      items: cur.items.map((it) => {
+        if (!want.has(it.id)) return it;
+        const lead = formsOf(it)[0];
+        const before = readAnswer(lead && lead.s && (lead.s as Record<string, unknown>)[SET_KEY]);
+        const again = restart && (change.list !== undefined
+          ? !!before && !!before.list && before.list !== change.list
+          : isRealChange(before, { ...(before || { updated: at }), ...change } as SetAnswer));
+        return withAnswer(again ? restartItem(it, at) : it, change, at);
+      }),
+    }));
   };
 
   /* The decks it names are read now, against the cards the Build screen
@@ -13595,6 +13907,22 @@ export default function ArabicTrainer() {
         : [];
     }
     if (!item) return [];
+    /* A personal set's picture: wrong choices of the same kind as the
+       asking — other names, other words of the list, other pairs — or, for
+       a picture to pick, the set's other pictures (0.631). */
+    if (item.setKind) {
+      const pool = setChoicePool(item, spec.picks);
+      if (pool) {
+        const reps = (statesOf(item)[(exercise && exercise.type) || ""] || {}).reps || 0;
+        return optionsFor({
+          answer: item,
+          pool,
+          wanted: PICK_OPTIONS,
+          seed: `${item.id} set ${reps}`,
+          textOf: spec.picks === "image" ? (w) => (Array.isArray(w.images) && w.images[0]) || "" : (w) => String(w.ar || ""),
+        });
+      }
+    }
     /*
      * A verb's own example, and a form of its subjunctive in the gap.
      *
@@ -14373,7 +14701,11 @@ export default function ArabicTrainer() {
         : field === "audio"
           ? "a recording, with nothing written"
           : String((item as any)[field] || "");
-    if (shown && shown !== prompt) out.shown = shown.slice(0, 300);
+    /* A personal set's picture: the learner's answer for it, which the
+       teacher sees nowhere else (0.631). */
+    const setLine = parentItem ? setReportLine(parentItem.id) : "";
+    const told = setLine ? [shown || prompt, setLine].filter(Boolean).join(" · ") : shown;
+    if (told && told !== prompt) out.shown = told.slice(0, 300);
     const line = dialog && item.gap ? linesOf(dialog)[item.gap.line] : null;
     const phrase = context || line;
     if (phrase && phrase.ar) {
@@ -15553,6 +15885,10 @@ export default function ArabicTrainer() {
                           ? "Read the sentence"
                           : "Read the text"
                         : "Read the whole text"
+                      : item.setAsk
+                      /* A personal set's own wording for this kind of
+                         asking (0.631). */
+                      ? String(item.setAsk)
                       : instructionFor(spec, item)}
                   </p>
                   <div className="at-ask" data-el="question-prompt">
@@ -15702,12 +16038,19 @@ export default function ArabicTrainer() {
                          what the word means, shown. The first one — a card
                          with several is a teacher's choice of which to lead
                          with, and it is the one the tiles use too. */
-                      <CardPicture
-                        hash={(Array.isArray(item.images) && item.images[0]) || ""}
-                        /* Once answered it shrinks to half, so the verdict
-                           and what comes with it fit without scrolling. */
-                        className={checked ? "prompt settled" : "prompt"}
-                      />
+                      <>
+                        <CardPicture
+                          /* Which of them takes turns, after each right
+                             answer (0.631) — see castFill. */
+                          hash={(Array.isArray(item.images) && item.images[Number(item.imageAt) || 0]) || ""}
+                          /* Once answered it shrinks to half, so the verdict
+                             and what comes with it fit without scrolling. */
+                          className={checked ? "prompt settled" : "prompt"}
+                        />
+                        {/* A personal set asking for the learner's own word
+                            names whose picture it is (0.631). */}
+                        {item.setCaption ? <p className="at-hint" data-el="set-caption" dir="auto">{String(item.setCaption)}</p> : null}
+                      </>
                     ) : spec.promptField === "audio" ? (
                       /* A context question plays the whole phrase, not the
                          word: hearing it in running speech is the exercise.
@@ -15718,12 +16061,16 @@ export default function ArabicTrainer() {
                          recordings are ever joined, and they are played in
                          order rather than stitched — the joins are where a
                          dialect lives. */
-                      <AudioPrompt
-                        recs={context ? context.recs : audibleOf(item)}
-                        after={context ? [] : chainOf(item)}
-                        autoPlay
-                        lead={leadSpeed(item, exercise.type)}
-                      />
+                      <>
+                        <AudioPrompt
+                          recs={context ? context.recs : audibleOf(item)}
+                          after={context ? [] : chainOf(item)}
+                          autoPlay
+                          lead={leadSpeed(item, exercise.type)}
+                        />
+                        {/* Who is speaking, where the teacher said (0.631). */}
+                        {!context && voiceLineOf(item) ? <p className="at-hint" data-el="set-voice">{voiceLineOf(item)}</p> : null}
+                      </>
                     ) : spec.promptField === "gap" ? (
                       /* One sentence of the scene, the word taken out of
                          it; put back once the question is answered. When
@@ -15964,6 +16311,7 @@ export default function ArabicTrainer() {
                         value={typed}
                         disabled={!!checked}
                         onChange={setTyped}
+                        turn={turnOf(statesOf(item)[exercise.type])}
                       />
                     ) : spec.picks ? (
                       <TextChoices
@@ -16260,7 +16608,7 @@ export default function ArabicTrainer() {
                             /* The picture that was wanted, which is the
                                answer to a question asked in pictures. */
                             <CardPicture
-                              hash={(Array.isArray(item.images) && item.images[0]) || ""}
+                              hash={(Array.isArray(item.images) && item.images[Number(item.imageAt) || 0]) || ""}
                               className="answer"
                               alt="The right picture"
                             />
@@ -16929,10 +17277,10 @@ export default function ArabicTrainer() {
             sets={heldSets}
             steps={setAsk.steps}
             openSet={setAsk.openSet}
-            onAnswer={(id, change) => writeAnswers([id], change)}
-            onList={(setId, listId) => {
+            onAnswer={(id, change, restart) => writeAnswers([id], change, restart)}
+            onList={(setId, listId, restart) => {
               const v = heldSets.find((x) => x.id === setId);
-              if (v) writeAnswers(v.pictures.map((p) => p.id), { list: listId });
+              if (v) writeAnswers(v.pictures.map((p) => p.id), { list: listId }, restart);
             }}
             onSkipRest={(ids) => writeAnswers(ids, { skip: true })}
             onClose={() => setSetAsk(null)}
@@ -20631,8 +20979,9 @@ function SetQuestions({ sets, steps, openSet, onAnswer, onList, onSkipRest, onCl
   steps?: SetStep[];
   /** The set whose answers are shown, from Settings. */
   openSet?: string;
-  onAnswer: (pictureId: string, change: Partial<Omit<SetAnswer, "updated">>) => void;
-  onList: (setId: string, listId: string) => void;
+  /** `restart` where the change was made from Settings and confirmed. */
+  onAnswer: (pictureId: string, change: Partial<Omit<SetAnswer, "updated">>, restart?: boolean) => void;
+  onList: (setId: string, listId: string, restart?: boolean) => void;
   onSkipRest: (pictureIds: string[]) => void;
   onClose: () => void;
   /** Where asking leads: a session's Start, said on the last screen. */
@@ -20716,7 +21065,7 @@ function SetQuestions({ sets, steps, openSet, onAnswer, onList, onSkipRest, onCl
         />
         <div className="at-row at-mt4">
           <Button variant="primary" disabled={!value} onClick={() => {
-            onList(choosing.id, value);
+            onList(choosing.id, value, here.view === "list");
             if (here.view === "list") go({ view: "answers", setId: choosing.id });
             else if (here.view === "steps") after();
           }}>
@@ -20788,7 +21137,7 @@ function SetQuestions({ sets, steps, openSet, onAnswer, onList, onSkipRest, onCl
         />
         <div className="at-row at-mt4">
           <Button variant="primary" disabled={!value} onClick={() => {
-            onAnswer(p.id, { meaning: value, none: undefined, skip: undefined });
+            onAnswer(p.id, { meaning: value, none: undefined, skip: undefined }, here.view === "picture");
             after();
           }}>
             Next

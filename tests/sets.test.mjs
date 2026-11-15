@@ -209,3 +209,57 @@ test("a reset keeps the answer, stamped with the reset's time, and nothing else"
   assert.deepEqual(S.keptAcrossReset({ img2pick: { phase: "review", updated: 3 } }, 50), {});
   assert.deepEqual(S.keptAcrossReset(undefined, 50), {});
 });
+
+/* ------------------------------------------------------------------
+   Practising a picture (0.631)
+   ------------------------------------------------------------------ */
+
+test("a picture takes turns between its name, the word and both, as far as each is on and possible", () => {
+  const on = S.emptySet();
+  assert.deepEqual(S.kindsFor(on, true, true), ["name", "word", "both"]);
+  assert.deepEqual(S.kindsFor(on, true, false), ["name", "word"], "an unticked word is never said with the name");
+  assert.deepEqual(S.kindsFor(on, false, true), ["name"], "an answer that does not resolve asks the name alone");
+  assert.deepEqual(S.kindsFor({ ...on, asks: { name: false, word: true, both: false } }, true, true), ["word"]);
+  assert.deepEqual(S.kindsFor({ ...on, asks: { name: false, word: false, both: false } }, true, true), []);
+});
+
+test("the word and the name go side by side in the set's order", () => {
+  assert.equal(S.pairText(S.emptySet(), "cô", "Lan"), "cô Lan");
+  assert.equal(S.pairText({ ...S.emptySet(), order: "after" }, " cô ", "Lan"), "Lan cô");
+});
+
+const A = "a".repeat(64), B = "b".repeat(64), C = "c".repeat(64), D = "d".repeat(64);
+
+test("both together is played in one voice where one person recorded both", () => {
+  const word = { clips: [A, B], voices: { [A]: "Mai", [B]: "Tuan" } };
+  const name = { clips: [C, D], voices: { [C]: "Tuan", [D]: "Mai" } };
+  assert.deepEqual(S.pairClips(S.emptySet(), word, name), { groups: [[A], [D]], voices: ["Mai"] });
+  assert.deepEqual(S.pairClips({ ...S.emptySet(), order: "after" }, word, name), { groups: [[D], [A]], voices: ["Mai"] });
+});
+
+test("otherwise the first recording of each, naming both voices", () => {
+  const word = { recs: [{ id: A }], voices: { [A]: "Mai" } };
+  const name = { recs: [{ id: C }], voices: { [C]: "Tuan" } };
+  assert.deepEqual(S.pairClips(S.emptySet(), word, name), { groups: [[A], [C]], voices: ["Mai", "Tuan"] });
+  assert.deepEqual(S.pairClips(S.emptySet(), { clips: [A] }, { clips: [C] }), { groups: [[A], [C]], voices: [] });
+  assert.equal(S.pairClips(S.emptySet(), { clips: [] }, name), null);
+  assert.equal(S.pairClips(S.emptySet(), word, {}), null);
+});
+
+test("only a change from one meaning to another is a real change", () => {
+  const was = { updated: 1, meaning: "aunt" };
+  assert.equal(S.isRealChange(was, { updated: 2, meaning: "grandmother" }), true);
+  assert.equal(S.isRealChange(was, { updated: 2, meaning: " Aunt" }), false);
+  assert.equal(S.isRealChange({ updated: 1, skip: true }, { updated: 2, meaning: "aunt" }), false, "a first answer after a skip");
+  assert.equal(S.isRealChange(null, { updated: 2, meaning: "aunt" }), false);
+  assert.equal(S.isRealChange(was, { updated: 2, none: true }), false, "doesn't apply starts nothing again");
+  assert.equal(S.isRealChange({ updated: 1, none: true }, { updated: 2, meaning: "aunt" }), false);
+});
+
+test("a report's line says the answer, the doesn't-apply wording, or that there is none", () => {
+  const set = { ...S.emptySet(), wording: { ...S.DEFAULT_WORDING, none: "Not mine" } };
+  assert.equal(S.answerLine(set, "Lan", { updated: 1, meaning: "aunt" }, "Hanoi"), 'Their answer for Lan: "aunt" (Hanoi)');
+  assert.equal(S.answerLine(set, "Lan", { updated: 1, none: true }, ""), 'Their answer for Lan: "Not mine"');
+  assert.equal(S.answerLine(set, "Lan", null, "Hanoi"), "Their answer for Lan: not answered yet (Hanoi)");
+  assert.ok(S.answerLine(set, "x".repeat(300), null, "").length <= 200);
+});

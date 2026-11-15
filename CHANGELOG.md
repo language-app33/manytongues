@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.631 — 15 November 2026
+
+**A card with several pictures now shows a different one each time you get
+it right.** Where a teacher has given a card two, three or four photos,
+the questions that show its picture take turns between them: the next one
+after each right answer, and the same one again after a miss, so a
+question you missed comes back looking the same. The picture choices do
+the same. Lists of cards and the editors still show the first photo.
+
+Where a teacher has said who is speaking on a recording, the name now
+shows under the play button: "Recorded by …".
+
+The rest of this release is the third step towards personal sets: how a
+picture in a set is practised, taking turns between its name, the
+student's own word and both together. No teacher can make a set yet, so
+nobody meets that part.
+
+To check by hand: practise a card with three pictures from its picture
+(Picture → choose, or Picture → writing). Get it right and it should show
+the next photo the next time it comes round; get it wrong and the same
+photo again.
+
 ## 0.630 — 15 November 2026
 
 **A second step towards personal sets, still with nothing you can see.**
