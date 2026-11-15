@@ -8433,3 +8433,19 @@ already switched off by the same shortcuts.
 **The teacher's counts** (`untaughtWithoutEnglish`, `withoutQuestions`)
 read the teacher's cards, never a student's device: a rough reading of what
 a word card can be asked from what it holds. Word cards only.
+
+## A spelling near miss keeps the run when writing from the meaning (0.628)
+
+**15 November 2026** · `keepsRun` and `markedState` in `src/grade.ts`,
+`tests/near-miss-run.test.mjs`
+
+Stage F1 of the plan, which needs none of the skill doors and so ships
+although the skill rules stay off. On an exercise that makes the word from
+its meaning (`WM` produce in `src/word-skills.ts`: `en2ar`, `img2ar`,
+`ctx2ar`, `own2ar`), an answer the language marks `near` or `harakat`
+appends nothing to `hist`. `solid` and `missedTwice` read `hist`, so the
+answer neither counts towards right twice running nor breaks it, and does
+not take the passes away. The rating (hard), the near-miss count and the
+schedule are as before. Only those two reasons: `missing`, `ending` and
+`otherForm` are near misses too, but about the word's form rather than its
+spelling, and the plan names the two.

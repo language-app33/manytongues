@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.628 — 15 November 2026
+
+**A small spelling slip no longer costs you a word you know.** When you
+write a word from its meaning (from its English, its picture, a phrase it
+is in, or its figures), getting it right twice running is what proves you
+know it. A near miss there, one letter out or the right letters with the
+wrong harakat, used to count as getting it wrong, so right, near miss,
+right wasn't "twice running" and you had to start again. A near miss now
+leaves the run as it was: it doesn't count towards it, and it doesn't
+break it.
+
+Everything else about a near miss is unchanged: it is still marked as a
+near miss and the word still comes round again soon. Other kinds of
+question are unchanged too.
+
+To check by hand: on a word you are writing from its English, answer
+right, then make a one-letter slip, then answer right. The word should
+count as right twice running.
+
 ## 0.627 — 14 November 2026
 
 **Teachers can run a course with less English, or none.** A course's
