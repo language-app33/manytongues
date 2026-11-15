@@ -181,6 +181,7 @@ import {
   Popover,
   DeckSwitch,
   DeckPickScreen,
+  PickSheet,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
 export { LanguageTag, languageName } from "./shared.tsx";
@@ -1753,7 +1754,8 @@ const MODE_LABEL: Record<PracticeMode, string> = {
 };
 
 /*
- * A deck as a personal set (0.632): off, or on with its wording, its word
+ * A personal set's own section, on its deck screen (0.632; since 0.633
+ * only on a deck made as a set, which stays one): its wording, its word
  * lists (other decks of the same courses), the words said with the name,
  * and what is asked. The deck's cards with a picture are the set's
  * pictures, edited as any deck's cards are; nothing here touches them.
@@ -1773,12 +1775,11 @@ function SetSection({ deck, decks, cards, busy, onSave }: {
   decks: Deck[];
   cards: Card[];
   busy?: boolean;
-  onSave: (next: SetConfig | null) => void;
+  onSave: (next: SetConfig) => void;
 }) {
   const saved = readSet(deck.set, deck.id);
   const [draft, setDraft] = useState<SetConfig | null>(saved);
   const [picking, setPicking] = useState(false);
-  const [askingOff, setAskingOff] = useState(false);
   /* A save elsewhere — another teacher, this one on another device —
      starts the draft again from what is stored. */
   const savedKey = JSON.stringify(saved);
@@ -1805,27 +1806,7 @@ function SetSection({ deck, decks, cards, busy, onSave }: {
       </span>
     </div>
   );
-  const onOff = (
-    <Segmented
-      label="Personal set"
-      disabled={busy}
-      options={[{ value: "off", label: "Off" }, { value: "on", label: "On" }]}
-      value={draft ? "on" : "off"}
-      onChange={(v) => {
-        if (v === "on") setDraft(draft || saved || emptySet());
-        else if (saved) setAskingOff(true);
-        else setDraft(null);
-      }}
-    />
-  );
-  if (!draft) {
-    return (
-      <div className="at-formblock" data-el="set-section">
-        {head}
-        {onOff}
-      </div>
-    );
-  }
+  if (!draft) return null;
   if (picking) {
     return (
       <DeckPickScreen
@@ -1850,7 +1831,6 @@ function SetSection({ deck, decks, cards, busy, onSave }: {
   return (
     <div className="at-formblock" data-el="set-section">
       {head}
-      {onOff}
       <Help>Its pictures are this deck&rsquo;s cards that have a picture. Add and record them as on any deck.</Help>
 
       {SET_WORDING.map(([key, label, lede]) => (
@@ -1920,22 +1900,9 @@ function SetSection({ deck, decks, cards, busy, onSave }: {
 
       <Help>You won&rsquo;t see what each student chose. It is included only in a problem report a student sends.</Help>
       <div className="at-chips at-mt3">
-        <Button variant="primary" icon="save" disabled={busy || !changed} onClick={() => onSave(readSet(draft, deck.id))}>Save</Button>
+        <Button variant="primary" icon="save" disabled={busy || !changed} onClick={() => onSave(readSet(draft, deck.id) || emptySet())}>Save</Button>
       </div>
 
-      {askingOff && (
-        <ConfirmModal
-          title="Make this an ordinary deck again?"
-          body={<p>Its wording, lists and ticks are removed. Students&rsquo; answers are kept with their progress, and used again if you switch it back on.</p>}
-          confirmLabel="Switch it off"
-          onCancel={() => setAskingOff(false)}
-          onConfirm={() => {
-            setAskingOff(false);
-            setDraft(null);
-            onSave(null);
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -4838,6 +4805,15 @@ function lockedNote(titles: Set<string>): string {
  * deck (its courses, its lock, what it holds) is on the deck's screen once
  * it is saved, as a card's exercises wait for the card to be saved.
  */
+/* The three kinds a new deck can be (0.633): chosen first, on a sheet,
+   and fixed once it is made. */
+type NewKind = "deck" | "unit" | "set";
+const NEW_KINDS: { kind: NewKind; title: string; meta: string }[] = [
+  { kind: "deck", title: "Regular deck", meta: "A set of cards, for any course." },
+  { kind: "unit", title: "Unit", meta: "One step of a course's path, opened in order." },
+  { kind: "set", title: "Personal set", meta: "Pictures each student answers a question about once, then practises with their own word." },
+];
+
 function NewDeck({
   choices,
   mustAsk,
@@ -4845,25 +4821,36 @@ function NewDeck({
   busy,
   onSave,
   onClose,
+  kind = "deck",
+  courses = [],
 }: {
   choices: Record<LangId, Lang>;
   mustAsk?: boolean;
   initialLang?: LangId;
   busy?: boolean;
-  onSave: (title: string, lang: LangId) => void;
+  /** `courseId` for a unit, which goes at the end of that course's path. */
+  onSave: (title: string, lang: LangId, courseId: string) => void;
   onClose: () => void;
+  kind?: NewKind;
+  /** The courses a unit can be made in. */
+  courses?: { id: string; title: string }[];
 }) {
   const [title, setTitle] = useState("");
   const [lang, setLang] = useState(initialLang || "");
+  const [courseId, setCourseId] = useState(courses.length === 1 ? courses[0].id : "");
   const [discarding, setDiscarding] = useState(false);
   const snack = useSnackbar();
-  const canSave = title.trim() && (!mustAsk || lang);
-  const changed = !!title.trim() || (!!mustAsk && !!lang);
+  const unit = kind === "unit";
+  /* A unit's language is its course's. */
+  const asksLang = !!mustAsk && !unit;
+  const canSave = title.trim() && (!asksLang || lang) && (!unit || courseId);
+  const changed = !!title.trim() || (asksLang && !!lang) || (unit && !!courseId && courses.length > 1);
+  const noun = unit ? "unit" : kind === "set" ? "personal set" : "deck";
 
   return (
     <>
     <Screen
-      title="Create deck"
+      title={`Create ${noun}`}
       onBack={() => (changed ? setDiscarding(true) : onClose())}
       backIcon="close"
       backLabel="Cancel"
@@ -4877,16 +4864,16 @@ function NewDeck({
         onClick: () => {
           if (busy) return;
           if (!canSave) snack("Some required fields are missing. They're marked with *.", "warn");
-          else onSave(title.trim(), lang);
+          else onSave(title.trim(), lang, courseId);
         },
       }}
       className="cardform"
     >
       <div className="at-formblock">
         <div className="at-formhead">
-          <span className="at-formnum">This deck</span>
+          <span className="at-formnum">{unit ? "This unit" : kind === "set" ? "This personal set" : "This deck"}</span>
         </div>
-        <Field label={<>Deck name<span className="at-reqstar" aria-hidden="true" /></>}>
+        <Field label={<>{unit ? "Unit name" : kind === "set" ? "Set name" : "Deck name"}<span className="at-reqstar" aria-hidden="true" /></>}>
           <input
             className="at-input"
             placeholder="e.g. Week 3 · Verbs"
@@ -4896,7 +4883,22 @@ function NewDeck({
           />
         </Field>
 
-        {mustAsk && (
+        {unit && (
+          courses.length ? (
+            <RadioGroup
+              label="Course"
+              name="new-unit-course"
+              lede="The unit goes at the end of this course's path, as a draft."
+              value={courseId || null}
+              onChange={setCourseId}
+              options={courses.map((c) => ({ value: c.id, label: c.title }))}
+            />
+          ) : (
+            <Help>A unit belongs to a course's path, and you teach no course yet.</Help>
+          )
+        )}
+
+        {asksLang && (
           <LanguageRadio
             languages={choices}
             value={lang}
@@ -4906,13 +4908,19 @@ function NewDeck({
           />
         )}
 
-        {mustAsk && !lang && <Help>Choose the language it holds.</Help>}
-        <Help className="at-mt3">Save the deck to add cards to it and share it with a course.</Help>
+        {asksLang && !lang && <Help>Choose the language it holds.</Help>}
+        <Help className="at-mt3">
+          {unit
+            ? "Save the unit to add its words and sentences."
+            : kind === "set"
+            ? "Save the set to add its pictures. Once it is in a course, choose its word lists on its screen."
+            : "Save the deck to add cards to it and share it with a course."}
+        </Help>
       </div>
     </Screen>
     {discarding && (
       <ConfirmModal
-        title="Discard this deck?"
+        title={`Discard this ${noun}?`}
         body={<p>Nothing has been saved yet.</p>}
         confirmLabel="Discard"
         onCancel={() => setDiscarding(false)}
@@ -6356,6 +6364,15 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      typing rather than after it. */
   const offline = useOffline();
   const [naming, setNaming] = useState<"new" | null>(null);
+  /* What kind of deck "New deck" makes: chosen on a sheet first, outside
+     My space, where only a regular deck can be made (0.633). */
+  const [choosingKind, setChoosingKind] = useState(false);
+  const [newKind, setNewKind] = useState<NewKind>("deck");
+  const newDeck = () => {
+    setNewKind("deck");
+    if (mineSide) setNaming("new");
+    else setChoosingKind(true);
+  };
   const [confirm, setConfirm] = useState<Pending | null>(null); // whatever is awaiting a yes
   /* Open a card to read it: the editor, locked. */
   const openCard = (c: Card | null | undefined) => {
@@ -7722,17 +7739,25 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   if (naming) {
     return (
       <NewDeck
+        kind={newKind}
+        courses={courses.map((c) => ({ id: c.id, title: c.title }))}
         choices={choicesOn}
         mustAsk={mustAskOn}
         initialLang={knownOn.length === 1 ? soleLangOn : ""}
         busy={busy}
         onClose={() => setNaming(null)}
-        onSave={(title, lang) =>
+        onSave={(title, lang, courseId) =>
           run(
             async () => {
-              const r = await API.createDeck(title, "", lang || soleLangOn, mineSide);
+              /* A unit is made on its course's path; a personal set is a
+                 deck made, then marked as a set (0.633). */
+              const r: any = newKind === "unit"
+                ? await API.createUnit(courseId, title)
+                : await API.createDeck(title, "", lang || soleLangOn, mineSide);
+              if (newKind === "set" && r && r.deck && r.deck.id) await API.saveSet(r.deck.id, emptySet());
               setNaming(null);
               await refresh();
+              if (newKind === "unit") setUnitCourse(courseId);
               if (r && r.deck && r.deck.id) setOpenDeck(r.deck.id);
             },
             `${title} created`
@@ -9434,9 +9459,9 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               </Field>
             </div>
 
-            {/* Whether this deck is a personal set, and how (0.632). Not
-                for a deck in My space: a set is a course's. */}
-            {!d.personal && (
+            {/* A personal set's wording, lists and ticks (0.632). Only on a
+                deck made as one (0.633). */}
+            {d.set && !d.personal && (
               <SetSection
                 deck={d}
                 decks={decks}
@@ -9451,7 +9476,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                       const { set: _was, ...rest } = x;
                       return set ? { ...rest, set } : rest;
                     }));
-                  }, next ? `${d.title} is a personal set` : `${d.title} is an ordinary deck again`)
+                  }, `${d.title} saved`)
                 }
               />
             )}
@@ -10355,6 +10380,18 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 A deck is a set of cards. A deck can be used to group cards by theme, class, or objective. Students see a deck once it's added to a course they belong to.
               </Help>
 
+              {choosingKind && (
+                <PickSheet title="New deck" lede="What kind of deck? This can't be changed once it is made." onClose={() => setChoosingKind(false)}>
+                  {NEW_KINDS.map((k) => (
+                    <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
+                      setChoosingKind(false);
+                      setNewKind(k.kind);
+                      setNaming("new");
+                    }} />
+                  ))}
+                </PickSheet>
+              )}
+
               <ItemList
                 noun="deck"
                 items={onDecks}
@@ -10371,7 +10408,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   <Nudge
                     icon="folder"
                     action={
-                      <Button variant="primary" icon="add" onClick={() => setNaming("new")}>
+                      <Button variant="primary" icon="add" onClick={newDeck}>
                         New deck
                       </Button>
                     }
@@ -10381,7 +10418,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
                 tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
-                onNew={() => setNaming("new")}
+                onNew={newDeck}
                 selected={selDecks}
                 onSelectedChange={setSelDecks}
                 bulkActions={[

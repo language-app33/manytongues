@@ -8,6 +8,31 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.633 — 15 November 2026
+
+**New deck now asks what kind of deck you want: a regular deck, a unit, or
+a personal set.** In Teaching, pressing New deck opens a short sheet with
+the three choices.
+
+- **Regular deck** is made exactly as before.
+- **Unit** asks for its name and which of your courses it belongs to, and
+  goes at the end of that course's path as a draft. The New unit button
+  on a course's page is still there too.
+- **Personal set** asks for its name (and language, where there is a
+  choice). Once it is in a course, its screen is where you choose its word
+  lists and write its wording.
+
+The kind is fixed once a deck is made. So the Personal set section no
+longer appears on every deck with an On/Off switch: it is only on decks
+made as personal sets, and has no switch. In My space, New deck makes a
+regular deck straight away, as before.
+
+To check by hand: in Teaching, press New deck and check the three choices.
+Make a unit and check it appears at the end of its course's path. Make a
+personal set, add it to a course, and check its screen offers that
+course's other decks as word lists. Open an ordinary deck and check it
+has no Personal set section.
+
 ## 0.632 — 15 November 2026
 
 **Personal sets: a deck of pictures each student answers once, then

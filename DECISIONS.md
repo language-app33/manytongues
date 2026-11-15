@@ -8607,3 +8607,26 @@ them says so. A teacher trying a set's picture has no answers, so the
 trial gets a stand-in: the first list, and every picture answered with
 that list's first word (`standInSets`); with no list, the name alone.
 
+## A new deck's kind is chosen first, and fixed (0.633)
+
+**15 November 2026** · `NewDeck`, `NEW_KINDS`, `newDeck` and
+`SetSection` in `src/spaces.tsx`; `tests/smoke.mjs`
+
+The owner's choice (1a, 2b, 3a, 4a, 5a, 6a): New deck opens a sheet with
+three kinds, a regular deck, a unit and a personal set, instead of a
+Personal set switch on every deck. A unit asks for its course, because it
+is made on that course's path (`create-unit`); the course page keeps its
+own New unit. A personal set is made like a deck, through `create-deck`,
+and marked as a set at once with `save-set` and the empty set; it asks for
+no course, so its lists are chosen on its screen once it is in one. The
+section is shown only on a deck that is a set, with no switch: the kind is
+fixed once made, so nothing about students' answers ever has to be
+undone. In My space the sheet is skipped and a regular deck is made, as
+before. No server change. Cost: a teacher who wants a set or a unit of an
+existing deck makes a new one and moves the cards (see BACKLOG.md,
+"Turning an existing deck into a unit").
+
+The deck-screen walk that reads an open deck's headings is back to its
+original "This deck | Cards": an ordinary deck has no Personal set
+section any more.
+

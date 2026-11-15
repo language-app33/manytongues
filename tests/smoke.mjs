@@ -324,6 +324,8 @@ const savedParts = [];
    second list, while the walk at the foot asks for it (0.632). */
 /** @type {any[]} */
 const savedSets = [];
+/** @type {any[]} */
+const madeUnits = [];
 let teacherSets = false;
 /* What the deck screen's Lock asked the server to do. */
 /** @type {any[]} */
@@ -534,7 +536,12 @@ const fakeFetch = async (input, opts = {}) => {
         decks: [
           { id: "d1", title: "Lesson 1", owner: account.handle, lang: "ar-PS", cardIds: [card.id, phrase.id], cardCount: 2, courses: [{ courseId: "c1", addedAt: 1 }] },
           { id: "d2", title: "Introductions", owner: account.handle, lang: "ar-PS", cardIds: [frameCard.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 2 }] },
-          ...(teacherSets ? [{ id: "d4", title: "Family words", owner: account.handle, lang: "ar-PS", cardIds: [card.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 4 }] }] : []),
+          ...(teacherSets ? [
+            { id: "d4", title: "Family words", owner: account.handle, lang: "ar-PS", cardIds: [card.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 4 }] },
+            { id: "d5", title: "Our family", owner: account.handle, lang: "ar-PS", cardIds: [], cardCount: 0, courses: [{ courseId: "c1", addedAt: 5 }],
+              set: { wording: { question: "Who is this person to you?", none: "I don't know this person", askName: "Who is this?", askWord: "What do you call this person?", askBoth: "Their name, with what you call them" },
+                lists: [], named: [], asks: { name: true, word: true, both: true }, order: "before" } },
+          ] : []),
         ],
       });
     }
@@ -566,6 +573,12 @@ const fakeFetch = async (input, opts = {}) => {
     }
     /* Whose numbers a deck uses (0.541): nobody here has any. */
     if (action === "number-sources") return json({ ok: true, sources: [], chosen: "" });
+    if (action === "create-unit" && teacherSets) {
+      const body = JSON.parse(opts.body || "{}");
+      madeUnits.push(body);
+      return json({ ok: true, deck: { id: "made-unit", unit: true, title: body.title, owner: account.handle, lang: "ar-PS", cardIds: [], cardCount: 0, courses: [{ courseId: body.courseId }] },
+        course: { id: "c1", title: "Arabic 101", language: "ar-PS", decks: ["d1", "made-unit"], path: ["made-unit"], students: [], teachers: [account.handle], role: "teacher" } });
+    }
     if (action === "save-set") {
       const body = JSON.parse(opts.body || "{}");
       savedSets.push(body);
@@ -9166,8 +9179,8 @@ const openPronounTables = async () => {
     const deckHeads = deckSheet
       ? [...deckSheet.querySelectorAll(".at-formnum, .at-section > .at-sectiontop > .at-eyebrow")].map((h) => (h.textContent || "").trim())
       : [];
-    check("an open deck is headed like a card's screen, This deck, then Personal set (0.632), to Cards",
-      deckHeads.join(" | ") === "This deck | Personal set | Cards",
+    check("an open deck is headed like a card's screen, This deck to Cards",
+      deckHeads.join(" | ") === "This deck | Cards",
       deckHeads.join(" | ") || "(not laid out like the card editor)");
     const thisDeck = deckSheet && deckSheet.querySelector(".at-formblock");
     const labels = thisDeck ? [...thisDeck.querySelectorAll(".at-label")].map((l) => (l.textContent || "").trim()) : [];
@@ -12549,10 +12562,12 @@ const openPronounTables = async () => {
   check("and nothing threw on the path's screens", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
-/* ---- a deck made a personal set, by its teacher (0.632) ----
-   The deck screen's Personal set section: switched on, the question
-   changed, two lists added, a word ticked, the word put after the name,
-   saved; then switched off. What save-set was sent is what is checked. */
+/* ---- a new deck's kind, and a personal set's section (0.632, 0.633) ----
+   New deck asks first what kind: a regular deck, a unit or a personal
+   set. A unit asks for its course; a personal set is made as a deck and
+   marked as a set. An ordinary deck has no Personal set section; a set
+   has one, with no switch: its question changed, two lists added, a word
+   ticked, the word after the name, saved. */
 {
   const before = errors.length;
   localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
@@ -12573,28 +12588,90 @@ const openPronounTables = async () => {
   const frame = () => host.querySelector(".at-screen.bare") || host;
   const tab = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
     .filter((b) => re.test((b.textContent || "").trim())).pop();
-  click(tab(/^Material$/) || null);
+  const toDecks = async () => {
+    click(tab(/^Material$/) || null);
+    await sleep(400);
+    click(tab(/^Decks$/) || null);
+    await sleep(500);
+  };
+  await toDecks();
+  const sheetRows = () => [...document.querySelectorAll(".at-sheet .at-openrow")].map((b) => (b.querySelector(".at-decktitle") || b).textContent || "");
+  const openSheet = async () => {
+    click(buttonNamed(/^New deck$/));
+    await sleep(300);
+  };
+  await openSheet();
+  check("New deck asks what kind: a regular deck, a unit or a personal set",
+    sheetRows().join(" | ") === "Regular deck | Unit | Personal set", sheetRows().join(" | ") || "no sheet");
+  const setValue = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set;
+  const name = async (/** @type {string} */ v) => {
+    const box = /** @type {HTMLInputElement | null} */ ([...document.querySelectorAll(".at-screen.cardform .at-formblock input.at-input")].pop() || null);
+    if (box) {
+      setValue?.call(box, v);
+      box.dispatchEvent(new w.Event("input", { bubbles: true }));
+      await sleep(120);
+    }
+  };
+  const save = async () => {
+    click([...document.querySelectorAll('.at-fab[aria-label="Save"]')].pop() || null);
+    await sleep(700);
+  };
+  click([...document.querySelectorAll(".at-sheet .at-openrow")].find((b) => /Personal set/.test(b.textContent || "")) || null);
   await sleep(400);
-  click(tab(/^Decks$/) || null);
-  await sleep(500);
-  click([...frame().querySelectorAll(".at-deckcard, .at-minicard, .at-tile")].find((t) => /Lesson 1/.test(t.textContent || "")) || null);
-  await sleep(600);
-  const section = () => /** @type {HTMLElement | null} */ ([...document.querySelectorAll('[data-el="set-section"]')].pop() || null);
-  check("an open deck has a Personal set section, off", !!section() && /Personal set/.test(section()?.textContent || ""), section() ? "" : "no section");
-  const segment = (/** @type {RegExp} */ re) => [...(section() || document).querySelectorAll(".at-segmented button")].find((b) => re.test((b.textContent || "").trim()));
-  click(segment(/^On$/) || null);
+  const screenTitle = () => (([...document.querySelectorAll(".at-screen.cardform .at-screenhead h2")].pop() || {}).textContent || "").trim();
+  check("choosing Personal set opens Create personal set", screenTitle() === "Create personal set", screenTitle());
+  const madeBefore = madeDecks.length;
+  const setsBefore = savedSets.length;
+  await name("Grandparents");
+  await save();
+  const madeSet = madeDecks[madeDecks.length - 1];
+  const markedSet = savedSets[savedSets.length - 1];
+  check("saved, it is made as a deck and marked as a personal set",
+    madeDecks.length === madeBefore + 1 && madeSet.title === "Grandparents" && savedSets.length === setsBefore + 1
+      && markedSet.deckId === `made${madeDecks.length}` && !!markedSet.set,
+    JSON.stringify({ madeSet, markedSet }));
+  backOut();
   await sleep(300);
+  await toDecks();
+  await openSheet();
+  click([...document.querySelectorAll(".at-sheet .at-openrow")].find((b) => /^Unit/.test((b.querySelector(".at-decktitle") || b).textContent || "")) || null);
+  await sleep(400);
+  check("choosing Unit asks for its course", screenTitle() === "Create unit" && /Course/.test((([...document.querySelectorAll(".at-screen.cardform")].pop() || {}).textContent) || ""),
+    screenTitle());
+  await name("Family unit 2");
+  await save();
+  const unitMade = madeUnits[madeUnits.length - 1];
+  check("and saved, it is made on that course's path", !!unitMade && unitMade.courseId === "c1" && unitMade.title === "Family unit 2", JSON.stringify(unitMade));
+  backOut();
+  await sleep(300);
+  await toDecks();
+  const openTile = async (/** @type {RegExp} */ re) => {
+    click([...frame().querySelectorAll(".at-deckcard, .at-minicard, .at-tile")].find((t) => re.test(t.textContent || "")) || null);
+    await sleep(600);
+  };
+  const section = () => /** @type {HTMLElement | null} */ ([...document.querySelectorAll('[data-el="set-section"]')].pop() || null);
+  await openTile(/Lesson 1/);
+  check("an ordinary deck has no Personal set section", !section(), "a section on Lesson 1");
+  backOut();
+  await sleep(400);
+  const setTile = [...frame().querySelectorAll(".at-deckcard, .at-minicard, .at-tile")].find((t) => /Our family/.test(t.textContent || ""));
+  check("a set's tile in the list says Personal set", !!setTile && /Personal set/.test(setTile.textContent || ""), setTile ? setTile.textContent || "" : "no tile");
+  await openTile(/Our family/);
+  check("a set's deck has its section, with no switch to turn it off",
+    !!section() && !/^(On|Off)$/m.test([...(section() || document).querySelectorAll(".at-segmented button")].map((b) => (b.textContent || "").trim()).join("\n")),
+    section() ? (section()?.textContent || "").slice(0, 200) : "no section");
+  const segment = (/** @type {RegExp} */ re) => [...(section() || document).querySelectorAll(".at-segmented button")].find((b) => re.test((b.textContent || "").trim()));
   const box = /** @type {HTMLInputElement | null} */ ((section() || document).querySelector('input[aria-label="The question"]'));
-  check("switched on, it shows the wording, starting at the defaults", !!box && box.value === "Who is this person to you?", box ? box.value : "no box");
+  check("it shows the wording, starting at the defaults", !!box && box.value === "Who is this person to you?", box ? box.value : "no box");
   if (box) {
-    must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(box, "Who is she to you?");
+    setValue?.call(box, "Who is she to you?");
     box.dispatchEvent(new w.Event("input", { bubbles: true }));
     await sleep(150);
   }
   click(buttonNamed(/^Add a list$/));
   await sleep(400);
   const pickRow = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-tickrow")].find((row) => re.test(row.textContent || ""));
-  check("the lists offered are the other decks of the course", !!pickRow(/Introductions/) && !!pickRow(/Family words/) && !pickRow(/Lesson 1/),
+  check("the lists offered are the other decks of the course, not sets", !!pickRow(/Introductions/) && !!pickRow(/Family words/) && !pickRow(/Our family/),
     [...document.querySelectorAll(".at-tickrow")].map((x) => x.textContent).join(" | "));
   click(pickRow(/Introductions/)?.querySelector("input"));
   await sleep(150);
@@ -12612,19 +12689,13 @@ const openPronounTables = async () => {
   await sleep(600);
   const sent = savedSets[savedSets.length - 1];
   check("Save sends the whole set to save-set",
-    !!sent && sent.deckId === "d1" && sent.set && sent.set.wording.question === "Who is she to you?"
+    !!sent && sent.deckId === "d5" && sent.set && sent.set.wording.question === "Who is she to you?"
       && JSON.stringify(sent.set.lists) === JSON.stringify(["d2", "d4"]) && sent.set.named.includes(card.id) && sent.set.order === "after",
     JSON.stringify(sent));
-  click(segment(/^Off$/) || null);
-  await sleep(300);
-  click(buttonNamed(/^Switch it off$/));
-  await sleep(600);
-  const off = savedSets[savedSets.length - 1];
-  check("switched off, after asking, it sends null", savedSets.length >= 2 && off.set === null, JSON.stringify(off));
   teacherSets = false;
   r.unmount();
   host.remove();
-  check("and nothing threw on a deck's Personal set section", errors.length === before, errors.slice(before, before + 3).join(" | "));
+  check("and nothing threw making decks of each kind, or on a set's section", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
 /* ---- who is speaking, on a recording (0.632) ----
