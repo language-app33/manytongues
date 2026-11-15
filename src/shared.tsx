@@ -1474,6 +1474,14 @@ export function clipsOf(form?: { clips?: string[]; slowClips?: string[] }) {
   return out;
 }
 
+/* The same, with who is speaking on each where the teacher said (0.629):
+   "Recorded by" and the name, beside the speed. For the screens that list
+   a form's recordings; a question's player reads `voices` itself. */
+export function voicedClips(form?: { clips?: string[]; slowClips?: string[]; voices?: Record<string, string> }) {
+  const voices = (form && form.voices) || {};
+  return clipsOf(form).map((c) => (voices[c.id] ? { ...c, label: `${c.label} · Recorded by ${voices[c.id]}` } : c));
+}
+
 /* Whether a form has any recording at all, whichever speed it is at. */
 export const formHasAudio = (form?: { clips?: string[]; slowClips?: string[] }) =>
   CLIP_KINDS.some((k) => ((form && form[k.key]) || []).length > 0);
@@ -2918,7 +2926,7 @@ function ReadSaid({ form, lang }: { form: Record<string, any>; lang: Lang }) {
 
 /** How a form sounds, at each speed it was recorded at. */
 function ReadSound({ form }: { form: Record<string, any> }) {
-  const clips = clipsOf(form);
+  const clips = voicedClips(form);
   if (!clips.length) return null;
   return (
     <>
@@ -3398,7 +3406,7 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
                   </p>
                   {line.en ? <p className="at-scenemeaning"><Written text={asMeaning(line.en)} /></p> : null}
                   {line.lat ? <p className="at-scenemeaning"><Written text={line.lat} /></p> : null}
-                  {clipsOf(line).length ? <ClipList clips={clipsOf(line)} /> : null}
+                  {clipsOf(line).length ? <ClipList clips={voicedClips(line)} /> : null}
                   {teacher ? <ReadAsked form={line as Record<string, any>} /> : null}
                   <ReadTaught
                     of={line as Record<string, any>}
@@ -5124,6 +5132,8 @@ export function cardToItem(card: Card, deckTitle: string, courseId: string, deck
        two is right half the time. */
     lang: card.lang,
     recs: recsOf(f),
+    /* Who is speaking on each recording, where the teacher said (0.629). */
+    ...(f.voices && typeof f.voices === "object" ? { voices: { ...f.voices } } : null),
     /* Its pictures, by hash — carried so that an exercise can show them.
        Absent on a form with none. */
     ...(Array.isArray(f.images) && f.images.length ? { images: f.images.slice() } : null),

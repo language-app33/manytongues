@@ -8,6 +8,21 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.629 — 15 November 2026
+
+**A first step towards personal sets, with nothing you can see yet.** A
+personal set will be a deck of pictures — the people in a family, say —
+that each student answers a question about once ("Who is this person to
+you?") and is then asked with their own word. This release teaches the
+server and the app to carry the two new pieces of information that needs:
+whether a deck is a personal set and how it is worded, and, on any
+recording, the name of whoever is speaking. Nothing yet sets either, so
+nothing changes for anyone.
+
+To check by hand: nothing to see. Cards, decks and recordings should
+behave exactly as before; a card saved and opened again keeps its
+recordings.
+
 ## 0.628 — 15 November 2026
 
 **A small spelling slip no longer costs you a word you know.** When you

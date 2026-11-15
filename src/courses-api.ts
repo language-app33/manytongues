@@ -7,6 +7,7 @@
  * something a person can read.
  */
 import type { Card, Feedback, Flag, LangId, User } from "./types.ts";
+import type { SetConfig } from "./sets.ts";
 import { renameLangIds } from "./lang-ids.ts";
 
 const ENDPOINT = "/api/courses";
@@ -388,6 +389,9 @@ export const lockDeck = (deckId: string, locked: boolean) => call("lock-deck", {
    whole list each time. */
 export const setDeckParts = (deckId: string, parts: string[]) =>
   call("set-deck-parts", { body: { deckId, parts } });
+/* Whether a deck is a personal set, and how: the whole set each time, or
+   null for an ordinary deck again (0.629). See src/sets.ts. */
+export const saveSet = (deckId: string, set: SetConfig | null) => call("save-set", { body: { deckId, set } });
 export const myCards = () => call("my-cards");
 /** Who a deck may take its numbers from, owner first (0.541). */
 export const numberSources = (deckId: string): Promise<{
@@ -685,6 +689,7 @@ export function explain(err: unknown): string {
       "own-space": "You can't close or delete a space your own account is in.",
       "not-reportable": "That's your own card. You can change it in My space.",
       "personal-deck": "A deck in My space can't go on a course. Copy it to the space first.",
+      "personal-set": "A deck in My space can't be a personal set. Copy it to the space first.",
       "personal-card": "A card in My space can't go in a deck of the space. Copy its deck to the space first.",
       "confirm-name": "Type the space's name exactly to confirm.",
       "admin-only": "Only the administrator can do that.",

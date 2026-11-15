@@ -148,6 +148,7 @@ const crossing = () => /** @type {[string, any][]} */ ([
   ["rename-deck", { body: { deckId: b.deck.id, title: "Mine now" } }],
   ["lock-deck", { body: { deckId: b.deck.id, locked: true } }],
   ["set-deck-parts", { body: { deckId: b.deck.id, parts: ["numbers:0-10"] } }],
+  ["save-set", { body: { deckId: b.deck.id, set: { lists: [] } } }],
   ["set-deck-numbers", { body: { deckId: b.deck.id, from: main.teacher.handle } }],
   ["delete-deck", { body: { deckId: b.deck.id } }],
   ["attach-deck", { body: { deckId: b.deck.id, courseId: main.course.id } }],
@@ -272,6 +273,8 @@ const PLACED = {
     "create-unit", "move-unit", "publish-unit", "open-unit",
     /* 0.627: a course's switches. */
     "set-course-practice",
+    /* 0.629: a personal set. */
+    "save-set",
   ],
   /* The App admin's tools for spaces themselves (stage 3), tried below. */
   spaces: [

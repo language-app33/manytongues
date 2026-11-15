@@ -8449,3 +8449,31 @@ not take the passes away. The rating (hard), the near-miss count and the
 schedule are as before. Only those two reasons: `missing`, `ending` and
 `otherForm` are near misses too, but about the word's form rather than its
 spelling, and the plan names the two.
+
+## Personal sets, stage 1: a set on a deck, a voice on a recording (0.629)
+
+**15 November 2026** · `src/sets.ts`, `save-set` and `voiceMap` in
+`server/api/courses.js`, `src/types.ts`, `cardToItem` and `voicedClips` in
+`src/shared.tsx`, `src/card-facts.ts`, `tests/sets.test.mjs`,
+`tests/sets-server.test.mjs`
+
+The first phase of `docs/PLAN-personal-sets.md`. A personal set is a deck
+with a `set` field (`SetConfig`): its wording, its word lists (other decks,
+by id), the words said with the name, and what is asked. One server action,
+`save-set`, modelled on `set-deck-parts`, writes it whole or removes it
+with null; it is read by `readSet`, a total hand-written reader with limits
+and default wording, which the server imports from `src/`. It goes into
+`materialVersion` only where present, so no existing version moves.
+`my-material` sends decks whole and every other deck write spreads the
+stored record, so nothing else on the server needed to know.
+
+Who is speaking is `voices` on a form, a name per recording hash, kept only
+for hashes in `clips` or `slowClips`, trimmed to forty characters, absent
+when empty. Narrowed beside `slowClips` for forms and scene lines; also in
+`RETIRED_CARD_FIELDS` so a card-level copy never lingers. The device
+carries it onto its forms; the read-out names each recording's speaker.
+
+The release numbers are one later than the plan's, which was written
+before 0.628 shipped. Cost: none visible; a deck field and a form field
+that older builds ignore.
+

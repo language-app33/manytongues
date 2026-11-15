@@ -38,6 +38,8 @@ import { tickCapitals } from "../../src/capitals.ts";
    way the app reads it. */
 import { countingCards, drawsFrom, isLiveIn, neverAskedAlone, unitProblems } from "../../src/path.ts";
 import { LANGUAGES } from "../../src/languages.ts";
+/* Personal sets (0.629): the one reader of what a teacher saves. */
+import { readSet } from "../../src/sets.ts";
 import { fillerCards } from "../../src/numbers/generate.ts";
 import { countedNouns, withNouns } from "../../src/numbers/nouns.ts";
 
@@ -279,6 +281,23 @@ const clipList = (list) =>
     .filter((/** @type {unknown} */ h) => typeof h === "string" && /^[a-f0-9]{64}$/.test(h))
     .slice(0, 12);
 
+/* Who is speaking on each recording of a form, by its hash (0.629): kept
+   only for recordings the form has, each name trimmed and at most forty
+   characters, an empty one dropped. Absent rather than empty on a form
+   with none, which is every form written before it. */
+/** @param {unknown} raw @param {string[]} heard */
+const voiceMap = (raw, heard) => {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const h of heard) {
+    const v = /** @type {Record<string, unknown>} */ (raw)[h];
+    const name = typeof v === "string" ? v.trim().slice(0, 40) : "";
+    if (name) out[h] = name;
+  }
+  return Object.keys(out).length ? { voices: out } : null;
+};
+
 /* The images on one form, narrowed the way its recordings are — names an
    image can have, and a handful of them: a picture is there to say what
    the word means, and four is already a gallery. */
@@ -300,7 +319,7 @@ const imagesOfCard = (card) =>
 
 const RETIRED_CARD_FIELDS = Object.fromEntries(
   [
-    "ar", "en", "lat", "clips", "slowClips", "answers", "subs", "ask", "lend",
+    "ar", "en", "lat", "clips", "slowClips", "voices", "answers", "subs", "ask", "lend",
     "row", "col", "of",
     /* Whatever grammatical values the languages declare, which were the
        card's when the card was a form. */
@@ -1035,7 +1054,10 @@ function materialVersion(courses, decks, fills = [], systems = []) {
        whether it is a path unit, only where it is one. */
     decks: decks.map((d) => {
       const row = [d.id, d.version || 1, d.title, (d.cardIds || []).length, (d.parts || []).join(",")];
-      return d.unit ? row.concat(["unit"]) : row;
+      const unit = d.unit ? row.concat(["unit"]) : row;
+      /* And its personal set, only where it is one (0.629): a teacher
+         changing the wording or the lists moves nothing else. */
+      return d.set ? unit.concat([JSON.stringify(d.set)]) : unit;
     }),
     /* The values a teacher has written are material too, and the only
        material that moves without a deck moving: a card that fills a
@@ -3304,6 +3326,8 @@ async function handle(req) {
               answers: storedAnswers(f),
               clips: clipList(f.clips),
               slowClips: clipList(f.slowClips),
+              /* And who is speaking on each, where the teacher said (0.629). */
+              ...voiceMap(f.voices, [...clipList(f.clips), ...clipList(f.slowClips)]),
               /* The pictures on this form — see imageList. Absent rather than
                  empty on a form with none, which is every form written before
                  a card could carry one. */
@@ -3385,6 +3409,7 @@ async function handle(req) {
                 lat: String(ln.lat || "").slice(0, 400),
                 clips: clipList(ln.clips),
                 slowClips: clipList(ln.slowClips),
+                ...voiceMap(ln.voices, [...clipList(ln.clips), ...clipList(ln.slowClips)]),
                 uses: Array.isArray(ln.uses)
                   ? [...new Set(ln.uses.map((/** @type {unknown} */ x) => String(x || "").replace(/[^A-Za-z0-9_-]/g, "")))]
                       .filter(Boolean)
@@ -4477,6 +4502,32 @@ async function handle(req) {
       /* And which of them reach nobody yet, so the deck can say so at once. */
       const waiting = next ? (await partsWaiting([next], await everyCourse(store))).get(next.id) : null;
       return json({ ok: true, parts, partsWaiting: waiting || [] });
+    }
+
+    /*
+     * Whether a deck is a personal set, and how (0.629): its wording, its
+     * word lists (other decks, by id), which words are said with the name,
+     * and what is asked. The whole of it each time, or null to make the
+     * deck an ordinary one again. A deck in My space is never one: a set's
+     * answers are a course's students'. Locked like the cards are, because
+     * the lists are what the deck holds as much as its cards — see
+     * src/sets.ts.
+     */
+    if (action === "save-set") {
+      const deck = await readDeck(store, String(body.deckId || ""));
+      if (!deck) return json({ error: "no-deck" }, 404);
+      if (!(await canEditDeck(store, deck, mine, iManage)))
+        return json({ error: "not-yours" }, 403);
+      if (deck.personal) return json({ error: "personal-set" }, 400);
+      if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
+      const next = await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
+        if (!fresh) return null;
+        const { set: _was, ...rest } = /** @type {any} */ (fresh);
+        const set = body.set === null ? null : readSet(body.set, fresh.id);
+        return { ...rest, ...(set ? { set } : null), updated: Date.now() };
+      });
+      await taught();
+      return json({ ok: true, deck: next });
     }
 
     /*

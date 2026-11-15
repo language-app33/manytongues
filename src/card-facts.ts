@@ -980,6 +980,19 @@ export const CARD_FACTS: FieldRule[] = [
     shown: (value) => (Array.isArray(value) && value.length ? [clipLabel("slowClips", value.length)] : []),
   },
   {
+    key: "voices",
+    on: "form",
+    label: "Recorded by",
+    what: "Who is speaking on each recording, where the teacher said.",
+    reader: "both",
+    /* The names, once each: which recording is whose is said beside each
+       one where the recordings are listed. */
+    shown: (value) =>
+      value && typeof value === "object" && !Array.isArray(value)
+        ? [...new Set(Object.values(value as Record<string, unknown>).filter((v): v is string => typeof v === "string" && !!v))]
+        : [],
+  },
+  {
     key: "images",
     on: "form",
     label: "Images",

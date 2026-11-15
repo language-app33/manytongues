@@ -60,6 +60,7 @@ const noun = {
       human: "thing",
       clips: [CLIP],
       slowClips: [SLOW],
+      voices: { [CLIP]: "Layla" },
       answers: [
         { text: "كِتاب", lat: "kitaab", number: "singular", gender: "masculine" },
         { text: "الكِتاب", lat: "il-kitaab", number: "singular", gender: "masculine" },

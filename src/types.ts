@@ -31,6 +31,7 @@
  * the two would be told apart by nothing but where you were standing.
  */
 import type { Range as SkillRange } from "./numbers/types.ts";
+import type { SetConfig } from "./sets.ts";
 export type { SkillRange };
 
 /**
@@ -887,6 +888,9 @@ export interface CardForm {
    * speeds.
    */
   slowClips?: string[];
+  /** Who is speaking on each recording of this form, by recording hash
+      (0.629). Only for hashes in `clips` or `slowClips`. */
+  voices?: Record<string, string>;
   /** Picture hashes — what this form means, shown. At most four; see
       ImageScreen. */
   images?: string[];
@@ -1309,6 +1313,12 @@ export interface Deck {
    * card that can be asked.
    */
   unit?: true;
+  /**
+   * Present means the deck is a personal set (0.629): its pictures are its
+   * cards with a picture, asked with each student's own word from one of
+   * its word lists. See src/sets.ts.
+   */
+  set?: SetConfig;
 }
 
 export interface Course {
@@ -1540,6 +1550,8 @@ export type Form = Record<string, any> & {
      a form on a device and a form on the server carry the same ones. */
   clips?: string[];
   slowClips?: string[];
+  /* Who is speaking on each recording, by hash, as CardForm holds it. */
+  voices?: Record<string, string>;
   /* Its pictures, by hash, as CardForm holds them. */
   images?: string[];
   s?: Record<string, ExerciseState>;
