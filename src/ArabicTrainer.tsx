@@ -349,7 +349,8 @@ import { agreeTook, countTook, finishTook, leadsOf, lineGate, passes, reviewOf, 
 import { castFill as castScene, filledScene, hasCast } from "./cast.ts";
 import { cardHeld, isPathUnit, mergeReached, pathRows, reachesFurther } from "./path.ts";
 import { allowedTypes, englishShown, readPractice } from "./course-practice.ts";
-import { allMapped } from "./word-skills.ts";
+import { allMapped, counts, ofSkill, skillOf, WORD_SKILL_MAP } from "./word-skills.ts";
+import type { Skill } from "./word-skills.ts";
 import type { CoursePractice } from "./course-practice.ts";
 import type { PathCourse, PathDeck, PathRow } from "./path.ts";
 import type { Review } from "./review.ts";
@@ -2498,6 +2499,7 @@ function sentenceWaits(line: Form, held: WordsHeld, lang: Lang): boolean {
    scheduler. Never in a language that has none to take off. */
 function formReadsBare(unit: Form | null | undefined, lang: Lang): boolean {
   if (!unit || !lang.marks) return false;
+  if (onSkillRules(unit, lang)) return skillReached(unit, lang);
   return readsBare(availableTypes(unit, lang), (t) => statesOf(unit)[t]);
 }
 
@@ -4505,7 +4507,8 @@ export function withoutQuestionAt(
    ------------------------------------------------------------------ */
 
 export const WORD_SKILLS_ON = false;
-let wordSkills = WORD_SKILLS_ON;
+let wordSkills =
+  WORD_SKILLS_ON || (typeof __WORD_SKILLS_TEST__ !== "undefined" && __WORD_SKILLS_TEST__ === true);
 /** For the tests, which run the whole suite both ways. */
 export function setWordSkills(on: boolean) {
   if (on === wordSkills) return;
@@ -4513,6 +4516,10 @@ export function setWordSkills(on: boolean) {
   forgetTypes();
 }
 export const wordSkillsOn = (): boolean => wordSkills;
+/** What a form may be dealt now — for the tests, which ask it of the doors. */
+export const dealtNow = (it: Form, settings: Settings): string[] => openPastPattern(it, settings);
+/** And the gate a sentence waits on — level two, or its skill reading. */
+export const gateReached = (it: Form, settings: Settings): boolean => levelGate(it, langOf(settingsFor(settings, it)), 2);
 
 /* Whether a form climbs by skill: the switch on, and the form in scope —
    a word, not from a number system, not a tense, a held person, a
@@ -4525,19 +4532,218 @@ function skillScoped(unit: Form, lang: Lang): boolean {
   const id = String(unit.id || "");
   if (id.startsWith("sys:") || isTenseForm(unit) || isHeld(unit) || sceneOf(id)) return false;
   if (/-l(?:~|\d)/.test(id)) return false;
+  /* Nor a cell of a table — a pronoun on the end of a word — which climbs
+     a rung's worth at a time (see easedUnits) and is not a word of its own. */
+  if (unit.row || unit.col) return false;
   const types = supportedRaw(unit, lang);
   return types.length > 0 && allMapped(types);
+}
+
+/* ------------------------------------------------------------------
+   The skill rules (stage D) — read only by the doors, only for a form on
+   them. See section 3 of the plan for R1 to R14.
+   ------------------------------------------------------------------ */
+
+interface SkillState {
+  skill: Skill;
+  /** Recognise keys that can pass the step (R3). */
+  recog: string[];
+  /** Practice-only recognise keys: dealt, never required. */
+  practice: string[];
+  /** The stepping stone, where there is one (R4). */
+  stone: string[];
+  /** Proof keys, in the order they are tried (R5). */
+  proofs: string[];
+  proven: boolean;
+  recogPassed: boolean;
+  stonePassed: boolean;
+}
+
+const answeredState = (s: ExerciseState | null | undefined): boolean =>
+  !!s && (s.phase !== "new" || (s.hist || []).length > 0);
+const lastRight = (s: ExerciseState | null | undefined): boolean => {
+  const h = (s && s.hist) || [];
+  return h.length > 0 && !!h[h.length - 1];
+};
+const lastWrong = (s: ExerciseState | null | undefined): boolean => {
+  const h = (s && s.hist) || [];
+  return h.length > 0 && !h[h.length - 1];
+};
+
+/* What the form has of each skill, read from what it supports (R1) and
+   what its records say. Nothing stored. */
+function skillStates(unit: Form, lang: Lang): SkillState[] {
+  const types = availableTypes(unit, lang);
+  const st = statesOf(unit);
+  const keys = (list: string[]) => list.flatMap((t) => keysFor(unit, t));
+  const solidKey = (k: string) => !!st[k] && solid(st[k]);
+  const out: SkillState[] = [];
+  for (const skill of ["US", "UH", "WH", "WM"] as Skill[]) {
+    const mine = ofSkill(types, skill);
+    const recogTypes = mine.filter((t) => skillOf(t)!.step === "recognise" && !skillOf(t)!.many);
+    let proofTypes = mine.filter((t) => skillOf(t)!.step === "produce");
+    let stoneTypes: string[] = [];
+    if (skill === "WH") {
+      const heard = ["rec2ar", "rec2ctx"].filter((t) => proofTypes.includes(t));
+      if (heard.length) {
+        stoneTypes = proofTypes.includes("tr2ar") ? ["tr2ar"] : [];
+        proofTypes = heard;
+      } else proofTypes = proofTypes.filter((t) => t === "tr2ar");
+    }
+    if ((skill === "US" || skill === "UH") && !proofTypes.length) {
+      proofTypes = mine.filter((t) => skillOf(t)!.many);
+    }
+    /* A skill is had only where something can prove it (R1, R5). */
+    if (!proofTypes.length) continue;
+    const proofs = keys(proofTypes);
+    const recog = keys(recogTypes.filter(counts));
+    const practice = keys(recogTypes.filter((t) => !counts(t)));
+    const stone = keys(stoneTypes);
+    const proven = proofs.some(solidKey);
+    out.push({
+      skill,
+      recog,
+      practice,
+      stone,
+      proofs,
+      proven,
+      /* Any one recognise exercise right twice running (R3); and a skill
+         proven once does not send the learner back to it (R10). */
+      recogPassed: proven || !recog.length || recog.some(solidKey),
+      stonePassed: proven || !stone.length || stone.every(solidKey),
+    });
+  }
+  return out;
+}
+
+/* A pass made on any key writing the word from its meaning, whether or not
+   that exercise is still supported or allowed: the form has been cleared
+   before (D6). The key with the most, or null. */
+function clearedBefore(unit: Form): string | null {
+  const st = statesOf(unit);
+  let best: string | null = null;
+  for (const [k, s] of Object.entries(st)) {
+    const m = WORD_SKILL_MAP[typeOf(k)];
+    if (!m || m.skill !== "WM" || m.step !== "produce" || !s || !((s.passes || 0) > 0)) continue;
+    if (!best || (s.passes || 0) > (st[best].passes || 0)) best = k;
+  }
+  return best;
+}
+
+/* The keys a form on the skill rules climbs with (R7): for each skill it
+   has, a solid proof where it is proven; otherwise what stands between it
+   and being proven. Cleared over these is every skill proven; the top of
+   them is the proof that writes the word from its meaning. */
+function skillLadder(unit: Form, lang: Lang): string[] {
+  const st = statesOf(unit);
+  const solidKey = (k: string) => !!st[k] && solid(st[k]);
+  const passesOf = (k: string) => (st[k] && st[k].passes) || 0;
+  const out: string[] = [];
+  for (const k of skillStates(unit, lang)) {
+    if (k.proven) {
+      const best = k.proofs.filter(solidKey).sort((a, b) => passesOf(b) - passesOf(a))[0];
+      out.push(best);
+      continue;
+    }
+    if (!k.recogPassed) out.push(...k.recog);
+    else if (k.recog.length) out.push(k.recog.find(solidKey)!);
+    if (!k.stonePassed) out.push(...k.stone);
+    out.push(...k.proofs);
+  }
+  return [...new Set(out)];
+}
+
+/* And the keys its standing is read from: the same, or — where the form
+   has made a pass writing the word from its meaning and is not cleared
+   over them — that key alone, which keeps it Cleared, and Learnt once it
+   holds two (D6, R14). */
+function skillStanding(unit: Form, lang: Lang): string[] {
+  const ladder = skillLadder(unit, lang);
+  const st = statesOf(unit);
+  if (ladder.length && cleared(ladder, (k) => st[k])) return ladder;
+  const before = clearedBefore(unit);
+  return before ? [before] : ladder;
+}
+
+/* Whether a form on the skill rules stands cleared. */
+const skillCleared = (unit: Form, lang: Lang): boolean => {
+  const keys = skillStanding(unit, lang);
+  return keys.length > 0 && cleared(keys, (k) => statesOf(unit)[k]);
+};
+
+/* What a form on the skill rules may be dealt now (R2, R4, R5, R9, R11). */
+function skillDeal(unit: Form, lang: Lang): string[] {
+  const st = statesOf(unit);
+  const solidKey = (k: string) => !!st[k] && solid(st[k]);
+  const all = skillStates(unit, lang);
+  const out: string[] = [];
+  if (skillCleared(unit, lang)) {
+    /* Reviews: the solid proofs of writing it from its meaning (R9). A
+       skill the form has gained since it cleared — a recording added, a
+       switch turned on — joins them, from its first step (R14). */
+    const wm = all.find((k) => k.skill === "WM");
+    const solidWm = wm ? wm.proofs.filter(solidKey) : [];
+    const before = clearedBefore(unit);
+    if (solidWm.length) out.push(...solidWm);
+    else if (before && availableTypes(unit, lang).includes(typeOf(before))) out.push(before);
+  }
+  const of = (skill: Skill) => all.find((k) => k.skill === skill);
+  const answeredAny = Object.values(st).some(answeredState);
+  const us = of("US");
+  const wmShown = !!clearedBefore(unit) || (of("WM") ? of("WM")!.proven : false);
+  const open = (skill: Skill) =>
+    skill === "US" || skill === "UH" ? true
+    : skill === "WH" ? answeredAny
+    : !us || us.proven || wmShown;
+  for (const k of all) {
+    if (k.proven || !open(k.skill)) continue;
+    if (!k.recogPassed) {
+      /* One of them at a time, varied by how many have been answered —
+         never all of them in one sitting (R11). */
+      const types = [...new Set(k.recog.concat(k.practice).map(typeOf))];
+      const n = k.recog.concat(k.practice).reduce((sum, key) => sum + ((st[key] && st[key].hist) || []).length, 0);
+      const pick = types[n % types.length];
+      out.push(...k.recog.concat(k.practice).filter((key) => typeOf(key) === pick));
+      continue;
+    }
+    if (!k.stonePassed) {
+      out.push(...k.stone);
+      continue;
+    }
+    /* A proof whose last answer was right finishes its run; after a miss,
+       the next proof the form supports (R5). */
+    const running = k.proofs.filter((p) => lastRight(st[p]));
+    if (running.length) {
+      out.push(...running);
+      continue;
+    }
+    const fresh = k.proofs.filter((p) => !lastWrong(st[p]));
+    out.push(...(fresh.length ? (k.skill === "WM" ? fresh : [fresh[0]]) : k.proofs));
+  }
+  return [...new Set(out)];
+}
+
+/* R13: "level two reached" for a form on the skill rules. */
+function skillReached(unit: Form, lang: Lang): boolean {
+  const all = skillStates(unit, lang);
+  const us = all.find((k) => k.skill === "US");
+  return us ? us.proven : all.some((k) => k.proven);
 }
 
 /* A gate other cards wait on: this form has reached `level` of its
    ladder, over what it supports. */
 function levelGate(unit: Form, lang: Lang, level: number): boolean {
+  if (level === 2 && onSkillRules(unit, lang)) return skillReached(unit, lang);
   const types = availableTypes(unit, lang);
   return !types.length || reachedLevel(types, (t) => statesOf(unit)[t], level);
 }
 
 /* And the stretch gate: every exercise the form supports through once. */
 function onceThrough(unit: Form, lang: Lang): boolean {
+  if (onSkillRules(unit, lang)) {
+    const keys = skillLadder(unit, lang);
+    return !keys.length || keys.every((k) => throughOnce(statesOf(unit)[k]));
+  }
   const types = availableTypes(unit, lang);
   return !types.length || types.every((t) => throughOnce(statesOf(unit)[t]));
 }
@@ -4773,6 +4979,9 @@ export function laddered(it: Form, settings: Settings): string[] {
  * DECISIONS.md, "A course's switches".
  */
 function standingKeys(it: Form, settings: Settings): string[] {
+  if (!isQuiet(it) && onSkillRules(it, langOf(settingsFor(settings, it)))) {
+    return isAsked(it) ? skillStanding(it, langOf(settingsFor(settings, it))) : [];
+  }
   const keys = laddered(it, settings);
   if (!practicesOf(it).some(Boolean) || !keys.length) return keys;
   const st = statesOf(it);
@@ -4812,6 +5021,8 @@ function ladderedOnceOpen(it: Form, settings: Settings): string[] {
   /* Nor for a person of a tense held as a skill, or the word of such a
      verb: the tense is what climbs — see HELD_UNITS. */
   if (isHeld(it)) return [];
+  /* A word form on the skill rules climbs by skill (stage D). */
+  if (onSkillRules(it, langOf(settingsFor(settings, it)))) return skillLadder(it, langOf(settingsFor(settings, it)));
   /* And a rung's worth rather than all of it, for a pronoun on the end of a
      word the learner can already write — see easedUnits. Said here because
      this is the list everything downstream reads, so what is dealt, what
@@ -4877,6 +5088,10 @@ function openTypes(it: Form, settings: Settings): string[] {
 /* What openTypes would say once the tense's table has been got: the one
    thing a question dealt to follow the table may be asked before it is. */
 function openPastPattern(it: Form, settings: Settings): string[] {
+  if (onSkillRules(it, langOf(settingsFor(settings, it)))) {
+    if (isQuiet(it) || !isAsked(it)) return [];
+    return skillDeal(it, langOf(settingsFor(settings, it))).filter((k) => typeAllowedNow(k, it));
+  }
   const cap = SKILL_CAPS.get(it && it.id);
   const open = reachedTypes(it, settings).filter((k) => typeAllowedNow(k, it) && (cap == null || levelOf(k) <= cap));
   return atItsTop(it, settings) ? open.filter((k) => levelOf(k) === topLevelOf(laddered(it, settings))) : open;
@@ -4901,6 +5116,8 @@ function openPastPattern(it: Form, settings: Settings): string[] {
  */
 function atItsTop(it: Form, settings: Settings): boolean {
   if (SKILL_CAPS.get(it && it.id) != null) return false;
+  /* A form on the skill rules is asked its reviews alone once cleared. */
+  if (onSkillRules(it, langOf(settingsFor(settings, it)))) return !isQuiet(it) && isAsked(it) && skillCleared(it, langOf(settingsFor(settings, it)));
   const ladder = laddered(it, settings);
   const top = topLevelOf(ladder);
   const below = ladder.filter((k) => levelOf(k) < top);
