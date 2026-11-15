@@ -349,6 +349,7 @@ import { agreeTook, countTook, finishTook, leadsOf, lineGate, passes, reviewOf, 
 import { castFill as castScene, filledScene, hasCast } from "./cast.ts";
 import { cardHeld, isPathUnit, mergeReached, pathRows, reachesFurther } from "./path.ts";
 import { allowedTypes, englishShown, readPractice } from "./course-practice.ts";
+import { allMapped } from "./word-skills.ts";
 import type { CoursePractice } from "./course-practice.ts";
 import type { PathCourse, PathDeck, PathRow } from "./path.ts";
 import type { Review } from "./review.ts";
@@ -2402,8 +2403,7 @@ function wordsCleared(stretch: Item, items: Item[], lang: Lang): boolean {
       /* Nor a face that counts things, which is asked with a noun and
          waits on one: counting never holds the next stretch back. */
       if (!isAsked(unit) || unit.countedAt) return true;
-      const types = availableTypes(unit, lang);
-      return !types.length || types.every((t) => throughOnce(statesOf(unit)[t]));
+      return onceThrough(unit, lang);
     }),
   ).length;
   return known >= Math.ceil(words.length * STRETCH_SHARE - 1e-9);
@@ -2489,8 +2489,7 @@ function sentenceWaits(line: Form, held: WordsHeld, lang: Lang): boolean {
   if (!hits.length) return false;
   const known = hits.filter(({ card: word, form }) => {
     const unit = isAsked(form) ? form : leadOf(word);
-    const types = availableTypes(unit, lang);
-    return !types.length || reachedLevel(types, (t) => statesOf(unit)[t], 2);
+    return levelGate(unit, lang, 2);
   }).length;
   return known < Math.ceil(hits.length * SENTENCE_SHARE - 1e-9);
 }
@@ -2676,8 +2675,7 @@ export function quietUnits(items: Item[], settings: Settings): Set<string> {
           const of = unit.id === card.id ? "" : unit.id;
           const mine = cellsIn(card, spec, of);
           if (!mine.length) continue;
-          const supported = availableTypes(unit, lang);
-          const known = reachedLevel(supported, (t) => statesOf(unit)[t], 2);
+          const known = availableTypes(unit, lang).length > 0 && levelGate(unit, lang, 2);
           if (!known) for (const cell of mine) out.add(cell.id);
         }
         /* And a cell hanging off a form the card no longer carries, which
@@ -4484,6 +4482,64 @@ export function withoutQuestionAt(
     return !!r && askableTypes(r.unit, settings).includes(b.type);
   });
   return exercises.slice(0, at).concat(standIn ? [standIn] : [], exercises.slice(at + 1));
+}
+
+/* ------------------------------------------------------------------
+   The doors (stage C of docs/PLAN-skills-switches-no-english.md)
+
+   A word form will one day climb by skill rather than by the four levels.
+   Everything that asks how far a form has got asks it through one of
+   these, so that change is made here and nowhere else:
+
+     * laddered — the keys a form climbs with;
+     * standingKeys — the keys its standing is read from;
+     * openPastPattern (and openTypes, reachedTypes on it) — what it may be
+       dealt now;
+     * atItsTop — whether it is asked its top alone;
+     * levelGate, onceThrough, formReadsBare — the gates other cards wait
+       on: a sentence on its words, a stretch of numbers on the one below,
+       a table's cells on their word, and when a word is read bare.
+
+   While WORD_SKILLS_ON is false every one of them answers exactly what it
+   always did.
+   ------------------------------------------------------------------ */
+
+export const WORD_SKILLS_ON = false;
+let wordSkills = WORD_SKILLS_ON;
+/** For the tests, which run the whole suite both ways. */
+export function setWordSkills(on: boolean) {
+  if (on === wordSkills) return;
+  wordSkills = on;
+  forgetTypes();
+}
+export const wordSkillsOn = (): boolean => wordSkills;
+
+/* Whether a form climbs by skill: the switch on, and the form in scope —
+   a word, not from a number system, not a tense, a held person, a
+   conversation or a text's line, and every type it supports in the map. */
+export function onSkillRules(unit: Form, lang: Lang = activeLang()): boolean {
+  if (!wordSkills || !unit) return false;
+  return skillScoped(unit, lang);
+}
+function skillScoped(unit: Form, lang: Lang): boolean {
+  const id = String(unit.id || "");
+  if (id.startsWith("sys:") || isTenseForm(unit) || isHeld(unit) || sceneOf(id)) return false;
+  if (/-l(?:~|\d)/.test(id)) return false;
+  const types = supportedRaw(unit, lang);
+  return types.length > 0 && allMapped(types);
+}
+
+/* A gate other cards wait on: this form has reached `level` of its
+   ladder, over what it supports. */
+function levelGate(unit: Form, lang: Lang, level: number): boolean {
+  const types = availableTypes(unit, lang);
+  return !types.length || reachedLevel(types, (t) => statesOf(unit)[t], level);
+}
+
+/* And the stretch gate: every exercise the form supports through once. */
+function onceThrough(unit: Form, lang: Lang): boolean {
+  const types = availableTypes(unit, lang);
+  return !types.length || types.every((t) => throughOnce(statesOf(unit)[t]));
 }
 
 /* Which exercise types this card's data can support.
