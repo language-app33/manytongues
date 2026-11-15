@@ -44,6 +44,9 @@ const FUTURE = {
   zzfuture: st(3),
   "zzfuture@1": st(2),
   zzmissed: { ...st(4, false), hist: [true, true, false, false] },
+  /* And a personal set's answer (0.630), which is not an exercise at all:
+     a record with no schedule on it, kept under a key no exercise has. */
+  "set-answer": { updated: NOW - DAY, meaning: "aunt", list: "dHanoi" },
 };
 
 /** @param {number} i @param {Record<string, any>} s */
@@ -89,6 +92,7 @@ test("a load carries a record for an exercise it does not know, untouched", () =
   assert.deepEqual(f.s.zzfuture, FUTURE.zzfuture);
   assert.deepEqual(f.s["zzfuture@1"], FUTURE["zzfuture@1"]);
   assert.deepEqual(f.s.zzmissed, FUTURE.zzmissed);
+  assert.deepEqual(f.s["set-answer"], FUTURE["set-answer"]);
 });
 
 test("and a record for a retired exercise, which it knows of but no longer asks", () => {
@@ -162,6 +166,8 @@ test("the record survives a sync, both ways, and a course refresh", () => {
   const away = foldCourses(course, [], {});
   assert.deepEqual(away.parked.w2.forms.w2.s["zzfuture@1"], FUTURE["zzfuture@1"], "and the drawer keeps it");
   assert.deepEqual(progressOf(course[2]).forms.w2.s.zzfuture, FUTURE.zzfuture);
+  assert.deepEqual(folded.items[2].forms[0].s["set-answer"], FUTURE["set-answer"], "a set's answer, likewise");
+  assert.deepEqual(pushed.items[2].forms[0].s["set-answer"], FUTURE["set-answer"]);
 });
 
 test("a lookup of an exercise by a name it does not know answers nothing rather than throwing", () => {

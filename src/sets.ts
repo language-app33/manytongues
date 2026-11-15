@@ -153,3 +153,101 @@ export function withAnswer<T extends WithForms>(item: T, change: Partial<Omit<Se
     updated: at,
   };
 }
+
+/* ------------------------------------------------------------------
+   What a student is still to be asked (0.630)
+
+   A set as the device sees it: its held lists in the set's order, each
+   with its words, and its pictures, each with the answer in its progress.
+   Built by the app from the decks and items it holds; everything below
+   reads only this.
+   ------------------------------------------------------------------ */
+
+export type PictureState = "new" | "skip" | "none" | "waiting" | "ok";
+
+export interface SetView<P extends { id: string; answer: SetAnswer | null } = { id: string; answer: SetAnswer | null }, W extends { en: string } = { en: string }> {
+  /** The set's deck. */
+  id: string;
+  title: string;
+  set: SetConfig;
+  /** The set's lists the student holds, in the set's order. */
+  lists: { id: string; title: string; words: W[] }[];
+  pictures: P[];
+}
+
+export type SetStep =
+  | { kind: "list"; setId: string }
+  | { kind: "picture"; setId: string; pictureId: string; fresh: boolean };
+
+/**
+ * The list a student learns a set's words from: the only held list where
+ * there is one; otherwise the `list` on the most recently written answer
+ * among its pictures, if that deck is still one of the set's held lists;
+ * otherwise none yet.
+ */
+export function chosenList(set: SetConfig, heldDeckIds: string[], answers: (SetAnswer | null | undefined)[]): string | null {
+  const held = set.lists.filter((id) => heldDeckIds.includes(id));
+  if (held.length === 1) return held[0];
+  if (!held.length) return null;
+  let best: SetAnswer | null = null;
+  for (const a of answers) if (a && a.list && (!best || a.updated > best.updated)) best = a;
+  return best && best.list && held.includes(best.list) ? best.list : null;
+}
+
+const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+
+/** The word whose English is the answer's meaning; none for a skip, a
+    doesn't-apply, or no such word in the list. */
+export function resolve<W extends { en: string }>(words: W[], answer: SetAnswer | null | undefined): W | null {
+  if (!answer || answer.none || !answer.meaning) return null;
+  const meaning = answer.meaning;
+  return words.find((w) => !!w.en && same(w.en, meaning)) || null;
+}
+
+/**
+ * Where one picture stands for one student. `words` is the chosen list's,
+ * or null while no list is chosen.
+ */
+export function pictureState(answer: SetAnswer | null | undefined, words: { en: string }[] | null): PictureState {
+  if (answer && answer.none) return "none";
+  if (answer && answer.meaning) return words && resolve(words, answer) ? "ok" : "waiting";
+  if (answer && answer.skip) return "skip";
+  return "new";
+}
+
+/** A view's chosen list, as a list of the view. */
+export function chosenOf<W extends { en: string }>(view: SetView<{ id: string; answer: SetAnswer | null }, W>) {
+  const id = chosenList(view.set, view.lists.map((l) => l.id), view.pictures.map((p) => p.answer));
+  return view.lists.find((l) => l.id === id) || null;
+}
+
+/**
+ * What is still to ask, set by set: the list, where there are several and
+ * none is chosen, before that set's pictures; then each picture not yet
+ * answered (new or waiting, marked fresh) or skipped (not fresh). A set
+ * with no held list, or no pictures, asks nothing.
+ */
+export function stepsToAsk(views: SetView[]): SetStep[] {
+  const out: SetStep[] = [];
+  for (const v of views) {
+    if (!v.lists.length || !v.pictures.length) continue;
+    const chosen = chosenOf(v);
+    if (!chosen) out.push({ kind: "list", setId: v.id });
+    for (const p of v.pictures) {
+      const state = pictureState(p.answer, chosen ? chosen.words : null);
+      if (state === "new" || state === "waiting") out.push({ kind: "picture", setId: v.id, pictureId: p.id, fresh: true });
+      else if (state === "skip") out.push({ kind: "picture", setId: v.id, pictureId: p.id, fresh: false });
+    }
+  }
+  return out;
+}
+
+/**
+ * A form's progress across a reset (0.630): every schedule goes, and the
+ * set's answer stays, re-stamped with the reset's time so that the merge
+ * between devices — which drops anything older than a reset — keeps it.
+ */
+export function keptAcrossReset(s: Record<string, unknown> | undefined, at: Millis): Record<string, SetAnswer> {
+  const was = readAnswer(s && s[SET_KEY]);
+  return was ? { [SET_KEY]: { ...was, updated: at } } : {};
+}

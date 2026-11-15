@@ -127,6 +127,7 @@ const PLACES: Record<string, [string, string]> = {
   ClaimAdmin: [LEARN, "Account settings · Becoming the administrator"],
   AppPreferences: [LEARN, "App preferences"],
   SettingsScreen: [LEARN, "Settings"],
+  SetQuestions: [LEARN, "A personal set · the list to learn from, the question asked once for each picture, and your answers in Settings"],
   AppVersion: [LEARN, "Settings · the version and the check for a newer one"],
   CornerMenu: [LEARN, "The menu behind your initial, in the bar at the foot of the window"],
   PlacePicker: [LEARN, "Choosing the space and the languages, in the menu behind your initial"],

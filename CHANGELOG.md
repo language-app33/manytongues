@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.630 — 15 November 2026
+
+**A second step towards personal sets, still with nothing you can see.**
+The app can now ask a student about a personal set: which of the
+teacher's word lists they want to learn from (only when there are
+several), and then the teacher's question once for each picture, with a
+button for "doesn't apply" and a Skip. Home would say how many pictures
+are waiting, and Settings would list a student's answers and let them
+change any of them. A student's answers are kept with their practice
+progress, sync between their devices, and survive Reset scheduling.
+
+No teacher can make a personal set yet, so nobody meets any of this.
+Practice does not use the answers yet either.
+
+To check by hand: nothing to see. Home, Settings and Start session should
+look and behave exactly as before; Reset scheduling should still send
+every card back to the beginning.
+
 ## 0.629 — 15 November 2026
 
 **A first step towards personal sets, with nothing you can see yet.** A

@@ -106,3 +106,106 @@ test("withAnswer writes a first answer onto a form with no progress", () => {
   const next = S.withAnswer({ forms: [{ id: "x" }] }, { list: "dC" }, 7);
   assert.deepEqual(next.forms[0].s, { [S.SET_KEY]: { updated: 7, list: "dC" } });
 });
+
+/* ------------------------------------------------------------------
+   What a student is still to be asked (0.630)
+   ------------------------------------------------------------------ */
+
+const HANOI = { id: "dHanoi", title: "Hanoi", words: [{ en: "father's younger sister" }, { en: "grandmother" }, { en: "mother" }] };
+const SAIGON = { id: "dSaigon", title: "Saigon", words: [{ en: "Father's younger sister " }, { en: "grandmother" }] };
+const config = (lists = ["dHanoi", "dSaigon"]) => ({ ...S.emptySet(), lists });
+const ans = (/** @type {any} */ a) => ({ updated: 1, ...a });
+/** @param {any[]} lists @param {Record<string, any>} answers */
+const view = (lists, answers = {}) => ({
+  id: "dFamily",
+  title: "Our family",
+  set: config(),
+  lists,
+  pictures: ["Lan", "Minh", "Hoa"].map((id) => ({ id, answer: answers[id] || null })),
+});
+
+test("with one list held, that is the list, without asking", () => {
+  assert.equal(S.chosenList(config(), ["dHanoi"], []), "dHanoi");
+  assert.equal(S.chosenList(config(["dHanoi"]), ["dHanoi", "dSaigon"], []), "dHanoi");
+});
+
+test("with none held, there is no list", () => {
+  assert.equal(S.chosenList(config(), [], [ans({ list: "dHanoi" })]), null);
+});
+
+test("with two held, the list on the most recent answer, if it is still one of them", () => {
+  const set = config();
+  assert.equal(S.chosenList(set, ["dHanoi", "dSaigon"], []), null);
+  assert.equal(S.chosenList(set, ["dHanoi", "dSaigon"], [ans({ list: "dHanoi", updated: 1 }), ans({ list: "dSaigon", updated: 5 }), null]), "dSaigon");
+  assert.equal(S.chosenList(set, ["dHanoi", "dSaigon"], [ans({ list: "dGone", updated: 9 })]), null);
+  assert.equal(S.chosenList({ ...set, lists: ["dHanoi", "dSaigon", "dHue"] }, ["dHanoi", "dSaigon", "dHue"], [ans({ list: "dHue" })]), "dHue");
+});
+
+test("an answer resolves by its English, trimmed and in any case, in whichever list is chosen", () => {
+  const a = ans({ meaning: "father's younger sister" });
+  assert.equal(S.resolve(HANOI.words, a), HANOI.words[0]);
+  assert.equal(S.resolve(SAIGON.words, a), SAIGON.words[0]);
+  assert.equal(S.resolve(SAIGON.words, ans({ meaning: "mother" })), null);
+  assert.equal(S.resolve(HANOI.words, ans({ skip: true })), null);
+  assert.equal(S.resolve(HANOI.words, ans({ none: true, meaning: "mother" })), null);
+  assert.equal(S.resolve(HANOI.words, null), null);
+});
+
+test("a picture is new, skipped, left out, waiting or answered", () => {
+  assert.equal(S.pictureState(null, HANOI.words), "new");
+  assert.equal(S.pictureState(ans({ list: "dHanoi" }), HANOI.words), "new", "a list chosen is not an answer");
+  assert.equal(S.pictureState(ans({ skip: true }), HANOI.words), "skip");
+  assert.equal(S.pictureState(ans({ none: true }), HANOI.words), "none");
+  assert.equal(S.pictureState(ans({ meaning: "mother" }), HANOI.words), "ok");
+  assert.equal(S.pictureState(ans({ meaning: "mother" }), SAIGON.words), "waiting", "the chosen list has no such word");
+  assert.equal(S.pictureState(ans({ meaning: "mother" }), null), "waiting", "no list chosen");
+});
+
+test("a fresh student with two lists is asked the list, then every picture", () => {
+  assert.deepEqual(S.stepsToAsk([view([HANOI, SAIGON])]), [
+    { kind: "list", setId: "dFamily" },
+    { kind: "picture", setId: "dFamily", pictureId: "Lan", fresh: true },
+    { kind: "picture", setId: "dFamily", pictureId: "Minh", fresh: true },
+    { kind: "picture", setId: "dFamily", pictureId: "Hoa", fresh: true },
+  ]);
+});
+
+test("with one list, nobody is asked to choose", () => {
+  const steps = S.stepsToAsk([view([HANOI])]);
+  assert.equal(steps.filter((/** @type {any} */ s) => s.kind === "list").length, 0);
+  assert.equal(steps.length, 3);
+});
+
+test("a set whose lists the student holds none of asks nothing", () => {
+  assert.deepEqual(S.stepsToAsk([view([])]), []);
+});
+
+test("after answers, only what is left is asked; a skip is asked again, not fresh", () => {
+  const steps = S.stepsToAsk([
+    view([HANOI, SAIGON], {
+      Lan: ans({ list: "dHanoi", meaning: "father's younger sister" }),
+      Minh: ans({ list: "dHanoi", none: true }),
+      Hoa: ans({ list: "dHanoi", skip: true }),
+    }),
+  ]);
+  assert.deepEqual(steps, [{ kind: "picture", setId: "dFamily", pictureId: "Hoa", fresh: false }]);
+});
+
+test("a picture added after the rest were answered is asked, alone", () => {
+  const v = view([HANOI], { Lan: ans({ meaning: "mother" }), Minh: ans({ meaning: "grandmother" }) });
+  assert.deepEqual(S.stepsToAsk([v]), [{ kind: "picture", setId: "dFamily", pictureId: "Hoa", fresh: true }]);
+});
+
+test("when the chosen list loses the word, that picture is waiting and asked again", () => {
+  const answers = { Lan: ans({ meaning: "mother" }), Minh: ans({ meaning: "grandmother" }), Hoa: ans({ none: true }) };
+  assert.deepEqual(S.stepsToAsk([view([HANOI], answers)]), []);
+  const lost = { ...HANOI, words: HANOI.words.filter((w) => w.en !== "mother") };
+  assert.deepEqual(S.stepsToAsk([view([lost], answers)]), [{ kind: "picture", setId: "dFamily", pictureId: "Lan", fresh: true }]);
+});
+
+test("a reset keeps the answer, stamped with the reset's time, and nothing else", () => {
+  const s = { img2pick: { phase: "review", updated: 3 }, [S.SET_KEY]: { updated: 3, meaning: "mother", list: "dHanoi" } };
+  assert.deepEqual(S.keptAcrossReset(s, 50), { [S.SET_KEY]: { updated: 50, meaning: "mother", list: "dHanoi" } });
+  assert.deepEqual(S.keptAcrossReset({ img2pick: { phase: "review", updated: 3 } }, 50), {});
+  assert.deepEqual(S.keptAcrossReset(undefined, 50), {});
+});

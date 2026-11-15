@@ -284,6 +284,19 @@ let teachesTwo = false;
 let withPath = false;
 /* And a learner's course with a path: two published units. */
 let studentPath = false;
+/* And a learner's course with a personal set (0.630): a deck of three
+   pictures and two word lists. */
+let studentSets = false;
+const PIC = (/** @type {string} */ c) => c.repeat(64);
+const setPicture = (/** @type {string} */ id, /** @type {string} */ ar, /** @type {string} */ c) => ({
+  id, owner: "t-1", lang: "ar-PS", rev: 1, updated: 1, forms: [{ ar, en: "", lat: "", images: [PIC(c)] }],
+});
+const setWord = (/** @type {string} */ id, /** @type {string} */ ar, /** @type {string} */ en) => ({
+  id, owner: "t-1", lang: "ar-PS", rev: 1, updated: 1, forms: [{ ar, en, lat: "" }],
+});
+const SET_PICTURES = [setPicture("ks0000000001", "لان", "1"), setPicture("ks0000000002", "مين", "2"), setPicture("ks0000000003", "هوا", "3")];
+const SET_NORTH = [setWord("ks0000000011", "عمة", "father's younger sister"), setWord("ks0000000012", "جدة", "grandmother"), setWord("ks0000000013", "أم", "mother")];
+const SET_SOUTH = [setWord("ks0000000021", "خالة", "father's younger sister"), setWord("ks0000000022", "ستي", "grandmother")];
 const rafa = nameCard("k555555555555", "رافائيل", "Raphael", "rafaa'iil");
 const viktor = nameCard("k666666666666", "فيكتور", "Victor", "fiktoor");
 let materialHits = 0;
@@ -404,6 +417,26 @@ const fakeFetch = async (input, opts = {}) => {
             { id: "d9", title: "Lesson 1", owner: "t-9", cardIds: [lingua.id], cardCount: 1, courseId: "c9", courseTitle: "Lingua Arabic", courseLanguage: "ar-PS", courses: [{ courseId: "c9", addedAt: 1 }], version: 1 },
           ],
           cards: [{ deckId: "d1", cards: [card, phrase] }, { deckId: "d9", cards: [lingua] }],
+          systems: [],
+        });
+      }
+      if (studentSets) {
+        const deck = (/** @type {string} */ id, /** @type {string} */ title, /** @type {any[]} */ cards, /** @type {number} */ at, extra = {}) => ({
+          id, title, owner: "t-1", cardIds: cards.map((c) => c.id), cardCount: cards.length, courseId: "c1", courseTitle: "Vietnamese 1",
+          courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: at }], version: 1, ...extra,
+        });
+        return json({
+          ok: true, version: "v-sets", teaches: false,
+          courses: [{ id: "c1", org: "main", title: "Vietnamese 1", language: "ar-PS", decks: ["dFam", "dNorth", "dSouth"], role: "student", studying: true, teaching: false }],
+          decks: [
+            deck("dFam", "Our family", SET_PICTURES, 1, { set: {
+              wording: { question: "Who is she to you?", none: "Not someone I know", askName: "Who is this?", askWord: "What do you call her?", askBoth: "Name and word" },
+              lists: ["dNorth", "dSouth"], named: [], asks: { name: true, word: true, both: true }, order: "before",
+            } }),
+            deck("dNorth", "Hanoi", SET_NORTH, 2),
+            deck("dSouth", "Saigon", SET_SOUTH, 3),
+          ],
+          cards: [{ deckId: "dFam", cards: SET_PICTURES }, { deckId: "dNorth", cards: SET_NORTH }, { deckId: "dSouth", cards: SET_SOUTH }],
           systems: [],
         });
       }
@@ -12378,6 +12411,72 @@ const openPronounTables = async () => {
   host.remove();
   localStorage.removeItem("arabic-trainer:material");
   check("and nothing threw on a learner's path", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- a personal set, asked of a learner (0.630) ----
+   A set of three pictures with two word lists. Start session asks for the
+   list first, then the teacher's question for each picture, in the
+   teacher's own words; the answers are kept in the practice document, and
+   Home says what is still waiting. */
+{
+  const before = errors.length;
+  const KEY = "arabic-trainer:arabic-trainer-v3";
+  localStorage.setItem(KEY, JSON.stringify({ version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [] }));
+  localStorage.removeItem("arabic-trainer:material");
+  window.history.replaceState(null, "", `${window.location.pathname}?open=learn`);
+  studentSets = true;
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1800);
+  const waiting = () => {
+    const el = host.querySelector('[data-el="set-waiting"]');
+    return el ? (el.textContent || "").replace(/\s+/g, " ") : "";
+  };
+  check("Home says how many pictures of the set are waiting", /3 pictures in Our family are waiting for your answer/.test(waiting()), waiting() || "no line");
+  click(buttonNamed(/^Start session$/));
+  await sleep(500);
+  const top = () => [...document.querySelectorAll(".at-screen")].pop();
+  const text = () => ((top() || {}).textContent || "").replace(/\s+/g, " ");
+  check("before the session, the learner is asked which list", /Which words do you want to learn\?/.test(text()) && /Hanoi/.test(text()) && /Saigon/.test(text()), text().slice(0, 200));
+  const radio = (/** @type {RegExp} */ re) => [...(top() || document).querySelectorAll(".at-tickrow")].find((row) => re.test(row.textContent || ""));
+  click(radio(/Hanoi/)?.querySelector("input"));
+  await sleep(150);
+  click(buttonNamed(/^Continue$/));
+  await sleep(400);
+  check("then the teacher's question for the first picture, with the list's meanings and the teacher's own buttons",
+    /1 of 3/.test(text()) && /Who is she to you\?/.test(text()) && /father's younger sister/.test(text()) && /Not someone I know/.test(text()) && /Skip for now/.test(text()),
+    text().slice(0, 300));
+  click(radio(/grandmother/)?.querySelector("input"));
+  await sleep(150);
+  click(buttonNamed(/^Next$/));
+  await sleep(400);
+  check("the second picture comes next", /2 of 3/.test(text()), text().slice(0, 120));
+  click(buttonNamed(/^Not someone I know$/));
+  await sleep(400);
+  check("then the third", /3 of 3/.test(text()), text().slice(0, 120));
+  click(buttonNamed(/^Skip for now$/));
+  await sleep(400);
+  check("and at the end, thanks, with each answer", /Thanks\. That.s all for now\./.test(text()) && /grandmother/.test(text()) && /Not someone I know/.test(text()) && /Not answered yet/.test(text()),
+    text().slice(0, 300));
+  backOut();
+  await sleep(1000); // the 600 ms save debounce
+  const doc = JSON.parse(localStorage.getItem(KEY) || "{}");
+  const answerOf = (/** @type {string} */ id) => {
+    const it = (doc.items || []).find((/** @type {any} */ x) => x.id === `srv${id}`);
+    return it && it.forms && it.forms[0] && it.forms[0].s ? it.forms[0].s["set-answer"] : null;
+  };
+  const [a, b, c] = SET_PICTURES.map((p) => answerOf(p.id));
+  check("the practice document holds the three answers, each with the list",
+    !!a && a.meaning === "grandmother" && a.list === "dNorth" && !!b && b.none === true && b.list === "dNorth" && !!c && c.skip === true && !c.meaning,
+    JSON.stringify([a, b, c]));
+  check("and Home says one picture is waiting", /1 picture in Our family is waiting for your answer/.test(waiting()), waiting() || "no line");
+  studentSets = false;
+  r.unmount();
+  host.remove();
+  localStorage.removeItem("arabic-trainer:material");
+  check("and nothing threw asking a set's questions", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
 /* ---- a course's path, in Teaching (0.616) ----

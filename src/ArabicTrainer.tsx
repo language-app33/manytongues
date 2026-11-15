@@ -67,8 +67,16 @@ import {
   useSnackbarState,
   WorkingNote,
   TabTitle,
+  /* Personal sets (0.630): the student's questions are built of these. */
+  Nudge,
+  RadioGroup,
+  SearchBox,
+  Tile,
 } from "./shared.tsx";
 import { renameLangIds } from "./lang-ids.ts";
+/* Personal sets (0.629): every rule of them is in sets.ts. */
+import { chosenOf, keptAcrossReset, pictureState, readAnswer, readSet, SET_KEY, stepsToAsk, withAnswer } from "./sets.ts";
+import type { SetAnswer, SetStep, SetView } from "./sets.ts";
 
 /* The onboarding, teaching, admin and course screens are their own chunk,
    fetched on the first tap that opens one of them. A student drilling cards
@@ -1969,6 +1977,66 @@ export function pathIndexOf(
     for (const r of got.rows) if (r.state !== "locked") openUnits.add(r.id);
   }
   return { decksOfCard, unitIds, unitItemIds, rows, openUnits, reached, finished };
+}
+
+/* ------------------------------------------------------------------
+   Personal sets (0.630)
+
+   A set is a held deck with a `set` on it; its pictures are its cards
+   whose lead form has a picture, each with the answer in its progress;
+   its lists are the decks it names that the learner holds, in its order,
+   each with its words — cards that are not sentences or scenes and have
+   both a script and an English meaning. Every rule about what that means
+   is in sets.ts; this only finds them among what the device holds.
+   ------------------------------------------------------------------ */
+
+/** Which session a set's questions were asked before, to start after. */
+type SetStart =
+  | { kind: "begin"; practice?: boolean; only?: (it: Item) => boolean; pathUnit?: string }
+  | { kind: "weak" }
+  | { kind: "saved"; saved: SavedSession };
+
+export type SetPicture = { id: string; name: string; images: string[]; answer: SetAnswer | null };
+export type SetWord = { id: string; ar: string; lat: string; en: string };
+export type HeldSet = SetView<SetPicture, SetWord>;
+
+export function setViewsOf(
+  items: Item[],
+  decks: (Deck & { courseLanguage?: string })[] | null | undefined,
+  langsOff: string[] = [],
+): HeldSet[] {
+  const all = decks || [];
+  if (!all.some((d) => d && d.set)) return [];
+  const byCard: Map<string, Item> = new Map();
+  for (const it of items) {
+    const src = (it as { source?: Record<string, unknown> }).source;
+    if (src && typeof src.cardId === "string") byCard.set(src.cardId, it);
+  }
+  const held: Map<string, Deck> = new Map(all.map((d) => [d.id, d]));
+  const cardsOf = (d: Deck) => (d.cardIds || []).map((id) => byCard.get(id)).filter((it): it is Item => !!it);
+  const out: HeldSet[] = [];
+  for (const d of all) {
+    const set = readSet(d.set, d.id);
+    if (!set) continue;
+    if (langsOff.includes(d.lang || d.courseLanguage || "")) continue;
+    const pictures = cardsOf(d).flatMap((it) => {
+      const lead = formsOf(it)[0];
+      if (!lead || !Array.isArray(lead.images) || !lead.images.length) return [];
+      return [{ id: it.id, name: lead.ar || "", images: lead.images.slice(), answer: readAnswer(lead.s && (lead.s as Record<string, unknown>)[SET_KEY]) }];
+    });
+    const lists = set.lists.flatMap((id) => {
+      const list = held.get(id);
+      if (!list) return [];
+      const words = cardsOf(list).flatMap((it) => {
+        const lead = formsOf(it)[0];
+        if (!lead || isDialog(it) || isSentence(it) || !lead.ar || !lead.en) return [];
+        return [{ id: it.id, ar: lead.ar, lat: lead.lat || "", en: lead.en }];
+      });
+      return [{ id, title: list.title, words }];
+    });
+    out.push({ id: d.id, title: d.title, set, lists, pictures });
+  }
+  return out;
 }
 
 /**
@@ -7787,6 +7855,17 @@ function liftState(s: Record<string, any> | null | undefined): ExerciseState {
    on its way in, so what it drops is dropped on every load, after every
    sync and on every import — which is exactly the sort of thing worth
    asserting rather than hoping about. */
+/**
+ * One form sent back to the beginning by Reset scheduling: every schedule
+ * fresh and what its fillings were met with forgotten — but a personal
+ * set's answer kept, stamped with the reset's time so the merge between
+ * devices, which drops what is older than a reset, keeps it too (0.630).
+ */
+export function resetForm<T extends Form>(f: T, at: Millis): T {
+  const { met: _forgotten, ...rest } = f;
+  return { ...rest, s: { ...freshStates(), ...(keptAcrossReset(f.s, at) as unknown as Record<string, ExerciseState>) } } as T;
+}
+
 export function liftStates(old: Record<string, any> = {}): Record<string, ExerciseState> {
   const s = freshStates();
   for (const [oldKey, newKey] of Object.entries(V2_MAP)) {
@@ -12448,6 +12527,22 @@ export default function ArabicTrainer() {
     },
     [langsOff, settings, spaceNow, spaceOfItem]
   );
+  /* The personal sets held, in the languages in play, and what is still
+     to ask in them (0.630). */
+  const heldSets = useMemo(() => setViewsOf(items, courseDecks, langsOff), [items, courseDecks, langsOff]);
+  const setSteps = useMemo(() => stepsToAsk(heldSets), [heldSets]);
+  const [setAsk, setSetAsk] = useState<null | { steps?: SetStep[]; openSet?: string; start?: SetStart }>(null);
+  const [setStartNow, setSetStartNow] = useState<SetStart | null>(null);
+  const passSets = useRef(false);
+  const setWaiting = useMemo(() => {
+    const bySet: Map<string, number> = new Map();
+    for (const st of setSteps) if (st.kind === "picture") bySet.set(st.setId, (bySet.get(st.setId) || 0) + 1);
+    const first = heldSets.find((v) => bySet.has(v.id));
+    if (!first) return "";
+    const n = bySet.get(first.id) || 0;
+    const more = bySet.size - 1;
+    return `${n === 1 ? "1 picture" : `${n} pictures`} in ${first.title}${more ? ` and ${more} more ${more === 1 ? "set" : "sets"}` : ""} ${n === 1 && !more ? "is" : "are"} waiting for your answer.`;
+  }, [setSteps, heldSets]);
   const narrowed = langsOff.length > 0 || !!spaceNow;
   const shown = useMemo(
     () => (narrowed ? items.filter(inPlay) : items),
@@ -12604,9 +12699,49 @@ export default function ArabicTrainer() {
     flash(`Saved changes to ${changed.name}`);
   }
 
+  /*
+   * A personal set's questions, before a session (0.630).
+   *
+   * Whatever is new — a list to choose, a picture never answered — is asked
+   * first, and the session the learner pressed for starts from the last of
+   * those screens. Started on the next render rather than from here, so the
+   * session is built from the answers just given and not from the cards as
+   * they were when the button was pressed.
+   */
+  function askFirst(start: SetStart): boolean {
+    if (passSets.current) {
+      passSets.current = false;
+      return false;
+    }
+    const fresh = setSteps.filter((st) => st.kind === "list" || st.fresh);
+    if (!fresh.length) return false;
+    setSetAsk({ steps: fresh, start });
+    return true;
+  }
+  useEffect(() => {
+    if (!setStartNow) return;
+    const st = setStartNow;
+    setSetStartNow(null);
+    passSets.current = true;
+    if (st.kind === "begin") begin(st.practice, st.only, st.pathUnit);
+    else if (st.kind === "weak") beginWeak();
+    else startSaved(st.saved);
+    passSets.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setStartNow]);
+  /* Every answer goes out through here, stamped and saved as a graded
+     answer is — see withAnswer. */
+  const writeAnswers = (ids: string[], change: Partial<Omit<SetAnswer, "updated">>) => {
+    const want = new Set(ids);
+    if (!want.size) return;
+    const at = now();
+    persist((cur) => ({ ...cur, items: cur.items.map((it) => (want.has(it.id) ? withAnswer(it, change, at) : it)) }));
+  };
+
   /* The decks it names are read now, against the cards the Build screen
      shows, so a card added to one since it was kept is in the session. */
   function startSaved(s: SavedSession) {
+    if (askFirst({ kind: "saved", saved: s })) return;
     const ids = new Set([...s.ids, ...cardsOfSaved(s, shown).map((it) => it.id)]);
     beginManual({ ids, mode: s.mode, count: s.count, minutes: s.minutes });
   }
@@ -12929,6 +13064,7 @@ export default function ArabicTrainer() {
    * in a language you have switched off is not what you came to fix.
    */
   function beginWeak() {
+    if (askFirst({ kind: "weak" })) return;
     const built = buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
     if (!built.exercises.length) {
       flash(
@@ -12959,6 +13095,7 @@ export default function ArabicTrainer() {
        of the deck chosen on the home screen. `pathUnit` lets that unit's
        new cards in although the path has not reached it: "Practise this
        unit" (R30, R24). */
+    if (askFirst({ kind: "begin", practice, only, pathUnit })) return;
     const built = buildSession({ items: shown, settings, inDeck: only || inDeck, practice, perDay, systems, pathUnit });
     if (!built.exercises.length) {
       /* This used to return in silence, which reads as a broken button. It
@@ -13014,11 +13151,8 @@ export default function ArabicTrainer() {
    * card marked high priority — is theirs and stays.
    */
   function resetScheduling() {
-    const wiped = <T extends Form>(f: T): T => {
-      const { met: _forgotten, ...rest } = f;
-      return { ...rest, s: freshStates() } as T;
-    };
     const at = now();
+    const wiped = <T extends Form>(f: T): T => resetForm(f, at);
     const cleared: Item[] = items.map((it) => ({
       ...it,
       forms: formsOf(it).map(wiped),
@@ -15193,6 +15327,17 @@ export default function ArabicTrainer() {
                     <p className="at-homeline">{homeLine(homeWaiting)}</p>
                   )}
 
+                  {/* A personal set's pictures still waiting for an answer
+                      (0.630): one line, naming the first set, and the way
+                      to answer them. */}
+                  {setWaiting && (
+                    <div data-el="set-waiting">
+                      <Nudge icon="person" action={<Button size="sm" onClick={() => setSetAsk({ steps: setSteps })}>Answer</Button>}>
+                        {setWaiting}
+                      </Nudge>
+                    </div>
+                  )}
+
                   {/* Each course's path, one line each, above the one
                       Start session (R27). */}
                   {pathLines.map((p) => (
@@ -16726,6 +16871,8 @@ export default function ArabicTrainer() {
             settings={settings}
             setSetting={setSetting}
             onReset={resetScheduling}
+            sets={heldSets.filter((v) => v.lists.length > 0 && v.pictures.length > 0)}
+            onOpenSet={(id) => setSetAsk({ openSet: id })}
             allClipIds={allClipIds}
             onDevice={audible}
             allImageIds={allImageIds}
@@ -16772,6 +16919,28 @@ export default function ArabicTrainer() {
               API.saveAccount(merged);
               setAccount(merged);
             }}
+          />
+        )}
+
+        {/* A personal set's questions: before a session, from Home, or one
+            set's answers from Settings (0.630). */}
+        {setAsk && (
+          <SetQuestions
+            sets={heldSets}
+            steps={setAsk.steps}
+            openSet={setAsk.openSet}
+            onAnswer={(id, change) => writeAnswers([id], change)}
+            onList={(setId, listId) => {
+              const v = heldSets.find((x) => x.id === setId);
+              if (v) writeAnswers(v.pictures.map((p) => p.id), { list: listId });
+            }}
+            onSkipRest={(ids) => writeAnswers(ids, { skip: true })}
+            onClose={() => setSetAsk(null)}
+            onStart={setAsk.start ? () => {
+              const st = setAsk.start || null;
+              setSetAsk(null);
+              setSetStartNow(st);
+            } : undefined}
           />
         )}
 
@@ -20439,9 +20608,287 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, onCourses, onSett
  * is why they are asked for together — there is one caller and it passes
  * both sets.
  */
-function SettingsScreen({ kind, onClose, ...rest }: {
+/*
+ * A personal set's questions (0.630): the list to learn from, where there
+ * are several; the teacher's question for each picture; and, from
+ * Settings, the learner's answers, each of which can be changed.
+ *
+ * Every word on it but the app's own (Next, Skip for now, Continue) is the
+ * teacher's: the set's wording and the decks' titles. It writes nothing
+ * itself — each answer goes out through `onAnswer` or `onList`, and comes
+ * back in `sets`, so what it shows is always what is stored.
+ */
+type SetAsking =
+  | { view: "steps"; at: number }
+  | { view: "done" }
+  | { view: "answers"; setId: string }
+  | { view: "picture"; setId: string; pictureId: string }
+  | { view: "list"; setId: string };
+
+function SetQuestions({ sets, steps, openSet, onAnswer, onList, onSkipRest, onClose, onStart }: {
+  sets: HeldSet[];
+  /** What to ask, in order; absent to open one set's answers instead. */
+  steps?: SetStep[];
+  /** The set whose answers are shown, from Settings. */
+  openSet?: string;
+  onAnswer: (pictureId: string, change: Partial<Omit<SetAnswer, "updated">>) => void;
+  onList: (setId: string, listId: string) => void;
+  onSkipRest: (pictureIds: string[]) => void;
+  onClose: () => void;
+  /** Where asking leads: a session's Start, said on the last screen. */
+  onStart?: () => void;
+}) {
+  const [at, setAt] = useState<SetAsking>(steps ? { view: "steps", at: 0 } : { view: "answers", setId: openSet || "" });
+  const [picked, setPicked] = useState("");
+  const [query, setQuery] = useState("");
+  const [photo, setPhoto] = useState(0);
+  const [asking, setAsking] = useState<null | { list: true; setId: string } | { setId: string; pictureId: string; name: string }>(null);
+
+  const setOf = (id: string) => sets.find((v) => v.id === id) || null;
+  const pictureOf = (v: HeldSet | null, id: string) => (v ? v.pictures.find((p) => p.id === id) || null : null);
+  const pictureSteps = (steps || []).filter((st): st is Extract<SetStep, { kind: "picture" }> => st.kind === "picture");
+
+  /* Whether a step still wants asking: a list chosen since, or a picture
+     answered by that choice, is passed over. */
+  const live = (st: SetStep): boolean => {
+    const v = setOf(st.setId);
+    if (!v || !v.lists.length) return false;
+    const chosen = chosenOf(v);
+    if (st.kind === "list") return !chosen;
+    const p = pictureOf(v, st.pictureId);
+    if (!p) return false;
+    const state = pictureState(p.answer, chosen ? chosen.words : null);
+    return state === "new" || state === "waiting" || state === "skip";
+  };
+  const nextFrom = (i: number): SetAsking => {
+    for (let j = i; j < (steps || []).length; j++) if (live((steps as SetStep[])[j])) return { view: "steps", at: j };
+    return { view: "done" };
+  };
+  const go = (next: SetAsking) => {
+    setPicked("");
+    setQuery("");
+    setPhoto(0);
+    setAt(next);
+  };
+  /* The first step may already be answered — on another device, say. */
+  const here: SetAsking = at.view === "steps" ? nextFrom(at.at) : at;
+  const after = () => go(here.view === "steps" ? nextFrom(here.at + 1) : openSet ? { view: "answers", setId: openSet } : { view: "done" });
+
+  /* What a picture's answer reads as, in a list of them. */
+  const answerText = (v: HeldSet, p: SetPicture) => {
+    const chosen = chosenOf(v);
+    const state = pictureState(p.answer, chosen ? chosen.words : null);
+    if (state === "none") return v.set.wording.none;
+    if (state === "ok" && chosen && p.answer && p.answer.meaning) {
+      const w = chosen.words.find((x) => x.en.trim().toLowerCase() === String(p.answer && p.answer.meaning).trim().toLowerCase());
+      return w ? `${w.en} · ${w.ar}` : p.answer.meaning;
+    }
+    return "Not answered yet";
+  };
+
+  /* A picture opened from Settings before any list is chosen asks for the
+     list first, and then is the picture. */
+  const unchosen = here.view === "picture" ? setOf(here.setId) : null;
+  const choosing = here.view === "list"
+    ? setOf(here.setId)
+    : here.view === "steps" && (steps as SetStep[])[here.at].kind === "list"
+    ? setOf((steps as SetStep[])[here.at].setId)
+    : unchosen && unchosen.lists.length && !chosenOf(unchosen)
+    ? unchosen
+    : null;
+  if (choosing) {
+    const chosen = chosenOf(choosing);
+    const value = picked || (chosen ? chosen.id : "");
+    return (
+      <Screen title={choosing.title} onBack={here.view === "list" ? () => go({ view: "answers", setId: choosing.id }) : onClose} backLabel={here.view === "list" ? "Back" : "Close"} backIcon={here.view === "list" ? "back" : "close"}>
+        <p className="at-eyebrow">Before you start</p>
+        <RadioGroup
+          label="Which words do you want to learn?"
+          name="set-list"
+          lede={`Your teacher has ${choosing.lists.length === 2 ? "two" : choosing.lists.length} lists. You can change this later in Settings.`}
+          value={value || null}
+          onChange={(id) => setPicked(id)}
+          options={choosing.lists.map((l) => ({
+            value: l.id,
+            label: l.title,
+            note: l.words.length ? `${l.words.slice(0, 3).map((w) => w.ar).join(" · ")}${l.words.length > 3 ? " …" : ""}` : undefined,
+          }))}
+        />
+        <div className="at-row at-mt4">
+          <Button variant="primary" disabled={!value} onClick={() => {
+            onList(choosing.id, value);
+            if (here.view === "list") go({ view: "answers", setId: choosing.id });
+            else if (here.view === "steps") after();
+          }}>
+            Continue
+          </Button>
+        </div>
+      </Screen>
+    );
+  }
+
+  const asked = here.view === "picture"
+    ? { v: setOf(here.setId), id: here.pictureId }
+    : here.view === "steps"
+    ? { v: setOf((steps as SetStep[])[here.at].setId), id: ((steps as SetStep[])[here.at] as { pictureId: string }).pictureId }
+    : null;
+  if (asked && asked.v) {
+    const v = asked.v;
+    const p = pictureOf(v, asked.id);
+    const chosen = chosenOf(v);
+    if (!p || !chosen) return null;
+    const n = pictureSteps.findIndex((st) => st.pictureId === p.id) + 1;
+    const current = p.answer && p.answer.meaning ? p.answer.meaning : "";
+    const value = picked || (chosen.words.some((w) => w.en === current) ? current : "");
+    const q = query.trim().toLowerCase();
+    const meanings = [...new Set(chosen.words.map((w) => w.en))];
+    const shownMeanings = meanings.filter((m) => !q || m.toLowerCase().includes(q) || m === value);
+    const big = p.images[Math.min(photo, p.images.length - 1)] || "";
+    const remaining = () => {
+      if (here.view !== "steps") return [];
+      return (steps as SetStep[])
+        .slice(here.at)
+        .filter((st): st is Extract<SetStep, { kind: "picture" }> => st.kind === "picture")
+        .map((st) => pictureOf(setOf(st.setId), st.pictureId))
+        .filter((x): x is SetPicture => !!x && pictureState(x.answer, null) === "new")
+        .map((x) => x.id);
+    };
+    return (
+      <Screen
+        title={v.title}
+        onBack={here.view === "picture" ? () => go({ view: "answers", setId: v.id }) : onClose}
+        backLabel={here.view === "picture" ? "Back" : "Close"}
+        backIcon={here.view === "picture" ? "back" : "close"}
+        action={here.view === "steps" ? (
+          <Button size="sm" variant="ghost" onClick={() => { onSkipRest(remaining()); go({ view: "done" }); }}>Skip the rest</Button>
+        ) : undefined}
+      >
+        {here.view === "steps" && n > 0 && <p className="at-eyebrow">{`${n} of ${pictureSteps.length}`}</p>}
+        <CardPicture hash={big} className="prompt" alt={p.name} />
+        {p.images.length > 1 && (
+          <div className="at-picthumbs at-mt3">
+            {p.images.map((h, i) => (
+              <button type="button" key={h} className={`at-picchoice${i === photo ? " on" : ""}`} aria-pressed={i === photo}
+                aria-label={`Photo ${i + 1}`} onClick={() => setPhoto(i)}>
+                <CardPicture hash={h} alt="" />
+              </button>
+            ))}
+          </div>
+        )}
+        <p className="at-lede at-mt3" dir="auto">{p.name}</p>
+        {meanings.length > 8 && (
+          <SearchBox value={query} onChange={setQuery} placeholder="Search" aria-label="Search the choices" boxClassName="at-mt3" />
+        )}
+        <RadioGroup
+          label={v.set.wording.question}
+          name="set-answer"
+          value={value || null}
+          onChange={(m) => setPicked(m)}
+          options={shownMeanings.map((m) => ({ value: m, label: m }))}
+        />
+        <div className="at-row at-mt4">
+          <Button variant="primary" disabled={!value} onClick={() => {
+            onAnswer(p.id, { meaning: value, none: undefined, skip: undefined });
+            after();
+          }}>
+            Next
+          </Button>
+        </div>
+        <div className="at-row at-mt3">
+          <Button variant="ghost" onClick={() => { onAnswer(p.id, { none: true, meaning: undefined, skip: undefined }); after(); }}>
+            {v.set.wording.none}
+          </Button>
+          {here.view === "steps" && (
+            <Button variant="ghost" onClick={() => { onAnswer(p.id, { skip: true, meaning: undefined, none: undefined }); after(); }}>
+              Skip for now
+            </Button>
+          )}
+        </div>
+      </Screen>
+    );
+  }
+
+  if (here.view === "answers") {
+    const v = setOf(here.setId);
+    if (!v) return <Screen title="Personal set" onBack={onClose} />;
+    const chosen = chosenOf(v);
+    return (
+      <Screen title={v.title} onBack={onClose}>
+        {v.lists.length > 1 && (
+          <>
+            <p className="at-eyebrow">Words you&rsquo;re learning</p>
+            <Tile
+              title={chosen ? chosen.title : "Not chosen yet"}
+              actions={<Button size="sm" onClick={() => (chosen ? setAsking({ list: true, setId: v.id }) : go({ view: "list", setId: v.id }))}>Change</Button>}
+            />
+          </>
+        )}
+        <p className="at-eyebrow at-mt4">{v.set.wording.question}</p>
+        {v.pictures.map((p) => (
+          <Tile
+            key={p.id}
+            title={p.name}
+            meta={answerText(v, p)}
+            onOpen={() => {
+              const state = pictureState(p.answer, chosen ? chosen.words : null);
+              if (state === "ok" || state === "none") setAsking({ setId: v.id, pictureId: p.id, name: p.name });
+              else go({ view: "picture", setId: v.id, pictureId: p.id });
+            }}
+          />
+        ))}
+        <Help className="at-mt4">
+          Only you see these. If you report a problem with one of these pictures, your answer for it is sent with the report.
+        </Help>
+        {asking && (
+          <ConfirmModal
+            danger={false}
+            title={"list" in asking ? "Change the words you learn?" : `Change your answer for ${asking.name}?`}
+            body={<p>{"list" in asking
+              ? "This starts all these pictures again. Your answers are kept and matched to the new words."
+              : "This starts this picture again. Nothing else changes."}</p>}
+            confirmLabel={"list" in asking ? "Choose another list" : "Change"}
+            onCancel={() => setAsking(null)}
+            onConfirm={() => {
+              const was = asking;
+              setAsking(null);
+              if ("list" in was) go({ view: "list", setId: was.setId });
+              else go({ view: "picture", setId: was.setId, pictureId: was.pictureId });
+            }}
+          />
+        )}
+      </Screen>
+    );
+  }
+
+  /* Done: what was answered, and the way on. */
+  const shown = pictureSteps.flatMap((st) => {
+    const v = setOf(st.setId);
+    const p = pictureOf(v, st.pictureId);
+    return v && p ? [{ v, p }] : [];
+  });
+  const names = [...new Set(shown.map((x) => x.v.title))];
+  return (
+    <Screen title={names.length === 1 ? names[0] : "Personal sets"} onBack={onClose} backLabel="Close" backIcon="close">
+      <p className="at-lede">Thanks. That&rsquo;s all for now.</p>
+      {shown.map(({ v, p }) => (
+        <Tile key={p.id} title={p.name} meta={answerText(v, p)} />
+      ))}
+      <Help className="at-mt3">
+        {`You can change any of these in Settings, under ${names.join(", ")}.`}
+      </Help>
+      <div className="at-row at-mt4">
+        <Button variant="primary" onClick={onStart || onClose}>{onStart ? "Start session" : "Done"}</Button>
+      </div>
+    </Screen>
+  );
+}
+
+function SettingsScreen({ kind, onClose, sets = [], onOpenSet, ...rest }: {
   kind?: string;
   onClose: () => void;
+  /** The personal sets the learner holds, each opening their answers (0.630). */
+  sets?: { id: string; title: string }[];
+  onOpenSet?: (id: string) => void;
 } & React.ComponentProps<typeof AccountSettings> & React.ComponentProps<typeof AppPreferences>) {
   const title = kind === "guide" ? "How it works" : "Settings";
   return (
@@ -20452,6 +20899,15 @@ function SettingsScreen({ kind, onClose, ...rest }: {
         <>
           {/* One screen: how the app behaves first, then you. */}
           <AppPreferences {...rest} />
+          {/* Your answers in each personal set, only where you hold one. */}
+          {sets.length > 0 && onOpenSet && (
+            <>
+              <p className="at-eyebrow at-mt4">Personal sets</p>
+              {sets.map((v) => (
+                <Tile key={v.id} title={v.title} meta="Your answers" onOpen={() => onOpenSet(v.id)} />
+              ))}
+            </>
+          )}
           <AccountSettings {...rest} />
         </>
       )}

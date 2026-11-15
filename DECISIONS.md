@@ -8477,3 +8477,36 @@ The release numbers are one later than the plan's, which was written
 before 0.628 shipped. Cost: none visible; a deck field and a form field
 that older builds ignore.
 
+## Personal sets, stage 2: asking the student (0.630)
+
+**15 November 2026** · `chosenList`, `resolve`, `pictureState`,
+`stepsToAsk`, `keptAcrossReset` in `src/sets.ts`; `setViewsOf`,
+`resetForm`, `SetQuestions`, `askFirst` in `src/ArabicTrainer.tsx`;
+`tests/sets.test.mjs`, `tests/sets-device.test.mjs`,
+`tests/unknown-exercises.test.mjs`, `tests/smoke.mjs`
+
+The second phase of `docs/PLAN-personal-sets.md`. A student's answer is a
+record at `s["set-answer"]` on the picture's lead form, written only
+through `withAnswer` and saved through `persist`, so it syncs, is backed up
+and is deleted with the practice it sits in. No server action, no cache, no
+new field. Choosing a list writes `list` into every picture's record at
+once; the set's chosen list is the `list` of the latest record, while that
+deck is still one of the set's lists and held.
+
+Reset scheduling now goes through `resetForm`, which keeps the answer and
+re-stamps it with the reset's time: the merge drops anything older than a
+reset, and an answer is not a schedule. `unknown-exercises` now carries an
+answer in its fixtures and asks for the same standings, sessions and sync.
+
+Before `begin`, `beginWeak` and `startSaved`, whatever is new (a list to
+choose, a picture never answered or no longer matching) is asked first.
+The session starts on the next render, from an effect, so it is built from
+the answers just given rather than the cards as they were when the button
+was pressed. "Skip the rest" marks the unanswered pictures skipped, as the
+prototype does, so the same questions do not come back before every
+session; a skipped picture is still counted on Home.
+
+Cost: one small CSS rule for the row of other photos on the question
+screen (`at-picthumbs`). The screens are dark until a teacher can make a
+set (stage 4).
+

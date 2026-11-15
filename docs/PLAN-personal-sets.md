@@ -539,6 +539,6 @@ One line per phase, filled in by the builder as each ships: release, date, and a
 The plan was written while 0.627 was current; 0.628 shipped first, so each phase lands one release later than its heading says (0.629 to 0.632).
 
 - Phase 1, the two new fields: 0.629, 15 November 2026. As planned. `save-set` refuses a My space deck with its own error, "personal-set", worded for this case. The read-out names each recording's speaker through a small helper, `voicedClips`, beside `clipsOf`, rather than changing `clipsOf`, which the trainer also reads for its slow-recording labels.
-- Phase 2, asking the student:
+- Phase 2, asking the student: 0.630, 15 November 2026. As planned, with three readings recorded here. "Skip the rest" writes a skip on each picture not yet answered, as the prototype does, so the same pictures are not asked before every session. A set with no pictures asks nothing, not even its list. The reset is a small exported `resetForm`, so it can be tested, and the rule it applies is `keptAcrossReset` in sets.ts. The Settings confirmations use the prototype's wording, though starting a picture again arrives in Phase 3.
 - Phase 3, practising a picture:
 - Phase 4, the teacher's side, and records:
