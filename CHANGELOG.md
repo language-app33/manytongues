@@ -8,6 +8,20 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.637 — 16 November 2026
+
+**A space you make with "I'll be this space's admin" now appears in your
+own list of spaces, so you can go into it and run it.** Until now the
+super admin who chose that option was recorded as the space's admin but
+not as one of its members, so the space never showed up for them and
+there was no way in.
+
+- Right after you create the space, the app refreshes and the new space is
+  in your list, marked as one you run.
+- Spaces already made this way are put right automatically the first time
+  you sign in after this release: they appear in your list without you
+  doing anything.
+
 ## 0.636 — 16 November 2026
 
 **When the app can't reach the server, a large bar at the foot of the

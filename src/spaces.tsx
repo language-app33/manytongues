@@ -10897,6 +10897,17 @@ function SpacesTab() {
               run(async () => {
                 const r = await API.createOrg(making.name.trim(), making.slug.trim().toLowerCase(),
                   making.self ? "" : making.adminName.trim(), "", "", making.self);
+                /* You are in it now (0.637): the app learns of the new
+                   space at once, the way adding yourself to one does. */
+                if (making.self) {
+                  const acc = API.loadAccount();
+                  if (acc) {
+                    const me2 = await API.whoAmI(acc.key).catch(() => null);
+                    if (me2) API.saveAccount({ ...me2.user, key: acc.key });
+                  }
+                  window.location.reload();
+                  return;
+                }
                 /* No key to show when you are its admin yourself (0.552). */
                 setMade(r.key ? { name: r.org.name, admin: r.admin.displayName, key: r.key, slug: r.org.slug } : null);
                 setMaking(null);

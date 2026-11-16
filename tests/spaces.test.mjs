@@ -567,6 +567,12 @@ test("the App admin can be a new space's admin, with no account made (0.552)", a
   assert.equal(r.json.key, "");
   assert.deepEqual(r.json.org.admins, [r.json.admin.handle]);
   assert.equal(r.json.admin.admin, true);
+  /* And it is one of their spaces, which they run (0.637): before, they
+     were its admin but not in it, so it was missing from their list. */
+  const who = (await api("whoami", { key: admin.key })).json;
+  const listed = who.user.orgs.find((/** @type {any} */ o) => o.id === r.json.org.id);
+  assert.ok(listed, "the new space is in the App admin's own list");
+  assert.equal(listed.runs, true);
   /* Without it, a name is still owed. */
   assert.equal((await api("admin-create-org", { key: admin.key, body: { name: "No admin", slug: "no-admin" } })).status, 400);
 });

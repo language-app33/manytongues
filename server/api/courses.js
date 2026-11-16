@@ -1561,6 +1561,37 @@ export function slugProblem(slug) {
 /** A hex colour or nothing. @param {unknown} c */
 const colourOf = (c) => (/^#[0-9a-f]{6}$/i.test(String(c || "")) ? String(c).toLowerCase() : "");
 
+/**
+ * Spaces an App admin was made admin of without being put in (0.552–0.636):
+ * "I'll be this space's admin" wrote them on the space's admins and nothing
+ * else, so the space never appeared in their own list. Once, the first time
+ * this release runs, each such App admin is made a member of every open
+ * space they run. Stamped first, so two processes can't both do it.
+ */
+/** @type {Promise<void> | null} */
+let repairedRunners = null;
+/** @param {Store} store */
+function repairAdminMemberships(store) {
+  if (!repairedRunners) {
+    repairedRunners = (async () => {
+      const at = Date.now();
+      const stamp = await updateJson(store, "stamp:admin-runs-member-0637", (/** @type {any} */ cur) => (cur ? null : { at }));
+      if (!stamp || stamp.at !== at) return;
+      const orgs = (await readManyJson(store, (await readIndex(store, "orgs")).map((id) => K.org(id)))).filter(Boolean);
+      for (const o of orgs) {
+        if (o.archived) continue;
+        for (const h of o.admins || []) {
+          const u = await readJson(store, K.user(h));
+          if (u && u.admin && !memberOf(u).includes(o.id)) await addMembership(store, h, o.id);
+        }
+      }
+    })().catch(() => {
+      repairedRunners = null;
+    });
+  }
+  return repairedRunners;
+}
+
 /*
  * Students' My space, removed once (0.550, 7a). Since 0.550 only teachers
  * and those who run a space have a My space; what students made in it under
@@ -2239,6 +2270,7 @@ async function handle(req) {
      */
     if (action === "signin" || action === "whoami") {
       await ensureMain(store);
+      await repairAdminMemberships(store);
       const found = await currentUser(req, store);
       if (!found) return json({ error: "bad-key" }, 401);
       /* Suspended across the whole app by the super admin (0.578). */
@@ -6809,6 +6841,10 @@ async function handle(req) {
         await updateJson(store, K.index("orgs"), (/** @type {any} */ cur) =>
           (cur || []).includes(id) ? null : (cur || []).concat([id])
         );
+        /* Running it means being in it (0.637): until then the App admin
+           was on its admins but not a member, so the space was missing
+           from their own list of spaces and they had no way in. */
+        if (selfAdmin) await addMembership(store, mine, id);
         return json({ ok: true, org, admin: user, key });
       }
 
