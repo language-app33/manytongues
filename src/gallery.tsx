@@ -121,6 +121,7 @@ const PARTS = "Inside another component";
 const PLACES: Record<string, [string, string]> = {
   /* The learner's app */
   ArabicTrainer: [LEARN, "The app around everything else"],
+  host: [LEARN, "Every screen · the bar saying the server can't be reached"],
   AccountPanel: [LEARN, "Account settings"],
   AccountSettings: [LEARN, "Account settings"],
   DeviceMedia: [LEARN, "Account settings · Recordings and pictures on this device"],
@@ -244,6 +245,7 @@ const PLACES: Record<string, [string, string]> = {
   NarrowBlank: [TEACH, "Reviewing a card's sentences · narrowing a blank"],
   ReportsScreen: [TEACH, "Reports from students"],
   NumbersTab: [TEACH, "A language's number system · its parts, the clock, and the way to corrections"],
+  FetchingSystems: [TEACH, "A language's number system · while it is fetched"],
   FixScreen: [TEACH, "A language's number system · correcting how a number is said"],
   SampleRows: [TEACH, "A language's number system · numbers as a student will be asked them"],
   PartBlock: [TEACH, "A language's number system · a section of a part's screen"],
