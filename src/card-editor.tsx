@@ -6735,7 +6735,10 @@ function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, d
  * the Advanced tab writes it in — so ticking the box carries it over
  * without anything to copy: it is the same form.
  */
-function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onSetDecks, onCreateDeck, onExport, onToSpace, onDelete }: {
+function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onSetDecks, onCreateDeck, onExport, onToSpace, onDelete, setOnly = false }: {
+  /** In personal sets and nothing else: the advanced card is not offered,
+      unless the card is one already (0.634). */
+  setOnly?: boolean;
   lang: Lang;
   scene: boolean;
   word: WordDraft;
@@ -6825,6 +6828,9 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
           because the rest of the screen follows from it. Said in no more
           than its own words; only where it cannot be unticked does it say
           why. */}
+      {setOnly && !advanced ? (
+        <Help>A personal set uses a card&rsquo;s name, its photos and its recordings, so its cards are always basic.</Help>
+      ) : (
       <CheckList
         options={[{
           id: "advanced",
@@ -6835,6 +6841,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
         chosen={advanced ? ["advanced"] : []}
         onToggle={(_, wasOn) => onAdvanced(!wasOn)}
       />
+      )}
       {/* Said while it can still be undone by ticking the box again:
           nothing is lost until the card is saved. */}
       {!advanced && drops.length > 0 && (
@@ -6870,6 +6877,9 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
             dims={[]}
             bare
           />
+          {setOnly && (
+            <Help className="at-mt3">In a personal set the English is optional: only how the name is spelt in English.</Help>
+          )}
       </div>
     )}
 
@@ -7599,6 +7609,7 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
   children?: Node;
 }) {
   const fields = answerFields();
+  const setOnly = useContext(SetOnly);
   /* Folded under its name inside the Forms section, unless anything at all
      is written in it — see FoldsForms. Decided once, when the screen opens:
      a form opened to be written in stays open while it is, and one emptied
@@ -7747,9 +7758,9 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
         </p>
       )}
 
-      <Field className={plain ? "at-softrule" : ""} label={plain ? undefined : <>English{required && !soundOrPicture(f) && <Req />}</>}>
+      <Field className={plain ? "at-softrule" : ""} label={plain ? undefined : <>English{required && !soundOrPicture(f) && !setOnly && <Req />}</>}>
         <Alternatives
-          headed={plain ? <>English{required && !soundOrPicture(f) && <Req />}</> : null}
+          headed={plain ? <>English{required && !soundOrPicture(f) && !setOnly && <Req />}</> : null}
           value={f.en}
           of={of}
           moreLabel="Other English answers"
@@ -7883,6 +7894,11 @@ function FormFields({ lang, form: f, dims, of = "", title, role = "", acts, dril
    once already: a form that arrives after that — "Add a form" — opens,
    since it was asked for to be written in. And whether every form starts
    folded, written in or not — see NounEditor. */
+/* Whether the card being edited is in personal sets and nothing else
+   (0.634): its English is optional then — a name needs no translation —
+   and the advanced card is not offered, a set using none of it. */
+const SetOnly = createContext(false);
+
 const FoldsForms = createContext<{ drawn: { current: boolean }; folded: boolean } | null>(null);
 
 /* Whether anything at all is written in a form: a word in any of its
@@ -10866,11 +10882,13 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
   const snack = useSnackbar();
   /* What is short, as against what is wrong: an empty field a red
      asterisk marks, or a mistake that already has its own red line. */
+  /* In personal sets and nothing else (0.634): see SetOnly. */
+  const setOnly = chosen.length > 0 && chosen.every((id) => !!((decks || []).find((d) => d.id === id) || {}).set);
   const missing = (() => {
     if (scene) return !talk.title.trim() || !talk.sceneKind || !canSaveScene(talk.title, talk.written, talk.text);
     if (word.needsName) return true;
     if (advanced && word.standsIn) return word.needsForm;
-    return !String(word.main.ar || "").trim() || (!String(word.main.en || "").trim() && !soundOrPicture(word.main));
+    return !String(word.main.ar || "").trim() || (!String(word.main.en || "").trim() && !soundOrPicture(word.main) && !setOnly);
   })();
   /* A tap on a field of a card being read. */
   /* Read fields are plain words now, so a tap on one needs no answer. */
@@ -11044,6 +11062,7 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
               The name, whether it is an advanced card, the word itself on
               a basic one, and its decks. */}
           <TabPanel id="overview" tab={shownTab} locked={locked} panel={panels.overview} onLockedTap={viewOnly}>
+            <SetOnly.Provider value={setOnly}>
             <BasicBlock
               lang={lang}
               scene={scene}
@@ -11063,7 +11082,9 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
               onExport={locked ? onExport : undefined}
               onToSpace={locked ? onToSpace : undefined}
               onDelete={!locked && stored && onDelete ? onDelete : undefined}
+              setOnly={setOnly}
             />
+            </SetOnly.Provider>
           </TabPanel>
 
           {/* ---- The card's own words ----

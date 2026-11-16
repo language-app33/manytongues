@@ -8,6 +8,22 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.634 — 16 November 2026
+
+**A card in a personal set is always a basic card, and its English is
+optional.** A set uses only a card's name, its photos and its recordings,
+so a card that is only in personal sets no longer offers "Build an
+advanced card"; a line says why instead. Its English box is no longer
+required, even before a photo is added: a name needs no translation, and
+a line says the English is only how the name is spelt in English.
+
+A card that is also in an ordinary deck keeps the advanced card, and a
+card that already has advanced details keeps showing them.
+
+To check by hand: in a personal set, add a card and check there is no
+"Build an advanced card" box and that it saves with a name and no English.
+Add the same card to an ordinary deck too and check the box comes back.
+
 ## 0.633 — 15 November 2026
 
 **New deck now asks what kind of deck you want: a regular deck, a unit, or

@@ -8630,3 +8630,20 @@ The deck-screen walk that reads an open deck's headings is back to its
 original "This deck | Cards": an ordinary deck has no Personal set
 section any more.
 
+## A card only in personal sets is basic, with optional English (0.634)
+
+**16 November 2026** · `SetOnly`, `BasicBlock`, `FormFields` and the
+`missing` check in `src/card-editor.tsx`; `tests/smoke.mjs`
+
+The owner's 1a, 2a. Nothing on the advanced card is read by a set: it
+practises only the lead form's word, pictures and recordings, and a "Name"
+subtype would only change how the deck's quality is scored. So a card
+whose decks are all personal sets is not offered "Build an advanced card",
+and its English is not required — before 0.634 it was already optional
+once a picture or a recording was on the card, so this only lifts the
+star until then. Read from the decks ticked on the card in the editor, so
+ticking an ordinary deck brings the box back; a card that already opens as
+advanced keeps it, so nothing on it goes out of sight. Cost: none stored;
+a teacher who wants another form on a set's picture adds the card to an
+ordinary deck first, and the set still ignores it.
+

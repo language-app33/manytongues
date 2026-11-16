@@ -538,7 +538,7 @@ const fakeFetch = async (input, opts = {}) => {
           { id: "d2", title: "Introductions", owner: account.handle, lang: "ar-PS", cardIds: [frameCard.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 2 }] },
           ...(teacherSets ? [
             { id: "d4", title: "Family words", owner: account.handle, lang: "ar-PS", cardIds: [card.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 4 }] },
-            { id: "d5", title: "Our family", owner: account.handle, lang: "ar-PS", cardIds: [], cardCount: 0, courses: [{ courseId: "c1", addedAt: 5 }],
+            { id: "d5", title: "Our family", owner: account.handle, lang: "ar-PS", cardIds: ["k777777777777"], cardCount: 1, courses: [{ courseId: "c1", addedAt: 5 }],
               set: { wording: { question: "Who is this person to you?", none: "I don't know this person", askName: "Who is this?", askWord: "What do you call this person?", askBoth: "Their name, with what you call them" },
                 lists: [], named: [], asks: { name: true, word: true, both: true }, order: "before" } },
           ] : []),
@@ -550,6 +550,9 @@ const fakeFetch = async (input, opts = {}) => {
         ok: true,
         cards: [
           { ...card, decks: teacherSets ? ["d1", "d4"] : ["d1"] },
+          /* A person in the personal set, a picture and a name (0.634). */
+          ...(teacherSets ? [{ id: "k777777777777", owner: account.handle, lang: "ar-PS", rev: 1, updated: 1, decks: ["d5"],
+            forms: [{ ar: "لان", en: "", lat: "lan", images: ["7".repeat(64)] }] }] : []),
           { ...phrase, decks: ["d1"] },
           { ...talk, decks: [] },
           { ...frameCard, decks: ["d2"] },
@@ -12692,6 +12695,22 @@ const openPronounTables = async () => {
     !!sent && sent.deckId === "d5" && sent.set && sent.set.wording.question === "Who is she to you?"
       && JSON.stringify(sent.set.lists) === JSON.stringify(["d2", "d4"]) && sent.set.named.includes(card.id) && sent.set.order === "after",
     JSON.stringify(sent));
+  /* A picture of the set, edited: always a basic card, its English optional. */
+  const personTile = [...document.querySelectorAll(".at-screen.cardform .at-cardtile, .at-screen.cardform .at-minicard, .at-screen.cardform .at-tile")]
+    .find((t) => /لان/.test(t.textContent || ""));
+  click(/** @type {any} */ (personTile));
+  await sleep(600);
+  click([...document.querySelectorAll('.at-fab[aria-label="Edit"]')].pop() || null);
+  await sleep(500);
+  const editing = [...document.querySelectorAll(".at-screen")].pop();
+  const editText = editing ? (editing.textContent || "").replace(/\s+/g, " ") : "";
+  check("a card only in a personal set is not offered as an advanced card",
+    !!personTile && !!editing && !/Build an advanced card/.test(editText) && /always basic/.test(editText), editText.slice(0, 300) || (personTile ? "no editor" : "no card tile"));
+  check("and says its English is optional", /the English is optional/.test(editText), editText.slice(0, 300));
+  backOut();
+  await sleep(300);
+  backOut();
+  await sleep(300);
   teacherSets = false;
   r.unmount();
   host.remove();
