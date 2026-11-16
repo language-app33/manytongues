@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.635 — 16 November 2026
+
+**A personal set's "word lists" are now called what they are: decks.** On
+a set's screen the heading reads **Words to choose from**, the button is
+**Add a deck**, and the warning for a set with none says no deck of words
+is chosen yet. Students choosing which words to learn are told "Your
+teacher has given two to choose from", and the button for changing it in
+Settings reads **Choose other words**. Nothing else changes.
+
+To check by hand: open a personal set and check the heading and the
+button; as a student of a set with two decks of words, check the choice
+screen's wording.
+
 ## 0.634 — 16 November 2026
 
 **A card in a personal set is always a basic card, and its English is

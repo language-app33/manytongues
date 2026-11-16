@@ -21080,7 +21080,7 @@ function SetQuestions({ sets, steps, openSet, onAnswer, onList, onSkipRest, onCl
         <RadioGroup
           label="Which words do you want to learn?"
           name="set-list"
-          lede={`Your teacher has ${choosing.lists.length === 2 ? "two" : choosing.lists.length} lists. You can change this later in Settings.`}
+          lede={`Your teacher has given ${choosing.lists.length === 2 ? "two" : choosing.lists.length} to choose from. You can change this later in Settings.`}
           value={value || null}
           onChange={(id) => setPicked(id)}
           options={choosing.lists.map((l) => ({
@@ -21221,7 +21221,7 @@ function SetQuestions({ sets, steps, openSet, onAnswer, onList, onSkipRest, onCl
             body={<p>{"list" in asking
               ? "This starts all these pictures again. Your answers are kept and matched to the new words."
               : "This starts this picture again. Nothing else changes."}</p>}
-            confirmLabel={"list" in asking ? "Choose another list" : "Change"}
+            confirmLabel={"list" in asking ? "Choose other words" : "Change"}
             onCancel={() => setAsking(null)}
             onConfirm={() => {
               const was = asking;

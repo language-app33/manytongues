@@ -1810,7 +1810,7 @@ function SetSection({ deck, decks, cards, busy, onSave }: {
   if (picking) {
     return (
       <DeckPickScreen
-        title="Word lists"
+        title="Words to choose from"
         decks={offered.map((d) => ({ id: d.id, title: d.title, locked: d.locked, cardCount: d.cardCount }))}
         chosen={draft.lists}
         onToggle={(id, wasOn) => edit({ lists: wasOn ? draft.lists.filter((x) => x !== id) : draft.lists.concat([id]) })}
@@ -1846,7 +1846,7 @@ function SetSection({ deck, decks, cards, busy, onSave }: {
         </Field>
       ))}
 
-      <Field label="Word lists" lede="Other decks of this course, each an ordinary deck of words. With two or more, each student picks one.">
+      <Field label="Words to choose from" lede="Other decks of this course, each an ordinary deck of words. With two or more, each student picks one deck.">
         {lists.map((l) => (
           <Tile
             key={l.id}
@@ -1857,7 +1857,7 @@ function SetSection({ deck, decks, cards, busy, onSave }: {
           />
         ))}
         <div className="at-chips">
-          <Button size="sm" icon="add" disabled={busy} onClick={() => setPicking(true)}>Add a list</Button>
+          <Button size="sm" icon="add" disabled={busy} onClick={() => setPicking(true)}>Add a deck</Button>
         </div>
       </Field>
 
@@ -4913,7 +4913,7 @@ function NewDeck({
           {unit
             ? "Save the unit to add its words and sentences."
             : kind === "set"
-            ? "Save the set to add its pictures. Once it is in a course, choose its word lists on its screen."
+            ? "Save the set to add its pictures. Once it is in a course, choose the decks its words come from on its screen."
             : "Save the deck to add cards to it and share it with a course."}
         </Help>
       </div>

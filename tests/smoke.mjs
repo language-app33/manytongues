@@ -12671,7 +12671,7 @@ const openPronounTables = async () => {
     box.dispatchEvent(new w.Event("input", { bubbles: true }));
     await sleep(150);
   }
-  click(buttonNamed(/^Add a list$/));
+  click(buttonNamed(/^Add a deck$/));
   await sleep(400);
   const pickRow = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-tickrow")].find((row) => re.test(row.textContent || ""));
   check("the lists offered are the other decks of the course, not sets", !!pickRow(/Introductions/) && !!pickRow(/Family words/) && !pickRow(/Our family/),

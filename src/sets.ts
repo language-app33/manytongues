@@ -343,7 +343,7 @@ export function setGaps(
   cards: { picture: boolean }[] = [],
 ): string[] {
   const out: string[] = [];
-  if (!set.lists.length) out.push("No word list is chosen yet, so students have nothing to answer with.");
+  if (!set.lists.length) out.push("No deck of words is chosen yet, so students have nothing to answer with.");
   for (const l of lists) {
     if (l.words.length < 4) {
       out.push(`${l.title} has ${l.words.length === 1 ? "only 1 word" : `only ${l.words.length} words`}. Four or more give the choices something to choose between.`);

@@ -271,7 +271,7 @@ test("a report's line says the answer, the doesn't-apply wording, or that there 
 const words = (/** @type {string[]} */ ens) => ens.map((en) => ({ en }));
 
 test("a set with no list says so", () => {
-  assert.match(S.setGaps(S.emptySet(), []).join(" "), /No word list is chosen yet/);
+  assert.match(S.setGaps(S.emptySet(), []).join(" "), /No deck of words is chosen yet/);
 });
 
 test("a list with fewer than four words says so", () => {

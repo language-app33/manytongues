@@ -8647,3 +8647,14 @@ advanced keeps it, so nothing on it goes out of sight. Cost: none stored;
 a teacher who wants another form on a set's picture adds the card to an
 ordinary deck first, and the set still ignores it.
 
+## A set's word lists are called decks on screen (0.635)
+
+**16 November 2026** · `SetSection` in `src/spaces.tsx`, `setGaps` in
+`src/sets.ts`, `SetQuestions` in `src/ArabicTrainer.tsx`
+
+The owner's 1a. A set's lists are ordinary decks, and the rest of the app
+says deck, so the screens do too: "Words to choose from", "Add a deck", and
+on the student's side "given two to choose from" and "Choose other words".
+Words only: the stored field is still `set.lists`, and the code and the
+plan keep calling them lists.
+
