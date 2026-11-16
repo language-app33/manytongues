@@ -867,6 +867,24 @@ const touch = (store, user, field, orgs = []) =>
     return { ...cur, [field]: now, ...(orgs.length ? { [per]: map } : {}) };
   });
 
+/*
+ * Key only (0.638): whoever teaches a course, runs a space or is the App
+ * admin signs in with their key, never by a sign-in link. Read straight
+ * from the store, across every space, whatever space the request acts in.
+ */
+/** @type {(store: Store, user: any) => Promise<boolean>} */
+async function keyOnly(store, user) {
+  if (!user) return true;
+  if (user.admin) return true;
+  for (const id of memberOf(user)) {
+    const o = await readJson(store, K.org(id));
+    if (o && (o.admins || []).includes(user.handle)) return true;
+  }
+  const ids = await readIndex(store, "courses");
+  const courses = await readManyJson(store, ids.map((/** @type {string} */ id) => K.course(id)));
+  return courses.some((/** @type {any} */ c) => c && (c.teachers || []).includes(user.handle));
+}
+
 /** @type {(course: Course | null, h: string) => boolean} */
 const isTeacher = (course, h) => !!course && (course.teachers || []).includes(h);
 /** @type {(course: Course | null, h: string) => boolean} */
@@ -2256,7 +2274,16 @@ async function handle(req) {
         );
       }
       // The key is shown once and cannot be read back from the digest.
-      return json({ ok: true, user: { ...withoutMemberships(user), org: orgCard(org), orgs: [orgCard(org)] }, key });
+      return json({
+        ok: true,
+        user: {
+          ...withoutMemberships(user),
+          org: orgCard(org),
+          orgs: [orgCard(org)],
+          keyOnly: !!(target && target.kind === "course" && target.asTeacher),
+        },
+        key,
+      });
     }
 
     /*
@@ -2275,6 +2302,9 @@ async function handle(req) {
       if (!found) return json({ error: "bad-key" }, 401);
       /* Suspended across the whole app by the super admin (0.578). */
       if (!found.admin && found.suspendedApp) return json({ error: "suspended-app" }, 403);
+      /* A sign-in link is for students only (0.638). */
+      const only = await keyOnly(store, found);
+      if (url.searchParams.get("via") === "link" && only) return json({ error: "key-only" }, 403);
       /** @type {any} */
       let me = found;
       let { orgDocs, active } = await standingOf(store, me);
@@ -2305,6 +2335,7 @@ async function handle(req) {
             orgAdmin: false,
             orgs: [],
             stranded,
+            keyOnly: only,
           },
         });
       }
@@ -2328,6 +2359,7 @@ async function handle(req) {
             .map((id) => orgDocs.get(id))
             .filter(Boolean)
             .map((o) => ({ ...orgCard(o), runs: (o.admins || []).includes(me.handle) })),
+          keyOnly: only,
         },
       });
     }
@@ -7115,7 +7147,7 @@ async function handle(req) {
             return next;
           });
         }
-        return json({ ok: true, user, key });
+        return json({ ok: true, user, key, keyOnly: await keyOnly(store, user), slug: actingOrgDoc ? actingOrgDoc.slug : "" });
       }
 
       if (action === "admin-reissue-key") {
@@ -7139,7 +7171,16 @@ async function handle(req) {
         /* The practice document is stored under the key's token; carry it
            over, or the new key opens an empty one (0.580). */
         if (target.keyHash) await moveSyncDoc(target.keyHash, sha(key)).catch(() => {});
-        return json({ ok: true, handle, key });
+        /* The address of a space they are in, for their sign-in link (0.638). */
+        let slug = "";
+        for (const id of memberOf(target)) {
+          const o = await readJson(store, K.org(id));
+          if (o && !o.archived) {
+            slug = o.slug;
+            break;
+          }
+        }
+        return json({ ok: true, handle, key, keyOnly: await keyOnly(store, target), slug });
       }
 
       /* Removing a person: the same walk as closing your own account, so

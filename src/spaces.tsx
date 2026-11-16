@@ -7,6 +7,7 @@ import type { Card, Course, Deck, Feedback, Flag, Form, Lang, LangId, User } fro
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
 import { CardEditor, ImageScreen } from "./card-editor.tsx";
 import { usableAccent } from "./contrast.ts";
+import { keyFromLink, signInLink } from "./sign-in-link.ts";
 import type { CardShape } from "./card-editor.tsx";
 import { formsOf, leadOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
@@ -217,6 +218,10 @@ export interface OnboardingPlace {
   unknown?: boolean;
   /** From an invite link, `?join=`. */
   joinCode?: string;
+  /** From a sign-in link, `#key=` (0.638). */
+  linkKey?: string;
+  /** The address's space is known (or there is none), so the link can be tried. */
+  linkReady?: boolean;
   /** Said once at the top: a closed space, a suspended account. */
   notice?: string;
 }
@@ -226,7 +231,9 @@ export function Onboarding({ onDone, place = {} }: {
   place?: OnboardingPlace;
 }) {
   const org = place.org;
-  const [step, setStep] = useState(place.joinCode && !(org && org.closed) ? "new" : "choose"); // choose | new | existing | key
+  const [step, setStep] = useState(
+    place.linkKey ? "link" : place.joinCode && !(org && org.closed) ? "new" : "choose"
+  ); // link | choose | new | existing | key
   const [name, setName] = useState("");
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -269,7 +276,7 @@ export function Onboarding({ onDone, place = {} }: {
     }
   }
 
-  async function signIn() {
+  async function signIn(given = key.trim(), viaLink = false) {
     setBusy(true);
     setError("");
     try {
@@ -278,14 +285,21 @@ export function Onboarding({ onDone, place = {} }: {
          this address isn't is no longer refused: it lands in its own
          (memberships). The invitation followed lets an account with no
          open space back in. */
-      const r = await API.whoAmI(key.trim(), org ? org.id : API.lastSpace(), place.joinCode || "");
-      const account = { ...r.user, key: key.trim() };
+      const r = await API.whoAmI(given, org ? org.id : API.lastSpace(), place.joinCode || "", viaLink);
+      const account = { ...r.user, key: given };
       API.saveAccount(account);
       if (!r.user.admin && r.user.org) API.rememberSpace(r.user.org.id);
       /* An account someone else made, signed in to for the first time, is
          asked to save its key before anything else (18a). */
       if (r.user && r.user.keySaved === false) {
         reach.ok();
+        if (viaLink) {
+          /* Arriving by link is not stopped to save the key (0.638): it stays
+             on their account page, with the link. */
+          API.keySaved().catch(() => {});
+          onDone({ ...account, keySaved: true });
+          return;
+        }
         setMade(account);
         setStep("key");
         return;
@@ -293,11 +307,27 @@ export function Onboarding({ onDone, place = {} }: {
       reach.ok();
       onDone(account);
     } catch (e) {
-      if (!reach.caught(e, signIn)) setError(API.explain(e));
+      if (reach.caught(e, () => signIn(given, viaLink))) return;
+      const why = String(e && (e as Error).message);
+      if (viaLink) setStep("existing");
+      setError(
+        viaLink && why === "bad-key"
+          ? "This sign-in link no longer works. Ask your teacher or your space's admin for a new one, or type your sign-in key."
+          : API.explain(e)
+      );
     } finally {
       setBusy(false);
     }
   }
+
+  /* A sign-in link (0.638): tried once, when the address's space is known. */
+  const linkStarted = useRef(false);
+  useEffect(() => {
+    if (!place.linkKey || !place.linkReady || linkStarted.current) return;
+    linkStarted.current = true;
+    void signIn(place.linkKey, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [place.linkKey, place.linkReady]);
 
   /* The space's colour, as the accent on this page only, if it can be seen
      on both themes (29a; src/contrast.ts). */
@@ -334,6 +364,17 @@ export function Onboarding({ onDone, place = {} }: {
             </Button>
           </>
         ) : null}
+        {!elsewhere && step === "link" && (
+          <>
+            <img className="ob-logo" src={org && org.logoData ? org.logoData : "/logo.svg"} alt="" width={72} height={72} />
+            <h1>{org ? org.name : "ManyTongues"}</h1>
+            <Lede>Signing you in…</Lede>
+            <Button variant="ghost" wide className="at-mt3" onClick={() => setStep("existing")}>
+              Type my sign-in key instead
+            </Button>
+          </>
+        )}
+
         {!elsewhere && step === "choose" && (
           <>
             <img className="ob-logo" src={org && org.logoData ? org.logoData : "/logo.svg"} alt="" width={72} height={72} />
@@ -422,7 +463,10 @@ export function Onboarding({ onDone, place = {} }: {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (key.trim() && !busy) signIn();
+                if (!key.trim() || busy) return;
+                const pasted = keyFromLink(key);
+                if (pasted) void signIn(pasted, true);
+                else void signIn();
               }}
             >
               <input
@@ -486,6 +530,14 @@ export function Onboarding({ onDone, place = {} }: {
               safe. If you lose it, only your space's admin can give you a new one.
             </Lede>
             <CodeBox label="Your sign-in key" code={made.key} />
+            {made.keyOnly === false && made.org && typeof made.org === "object" && made.org.slug ? (
+              <CodeBox
+                long
+                label="Your private sign-in link"
+                hint="Opening it signs you in on any device, with nothing to type. Anyone who has it is you, so never share it."
+                code={signInLink(window.location.origin, made.org.slug, made.key)}
+              />
+            ) : null}
             <Help>
               You are <strong>{made.displayName}</strong> · <span className="at-handle">{made.handle}</span>
               . Share the handle freely; never the key.
@@ -657,7 +709,7 @@ export function PersonActions({ person, org, keyOrg, mayKey, mayAct, suspendable
   suspendedHere: boolean;
   removable: boolean;
   onConfirm: (p: Pending) => void;
-  onNewKey: (made: { name: string; handle: string; key: string }) => void;
+  onNewKey: (made: { name: string; handle: string; key: string; link?: string }) => void;
   children?: Node;
 }) {
   const u = person;
@@ -677,7 +729,13 @@ export function PersonActions({ person, org, keyOrg, mayKey, mayAct, suspendable
           ),
           action: async () => {
             const r = await API.reissueKey(u.handle, keyOrg);
-            onNewKey({ name: u.displayName, handle: u.handle, key: r.key });
+            onNewKey({
+              name: u.displayName,
+              handle: u.handle,
+              key: r.key,
+              /* A student's private sign-in link, built here from the key (0.638). */
+              link: r.keyOnly === false && r.slug ? signInLink(window.location.origin, r.slug, r.key) : "",
+            });
           },
         })} />
       )}
@@ -2863,6 +2921,14 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                     code={newKey.key}
                     hint={newKey.handle ? <>Their handle is <strong>{newKey.handle}</strong>.</> : undefined}
                   />
+                  {newKey.link ? (
+                    <CodeBox
+                      long
+                      label={`Private sign-in link for ${newKey.name}`}
+                      hint="Opening it signs them in, with nothing to type. It is for them alone: never post it to a class or a group."
+                      code={newKey.link}
+                    />
+                  ) : null}
                   <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
                     <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>
                       Done
@@ -2897,6 +2963,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                               handle: r.user.handle,
                               key: r.key,
                               fresh: true,
+                              link: r.keyOnly === false && r.slug ? signInLink(window.location.origin, r.slug, r.key) : "",
                             });
                             setMakingUser(null);
                             return r;
@@ -2973,8 +3040,9 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                   )}
 
                   <Help>
-                    You'll get their sign-in key once, to pass on privately. They don't need to
-                    do anything first — the key signs them in on any device.
+                    You'll get their sign-in key once, to pass on privately, and for a student a
+                    private sign-in link too. They don't need to do anything first — the key or
+                    the link signs them in on any device.
                   </Help>
 
                                 </Screen>
@@ -11454,7 +11522,7 @@ function EveryonePeople({ me }: { me: string }) {
   /* See useRun and useConfirm: a yes runs, then the list is read again. */
   const { run, busy, setBusy, error, setError } = useRun({ refresh: () => load() });
   const { setConfirm, modal: confirmModal } = useConfirm(run, { busy });
-  const [newKey, setNewKey] = useState<{ name: string; handle?: string; key: string } | null>(null);
+  const [newKey, setNewKey] = useState<{ name: string; handle?: string; key: string; link?: string } | null>(null);
   /* Everyone once, or under each of their spaces (0.578). */
   const [view, setView] = useState<"all" | "spaces">("all");
   /* Taking one space away from someone (0.578): who, and which. */
@@ -11676,6 +11744,14 @@ function EveryonePeople({ me }: { me: string }) {
       {newKey && (
         <div className="at-sub">
           <CodeBox label={`New sign-in key for ${newKey.name}`} code={newKey.key} />
+          {newKey.link ? (
+            <CodeBox
+              long
+              label={`Private sign-in link for ${newKey.name}`}
+              hint="Opening it signs them in, with nothing to type. It is for them alone: never post it to a class or a group."
+              code={newKey.link}
+            />
+          ) : null}
           <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
             <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>Done</Button>
           </div>

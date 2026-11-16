@@ -1732,6 +1732,15 @@ Addresses and joining (since 0.543):
   reopened and deleted in Admin → Spaces. Deleting an account, or a whole
   space, also erases each account's practice history (`forgetSyncDoc` in
   `server/api/sync.js`).
+- A student's sign-in link (0.638) is `<origin>/<address>#key=<sign-in key>`
+  (`src/sign-in-link.ts`). The key rides after `#`, so it never reaches a
+  server, and the app reads it once at start and takes it out of the
+  address and the history at once. The server says who may use one:
+  `keyOnly` on `whoami`, `signup`, `admin-create-user` and
+  `admin-reissue-key` is true for anyone who teaches a course, runs a space
+  or is the App admin, and a `whoami` sent from a link (`via=link`) for
+  such an account is refused with `key-only`. The link is built on the
+  device from the key it holds; it is never stored or sent.
 
 Running a space (since 0.544):
 

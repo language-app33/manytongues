@@ -8693,3 +8693,41 @@ it was shown before, because pressing Retry would be told the same.
 launch-time check of the courses that fails says nothing app-wide. The
 courses' failure is held only while the Courses screen is open. The sync
 dot keeps its own wording, since it is a status rather than an error.
+
+---
+
+## Sign-in links (0.638)
+
+**16 November 2026** · `src/sign-in-link.ts`, `keyOnly` in `server/api/courses.js`
+
+A student gets a private link that signs a device in with nothing to type:
+the space's address with the sign-in key after `#`. It is the key, carried
+differently, and every rule follows from that.
+
+**It works as long as the key does.** No expiry and no "use once": a new
+key kills the old link, and that is the only way to kill one. Nothing new
+is stored, and the server never builds or sees a link.
+
+**The key is still shown, and the link is shown wherever the key is** —
+on "Keep this somewhere safe", on the account page, and to the admin who
+made or replaced the key. Arriving by link does not stop the student to
+tick that the key is saved; the key and link stay on their account page.
+
+**Opened where someone else is signed in, it asks** "Switch to …?" before
+anything happens, and switching goes through Log out, so the first
+person's practice is set aside for them. It lands on the space's home
+page, as any sign-in does.
+
+**Students only.** Whoever teaches a course, runs a space or is the App
+admin is key only, judged by the server across every space at each
+sign-in, so a student made a teacher loses their link at once. An old link
+of theirs is refused by the app (`via=link` → `key-only`) rather than by
+issuing them a new key. That is a soft guard: the key can still be read
+out of the link and typed. It keeps a long-lived credential for an account
+with authority out of the shape most easily forwarded, without replacing
+anyone's key.
+
+**Left out on purpose.** No QR code, and no setting up a whole class at
+once; both are for later. On an iPhone, an app installed to the home
+screen must be signed in once by pasting the link or key, because a link
+always opens the browser.

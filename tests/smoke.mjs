@@ -347,6 +347,10 @@ const joinedSpaces = [];
 /* Who whoami answers as, where a walk signs somebody else in. */
 /** @type {any} */
 let whoamiAs = null;
+/* Who whoami answers as for a given key, where a walk needs two people at
+   once — the device's account and a sign-in link's (0.638). */
+/** @type {Map<string, any>} */
+const whoamiKeys = new Map();
 /* Saves the stub takes, where a walk turns them on — see save-card below. */
 let takeSaves = false;
 /* A walk's own answer to a save, where it needs the server to fail, be
@@ -407,7 +411,10 @@ const fakeFetch = async (input, opts = {}) => {
     /* With every space the account may use (memberships): the account's
        own `orgs` where a test gives it several, else its one space. */
     if (action === "whoami") {
-      const own = /** @type {any} */ (whoamiAs || account);
+      const sentKey = (opts.headers && opts.headers["x-key"]) || "";
+      const own = /** @type {any} */ (whoamiKeys.get(sentKey) || whoamiAs || account);
+      /* A sign-in link is for students only (0.638). */
+      if (url.searchParams.get("via") === "link" && own && own.keyOnly === true) return json({ error: "key-only" }, 403);
       const orgs = own && Array.isArray(own.orgs) ? own.orgs : own && own.org ? [own.org] : [];
       return json({ ok: true, user: { ...own, key: undefined, orgs } });
     }
@@ -12146,6 +12153,138 @@ const openPronounTables = async () => {
   r.unmount();
   host.remove();
   whoamiAs = null;
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+}
+
+/* ---- sign-in links (0.638) ----
+
+   A student's private link is the space's address with their key after
+   `#`. Opened signed out, it signs them in with nothing to type and the key
+   leaves the address bar; opened while someone else is signed in, it asks
+   before switching; a teacher's or admin's is refused; and the account
+   page offers the link only to a student. */
+{
+  const MAIN_DOC = "arabic-trainer:arabic-trainer-v3";
+  const PARKED = `${MAIN_DOC}:parked:${account.handle}`;
+  const main = { id: "main", slug: "main", name: "Main", logo: "", colour: "" };
+  const lina = {
+    handle: "lina-5d6e", displayName: "Lina", key: "willow-amber-quartz-fjord-7e3a", admin: false,
+    keyOnly: false, keySaved: false, org: main,
+  };
+  const tariq = {
+    handle: "tariq-8f9a", displayName: "Tariq", key: "harbour-gable-ember-cedar-2b4c", admin: false,
+    keyOnly: true, org: main,
+  };
+  const mine = {
+    id: "klinkwalk0001", kind: "word", tags: [], created: 1, updated: 1, lang: "ar-PS",
+    forms: [{ id: "klinkwalk0001-f", ar: "قمر", en: "moon", lat: "qamar", s: {} }],
+  };
+  const holds = (/** @type {any} */ doc) => !!doc && (doc.items || []).some((/** @type {any} */ it) => it.id === mine.id);
+  const signedInAs = () => {
+    try {
+      return (JSON.parse(localStorage.getItem("arabic-account") || "null") || {}).key || "";
+    } catch (e) {
+      return "";
+    }
+  };
+  whoamiAs = null;
+  whoamiKeys.clear();
+  whoamiKeys.set(lina.key, lina);
+  whoamiKeys.set(tariq.key, tariq);
+  /** Opens the app at an address, as a fresh page would. */
+  const open = async (/** @type {string} */ address) => {
+    window.history.replaceState(null, "", address);
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    await sleep(2500);
+    const here = (/** @type {RegExp} */ re) => [...host.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
+    /* A dialog is put at the foot of the page, outside the app's own box. */
+    const anywhere = (/** @type {RegExp} */ re) => [...document.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
+    const close = () => {
+      r.unmount();
+      host.remove();
+    };
+    return { host, here, anywhere, close };
+  };
+
+  /* 1. Signed out, a student's link opened. */
+  localStorage.removeItem("arabic-account");
+  {
+    const app = await open(`/#key=${lina.key}`);
+    check("a sign-in link opened signed out signs the student in", !app.here(/sign-in key/) && signedInAs() === lina.key,
+      `${signedInAs() || "nobody"} · ${(app.host.textContent || "").slice(0, 100)}`);
+    check("without stopping them to tick that the key is saved", !/Keep this somewhere safe/.test(app.host.textContent || ""),
+      (app.host.textContent || "").slice(0, 100));
+    check("and the key is taken out of the address", window.location.hash === "", window.location.hash);
+    app.close();
+  }
+
+  /* 4. A key-only person's link, signed out. */
+  localStorage.removeItem("arabic-account");
+  {
+    const app = await open(`/#key=${tariq.key}`);
+    check("a teacher's sign-in link is refused, with the key box offered",
+      !!app.host.querySelector("#signin-key") && /Sign-in links are for students\./.test(app.host.textContent || ""),
+      (app.host.textContent || "").slice(0, 160));
+    check("and nobody is signed in", signedInAs() === "", signedInAs());
+    app.close();
+  }
+
+  /* 2. Signed in as one person, another's link opened: asked, and kept. */
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+  {
+    const app = await open(`/#key=${lina.key}`);
+    check("a link for someone else asks before switching", !!app.anywhere(/^Switch to Lina$/),
+      (document.body.textContent || "").slice(0, 160));
+    click([...document.querySelectorAll(".at-modal button")].find((b) => /^Cancel$/.test((b.textContent || "").trim())));
+    await sleep(800);
+    check("and Cancel keeps the person who was here", signedInAs() === account.key && !app.anywhere(/^Switch to Lina$/), signedInAs());
+    app.close();
+  }
+
+  /* 3. The same, and switching. */
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+  localStorage.setItem(MAIN_DOC, JSON.stringify({ version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, items: [mine] }));
+  localStorage.removeItem(PARKED);
+  {
+    const app = await open(`/#key=${lina.key}`);
+    click(app.anywhere(/^Switch to Lina$/));
+    await sleep(3500);
+    check("switching signs the link's person in", signedInAs() === lina.key, signedInAs() || "nobody");
+    check("and the first person's practice is set aside for them", holds(JSON.parse(localStorage.getItem(PARKED) || "null")),
+      localStorage.getItem(PARKED) ? "set aside without it" : "nothing set aside");
+
+    /* 5. The account page offers the link to a student. */
+    const settingsHave = async (/** @type {RegExp} */ re) => {
+      click(app.host.querySelector(".at-cornerbtn"));
+      await sleep(300);
+      click([...app.host.querySelectorAll("button.at-cline")].find((b) => /Settings$/.test((b.textContent || "").trim())));
+      await sleep(400);
+      return !!app.here(re);
+    };
+    check("a student's account page offers their sign-in link", await settingsHave(/^Show my link$/),
+      (app.host.textContent || "").slice(0, 160));
+    app.close();
+  }
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+  {
+    const app = await open("/");
+    click(app.host.querySelector(".at-cornerbtn"));
+    await sleep(300);
+    click([...app.host.querySelectorAll("button.at-cline")].find((b) => /Settings$/.test((b.textContent || "").trim())));
+    await sleep(400);
+    check("an account the server has not called a student is offered no link",
+      !!app.here(/^Show my key$/) && !app.here(/^Show my link$/), (app.host.textContent || "").slice(0, 160));
+    app.close();
+  }
+
+  whoamiAs = null;
+  whoamiKeys.clear();
+  window.history.replaceState(null, "", "/");
+  localStorage.removeItem(PARKED);
+  localStorage.removeItem(`${MAIN_DOC}:parked:${lina.handle}`);
   localStorage.setItem("arabic-account", JSON.stringify(account));
 }
 

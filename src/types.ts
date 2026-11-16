@@ -843,6 +843,8 @@ export interface User {
   orgs?: { id: string; slug: string; name: string; logo: string; colour: string; runs?: boolean }[];
   /** False until the person has ticked that their key is saved (0.544). Absent: saved. */
   keySaved?: boolean;
+  /** Teaches, runs a space or is the App admin: key only, no sign-in link (0.638). Worked out by the server, never stored. Absent from an older server: treat as key only. */
+  keyOnly?: boolean;
   /** While suspended: when, by whom, why, and the courses to put back (0.544). */
   suspended?: {
     at: Millis;

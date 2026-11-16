@@ -147,6 +147,7 @@ function ChunkFallback() {
   return slow ? <Help>Loading…</Help> : null;
 }
 import * as API from "./courses-api.ts";
+import { keyFromHash, signInLink } from "./sign-in-link.ts";
 import { whereRows, langsSummary } from "./places.ts";
 import type { WhereRow } from "./places.ts";
 import {
@@ -11237,6 +11238,13 @@ export default function ArabicTrainer() {
     const join = new URLSearchParams(window.location.search).get("join") || "";
     return { slug, join };
   });
+  /* A sign-in link's key (0.638), read once from `#key=`. Held in memory
+     only, and taken out of the address bar and the history at once. */
+  const [linkKey, setLinkKey] = useState(() => keyFromHash(window.location.hash));
+  useEffect(() => {
+    if (!window.location.hash.startsWith("#key=")) return;
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+  }, []);
   const [addressSpace, setAddressSpace] = useState<OnboardingPlace["org"] | null>(null);
   const [addressUnknown, setAddressUnknown] = useState(false);
   /* Read by the course refresh, which must not ask before it is known
@@ -11379,6 +11387,27 @@ export default function ArabicTrainer() {
    */
   const accountKey = account && account.key;
   const accountHandle = account && account.handle;
+  /* A sign-in link opened on a device that is signed in (0.638). The same
+     person: nothing to do. Someone else: ask before switching. */
+  const [linkAsk, setLinkAsk] = useState<{ name: string } | null>(null);
+  const linkPeeked = useRef(false);
+  useEffect(() => {
+    if (!ready || !account || !linkKey || linkPeeked.current) return;
+    if (linkKey === account.key) {
+      setLinkKey("");
+      return;
+    }
+    linkPeeked.current = true;
+    API.whoAmI(linkKey, "", "", true).then(
+      (r) => setLinkAsk({ name: r.user.displayName || r.user.handle }),
+      (e) => {
+        setLinkKey("");
+        const why = String(e && (e as Error).message);
+        flash(why === "bad-key" ? "That sign-in link no longer works." : API.explain(e), "warn");
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, accountKey, linkKey]);
   /* Like the handle: a value rather than the object, so a re-fetch that
      changes nothing about the person does not rebuild everything that
      depends on it. */
@@ -15302,6 +15331,7 @@ export default function ArabicTrainer() {
                  tries it (0.574): its practice has its own key on the
                  device, read at start, so start again. */
               if (API.tryingSpace() !== TRYING) {
+                setLinkKey("");
                 window.location.reload();
                 return;
               }
@@ -15309,12 +15339,15 @@ export default function ArabicTrainer() {
                  back before their first sync, which setAccount starts. */
               if (a && a.handle) await adoptParked(a.handle);
               setSignedOutWhy("");
+              setLinkKey("");
               setAccount(a);
             }}
             place={{
               org: addressSpace || undefined,
               unknown: addressUnknown,
               joinCode: address.join,
+              linkKey,
+              linkReady: !address.slug || !!addressSpace || addressUnknown,
               notice: signedOutWhy,
             }}
           />
@@ -15333,6 +15366,25 @@ export default function ArabicTrainer() {
       </div>
     );
   }
+
+  /* Logging out of this device: from Settings, and when switching to the
+     person whose sign-in link was opened here (0.638). */
+  const logOutHere = async () => {
+    /* This person's practice is set aside first, so the next
+       person to sign in starts clean (0.580). */
+    await parkForLogOut();
+    /* Every space tried on this device goes too (0.574). */
+    API.dropTrial();
+    API.clearAccount();
+    setAccount(null);
+    setSpace("learn");
+    setScreen(null);
+    setTab("home");
+    setMyCourses([]);
+    setCourseDecks([]);
+    setTeaches(false);
+    forgetTeaches();
+  };
 
   const theme = settings.theme || "auto";
   setSounds(settings.sounds);
@@ -17240,6 +17292,28 @@ export default function ArabicTrainer() {
           </React.Suspense>
         )}
 
+        {linkAsk && account ? (
+          <ConfirmModal
+            title={`Switch to ${linkAsk.name}?`}
+            danger={false}
+            confirmLabel={`Switch to ${linkAsk.name}`}
+            body={
+              <p>
+                This device is signed in as {account.displayName}. The sign-in link you opened is
+                for {linkAsk.name}. {account.displayName}'s progress stays safe.
+              </p>
+            }
+            onCancel={() => {
+              setLinkAsk(null);
+              setLinkKey("");
+            }}
+            onConfirm={async () => {
+              setLinkAsk(null);
+              await logOutHere();
+            }}
+          />
+        ) : null}
+
         {leaving && (
           <ConfirmModal
             title="Leave this session?"
@@ -17281,22 +17355,7 @@ export default function ArabicTrainer() {
               setSpace("learn");
               setScreen(null);
             }}
-            onLogOut={async () => {
-              /* This person's practice is set aside first, so the next
-                 person to sign in starts clean (0.580). */
-              await parkForLogOut();
-              /* Every space tried on this device goes too (0.574). */
-              API.dropTrial();
-              API.clearAccount();
-              setAccount(null);
-              setSpace("learn");
-              setScreen(null);
-              setTab("home");
-              setMyCourses([]);
-              setCourseDecks([]);
-              setTeaches(false);
-              forgetTeaches();
-            }}
+            onLogOut={logOutHere}
             onBecameAdmin={() =>
               account &&
               API.whoAmI(account.key).then((r) => {
@@ -20446,6 +20505,23 @@ function Guide() {
 function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: (name: string) => void }) {
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
+  /* A student's private sign-in link (0.638): built here from the key, never sent anywhere. */
+  const [showLink, setShowLink] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const link =
+    me.keyOnly === false && me.org && typeof me.org === "object" && me.org.slug
+      ? signInLink(window.location.origin, me.org.slug, me.key)
+      : "";
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 1800);
+    } catch (e) {
+      /* clipboard blocked — the field is selectable instead */
+    }
+  }
 
   async function copyKey() {
     try {
@@ -20519,6 +20595,40 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
           </Button>
         )}
       </FormField>
+
+      {link ? (
+        <FormField
+          label="Sign-in link"
+          lede="Opens the app already signed in as you, on any device. Keep it private: anyone who has it is you."
+        >
+          {showLink ? (
+            <>
+              {/* No name, so a password manager does not take it for the password. */}
+              <input
+                className="at-input at-keyfield"
+                type="text"
+                readOnly
+                autoComplete="off"
+                aria-label="Your sign-in link"
+                value={link}
+                onFocus={(e) => e.target.select()}
+              />
+              <div className="at-row at-mt3">
+                <Button variant="ghost" size="sm" onClick={() => setShowLink(false)}>
+                  Hide
+                </Button>
+                <Button variant="ghost" size="sm" onClick={copyLink}>
+                  {copiedLink ? "Copied" : "Copy"}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => setShowLink(true)}>
+              Show my link
+            </Button>
+          )}
+        </FormField>
+      ) : null}
     </div>
   );
 }
@@ -21579,7 +21689,7 @@ function AccountSettings({
           confirmLabel="Log out"
           body={
             <p>
-              You'll need your sign-in key to get back in, and nobody can recover it for you except
+              You'll need your sign-in key{account.keyOnly === false ? " or your sign-in link" : ""} to get back in, and nobody can recover it for you except
               your space's admin. Your account, courses and progress stay exactly as they are.
             </p>
           }

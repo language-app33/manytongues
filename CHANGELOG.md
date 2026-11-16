@@ -8,6 +8,47 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.638 — 16 November 2026
+
+**A student now has a private sign-in link beside their sign-in key.
+Opening it signs that device in and shows their space's home page, with
+nothing to type.** The key stays and works exactly as before; the link is
+only another way of carrying it.
+
+- **Students** see "Your private sign-in link" wherever they see their key:
+  on "Keep this somewhere safe" when they first join, and under "Show my
+  link" on their account page at any time. A student whose account was made
+  for them is no longer stopped to tick "I've saved my key" when they
+  arrive by link.
+- **Admins** adding a student, or giving one a new key, get the link under
+  the key, to pass on privately. A new key stops the old link working.
+- **Links are for students only.** Anyone who teaches a course, runs a
+  space or is the App admin signs in with their key, as today; an old link
+  of theirs says "Sign-in links are for students. Type your sign-in key
+  instead."
+- **Opened on a device someone else is signed in to**, the link asks
+  "Switch to …?" first. Staying keeps that person; switching sets their
+  progress aside for them, as Log out does.
+- A whole link pasted into the sign-in key box works too.
+- The key never stays in the address bar or the browser's history, and the
+  link is never sent to the server.
+
+On an iPhone, an app installed to the home screen still has to be signed
+in once by pasting the link or the key, because a link always opens the
+browser. There is no QR code yet, and setting up a whole class at once is
+left for later.
+
+To check by hand: as an admin, add a student (key and link shown) and a
+teacher (key only). Open the student's link in a private window: straight
+in, no tick box, no key in the address bar; open it again: nothing more
+happens. Signed in as one student, open another's link: you're asked
+before switching, and the first keeps their progress. Give the student a
+new key: the old link says it no longer works. Make them a teacher of a
+course: their link is refused, and typing the key works. A student's
+account page has "Show my link"; a teacher's doesn't. Pasting a whole link
+into "I already have a sign-in key" signs in. A new student joining with a
+course code sees both the key and the link.
+
 ## 0.637 — 16 November 2026
 
 **A space you make with "I'll be this space's admin" now appears in your

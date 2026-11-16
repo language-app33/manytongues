@@ -271,8 +271,8 @@ export const signUp = (displayName: string, code?: string, org?: string) =>
    open, or the one last used on this device. `code` lets an account with
    no space it may use get back in with the invitation it followed
    (memberships). */
-export const whoAmI = (key: string, org?: string, code?: string) =>
-  call("whoami", { key, params: { ...(org ? { org } : {}), ...(code ? { code } : {}) } });
+export const whoAmI = (key: string, org?: string, code?: string, viaLink = false) =>
+  call("whoami", { key, params: { ...(org ? { org } : {}), ...(code ? { code } : {}), ...(viaLink ? { via: "link" } : {}) } });
 
 /* The space last used on this device, for landing there at the plain
    address (memberships, 2a). Per device, like the theme. */
@@ -667,6 +667,7 @@ export function explain(err: unknown): string {
     {
       offline: "Can't reach the server. Your own cards still work.",
       "bad-key": "That sign-in key isn't recognised.",
+      "key-only": "Sign-in links are for students. Type your sign-in key instead.",
       "bad-code": "Nothing has that code. Check it with whoever gave it to you.",
       "code-required": "You need a code to join: an invitation link, or a course code from your teacher.",
       "other-space": "That belongs to another space.",
