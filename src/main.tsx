@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import { storage, requestPersistence } from "./storage.ts";
 import { watchForUpdates } from "./updates.ts";
 import ArabicTrainer from "./ArabicTrainer.tsx";
+import { ReachSnackbar } from "./shared.tsx";
 import "./index.css";
 
 // The component reads window.storage, so point it at the local adapter.
@@ -97,6 +98,9 @@ createRoot(host).render(
   <React.StrictMode>
     <Recovery>
       <ArabicTrainer />
+      {/* Can't reach the server, with Retry: one bar for every screen,
+          the sign-in page included (0.636). */}
+      <ReachSnackbar />
     </Recovery>
   </React.StrictMode>
 );

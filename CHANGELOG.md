@@ -8,6 +8,37 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.636 — 16 November 2026
+
+**When the app can't reach the server, a large bar at the foot of the
+screen says so and offers Retry.** It replaces the "Can't reach the server"
+and "The server didn't answer" messages that used to appear under a form,
+in place of a list, or in a pop-up that faded before it could be acted on.
+
+- **Retry redoes exactly what failed**: it reloads the list, or sends the
+  join, sign-in, save or upload again, with what you had typed. While it
+  works the button reads "Retrying…"; if it fails again the bar says
+  "Still can't reach the server".
+- **It stays** until Retry works, the connection comes back, or you close
+  it. When the device comes back online it retries by itself.
+- Leaving a space, closing an account, clearing data and taking someone
+  off a space are only ever redone when you press Retry, never by
+  themselves.
+- A list that could not load keeps a short line where it would be, such as
+  "Couldn't load the latest from the server", so the screen doesn't look
+  empty for no reason.
+- Errors that retrying won't fix — a wrong code, a full device — are shown
+  where they were before.
+
+Background checks, like the courses check when the app opens, stay quiet;
+the Courses screen shows the bar for them while it is open. The sync dot
+in the corner keeps its own wording.
+
+To check by hand: with the network off, sign in, join a course, open the
+Courses screen, and in Teaching or Admin press refresh. Each should show
+the bar; Retry should show "Retrying…" and then "Still can't reach the
+server"; turning the network back on should make it go by itself.
+
 ## 0.635 — 16 November 2026
 
 **A personal set's "word lists" are now called what they are: decks.** On

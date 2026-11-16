@@ -1762,6 +1762,30 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 @keyframes at-snack-in { from { opacity:0; transform: translate(-50%, 10px); }
   to { opacity:1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .at-snack { animation: none; } }
+/* Can't reach the server (0.636): the snackbar's place and look, larger,
+   and staying — it holds Retry, so it cannot go on a timer. Above the
+   ordinary snackbar's spot, which moves up over it while it is shown so
+   the two never sit on each other. */
+.at-reachbar { position: fixed; left:50%; transform: translateX(-50%);
+  bottom: calc(84px + env(safe-area-inset-bottom)); z-index: var(--z-toast);
+  background: var(--surface); border:1px solid var(--line); border-left:4px solid var(--rose);
+  border-radius:10px; padding:16px 10px 16px 16px;
+  display:flex; align-items:center; gap:14px;
+  box-shadow: var(--nav-shadow);
+  width: calc(100% - 24px); max-width: 560px;
+  font-family: var(--ui); font-size:16px; color: var(--text);
+  animation: at-snack-in 160ms ease-out; }
+.at-reachbar > .at-ic { color: var(--rose); flex:none; }
+.at-reachbar .msg { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; overflow-wrap:anywhere; }
+.at-reachbar .msg strong { font-weight:700; }
+.at-reachbar .detail { font-size:13px; color: var(--muted); }
+.at-reachretry { flex:none; border:0; cursor:pointer; padding:10px 18px; border-radius:8px;
+  font: inherit; font-size:15px; font-weight:800; background: var(--jade); color: var(--onjade); }
+.at-reachretry:hover { filter: brightness(1.08); }
+.at-reachretry:disabled { opacity:.6; cursor:default; }
+.at-reachbar.still { position: static; transform:none; animation:none; width:auto; }
+html.at-reaching .at-snack { bottom: calc(176px + env(safe-area-inset-bottom)); }
+@media (prefers-reduced-motion: reduce) { .at-reachbar { animation: none; } }
 /* "Working…" while a space is fetching or a save is in flight. The
    snackbar's place and the snackbar's manners — it sits over the content
    rather than in it, so nothing on the page moves for it, and the

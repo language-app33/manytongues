@@ -33,13 +33,13 @@
  * else: an empty reading is the automatic one, so a pronoun saved before
  * this reads correctly without being opened.
  */
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { Card, Lang } from "./types.ts";
 import { verbOf } from "./languages.ts";
 import { personsOf, picksOf } from "./verbs.ts";
 import { formsOf } from "./cards.ts";
 import { beReadings } from "./variables.ts";
-import { Button, DeckSwitch, Field, Help, Notice, Screen, plural } from "./shared.tsx";
+import { Button, DeckSwitch, Field, Help, Notice, Screen, plural, useReach } from "./shared.tsx";
 import { RecordingScreen, ScriptInput } from "./card-editor.tsx";
 import * as API from "./courses-api.ts";
 
@@ -126,6 +126,8 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, decks, onDe
   const [recording, setRecording] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const reach = useReach();
+  const saveRef = useRef<() => Promise<void>>(async () => {});
   /* The decks the set is in: any that holds a pronoun of it. */
   const setDecks = useMemo(
     () => [...new Set(Object.values(held).flatMap((c) => (c && Array.isArray((c as any).decks) ? (c as any).decks as string[] : [])))],
@@ -194,12 +196,14 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, decks, onDe
           card && Array.isArray((card as any).decks) ? (card as any).decks : setDecks,
         );
       }
+      reach.ok();
     } catch (e) {
-      setError(API.explain(e));
+      if (!reach.caught(e, () => saveRef.current())) setError(API.explain(e));
     } finally {
       setSaving(false);
     }
   }
+  saveRef.current = save;
 
   if (recording) {
     const p = persons.find((x) => x.id === recording);

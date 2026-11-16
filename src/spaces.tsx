@@ -178,6 +178,8 @@ import {
   useLiveRefresh,
   useSnackbar,
   useRun,
+  useReach,
+  useReachHold,
   Popover,
   DeckSwitch,
   DeckPickScreen,
@@ -185,6 +187,11 @@ import {
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
 export { LanguageTag, languageName } from "./shared.tsx";
+
+/* What a screen says in place of what it could not load when the server
+   was out of reach. The snackbar says why and offers Retry (0.636); this
+   only keeps the screen from looking empty for no reason. */
+const LOAD_UNREACHED = "Couldn't load the latest from the server.";
 export { ConfirmModal, useLiveRefresh, cardToItem, localIdFor };
 
 /*
@@ -237,15 +244,11 @@ export function Onboarding({ onDone, place = {} }: {
 
   /*
    * The app's general wording for a request that could not be made is
-   * "Can't reach the server. Your own cards still work" — which is written
-   * for somebody who has cards, on a screen where nobody does yet. Here it
-   * is the one thing standing between a person and the app, so it says so
-   * and says what to do about it.
+   * "Can't reach the server" — said by the snackbar, with Retry (0.636).
+   * Here it is the one thing standing between a person and the app, so
+   * the snackbar carries a line saying so and what to do about it.
    */
-  const explainHere = (e: unknown) =>
-    String((e && (e as Error).message) || e) === "offline"
-      ? "Setting up needs a connection. Once you're set up, the app works without one."
-      : API.explain(e);
+  const reach = useReach({ detail: "Setting up needs a connection. Once you're set up, the app works without one." });
 
   async function create() {
     setBusy(true);
@@ -256,10 +259,11 @@ export function Onboarding({ onDone, place = {} }: {
       API.saveAccount(account);
       setMade(account);
       setStep("key");
+      reach.ok();
     } catch (e) {
       const there = otherSpace(e);
       if (there) setElsewhere(there);
-      else setError(explainHere(e));
+      else if (!reach.caught(e, create)) setError(API.explain(e));
     } finally {
       setBusy(false);
     }
@@ -281,13 +285,15 @@ export function Onboarding({ onDone, place = {} }: {
       /* An account someone else made, signed in to for the first time, is
          asked to save its key before anything else (18a). */
       if (r.user && r.user.keySaved === false) {
+        reach.ok();
         setMade(account);
         setStep("key");
         return;
       }
+      reach.ok();
       onDone(account);
     } catch (e) {
-      setError(explainHere(e));
+      if (!reach.caught(e, signIn)) setError(API.explain(e));
     } finally {
       setBusy(false);
     }
@@ -2447,6 +2453,11 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
 
   /* Answers whether it worked, which is what the background poll reads to
      know whether to back off — see useLiveRefresh. */
+  /* A reload that could not reach the server: the snackbar's Retry
+     reloads (0.636). Only one asked for — a background poll that fails
+     says nothing, and one that works lets go of the failure. */
+  const reach = useReach();
+  const refreshRef = useRef<(background?: boolean) => Promise<boolean>>(async () => false);
   const refresh = useCallback(async (background: boolean = false) => {
     /* A background poll must not flash "Working" or grey the buttons out
        from under someone mid-click; only a deliberate refresh does that. */
@@ -2454,14 +2465,18 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
     try {
       setData(await pullAdmin(account.handle));
       setError("");
+      reach.ok();
       return true;
     } catch (e) {
-      if (!background) setError(API.explain(e));
+      if (!background) {
+        setError(reach.caught(e, () => refreshRef.current()) ? LOAD_UNREACHED : API.explain(e));
+      }
       return false;
     } finally {
       if (!background) setBusy(false);
     }
-  }, [account.handle, setBusy, setError]);
+  }, [account.handle, setBusy, setError, reach]);
+  refreshRef.current = refresh;
 
   /* Whether this mount had something to show before it asked. Read once,
      at the first render: what matters is how the space arrived, not what
@@ -2492,6 +2507,8 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
   useLiveRefresh(backgroundRefresh);
 
   const snack = useSnackbar();
+  /* The card a report is about, when it could not be fetched (0.636). */
+  const cardReach = useReach();
 
   /* `done` is what to say once it worked. A string, or a function of
      whatever the call returned when the message wants to name the thing —
@@ -2502,15 +2519,21 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
      than carried by the overview: Admin holds decks, not cards, and a site
      with five hundred reports would otherwise be sending five hundred
      cards to a screen showing one. */
-  async function openFlaggedCard(flag: Flag) {
+  function openFlaggedCard(flag: Flag) {
     setOpenCard({ flag, card: null, error: "" });
+    return loadFlaggedCard(flag);
+  }
+  /* Retry fetches again without opening anything: a screen closed since
+     stays closed, and the answer is dropped below. */
+  async function loadFlaggedCard(flag: Flag) {
     try {
       const got = await API.adminCard(flag.cardId);
+      cardReach.ok();
       /* Only if it is still the one being waited for: two taps in a row
          must not leave the second screen showing the first card. */
       setOpenCard((cur) => (cur && cur.flag.id === flag.id ? { ...cur, card: got.card } : cur));
     } catch (e) {
-      const said = API.explain(e);
+      const said = cardReach.caught(e, () => loadFlaggedCard(flag)) ? "Couldn't load this card." : API.explain(e);
       setOpenCard((cur) => (cur && cur.flag.id === flag.id ? { ...cur, error: said } : cur));
     }
   }
@@ -3342,7 +3365,10 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                     openCard.flag.prompt ||
                     "The flagged card"
                   }
-                  onBack={() => setOpenCard(null)}
+                  onBack={() => {
+                    setOpenCard(null);
+                    cardReach.ok();
+                  }}
                 >
                   <Notice kind="error">{openCard.error}</Notice>
                   {!openCard.card && !openCard.error && (
@@ -3652,6 +3678,7 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const reach = useReach();
 
   if (!open)
     return (
@@ -3675,14 +3702,15 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
       <div className="at-row at-mt3">
         <Button variant="primary" size="sm"
           disabled={!key.trim() || busy}
-          onClick={async () => {
+          onClick={async function claim() {
             setBusy(true);
             try {
               await API.claimAdmin(key.trim());
+              reach.ok();
               setOpen(false);
               onDone();
             } catch (e) {
-              setError(API.explain(e));
+              if (!reach.caught(e, claim)) setError(API.explain(e));
             } finally {
               setBusy(false);
             }
@@ -3907,6 +3935,8 @@ function BackupScreen({
   const [newSlugs, setNewSlugs] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<API.RestorePreview | null>(null);
   const [checking, setChecking] = useState(false);
+  /* The check of a backup against the server, when it could not be made. */
+  const checkReach = useReach();
   const [previewErr, setPreviewErr] = useState("");
   useEffect(() => {
     if (file) setParts(includedIn(file));
@@ -3958,9 +3988,10 @@ function BackupScreen({
     try {
       const o = restoreOptionsFor(file, door, { bringBack, keepSpaceCard, newSlugs, ...choices });
       setPreview(await API.restorePreview(previewBody(file, o, chosen)));
+      checkReach.ok();
     } catch (e) {
       setPreview(null);
-      setPreviewErr(API.explain(e));
+      if (!checkReach.caught(e, () => check(choices))) setPreviewErr(API.explain(e));
     } finally {
       setChecking(false);
     }
@@ -4334,8 +4365,9 @@ function ExportScreen({ ask, onDone, onClose }: {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [err, setErr] = useState("");
   const busy = !!progress;
+  const reach = useReach();
 
-  const download = async () => {
+  const download = async (): Promise<void> => {
     setErr("");
     setProgress({ done: 0, total: 0 });
     try {
@@ -4356,9 +4388,10 @@ function ExportScreen({ ask, onDone, onClose }: {
         media && counts.clips ? plural(counts.clips, "recording") : "",
       ].filter(Boolean).join(", ");
       const left = refused ? ` ${plural(refused, "item")} not yours to export stayed out.` : "";
+      reach.ok();
       onDone(`Exported ${said}.${left}${problems.length ? " " + problems.join(" ") : ""}`, refused || problems.length ? "warn" : "good");
     } catch (e) {
-      setErr(API.explain(e));
+      if (!reach.caught(e, download)) setErr(API.explain(e));
       setProgress(null);
     }
   };
@@ -4598,6 +4631,8 @@ function ClearScreen({ onClear, onClose }: {
   const [error, setError] = useState("");
   const [done, setDone] = useState<any | null>(null);
   const [asking, setAsking] = useState(false);
+  /* Clearing is redone only when Retry is pressed (0.636). */
+  const reach = useReach({ auto: false });
 
   const naming = partsChosen(parts).map((p) => p.title.toLowerCase()).join(", ");
 
@@ -4685,17 +4720,18 @@ function ClearScreen({ onClear, onClose }: {
             </p>
           }
           onCancel={() => setAsking(false)}
-          onConfirm={async () => {
+          onConfirm={async function clearIt() {
             setAsking(false);
             setBusy(true);
             setError("");
             try {
               const r = await onClear(key.trim(), parts);
+              reach.ok();
               setDone(r.removed || {});
               setParts([]);
               setKey("");
             } catch (e) {
-              setError(API.explain(e));
+              if (!reach.caught(e, clearIt)) setError(API.explain(e));
             } finally {
               setBusy(false);
             }
@@ -6431,6 +6467,11 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   /* As in AdminSpace: whether it worked, for the poll's own backoff. A
      partial answer counts as a failure for that purpose — something is
      wrong out there — while still putting on screen whatever did arrive. */
+  /* A reload that could not reach the server: the snackbar's Retry
+     reloads (0.636). Only one asked for — a background poll that fails
+     says nothing, and one that works lets go of the failure. */
+  const reach = useReach();
+  const refreshRef = useRef<(background?: boolean) => Promise<boolean>>(async () => false);
   const refresh = useCallback(async (background: boolean = false) => {
     if (!background) setBusy(true);
     try {
@@ -6456,15 +6497,25 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       setDecks(unlockedDecks(fresh.decks));
       setCards(fresh.cards);
       setMissingClips(fresh.missingClips);
-      if (!background || !fresh.failed) setError(fresh.failed ? API.explain(fresh.failed) : "");
+      /* Part of it may have failed while the rest arrived. */
+      if (!fresh.failed) {
+        reach.ok();
+        setError("");
+      } else if (!background) {
+        const failed = fresh.failed;
+        setError(reach.caught(failed, () => refreshRef.current()) ? LOAD_UNREACHED : API.explain(failed));
+      }
       return !fresh.failed;
     } catch (e) {
-      if (!background) setError(API.explain(e));
+      if (!background) {
+        setError(reach.caught(e, () => refreshRef.current()) ? LOAD_UNREACHED : API.explain(e));
+      }
       return false;
     } finally {
       if (!background) setBusy(false);
     }
-  }, [account.handle, setBusy, setError]);
+  }, [account.handle, setBusy, setError, reach]);
+  refreshRef.current = refresh;
 
   /* See AdminSpace: how this mount arrived, read once. Arriving with the
      last contents means the check for what has changed runs quietly. */
@@ -8430,13 +8481,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
        showing empty boxes that are about to be filled in would invite
        somebody to type over their own work. */
     if (!systems) {
-      void loadSystems().catch((e) => setError(API.explain(e)));
-      return (
-        <Screen title="Number system" onBack={() => setNumbering(null)}>
-          <Help>Fetching what is written for {numLang.name}…</Help>
-          {error ? <Notice kind="warn">{error}</Notice> : null}
-        </Screen>
-      );
+      return <FetchingSystems name={numLang.name} load={loadSystems} onBack={() => setNumbering(null)} />;
     }
     const held = systems.numbers.find((n) => n.languageId === numbering) || null;
     const numbers =
@@ -10587,11 +10632,15 @@ export function StudentCourses({
   error,
   onJoin,
   onRefresh,
+  onRetry,
   onPractise,
   spaces,
   mySpaceIds,
 }: {
   courses: Course[];
+  /** Given when the courses could not be checked because the server was
+      out of reach: offered as Retry while this screen is open (0.636). */
+  onRetry?: () => unknown;
   /** Every space the account is in, to say so when a code joins another. */
   mySpaceIds?: string[];
   /** Your spaces, when Learning shows more than one: the courses go under
@@ -10607,6 +10656,9 @@ export function StudentCourses({
   onPractise: (deckTitle: string) => void;
 }) {
   const [note, setNote] = useState("");
+  useReachHold(onRetry, { detail: "Your own cards still work." });
+  const joinReach = useReach();
+  const joinRef = useRef<(code: string) => Promise<void>>(async () => {});
   const groups = spaces && spaces.length > 1
     ? spaces.map((o) => ({ key: o.id, title: o.name, courses: courses.filter((c) => (c as any).org === o.id) }))
     : undefined;
@@ -10623,9 +10675,10 @@ export function StudentCourses({
       joinHint="Enter the code your teacher gave you."
       joinPlaceholder="Course code"
       joinNote={note}
-      onJoin={onJoin && (async (code) => {
+      onJoin={onJoin && (joinRef.current = async (code) => {
         try {
           const r = await onJoin(code);
+          joinReach.ok();
           setNote(
             r && r.course
               ? r.space && mySpaceIds && mySpaceIds.length && !mySpaceIds.includes(r.space.id)
@@ -10634,7 +10687,7 @@ export function StudentCourses({
               : "Joined."
           );
         } catch (e) {
-          setNote(API.explain(e));
+          setNote(joinReach.caught(e, () => joinRef.current(code)) ? "" : API.explain(e));
         }
       })}
       renderCourse={(c) => {
@@ -10682,24 +10735,73 @@ export function StudentCourses({
  * deck's Edit, because it changes what students hear rather than what the
  * deck is called. Shown only on a deck that holds number parts.
  */
+/*
+ * The number screen while what is written for it is fetched. Its own
+ * component so the fetch is made once on the way in and again on Retry
+ * (0.636), rather than on every render as it was.
+ */
+function FetchingSystems({ name, load, onBack }: { name: string; load: () => Promise<void>; onBack: () => void }) {
+  const [error, setError] = useState("");
+  const reach = useReach();
+  useEffect(() => {
+    let live = true;
+    const go = (): Promise<void> =>
+      load().then(
+        () => reach.ok(),
+        (e) => {
+          if (live) setError(reach.caught(e, go) ? LOAD_UNREACHED : API.explain(e));
+        },
+      );
+    void go();
+    return () => {
+      live = false;
+    };
+  }, [load, reach]);
+  return (
+    <Screen title="Number system" onBack={onBack}>
+      <Help>Fetching what is written for {name}…</Help>
+      {error ? <Notice kind="warn">{error}</Notice> : null}
+    </Screen>
+  );
+}
+
 function NumbersFrom({ deckId }: { deckId: string }) {
   const [sources, setSources] = useState<{ handle: string; displayName: string }[] | null>(null);
   const [chosen, setChosen] = useState("");
   const [error, setError] = useState("");
+  /* Loading the choice, and making one: each its own Retry (0.636). */
+  const loadReach = useReach();
+  const saveReach = useReach();
   useEffect(() => {
     let live = true;
-    API.numberSources(deckId).then(
-      (r) => {
-        if (!live) return;
-        setSources(r.sources);
-        setChosen(r.chosen);
-      },
-      (e) => live && setError(API.explain(e)),
-    );
+    const go = (): Promise<void> =>
+      API.numberSources(deckId).then(
+        (r) => {
+          if (!live) return;
+          loadReach.ok();
+          setError("");
+          setSources(r.sources);
+          setChosen(r.chosen);
+        },
+        (e) => {
+          if (live) setError(loadReach.caught(e, go) ? LOAD_UNREACHED : API.explain(e));
+        },
+      );
+    void go();
     return () => {
       live = false;
     };
-  }, [deckId]);
+  }, [deckId, loadReach]);
+  async function choose(h: string, was: string): Promise<void> {
+    setChosen(h);
+    try {
+      await API.setDeckNumbers(deckId, h);
+      saveReach.ok();
+    } catch (e) {
+      setChosen(was);
+      if (!saveReach.caught(e, () => choose(h, was))) setError(API.explain(e));
+    }
+  }
   if (error) return <Notice kind="error">{error}</Notice>;
   if (!sources || !sources.length) return null;
   return (
@@ -10710,16 +10812,7 @@ function NumbersFrom({ deckId }: { deckId: string }) {
         quiet
         value={chosen}
         options={sources.map((x) => ({ value: x.handle, label: x.displayName }))}
-        onChange={async (h) => {
-          const was = chosen;
-          setChosen(h);
-          try {
-            await API.setDeckNumbers(deckId, h);
-          } catch (e) {
-            setChosen(was);
-            setError(API.explain(e));
-          }
-        }}
+        onChange={(h) => void choose(h, chosen)}
       />
     </Field>
   );
@@ -10760,13 +10853,15 @@ function SpacesTab() {
     },
   });
 
-  const load = useCallback(async () => {
+  const loadReach = useReach();
+  const load = useCallback(async function loadOrgs(): Promise<void> {
     try {
       setOrgs((await API.adminOrgs()).orgs);
+      loadReach.ok();
     } catch (e) {
-      setError(API.explain(e));
+      setError(loadReach.caught(e, loadOrgs) ? LOAD_UNREACHED : API.explain(e));
     }
-  }, [setError]);
+  }, [setError, loadReach]);
   useEffect(() => {
     load();
   }, [load]);
@@ -11354,7 +11449,20 @@ function EveryonePeople({ me }: { me: string }) {
   /* Taking one space away from someone (0.578): who, and which. */
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeFrom, setRemoveFrom] = useState("");
-  const load = useCallback(() => API.everyone().then((r) => setData(r), (e) => setError(API.explain(e))), [setError]);
+  const loadReach = useReach();
+  /* Adding someone, and taking a space away: the second is redone only
+     when Retry is pressed (0.636). */
+  const addReach = useReach();
+  const removeReach = useReach({ auto: false });
+  const load = useCallback(function loadPeople(): Promise<void> {
+    return API.everyone().then(
+      (r) => {
+        loadReach.ok();
+        setData(r);
+      },
+      (e) => setError(loadReach.caught(e, loadPeople) ? LOAD_UNREACHED : API.explain(e)),
+    );
+  }, [setError, loadReach]);
   useEffect(() => {
     load();
   }, [load]);
@@ -11475,11 +11583,12 @@ function EveryonePeople({ me }: { me: string }) {
               </>
             }
             onCancel={() => setAdding(null)}
-            onConfirm={async () => {
+            onConfirm={async function addIt() {
               if (!addTo) return;
               setBusy(true);
               try {
                 await API.addMember(adding.handle, addTo);
+                addReach.ok();
                 /* Yourself (0.575): the app learns of the new space at
                    once, and starts again if it changes where you are. */
                 if (adding.handle === me) {
@@ -11494,7 +11603,7 @@ function EveryonePeople({ me }: { me: string }) {
                 setAdding(null);
                 await load();
               } catch (e) {
-                setError(API.explain(e));
+                if (!addReach.caught(e, addIt)) setError(API.explain(e));
               } finally {
                 setBusy(false);
               }
@@ -11526,15 +11635,16 @@ function EveryonePeople({ me }: { me: string }) {
               </>
             }
             onCancel={() => setRemoving(null)}
-            onConfirm={async () => {
+            onConfirm={async function removeIt() {
               if (!removeFrom) return;
               setBusy(true);
               try {
                 await API.removeFromSpace(removing.handle, removeFrom);
+                removeReach.ok();
                 setRemoving(null);
                 await load();
               } catch (e) {
-                setError(API.explain(e));
+                if (!removeReach.caught(e, removeIt)) setError(API.explain(e));
               } finally {
                 setBusy(false);
               }
@@ -11656,7 +11766,18 @@ function EveryReport({ languages }: { languages: Record<string, any> }) {
       /* private browsing: it opens on card reports next time */
     }
   };
-  const load = useCallback(() => API.allReports().then((r) => setData(r), (e) => setError(API.explain(e))), []);
+  const loadReach = useReach();
+  const dismissReach = useReach();
+  const load = useCallback(function loadReports(): Promise<void> {
+    return API.allReports().then(
+      (r) => {
+        loadReach.ok();
+        setError("");
+        setData(r);
+      },
+      (e) => setError(loadReach.caught(e, loadReports) ? LOAD_UNREACHED : API.explain(e)),
+    );
+  }, [loadReach]);
   useEffect(() => {
     load();
   }, [load]);
@@ -11664,12 +11785,13 @@ function EveryReport({ languages }: { languages: Record<string, any> }) {
   const nameOf = (id: string) => (data.orgs.find((o) => o.id === id) || { name: id }).name;
   const flags = data.flags.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
   const feedback = (data.feedback || []).slice().sort((a, b) => (b.at || 0) - (a.at || 0));
-  const dismiss = async (work: () => Promise<unknown>) => {
+  const dismiss = async (work: () => Promise<unknown>): Promise<void> => {
     try {
       await work();
+      dismissReach.ok();
       await load();
     } catch (e) {
-      setError(API.explain(e));
+      if (!dismissReach.caught(e, () => dismiss(work))) setError(API.explain(e));
     }
   };
   return (

@@ -8658,3 +8658,38 @@ on the student's side "given two to choose from" and "Choose other words".
 Words only: the stored field is still `set.lists`, and the code and the
 plan keep calling them lists.
 
+
+## "Can't reach the server" is one bar that asks for something
+
+**16 November 2026** · `src/reach.ts`, `src/shared.tsx` (`useReach`, `ReachSnackbar`)
+
+The server being out of reach used to be said in about thirty places, each
+where its screen kept its errors: under a form, in place of a list, or in
+a snackbar that faded in four seconds. On the owner's word it is now one
+large snackbar with **Retry**, wherever it happens, and the old wording is
+gone from those places.
+
+**It breaks the snackbar's own rule, deliberately.** The ordinary snackbar
+never asks for anything, which is why it may vanish on a timer. This one
+holds a button, so it stays until what failed has worked, the connection
+comes back and it works, or it is closed. It is a separate component for
+that reason, not an option on the old one.
+
+**Retry redoes the thing, not "reconnects".** There is no connection to
+re-open: each request stands alone. So every place that fails hands over
+how to do itself again, and Retry does all of them — reloads the list,
+resends the join with the same code. A failure is held only while the
+screen it came from is open, so Retry never resends a form nobody can see.
+The connection coming back does the same, except for what should only be
+redone by hand: leaving a space, closing an account, clearing data, taking
+someone off a space.
+
+**What counts as out of reach.** A request that could not be made, and a
+502, 503 or 504, which is a gateway answering for a server that is
+restarting. Anything else is the server having decided, and stays where
+it was shown before, because pressing Retry would be told the same.
+
+**What it costs.** Background work stays quiet: a poll, a sync or the
+launch-time check of the courses that fails says nothing app-wide. The
+courses' failure is held only while the Courses screen is open. The sync
+dot keeps its own wording, since it is a status rather than an error.

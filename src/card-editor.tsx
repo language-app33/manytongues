@@ -71,6 +71,7 @@ import {
   joinAlternatives,
   CheckList,
   useSnackbar,
+  useReach,
   CLIP_KINDS,
   ClipList,
   clipsOf,
@@ -1433,6 +1434,7 @@ export function ImageScreen({ title, images, onChange, onClose }: {
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const reach = useReach();
   const full = images.length >= MAX_IMAGES;
   /* Opened from a card being read: the pictures, and no way to change them. */
   const locked = useContext(Locked);
@@ -1453,7 +1455,9 @@ export function ImageScreen({ title, images, onChange, onClose }: {
       /* Into the one picture cache, so it is drawn without a fetch. */
       primePicture(hash, data);
       if (!images.includes(hash)) onChange(images.concat([hash]).slice(0, MAX_IMAGES));
+      reach.ok();
     } catch (e) {
+      if (reach.caught(e, () => addRef.current(file))) return;
       setError(
         e instanceof Error && e.message === "bad-image"
           ? "That picture couldn't be read. Try another, or save it as a JPEG or PNG first."
@@ -1464,7 +1468,9 @@ export function ImageScreen({ title, images, onChange, onClose }: {
     }
   }
 
-  /* The newest of add, for the paste listener set once below. */
+  /* The newest of add, for the paste listener set once below — and for
+     Retry, whose add from the failed render reads the pictures as they
+     were then. */
   const addRef = useRef(add);
   addRef.current = add;
   const canPaste = !locked && !busy && !full;
@@ -1667,6 +1673,9 @@ export function RecordingScreen({ name, form, onChange, onClose, voices }: {
   const [elapsed, setElapsed] = useState(0);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const reach = useReach();
+  /* The latest store, for Retry: see ImageScreen's addRef. */
+  const storeRef = useRef<(blobs: Blob[], key: "clips" | "slowClips") => Promise<void>>(async () => {});
   const rec: React.MutableRefObject<MediaRecorder | null> = useRef(null);
   const tick: React.MutableRefObject<ReturnType<typeof setInterval> | null> = useRef(null);
 
@@ -1716,13 +1725,17 @@ export function RecordingScreen({ name, form, onChange, onClose, voices }: {
         await API.putClip(hash, await blobToDataUrl(blob));
         added.push(hash);
       }
+      reach.ok();
     } catch (e) {
-      setError(API.explain(e));
+      /* Those that went up are kept below; Retry sends the rest. */
+      const rest = audio.slice(added.length);
+      if (!reach.caught(e, () => storeRef.current(rest, key))) setError(API.explain(e));
     } finally {
       if (added.length) put(key, listOf(key).concat(added), added);
       setBusy("");
     }
   }
+  storeRef.current = store;
 
   async function begin(key: "clips" | "slowClips") {
     setError("");

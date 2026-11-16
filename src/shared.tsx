@@ -21,6 +21,8 @@ import { askLine, A_SENTENCE, blanksOn, cellTitle, CLIP_KINDS, combosOf, dimsSai
   rowsLine, tablesOn, tableTitle, unnamedOn } from "./card-facts.ts";
 import { colOf, foldJoined, NO_PARTNER, personsFor, personsOf, rowOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { isOffline, watchNet } from "./net.ts";
+import { dismissReach, holdReach, isUnreachable, reachState, releaseReach, retryReach, showReach, watchReach } from "./reach.ts";
+import type { ReachState } from "./reach.ts";
 import { isTenseForm, withTenses } from "./tense-skills.ts";
 /* A teacher's numbers and their clock, which arrive with the material and
    become cards on the way in. Reached through the registry, never by
@@ -197,6 +199,9 @@ const ICONS: Record<string, string> = {
     "M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z",
   /* The number sign, for the screen a language's numbers are written on. */
   hash: "M20 10V8h-4V4h-2v4h-4V4H8v4H4v2h4v4H4v2h4v4h2v-4h4v4h2v-4h4v-2h-4v-4h4zm-6 4h-4v-4h4v4z",
+  /* A cloud struck through: the server out of reach (0.636). */
+  "cloud-off":
+    "M19.35 10.04C18.67 6.59 15.64 4 12 4c-1.48 0-2.85.43-4.01 1.17l1.46 1.46C10.21 6.23 11.08 6 12 6c3.04 0 5.5 2.46 5.5 5.5v.5H19c1.66 0 3 1.34 3 3 0 1.13-.64 2.11-1.56 2.62l1.45 1.45C23.16 18.16 24 16.68 24 15c0-2.64-2.05-4.78-4.65-4.96zM3 5.27l2.75 2.74C2.56 8.15 0 10.77 0 14c0 3.31 2.69 6 6 6h11.73l2 2L21 20.73 4.27 4 3 5.27zM7.73 10l8 8H6c-2.21 0-4-1.79-4-4s1.79-4 4-4h1.73z",
 };
 
 export function Icon({ name, size = 20 }: { name: string; size?: number }) {
@@ -3942,6 +3947,7 @@ export function useRun({ refresh, snackErrors = false, quietDone = false, before
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const snack = useSnackbar();
+  const { caught, ok } = useReach();
   /* Said at the foot of the app however deep the screen it was started
      from — see WorkingNote. */
   useWorking(busy);
@@ -3951,8 +3957,13 @@ export function useRun({ refresh, snackErrors = false, quietDone = false, before
     const o = opts.current;
     setBusy(true);
     if (o.before) o.before();
+    /* Whether the work itself went through. If only the reading-again
+       after it failed, Retry must read again, not do the work twice. */
+    let did = false;
     try {
       const out = await fn();
+      did = true;
+      ok();
       if (o.refresh) await o.refresh();
       setError("");
       const warn = o.instead ? o.instead() : null;
@@ -3960,6 +3971,23 @@ export function useRun({ refresh, snackErrors = false, quietDone = false, before
       else if (done) snack(typeof done === "function" ? done(out) : done, o.quietDone ? undefined : "good");
       return out;
     } catch (e) {
+      /* Out of reach: said by the snackbar, whose Retry does this again
+         (0.636), rather than under the screen. */
+      const again = did
+        ? async () => {
+            const r = opts.current.refresh;
+            try {
+              if (r) await r();
+              ok();
+            } catch (e2) {
+              caught(e2, again);
+            }
+          }
+        : () => runRef.current(fn, done);
+      if (caught(e, again)) {
+        setError("");
+        return undefined;
+      }
       const said = API.explain(e);
       setError(said);
       if (o.snackErrors) snack(said, "warn");
@@ -3967,7 +3995,9 @@ export function useRun({ refresh, snackErrors = false, quietDone = false, before
     } finally {
       setBusy(false);
     }
-  }, [snack]);
+  }, [snack, caught, ok]);
+  const runRef = useRef(run);
+  runRef.current = run;
   const clearError = useCallback(() => setError(""), []);
   return { run, busy, setBusy, error, setError, clearError };
 }
@@ -3995,6 +4025,140 @@ export function usePicture(hash: string) {
 
 export function useSnackbar() {
   return React.useContext(SnackbarContext) || noSnackbar;
+}
+
+/* ==================================================================
+   Can't reach the server (0.636)
+   ==================================================================
+
+   One large snackbar, with Retry, wherever the server could not be
+   reached — see reach.ts for why it is one and not thirty. Unlike the
+   snackbar above it asks for something, so it does not go on a timer: it
+   stays until Retry works, the connection comes back and that works, or
+   it is closed.
+
+   A screen takes part through useReach:
+
+     const reach = useReach();
+     try { await API.thing(); reach.ok(); }
+     catch (e) { if (!reach.caught(e, () => doThing())) setError(API.explain(e)); }
+
+   `caught` answers whether the snackbar took the failure. If it did, the
+   screen says nothing of its own beyond, for a list that could not load,
+   a short line where the list would be. The failure is held while the
+   screen is open and let go when it closes, so Retry never resends a form
+   nobody can see any more.
+*/
+
+/**
+ * Hold a failure while this is mounted and `retry` is given; let it go
+ * when either stops. For a failure found in one place and shown in
+ * another: the trainer finds that the courses could not load, and the
+ * Courses screen, while it is open, is what holds it.
+ */
+export function useReachHold(retry: (() => unknown) | null | undefined, { detail, auto = true }: { detail?: string; auto?: boolean } = {}) {
+  const latest = useRef(retry);
+  latest.current = retry;
+  const said = useRef({ detail, auto });
+  said.current = { detail, auto };
+  const on = !!retry;
+  /* A layout effect, so a retry that worked lets go in the same commit
+     that shows it worked — before "Still can't reach the server" could be
+     said about it. */
+  useLayoutEffect(() => {
+    if (!on) return undefined;
+    const id = holdReach({
+      retry: () => (latest.current ? latest.current() : undefined),
+      detail: said.current.detail,
+      auto: said.current.auto,
+    });
+    return () => releaseReach(id);
+  }, [on]);
+}
+
+export function useReach({ detail, auto = true }: { detail?: string; auto?: boolean } = {}) {
+  /* How many times it has failed in a row; nought is not waiting. Counted
+     so that pressing the same button into the same wall shows the
+     snackbar again after it was closed. */
+  const [failed, setFailed] = useState(0);
+  const retryRef = useRef<() => unknown>(() => {});
+  const on = failed > 0;
+  /* Stable, so holding it does not start again on every render. */
+  const [retry] = useState(() => () => retryRef.current());
+  useReachHold(on ? retry : null, { detail, auto });
+  useEffect(() => {
+    if (failed > 1) showReach();
+  }, [failed]);
+  const caught = useCallback((e: unknown, again: () => unknown): boolean => {
+    if (!isUnreachable(e)) {
+      setFailed(0);
+      return false;
+    }
+    retryRef.current = again;
+    setFailed((n) => n + 1);
+    return true;
+  }, []);
+  const ok = useCallback(() => setFailed(0), []);
+  /* The same object every render, so a callback that names it in its
+     dependencies is not made again each time. */
+  return useMemo(() => ({ caught, ok }), [caught, ok]);
+}
+
+/** The bar itself, drawn from what it is told: the gallery shows it still. */
+export function ReachBar({ again = false, retrying = false, detail = "", onRetry, onDismiss, still = false }: {
+  again?: boolean;
+  retrying?: boolean;
+  detail?: string;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+  /** In the page rather than floating over it: the gallery. */
+  still?: boolean;
+}) {
+  return (
+    <div className={`at-reachbar${still ? " still" : ""}`} role="alert">
+      <Icon name="cloud-off" size={22} />
+      <span className="msg">
+        <strong>{again ? "Still can't reach the server" : "Can't reach the server"}</strong>
+        {detail ? <span className="detail">{detail}</span> : null}
+      </span>
+      <button className="at-reachretry" onClick={onRetry} disabled={retrying}>
+        {retrying ? "Retrying…" : "Retry"}
+      </button>
+      {onDismiss && (
+        <button className="at-snackx" onClick={onDismiss} aria-label="Dismiss">
+          <Icon name="close" size={16} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/*
+ * The one place the bar is drawn: beside the app, in main.tsx, so it is the
+ * same bar on the sign-in page as everywhere else. Put inside the app's
+ * root for its theme, and found again each time it changes, because the
+ * sign-in page and the app are different roots.
+ */
+export function ReachSnackbar() {
+  const [s, setS] = useState<ReachState>(reachState);
+  useEffect(() => watchReach(setS), []);
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    document.documentElement.classList.toggle("at-reaching", s.shown);
+    return () => document.documentElement.classList.remove("at-reaching");
+  }, [s.shown]);
+  if (!s.shown) return null;
+  const view = (
+    <ReachBar
+      again={s.again}
+      retrying={s.retrying}
+      detail={s.detail}
+      onRetry={() => void retryReach()}
+      onDismiss={dismissReach}
+    />
+  );
+  if (typeof document === "undefined") return view;
+  return createPortal(view, document.querySelector(".at") || document.body);
 }
 
 /* How many screens are open. A screen opened from inside a space is nested in

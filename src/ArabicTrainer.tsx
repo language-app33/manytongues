@@ -65,6 +65,7 @@ import {
   useSlowWait,
   useSnackbar,
   useSnackbarState,
+  useReach,
   WorkingNote,
   TabTitle,
   /* Personal sets (0.630): the student's questions are built of these. */
@@ -311,6 +312,7 @@ import { buildContextIndex } from "./context-index.ts";
 import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
+import { isUnreachable } from "./reach.ts";
 import { knownMissing as knownMissingAt, MISSING_CLIPS, pictureData } from "./pictures.ts";
 import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 import {
@@ -11516,6 +11518,9 @@ export default function ArabicTrainer() {
   );
   const [courseBusy, setCourseBusy] = useState(false);
   const [courseError, setCourseError] = useState("");
+  /* The last check of the courses could not reach the server: the Courses
+     screen, while open, offers Retry for it (0.636). */
+  const [courseUnreached, setCourseUnreached] = useState(false);
   /* The unit a learner has open from Home or Progress (0.617). */
   const [unitOpen, setUnitOpen] = useState<{ courseId: string; deckId: string } | null>(null);
 
@@ -11708,6 +11713,10 @@ export default function ArabicTrainer() {
   /* Every short-lived message the app says, here and in the teaching and
      admin screens below, which reach it through SnackbarProvider. */
   const snack = useSnackbarState();
+  /* Can't reach the server, with Retry (0.636): feedback sent from the
+     menu, and joining a space from its invitation. */
+  const feedbackReach = useReach();
+  const inviteReach = useReach();
   const kb = useSoftKeyboard();
 
   /* ---- sync ---- */
@@ -13168,6 +13177,7 @@ export default function ArabicTrainer() {
         }
         materialVersion.current = r.version || "";
         answered = true;
+        setCourseUnreached(false);
         if (r.unchanged) {
           setCourseError("");
           if (announce === true) flash("Nothing new");
@@ -13250,7 +13260,11 @@ export default function ArabicTrainer() {
           );
         }
       } catch (e) {
-        setCourseError(API.explain(e));
+        /* Out of reach: the snackbar says so and offers Retry; the screen
+           keeps a short line, because what it shows may be out of date. */
+        const away = isUnreachable(e);
+        setCourseUnreached(away);
+        setCourseError(away ? "Couldn't check your courses for anything new." : API.explain(e));
       } finally {
         refreshing.current = false;
         setCourseBusy(false);
@@ -15158,9 +15172,14 @@ export default function ArabicTrainer() {
    */
   function sendFeedback(kind: FeedbackKind, note: string) {
     const where = [SPACE_LABEL[space] || space, session ? "practice session" : tab].filter(Boolean).join(" · ");
-    API.sendFeedback({ kind, note: note.slice(0, FLAG_NOTE_MAX), screen: where, release: APP_BUILD })
-      .then(() => flash("Thank you for the feedback 🫶", "good"))
-      .catch((e) => flash(API.explain(e), "warn"));
+    return API.sendFeedback({ kind, note: note.slice(0, FLAG_NOTE_MAX), screen: where, release: APP_BUILD })
+      .then(() => {
+        feedbackReach.ok();
+        flash("Thank you for the feedback 🫶", "good");
+      })
+      .catch((e) => {
+        if (!feedbackReach.caught(e, () => sendFeedback(kind, note))) flash(API.explain(e), "warn");
+      });
   }
 
   function undoDelete() {
@@ -15241,7 +15260,7 @@ export default function ArabicTrainer() {
             </Lede>
             {joinError ? <Notice kind="warn">{joinError}</Notice> : null}
             <Button variant="primary" wide className="at-mt4" disabled={joinBusy}
-              onClick={async () => {
+              onClick={async function joinIt() {
                 setJoinBusy(true);
                 setJoinError("");
                 try {
@@ -15252,7 +15271,7 @@ export default function ArabicTrainer() {
                   /* Into the space just joined, the way switching space is. */
                   window.location.assign(`/${addressSpace.slug}`);
                 } catch (e) {
-                  setJoinError(API.explain(e));
+                  if (!inviteReach.caught(e, joinIt)) setJoinError(API.explain(e));
                   setJoinBusy(false);
                 }
               }}
@@ -17136,6 +17155,7 @@ export default function ArabicTrainer() {
             languages={LANGUAGES}
             busy={courseBusy}
             error={courseError}
+            onRetry={courseUnreached ? () => refreshCourses("changes") : undefined}
             /* Trying a space is not joining it (0.574). */
             onJoin={TRYING ? undefined : async (code: string) => {
               const r = await API.joinCourse(code);
@@ -20527,6 +20547,9 @@ function LeaveSpace({ onLeft, space, others = 0, admin = false }: {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  /* Leaving is redone only when Retry is pressed, never by the connection
+     coming back on its own (0.636). */
+  const reach = useReach({ auto: false });
   const name = space && others > 0 ? space.name : "this space";
   return (
     <>
@@ -20547,10 +20570,11 @@ function LeaveSpace({ onLeft, space, others = 0, admin = false }: {
             )
           }
           onCancel={() => setAsking(false)}
-          onConfirm={async () => {
+          onConfirm={async function leave() {
             setBusy(true);
             try {
               await API.leaveSpace(space && space.id);
+              reach.ok();
               if (others > 0) {
                 window.location.assign("/");
                 return;
@@ -20558,7 +20582,7 @@ function LeaveSpace({ onLeft, space, others = 0, admin = false }: {
               API.clearAccount();
               onLeft();
             } catch (e) {
-              setError(API.explain(e));
+              if (!reach.caught(e, leave)) setError(API.explain(e));
               setBusy(false);
               setAsking(false);
             }
@@ -20574,6 +20598,8 @@ function CloseAccount({ handle, onClosed }: { handle: string; onClosed: () => vo
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  /* Only ever redone by pressing Retry (0.636). */
+  const reach = useReach({ auto: false });
 
   if (!open)
     return (
@@ -20609,14 +20635,15 @@ function CloseAccount({ handle, onClosed }: { handle: string; onClosed: () => vo
         </Button>
         <Button variant="danger" size="sm"
           disabled={typed.trim() !== handle || busy}
-          onClick={async () => {
+          onClick={async function closeIt() {
             setBusy(true);
             try {
               await API.deleteAccount();
+              reach.ok();
               API.clearAccount();
               onClosed();
             } catch (e) {
-              setError(API.explain(e));
+              if (!reach.caught(e, closeIt)) setError(API.explain(e));
               setBusy(false);
             }
           }}
@@ -20751,6 +20778,10 @@ function AppVersion() {
   const [reloading, setReloading] = useState(false);
   const alive = useRef(true);
   const snack = useSnackbar();
+  /* A Check that found no server: the snackbar says so, and its Retry
+     checks again (0.636). */
+  const { caught, ok } = useReach();
+  const checkRef = useRef<(announce?: boolean) => unknown>(() => {});
 
   useEffect(
     () => () => {
@@ -20781,19 +20812,21 @@ function AppVersion() {
              Reload, which is louder and more useful than a pill. The other
              two outcomes change nothing on screen, so without a word the
              button reads as dead. */
+          if (found) ok();
           if (!announce) return;
-          if (!found) snack("Couldn't reach the server");
+          if (!found) caught(new Error("offline"), () => checkRef.current(true));
           else if (found.commit === APP_COMMIT) snack("You're on the latest version");
         })
         .catch(() => {
           if (!alive.current) return;
           setDeployed(false);
           setBusy(false);
-          if (announce) snack("Couldn't reach the server");
+          if (announce) caught(new Error("offline"), () => checkRef.current(true));
         });
     },
-    [snack],
+    [snack, caught, ok],
   );
+  checkRef.current = check;
 
   useEffect(() => {
     check();
@@ -21851,6 +21884,7 @@ function StrandedPanel({ stranded, onJoined }: {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const reach = useReach();
   const said = (why: string, name: string) =>
     why === "removed" ? `You were removed from ${name}.` : why === "left" ? `You left ${name}.` : `You're suspended in ${name}.`;
   return (
@@ -21881,13 +21915,18 @@ function StrandedPanel({ stranded, onJoined }: {
             } catch (e) {
               /* not a link: a code */
             }
-            try {
-              await API.joinCourse(given);
-              onJoined();
-            } catch (e) {
-              setError(API.explain(e));
-              setBusy(false);
-            }
+            const join = async (): Promise<void> => {
+              setBusy(true);
+              try {
+                await API.joinCourse(given);
+                reach.ok();
+                onJoined();
+              } catch (e) {
+                if (!reach.caught(e, join)) setError(API.explain(e));
+                setBusy(false);
+              }
+            };
+            await join();
           }}>
           Join
         </Button>

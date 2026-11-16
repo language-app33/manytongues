@@ -59,6 +59,7 @@ import {
   narrowing,
   plural,
   useSnackbarState,
+  ReachBar,
 } from "./shared.tsx";
 
 /* Every icon the set has, so a name can be picked by eye. Kept in step with
@@ -318,6 +319,8 @@ const PLACES: Record<string, [string, string]> = {
   SpaceFrame: [PARTS, "The Teaching and Admin frame"],
   Snackbar: [PARTS, "The message that appears and goes"],
   useSnackbarState: [PARTS, "The message that appears and goes"],
+  ReachBar: [PARTS, "Can't reach the server, with Retry"],
+  ReachSnackbar: [PARTS, "Can't reach the server, with Retry"],
 };
 
 /* Not in the table: say something readable rather than nothing, and put
@@ -1178,6 +1181,19 @@ export function ComponentGallery() {
         what="The state behind the pill, for whichever component hosts it: { show, dismiss, node, current }."
         note="A hook. Render node once, near the end of the tree; the trainer does, and passes show down through SnackbarProvider."
       />
+
+      <Row
+        name="ReachBar"
+        what="Can't reach the server, with Retry. Large, and it stays until Retry works, the connection comes back, or it is closed."
+        note="Never drawn by hand: ReachSnackbar, beside the app in main.tsx, draws the one bar. A screen takes part with useReach() — caught(error, retry) on a failure, ok() when it works — or useReachHold(retry) for a failure found elsewhere. Shown here still, in the page."
+      >
+        <V label="first" wide><ReachBar still onRetry={() => {}} onDismiss={() => {}} /></V>
+        <V label="with a line of its own" wide>
+          <ReachBar still detail="Setting up needs a connection. Once you're set up, the app works without one." onRetry={() => {}} />
+        </V>
+        <V label="retrying" wide><ReachBar still retrying onRetry={() => {}} /></V>
+        <V label="after a retry that failed" wide><ReachBar still again onRetry={() => {}} onDismiss={() => {}} /></V>
+      </Row>
 
       <Row
         name="useLiveRefresh(fn, everyMs)"
