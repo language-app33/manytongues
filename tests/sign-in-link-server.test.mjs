@@ -160,3 +160,87 @@ test("signing up with a teacher's course code is key only; a student's is not", 
   assert.equal(asTeacher.status, 200);
   assert.equal(asTeacher.json.user.keyOnly, true);
 });
+
+/* ------------------------------------------- a link's own code (0.639) */
+
+const { createHash } = await import("node:crypto");
+const { getStore } = await import("../server/store.js");
+const digest = (/** @type {string} */ s) => createHash("sha256").update(s).digest("hex");
+const SHAPE = /^[a-z0-9]+(-[a-z0-9]+){2,7}$/;
+
+test("a student's link carries a code of its own, which signs in to the same practice", async () => {
+  const r = await api("admin-create-user", { key: admin.key, body: { displayName: "Rima", courseId: course.id, roles: ["student"] } });
+  const code = r.json.linkKey;
+  assert.match(code, SHAPE);
+  assert.notEqual(code, r.json.key);
+  const viaLink = await whoami(code, true);
+  assert.equal(viaLink.status, 200);
+  assert.equal(viaLink.json.user.handle, r.json.user.handle);
+  assert.equal(viaLink.json.user.syncToken, digest(r.json.key), "the practice is kept under the key's digest");
+  assert.equal(viaLink.json.user.linkKey, code);
+  /* Typed into the key box, it works as well. */
+  assert.equal((await whoami(code)).status, 200);
+  /* And the record sent out never carries the digests. */
+  assert.equal(viaLink.json.user.linkHash, undefined);
+  assert.equal(viaLink.json.user.keyHash, undefined);
+});
+
+test("a student made before links gets one without their key changing", async () => {
+  const r = await api("admin-create-user", { key: admin.key, body: { displayName: "Zaid", courseId: course.id, roles: ["student"] } });
+  const handle = r.json.user.handle;
+  /* As an account from before 0.639 is stored: no link. */
+  const store = getStore("arabic-courses");
+  const rec = JSON.parse(String(await store.get(`user:${handle}`, { type: "text" })));
+  await store.delete(`key:${rec.linkHash}`).catch(() => {});
+  delete rec.linkHash;
+  delete rec.linkN;
+  await store.set(`user:${handle}`, JSON.stringify(rec));
+  assert.equal((await whoami(r.json.linkKey, true)).status, 401, "the link is gone");
+  const people = (await api("admin-overview", { key: admin.key })).json;
+  const row = people.users.find((/** @type {any} */ u) => u.handle === handle);
+  assert.match(row.linkKey, SHAPE);
+  assert.equal(people.linkSlug, "main");
+  assert.equal((await whoami(row.linkKey, true)).status, 200, "the link made for them works");
+  assert.equal((await whoami(r.json.key)).status, 200, "and so does their key, unchanged");
+});
+
+test("a new key makes a new link and ends the old one", async () => {
+  const r = await api("admin-create-user", { key: admin.key, body: { displayName: "Yara", courseId: course.id, roles: ["student"] } });
+  const again = await api("admin-reissue-key", { key: admin.key, body: { handle: r.json.user.handle } });
+  assert.match(again.json.linkKey, SHAPE);
+  assert.notEqual(again.json.linkKey, r.json.linkKey);
+  assert.equal((await whoami(r.json.linkKey, true)).status, 401);
+  const fresh = await whoami(again.json.linkKey, true);
+  assert.equal(fresh.status, 200);
+  assert.equal(fresh.json.user.syncToken, digest(again.json.key));
+});
+
+test("teachers and admins have no link, and a student made a teacher loses theirs", async () => {
+  const t = await api("admin-create-user", { key: admin.key, body: { displayName: "Karim", courseId: course.id, roles: ["teacher"] } });
+  assert.equal(t.json.linkKey, "");
+  assert.equal((await whoami(t.json.key)).json.user.linkKey, "");
+  const s = await api("admin-create-user", { key: admin.key, body: { displayName: "Dana" } });
+  const code = s.json.linkKey;
+  assert.equal((await whoami(code)).status, 200);
+  await api("assign-teacher", { key: admin.key, body: { courseId: course.id, handle: s.json.user.handle } });
+  const refused = await whoami(code);
+  assert.equal(refused.status, 403, "refused even when the app does not say it came by link");
+  assert.equal(refused.json.error, "key-only");
+  assert.equal((await whoami(code)).status, 401, "and the code is gone after that");
+  assert.equal((await whoami(s.json.key)).status, 200, "their key still works");
+});
+
+test("a space admin sees the links of their own students, and nobody else's", async () => {
+  const s = await api("admin-create-user", { key: bAdmin.key, body: { displayName: "Laila", courseId: bCourse.id, roles: ["student"] } });
+  assert.match(s.json.linkKey, SHAPE);
+  const seen = (await api("admin-overview", { key: bAdmin.key })).json;
+  assert.equal(seen.linkSlug, "lingua");
+  const row = (/** @type {string} */ h) => seen.users.find((/** @type {any} */ u) => u.handle === h);
+  assert.equal(row(s.json.user.handle).linkKey, s.json.linkKey);
+  assert.equal(row(bAdmin.handle).linkKey, "", "a space admin has none");
+  const everyone = (await api("admin-everyone", { key: admin.key })).json.people;
+  const laila = everyone.find((/** @type {any} */ u) => u.handle === s.json.user.handle);
+  assert.equal(laila.linkKey, s.json.linkKey);
+  assert.equal(laila.linkSlug, "lingua");
+  assert.equal(everyone.find((/** @type {any} */ u) => u.handle === admin.handle).linkKey, "");
+});

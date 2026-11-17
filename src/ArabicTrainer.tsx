@@ -11386,6 +11386,7 @@ export default function ArabicTrainer() {
    * call sites.
    */
   const accountKey = account && account.key;
+  const accountSync = account && account.syncToken;
   const accountHandle = account && account.handle;
   /* A sign-in link opened on a device that is signed in (0.638). The same
      person: nothing to do. Someone else: ask before switching. */
@@ -11393,13 +11394,17 @@ export default function ArabicTrainer() {
   const linkPeeked = useRef(false);
   useEffect(() => {
     if (!ready || !account || !linkKey || linkPeeked.current) return;
-    if (linkKey === account.key) {
+    if (linkKey === account.key || linkKey === account.linkKey) {
       setLinkKey("");
       return;
     }
     linkPeeked.current = true;
     API.whoAmI(linkKey, "", "", true).then(
-      (r) => setLinkAsk({ name: r.user.displayName || r.user.handle }),
+      (r) => {
+        /* Their own link, holding its own code (0.639): nothing to do. */
+        if (r.user.handle === account.handle) setLinkKey("");
+        else setLinkAsk({ name: r.user.displayName || r.user.handle });
+      },
       (e) => {
         setLinkKey("");
         const why = String(e && (e as Error).message);
@@ -12034,7 +12039,9 @@ export default function ArabicTrainer() {
     /* Trying a space (0.574): no sync, so no token. */
     if (TRYING) return;
     let alive = true;
-    tokenFor(account.key).then((token) => {
+    /* A device signed in by a sign-in link holds the link's code, not the
+       key, so the server says where the practice is (0.639). */
+    (account.syncToken ? Promise.resolve(account.syncToken) : tokenFor(account.key)).then((token) => {
       if (!alive) return;
       saveSyncConfig({ ...loadSyncConfig(), token });
       setSyncCfg((c) => ({ ...c, token }));
@@ -12046,7 +12053,7 @@ export default function ArabicTrainer() {
   /* As above. The account object changes identity far more often
      than the person behind it does. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, accountKey, runSync]);
+  }, [ready, accountKey, accountSync, runSync]);
 
   /* Once a sync has settled, and never while a session is running: the
      recordings and pictures nothing names any more are cleared from the
@@ -20509,8 +20516,8 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
   const [showLink, setShowLink] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const link =
-    me.keyOnly === false && me.org && typeof me.org === "object" && me.org.slug
-      ? signInLink(window.location.origin, me.org.slug, me.key)
+    me.keyOnly === false && me.linkKey && me.org && typeof me.org === "object" && me.org.slug
+      ? signInLink(window.location.origin, me.org.slug, me.linkKey)
       : "";
 
   async function copyLink() {

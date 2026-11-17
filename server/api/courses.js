@@ -9,7 +9,7 @@ import {
   forgetSyncDoc, moveSyncDoc, readSyncDoc, readSyncAudio, recordingIdsOf, syncSize, mergeSyncDoc, writeSyncAudioIfAbsent,
   MAX_BYTES as SYNC_MAX_BYTES,
 } from "./sync.js";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 /* The one list of grammatical fields a card may carry, shared with the app so
    that adding an axis to a language does not silently drop it here. */
@@ -763,7 +763,7 @@ function normalisedUser(u) {
 }
 /** What the server keeps about memberships, taken off anything sent out. @param {any} u */
 const withoutMemberships = (u) => {
-  const { keyHash: _k, orgs: _o, suspendedIn: _s, lastLearnedIn: _l, lastTaughtIn: _t, ...safe } = u;
+  const { keyHash: _k, linkHash: _h, linkN: _n, orgs: _o, suspendedIn: _s, lastLearnedIn: _l, lastTaughtIn: _t, ...safe } = u;
   return safe;
 };
 
@@ -797,7 +797,7 @@ const readDeck = async (store, id) => scoped(await readJson(store, K.deck(id)));
 const readCard = async (store, id) => scoped(await readJson(store, K.card(id)));
 /* The caller themselves is always readable: an App admin working in another
    org is still the person they are. */
-/** @type {(store: Store, h: string) => Promise<(User & { keyHash?: string }) | null>} */
+/** @type {(store: Store, h: string) => Promise<(User & { keyHash?: string, linkHash?: string, linkN?: number }) | null>} */
 const readUser = async (store, h) => {
   const u = await readJson(store, K.user(h));
   const at = orgScope.getStore();
@@ -829,7 +829,7 @@ async function indexAdd(store, what, id) {
 /**
  * @param {Request} req
  * @param {Store} store
- * @returns {Promise<(User & { keyHash?: string }) | null>}
+ * @returns {Promise<(User & { keyHash?: string, linkHash?: string, linkN?: number }) | null>}
  */
 async function currentUser(req, store) {
   const key = req.headers.get("x-key") || "";
@@ -883,6 +883,82 @@ async function keyOnly(store, user) {
   const ids = await readIndex(store, "courses");
   const courses = await readManyJson(store, ids.map((/** @type {string} */ id) => K.course(id)));
   return courses.some((/** @type {any} */ c) => c && (c.teachers || []).includes(user.handle));
+}
+
+/*
+ * Who is key only, for a whole list at once (0.639): the same rule as
+ * keyOnly, read once rather than once per person.
+ */
+/** @type {(store: Store) => Promise<(user: any) => boolean>} */
+async function keyOnlyJudge(store) {
+  const courses = await readManyJson(store, (await readIndex(store, "courses")).map((/** @type {string} */ id) => K.course(id)));
+  const orgs = await readManyJson(store, (await readIndex(store, "orgs")).map((/** @type {string} */ id) => K.org(id)));
+  const teach = new Set(courses.flatMap((/** @type {any} */ c) => (c && c.teachers) || []));
+  const run = new Set(orgs.flatMap((/** @type {any} */ o) => (o && o.admins) || []));
+  return (u) => !u || !!u.admin || teach.has(u.handle) || run.has(u.handle);
+}
+
+/*
+ * A student's sign-in link (0.639) carries a code of its own, not their
+ * key: the key is kept only as a digest and cannot be read back, and every
+ * student was to have a link without anyone's key changing. The code is
+ * worked out from the App admin key, the handle and a count, so nothing
+ * secret is stored: the account keeps the code's digest (`linkHash`),
+ * and `keyOf` maps that digest to the handle like a key's, so the code
+ * signs in wherever a key does. A new key raises the count, which makes a
+ * new code and ends the old one. With no App admin key set, there are no
+ * links; with a different one, the links are made again.
+ */
+/** @type {(handle: string, n: number) => string} */
+function linkCodeFor(handle, n) {
+  const secret = process.env.ADMIN_KEY || "";
+  if (!secret) return "";
+  const b = createHmac("sha256", secret).update(`sign-in-link:${handle}:${n}`).digest();
+  const pick = (/** @type {number} */ i) => WORDS[b[i] % WORDS.length];
+  return `${pick(0)}-${pick(1)}-${pick(2)}-${pick(3)}-${b.subarray(4, 6).toString("hex")}`;
+}
+
+/**
+ * The link codes of these students, made where missing, wrong or no longer
+ * findable. Answers handle → code; "" for anyone given no link.
+ * @param {Store} store
+ * @param {any[]} users  Account records, as stored; only students' are passed.
+ * @returns {Promise<Map<string, string>>}
+ */
+async function ensureLinks(store, users) {
+  /** @type {Map<string, string>} */
+  const out = new Map();
+  const list = users.filter((u) => u && u.handle);
+  if (!process.env.ADMIN_KEY || !list.length) return out;
+  const codes = list.map((u) => linkCodeFor(u.handle, Number(u.linkN) || 0));
+  const found = await readManyJson(store, codes.map((c) => K.keyOf(sha(c))));
+  for (let i = 0; i < list.length; i++) {
+    const u = list[i];
+    const code = codes[i];
+    if (u.linkHash !== sha(code) || found[i] !== u.handle) {
+      if (u.linkHash && u.linkHash !== sha(code)) await store.delete(K.keyOf(u.linkHash)).catch(() => {});
+      await writeJson(store, K.keyOf(sha(code)), u.handle);
+      await updateJson(store, K.user(u.handle), (/** @type {any} */ cur) =>
+        cur ? { ...cur, linkHash: sha(code), linkN: Number(u.linkN) || 0 } : null
+      );
+    }
+    out.set(u.handle, code);
+  }
+  return out;
+}
+
+/** One student's link code, made if missing. @type {(store: Store, user: any) => Promise<string>} */
+const ensureLink = async (store, user) => (await ensureLinks(store, [user])).get(user.handle) || "";
+
+/** Ending someone's link, as when they come to teach or run a space. @type {(store: Store, user: any) => Promise<void>} */
+async function dropLink(store, user) {
+  if (!user || !user.linkHash) return;
+  await store.delete(K.keyOf(user.linkHash)).catch(() => {});
+  await updateJson(store, K.user(user.handle), (/** @type {any} */ cur) => {
+    if (!cur || !cur.linkHash) return null;
+    const { linkHash: _h, ...rest } = cur;
+    return rest;
+  });
 }
 
 /** @type {(course: Course | null, h: string) => boolean} */
@@ -1248,6 +1324,7 @@ async function wipeAccount(store, handle, how = {}) {
   await clearPersonal(store, handle, "");
 
   if (user.keyHash) await store.delete(K.keyOf(user.keyHash)).catch(() => {});
+  if (user.linkHash) await store.delete(K.keyOf(user.linkHash)).catch(() => {});
   /* And the practice history, which the key's digest finds (86a). */
   if (user.keyHash) await forgetSyncDoc(user.keyHash).catch(() => {});
   await store.delete(K.user(handle)).catch(() => {});
@@ -2274,13 +2351,16 @@ async function handle(req) {
         );
       }
       // The key is shown once and cannot be read back from the digest.
+      const asTeacher = !!(target && target.kind === "course" && target.asTeacher);
       return json({
         ok: true,
         user: {
           ...withoutMemberships(user),
           org: orgCard(org),
           orgs: [orgCard(org)],
-          keyOnly: !!(target && target.kind === "course" && target.asTeacher),
+          keyOnly: asTeacher,
+          linkKey: asTeacher ? "" : await ensureLink(store, user),
+          syncToken: sha(key),
         },
         key,
       });
@@ -2302,9 +2382,18 @@ async function handle(req) {
       if (!found) return json({ error: "bad-key" }, 401);
       /* Suspended across the whole app by the super admin (0.578). */
       if (!found.admin && found.suspendedApp) return json({ error: "suspended-app" }, 403);
-      /* A sign-in link is for students only (0.638). */
+      /* A sign-in link is for students only (0.638). Its own code (0.639)
+         is refused for anyone else whether or not the app says it came by
+         link, and someone who has come to teach or run a space loses theirs. */
       const only = await keyOnly(store, found);
-      if (url.searchParams.get("via") === "link" && only) return json({ error: "key-only" }, 403);
+      const byLink = !!found.linkHash && sha(req.headers.get("x-key") || "") === found.linkHash;
+      if (only && found.linkHash) await dropLink(store, found);
+      if ((url.searchParams.get("via") === "link" || byLink) && only) return json({ error: "key-only" }, 403);
+      /* Their own link code, for their account page; and where their practice
+         is kept, which a device signed in by link cannot work out from the
+         code it holds. */
+      const linkKey = only ? "" : await ensureLink(store, found);
+      const syncToken = found.keyHash || "";
       /** @type {any} */
       let me = found;
       let { orgDocs, active } = await standingOf(store, me);
@@ -2336,6 +2425,8 @@ async function handle(req) {
             orgs: [],
             stranded,
             keyOnly: only,
+            linkKey,
+            syncToken,
           },
         });
       }
@@ -2360,6 +2451,8 @@ async function handle(req) {
             .filter(Boolean)
             .map((o) => ({ ...orgCard(o), runs: (o.admins || []).includes(me.handle) })),
           keyOnly: only,
+          linkKey,
+          syncToken,
         },
       });
     }
@@ -5979,6 +6072,14 @@ async function handle(req) {
           readManyJson(store, flagIds.map((id) => K.flag(id))).then(here),
         ]);
         const courses = courseRows.filter(Boolean);
+        /* Each student's sign-in link, for whoever may give them a new key
+           (0.639): the App admin, or a space admin for someone in their
+           space alone who runs nothing. Made here for anyone without one. */
+        const judge = await keyOnlyJudge(store);
+        const linkable = userRows.filter(
+          (u) => u && !judge(u) && (iAmAdmin || (!(actingOrgDoc.admins || []).includes(u.handle) && memberOf(u).length <= 1))
+        );
+        const links = await ensureLinks(store, linkable);
         const users = [];
         for (const u of userRows) {
           if (!u) continue;
@@ -5989,6 +6090,8 @@ async function handle(req) {
           const safe = withoutMemberships(u);
           users.push({
             ...safe,
+            keyOnly: judge(u),
+            linkKey: links.get(h) || "",
             suspended: suspensionIn(u, acting) || undefined,
             lastLearned: lastLearnedFor(u, acting),
             lastTaught: lastTaughtFor(u, acting),
@@ -6085,7 +6188,7 @@ async function handle(req) {
         const former = (await readJson(store, K.former(acting))) || [];
         /* And the space's invitation, for its admins to share (37a). */
         const invite = actingOrgDoc ? { code: actingOrgDoc.inviteCode, slug: actingOrgDoc.slug, name: actingOrgDoc.name, admins: actingOrgDoc.admins || [] } : null;
-        return jsonTagged(req, { ok: true, users, courses, decks, flags, former, invite });
+        return jsonTagged(req, { ok: true, users, courses, decks, flags, former, invite, linkSlug: actingOrgDoc ? actingOrgDoc.slug : "" });
       }
 
       /* A lost key: the handle survives, so memberships and progress do too. */
@@ -6650,6 +6753,7 @@ async function handle(req) {
           for (const u of users) {
             if (!u || u.handle === mine) continue;
             if (u.keyHash) await store.delete(K.keyOf(u.keyHash));
+            if (u.linkHash) await store.delete(K.keyOf(u.linkHash)).catch(() => {});
             await store.delete(K.user(u.handle));
             await store.delete(K.myCards(u.handle));
             removed.users += 1;
@@ -6895,9 +6999,23 @@ async function handle(req) {
           const rows = (await readManyJson(store, (await readIndex(store, "users")).map((h) => K.user(h)))).filter(Boolean);
           /* Every space each person is in, and their account-wide moments
              (memberships, A2): Super admin sees the whole account. */
+          /* Every student's sign-in link (0.639), at the first space they are
+             still in. */
+          const judge = await keyOnlyJudge(store);
+          const links = await ensureLinks(store, rows.filter((u) => !judge(u)));
           const people = rows.map((u) => {
             const norm = normalisedUser(u);
-            return { ...withoutMemberships(u), suspended: undefined, org: orgOf(u), orgs: norm.orgs, suspendedIn: norm.suspendedIn };
+            const at = norm.orgs.map((/** @type {string} */ id) => orgs.find((/** @type {any} */ o) => o.id === id)).find((/** @type {any} */ o) => o && !o.archived);
+            return {
+              ...withoutMemberships(u),
+              suspended: undefined,
+              org: orgOf(u),
+              orgs: norm.orgs,
+              suspendedIn: norm.suspendedIn,
+              keyOnly: judge(u),
+              linkKey: links.get(u.handle) || "",
+              linkSlug: at ? at.slug : "",
+            };
           });
           return json({ ok: true, orgs, people });
         }
@@ -7147,7 +7265,15 @@ async function handle(req) {
             return next;
           });
         }
-        return json({ ok: true, user, key, keyOnly: await keyOnly(store, user), slug: actingOrgDoc ? actingOrgDoc.slug : "" });
+        const only = await keyOnly(store, user);
+        return json({
+          ok: true,
+          user,
+          key,
+          keyOnly: only,
+          linkKey: only ? "" : await ensureLink(store, user),
+          slug: actingOrgDoc ? actingOrgDoc.slug : "",
+        });
       }
 
       if (action === "admin-reissue-key") {
@@ -7166,7 +7292,12 @@ async function handle(req) {
         }
         const key = makeKey();
         if (target.keyHash) await store.delete(K.keyOf(target.keyHash)).catch(() => {});
-        await writeJson(store, K.user(handle), { ...target, keyHash: sha(key) });
+        /* A new key ends their sign-in link too (0.639): the next count
+           makes a new code. */
+        if (target.linkHash) await store.delete(K.keyOf(target.linkHash)).catch(() => {});
+        const { linkHash: _h, ...unlinked } = /** @type {any} */ (target);
+        const renewed = { ...unlinked, keyHash: sha(key), linkN: (Number(target.linkN) || 0) + 1 };
+        await writeJson(store, K.user(handle), renewed);
         await writeJson(store, K.keyOf(sha(key)), handle);
         /* The practice document is stored under the key's token; carry it
            over, or the new key opens an empty one (0.580). */
@@ -7180,7 +7311,8 @@ async function handle(req) {
             break;
           }
         }
-        return json({ ok: true, handle, key, keyOnly: await keyOnly(store, target), slug });
+        const only = await keyOnly(store, target);
+        return json({ ok: true, handle, key, keyOnly: only, linkKey: only ? "" : await ensureLink(store, renewed), slug });
       }
 
       /* Removing a person: the same walk as closing your own account, so

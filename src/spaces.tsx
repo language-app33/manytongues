@@ -145,6 +145,7 @@ import {
   Icon,
   IconButton,
   ItemList,
+  Pressable,
   SearchBox,
   LanguageRadio,
   Lede,
@@ -530,12 +531,12 @@ export function Onboarding({ onDone, place = {} }: {
               safe. If you lose it, only your space's admin can give you a new one.
             </Lede>
             <CodeBox label="Your sign-in key" code={made.key} />
-            {made.keyOnly === false && made.org && typeof made.org === "object" && made.org.slug ? (
+            {made.keyOnly === false && made.linkKey && made.org && typeof made.org === "object" && made.org.slug ? (
               <CodeBox
                 long
                 label="Your private sign-in link"
                 hint="Opening it signs you in on any device, with nothing to type. Anyone who has it is you, so never share it."
-                code={signInLink(window.location.origin, made.org.slug, made.key)}
+                code={signInLink(window.location.origin, made.org.slug, made.linkKey)}
               />
             ) : null}
             <Help>
@@ -709,7 +710,7 @@ export function PersonActions({ person, org, keyOrg, mayKey, mayAct, suspendable
   suspendedHere: boolean;
   removable: boolean;
   onConfirm: (p: Pending) => void;
-  onNewKey: (made: { name: string; handle: string; key: string; link?: string }) => void;
+  onNewKey: (made: { name: string; handle: string; key: string }) => void;
   children?: Node;
 }) {
   const u = person;
@@ -723,19 +724,15 @@ export function PersonActions({ person, org, keyOrg, mayKey, mayAct, suspendable
           confirmLabel: "Issue a new key",
           body: (
             <p>
-              Their current key stops working the moment you do this, on every device they use.
-              Their handle, courses and progress are untouched. You&apos;ll see the new key once.
+              Their current key, and their sign-in link if they have one, stop working the moment you
+              do this, on every device they use. Their handle, courses and progress are untouched.
+              You&apos;ll see the new key once.
             </p>
           ),
           action: async () => {
             const r = await API.reissueKey(u.handle, keyOrg);
-            onNewKey({
-              name: u.displayName,
-              handle: u.handle,
-              key: r.key,
-              /* A student's private sign-in link, built here from the key (0.638). */
-              link: r.keyOnly === false && r.slug ? signInLink(window.location.origin, r.slug, r.key) : "",
-            });
+            /* Their tile opens by itself, with the key and the new link (0.639). */
+            onNewKey({ name: u.displayName, handle: u.handle, key: r.key });
           },
         })} />
       )}
@@ -1017,6 +1014,84 @@ export function CodeBox({ label, code, hint, onNew, busy, long = false }: {
         )}
       </div>
     </div>
+  );
+}
+
+/*
+ * One person on a list of people, folded (0.639). Built as a form's panel
+ * is in the card editor: the name is the heading that opens it, with what
+ * says who they are under it, and the arrow. `lead` stays on the folded
+ * tile (a course's Teacher and Student switches); `flags` under the
+ * heading, open or not. `open` opens it from outside, as when a new key
+ * has just been made for them.
+ */
+export function PersonFold({ title, meta, lead, flags, open: opened = false, children }: {
+  title: Node;
+  meta?: Node;
+  lead?: Node;
+  flags?: Node;
+  open?: boolean;
+  children?: Node;
+}) {
+  const [open, setOpen] = useState(opened);
+  useEffect(() => {
+    if (opened) setOpen(true);
+  }, [opened]);
+  return (
+    <div className="at-formblock at-formtile" data-el="person-fold">
+      <div className="at-formhead">
+        <Pressable className="at-groupfold at-formfold" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          <span className="at-formnum">{title}</span>
+          <span className="at-groupcount">{meta}</span>
+          <Icon name={open ? "chevronUp" : "chevronDown"} size={24} />
+        </Pressable>
+        {lead ? <span className="at-formacts">{lead}</span> : null}
+      </div>
+      {flags}
+      {open ? children : null}
+    </div>
+  );
+}
+
+/* A student's private sign-in link, for an admin to pass on (0.639). Built
+   here from the code the server answered with; nothing for anyone else. */
+export function PersonLink({ name, slug, code }: { name: string; slug?: string; code?: string }) {
+  if (!code || !slug) return null;
+  return (
+    <CodeBox
+      long
+      label={`Private sign-in link for ${name}`}
+      hint="Opening it signs them in, with nothing to type. It is for them alone: never post it to a class or a group."
+      code={signInLink(window.location.origin, slug, code)}
+    />
+  );
+}
+
+/* A key just made, shown once inside the person's tile (0.639): it is kept
+   only as a digest, so this is the one time it can be read. */
+export function NewKeyNote({ made, onDone }: {
+  made: { name: string; key: string; handle?: string; fresh?: boolean };
+  onDone: () => void;
+}) {
+  return (
+    <>
+      <CodeBox
+        label={`${made.fresh ? "Sign-in key for" : "New sign-in key for"} ${made.name}`}
+        code={made.key}
+        hint={made.handle ? <>Their handle is <strong>{made.handle}</strong>.</> : undefined}
+      />
+      <Help>
+        {made.fresh
+          ? "Send it to them through something private — the key is the whole credential, and anyone holding it is them. "
+          : "Give it to them directly. Their old key and link stopped working the moment you made this one; their handle, courses and progress are unchanged. "}
+        You won't see the key again, but you can issue another.
+      </Help>
+      <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
+        <Button variant="ghost" size="sm" onClick={onDone}>
+          Done
+        </Button>
+      </div>
+    </>
   );
 }
 
@@ -1766,7 +1841,7 @@ export function CoursesPage({
 /**
  * @param props  The caller knows whose row this is, so only the answer comes back.
  */
-function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole }: {
+function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole, inside }: {
   handle: string;
   name?: string;
   me?: string;
@@ -1774,6 +1849,8 @@ function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole }: {
   studying: boolean;
   busy?: boolean;
   onSetRole: (role: "teacher" | "student", on: boolean) => void;
+  /** What opening the row shows — a student's sign-in link (0.639). Without it, nothing opens. */
+  inside?: Node;
 }) {
   const role: (key: "teacher" | "student", cls: string, label: string, on: boolean) => Node = (key, cls, label, on) => (
     <button
@@ -1786,6 +1863,21 @@ function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole }: {
       {label}
     </button>
   );
+  const roles = (
+    <span className="at-roles">
+      {role("teacher", "teach", "Teacher", teaching)}
+      {role("student", "study", "Student", studying)}
+    </span>
+  );
+  /* Folded where there is something to open (0.639), with the switches
+     kept on the folded row, so setting up a class is still a tap each. */
+  if (inside) {
+    return (
+      <PersonFold title={<PersonName name={name} handle={handle} me={me} />} meta={handle} lead={roles}>
+        {inside}
+      </PersonFold>
+    );
+  }
   return (
     <div className="at-item at-rosterrow">
       <div className="grow">
@@ -1794,10 +1886,7 @@ function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole }: {
         </div>
         <div className="at-handle">{handle}</div>
       </div>
-      <span className="at-roles">
-        {role("teacher", "teach", "Teacher", teaching)}
-        {role("student", "study", "Student", studying)}
-      </span>
+      {roles}
     </div>
   );
 }
@@ -2092,6 +2181,7 @@ function PracticeSection({ course, cards, lang, busy, onSave }: {
 function CourseSettings({
   course,
   users,
+  linkSlug = "",
   languages,
   account,
   busy,
@@ -2104,6 +2194,8 @@ function CourseSettings({
 }: {
   course: Course;
   users: User[];
+  /** The space's address, for its students' sign-in links (0.639). */
+  linkSlug?: string;
   languages: Record<LangId, Lang>;
   account: User;
   busy?: boolean;
@@ -2135,6 +2227,11 @@ function CourseSettings({
     return u ? u.displayName : h;
   };
   const outsiders = users.filter((u) => !people.includes(u.handle));
+  /* A student's sign-in link, where the admin may see it (0.639). */
+  const linkOf = (h: string, name: string) => {
+    const u = users.find((x) => x.handle === h);
+    return u && u.linkKey && linkSlug ? <PersonLink name={name} slug={linkSlug} code={u.linkKey} /> : undefined;
+  };
 
   return (
     <Screen
@@ -2288,6 +2385,7 @@ function CourseSettings({
                 teaching={c.teachers.includes(h)}
                 studying={c.students.includes(h)}
                 busy={busy}
+                inside={linkOf(h, nameOf(h))}
                 onSetRole={(role, on) => onSetRole(h, nameOf(h), role, on)}
               />
             ))}
@@ -2315,6 +2413,7 @@ function CourseSettings({
                       teaching={false}
                       studying={false}
                       busy={busy}
+                      inside={linkOf(u.handle, u.displayName)}
                       onSetRole={(role) => onSetRole(u.handle, u.displayName, role, true)}
                     />
                   ))}
@@ -2710,6 +2809,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
         <CourseSettings
           course={c}
           users={users}
+          linkSlug={(data && data.linkSlug) || ""}
           languages={languages}
           account={account}
           busy={busy}
@@ -2914,35 +3014,6 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 </Section>
               ) : null}
               <Section head title="This space's people">
-              {newKey && (
-                <div className="at-sub">
-                  <CodeBox
-                    label={`${newKey.fresh ? "Sign-in key for" : "New sign-in key for"} ${newKey.name}`}
-                    code={newKey.key}
-                    hint={newKey.handle ? <>Their handle is <strong>{newKey.handle}</strong>.</> : undefined}
-                  />
-                  {newKey.link ? (
-                    <CodeBox
-                      long
-                      label={`Private sign-in link for ${newKey.name}`}
-                      hint="Opening it signs them in, with nothing to type. It is for them alone: never post it to a class or a group."
-                      code={newKey.link}
-                    />
-                  ) : null}
-                  <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
-                    <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>
-                      Done
-                    </Button>
-                  </div>
-                  <Help>
-                    {newKey.fresh
-                      ? "Send it to them through something private — the key is the whole credential, and anyone holding it is them. "
-                      : "Give it to them directly. Their old key stopped working the moment you made this one; their handle, courses and progress are unchanged. "}
-                    You won't see it again, but you can issue another.
-                  </Help>
-                </div>
-              )}
-
               {makingUser && (
                 <Screen
                   title="Add a person"
@@ -2958,12 +3029,12 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                               makingUser.courseId || "",
                               (makingUser.roles as ("teacher" | "student")[])
                             );
+                            /* Their tile opens by itself, with the key (0.639). */
                             setNewKey({
                               name: r.user.displayName,
                               handle: r.user.handle,
                               key: r.key,
                               fresh: true,
-                              link: r.keyOnly === false && r.slug ? signInLink(window.location.origin, r.slug, r.key) : "",
                             });
                             setMakingUser(null);
                             return r;
@@ -3040,9 +3111,9 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                   )}
 
                   <Help>
-                    You'll get their sign-in key once, to pass on privately, and for a student a
-                    private sign-in link too. They don't need to do anything first — the key or
-                    the link signs them in on any device.
+                    You'll get their sign-in key once, to pass on privately. A student also has a
+                    private sign-in link, kept in their tile on this list. They don't need to do
+                    anything first — the key or the link signs them in on any device.
                   </Help>
 
                                 </Screen>
@@ -3113,35 +3184,15 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 ]}
                 itemKey={(u) => u.handle}
                 renderItem={(u) => (
-                  <div className="at-deckcard">
-                    <div className="at-deckrow2">
-                      <div className="at-deckmain">
-                        <div className="at-decktitle">
-                          <PersonName
-                            name={u.displayName}
-                            handle={u.handle}
-                            me={account.handle}
-                          />
-                        </div>
-                        <div className="at-deckmeta">{u.handle}</div>
-                      </div>
-                      <div className="at-deckacts">
-                        {/* Suspending and removing (64a, 0.578): in this space
-                            only; never yourself, an App admin, or — unless you
-                            are the App admin — a space admin (70a). Someone
-                            the super admin suspended everywhere is theirs. */}
-                        <PersonActions
-                          person={u}
-                          mayKey={!!(account.admin || !(u.admin || leads.has(u.handle)))}
-                          mayAct={mayAct(u)}
-                          suspendable={!(u as any).suspendedApp}
-                          suspendedHere={!!u.suspended}
-                          removable
-                          onConfirm={setConfirm}
-                          onNewKey={setNewKey}
-                        />
-                      </div>
-                    </div>
+                  /* Folded (0.639): the name opens it, as a form opens in the
+                     card editor. Opened, what can be done to them, and for a
+                     student their private sign-in link. */
+                  <PersonFold
+                    title={<PersonName name={u.displayName} handle={u.handle} me={account.handle} />}
+                    meta={u.handle}
+                    open={!!newKey && newKey.handle === u.handle}
+                    flags={
+                      <>
                     {/* Admin is a flag on the person, not a course they are
                         in, so it stays a badge and keeps the row to itself. */}
                     {(u.admin || leads.has(u.handle) || u.suspended || (u as any).suspendedApp) && (
@@ -3156,6 +3207,29 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                         ) : null}
                       </div>
                     )}
+                      </>
+                    }
+                  >
+                    {newKey && newKey.handle === u.handle ? (
+                      <NewKeyNote made={newKey as { name: string; key: string; handle?: string; fresh?: boolean }} onDone={() => setNewKey(null)} />
+                    ) : null}
+                    <PersonLink name={u.displayName} slug={(data && data.linkSlug) || ""} code={u.linkKey} />
+                    <div className="at-row at-mt3">
+                      {/* Suspending and removing (64a, 0.578): in this space
+                          only; never yourself, an App admin, or — unless you
+                          are the App admin — a space admin (70a). Someone
+                          the super admin suspended everywhere is theirs. */}
+                      <PersonActions
+                        person={u}
+                        mayKey={!!(account.admin || !(u.admin || leads.has(u.handle)))}
+                        mayAct={mayAct(u)}
+                        suspendable={!(u as any).suspendedApp}
+                        suspendedHere={!!u.suspended}
+                        removable
+                        onConfirm={setConfirm}
+                        onNewKey={setNewKey}
+                      />
+                    </div>
                     {/* "Hasn't signed in yet" was a pill up here. The lines
                         below say it, in the same place as the two questions
                         it sits beside, so the pill was the same fact
@@ -3197,7 +3271,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                         never="Never made a card or a deck"
                       />
                     </div>
-                  </div>
+                  </PersonFold>
                 )}
               />
               </Section>
@@ -11353,13 +11427,14 @@ function FormerMembers({ former, people, busy, ask }: {
         empty="Nobody matches."
         renderItem={(r) => {
         const suspended = r.why === "left" || r.why === "removed";
+        /* Folded like every list of people (0.639); no key or link here. */
         return (
-          <Tile key={r.handle}
+          <PersonFold key={r.handle}
             title={r.displayName}
             meta={`${FORMER_WHY[r.why] || r.why} · ${shortDate(r.left)} · joined ${shortDate(r.joined)}${
               r.courses.length ? ` · was in ${r.courses.map((c) => c.title).join(", ")}` : ""}`}
-            actions={
-              <>
+          >
+            <div className="at-row at-mt3">
                 {suspended && (
                   <Button size="sm" disabled={busy}
                     onClick={() => ask({
@@ -11396,9 +11471,8 @@ function FormerMembers({ former, people, busy, ask }: {
                       action: () => API.purgeFormer(r.handle),
                     })} />
                 )}
-              </>
-            }
-          />
+            </div>
+          </PersonFold>
         );
       }}
       />
@@ -11506,7 +11580,7 @@ function SpaceExtras({ org }: { org: API.OrgRow }) {
  * reactivating and deleting work wherever the person is: each call is sent
  * as from their space.
  */
-type Person = User & { org: string; orgs?: string[]; suspendedIn?: Record<string, unknown>; suspendedApp?: unknown };
+type Person = User & { org: string; orgs?: string[]; suspendedIn?: Record<string, unknown>; suspendedApp?: unknown; linkSlug?: string };
 
 function EveryonePeople({ me }: { me: string }) {
   const [data, setData] = useState<{
@@ -11522,7 +11596,7 @@ function EveryonePeople({ me }: { me: string }) {
   /* See useRun and useConfirm: a yes runs, then the list is read again. */
   const { run, busy, setBusy, error, setError } = useRun({ refresh: () => load() });
   const { setConfirm, modal: confirmModal } = useConfirm(run, { busy });
-  const [newKey, setNewKey] = useState<{ name: string; handle?: string; key: string; link?: string } | null>(null);
+  const [newKey, setNewKey] = useState<{ name: string; handle?: string; key: string } | null>(null);
   /* Everyone once, or under each of their spaces (0.578). */
   const [view, setView] = useState<"all" | "spaces">("all");
   /* Taking one space away from someone (0.578): who, and which. */
@@ -11558,6 +11632,15 @@ function EveryonePeople({ me }: { me: string }) {
     const why = whyIn(u, org);
     return why === "removed" || why === "left";
   };
+  /* One person, folded (0.639): opened, their new key if one was just
+     made, a student's sign-in link, and the actions. */
+  const fold = (u: Person, meta: string, o: API.SuperOrg | null) => (
+    <PersonFold key={u.handle} title={u.displayName} meta={meta} open={!!newKey && newKey.handle === u.handle}>
+      {newKey && newKey.handle === u.handle ? <NewKeyNote made={newKey} onDone={() => setNewKey(null)} /> : null}
+      <PersonLink name={u.displayName} slug={u.linkSlug} code={u.linkKey} />
+      <div className="at-row at-mt3">{actionsFor(u, o)}</div>
+    </PersonFold>
+  );
   /* The same actions in both views; `o` is the space a row is under, or
      null in All. */
   const actionsFor = (u: Person, o: API.SuperOrg | null) => {
@@ -11741,22 +11824,6 @@ function EveryonePeople({ me }: { me: string }) {
       />
       <SearchBox placeholder="Search everyone, in every space" aria-label="Search everyone, in every space"
         value={q} onChange={setQ} style={{ marginBottom: 14 }} />
-      {newKey && (
-        <div className="at-sub">
-          <CodeBox label={`New sign-in key for ${newKey.name}`} code={newKey.key} />
-          {newKey.link ? (
-            <CodeBox
-              long
-              label={`Private sign-in link for ${newKey.name}`}
-              hint="Opening it signs them in, with nothing to type. It is for them alone: never post it to a class or a group."
-              code={newKey.link}
-            />
-          ) : null}
-          <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
-            <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>Done</Button>
-          </div>
-        </div>
-      )}
       {data && view === "all" && (() => {
         const everyone = data.people.filter(match).slice().sort((a, b) => a.displayName.localeCompare(b.displayName));
         return (
@@ -11775,12 +11842,10 @@ function EveryonePeople({ me }: { me: string }) {
                 const why = whyIn(u, id);
                 return `${o ? o.name : id}${why === "suspended" ? " (suspended)" : why === "removed" ? " (removed)" : why === "left" ? " (left)" : ""}`;
               });
-              return (
-                <Tile key={u.handle}
-                  title={u.displayName}
-                  meta={`${u.handle}${u.admin ? " · App admin" : ""}${u.suspendedApp ? " · Suspended everywhere" : ""} · ${names.join(", ") || "In no space"}`}
-                  actions={actionsFor(u, null)}
-                />
+              return fold(
+                u,
+                `${u.handle}${u.admin ? " · App admin" : ""}${u.suspendedApp ? " · Suspended everywhere" : ""} · ${names.join(", ") || "In no space"}`,
+                null,
               );
               }}
             />
@@ -11806,13 +11871,11 @@ function EveryonePeople({ me }: { me: string }) {
               match={(u, nq) => `${u.displayName} ${u.handle}`.toLowerCase().includes(nq)}
               renderItem={(u) => {
               const why = whyIn(u, o.id);
-              return (
-                <Tile key={u.handle}
-                  title={u.displayName}
-                  meta={`${u.handle}${u.admin ? " · App admin" : o.admins.includes(u.handle) ? " · Space admin" : ""}${
-                    u.suspendedApp ? " · Suspended everywhere" : why === "suspended" ? " · Suspended" : why === "removed" ? " · Removed" : why === "left" ? " · Left" : ""}`}
-                  actions={actionsFor(u, o)}
-                />
+              return fold(
+                u,
+                `${u.handle}${u.admin ? " · App admin" : o.admins.includes(u.handle) ? " · Space admin" : ""}${
+                  u.suspendedApp ? " · Suspended everywhere" : why === "suspended" ? " · Suspended" : why === "removed" ? " · Removed" : why === "left" ? " · Left" : ""}`,
+                o,
               );
               }}
             />

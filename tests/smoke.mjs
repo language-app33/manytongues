@@ -61,6 +61,9 @@ const out = await buildOnce(
     "review-sheet.tsx",
     /* And the recording screen, driven on its own at the foot (0.632). */
     "card-editor.tsx",
+    /* And a person's folded tile on an admin's list, driven on its own in
+       the sign-in links walk (0.639). */
+    "spaces.tsx",
   ],
   {
     splitting: true,
@@ -12170,6 +12173,8 @@ const openPronounTables = async () => {
   const lina = {
     handle: "lina-5d6e", displayName: "Lina", key: "willow-amber-quartz-fjord-7e3a", admin: false,
     keyOnly: false, keySaved: false, org: main,
+    /* Her link's own code (0.639): not her key, but it signs her in. */
+    linkKey: "meadow-raven-saffron-cedar-3c5d",
   };
   const tariq = {
     handle: "tariq-8f9a", displayName: "Tariq", key: "harbour-gable-ember-cedar-2b4c", admin: false,
@@ -12190,6 +12195,7 @@ const openPronounTables = async () => {
   whoamiAs = null;
   whoamiKeys.clear();
   whoamiKeys.set(lina.key, lina);
+  whoamiKeys.set(lina.linkKey, lina);
   whoamiKeys.set(tariq.key, tariq);
   /** Opens the app at an address, as a fresh page would. */
   const open = async (/** @type {string} */ address) => {
@@ -12209,12 +12215,23 @@ const openPronounTables = async () => {
     return { host, here, anywhere, close };
   };
 
-  /* 1. Signed out, a student's link opened. */
+  /* 1. Signed out, a student's link opened: it carries its own code
+     (0.639), and her practice is kept under her key's digest, which the
+     server tells the device. */
+  const digestOf = async (/** @type {string} */ key) => {
+    const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+  /** @type {any} */ (lina).syncToken = await digestOf(lina.key);
+  remoteDocs.clear();
   localStorage.removeItem("arabic-account");
   {
-    const app = await open(`/#key=${lina.key}`);
-    check("a sign-in link opened signed out signs the student in", !app.here(/sign-in key/) && signedInAs() === lina.key,
+    const app = await open(`/#key=${lina.linkKey}`);
+    check("a sign-in link opened signed out signs the student in", !app.here(/sign-in key/) && signedInAs() === lina.linkKey,
       `${signedInAs() || "nobody"} · ${(app.host.textContent || "").slice(0, 100)}`);
+    check("and her practice is kept where her key keeps it, not under the link's code",
+      remoteDocs.has(/** @type {any} */ (lina).syncToken) && !remoteDocs.has(await digestOf(lina.linkKey)),
+      [...remoteDocs.keys()].map((k) => k.slice(0, 8)).join(", ") || "nothing synced");
     check("without stopping them to tick that the key is saved", !/Keep this somewhere safe/.test(app.host.textContent || ""),
       (app.host.textContent || "").slice(0, 100));
     check("and the key is taken out of the address", window.location.hash === "", window.location.hash);
@@ -12278,6 +12295,42 @@ const openPronounTables = async () => {
     check("an account the server has not called a student is offered no link",
       !!app.here(/^Show my key$/) && !app.here(/^Show my link$/), (app.host.textContent || "").slice(0, 160));
     app.close();
+  }
+
+  /* 6. A person's tile on an admin's list (0.639): folded, and opened by
+     its name, to the student's sign-in link. */
+  {
+    const { PersonFold, PersonLink } = await import(path.join(out, "spaces.js"));
+    /* It is the form panel's fold, which this file opens as drawn. */
+    openFormsAsDrawn = false;
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    const tile = (/** @type {boolean} */ opened) =>
+      React.createElement(PersonFold, { title: "Lina", meta: lina.handle, open: opened },
+        React.createElement(PersonLink, { name: "Lina", slug: "lingua", code: lina.linkKey }));
+    r.render(tile(false));
+    await sleep(100);
+    const head = /** @type {HTMLElement | null} */ (host.querySelector('[aria-expanded]'));
+    check("a person's tile starts folded, with no link showing",
+      !!head && head.getAttribute("aria-expanded") === "false" && !/sign-in link/i.test(host.textContent || ""),
+      (host.textContent || "").slice(0, 120));
+    click(head);
+    await sleep(100);
+    check("opened by its name, it shows the student's private sign-in link",
+      /Private sign-in link for Lina/.test(host.textContent || "") &&
+        (host.textContent || "").includes(`/lingua#key=${lina.linkKey}`),
+      (host.textContent || "").slice(0, 200));
+    r.render(tile(false));
+    click(head);
+    await sleep(100);
+    r.render(tile(true));
+    await sleep(100);
+    check("and a tile whose person just had a key made opens by itself",
+      /Private sign-in link for Lina/.test(host.textContent || ""), (host.textContent || "").slice(0, 120));
+    r.unmount();
+    host.remove();
+    openFormsAsDrawn = true;
   }
 
   whoamiAs = null;
