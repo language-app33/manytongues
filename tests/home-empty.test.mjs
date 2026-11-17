@@ -24,14 +24,19 @@ test("a space with no cards and no course here invites a join, counted in this s
 });
 
 test("a space whose courses hold nothing yet says it is waiting on them", () => {
-  assert.deepEqual(whyHomeIsEmpty({ practisable: 0, offLangs: [], cardsHere: 0, coursesHere: 2 }),
-    { kind: "no-cards", courses: 2 });
+  const why = whyHomeIsEmpty({ practisable: 0, offLangs: [], cardsHere: 0, coursesHere: 2 });
+  assert.deepEqual(why, { kind: "no-cards", courses: 2 });
+  assert.equal(homeEmptySays(why), "Nothing to practice yet!");
+});
+
+test("someone in no course is asked to join one", () => {
+  assert.equal(homeEmptySays({ kind: "no-cards", courses: 0 }), "Join a course to get started!");
 });
 
 test("cards here that cannot be practised yet are not ready, not missing", () => {
   const why = whyHomeIsEmpty({ practisable: 0, offLangs: [], cardsHere: 12, coursesHere: 1 });
   assert.deepEqual(why, { kind: "not-ready" });
-  assert.match(homeEmptySays(why), /none is ready to practise yet/);
+  assert.equal(homeEmptySays(why), "Nothing to practice yet!");
   /* Not the teacher's warning it replaces. */
   assert.doesNotMatch(homeEmptySays(why), /exercise type/);
 });
@@ -39,10 +44,10 @@ test("cards here that cannot be practised yet are not ready, not missing", () =>
 test("languages switched off come first: they are one tap away", () => {
   const why = whyHomeIsEmpty({ practisable: 0, offLangs: ["ar-PS", "fr"], cardsHere: 12, coursesHere: 1 });
   assert.deepEqual(why, { kind: "langs", langs: ["ar-PS", "fr"] });
-  assert.equal(homeEmptySays(why, ["Palestinian Arabic", "French"]),
-    "Your cards here are in Palestinian Arabic and French, which you've switched off.");
-  assert.equal(homeEmptySays({ kind: "langs", langs: ["fr"] }, ["French"]),
-    "Your cards here are in French, which you've switched off.");
+  assert.equal(homeEmptySays(why, 1),
+    "Nothing to practice in the selected language. Switch on a language to get started.");
+  assert.equal(homeEmptySays(why, 2),
+    "Nothing to practice in the selected languages. Switch on a language to get started.");
 });
 
 test("a saved session is offered only where it has something to practise", () => {

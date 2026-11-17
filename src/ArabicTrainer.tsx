@@ -851,7 +851,7 @@ export function mergeMoves(
    progress can be asked what it does without a browser — see grade.ts. */
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
 import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
-import { homeEmptySays, whyHomeIsEmpty } from "./home-empty.ts";
+import { homeEmptySays, listOf as listOfNames, whyHomeIsEmpty } from "./home-empty.ts";
 import type { Filler, Mark } from "./grade.ts";
 
 import { applyUpdate, beforeReload, onUpdateReady, updateReady } from "./updates.ts";
@@ -15750,7 +15750,6 @@ export default function ArabicTrainer() {
                     which is how it came to say something different from
                     both. */}
                 <Empty
-                  title="Nothing to practice yet"
                   /* The invitation is for someone who has nowhere to get
                      cards from, and only once we know that. An enrolled
                      student is waiting on their teacher, not on a code, and
@@ -15763,7 +15762,8 @@ export default function ArabicTrainer() {
                       <Button variant="primary"
                         onClick={() => setSetting("langsOff", langsOff.filter((l) => !homeEmpty.langs.includes(l)))}
                       >
-                        Switch {homeEmpty.langs.length === 1 ? "it" : "them"} back on
+                        {/* Named, since the line above no longer names them. */}
+                        {`Switch on ${listOfNames(homeEmpty.langs.map((l) => (LANGUAGES[l] || {}).name || l))}`}
                       </Button>
                     ) : homeEmpty.kind === "no-cards" && coursesKnown && homeEmpty.courses === 0 && !TRYING ? (
                       /* Not while trying a space: there is no joining there (0.574). */
@@ -15773,11 +15773,10 @@ export default function ArabicTrainer() {
                     ) : null
                   }
                 >
-                  {homeEmpty.kind === "no-cards"
-                    ? noCardsYet(homeEmpty.courses)
-                    : homeEmptySays(homeEmpty, homeEmpty.kind === "langs"
-                      ? homeEmpty.langs.map((l) => (LANGUAGES[l] || {}).name || l)
-                      : [])}
+                  {/* One line, as the owner worded it (0.641): no heading
+                      over it, since the line is the whole of what there is
+                      to say. */}
+                  {homeEmptySays(homeEmpty, Math.max(langChoices.length - langsOff.length, 1))}
                 </Empty>
               </>
             )}
@@ -18072,7 +18071,7 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
         <div className="at-card at-mt4">
           <p className="at-eyebrow">High priority</p>
           <Help>
-            For a word you want to get on with. Marked, it joins your very next
+            For a card you want to get on with. Marked, it joins your very next
             session whatever its schedule says, and opens it — and it stays in
             every session until you take the mark off. Nothing else about it
             changes: what you have learnt, and when it would have come round
@@ -21999,13 +21998,13 @@ export type Ready = { review: number; climbing: number; fresh: number; behind: b
  */
 export function homeLine({ review, climbing, fresh, behind }: Ready): string {
   const news = fresh
-    ? ` · ${plural(fresh, "new word")} waiting`
+    ? ` · ${plural(fresh, "new card")} waiting`
     : behind
-    ? " · new words wait until you've caught up"
+    ? " · new cards wait until you've caught up"
     : "";
   if (review) return `${plural(review, "card")} ready to review${climbing ? ` · ${climbing} in progress` : ""}${news}`;
   if (climbing) return `Nothing to review — ${plural(climbing, "card")} in progress${news}`;
-  if (fresh) return `Nothing to review — ready to learn ${fresh === 1 ? "a new word" : `${fresh} new words`}`;
+  if (fresh) return `Nothing to review — ready to learn ${fresh === 1 ? "a new card" : `${fresh} new cards`}`;
   return "All caught up — a practice session now still helps them stick";
 }
 

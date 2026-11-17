@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.641 — 17 November 2026
+
+**The home screen says less when there is nothing to practise, and counts
+cards as cards.**
+
+- **Nothing to practise, in one line.** The heading over it is gone.
+  Someone in no course reads "Join a course to get started!", with the Join
+  a course button as before. Someone whose course has no cards yet, or
+  whose cards are not ready yet, reads "Nothing to practice yet!". Someone
+  whose cards are all in languages they have switched off reads "Nothing
+  to practice in the selected language. Switch on a language to get
+  started." ("languages" when more than one is still on), and the button
+  under it names the language it switches back on: "Switch on French".
+- **Cards, not words.** The line above Start session counted new cards as
+  "new words", though a new card can be a phrase, a sentence or a number.
+  It now says "5 new cards waiting", "ready to learn 5 new cards" and "new
+  cards wait until you've caught up". The note on a card marked high
+  priority says "a card" for the same reason.
+
+The Cards and Progress tabs keep their longer wording for having no cards.
+
 ## 0.640 — 17 November 2026
 
 **Every student now has a private sign-in link, without anyone's key
