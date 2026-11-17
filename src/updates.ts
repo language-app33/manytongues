@@ -86,6 +86,14 @@ let touched = false;
    and a reload loop is the one failure that cannot be got out of from
    inside the app. */
 const GAP_MS = 10000;
+
+/* How long a page counts as still opening: the handover a launch brings on
+   lands within this, and a reload then is part of the launch rather than a
+   flash after it. */
+const LAUNCH_MS = 8000;
+function launching() {
+  return typeof performance === "undefined" || performance.now() < LAUNCH_MS;
+}
 const STAMP = "arabic-trainer:updated-at";
 
 function stampOf(key: string) {
@@ -181,7 +189,13 @@ export function watchForUpdates() {
     if (!wasControlled) return;
     /* Untouched, a reload loses nothing and saves the second refresh.
        Touched, it is said rather than done: see `ready` above. */
-    if (!touched && Date.now() - stampOf(STAMP) >= GAP_MS) {
+    /* Only while the app is still opening (0.643). Later — above all on
+       coming back to it, which is when the check below runs — the reload
+       was a flash in front of somebody who had only just looked, and on an
+       empty home screen, where there is nothing to tap, it happened every
+       time a version had gone out. Then the banner says so instead, and
+       the new version is what the next launch opens with. */
+    if (!touched && launching() && Date.now() - stampOf(STAMP) >= GAP_MS) {
       setStamp(STAMP);
       runBeforeReloads();
       window.location.reload();

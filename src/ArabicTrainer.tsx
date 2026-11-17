@@ -853,6 +853,7 @@ export function mergeMoves(
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
 import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
 import { homeEmptySays, listOf as listOfNames, whyHomeIsEmpty } from "./home-empty.ts";
+import { rememberedTheme, rememberTheme } from "./theme-memory.ts";
 import type { Filler, Mark } from "./grade.ts";
 
 import { applyUpdate, beforeReload, onUpdateReady, updateReady } from "./updates.ts";
@@ -12221,6 +12222,7 @@ export default function ArabicTrainer() {
     document.documentElement.dataset.theme = t;
     document.documentElement.style.colorScheme =
       t === "auto" ? "light dark" : t;
+    rememberTheme(t);
   }, [data.settings.theme]);
 
   /* Anything recorded before clips moved to IndexedDB gets moved across. */
@@ -15405,11 +15407,16 @@ export default function ArabicTrainer() {
   }
 
   if (!ready) {
+    /* In the theme this device last used (0.643). Before, it was always
+       the dark one, so on a light device every launch went light, dark,
+       light — the flash on coming back to the app, whenever the phone had
+       let it go in the background. And the line waits a moment before it
+       shows, so a launch that is quick shows nothing but the page. */
     return (
-      <div className="at">
+      <div className={`at ${rememberedTheme()}`}>
         <div className="at-wrap">
 
-          <p className="at-eyebrow">Loading your items…</p>
+          <p className="at-eyebrow at-latecome">Loading your items…</p>
         </div>
       </div>
     );
@@ -15661,13 +15668,12 @@ export default function ArabicTrainer() {
               place you work in every day. */}
           {/* Not while there is no space to use (0.580, audit finding 15):
               the panel above is the whole page. */}
-          {/* Nor while there is nothing to practise (0.642): Progress and
-              Cards would only say the same "nothing yet" again, and Home on
-              its own is not a choice. The You menu stays. */}
-          {!inExercise && space === "learn" && !stranded && !homeEmpty && (
+          {/* With nothing to practise, Home alone (0.642, 0.643): Progress
+              and Cards would only say the same "nothing yet" again. */}
+          {!inExercise && space === "learn" && !stranded && (
             <Tabs
               dock
-              tabs={[
+              tabs={homeEmpty ? [["home", "Home", "school"]] : [
                 ["home", "Home", "school"],
                 ["progress", "Progress", "verify"],
                 ["items", "Cards", "cards"],
@@ -15786,7 +15792,9 @@ export default function ArabicTrainer() {
                   {/* One line, as the owner worded it (0.641): no heading
                       over it, since the line is the whole of what there is
                       to say. */}
-                  {homeEmptySays(homeEmpty, Math.max(langChoices.length - langsOff.length, 1))}
+                  <span className="at-emptybig">
+                    {homeEmptySays(homeEmpty, Math.max(langChoices.length - langsOff.length, 1))}
+                  </span>
                 </Empty>
               </>
             )}
@@ -17551,7 +17559,10 @@ export default function ArabicTrainer() {
           taken down during an exercise. Two halves: the space's own
           sections, and beside them what is true wherever you are — which
           space and which languages, and you. */}
-      <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
+      {/* Home and You alone are two buttons, not a bar to stretch across
+          the window (0.643). */}
+      <nav className={`at-dock${inExercise ? " off" : ""}${
+        !inExercise && space === "learn" && !stranded && homeEmpty ? " few" : ""}`} aria-label="App">
         {/* One bar: the space's sections, then you. The holders inside it
             draw nothing, so every item is a sibling in the one row and they
             share it evenly. Where you are is at the top of the page (0.601). */}

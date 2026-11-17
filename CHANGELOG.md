@@ -8,6 +8,30 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.643 — 17 November 2026
+
+**No more flash on coming back to the app.**
+
+- **The flash.** When a phone had let the app go in the background,
+  coming back to it opened it afresh, and the moment of loading was always
+  in the dark theme. On a light phone that was light, dark, light. The
+  loading moment now uses the theme the device last used, and its "Loading
+  your items…" line only appears if loading takes longer than a moment.
+- **New versions wait for the next launch.** Coming back to the app after
+  a new version went out used to reload it in front of you if you had not
+  tapped anything yet, which on an empty home screen was every time. Now
+  the "A new version is ready" banner says so, as it already did once you
+  had tapped something, and the next launch opens the new version. A
+  version that arrives while the app is still opening is still taken
+  straight away.
+- **Home stays in the bar.** With nothing to practise the bar holds Home
+  and your menu, side by side in the middle rather than across the whole
+  window. Progress and Cards still come back when there is something to
+  practise.
+- **A larger line.** "Nothing to practice yet!", and the other lines in
+  its place, are now the screen's headline: larger, bolder and in the
+  app's own lettering.
+
 ## 0.642 — 17 November 2026
 
 **A friendlier empty home screen, and directions to install that match
