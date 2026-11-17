@@ -24,7 +24,7 @@
  * by copying something out of the app and reading it.
  */
 
-import type { Card, CardForm, CardState, Flag, Millis } from "./types.ts";
+import type { Card, CardForm, CardState, Feedback, Flag, Millis } from "./types.ts";
 import { formsOf } from "./cards.ts";
 import { cardRef, fillNames } from "./variables.ts";
 
@@ -339,4 +339,73 @@ export function flagsToText(flags: Flag[], opts: FlagExportOptions): string {
      own lines are not blocks. */
   const body = list.map((f, i) => block(f, i + 1, list.length, opts).join("\n"));
   return [head.join("\n"), ...body].join("\n\n") + "\n";
+}
+
+/*
+ * Feedback about the app itself (0.646), as text to paste somewhere.
+ *
+ * Much less than a card report: there is no card and no answer, only what
+ * somebody said, where they were, and when. One block each, with the same
+ * fixed labels down the left as a card report, and the same newest-first
+ * order the Super admin screen shows them in. Every name is passed in, as
+ * above, so the format can be checked by a test.
+ */
+export interface FeedbackNames {
+  /** What feedback of this kind is called ("Something's broken"). */
+  kind: (kind: string) => string;
+  /** The space it came from, by id. */
+  space: (id: string) => string;
+  when: (at: Millis) => string;
+}
+
+export function feedbackToText(items: Feedback[], opts: { at: Millis; release?: string; names: FeedbackNames }): string {
+  const list = items || [];
+  const { names } = opts;
+  const head = [
+    `Feedback about the app — ${list.length} ${list.length === 1 ? "message" : "messages"}, newest first.`,
+    `Exported ${names.when(opts.at)}${opts.release ? ` from app ${opts.release}` : ""}.`,
+  ].join("\n");
+  if (!list.length) return [head, "No feedback has been sent."].join("\n\n") + "\n";
+  const body = list.map((f, i) => {
+    const out = [`#${i + 1} of ${list.length} — ${names.kind(f.kind)}`];
+    const who = f.handleName && f.handle && f.handleName !== f.handle ? `${f.handleName} (@${f.handle})` : f.handleName || f.handle;
+    if (who) out.push(`From:     ${who}`);
+    if (f.role) out.push(`Role:     ${f.role}`);
+    const space = (f.org ? names.space(f.org) : "") || f.spaceName || "";
+    if (space) out.push(`Space:    ${space}${f.org && f.org !== space ? ` (${f.org})` : ""}`);
+    /* Every course they were on there, so "it doesn't show my lessons"
+       can be checked against the right ones. Left out, not "none", on
+       feedback from before this was recorded. */
+    if (f.courses) {
+      out.push(
+        f.courses.length
+          ? `Courses:  ${f.courses.map((c) => `${c.title || c.id}${c.language ? ` [${c.language}]` : ""}${c.roles.length ? ` as ${c.roles.join(" and ")}` : ""} (${c.id})`).join("\n          ")}`
+          : "Courses:  none in this space",
+      );
+    }
+    if (f.screen) out.push(`Screen:   ${f.screen}`);
+    const c = f.context || {};
+    if (c.courseId || c.deckId || c.question) {
+      const where = [
+        c.courseId ? `course ${c.courseTitle || "?"} (${c.courseId})` : "",
+        c.deckId ? `deck ${c.deckTitle || "?"} (${c.deckId})` : "",
+      ].filter(Boolean).join(", ");
+      out.push(`Doing:    practising${c.question ? ` "${c.question}"` : ""}${c.exercise ? ` in ${c.exercise}` : ""}${c.language ? ` [${c.language}]` : ""}`);
+      if (where) out.push(`Source:   ${where}`);
+      if (c.cardId) out.push(`Card:     ${c.cardId}`);
+    }
+    if (c.langsOff) out.push(`Switched off: ${c.langsOff}`);
+    if (f.at) out.push(`Sent:     ${names.when(f.at)}${f.release ? ` (app ${f.release})` : ""}`);
+    const device = [
+      c.screenSize ? `screen ${c.screenSize}` : "",
+      c.installed === "yes" ? "installed app" : c.installed === "no" ? "in the browser" : "",
+      c.online === "no" ? "offline" : "",
+      c.locale ? `language ${c.locale}` : "",
+    ].filter(Boolean).join(", ");
+    if (device || f.device) out.push(`Device:   ${[device, f.device].filter(Boolean).join(" — ")}`);
+    const said = String(f.note || "").trim();
+    out.push(said ? `Said:\n${said.split("\n").map((l) => `  ${l}`).join("\n")}` : "Said:     (nothing written)");
+    return out.join("\n");
+  });
+  return [head, ...body].join("\n\n") + "\n";
 }

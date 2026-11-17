@@ -8,6 +8,39 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.646 — 17 November 2026
+
+**Feedback in Super admin's Reports works like card reports.** The
+Feedback list now has the same tools as Card reports:
+
+- **Copy all** at the top puts every message on the clipboard as plain
+  text — who sent it, from which space and screen, when, and what they
+  said — ready to paste somewhere.
+- **Select** ticks messages, and the bar that rises offers **Copy** and
+  **Clear** for the ticked ones.
+- Each message has its own **Copy** and **Clear** buttons. Clear asks
+  first, as it does for card reports, where Dismiss used to remove a
+  message at once.
+
+Each message now leads with what was said, like a card report, with the
+rest of a long message underneath.
+
+**Feedback says enough to find where a problem came from.** A message
+now records, as things stood when it was sent:
+
+- the sender's part in the space (Learner, Teacher, Space admin, App
+  admin, or App admin trying the space) and the space's name;
+- every course they are on in that space, its language, and whether they
+  teach it, learn in it, or both;
+- if they were practising: the question on screen, its exercise and
+  language, and the course, deck and card it came from;
+- the languages they had switched off;
+- their device: screen size, installed app or browser, offline or not,
+  the device's language, and the browser's own description.
+
+The tile shows their part, their courses and what they were practising;
+Copy gives all of it. Feedback sent before this release has none of it.
+
 ## 0.645 — 17 November 2026
 
 **Join a course from Home without leaving it.** The Join a course button

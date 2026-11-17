@@ -15271,7 +15271,28 @@ export default function ArabicTrainer() {
    */
   function sendFeedback(kind: FeedbackKind, note: string) {
     const where = [SPACE_LABEL[space] || space, session ? "practice session" : tab].filter(Boolean).join(" · ");
-    return API.sendFeedback({ kind, note: note.slice(0, FLAG_NOTE_MAX), screen: where, release: APP_BUILD })
+    /* And what tells where a problem came from (0.646): the question on
+       screen and the course and deck it came from, the languages switched
+       off, and the device. The server adds their role and courses. */
+    const from = session && parentItem ? fromDeck(parentItem) : null;
+    const context: API.FeedbackSent["context"] = {
+      ...(session && parentItem
+        ? {
+            courseId: (from && from.courseId) || "",
+            deckId: (from && from.deckId) || "",
+            cardId: serverCardId(parentItem) || "",
+            exercise: exercise ? String(typeOf(exercise.type)) : "",
+            language: qLang.id,
+            question: String((item && item.ar) || leadOf(parentItem).ar || "").slice(0, 200),
+          }
+        : {}),
+      langsOff: langsOff.slice(),
+      screenSize: typeof window !== "undefined" ? `${window.innerWidth}×${window.innerHeight}` : "",
+      installed: typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(display-mode: standalone)").matches,
+      online: !isOffline(),
+      locale: typeof navigator !== "undefined" ? navigator.language || "" : "",
+    };
+    return API.sendFeedback({ kind, note: note.slice(0, FLAG_NOTE_MAX), screen: where, release: APP_BUILD, context })
       .then(() => {
         feedbackReach.ok();
         flash("Thank you for the feedback 🫶", "good");

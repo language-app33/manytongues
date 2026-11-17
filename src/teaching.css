@@ -312,6 +312,8 @@
 .at-flagreport > * + * { margin-top:6px; }
 .at-flagreport-q { margin:0; font-size:calc(20px * var(--sscale, 1)); font-weight:600;
   line-height:calc(1.5 * var(--sleading, 1)); overflow-wrap:anywhere; }
+/* Who sent feedback and what they were doing (0.646): small, under what they said. */
+.at-flagreport-facts { margin:0; font-size:13px; color: var(--text-soft); overflow-wrap:anywhere; }
 .at-flagreport-en { margin:0; font-size:14px; color: var(--text-soft); overflow-wrap:anywhere; }
 /* Which question it was, and what has become of the card since — the two
    small facts, on one line, sharing the width rather than stacking. The
