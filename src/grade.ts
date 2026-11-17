@@ -32,7 +32,8 @@
 
 import type { Clock, ExerciseState, Form, Item } from "./types.ts";
 import { PASSES_TO_LEARN, cameRound, cleared, freshState, missedTwice, reschedule, topLevelOf } from "./scheduler.ts";
-import { levelOf } from "./languages.ts";
+import { levelOf, typeOf } from "./languages.ts";
+import { WORD_SKILL_MAP } from "./word-skills.ts";
 import { formsOf, leadOf } from "./cards.ts";
 import { linesOf } from "./dialogs.ts";
 import { noteMet } from "./variables.ts";
@@ -66,6 +67,25 @@ export interface Answered {
   skipped?: boolean;
   /** Whether the nudge was open when the answer was sent. */
   hintAtAnswer?: boolean;
+  /**
+   * A spelling near miss on writing a word from its meaning, which leaves
+   * the run of right answers as it was (0.628) — see keepsRun.
+   */
+  keepsRun?: boolean;
+}
+
+/*
+ * Writing a word from its meaning — from its English, its picture, a
+ * phrase or its figures (the "write what you mean" exercises that make the
+ * answer: see src/word-skills.ts). A near miss in spelling there is a word
+ * known and mistyped, so it neither counts towards being right twice
+ * running nor breaks it (0.628, F1 of the plan).
+ */
+const KEEPS_RUN_REASONS = ["near", "harakat"];
+export function keepsRun(type: string, checked: Checked | null | undefined): boolean {
+  const m = WORD_SKILL_MAP[type];
+  return !!m && m.skill === "WM" && m.step === "produce" && !!checked && !checked.ok &&
+    KEEPS_RUN_REASONS.includes(String(checked.reason || ""));
 }
 
 /** What the marking of one answer comes to. */
@@ -314,7 +334,7 @@ export function markedState(
   if (checked && !checked.ok && NEARLY.includes(String(checked.reason || ""))) {
     s.near = (s.near || 0) + 1;
   }
-  s.hist = (s.hist || []).concat([mark.correct ? 1 : 0]).slice(-6);
+  if (!how.keepsRun) s.hist = (s.hist || []).concat([mark.correct ? 1 : 0]).slice(-6);
   /*
    * And the pass, where this was the top of a cleared card's ladder.
    *
@@ -455,7 +475,13 @@ export function gradeInto(items: Item[], marks: Mark[], asking: Asking): Item[] 
     out[idx] = withMark(
       item,
       mark.subId,
-      markedState(before, mark, asking.how, asking.clock, counting),
+      markedState(
+        before,
+        mark,
+        { ...asking.how, keepsRun: keepsRun(typeOf(key), asking.how && asking.how.checked) },
+        asking.clock,
+        counting,
+      ),
       { ...asking, type: key },
       mark.filled,
     );

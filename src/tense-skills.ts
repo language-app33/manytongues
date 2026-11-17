@@ -37,7 +37,7 @@
 
 import type { ExerciseState, Form, Lang, VerbSpec } from "./types.ts";
 import { formsOf, leadOf, subFormsOf } from "./cards.ts";
-import { levelOf, typeOf, verbOf } from "./languages.ts";
+import { levelOf, typeOf, TYPES, verbOf } from "./languages.ts";
 import { solid } from "./scheduler.ts";
 import { isCell, ownerOf, rowIdsOf, rowOf, tensesOf } from "./verbs.ts";
 import { sameLetters, tenseOf } from "./verb-drills.ts";
@@ -148,11 +148,11 @@ export function withTenses<T extends Record<string, any>>(card: T, lang: Lang | 
     const at = (forms || formsOf(card)).findIndex((f) => f.id === id);
     const had = at >= 0 ? (forms || formsOf(card))[at] : null;
     const own: Record<string, ExerciseState> = (had && had.s) || {};
-    const answered = Object.values(own).some((s) => !isFresh(s));
+    const answered = Object.entries(own).some(([k, s]) => TYPES.includes(typeOf(k)) && !isFresh(s));
     const seeded: Record<string, ExerciseState> = {};
     if (!answered) {
       const keys = new Set<string>();
-      for (const p of tense.places) for (const k of Object.keys(p.form.s || {})) if (typeOf(k) === k) keys.add(k);
+      for (const p of tense.places) for (const k of Object.keys(p.form.s || {})) if (typeOf(k) === k && TYPES.includes(k)) keys.add(k);
       for (const k of keys) {
         const mid = middleState(tense.places.map((p) => (p.form.s || {})[k]));
         if (mid) seeded[k] = mid;
@@ -201,7 +201,7 @@ export const shakyOn = (cell: Form | null | undefined, key: string): boolean =>
  */
 export function shaky(cell: Form | null | undefined): boolean {
   if (!cell) return false;
-  return Object.entries(cell.s || {}).some(([k, s]) => typeOf(k) !== PATTERN && weaknessOf(s) > 0);
+  return Object.entries(cell.s || {}).some(([k, s]) => TYPES.includes(typeOf(k)) && typeOf(k) !== PATTERN && weaknessOf(s) > 0);
 }
 
 /** The persons of a tense that keep going wrong, in the language's order. */
@@ -217,6 +217,7 @@ export function rightAt(cell: Form | null | undefined, level: number): boolean {
   if (!cell) return false;
   return Object.entries(cell.s || {}).some(
     ([k, s]) =>
+      TYPES.includes(typeOf(k)) &&
       typeOf(k) !== PATTERN &&
       levelOf(k) === level &&
       !!s &&

@@ -21,6 +21,8 @@ import { askLine, A_SENTENCE, blanksOn, cellTitle, CLIP_KINDS, combosOf, dimsSai
   rowsLine, tablesOn, tableTitle, unnamedOn } from "./card-facts.ts";
 import { colOf, foldJoined, NO_PARTNER, personsFor, personsOf, rowOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { isOffline, watchNet } from "./net.ts";
+import { dismissReach, holdReach, isUnreachable, reachState, releaseReach, retryReach, showReach, watchReach } from "./reach.ts";
+import type { ReachState } from "./reach.ts";
 import { isTenseForm, withTenses } from "./tense-skills.ts";
 /* A teacher's numbers and their clock, which arrive with the material and
    become cards on the way in. Reached through the registry, never by
@@ -197,6 +199,9 @@ const ICONS: Record<string, string> = {
     "M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z",
   /* The number sign, for the screen a language's numbers are written on. */
   hash: "M20 10V8h-4V4h-2v4h-4V4H8v4H4v2h4v4H4v2h4v4h2v-4h4v4h2v-4h4v-2h-4v-4h4zm-6 4h-4v-4h4v4z",
+  /* A cloud struck through: the server out of reach (0.636). */
+  "cloud-off":
+    "M19.35 10.04C18.67 6.59 15.64 4 12 4c-1.48 0-2.85.43-4.01 1.17l1.46 1.46C10.21 6.23 11.08 6 12 6c3.04 0 5.5 2.46 5.5 5.5v.5H19c1.66 0 3 1.34 3 3 0 1.13-.64 2.11-1.56 2.62l1.45 1.45C23.16 18.16 24 16.68 24 15c0-2.64-2.05-4.78-4.65-4.96zM3 5.27l2.75 2.74C2.56 8.15 0 10.77 0 14c0 3.31 2.69 6 6 6h11.73l2 2L21 20.73 4.27 4 3 5.27zM7.73 10l8 8H6c-2.21 0-4-1.79-4-4s1.79-4 4-4h1.73z",
 };
 
 export function Icon({ name, size = 20 }: { name: string; size?: number }) {
@@ -1472,6 +1477,14 @@ export function clipsOf(form?: { clips?: string[]; slowClips?: string[] }) {
     }
   }
   return out;
+}
+
+/* The same, with who is speaking on each where the teacher said (0.629):
+   "Recorded by" and the name, beside the speed. For the screens that list
+   a form's recordings; a question's player reads `voices` itself. */
+export function voicedClips(form?: { clips?: string[]; slowClips?: string[]; voices?: Record<string, string> }) {
+  const voices = (form && form.voices) || {};
+  return clipsOf(form).map((c) => (voices[c.id] ? { ...c, label: `${c.label} · Recorded by ${voices[c.id]}` } : c));
 }
 
 /* Whether a form has any recording at all, whichever speed it is at. */
@@ -2918,7 +2931,7 @@ function ReadSaid({ form, lang }: { form: Record<string, any>; lang: Lang }) {
 
 /** How a form sounds, at each speed it was recorded at. */
 function ReadSound({ form }: { form: Record<string, any> }) {
-  const clips = clipsOf(form);
+  const clips = voicedClips(form);
   if (!clips.length) return null;
   return (
     <>
@@ -3398,7 +3411,7 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
                   </p>
                   {line.en ? <p className="at-scenemeaning"><Written text={asMeaning(line.en)} /></p> : null}
                   {line.lat ? <p className="at-scenemeaning"><Written text={line.lat} /></p> : null}
-                  {clipsOf(line).length ? <ClipList clips={clipsOf(line)} /> : null}
+                  {clipsOf(line).length ? <ClipList clips={voicedClips(line)} /> : null}
                   {teacher ? <ReadAsked form={line as Record<string, any>} /> : null}
                   <ReadTaught
                     of={line as Record<string, any>}
@@ -3934,6 +3947,7 @@ export function useRun({ refresh, snackErrors = false, quietDone = false, before
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const snack = useSnackbar();
+  const { caught, ok } = useReach();
   /* Said at the foot of the app however deep the screen it was started
      from — see WorkingNote. */
   useWorking(busy);
@@ -3943,8 +3957,13 @@ export function useRun({ refresh, snackErrors = false, quietDone = false, before
     const o = opts.current;
     setBusy(true);
     if (o.before) o.before();
+    /* Whether the work itself went through. If only the reading-again
+       after it failed, Retry must read again, not do the work twice. */
+    let did = false;
     try {
       const out = await fn();
+      did = true;
+      ok();
       if (o.refresh) await o.refresh();
       setError("");
       const warn = o.instead ? o.instead() : null;
@@ -3952,6 +3971,23 @@ export function useRun({ refresh, snackErrors = false, quietDone = false, before
       else if (done) snack(typeof done === "function" ? done(out) : done, o.quietDone ? undefined : "good");
       return out;
     } catch (e) {
+      /* Out of reach: said by the snackbar, whose Retry does this again
+         (0.636), rather than under the screen. */
+      const again = did
+        ? async () => {
+            const r = opts.current.refresh;
+            try {
+              if (r) await r();
+              ok();
+            } catch (e2) {
+              caught(e2, again);
+            }
+          }
+        : () => runRef.current(fn, done);
+      if (caught(e, again)) {
+        setError("");
+        return undefined;
+      }
       const said = API.explain(e);
       setError(said);
       if (o.snackErrors) snack(said, "warn");
@@ -3959,7 +3995,9 @@ export function useRun({ refresh, snackErrors = false, quietDone = false, before
     } finally {
       setBusy(false);
     }
-  }, [snack]);
+  }, [snack, caught, ok]);
+  const runRef = useRef(run);
+  runRef.current = run;
   const clearError = useCallback(() => setError(""), []);
   return { run, busy, setBusy, error, setError, clearError };
 }
@@ -3987,6 +4025,140 @@ export function usePicture(hash: string) {
 
 export function useSnackbar() {
   return React.useContext(SnackbarContext) || noSnackbar;
+}
+
+/* ==================================================================
+   Can't reach the server (0.636)
+   ==================================================================
+
+   One large snackbar, with Retry, wherever the server could not be
+   reached — see reach.ts for why it is one and not thirty. Unlike the
+   snackbar above it asks for something, so it does not go on a timer: it
+   stays until Retry works, the connection comes back and that works, or
+   it is closed.
+
+   A screen takes part through useReach:
+
+     const reach = useReach();
+     try { await API.thing(); reach.ok(); }
+     catch (e) { if (!reach.caught(e, () => doThing())) setError(API.explain(e)); }
+
+   `caught` answers whether the snackbar took the failure. If it did, the
+   screen says nothing of its own beyond, for a list that could not load,
+   a short line where the list would be. The failure is held while the
+   screen is open and let go when it closes, so Retry never resends a form
+   nobody can see any more.
+*/
+
+/**
+ * Hold a failure while this is mounted and `retry` is given; let it go
+ * when either stops. For a failure found in one place and shown in
+ * another: the trainer finds that the courses could not load, and the
+ * Courses screen, while it is open, is what holds it.
+ */
+export function useReachHold(retry: (() => unknown) | null | undefined, { detail, auto = true }: { detail?: string; auto?: boolean } = {}) {
+  const latest = useRef(retry);
+  latest.current = retry;
+  const said = useRef({ detail, auto });
+  said.current = { detail, auto };
+  const on = !!retry;
+  /* A layout effect, so a retry that worked lets go in the same commit
+     that shows it worked — before "Still can't reach the server" could be
+     said about it. */
+  useLayoutEffect(() => {
+    if (!on) return undefined;
+    const id = holdReach({
+      retry: () => (latest.current ? latest.current() : undefined),
+      detail: said.current.detail,
+      auto: said.current.auto,
+    });
+    return () => releaseReach(id);
+  }, [on]);
+}
+
+export function useReach({ detail, auto = true }: { detail?: string; auto?: boolean } = {}) {
+  /* How many times it has failed in a row; nought is not waiting. Counted
+     so that pressing the same button into the same wall shows the
+     snackbar again after it was closed. */
+  const [failed, setFailed] = useState(0);
+  const retryRef = useRef<() => unknown>(() => {});
+  const on = failed > 0;
+  /* Stable, so holding it does not start again on every render. */
+  const [retry] = useState(() => () => retryRef.current());
+  useReachHold(on ? retry : null, { detail, auto });
+  useEffect(() => {
+    if (failed > 1) showReach();
+  }, [failed]);
+  const caught = useCallback((e: unknown, again: () => unknown): boolean => {
+    if (!isUnreachable(e)) {
+      setFailed(0);
+      return false;
+    }
+    retryRef.current = again;
+    setFailed((n) => n + 1);
+    return true;
+  }, []);
+  const ok = useCallback(() => setFailed(0), []);
+  /* The same object every render, so a callback that names it in its
+     dependencies is not made again each time. */
+  return useMemo(() => ({ caught, ok }), [caught, ok]);
+}
+
+/** The bar itself, drawn from what it is told: the gallery shows it still. */
+export function ReachBar({ again = false, retrying = false, detail = "", onRetry, onDismiss, still = false }: {
+  again?: boolean;
+  retrying?: boolean;
+  detail?: string;
+  onRetry?: () => void;
+  onDismiss?: () => void;
+  /** In the page rather than floating over it: the gallery. */
+  still?: boolean;
+}) {
+  return (
+    <div className={`at-reachbar${still ? " still" : ""}`} role="alert">
+      <Icon name="cloud-off" size={22} />
+      <span className="msg">
+        <strong>{again ? "Still can't reach the server" : "Can't reach the server"}</strong>
+        {detail ? <span className="detail">{detail}</span> : null}
+      </span>
+      <button className="at-reachretry" onClick={onRetry} disabled={retrying}>
+        {retrying ? "Retrying…" : "Retry"}
+      </button>
+      {onDismiss && (
+        <button className="at-snackx" onClick={onDismiss} aria-label="Dismiss">
+          <Icon name="close" size={16} />
+        </button>
+      )}
+    </div>
+  );
+}
+
+/*
+ * The one place the bar is drawn: beside the app, in main.tsx, so it is the
+ * same bar on the sign-in page as everywhere else. Put inside the app's
+ * root for its theme, and found again each time it changes, because the
+ * sign-in page and the app are different roots.
+ */
+export function ReachSnackbar() {
+  const [s, setS] = useState<ReachState>(reachState);
+  useEffect(() => watchReach(setS), []);
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    document.documentElement.classList.toggle("at-reaching", s.shown);
+    return () => document.documentElement.classList.remove("at-reaching");
+  }, [s.shown]);
+  if (!s.shown) return null;
+  const view = (
+    <ReachBar
+      again={s.again}
+      retrying={s.retrying}
+      detail={s.detail}
+      onRetry={() => void retryReach()}
+      onDismiss={dismissReach}
+    />
+  );
+  if (typeof document === "undefined") return view;
+  return createPortal(view, document.querySelector(".at") || document.body);
 }
 
 /* How many screens are open. A screen opened from inside a space is nested in
@@ -5124,6 +5296,8 @@ export function cardToItem(card: Card, deckTitle: string, courseId: string, deck
        two is right half the time. */
     lang: card.lang,
     recs: recsOf(f),
+    /* Who is speaking on each recording, where the teacher said (0.629). */
+    ...(f.voices && typeof f.voices === "object" ? { voices: { ...f.voices } } : null),
     /* Its pictures, by hash — carried so that an exercise can show them.
        Absent on a form with none. */
     ...(Array.isArray(f.images) && f.images.length ? { images: f.images.slice() } : null),
@@ -5500,7 +5674,7 @@ export async function pullCourses(
        arrive the way every other card does — see fileIntoDecks. A deck in
        another language holds none of this system's. */
     const holding = decksForSystem(decks, set.numbers.languageId, set.numbers.id)
-      .map((d: Deck) => ({ title: String(d.title || ""), parts: d.parts || [] }));
+      .map((d: Deck) => ({ id: d.id, title: String(d.title || ""), parts: d.parts || [] }));
     const filed = fileIntoDecks(handed, { composer, sys: set.numbers, timeComposer, timeSys: set.times }, holding);
     for (const item of filed) {
       if (at.has(item.id)) continue;
@@ -5576,7 +5750,53 @@ export function pairSystems(raw: unknown[]): SystemSet[] {
  * match by name, the new form finds its place taken, and starts fresh —
  * which is what it is.
  */
-function foldForms<T extends Form>(had: T[], fresh: T[]): T[] {
+/*
+ * And what the teacher's fresh copy no longer has.
+ *
+ * A form or a conversation line the teacher removed used to be dropped
+ * here with whatever the learner had earned on it, and the loss spread
+ * through sync to every device they own (0.624). The fold now says which
+ * of the learner's forms found no place in the fresh copy and carry work,
+ * so foldCourses can set that work aside in the drawer a whole card's
+ * progress goes into when the card leaves a course — and, where a form of
+ * that name comes back with nothing of its own, hand it back.
+ */
+type FormsAside = Parked["forms"];
+
+/* Whether a schedule says anything — the same reading the drawer and the
+   wire use. */
+const hasWork = (f: Form) => Object.keys(compactStates(f.s)).length > 0;
+
+/* Whether a form or a line carries a name of its own — a teacher's name
+   after the tilde, a tense's, or a number face's — rather than its place
+   in the list. */
+const named = (f: Form | null | undefined) => !!f && /-[flt]~/.test(String(f.id || ""));
+
+/* Two sets of schedules for one form, each exercise from whichever side
+   answered it last — the rule sync merges by. */
+function newerStates(a: Record<string, ExerciseState> = {}, b: Record<string, ExerciseState> = {}) {
+  const out: Record<string, ExerciseState> = { ...a };
+  for (const [t, st] of Object.entries(b)) {
+    if (!out[t] || (st && (st.updated || 0) > (out[t].updated || 0))) out[t] = st;
+  }
+  return out;
+}
+
+/* One form's entry in the drawer, from what it carries. */
+const asideOf = (f: Form): FormsAside[string] => {
+  const s = compactStates(f.s);
+  return { ...(Object.keys(s).length ? { s } : null), ...(f.met ? { met: f.met } : null) };
+};
+
+function foldForms<T extends Form>(
+  had: T[],
+  fresh: T[],
+  /* What the drawer already holds for this card's forms, by name. */
+  drawer: FormsAside = {},
+  /* When the card was last sent back to the beginning: nothing answered
+     before it comes back out of the drawer. */
+  reset = 0,
+): { forms: T[]; aside: FormsAside } {
   const byId = new Map(had.filter((f) => f && f.id).map((f) => [f.id, f]));
   const taken: Set<number> = new Set();
   const matched: (T | null)[] = fresh.map((f) => {
@@ -5586,12 +5806,48 @@ function foldForms<T extends Form>(had: T[], fresh: T[]): T[] {
     if (at >= 0) taken.add(at);
     return mate;
   });
-  return fresh.map((one, i) => {
+  const used: Set<T> = new Set();
+  const forms = fresh.map((one, i) => {
+    const folded = foldOne(one, i);
+    return restored(folded);
+  });
+  /* The learner's forms that found no place, with work on them. A form
+     with no name cannot be found again, so it cannot be set aside. */
+  const aside: FormsAside = {};
+  for (const f of had) {
+    if (!f || !f.id || used.has(f) || (!hasWork(f) && !f.met)) continue;
+    aside[f.id] = asideOf(f);
+  }
+  return { forms, aside };
+
+  /* A form with nothing of its own, given back what the drawer held for
+     it — under anything it does have, never over it. */
+  function restored(f: T): T {
+    const saved = f && f.id ? drawer[f.id] : null;
+    if (!saved || hasWork(f)) return f;
+    const s: Record<string, ExerciseState> = {};
+    for (const [t, st] of Object.entries(saved.s || {})) {
+      if (!reset || (st && (st.updated || 0) >= reset)) s[t] = st;
+    }
+    if (!Object.keys(s).length && !saved.met) return f;
+    const met = reset ? f.met : mergeMet(f.met, saved.met);
+    return { ...f, s: { ...(f.s || {}), ...s }, ...(met ? { met } : null) } as T;
+  }
+
+  function foldOne(one: T, i: number): T {
     /* What a card no longer made handed on to this one — see
        handOnCounting. Under the learner's own schedules, never over one,
        and never stored itself. */
     const { carried, ...f } = one;
-    const mate = matched[i] || (taken.has(i) ? null : had[i]);
+    /* By place only where one of the two has no name of its own to be
+       matched by (0.625): the legacy case the fallback was written for,
+       including a teacher's next save naming every form of an old card at
+       once. Two named forms that did not match by name are two different
+       forms — one removed, one added — and the new one starts fresh while
+       the old one's work goes into the drawer. */
+    const placed = taken.has(i) || !had[i] || (named(had[i]) && named(one)) ? null : had[i];
+    const mate = matched[i] || placed;
+    if (mate) used.add(mate);
     if (!mate) return (carried ? { ...f, s: { ...carried, ...(f.s || {}) } } : f) as T;
     /*
      * The schedule, and the other thing a form carries that the learner
@@ -5608,8 +5864,29 @@ function foldForms<T extends Form>(had: T[], fresh: T[]): T[] {
     const met = mergeMet(f.met, mate.met);
     const s = mate.s || f.s;
     return { ...f, s: carried ? { ...carried, ...(s || {}) } : s, ...(met ? { met } : null) } as T;
-  });
+  }
 }
+
+/* Two drawers' worth of forms for one card, put together: each form's
+   schedules by the newer answer, its record of words met by the larger. */
+function joinAside(a: FormsAside = {}, b: FormsAside = {}): FormsAside {
+  const out: FormsAside = { ...a };
+  for (const [id, saved] of Object.entries(b)) {
+    const had = out[id];
+    if (!had) {
+      out[id] = saved;
+      continue;
+    }
+    const s = newerStates(had.s, saved.s);
+    const met = mergeMet(had.met, saved.met);
+    out[id] = { ...(Object.keys(s).length ? { s } : null), ...(met ? { met } : null) };
+  }
+  return out;
+}
+
+/* A drawer's forms without the ones named here. */
+const without = (from: FormsAside = {}, ids: Set<string>): FormsAside =>
+  Object.fromEntries(Object.entries(from).filter(([id]) => !ids.has(id)));
 
 /**
  * What a card's forms have earned, as the drawer keeps it.
@@ -5740,6 +6017,9 @@ const unjoined = (item: Item): Item =>
 export function foldCourses(items: Item[], incoming: Item[], parked: Record<string, Parked> = {}) {
   const byId = new Map(items.map((i) => [i.id, i]));
   const kept: Item[] = [];
+  /* What each card still here had on forms and lines the teacher's copy no
+     longer has — see foldForms. */
+  const asideBy: Map<string, { forms: FormsAside; lines: FormsAside }> = new Map();
   for (const joined of incoming) {
     /* With its tenses, where they are skills, so the fold below finds them
        by name the way it finds every other form — see tense-skills.ts. */
@@ -5766,6 +6046,11 @@ export function foldCourses(items: Item[], incoming: Item[], parked: Record<stri
          never-answered on the next refresh. They fold by the same rule the
          forms do; a line has carried a name of its own since it was
          written. */
+      const drawer = parked[fresh.id];
+      const reset = Number(existing.reset) || 0;
+      const foldedForms = foldForms(formsOf(existing), formsOf(fresh), drawer && drawer.forms, reset);
+      const foldedLines = foldForms(existing.lines || [], fresh.lines || [], drawer && drawer.lines, reset);
+      asideBy.set(fresh.id, { forms: foldedForms.aside, lines: foldedLines.aside });
       kept.push(withTenses({
         ...fresh,
         /* Whatever the learner last said about wanting this card next,
@@ -5783,8 +6068,8 @@ export function foldCourses(items: Item[], incoming: Item[], parked: Record<stri
             }
           : null),
         ...(existing.reset ? { reset: existing.reset } : null),
-        forms: foldForms(formsOf(existing), formsOf(fresh)),
-        ...(fresh.lines ? { lines: foldForms(existing.lines || [], fresh.lines) } : null),
+        forms: foldedForms.forms,
+        ...(fresh.lines ? { lines: foldedLines.forms } : null),
       }, lang));
     } else {
       /* A card the device has never held — or one that went away and has
@@ -5828,11 +6113,44 @@ export function foldCourses(items: Item[], incoming: Item[], parked: Record<stri
       saved.priorityAt ||
       saved.priority
     ) {
-      nextParked[it.id] = saved;
+      /* Beside whatever was already set aside for forms the card had lost
+         before it left (0.624), which the card itself no longer carries. */
+      const prev = parked[it.id];
+      const lines = joinAside(prev && prev.lines, saved.lines);
+      nextParked[it.id] = {
+        ...saved,
+        forms: joinAside(prev && prev.forms, saved.forms),
+        ...(Object.keys(lines).length ? { lines } : null),
+      };
     }
   }
-  /* A card that is here again has nothing left to keep aside. */
-  for (const id of incomingIds) delete nextParked[id];
+  /*
+   * A card that is here again has nothing left to keep aside — except for
+   * forms and lines it does not have (0.624).
+   *
+   * What the drawer held for a form the card carries has been handed back
+   * by now, or was not needed because the form had work of its own; either
+   * way it is done with. What it held for a form the card does not carry
+   * stays until that form comes back or the entry ages out, and what this
+   * refresh found on forms the teacher removed joins it, stamped now.
+   */
+  for (const it of kept) {
+    const prev = parked[it.id];
+    const here = new Set([...formsOf(it), ...(it.lines || [])].map((f) => f && f.id).filter(Boolean) as string[]);
+    const found = asideBy.get(it.id);
+    const forms = joinAside(without(prev && prev.forms, here), found && found.forms);
+    const lines = joinAside(without(prev && prev.lines, here), found && found.lines);
+    if (!Object.keys(forms).length && !Object.keys(lines).length) {
+      delete nextParked[it.id];
+      continue;
+    }
+    const fresher = !!found && (Object.keys(found.forms).length > 0 || Object.keys(found.lines).length > 0);
+    nextParked[it.id] = {
+      at: fresher || !prev ? Date.now() : prev.at,
+      forms,
+      ...(Object.keys(lines).length ? { lines } : null),
+    };
+  }
 
   return {
     parked: nextParked,

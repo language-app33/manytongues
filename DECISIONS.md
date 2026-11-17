@@ -8112,3 +8112,658 @@ list `faceAsk` draws from, and every noun the system counts). Text rather
 than structure because the export is plain text and nothing else reads
 them. The server stores each only when sent, at most 400 characters, so an
 older build's report reads exactly as before.
+
+---
+
+## Units: a course's path
+
+**11 November 2026** · `src/path.ts`, `src/types.ts` (0.613 onward)
+
+A course gains a second kind of element beside decks: the unit, one step
+of a path a class walks in order. The owner's plan settled the rules
+(R1–R37, A1–A7); this entry is why they are shaped the way they are.
+
+**A unit is a deck with a flag, not a new record.** A unit holds cards
+exactly as a deck does, joins courses as a deck does, and is sent to
+students as a deck is. Making it a deck with `unit: true` meant every piece
+of that — saving cards into it, the number parts it holds, backup and
+restore, the student's download — already worked. What is new lives on the
+course (`path`, `pathLive`, `opened`), because a unit can be in several
+courses and each gives it its own place, publishes it separately and opens
+it early separately.
+
+**Progress belongs to the card, so the path stores almost nothing.**
+Whether a unit is finished is read off its cards each time: every word
+and sentence card cleared. A card cleared through another deck or course
+counts. The one thing remembered is which units were ever *reached*,
+because "nobody is ever sent back" (R25) cannot be read off the cards: a
+card that slips after its unit was finished would otherwise lock every
+unit after it again.
+
+**Held means held everywhere it lives, or not at all.** A never-met card
+is kept out of sessions only while every deck it is in is a unit the
+learner has not reached (`cardHeld`). A teacher who puts a word in unit 5
+and in an ordinary deck has said it may come now, and it does. This is
+also why the path never filters which words fill a blank: a word stands in
+a blank once the learner has cleared it, wherever it was cleared, which
+already gives "cards before sentences" without a second rule.
+
+**Named apart from `Unit`.** The trainer already calls one askable form of
+a card a unit (`unitsOf`, `quietUnits`). Renaming either would touch
+hundreds of lines for nothing; the new thing is a *path unit* in code.
+
+**0.614: the checklist counts what the path has taught, and only what a
+teacher approved.** A blank needs five different cards (R10), and a card
+counts only where a teacher approved a sentence it fills (R11) and it
+comes from this unit, an earlier published unit, or is never asked on its
+own (R12). Counting by passing review alone would have counted every card
+with no review at all, which is the card nobody has read. The pool handed
+to `sentencesOf` is the counting cards themselves, so every sentence
+counted is made only of words allowed to count; the approval keys are the
+ordinary review fingerprints, so nothing about review changes. This is a
+rule for the checklist only (R13): a device fills blanks exactly as before,
+so a word from a later unit already cleared elsewhere can still appear.
+The server judges published cards, as students get them, and may be
+stricter than the teacher's screen; the screen says so when it is.
+
+A unit is always on the path of every course that holds it (A1), so
+`attach-deck` puts it at the end as a draft there and there is no separate
+"unpublish" (A4): a unit is withdrawn by removing it, as a deck is.
+
+**0.615: one setting merged by union, on the device and the server.**
+Settings sync whole and last-writer-wins, which is right for a theme and
+wrong for the units a learner has reached: a phone that last synced
+before unit 3 opened would hand back a list without it, and if unit 2 had
+since slipped below finished, unit 3 would lock again — the one thing R25
+forbids. So `pathReached` alone is joined by `mergeReached` wherever
+settings meet: in `mergeData`, which both the app and a restore use, and
+in the sync endpoint before it writes, because an older build that does
+not know the field uploads its own settings whole. That costs the server
+one more read of the document per upload; reading it against the ETag
+the client sent keeps it exact, since any other version makes the write
+a conflict anyway. Writing a newly reached unit does not stamp
+`settingsUpdated`: the union carries it, and a stamp would hand this
+device's other choices to the learner's other devices.
+
+**What is held, and where.** Only never-met cards, and only at the places
+a card is first met: the session's pool, the home count (which must equal
+it), and a grid's spare tiles, since a spare tile is marked like any
+other. Every kind of session is covered by the first, saved sessions,
+prep and Ultimate included (A5). Blanks are not filtered: a word fills a
+blank only once cleared, wherever it was cleared (R13).
+
+**0.616: the teacher's screens reuse the deck's.** A unit's page is the
+deck page with a heading, a checklist and a Publish button, because a
+unit is a deck underneath (R1) and every way of adding, editing and
+reviewing cards should be the one teachers already know. The checklist is
+judged in the course the page was opened from, since a unit can be ready
+in one course and not in another. The screen reads every card, drafts
+included, and says how many drafts there are; the server reads published
+cards only and is the one that decides, and when it refuses, its own list
+replaces the screen's. "Needs attention" is the same checklist on a unit
+already published (R17): it never takes the unit away from students. The
+advice on forms reads only the grammar the language declares, and is
+advice only (A6), so a language without gender or number shows nothing.
+
+**0.617: what a learner is shown is counted the way the path counts.**
+The stages on Home and a unit's page are worked out by one function
+(`unitStages`) that reads the same items as "finished" (`unitItems`), the
+same cleared test, and leaves out what can never be asked and the text or
+conversation, so Words and Sentences both full is exactly a finished unit.
+A unit's items are never found through its title, which two decks can
+share, nor through a card's `source.deckId`, which names one deck of
+several. The fifth state — open, and not the current unit, because an
+earlier unit slipped after this one opened — is shown as "Open"; the plan
+named four, and none of them was true of it.
+
+**0.618: marking a unit cleared reuses "This was too easy".** No new
+write: `liftLevel` from a top-level key, as `creditNumbers` does it, which
+already means "up every level, no passes, a review a day out". So marking
+never makes a card learnt (R33), never touches one already cleared or
+learnt (A7), and a card missed twice afterwards drops back by the rule
+every card follows. Only a unit open for the learner can be marked (R34),
+because marking is a way past what the learner has in front of them, not
+a way to jump the path; there is no undo (R36) because the cards' own
+states are what was written, and there is nothing else to take back.
+
+One case the plan said to stop at, and the owner has not yet answered: a
+number part's questions in figures open only once the ten figures are
+cleared, and marking clears the figures in the same write that lifts the
+part. So the part reads below cleared afterwards, with new questions, and
+the unit is not finished until they are answered or it is marked again.
+Left as built rather than adding a second way to clear a part.
+
+**What was weighed and left out of the first version.** A class view of
+who is on which unit, a goal line per unit, turning a deck into a unit,
+a teacher's switch for "Mark as cleared", undoing a marking, marking a
+locked unit or several at once, units in a learner's own space, any
+change to how word sets are written or to the stretch rule, any filter on
+what fills a blank, any rule refusing to put a card somewhere because of
+where else it is, any new exercise, level or scheduling rule, forcing new
+words into unit order among the units already open, and scoring the
+variety of forms. Each would change what the owner decided above; none
+was needed for the path to work. Which of them are wanted later is the
+owner's to say, and they go to BACKLOG.md when they do.
+
+**0.620: one press clears a number part whole.** The owner answered the
+question above with 1b: marking a unit that holds numbers also clears
+the part's questions in figures, so the unit is finished in one press.
+Still `liftLevel` and nothing else: `clearPathUnit` lifts once, reads the
+ten figures as cleared the way the app will read them from the saved
+cards, and lifts the part's skill again against the ladder that gives
+it, putting the figures index back as it was. No second way to clear a
+part was added; a second press writes nothing.
+
+
+## A stretch of the number line opens on six in ten of its words (0.622)
+
+**13 November 2026** · `STRETCH_SHARE` in `src/ArabicTrainer.tsx`,
+`tests/numbers-progress.test.mjs`
+
+The owner lowered the word route through a stretch from 80% to 60%,
+rounded up as before: six of ten for 0 to 9 and for 10 to 19, two of
+three, both of two. Seen on a learner with seven of 10 to 19's words
+learnt and three climbing, and twenty cards waiting on one more.
+
+The sentence gate (`sentenceWaits`) had read the same constant since it
+was written. It keeps 80% under a constant of its own, `SENTENCE_SHARE`,
+because the owner asked about stretches and a sentence is read whole.
+
+Safe for the reason 0.416 gave: each number is still asked only once
+every word in it is cleared (askingsKnown). What opens sooner is the
+words of the stretch above, which enter through the session mix's
+learning share and the limit of 20 in learning like any new card.
+
+## A session tops up with the card furthest through its wait (0.623)
+
+**13 November 2026** · `mixSession` in `src/session-mix.ts`,
+`tests/session-mix.test.mjs`
+
+When the shares left places empty, cards not yet due (`ahead`) filled them
+nearest due first. An answer before a card is due moves nothing, so a
+learner who sat several times a day was topped up with the same handful
+every sitting, as long as they were out of the last three hours' window.
+`ahead` is now sorted by how far each card is through its wait, (now −
+lastSeen) / (due − lastSeen), highest first, then by due. The `recent`
+list (practised in the last three hours) keeps its order. This is stage 1
+of the plan to organise practice by skill, agreed with the owner on 13
+November; it stands on its own.
+
+**Why not longest unseen first, as the plan said.** Measured over ten
+seeds of the forgetting learner (`forgetter`, 200 mixed cards), old rule
+against longest unseen against furthest through its wait, words known a
+month on: 1 a day 32.9 / 32.7 / 31.8; 3 a day 121.8 / 120.7 / 121.5;
+3 a day struggling 28.9 / 29.8 / 31.5; 15 a day 193.6 / 188.8 / 193.3.
+Longest unseen cost the keen learner about five words, worse in every
+seed: the cards unseen longest are the strong ones, spaced furthest, and
+the old rule had (by accident) kept returning to weak ones. Furthest
+through its wait sends a card just answered to the back and still leans to
+short waits. On the keen 400-card life each card was dealt 3.95 times a
+day under the old rule, 1.01 longest unseen, 1.58 furthest through. The
+once-a-day learner's 1.1 fewer is within the spread between seeds, though
+seven seeds of ten came out lower. The owner chose this on 13 November.
+
+## A form the teacher removes is set aside, not dropped (0.624)
+
+**14 November 2026** · `foldForms` and `foldCourses` in `src/shared.tsx`,
+`tests/form-aside.test.mjs`
+
+`foldForms` built the learner's forms from the teacher's fresh copy, so a
+form or line the fresh copy did not have was dropped with its schedules,
+and the loss spread by sync. It now also returns the learner's forms that
+found no mate and carry work, and `foldCourses` keeps them in the existing
+`parked` drawer under the card's id, by form id (`forms`, and `lines` for
+a conversation's turns). A fresh form whose id is in the drawer and which
+has no work of its own is given the drawer's schedules (none answered
+before the card's `reset`), and the entry goes. Nothing new is stored: the
+drawer already syncs, merges by its `at`, and ages out after 180 days.
+
+Two things the plan did not say. A card still here used to have its
+drawer entry deleted on every refresh; it now keeps the entries for forms
+it does not carry, so a whole card coming back without one of its forms
+keeps that form's work set aside rather than losing it. And a card that
+leaves a course joins its own progress to whatever was already set aside
+for it, rather than writing over it.
+
+## Two named forms are never matched by place (0.625)
+
+**14 November 2026** · `foldForms` in `src/shared.tsx`,
+`tests/form-aside.test.mjs`
+
+`foldForms` fell back to matching an unmatched fresh form with the old
+form in the same position, so a named form put where a removed named form
+was inherited its schedules. The fallback now applies only where at least
+one of the two has no name (`-f~`, `-l~` or `-t~` in its id).
+
+The plan said "only when both have no name". That would break the case
+the fallback still serves every day: an old card's forms carry place-ids
+(`-f0`) on devices until a teacher next saves it, and that save names all
+of them at once (`-f~x`). Under "both", every such save would start every
+sub-form afresh. So the rule refuses the place match only when both forms
+are named, which is exactly the removed-and-replaced case.
+
+## A device carries progress it does not know (0.626)
+
+**14 November 2026** · `liftStates` in `src/ArabicTrainer.tsx`,
+`checkAnswer` in `src/languages.ts`, `src/tense-skills.ts`,
+`tests/unknown-exercises.test.mjs`, `tests/stored-shape.test.mjs`
+
+`liftStates` rebuilt each form's `s` from `TYPES` on every load, sync and
+restore, so a record for an exercise this release does not know (a later
+release's, or a retired one's) was dropped from the device's copy and lost
+for good if that copy ever replaced the server's. It now carries every
+other key as it is, unlifted, except the two pre-v2 names (`mean`,
+`write`) that are lifted into `ar2en` and `en2ar`. Its comment's worry — a
+stale mapping writing a fresh state for a retired type — does not return:
+nothing is written for such a key that was not already there.
+
+Nothing reads those records. Every reader asks of `TYPES`; the few that
+walked a form's whole `s` (the tense skills' seeding, `shaky`, `rightAt`)
+now skip names outside `TYPES`, and `checkAnswer` marks an unknown name
+wrong instead of throwing. The test runs standings, next review, weak
+spots, the workload, the climb, the ladder and both session builders with
+and without such records and requires the same answers.
+
+`tests/stored-shape.test.mjs` guards the places older devices drop things
+from (the plan's D2 to D5): the document's top-level fields, the setting
+names the app reads, what a course refresh keeps of the learner's on a
+card, and that every progress write stamps `updated`. Each fails when a
+change adds to that list, so the change has to say why older devices will
+not erase it.
+
+One existing test changed, because its sentence is no longer the agreed
+behaviour: `tests/cards.test.mjs`, "a card's second accepted spelling
+keeps its schedule across a load", asserted that a key naming an exercise
+that does not exist is dropped. It now asserts that it is carried as it is.
+
+Shipped alone, before any exercise is added, so it reaches devices first.
+
+## A course's switches (0.627)
+
+**14 November 2026** · `src/course-practice.ts`, `availableTypes`,
+`practiceIndexOf`, `standingKeys` and `englishModeFor` in
+`src/ArabicTrainer.tsx`, `set-course-practice` in
+`server/api/courses.js`, the Exercises section of the course page in
+`src/spaces.tsx`, `tests/course-practice*.test.mjs`
+
+A course carries one record, `practice: { mode, off }` — a shortcut
+(`with`, `little`, `none`, `custom`) and the exercises switched off by hand.
+Absent is everything on. It lives on the course record only (never in a
+learner's settings, which older devices overwrite whole), is written
+whole by `set-course-practice` (a teacher of the course, or an admin),
+survives every other course write because each spreads the stored course,
+and is part of `materialVersion`, so devices fetch it when it changes.
+
+**One door.** `allowedTypes(practices, supported)` decides, and it is
+applied once, inside `availableTypes`, before the answer is cached. The
+practices come from `practiceIndexOf(courses, decks)`: for each course
+card, the switches of every course whose decks list it (null for a course
+without any). A question is asked if any of them allows it; a card in no
+course — the learner's own, or a value a deck borrows — allows all.
+`ENGLISH_TYPES` lists the exercises that use English; number and time
+exercises write figures in the English field and are not among them.
+
+**No translation and "nothing but English".** A form that had a meaning
+in English and is left with no exercise needing a picture, recording,
+phrase or scene is asked nothing. A recording counts (it gives "write what
+you hear"), as the plan lists it among the things that can teach without
+English.
+
+**Keeping status across a flip, without storing anything.** What a form is
+asked is what Cleared and Learnt are read over, so a flip could demote a
+card. `standingKeys` is laddered with two corrections, applied only to
+cards whose courses have switches: a question the form has not yet shown
+(not solid, never wrong twice running) does not hold back a form that has
+made a pass on anything; and a question switched off on a level above
+everything the form is now asked, with passes on it, still counts. The
+readers that say where a card stands (`cardStandings`, the value reach,
+path units, "not seen lately", the next pass) read `standingKeys`; what is
+dealt reads `laddered`. A course's record is never removed once set — going
+back to With translation keeps one — because removing it would end the
+first correction. The plan's D6 is the same idea for the skill rules.
+
+**English on screen.** `englishModeFor(card)` reads the most English any of
+the card's courses allows: shown, behind a tap (Little), or hidden (None).
+Hidden removes the meaning lines on questions, on the answer and on scenes.
+Behind a tap applies to the meaning on the answer; opening it is folded
+into `leaned` like the marks put back on a bare word, so a right answer
+becomes a near miss. Questions that are themselves about English are
+already switched off by the same shortcuts.
+
+**The teacher's counts** (`untaughtWithoutEnglish`, `withoutQuestions`)
+read the teacher's cards, never a student's device: a rough reading of what
+a word card can be asked from what it holds. Word cards only.
+
+## A spelling near miss keeps the run when writing from the meaning (0.628)
+
+**15 November 2026** · `keepsRun` and `markedState` in `src/grade.ts`,
+`tests/near-miss-run.test.mjs`
+
+Stage F1 of the plan, which needs none of the skill doors and so ships
+although the skill rules stay off. On an exercise that makes the word from
+its meaning (`WM` produce in `src/word-skills.ts`: `en2ar`, `img2ar`,
+`ctx2ar`, `own2ar`), an answer the language marks `near` or `harakat`
+appends nothing to `hist`. `solid` and `missedTwice` read `hist`, so the
+answer neither counts towards right twice running nor breaks it, and does
+not take the passes away. The rating (hard), the near-miss count and the
+schedule are as before. Only those two reasons: `missing`, `ending` and
+`otherForm` are near misses too, but about the word's form rather than its
+spelling, and the plan names the two.
+
+## Personal sets, stage 1: a set on a deck, a voice on a recording (0.629)
+
+**15 November 2026** · `src/sets.ts`, `save-set` and `voiceMap` in
+`server/api/courses.js`, `src/types.ts`, `cardToItem` and `voicedClips` in
+`src/shared.tsx`, `src/card-facts.ts`, `tests/sets.test.mjs`,
+`tests/sets-server.test.mjs`
+
+The first phase of `docs/PLAN-personal-sets.md`. A personal set is a deck
+with a `set` field (`SetConfig`): its wording, its word lists (other decks,
+by id), the words said with the name, and what is asked. One server action,
+`save-set`, modelled on `set-deck-parts`, writes it whole or removes it
+with null; it is read by `readSet`, a total hand-written reader with limits
+and default wording, which the server imports from `src/`. It goes into
+`materialVersion` only where present, so no existing version moves.
+`my-material` sends decks whole and every other deck write spreads the
+stored record, so nothing else on the server needed to know.
+
+Who is speaking is `voices` on a form, a name per recording hash, kept only
+for hashes in `clips` or `slowClips`, trimmed to forty characters, absent
+when empty. Narrowed beside `slowClips` for forms and scene lines; also in
+`RETIRED_CARD_FIELDS` so a card-level copy never lingers. The device
+carries it onto its forms; the read-out names each recording's speaker.
+
+The release numbers are one later than the plan's, which was written
+before 0.628 shipped. Cost: none visible; a deck field and a form field
+that older builds ignore.
+
+## Personal sets, stage 2: asking the student (0.630)
+
+**15 November 2026** · `chosenList`, `resolve`, `pictureState`,
+`stepsToAsk`, `keptAcrossReset` in `src/sets.ts`; `setViewsOf`,
+`resetForm`, `SetQuestions`, `askFirst` in `src/ArabicTrainer.tsx`;
+`tests/sets.test.mjs`, `tests/sets-device.test.mjs`,
+`tests/unknown-exercises.test.mjs`, `tests/smoke.mjs`
+
+The second phase of `docs/PLAN-personal-sets.md`. A student's answer is a
+record at `s["set-answer"]` on the picture's lead form, written only
+through `withAnswer` and saved through `persist`, so it syncs, is backed up
+and is deleted with the practice it sits in. No server action, no cache, no
+new field. Choosing a list writes `list` into every picture's record at
+once; the set's chosen list is the `list` of the latest record, while that
+deck is still one of the set's lists and held.
+
+Reset scheduling now goes through `resetForm`, which keeps the answer and
+re-stamps it with the reset's time: the merge drops anything older than a
+reset, and an answer is not a schedule. `unknown-exercises` now carries an
+answer in its fixtures and asks for the same standings, sessions and sync.
+
+Before `begin`, `beginWeak` and `startSaved`, whatever is new (a list to
+choose, a picture never answered or no longer matching) is asked first.
+The session starts on the next render, from an effect, so it is built from
+the answers just given rather than the cards as they were when the button
+was pressed. "Skip the rest" marks the unanswered pictures skipped, as the
+prototype does, so the same questions do not come back before every
+session; a skipped picture is still counted on Home.
+
+Cost: one small CSS rule for the row of other photos on the question
+screen (`at-picthumbs`). The screens are dark until a teacher can make a
+set (stage 4).
+
+## Personal sets, stage 3: practising a picture (0.631)
+
+**15 November 2026** · `kindsFor`, `pairText`, `pairClips`, `isRealChange`,
+`answerLine` in `src/sets.ts`; `setIndexOf`, `setSetIndex`, `setTypes`,
+`castSet`, `setChoicePool`, `setReportLine`, `restartItem`, `voiceLineOf`
+and the `imageAt` turn in `castFill`, in `src/ArabicTrainer.tsx`;
+`tests/sets-ask.test.mjs`
+
+The third phase of `docs/PLAN-personal-sets.md`. A module-level set index,
+set from `installIndexes` and from the app's render as the path index is,
+says which items are pictures, how each stands, what word its answer
+resolves to and which kinds it takes turns between, and which items are
+out of play. A picture's lead form offers only the two picture exercises
+and the two listening ones (`setTypes`, inside `availableTypes` before the
+course switches); its other forms offer nothing. `castSet`, first in
+`castFill`, chooses the kind by `turnOf` on the question's own schedule, as
+everything else that varies between askings does, and keeps the picture's
+id and progress, so progress stays on the picture: one picture takes turns
+rather than keeping progress per kind, and a real change to an answer
+starts it again (`restartItem`, from Settings only).
+
+Wrong choices are of the asking's kind (`setChoicePool`): other names,
+other words of the chosen list, or the learner's own pairs and this name
+with other ticked words. "Both together", heard, is played as two
+recordings through the existing `recSeq`, in one voice where one person
+recorded both. Out of play — a picture that doesn't apply, a word held only
+in a list not chosen — goes through `inPlay`, so Home, the counts and every
+session read it; a hand-built Ultimate or Weak session reads all items and
+could still take such a card if it was saved in a session earlier, which is
+left as it is.
+
+Every card with several pictures now shows `images[turn % count]` on its
+picture prompt and answer, and each picture choice its own next photo;
+which card a tile is stays keyed on its first. Cost: a picture prompt is no
+longer always the teacher's first photo.
+
+## Personal sets, stage 4: the teacher's side, and the choices behind sets (0.632)
+
+**15 November 2026** · `SetSection`, `setDecksForTrial` in
+`src/spaces.tsx`; `RecordingScreen` in `src/card-editor.tsx`; `setGaps` in
+`src/sets.ts`; `standInSets` and the trial index in
+`src/ArabicTrainer.tsx`; `tests/sets.test.mjs`, `tests/smoke.mjs`
+
+The fourth phase of `docs/PLAN-personal-sets.md`, which makes sets
+visible. The choices that were not obvious, across the four releases:
+
+**A set is a deck, and its lists are decks.** The teacher's only new data
+is the deck's `set` and a form's `voices`; creating, attaching, backing up
+and deleting are the deck's. Cost: a list's name is its deck's title, and
+the picker offers only decks already in the same course.
+
+**The answer lives in `s` under a key that is not an exercise, and is
+carried across a reset.** Progress records already sync, back up and
+delete, and since 0.626 every device carries an unknown key untouched; so
+no new storage, no server action, no privacy question. Reset scheduling
+keeps it, re-stamped with the reset's time, because the merge drops what is
+older. Cost: an admin clearing a student's progress clears their answers,
+and a device older than 0.626 may drop them, after which the student is
+asked again.
+
+**An answer is matched across lists by its English.** A student chooses a
+meaning, so changing list keeps every answer that the new list also has a
+word for; one it lacks becomes waiting and is asked again. Cost: two words
+with the same English in one list cannot be told apart.
+
+**One picture takes turns between kinds instead of keeping progress per
+kind.** The kind is `turnOf` on the question's own schedule, so a miss
+comes back the same. Cost: name, word and both share one ladder, and a
+real change of answer starts the picture again.
+
+**Who is speaking is kept per form, and a pair is played as two
+recordings.** `voices` names each recording hash; "both together" plays
+the word's recording then the name's through the existing `recSeq`,
+choosing one person who recorded both where there is one. On the editor
+the names are the form's even where the recordings are an accepted
+answer's: the recording screen hands the form all the names of its
+answers' recordings at once.
+
+**A card with several pictures takes turns between them everywhere.** The
+prompt, its answer and each picture choice show `images[turn % count]`;
+which card a tile is stays keyed on the first. Cost: the teacher's first
+photo is no longer always the one shown.
+
+**A device that has not updated sees ordinary decks.** It asks each
+picture's name and teaches every list's words; nothing it stores is lost.
+
+**On the teacher's screens:** the Personal set section sits on the deck
+screen of any deck not in My space, with its own draft saved whole through
+`save-set`; switching a saved set off asks first and saves null at once.
+The plan put a "Personal set" note in "the course's list of decks"; the
+course page lists decks as chips, which carry no notes, so the note is on
+the deck's tile in the teacher's list of decks instead. The deck screen's
+headings are now This deck, Personal set, Cards, and the walk that checks
+them says so. A teacher trying a set's picture has no answers, so the
+trial gets a stand-in: the first list, and every picture answered with
+that list's first word (`standInSets`); with no list, the name alone.
+
+## A new deck's kind is chosen first, and fixed (0.633)
+
+**15 November 2026** · `NewDeck`, `NEW_KINDS`, `newDeck` and
+`SetSection` in `src/spaces.tsx`; `tests/smoke.mjs`
+
+The owner's choice (1a, 2b, 3a, 4a, 5a, 6a): New deck opens a sheet with
+three kinds, a regular deck, a unit and a personal set, instead of a
+Personal set switch on every deck. A unit asks for its course, because it
+is made on that course's path (`create-unit`); the course page keeps its
+own New unit. A personal set is made like a deck, through `create-deck`,
+and marked as a set at once with `save-set` and the empty set; it asks for
+no course, so its lists are chosen on its screen once it is in one. The
+section is shown only on a deck that is a set, with no switch: the kind is
+fixed once made, so nothing about students' answers ever has to be
+undone. In My space the sheet is skipped and a regular deck is made, as
+before. No server change. Cost: a teacher who wants a set or a unit of an
+existing deck makes a new one and moves the cards (see BACKLOG.md,
+"Turning an existing deck into a unit").
+
+The deck-screen walk that reads an open deck's headings is back to its
+original "This deck | Cards": an ordinary deck has no Personal set
+section any more.
+
+## A card only in personal sets is basic, with optional English (0.634)
+
+**16 November 2026** · `SetOnly`, `BasicBlock`, `FormFields` and the
+`missing` check in `src/card-editor.tsx`; `tests/smoke.mjs`
+
+The owner's 1a, 2a. Nothing on the advanced card is read by a set: it
+practises only the lead form's word, pictures and recordings, and a "Name"
+subtype would only change how the deck's quality is scored. So a card
+whose decks are all personal sets is not offered "Build an advanced card",
+and its English is not required — before 0.634 it was already optional
+once a picture or a recording was on the card, so this only lifts the
+star until then. Read from the decks ticked on the card in the editor, so
+ticking an ordinary deck brings the box back; a card that already opens as
+advanced keeps it, so nothing on it goes out of sight. Cost: none stored;
+a teacher who wants another form on a set's picture adds the card to an
+ordinary deck first, and the set still ignores it.
+
+## A set's word lists are called decks on screen (0.635)
+
+**16 November 2026** · `SetSection` in `src/spaces.tsx`, `setGaps` in
+`src/sets.ts`, `SetQuestions` in `src/ArabicTrainer.tsx`
+
+The owner's 1a. A set's lists are ordinary decks, and the rest of the app
+says deck, so the screens do too: "Words to choose from", "Add a deck", and
+on the student's side "given two to choose from" and "Choose other words".
+Words only: the stored field is still `set.lists`, and the code and the
+plan keep calling them lists.
+
+
+## "Can't reach the server" is one bar that asks for something
+
+**16 November 2026** · `src/reach.ts`, `src/shared.tsx` (`useReach`, `ReachSnackbar`)
+
+The server being out of reach used to be said in about thirty places, each
+where its screen kept its errors: under a form, in place of a list, or in
+a snackbar that faded in four seconds. On the owner's word it is now one
+large snackbar with **Retry**, wherever it happens, and the old wording is
+gone from those places.
+
+**It breaks the snackbar's own rule, deliberately.** The ordinary snackbar
+never asks for anything, which is why it may vanish on a timer. This one
+holds a button, so it stays until what failed has worked, the connection
+comes back and it works, or it is closed. It is a separate component for
+that reason, not an option on the old one.
+
+**Retry redoes the thing, not "reconnects".** There is no connection to
+re-open: each request stands alone. So every place that fails hands over
+how to do itself again, and Retry does all of them — reloads the list,
+resends the join with the same code. A failure is held only while the
+screen it came from is open, so Retry never resends a form nobody can see.
+The connection coming back does the same, except for what should only be
+redone by hand: leaving a space, closing an account, clearing data, taking
+someone off a space.
+
+**What counts as out of reach.** A request that could not be made, and a
+502, 503 or 504, which is a gateway answering for a server that is
+restarting. Anything else is the server having decided, and stays where
+it was shown before, because pressing Retry would be told the same.
+
+**What it costs.** Background work stays quiet: a poll, a sync or the
+launch-time check of the courses that fails says nothing app-wide. The
+courses' failure is held only while the Courses screen is open. The sync
+dot keeps its own wording, since it is a status rather than an error.
+
+---
+
+## Sign-in links (0.638)
+
+**16 November 2026** · `src/sign-in-link.ts`, `keyOnly` in `server/api/courses.js`
+
+A student gets a private link that signs a device in with nothing to type:
+the space's address with the sign-in key after `#`. It is the key, carried
+differently, and every rule follows from that.
+
+**It works as long as the key does.** No expiry and no "use once": a new
+key kills the old link, and that is the only way to kill one. Nothing new
+is stored, and the server never builds or sees a link.
+
+**The key is still shown, and the link is shown wherever the key is** —
+on "Keep this somewhere safe", on the account page, and to the admin who
+made or replaced the key. Arriving by link does not stop the student to
+tick that the key is saved; the key and link stay on their account page.
+
+**Opened where someone else is signed in, it asks** "Switch to …?" before
+anything happens, and switching goes through Log out, so the first
+person's practice is set aside for them. It lands on the space's home
+page, as any sign-in does.
+
+**Students only.** Whoever teaches a course, runs a space or is the App
+admin is key only, judged by the server across every space at each
+sign-in, so a student made a teacher loses their link at once. An old link
+of theirs is refused by the app (`via=link` → `key-only`) rather than by
+issuing them a new key. That is a soft guard: the key can still be read
+out of the link and typed. It keeps a long-lived credential for an account
+with authority out of the shape most easily forwarded, without replacing
+anyone's key.
+
+**Left out on purpose.** No QR code, and no setting up a whole class at
+once; both are for later. On an iPhone, an app installed to the home
+screen must be signed in once by pasting the link or key, because a link
+always opens the browser.
+
+---
+
+## A sign-in link carries a code of its own (0.640)
+
+**17 November 2026** · `linkCodeFor` and `ensureLinks` in `server/api/courses.js`
+
+In 0.638 a link was the key written as an address. The owner then wanted
+every student to have a link at once, without any key changing. Keys are
+kept only as digests, so an existing student's key cannot be read back to
+make one. So a link now carries its own code.
+
+**Worked out, not stored.** The code comes from the App admin key, the
+handle and a count, so the server keeps only its digest, as it does a
+key's, and can work the code out again whenever an admin opens a list.
+Storing the codes encrypted would have meant keeping a secret readable on
+disk; working them out means nothing secret is stored at all. A new key
+raises the count, so the old link ends with the old key. The cost: a
+changed App admin key changes every link, and a site with no App admin key
+has none.
+
+**Two things sign a student in.** The code is accepted wherever a key is.
+Practice is kept under the key's digest, which a device holding only the
+code cannot work out, so `whoami` tells the device where it is
+(`syncToken`).
+
+**Keys are still shown once.** The owner chose to keep keys unreadable
+(2b) once the link did the key's job for students. A new key appears
+once, inside the person's tile.
+
+**Folded people.** Every list of people that an admin works in uses the
+card editor's form fold. There is no fold component to reuse, only that
+markup, so `PersonFold` copies it. A row with nothing to open (a teacher
+on a course's people) stays a plain row rather than a fold with nothing
+inside.
+

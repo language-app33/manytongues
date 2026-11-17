@@ -719,6 +719,17 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-picchoice:hover:not(:disabled), .at-picchoice:focus-visible { border-color: var(--brass); }
 .at-picchoice.on { border-color: var(--accent); box-shadow:0 0 0 3px var(--accent); }
 .at-picchoice:disabled { cursor:default; }
+/* Once a picture question is answered, its picture (or its grid of tiles)
+   eases down to half its width, and so half its height, so the verdict and
+   whatever is shown with it fit on the screen without scrolling. */
+.at-picture.prompt, .at-picchoices { transition: width .35s ease, max-width .35s ease; }
+.at-picture.prompt.settled { width:calc(min(100%, 320px, var(--pic-cap) * 4 / 3) / 2); }
+.at-picchoices.settled { max-width:calc(var(--pic-cap) / 2); }
+/* A personal set's other photos of one picture, small, beside each other:
+   tapping one shows it large (0.630). */
+.at-picthumbs { display:flex; flex-wrap:wrap; gap:8px; justify-content:center; }
+.at-picthumbs > .at-picchoice { width:56px; }
+@media (prefers-reduced-motion: reduce) { .at-picture.prompt, .at-picchoices { transition:none; } }
 
 .at-imgtile > .at-icon { position:absolute; top:6px; inset-inline-end:6px; flex:none;
   width:40px; min-height:40px; padding:0; }
@@ -965,6 +976,10 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    took, and Duplicate and Remove stay beside it. Folded, the panel is its
    heading alone, so the rule under the heading goes with what it ruled. */
 .at-formhead > .at-formfold { flex:1 1 auto; width:auto; min-width:0; margin:0; min-height:0; }
+/* A folded person on a list of people (0.640) is its heading alone: no
+   rule and no gap under it when nothing follows. */
+.at-formtile > .at-formhead:last-child:has(> .at-formfold[aria-expanded="false"]) { margin-bottom:0;
+  padding-bottom:0; border-bottom:0; }
 .at-formfold > .at-formnum { color: inherit; }
 .at-screen.cardform .at-formtile .at-part > .at-formhead:has(> .at-formfold[aria-expanded="false"]) {
   margin-bottom:0; padding-bottom:0; border-bottom:0; }
@@ -1751,6 +1766,30 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 @keyframes at-snack-in { from { opacity:0; transform: translate(-50%, 10px); }
   to { opacity:1; transform: translate(-50%, 0); } }
 @media (prefers-reduced-motion: reduce) { .at-snack { animation: none; } }
+/* Can't reach the server (0.636): the snackbar's place and look, larger,
+   and staying — it holds Retry, so it cannot go on a timer. Above the
+   ordinary snackbar's spot, which moves up over it while it is shown so
+   the two never sit on each other. */
+.at-reachbar { position: fixed; left:50%; transform: translateX(-50%);
+  bottom: calc(84px + env(safe-area-inset-bottom)); z-index: var(--z-toast);
+  background: var(--surface); border:1px solid var(--line); border-left:4px solid var(--rose);
+  border-radius:10px; padding:16px 10px 16px 16px;
+  display:flex; align-items:center; gap:14px;
+  box-shadow: var(--nav-shadow);
+  width: calc(100% - 24px); max-width: 560px;
+  font-family: var(--ui); font-size:16px; color: var(--text);
+  animation: at-snack-in 160ms ease-out; }
+.at-reachbar > .at-ic { color: var(--rose); flex:none; }
+.at-reachbar .msg { flex:1; min-width:0; display:flex; flex-direction:column; gap:3px; overflow-wrap:anywhere; }
+.at-reachbar .msg strong { font-weight:700; }
+.at-reachbar .detail { font-size:13px; color: var(--muted); }
+.at-reachretry { flex:none; border:0; cursor:pointer; padding:10px 18px; border-radius:8px;
+  font: inherit; font-size:15px; font-weight:800; background: var(--jade); color: var(--onjade); }
+.at-reachretry:hover { filter: brightness(1.08); }
+.at-reachretry:disabled { opacity:.6; cursor:default; }
+.at-reachbar.still { position: static; transform:none; animation:none; width:auto; }
+html.at-reaching .at-snack { bottom: calc(176px + env(safe-area-inset-bottom)); }
+@media (prefers-reduced-motion: reduce) { .at-reachbar { animation: none; } }
 /* "Working…" while a space is fetching or a save is in flight. The
    snackbar's place and the snackbar's manners — it sits over the content
    rather than in it, so nothing on the page moves for it, and the
@@ -3556,3 +3595,24 @@ fieldset.at-cardlock:disabled .at-field { margin-bottom:16px; }
    cards that don't reach students yet, on its screen and its tile. */
 .at-formrole .at-formline { display:block; }
 
+
+/* A course's path, as a learner sees it (0.617): on Home, a line per
+   course above Start session; on Progress, every unit in order; and a
+   unit's own page, its state and stages above its cards. */
+.at-pathhome { display:flex; flex-direction:column; gap:4px; width:100%; text-align:start;
+  border:2px solid var(--line); border-radius: var(--r); background: var(--surface);
+  padding:12px 14px; margin:0 0 12px; font: inherit; color: var(--text); cursor:pointer; }
+p.at-pathhome { cursor:default; font-weight:700; }
+.at-pathhomehead { font-family: var(--ui); font-weight:800; font-size:14px; overflow-wrap:anywhere; }
+.at-pathhomestages { display:flex; flex-wrap:wrap; gap:4px 12px; margin:0; color: var(--muted);
+  font-size:13px; font-variant-numeric: tabular-nums; }
+.at-pathlist { display:flex; flex-direction:column; gap:8px; }
+.at-pathunit { display:flex; justify-content:space-between; align-items:baseline; gap:12px;
+  border:2px solid var(--line); border-radius: var(--r); background: var(--surface);
+  padding:12px 14px; font: inherit; color: var(--text); text-align:start; cursor:pointer; min-width:0; }
+.at-pathunit.current { border-color: var(--brass); }
+.at-pathunit.locked { color: var(--muted); }
+.at-pathunitname { font-family: var(--ui); font-weight:800; font-size:14px; overflow-wrap:anywhere; min-width:0; }
+.at-pathunitstate { margin:0; color: var(--muted); font-size:13px; white-space:nowrap; }
+.at-pathunitstate i { font-style:normal; opacity:.75; }
+.at-unithead { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }

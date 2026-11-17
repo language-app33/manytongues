@@ -20,6 +20,8 @@ declare module "*.css";
  * why eslint.config.js has to declare them as globals too.
  */
 declare const __APP_RELEASE__: string;
+/** Set by the test build only: run with practice by skill on. */
+declare const __WORD_SKILLS_TEST__: boolean | undefined;
 declare const __APP_VERSION__: string;
 declare const __BUILT_AT__: string;
 

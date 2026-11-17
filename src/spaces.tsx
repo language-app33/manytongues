@@ -7,6 +7,7 @@ import type { Card, Course, Deck, Feedback, Flag, Form, Lang, LangId, User } fro
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
 import { CardEditor, ImageScreen } from "./card-editor.tsx";
 import { usableAccent } from "./contrast.ts";
+import { keyFromLink, signInLink } from "./sign-in-link.ts";
 import type { CardShape } from "./card-editor.tsx";
 import { formsOf, leadOf } from "./cards.ts";
 import { cardMatches } from "./search.ts";
@@ -62,7 +63,21 @@ import {
   levelOf,
   LEVEL_NAME,
   scriptVars,
+  dimsOf,
+  TYPES,
   verbOf } from "./languages.ts";
+import {
+  PRACTICE_MODES,
+  readPractice,
+  switchOf,
+  untaughtWithoutEnglish,
+  usesEnglish,
+  withoutQuestions,
+} from "./course-practice.ts";
+import type { CoursePractice, PracticeMode } from "./course-practice.ts";
+/* Personal sets (0.632): the teacher's section reads and checks the set. */
+import { emptySet, pairText, readSet, setGaps } from "./sets.ts";
+import type { SetConfig } from "./sets.ts";
 import { isDialog, linesOf, sceneKindOf } from "./dialogs.ts";
 import { asMeaning, cardRef, droppedIn, fillNames, hasSlots, isSentence, MAX_FILLS, refClash, renamedIn, slotName, slotsOf, taggedIn } from "./variables.ts";
 import { fillersFor, groupPronouns, isPronounCard, isPronounGroup, pickedCardIds } from "./card-facts.ts";
@@ -81,6 +96,8 @@ import { cardSentences, needsReview, stateFrom, toReview } from "./review.ts";
 import type { PartSentences } from "./review.ts";
 import { deckQuality, FIXES_SHOWN, qualityTone } from "./deck-quality.ts";
 import type { Quality } from "./deck-quality.ts";
+import { blankFills, countingCards, deleteUnitLine, draftsLine, isLiveIn, isPathUnit, pathUnits, problemLine, sameFormBlanks, unitProblems } from "./path.ts";
+import type { UnitProblem } from "./path.ts";
 import { inPlayWith, langsToMakeIn, teachingChoices } from "./lang-choice.ts";
 import type { LangChoice } from "./lang-choice.ts";
 import type { ReviewState } from "./review.ts";
@@ -128,6 +145,7 @@ import {
   Icon,
   IconButton,
   ItemList,
+  Pressable,
   SearchBox,
   LanguageRadio,
   Lede,
@@ -162,12 +180,20 @@ import {
   useLiveRefresh,
   useSnackbar,
   useRun,
+  useReach,
+  useReachHold,
   Popover,
   DeckSwitch,
   DeckPickScreen,
+  PickSheet,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
 export { LanguageTag, languageName } from "./shared.tsx";
+
+/* What a screen says in place of what it could not load when the server
+   was out of reach. The snackbar says why and offers Retry (0.636); this
+   only keeps the screen from looking empty for no reason. */
+const LOAD_UNREACHED = "Couldn't load the latest from the server.";
 export { ConfirmModal, useLiveRefresh, cardToItem, localIdFor };
 
 /*
@@ -193,6 +219,10 @@ export interface OnboardingPlace {
   unknown?: boolean;
   /** From an invite link, `?join=`. */
   joinCode?: string;
+  /** From a sign-in link, `#key=` (0.638). */
+  linkKey?: string;
+  /** The address's space is known (or there is none), so the link can be tried. */
+  linkReady?: boolean;
   /** Said once at the top: a closed space, a suspended account. */
   notice?: string;
 }
@@ -202,7 +232,9 @@ export function Onboarding({ onDone, place = {} }: {
   place?: OnboardingPlace;
 }) {
   const org = place.org;
-  const [step, setStep] = useState(place.joinCode && !(org && org.closed) ? "new" : "choose"); // choose | new | existing | key
+  const [step, setStep] = useState(
+    place.linkKey ? "link" : place.joinCode && !(org && org.closed) ? "new" : "choose"
+  ); // link | choose | new | existing | key
   const [name, setName] = useState("");
   const [key, setKey] = useState("");
   const [busy, setBusy] = useState(false);
@@ -220,15 +252,11 @@ export function Onboarding({ onDone, place = {} }: {
 
   /*
    * The app's general wording for a request that could not be made is
-   * "Can't reach the server. Your own cards still work" — which is written
-   * for somebody who has cards, on a screen where nobody does yet. Here it
-   * is the one thing standing between a person and the app, so it says so
-   * and says what to do about it.
+   * "Can't reach the server" — said by the snackbar, with Retry (0.636).
+   * Here it is the one thing standing between a person and the app, so
+   * the snackbar carries a line saying so and what to do about it.
    */
-  const explainHere = (e: unknown) =>
-    String((e && (e as Error).message) || e) === "offline"
-      ? "Setting up needs a connection. Once you're set up, the app works without one."
-      : API.explain(e);
+  const reach = useReach({ detail: "Setting up needs a connection. Once you're set up, the app works without one." });
 
   async function create() {
     setBusy(true);
@@ -239,16 +267,17 @@ export function Onboarding({ onDone, place = {} }: {
       API.saveAccount(account);
       setMade(account);
       setStep("key");
+      reach.ok();
     } catch (e) {
       const there = otherSpace(e);
       if (there) setElsewhere(there);
-      else setError(explainHere(e));
+      else if (!reach.caught(e, create)) setError(API.explain(e));
     } finally {
       setBusy(false);
     }
   }
 
-  async function signIn() {
+  async function signIn(given = key.trim(), viaLink = false) {
     setBusy(true);
     setError("");
     try {
@@ -257,24 +286,49 @@ export function Onboarding({ onDone, place = {} }: {
          this address isn't is no longer refused: it lands in its own
          (memberships). The invitation followed lets an account with no
          open space back in. */
-      const r = await API.whoAmI(key.trim(), org ? org.id : API.lastSpace(), place.joinCode || "");
-      const account = { ...r.user, key: key.trim() };
+      const r = await API.whoAmI(given, org ? org.id : API.lastSpace(), place.joinCode || "", viaLink);
+      const account = { ...r.user, key: given };
       API.saveAccount(account);
       if (!r.user.admin && r.user.org) API.rememberSpace(r.user.org.id);
       /* An account someone else made, signed in to for the first time, is
          asked to save its key before anything else (18a). */
       if (r.user && r.user.keySaved === false) {
+        reach.ok();
+        if (viaLink) {
+          /* Arriving by link is not stopped to save the key (0.638): it stays
+             on their account page, with the link. */
+          API.keySaved().catch(() => {});
+          onDone({ ...account, keySaved: true });
+          return;
+        }
         setMade(account);
         setStep("key");
         return;
       }
+      reach.ok();
       onDone(account);
     } catch (e) {
-      setError(explainHere(e));
+      if (reach.caught(e, () => signIn(given, viaLink))) return;
+      const why = String(e && (e as Error).message);
+      if (viaLink) setStep("existing");
+      setError(
+        viaLink && why === "bad-key"
+          ? "This sign-in link no longer works. Ask your teacher or your space's admin for a new one, or type your sign-in key."
+          : API.explain(e)
+      );
     } finally {
       setBusy(false);
     }
   }
+
+  /* A sign-in link (0.638): tried once, when the address's space is known. */
+  const linkStarted = useRef(false);
+  useEffect(() => {
+    if (!place.linkKey || !place.linkReady || linkStarted.current) return;
+    linkStarted.current = true;
+    void signIn(place.linkKey, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [place.linkKey, place.linkReady]);
 
   /* The space's colour, as the accent on this page only, if it can be seen
      on both themes (29a; src/contrast.ts). */
@@ -311,6 +365,17 @@ export function Onboarding({ onDone, place = {} }: {
             </Button>
           </>
         ) : null}
+        {!elsewhere && step === "link" && (
+          <>
+            <img className="ob-logo" src={org && org.logoData ? org.logoData : "/logo.svg"} alt="" width={72} height={72} />
+            <h1>{org ? org.name : "ManyTongues"}</h1>
+            <Lede>Signing you in…</Lede>
+            <Button variant="ghost" wide className="at-mt3" onClick={() => setStep("existing")}>
+              Type my sign-in key instead
+            </Button>
+          </>
+        )}
+
         {!elsewhere && step === "choose" && (
           <>
             <img className="ob-logo" src={org && org.logoData ? org.logoData : "/logo.svg"} alt="" width={72} height={72} />
@@ -399,7 +464,10 @@ export function Onboarding({ onDone, place = {} }: {
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                if (key.trim() && !busy) signIn();
+                if (!key.trim() || busy) return;
+                const pasted = keyFromLink(key);
+                if (pasted) void signIn(pasted, true);
+                else void signIn();
               }}
             >
               <input
@@ -463,6 +531,14 @@ export function Onboarding({ onDone, place = {} }: {
               safe. If you lose it, only your space's admin can give you a new one.
             </Lede>
             <CodeBox label="Your sign-in key" code={made.key} />
+            {made.keyOnly === false && made.linkKey && made.org && typeof made.org === "object" && made.org.slug ? (
+              <CodeBox
+                long
+                label="Your private sign-in link"
+                hint="Opening it signs you in on any device, with nothing to type. Anyone who has it is you, so never share it."
+                code={signInLink(window.location.origin, made.org.slug, made.linkKey)}
+              />
+            ) : null}
             <Help>
               You are <strong>{made.displayName}</strong> · <span className="at-handle">{made.handle}</span>
               . Share the handle freely; never the key.
@@ -648,12 +724,14 @@ export function PersonActions({ person, org, keyOrg, mayKey, mayAct, suspendable
           confirmLabel: "Issue a new key",
           body: (
             <p>
-              Their current key stops working the moment you do this, on every device they use.
-              Their handle, courses and progress are untouched. You&apos;ll see the new key once.
+              Their current key, and their sign-in link if they have one, stop working the moment you
+              do this, on every device they use. Their handle, courses and progress are untouched.
+              You&apos;ll see the new key once.
             </p>
           ),
           action: async () => {
             const r = await API.reissueKey(u.handle, keyOrg);
+            /* Their tile opens by itself, with the key and the new link (0.640). */
             onNewKey({ name: u.displayName, handle: u.handle, key: r.key });
           },
         })} />
@@ -936,6 +1014,84 @@ export function CodeBox({ label, code, hint, onNew, busy, long = false }: {
         )}
       </div>
     </div>
+  );
+}
+
+/*
+ * One person on a list of people, folded (0.640). Built as a form's panel
+ * is in the card editor: the name is the heading that opens it, with what
+ * says who they are under it, and the arrow. `lead` stays on the folded
+ * tile (a course's Teacher and Student switches); `flags` under the
+ * heading, open or not. `open` opens it from outside, as when a new key
+ * has just been made for them.
+ */
+export function PersonFold({ title, meta, lead, flags, open: opened = false, children }: {
+  title: Node;
+  meta?: Node;
+  lead?: Node;
+  flags?: Node;
+  open?: boolean;
+  children?: Node;
+}) {
+  const [open, setOpen] = useState(opened);
+  useEffect(() => {
+    if (opened) setOpen(true);
+  }, [opened]);
+  return (
+    <div className="at-formblock at-formtile" data-el="person-fold">
+      <div className="at-formhead">
+        <Pressable className="at-groupfold at-formfold" aria-expanded={open} onClick={() => setOpen((v) => !v)}>
+          <span className="at-formnum">{title}</span>
+          <span className="at-groupcount">{meta}</span>
+          <Icon name={open ? "chevronUp" : "chevronDown"} size={24} />
+        </Pressable>
+        {lead ? <span className="at-formacts">{lead}</span> : null}
+      </div>
+      {flags}
+      {open ? children : null}
+    </div>
+  );
+}
+
+/* A student's private sign-in link, for an admin to pass on (0.640). Built
+   here from the code the server answered with; nothing for anyone else. */
+export function PersonLink({ name, slug, code }: { name: string; slug?: string; code?: string }) {
+  if (!code || !slug) return null;
+  return (
+    <CodeBox
+      long
+      label={`Private sign-in link for ${name}`}
+      hint="Opening it signs them in, with nothing to type. It is for them alone: never post it to a class or a group."
+      code={signInLink(window.location.origin, slug, code)}
+    />
+  );
+}
+
+/* A key just made, shown once inside the person's tile (0.640): it is kept
+   only as a digest, so this is the one time it can be read. */
+export function NewKeyNote({ made, onDone }: {
+  made: { name: string; key: string; handle?: string; fresh?: boolean };
+  onDone: () => void;
+}) {
+  return (
+    <>
+      <CodeBox
+        label={`${made.fresh ? "Sign-in key for" : "New sign-in key for"} ${made.name}`}
+        code={made.key}
+        hint={made.handle ? <>Their handle is <strong>{made.handle}</strong>.</> : undefined}
+      />
+      <Help>
+        {made.fresh
+          ? "Send it to them through something private — the key is the whole credential, and anyone holding it is them. "
+          : "Give it to them directly. Their old key and link stopped working the moment you made this one; their handle, courses and progress are unchanged. "}
+        You won't see the key again, but you can issue another.
+      </Help>
+      <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
+        <Button variant="ghost" size="sm" onClick={onDone}>
+          Done
+        </Button>
+      </div>
+    </>
   );
 }
 
@@ -1685,7 +1841,7 @@ export function CoursesPage({
 /**
  * @param props  The caller knows whose row this is, so only the answer comes back.
  */
-function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole }: {
+function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole, inside }: {
   handle: string;
   name?: string;
   me?: string;
@@ -1693,6 +1849,8 @@ function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole }: {
   studying: boolean;
   busy?: boolean;
   onSetRole: (role: "teacher" | "student", on: boolean) => void;
+  /** What opening the row shows — a student's sign-in link (0.640). Without it, nothing opens. */
+  inside?: Node;
 }) {
   const role: (key: "teacher" | "student", cls: string, label: string, on: boolean) => Node = (key, cls, label, on) => (
     <button
@@ -1705,6 +1863,21 @@ function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole }: {
       {label}
     </button>
   );
+  const roles = (
+    <span className="at-roles">
+      {role("teacher", "teach", "Teacher", teaching)}
+      {role("student", "study", "Student", studying)}
+    </span>
+  );
+  /* Folded where there is something to open (0.640), with the switches
+     kept on the folded row, so setting up a class is still a tap each. */
+  if (inside) {
+    return (
+      <PersonFold title={<PersonName name={name} handle={handle} me={me} />} meta={handle} lead={roles}>
+        {inside}
+      </PersonFold>
+    );
+  }
   return (
     <div className="at-item at-rosterrow">
       <div className="grow">
@@ -1713,10 +1886,294 @@ function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole }: {
         </div>
         <div className="at-handle">{handle}</div>
       </div>
-      <span className="at-roles">
-        {role("teacher", "teach", "Teacher", teaching)}
-        {role("student", "study", "Student", studying)}
+      {roles}
+    </div>
+  );
+}
+
+/*
+ * Which exercises a course's students are asked (0.627) — see
+ * course-practice.ts. The four shortcuts at the top set and lock the
+ * switches of the exercises that use English; every other switch is the
+ * teacher's, and Custom unlocks the lot. Saved as it is tapped, like the
+ * decks below it; a change that would leave cards with no question at all
+ * says how many first and asks.
+ */
+const MODE_LABEL: Record<PracticeMode, string> = {
+  with: "With translation",
+  little: "Little translation",
+  none: "No translation",
+  custom: "Custom",
+};
+
+/*
+ * A personal set's own section, on its deck screen (0.632; since 0.633
+ * only on a deck made as a set, which stays one): its wording, its word
+ * lists (other decks of the same courses), the words said with the name,
+ * and what is asked. The deck's cards with a picture are the set's
+ * pictures, edited as any deck's cards are; nothing here touches them.
+ * Its own draft, saved whole through save-set — see src/sets.ts.
+ */
+const SET_WORDING: [keyof SetConfig["wording"], string, string][] = [
+  ["question", "The question", "Asked once for each picture."],
+  ["none", "The doesn't-apply button", "Leaves that picture out for that student."],
+  ["askName", "Asking the name", "In practice, when the picture's name is the answer."],
+  ["askWord", "Asking their word", "In practice, when the student's own word is the answer."],
+  ["askBoth", "Asking both", "In practice, when the answer is their word with the name."],
+];
+
+function SetSection({ deck, decks, cards, busy, onSave }: {
+  deck: Deck;
+  /** Every deck the teacher can see, for the lists to be chosen from. */
+  decks: Deck[];
+  cards: Card[];
+  busy?: boolean;
+  onSave: (next: SetConfig) => void;
+}) {
+  const saved = readSet(deck.set, deck.id);
+  const [draft, setDraft] = useState<SetConfig | null>(saved);
+  const [picking, setPicking] = useState(false);
+  /* A save elsewhere — another teacher, this one on another device —
+     starts the draft again from what is stored. */
+  const savedKey = JSON.stringify(saved);
+  useEffect(() => {
+    setDraft(readSet(deck.set, deck.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [savedKey, deck.id]);
+  const courseIds = (deck.courses || []).map((l) => l.courseId);
+  const offered = decks.filter((d) => d.id !== deck.id && !d.set && !d.personal
+    && (d.courses || []).some((l) => courseIds.includes(l.courseId)));
+  const wordsOf = (deckId: string) => cards.filter((c) => (c.decks || []).includes(deckId)
+    && !isSentence(c) && !isDialog(c) && !!(formsOf(c)[0] || {}).ar && !!(formsOf(c)[0] || {}).en);
+  const own = cards.filter((c) => (c.decks || []).includes(deck.id));
+  const pictured = (c: Card) => Array.isArray((formsOf(c)[0] || {}).images) && ((formsOf(c)[0] || {}).images || []).length > 0;
+  const titleOf = (id: string) => (decks.find((d) => d.id === id) || { title: "A deck you can't see" }).title;
+  const changed = JSON.stringify(draft) !== savedKey;
+  const edit = (patch: Partial<SetConfig>) => draft && setDraft({ ...draft, ...patch });
+
+  const head = (
+    <div className="at-formhead">
+      <span className="at-formnum">Personal set</span>
+      <span className="at-formrole">
+        Each student answers a question about each picture once, and is then asked with their own word.
       </span>
+    </div>
+  );
+  if (!draft) return null;
+  if (picking) {
+    return (
+      <DeckPickScreen
+        title="Words to choose from"
+        decks={offered.map((d) => ({ id: d.id, title: d.title, locked: d.locked, cardCount: d.cardCount }))}
+        chosen={draft.lists}
+        onToggle={(id, wasOn) => edit({ lists: wasOn ? draft.lists.filter((x) => x !== id) : draft.lists.concat([id]) })}
+        confirm="Done"
+        onConfirm={() => setPicking(false)}
+        onCancel={() => setPicking(false)}
+        empty="No other deck is in this deck's courses yet. Make a deck of words, add it to the course, and choose it here."
+      />
+    );
+  }
+  const lists = draft.lists.map((id) => ({ id, title: titleOf(id), cards: wordsOf(id) }));
+  const firstPicture = own.find(pictured);
+  const firstWord = lists.length && lists[0].cards.length ? formsOf(lists[0].cards[0])[0] : null;
+  const sampleName = (firstPicture && formsOf(firstPicture)[0].ar) || "Lan";
+  const sampleWord = (firstWord && firstWord.ar) || "…";
+  const gaps = setGaps(draft, lists.map((l) => ({ title: l.title, words: l.cards.map((c) => ({ en: formsOf(c)[0].en || "" })) })),
+    own.map((c) => ({ picture: pictured(c) })));
+  return (
+    <div className="at-formblock" data-el="set-section">
+      {head}
+      <Help>Its pictures are this deck&rsquo;s cards that have a picture. Add and record them as on any deck.</Help>
+
+      {SET_WORDING.map(([key, label, lede]) => (
+        <Field key={key} label={label} lede={lede}>
+          <input
+            className="at-input"
+            aria-label={label}
+            maxLength={120}
+            value={draft.wording[key]}
+            disabled={busy}
+            onChange={(e) => edit({ wording: { ...draft.wording, [key]: e.target.value } })}
+          />
+        </Field>
+      ))}
+
+      <Field label="Words to choose from" lede="Other decks of this course, each an ordinary deck of words. With two or more, each student picks one deck.">
+        {lists.map((l) => (
+          <Tile
+            key={l.id}
+            title={l.title}
+            meta={plural(l.cards.length, "word")}
+            actions={<IconButton icon="close" label={`Remove ${l.title}`} disabled={busy}
+              onClick={() => edit({ lists: draft.lists.filter((x) => x !== l.id), named: draft.named.filter((n) => !l.cards.some((c) => c.id === n)) })} />}
+          />
+        ))}
+        <div className="at-chips">
+          <Button size="sm" icon="add" disabled={busy} onClick={() => setPicking(true)}>Add a deck</Button>
+        </div>
+      </Field>
+
+      {lists.length > 0 && (
+        <Field label="Said with the name" lede="Tick the words that are said together with a person's name.">
+          {lists.map((l) => (
+            <div key={l.id}>
+              <p className="at-eyebrow">{l.title}</p>
+              <CheckList
+                options={l.cards.map((c) => ({ id: String(c.id), title: formsOf(c)[0].ar, note: formsOf(c)[0].en }))}
+                chosen={draft.named}
+                onToggle={(id, wasOn) => edit({ named: wasOn ? draft.named.filter((x) => x !== id) : draft.named.concat([id]) })}
+                empty="No words in this deck yet."
+              />
+            </div>
+          ))}
+        </Field>
+      )}
+
+      <Field label="What is asked" lede="Each picture takes turns between these.">
+        <CheckList
+          options={[
+            { id: "name", title: "The name", note: sampleName },
+            { id: "word", title: "Their word", note: sampleWord },
+            { id: "both", title: "Both together", note: pairText(draft, sampleWord, sampleName) },
+          ]}
+          chosen={(["name", "word", "both"] as const).filter((k) => draft.asks[k])}
+          onToggle={(id, wasOn) => edit({ asks: { ...draft.asks, [id]: !wasOn } })}
+        />
+        <Segmented
+          label="The word goes"
+          disabled={busy}
+          options={[{ value: "before", label: "Before the name" }, { value: "after", label: "After the name" }]}
+          value={draft.order}
+          onChange={(v) => edit({ order: v })}
+        />
+      </Field>
+
+      {gaps.map((g) => <Notice key={g} kind="warn">{g}</Notice>)}
+
+      <Help>You won&rsquo;t see what each student chose. It is included only in a problem report a student sends.</Help>
+      <div className="at-chips at-mt3">
+        <Button variant="primary" icon="save" disabled={busy || !changed} onClick={() => onSave(readSet(draft, deck.id) || emptySet())}>Save</Button>
+      </div>
+
+    </div>
+  );
+}
+
+function PracticeSection({ course, cards, lang, busy, onSave }: {
+  course: Course;
+  /** The cards of the course's decks, as the teacher's lists hold them. */
+  cards: Card[];
+  lang: Lang | null;
+  busy?: boolean;
+  onSave: (next: CoursePractice) => void;
+}) {
+  const now: CoursePractice = readPractice(course.practice) || { mode: "with", off: [] };
+  const [asking, setAsking] = useState<{ next: CoursePractice; n: number } | null>(null);
+  const [showUntaught, setShowUntaught] = useState(false);
+  const untaught = useMemo(() => untaughtWithoutEnglish(cards), [cards]);
+  /* The exercises this course's language words, by level. A type the pack
+     has no wording for is not one its cards can be asked. */
+  const byLevel = useMemo(() => {
+    const out: Map<number, string[]> = new Map();
+    for (const t of TYPES) {
+      const spec = lang ? exOf(t, lang) : null;
+      if (!spec || spec.retired) continue;
+      const l = levelOf(t);
+      out.set(l, (out.get(l) || []).concat([t]));
+    }
+    return [...out.entries()].sort((a, b) => a[0] - b[0]);
+  }, [lang]);
+  const ask = (next: CoursePractice) => {
+    const n = withoutQuestions(cards, next);
+    if (n > withoutQuestions(cards, now)) setAsking({ next, n });
+    else onSave(next);
+  };
+  const flip = (type: string, on: boolean) => {
+    const off = on ? now.off.filter((t) => t !== type) : [...new Set(now.off.concat([type]))];
+    ask({ mode: now.mode, off });
+  };
+  const word = (c: Card) => {
+    const f = (c.forms || [])[0] || ({} as Record<string, any>);
+    return `${f.ar || ""}${f.en ? ` — ${f.en}` : ""}`;
+  };
+  return (
+    <div className="at-formblock">
+      <div className="at-formhead">
+        <span className="at-formnum">Exercises</span>
+        <span className="at-formrole">
+          What students in this course are asked. Phones on an older version of the app ask everything until they update.
+        </span>
+      </div>
+      <div className="at-practice-modes">
+      <Segmented
+        size={null}
+        label="How much English"
+        disabled={busy}
+        options={PRACTICE_MODES.map((m) => ({ value: m, label: MODE_LABEL[m] }))}
+        value={now.mode}
+        onChange={(mode) => mode !== now.mode && ask({ mode, off: now.off })}
+      />
+      </div>
+      {now.mode !== "custom" ? (
+        <Help>English exercises are switched off by this choice. The others are yours to set.</Help>
+      ) : (
+        <Help>Every exercise is yours to set.</Help>
+      )}
+      {now.mode === "none" && untaught.length > 0 && (
+        <p className="at-practice-warn">
+          {plural(untaught.length, "word")} cannot be taught without English.{" "}
+          <button type="button" className="at-linkbtn" onClick={() => setShowUntaught((v) => !v)}>
+            {showUntaught ? "Hide them" : "See them"}
+          </button>
+        </p>
+      )}
+      {now.mode === "none" && showUntaught && untaught.length > 0 && (
+        <ul className="at-practice-untaught">
+          {untaught.map((c) => <li key={c.id}>{word(c)}</li>)}
+        </ul>
+      )}
+      {byLevel.map(([level, types]) => (
+        <div key={level} className="at-practice-level">
+          <div className="at-practice-levelname">{LEVEL_NAME[level] || `Level ${level}`}</div>
+          {types.map((t) => {
+            const s = switchOf(now, t);
+            const locked = now.mode !== "custom" && usesEnglish(t);
+            const spec = lang ? exOf(t, lang) : null;
+            return (
+              <div key={t} className={`at-practice-row${locked ? " locked" : ""}`}>
+                <span className="grow">
+                  {(spec && spec.label) || t}
+                  {usesEnglish(t) && <span className="at-tag sm at-practice-eng">English</span>}
+                </span>
+                {locked ? (
+                  <span className="at-practice-lockword">{s === "on" ? "On" : s === "off" ? "Off" : "Where needed"}</span>
+                ) : (
+                  <Segmented
+                    label={(spec && spec.label) || t}
+                    disabled={busy}
+                    options={[{ value: "off", label: "Off" }, { value: "on", label: "On" }]}
+                    value={s === "off" ? "off" : "on"}
+                    onChange={(v) => flip(t, v === "on")}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ))}
+      {asking && (
+        <ConfirmModal
+          title={`${plural(asking.n, "card")} would have no questions`}
+          body={<p>Students would not be asked {asking.n === 1 ? "it" : "them"} at all in this course until you change this back. Their progress is kept.</p>}
+          confirmLabel="Change it anyway"
+          onCancel={() => setAsking(null)}
+          onConfirm={() => {
+            onSave(asking.next);
+            setAsking(null);
+          }}
+        />
+      )}
     </div>
   );
 }
@@ -1724,6 +2181,7 @@ function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole }: {
 function CourseSettings({
   course,
   users,
+  linkSlug = "",
   languages,
   account,
   busy,
@@ -1736,6 +2194,8 @@ function CourseSettings({
 }: {
   course: Course;
   users: User[];
+  /** The space's address, for its students' sign-in links (0.640). */
+  linkSlug?: string;
   languages: Record<LangId, Lang>;
   account: User;
   busy?: boolean;
@@ -1767,6 +2227,11 @@ function CourseSettings({
     return u ? u.displayName : h;
   };
   const outsiders = users.filter((u) => !people.includes(u.handle));
+  /* A student's sign-in link, where the admin may see it (0.640). */
+  const linkOf = (h: string, name: string) => {
+    const u = users.find((x) => x.handle === h);
+    return u && u.linkKey && linkSlug ? <PersonLink name={name} slug={linkSlug} code={u.linkKey} /> : undefined;
+  };
 
   return (
     <Screen
@@ -1920,6 +2385,7 @@ function CourseSettings({
                 teaching={c.teachers.includes(h)}
                 studying={c.students.includes(h)}
                 busy={busy}
+                inside={linkOf(h, nameOf(h))}
                 onSetRole={(role, on) => onSetRole(h, nameOf(h), role, on)}
               />
             ))}
@@ -1947,6 +2413,7 @@ function CourseSettings({
                       teaching={false}
                       studying={false}
                       busy={busy}
+                      inside={linkOf(u.handle, u.displayName)}
                       onSetRole={(role) => onSetRole(u.handle, u.displayName, role, true)}
                     />
                   ))}
@@ -2143,6 +2610,11 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
 
   /* Answers whether it worked, which is what the background poll reads to
      know whether to back off — see useLiveRefresh. */
+  /* A reload that could not reach the server: the snackbar's Retry
+     reloads (0.636). Only one asked for — a background poll that fails
+     says nothing, and one that works lets go of the failure. */
+  const reach = useReach();
+  const refreshRef = useRef<(background?: boolean) => Promise<boolean>>(async () => false);
   const refresh = useCallback(async (background: boolean = false) => {
     /* A background poll must not flash "Working" or grey the buttons out
        from under someone mid-click; only a deliberate refresh does that. */
@@ -2150,14 +2622,18 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
     try {
       setData(await pullAdmin(account.handle));
       setError("");
+      reach.ok();
       return true;
     } catch (e) {
-      if (!background) setError(API.explain(e));
+      if (!background) {
+        setError(reach.caught(e, () => refreshRef.current()) ? LOAD_UNREACHED : API.explain(e));
+      }
       return false;
     } finally {
       if (!background) setBusy(false);
     }
-  }, [account.handle, setBusy, setError]);
+  }, [account.handle, setBusy, setError, reach]);
+  refreshRef.current = refresh;
 
   /* Whether this mount had something to show before it asked. Read once,
      at the first render: what matters is how the space arrived, not what
@@ -2188,6 +2664,8 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
   useLiveRefresh(backgroundRefresh);
 
   const snack = useSnackbar();
+  /* The card a report is about, when it could not be fetched (0.636). */
+  const cardReach = useReach();
 
   /* `done` is what to say once it worked. A string, or a function of
      whatever the call returned when the message wants to name the thing —
@@ -2198,15 +2676,21 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
      than carried by the overview: Admin holds decks, not cards, and a site
      with five hundred reports would otherwise be sending five hundred
      cards to a screen showing one. */
-  async function openFlaggedCard(flag: Flag) {
+  function openFlaggedCard(flag: Flag) {
     setOpenCard({ flag, card: null, error: "" });
+    return loadFlaggedCard(flag);
+  }
+  /* Retry fetches again without opening anything: a screen closed since
+     stays closed, and the answer is dropped below. */
+  async function loadFlaggedCard(flag: Flag) {
     try {
       const got = await API.adminCard(flag.cardId);
+      cardReach.ok();
       /* Only if it is still the one being waited for: two taps in a row
          must not leave the second screen showing the first card. */
       setOpenCard((cur) => (cur && cur.flag.id === flag.id ? { ...cur, card: got.card } : cur));
     } catch (e) {
-      const said = API.explain(e);
+      const said = cardReach.caught(e, () => loadFlaggedCard(flag)) ? "Couldn't load this card." : API.explain(e);
       setOpenCard((cur) => (cur && cur.flag.id === flag.id ? { ...cur, error: said } : cur));
     }
   }
@@ -2325,6 +2809,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
         <CourseSettings
           course={c}
           users={users}
+          linkSlug={(data && data.linkSlug) || ""}
           languages={languages}
           account={account}
           busy={busy}
@@ -2529,27 +3014,6 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 </Section>
               ) : null}
               <Section head title="This space's people">
-              {newKey && (
-                <div className="at-sub">
-                  <CodeBox
-                    label={`${newKey.fresh ? "Sign-in key for" : "New sign-in key for"} ${newKey.name}`}
-                    code={newKey.key}
-                    hint={newKey.handle ? <>Their handle is <strong>{newKey.handle}</strong>.</> : undefined}
-                  />
-                  <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
-                    <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>
-                      Done
-                    </Button>
-                  </div>
-                  <Help>
-                    {newKey.fresh
-                      ? "Send it to them through something private — the key is the whole credential, and anyone holding it is them. "
-                      : "Give it to them directly. Their old key stopped working the moment you made this one; their handle, courses and progress are unchanged. "}
-                    You won't see it again, but you can issue another.
-                  </Help>
-                </div>
-              )}
-
               {makingUser && (
                 <Screen
                   title="Add a person"
@@ -2565,6 +3029,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                               makingUser.courseId || "",
                               (makingUser.roles as ("teacher" | "student")[])
                             );
+                            /* Their tile opens by itself, with the key (0.640). */
                             setNewKey({
                               name: r.user.displayName,
                               handle: r.user.handle,
@@ -2646,8 +3111,9 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                   )}
 
                   <Help>
-                    You'll get their sign-in key once, to pass on privately. They don't need to
-                    do anything first — the key signs them in on any device.
+                    You'll get their sign-in key once, to pass on privately. A student also has a
+                    private sign-in link, kept in their tile on this list. They don't need to do
+                    anything first — the key or the link signs them in on any device.
                   </Help>
 
                                 </Screen>
@@ -2718,35 +3184,15 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 ]}
                 itemKey={(u) => u.handle}
                 renderItem={(u) => (
-                  <div className="at-deckcard">
-                    <div className="at-deckrow2">
-                      <div className="at-deckmain">
-                        <div className="at-decktitle">
-                          <PersonName
-                            name={u.displayName}
-                            handle={u.handle}
-                            me={account.handle}
-                          />
-                        </div>
-                        <div className="at-deckmeta">{u.handle}</div>
-                      </div>
-                      <div className="at-deckacts">
-                        {/* Suspending and removing (64a, 0.578): in this space
-                            only; never yourself, an App admin, or — unless you
-                            are the App admin — a space admin (70a). Someone
-                            the super admin suspended everywhere is theirs. */}
-                        <PersonActions
-                          person={u}
-                          mayKey={!!(account.admin || !(u.admin || leads.has(u.handle)))}
-                          mayAct={mayAct(u)}
-                          suspendable={!(u as any).suspendedApp}
-                          suspendedHere={!!u.suspended}
-                          removable
-                          onConfirm={setConfirm}
-                          onNewKey={setNewKey}
-                        />
-                      </div>
-                    </div>
+                  /* Folded (0.640): the name opens it, as a form opens in the
+                     card editor. Opened, what can be done to them, and for a
+                     student their private sign-in link. */
+                  <PersonFold
+                    title={<PersonName name={u.displayName} handle={u.handle} me={account.handle} />}
+                    meta={u.handle}
+                    open={!!newKey && newKey.handle === u.handle}
+                    flags={
+                      <>
                     {/* Admin is a flag on the person, not a course they are
                         in, so it stays a badge and keeps the row to itself. */}
                     {(u.admin || leads.has(u.handle) || u.suspended || (u as any).suspendedApp) && (
@@ -2761,6 +3207,29 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                         ) : null}
                       </div>
                     )}
+                      </>
+                    }
+                  >
+                    {newKey && newKey.handle === u.handle ? (
+                      <NewKeyNote made={newKey as { name: string; key: string; handle?: string; fresh?: boolean }} onDone={() => setNewKey(null)} />
+                    ) : null}
+                    <PersonLink name={u.displayName} slug={(data && data.linkSlug) || ""} code={u.linkKey} />
+                    <div className="at-row at-mt3">
+                      {/* Suspending and removing (64a, 0.578): in this space
+                          only; never yourself, an App admin, or — unless you
+                          are the App admin — a space admin (70a). Someone
+                          the super admin suspended everywhere is theirs. */}
+                      <PersonActions
+                        person={u}
+                        mayKey={!!(account.admin || !(u.admin || leads.has(u.handle)))}
+                        mayAct={mayAct(u)}
+                        suspendable={!(u as any).suspendedApp}
+                        suspendedHere={!!u.suspended}
+                        removable
+                        onConfirm={setConfirm}
+                        onNewKey={setNewKey}
+                      />
+                    </div>
                     {/* "Hasn't signed in yet" was a pill up here. The lines
                         below say it, in the same place as the two questions
                         it sits beside, so the pill was the same fact
@@ -2802,7 +3271,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                         never="Never made a card or a deck"
                       />
                     </div>
-                  </div>
+                  </PersonFold>
                 )}
               />
               </Section>
@@ -3038,7 +3507,10 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                     openCard.flag.prompt ||
                     "The flagged card"
                   }
-                  onBack={() => setOpenCard(null)}
+                  onBack={() => {
+                    setOpenCard(null);
+                    cardReach.ok();
+                  }}
                 >
                   <Notice kind="error">{openCard.error}</Notice>
                   {!openCard.card && !openCard.error && (
@@ -3348,6 +3820,7 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
   const [key, setKey] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const reach = useReach();
 
   if (!open)
     return (
@@ -3371,14 +3844,15 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
       <div className="at-row at-mt3">
         <Button variant="primary" size="sm"
           disabled={!key.trim() || busy}
-          onClick={async () => {
+          onClick={async function claim() {
             setBusy(true);
             try {
               await API.claimAdmin(key.trim());
+              reach.ok();
               setOpen(false);
               onDone();
             } catch (e) {
-              setError(API.explain(e));
+              if (!reach.caught(e, claim)) setError(API.explain(e));
             } finally {
               setBusy(false);
             }
@@ -3603,6 +4077,8 @@ function BackupScreen({
   const [newSlugs, setNewSlugs] = useState<Record<string, string>>({});
   const [preview, setPreview] = useState<API.RestorePreview | null>(null);
   const [checking, setChecking] = useState(false);
+  /* The check of a backup against the server, when it could not be made. */
+  const checkReach = useReach();
   const [previewErr, setPreviewErr] = useState("");
   useEffect(() => {
     if (file) setParts(includedIn(file));
@@ -3654,9 +4130,10 @@ function BackupScreen({
     try {
       const o = restoreOptionsFor(file, door, { bringBack, keepSpaceCard, newSlugs, ...choices });
       setPreview(await API.restorePreview(previewBody(file, o, chosen)));
+      checkReach.ok();
     } catch (e) {
       setPreview(null);
-      setPreviewErr(API.explain(e));
+      if (!checkReach.caught(e, () => check(choices))) setPreviewErr(API.explain(e));
     } finally {
       setChecking(false);
     }
@@ -3993,6 +4470,11 @@ function RestoreResult({ report }: { report: RestoreReport }) {
         );
       })}
       {report.skippedMore ? <Help>And {report.skippedMore} more not listed.</Help> : null}
+      {/* A course already here is left as it is, switches and all (0.627):
+          the backup's choice of exercises is not put back over it. */}
+      {report.skipped.some((x) => x.key.startsWith("course:")) ? (
+        <Help>A course that was already here keeps its own choice of exercises; the backup&rsquo;s is not put back.</Help>
+      ) : null}
     </div>
   );
 }
@@ -4025,8 +4507,9 @@ function ExportScreen({ ask, onDone, onClose }: {
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
   const [err, setErr] = useState("");
   const busy = !!progress;
+  const reach = useReach();
 
-  const download = async () => {
+  const download = async (): Promise<void> => {
     setErr("");
     setProgress({ done: 0, total: 0 });
     try {
@@ -4047,9 +4530,10 @@ function ExportScreen({ ask, onDone, onClose }: {
         media && counts.clips ? plural(counts.clips, "recording") : "",
       ].filter(Boolean).join(", ");
       const left = refused ? ` ${plural(refused, "item")} not yours to export stayed out.` : "";
+      reach.ok();
       onDone(`Exported ${said}.${left}${problems.length ? " " + problems.join(" ") : ""}`, refused || problems.length ? "warn" : "good");
     } catch (e) {
-      setErr(API.explain(e));
+      if (!reach.caught(e, download)) setErr(API.explain(e));
       setProgress(null);
     }
   };
@@ -4289,6 +4773,8 @@ function ClearScreen({ onClear, onClose }: {
   const [error, setError] = useState("");
   const [done, setDone] = useState<any | null>(null);
   const [asking, setAsking] = useState(false);
+  /* Clearing is redone only when Retry is pressed (0.636). */
+  const reach = useReach({ auto: false });
 
   const naming = partsChosen(parts).map((p) => p.title.toLowerCase()).join(", ");
 
@@ -4376,17 +4862,18 @@ function ClearScreen({ onClear, onClose }: {
             </p>
           }
           onCancel={() => setAsking(false)}
-          onConfirm={async () => {
+          onConfirm={async function clearIt() {
             setAsking(false);
             setBusy(true);
             setError("");
             try {
               const r = await onClear(key.trim(), parts);
+              reach.ok();
               setDone(r.removed || {});
               setParts([]);
               setKey("");
             } catch (e) {
-              setError(API.explain(e));
+              if (!reach.caught(e, clearIt)) setError(API.explain(e));
             } finally {
               setBusy(false);
             }
@@ -4496,6 +4983,15 @@ function lockedNote(titles: Set<string>): string {
  * deck (its courses, its lock, what it holds) is on the deck's screen once
  * it is saved, as a card's exercises wait for the card to be saved.
  */
+/* The three kinds a new deck can be (0.633): chosen first, on a sheet,
+   and fixed once it is made. */
+type NewKind = "deck" | "unit" | "set";
+const NEW_KINDS: { kind: NewKind; title: string; meta: string }[] = [
+  { kind: "deck", title: "Regular deck", meta: "A set of cards, for any course." },
+  { kind: "unit", title: "Unit", meta: "One step of a course's path, opened in order." },
+  { kind: "set", title: "Personal set", meta: "Pictures each student answers a question about once, then practises with their own word." },
+];
+
 function NewDeck({
   choices,
   mustAsk,
@@ -4503,25 +4999,36 @@ function NewDeck({
   busy,
   onSave,
   onClose,
+  kind = "deck",
+  courses = [],
 }: {
   choices: Record<LangId, Lang>;
   mustAsk?: boolean;
   initialLang?: LangId;
   busy?: boolean;
-  onSave: (title: string, lang: LangId) => void;
+  /** `courseId` for a unit, which goes at the end of that course's path. */
+  onSave: (title: string, lang: LangId, courseId: string) => void;
   onClose: () => void;
+  kind?: NewKind;
+  /** The courses a unit can be made in. */
+  courses?: { id: string; title: string }[];
 }) {
   const [title, setTitle] = useState("");
   const [lang, setLang] = useState(initialLang || "");
+  const [courseId, setCourseId] = useState(courses.length === 1 ? courses[0].id : "");
   const [discarding, setDiscarding] = useState(false);
   const snack = useSnackbar();
-  const canSave = title.trim() && (!mustAsk || lang);
-  const changed = !!title.trim() || (!!mustAsk && !!lang);
+  const unit = kind === "unit";
+  /* A unit's language is its course's. */
+  const asksLang = !!mustAsk && !unit;
+  const canSave = title.trim() && (!asksLang || lang) && (!unit || courseId);
+  const changed = !!title.trim() || (asksLang && !!lang) || (unit && !!courseId && courses.length > 1);
+  const noun = unit ? "unit" : kind === "set" ? "personal set" : "deck";
 
   return (
     <>
     <Screen
-      title="Create deck"
+      title={`Create ${noun}`}
       onBack={() => (changed ? setDiscarding(true) : onClose())}
       backIcon="close"
       backLabel="Cancel"
@@ -4535,16 +5042,16 @@ function NewDeck({
         onClick: () => {
           if (busy) return;
           if (!canSave) snack("Some required fields are missing. They're marked with *.", "warn");
-          else onSave(title.trim(), lang);
+          else onSave(title.trim(), lang, courseId);
         },
       }}
       className="cardform"
     >
       <div className="at-formblock">
         <div className="at-formhead">
-          <span className="at-formnum">This deck</span>
+          <span className="at-formnum">{unit ? "This unit" : kind === "set" ? "This personal set" : "This deck"}</span>
         </div>
-        <Field label={<>Deck name<span className="at-reqstar" aria-hidden="true" /></>}>
+        <Field label={<>{unit ? "Unit name" : kind === "set" ? "Set name" : "Deck name"}<span className="at-reqstar" aria-hidden="true" /></>}>
           <input
             className="at-input"
             placeholder="e.g. Week 3 · Verbs"
@@ -4554,7 +5061,22 @@ function NewDeck({
           />
         </Field>
 
-        {mustAsk && (
+        {unit && (
+          courses.length ? (
+            <RadioGroup
+              label="Course"
+              name="new-unit-course"
+              lede="The unit goes at the end of this course's path, as a draft."
+              value={courseId || null}
+              onChange={setCourseId}
+              options={courses.map((c) => ({ value: c.id, label: c.title }))}
+            />
+          ) : (
+            <Help>A unit belongs to a course's path, and you teach no course yet.</Help>
+          )
+        )}
+
+        {asksLang && (
           <LanguageRadio
             languages={choices}
             value={lang}
@@ -4564,13 +5086,19 @@ function NewDeck({
           />
         )}
 
-        {mustAsk && !lang && <Help>Choose the language it holds.</Help>}
-        <Help className="at-mt3">Save the deck to add cards to it and share it with a course.</Help>
+        {asksLang && !lang && <Help>Choose the language it holds.</Help>}
+        <Help className="at-mt3">
+          {unit
+            ? "Save the unit to add its words and sentences."
+            : kind === "set"
+            ? "Save the set to add its pictures. Once it is in a course, choose the decks its words come from on its screen."
+            : "Save the deck to add cards to it and share it with a course."}
+        </Help>
       </div>
     </Screen>
     {discarding && (
       <ConfirmModal
-        title="Discard this deck?"
+        title={`Discard this ${noun}?`}
         body={<p>Nothing has been saved yet.</p>}
         confirmLabel="Discard"
         onCancel={() => setDiscarding(false)}
@@ -5089,6 +5617,178 @@ function QualityMark({ quality }: { quality?: Quality | null }) {
     <span className={`at-quality ${qualityTone(quality.score)}`} title="Deck quality, out of 100">
       {` · Deck quality ${quality.score}`}
     </span>
+  );
+}
+
+/* ------------------------------------------------------------------
+   A course's path (0.616)
+
+   Above a course's decks: its units, in order, drafts included — each with
+   whether it is published in this course, a warning where it is published
+   and its checklist is no longer clear (R17), and its quality. Every rule
+   is in src/path.ts; this only shows it and calls the server.
+   ------------------------------------------------------------------ */
+
+function PathSection({ course, units, problemsOf, qualityOf, spare, othersOf, busy, onOpen, onCreate, onAdd, onMove, onOpenForClass, onRemove, onDelete }: {
+  course: Course;
+  /** The course's units in path order, drafts included. */
+  units: Deck[];
+  problemsOf: (unitId: string) => UnitProblem[];
+  qualityOf: (unit: Deck) => Quality | null;
+  /** The teacher's units not in this course, to add. */
+  spare: Deck[];
+  /** How many other courses hold a unit. */
+  othersOf: (unitId: string) => number;
+  busy?: boolean;
+  onOpen: (unitId: string) => void;
+  onCreate: (title: string) => void;
+  onAdd: (unitId: string) => void;
+  onMove: (unitId: string, to: number) => void;
+  onOpenForClass: (unitId: string, open: boolean) => void;
+  onRemove: (unitId: string) => void;
+  onDelete: (unitId: string) => void;
+}) {
+  const [naming, setNaming] = useState<string | null>(null);
+  const [adding, setAdding] = useState(false);
+  const [deleting, setDeleting] = useState<Deck | null>(null);
+  const opened = new Set(course.opened || []);
+  return (
+    <div className="at-formblock" data-el="course-path">
+      <div className="at-formhead">
+        <span className="at-formnum">Path</span>
+        <span className="at-formrole">
+          {units.length
+            ? "Students open these units in order. Tap one to open it."
+            : "Units your students open one after another, in the order you set."}
+        </span>
+      </div>
+      {units.map((u, i) => {
+        const live = isLiveIn(course, u.id);
+        const attention = live && problemsOf(u.id).length > 0;
+        return (
+          <div className="at-pathrow" key={u.id} data-el="path-unit">
+            <OpenRow
+              title={`${i + 1}. ${u.title}`}
+              label={`Open unit ${i + 1}, ${u.title}`}
+              meta={
+                <>
+                  {live ? "Published" : "Draft"}
+                  {attention ? <span className="at-notreach">{" · Needs attention"}</span> : null}
+                  {live && opened.has(u.id) ? " · Open for the class" : null}
+                  <QualityMark quality={qualityOf(u)} />
+                </>
+              }
+              onOpen={() => onOpen(u.id)}
+            />
+            <div className="at-row at-pathacts">
+              <Button size="sm" variant="ghost" icon="chevronUp" disabled={busy || i === 0} onClick={() => onMove(u.id, i - 1)}>Move up</Button>
+              <Button size="sm" variant="ghost" icon="chevronDown" disabled={busy || i === units.length - 1} onClick={() => onMove(u.id, i + 1)}>Move down</Button>
+              {live ? (
+                <Button size="sm" variant="ghost" disabled={busy} onClick={() => onOpenForClass(u.id, !opened.has(u.id))}>
+                  {opened.has(u.id) ? "Close for the class" : "Open for the class"}
+                </Button>
+              ) : null}
+              <Button size="sm" variant="ghost" disabled={busy} onClick={() => onRemove(u.id)}>Remove from this course</Button>
+              <Button size="sm" variant="ghost" icon="delete" disabled={busy} onClick={() => setDeleting(u)}>Delete unit</Button>
+            </div>
+          </div>
+        );
+      })}
+      <div className="at-row at-mt3">
+        <Button icon="add" disabled={busy} onClick={() => setNaming("")}>New unit</Button>
+        <Button icon="add" disabled={busy || !spare.length} onClick={() => setAdding(true)}>Add an existing unit</Button>
+      </div>
+      {naming !== null && (
+        <ConfirmModal
+          title="New unit"
+          danger={false}
+          confirmLabel="New unit"
+          busy={busy}
+          body={
+            <Field label="Unit title">
+              <input className="at-input" autoFocus value={naming} onChange={(e) => setNaming(e.target.value)} />
+            </Field>
+          }
+          onCancel={() => setNaming(null)}
+          onConfirm={() => {
+            const title = (naming || "").trim();
+            if (!title) return;
+            setNaming(null);
+            onCreate(title);
+          }}
+        />
+      )}
+      {adding && (
+        <ConfirmModal
+          title="Add an existing unit"
+          danger={false}
+          confirmLabel="Done"
+          body={
+            <div>
+              {spare.map((u) => (
+                <OpenRow key={u.id} title={u.title} label={`Add ${u.title}`} meta="Add to the end of the path"
+                  onOpen={() => { setAdding(false); onAdd(u.id); }} />
+              ))}
+            </div>
+          }
+          onCancel={() => setAdding(false)}
+          onConfirm={() => setAdding(false)}
+        />
+      )}
+      {deleting && (
+        <ConfirmModal
+          title={`Delete ${deleting.title}?`}
+          confirmLabel="Delete unit"
+          confirmWord={deleting.title}
+          busy={busy}
+          body={
+            <>
+              <p>Its cards stay in your library. There is no undoing this.</p>
+              {othersOf(deleting.id) > 0 ? <p>{deleteUnitLine(othersOf(deleting.id))}</p> : null}
+            </>
+          }
+          onCancel={() => setDeleting(null)}
+          onConfirm={() => {
+            const id = deleting.id;
+            setDeleting(null);
+            onDelete(id);
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/*
+ * A unit's checklist in one course (0.616): what stands between it and
+ * publishing there, in the teacher's words, and the button. The server
+ * judges published cards only, so it can be stricter than this; what it
+ * answered is shown in place of this screen's own reading when it does.
+ */
+function UnitChecklist({ live, problems, drafts, textOf, busy, onPublish }: {
+  live: boolean;
+  problems: UnitProblem[];
+  drafts: number;
+  textOf: (cardId: string) => string;
+  busy?: boolean;
+  onPublish: () => void;
+}) {
+  return (
+    <Field label="Checklist">
+      {problems.length ? (
+        <ul className="at-checklist" data-el="unit-checklist">
+          {problems.map((p, i) => <li key={i}>{problemLine(p, textOf)}</li>)}
+        </ul>
+      ) : !live ? (
+        <Notice kind="ok">Ready to publish</Notice>
+      ) : null}
+      {drafts > 0 ? <Help>{draftsLine(drafts)}</Help> : null}
+      {!live && (
+        <Button variant="primary" icon="check" disabled={busy || problems.length > 0} onClick={onPublish}>
+          Publish unit
+        </Button>
+      )}
+    </Field>
   );
 }
 
@@ -5682,7 +6382,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   /* Told which languages this space holds, so that switch has something to
      offer; told nothing is held on the way out. */
   onLangChoices?: (choices: LangChoice[]) => void;
-  onTry?: (plan: { items: any[], exercise: any, back: any }) => void;
+  onTry?: (plan: { items: any[], exercise: any, back: any, decks?: Deck[] }) => void;
   resume?: { cardId?: string; tab?: string; deckId?: string | null } | null;
   /* Sends a recording the server lacks from this device, where the device
      still has it. True when it went up. */
@@ -5729,6 +6429,12 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   });
 
   const [courseView, setCourseView] = useState<any | null>(null);
+  /* The course a unit's page was opened from (0.616): its checklist, its
+     number and its Publish are that course's. And what the server last
+     answered when publishing was refused, which may be stricter than this
+     screen's reading — it judges published cards only. */
+  const [unitCourse, setUnitCourse] = useState<string | null>(null);
+  const [serverProblems, setServerProblems] = useState<{ unitId: string; courseId: string; problems: UnitProblem[] } | null>(null);
   /* The decks a course is still saving, and which way: shown on the
      deck's row as "Adding…" or "Removing…" until the server answers, and
      not tappable meanwhile, so a second tap cannot undo the first. */
@@ -5740,6 +6446,15 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      change have been saved, said on the button. */
   const [applying, setApplying] = useState<{ done: number; total: number } | null>(null);
   const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
+  /* The personal sets, and the decks they name as lists, with the cards
+     each holds — what a trial of a set's picture is set up from (0.632). */
+  const setDecksForTrial = (): Deck[] => {
+    const sets = decks.filter((d) => d.set);
+    const wanted = new Set(sets.flatMap((d) => [d.id, ...((d.set && d.set.lists) || [])]));
+    return decks
+      .filter((d) => wanted.has(d.id))
+      .map((d) => ({ ...d, cardIds: allCards.filter((c) => (c.decks || []).includes(d.id)).map((c) => String(c.id)) }));
+  };
   const [allCards, setCards] = useState<Card[]>(last ? last.cards : []);
   const cards = useMemo(() => allCards.filter((c) => !!c.personal === mineSide), [allCards, mineSide]);
   /* Which recordings those cards name that the server does not hold, told
@@ -5827,6 +6542,15 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
      typing rather than after it. */
   const offline = useOffline();
   const [naming, setNaming] = useState<"new" | null>(null);
+  /* What kind of deck "New deck" makes: chosen on a sheet first, outside
+     My space, where only a regular deck can be made (0.633). */
+  const [choosingKind, setChoosingKind] = useState(false);
+  const [newKind, setNewKind] = useState<NewKind>("deck");
+  const newDeck = () => {
+    setNewKind("deck");
+    if (mineSide) setNaming("new");
+    else setChoosingKind(true);
+  };
   const [confirm, setConfirm] = useState<Pending | null>(null); // whatever is awaiting a yes
   /* Open a card to read it: the editor, locked. */
   const openCard = (c: Card | null | undefined) => {
@@ -5885,6 +6609,11 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   /* As in AdminSpace: whether it worked, for the poll's own backoff. A
      partial answer counts as a failure for that purpose — something is
      wrong out there — while still putting on screen whatever did arrive. */
+  /* A reload that could not reach the server: the snackbar's Retry
+     reloads (0.636). Only one asked for — a background poll that fails
+     says nothing, and one that works lets go of the failure. */
+  const reach = useReach();
+  const refreshRef = useRef<(background?: boolean) => Promise<boolean>>(async () => false);
   const refresh = useCallback(async (background: boolean = false) => {
     if (!background) setBusy(true);
     try {
@@ -5910,15 +6639,25 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       setDecks(unlockedDecks(fresh.decks));
       setCards(fresh.cards);
       setMissingClips(fresh.missingClips);
-      if (!background || !fresh.failed) setError(fresh.failed ? API.explain(fresh.failed) : "");
+      /* Part of it may have failed while the rest arrived. */
+      if (!fresh.failed) {
+        reach.ok();
+        setError("");
+      } else if (!background) {
+        const failed = fresh.failed;
+        setError(reach.caught(failed, () => refreshRef.current()) ? LOAD_UNREACHED : API.explain(failed));
+      }
       return !fresh.failed;
     } catch (e) {
-      if (!background) setError(API.explain(e));
+      if (!background) {
+        setError(reach.caught(e, () => refreshRef.current()) ? LOAD_UNREACHED : API.explain(e));
+      }
       return false;
     } finally {
       if (!background) setBusy(false);
     }
-  }, [account.handle, setBusy, setError]);
+  }, [account.handle, setBusy, setError, reach]);
+  refreshRef.current = refresh;
 
   /* See AdminSpace: how this mount arrived, read once. Arriving with the
      last contents means the check for what has changed runs quietly. */
@@ -6167,6 +6906,37 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
    * anything of the teacher's. The sentences a blank makes are the ones
    * review already worked out.
    */
+  /*
+   * A course's path (0.616). What may count toward a unit's five, in one
+   * course: the cards of the units drawsFrom names, every card never asked
+   * on its own, and the number values of the parts those units hold —
+   * countingCards in path.ts, the server's rule too. For the checklist and
+   * the quality score only: never handed to the card editor or the review
+   * sheet, whose pools are exactly what they were.
+   */
+  const countingFor = useCallback(
+    (unitId: string, course: Course): Card[] =>
+      countingCards({ course, decks: allDecks, unitId, cards: lendable, deckIdsOf: (c) => c.decks || [], fillers: lendable }),
+    [allDecks, lendable],
+  );
+  /* The course a unit is judged in: the one its page was opened from, or
+     else the first whose path holds it. */
+  const courseOfUnit = useCallback(
+    (unitId: string): Course | null =>
+      (unitCourse && courses.find((c) => c.id === unitCourse && (c.path || []).includes(unitId))) ||
+      courses.find((c) => (c.path || []).includes(unitId)) ||
+      null,
+    [courses, unitCourse],
+  );
+  /* A unit's checklist in a course, as this screen reads it. */
+  const problemsIn = useCallback(
+    (unitId: string, course: Course): UnitProblem[] => {
+      const unit = allDecks.find((d) => d.id === unitId);
+      const held = cards.filter((c) => (c.decks || []).includes(unitId));
+      return unitProblems({ cards: held, counting: countingFor(unitId, course), lang: unit ? langOfDeck(unit) : null });
+    },
+    [allDecks, cards, countingFor, langOfDeck],
+  );
   const qualityOf = useCallback(
     (deck: Deck, pending = false): Quality => {
       const held = cards.filter((c) => (c.decks || []).includes(deck.id));
@@ -6174,7 +6944,12 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       const linked = new Set(
         (deck.courses || []).flatMap((l) => (courses.find((c) => c.id === l.courseId) || { decks: [] as string[] }).decks),
       );
-      const known = linked.size
+      /* A unit's words may come only from what the path has taught by
+         then, so a word a later unit teaches reads as not taught (R15). */
+      const onPath = isPathUnit(deck) ? courseOfUnit(deck.id) : null;
+      const known = onPath
+        ? countingFor(deck.id, onPath)
+        : linked.size
         ? lendable.filter((c) => !owned.has(c.id) || (c.decks || []).some((id) => linked.has(id)))
         : lendable;
       return deckQuality(held, {
@@ -6186,7 +6961,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         pending,
       });
     },
-    [cards, courses, lendable, langOfDeck, sentenceParts, lentById],
+    [cards, courses, lendable, langOfDeck, sentenceParts, lentById, courseOfUnit, countingFor],
   );
   const qualities: Map<string, Quality> = useMemo(
     () => (tab === "decks" ? new Map(decks.map((d) => [d.id, qualityOf(d)])) : new Map()),
@@ -6198,6 +6973,17 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     const d = openDeck ? decks.find((x) => x.id === openDeck) : null;
     return d ? qualityOf(d, true) : null;
   }, [openDeck, decks, qualityOf]);
+  /* The checklist of every unit on the course on screen, and of the unit
+     open, worked out once per change rather than on every render. */
+  const pathChecks: Map<string, UnitProblem[]> = useMemo(() => {
+    const out: Map<string, UnitProblem[]> = new Map();
+    const course = courseView ? courses.find((c) => c.id === courseView) : null;
+    if (course) for (const u of pathUnits(course, allDecks)) out.set(u.id, problemsIn(u.id, course));
+    const open = openDeck ? allDecks.find((d) => d.id === openDeck) : null;
+    const at = open && isPathUnit(open) ? courseOfUnit(open.id) : null;
+    if (open && at && !out.has(open.id)) out.set(open.id, problemsIn(open.id, at));
+    return out;
+  }, [courseView, courses, allDecks, openDeck, problemsIn, courseOfUnit]);
   /* Narrowed then ordered. ItemList's own search runs after this, over what
      is left, so a search inside a filter behaves the way it reads. */
   const shownCards = useMemo(
@@ -7146,17 +7932,25 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   if (naming) {
     return (
       <NewDeck
+        kind={newKind}
+        courses={courses.map((c) => ({ id: c.id, title: c.title }))}
         choices={choicesOn}
         mustAsk={mustAskOn}
         initialLang={knownOn.length === 1 ? soleLangOn : ""}
         busy={busy}
         onClose={() => setNaming(null)}
-        onSave={(title, lang) =>
+        onSave={(title, lang, courseId) =>
           run(
             async () => {
-              const r = await API.createDeck(title, "", lang || soleLangOn, mineSide);
+              /* A unit is made on its course's path; a personal set is a
+                 deck made, then marked as a set (0.633). */
+              const r: any = newKind === "unit"
+                ? await API.createUnit(courseId, title)
+                : await API.createDeck(title, "", lang || soleLangOn, mineSide);
+              if (newKind === "set" && r && r.deck && r.deck.id) await API.saveSet(r.deck.id, emptySet());
               setNaming(null);
               await refresh();
+              if (newKind === "unit") setUnitCourse(courseId);
               if (r && r.deck && r.deck.id) setOpenDeck(r.deck.id);
             },
             `${title} created`
@@ -7303,7 +8097,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               card={editing.card}
               cards={lendable}
               lang={editLang || undefined}
-              onTry={onTry}
+              /* With the personal sets and their lists, each with its
+                 cards, so a set's picture is tried as a student meets it
+                 — with a stand-in answer, a teacher having none (0.632). */
+              onTry={onTry ? (plan) => onTry({ ...plan, decks: setDecksForTrial() }) : undefined}
             />
           ) : null
         }
@@ -7826,13 +8623,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
        showing empty boxes that are about to be filled in would invite
        somebody to type over their own work. */
     if (!systems) {
-      void loadSystems().catch((e) => setError(API.explain(e)));
-      return (
-        <Screen title="Number system" onBack={() => setNumbering(null)}>
-          <Help>Fetching what is written for {numLang.name}…</Help>
-          {error ? <Notice kind="warn">{error}</Notice> : null}
-        </Screen>
-      );
+      return <FetchingSystems name={numLang.name} load={loadSystems} onBack={() => setNumbering(null)} />;
     }
     const held = systems.numbers.find((n) => n.languageId === numbering) || null;
     const numbers =
@@ -8636,6 +9427,50 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         </Screen>
       );
     }
+    /* A path unit (0.616): its page is a deck's, headed with its number on
+       the path of the course it was opened from, with that course's
+       checklist and Publish above its cards. */
+    const unitIn = isPathUnit(d) ? courseOfUnit(d.id) : null;
+    const unitNo = unitIn ? pathUnits(unitIn, allDecks).findIndex((u) => u.id === d.id) + 1 : 0;
+    const unitLive = !!unitIn && isLiveIn(unitIn, d.id);
+    const fromServer = serverProblems && unitIn && serverProblems.unitId === d.id && serverProblems.courseId === unitIn.id
+      ? serverProblems.problems : null;
+    const unitChecks = unitIn ? fromServer || pathChecks.get(d.id) || [] : [];
+    const cardText = (id: string) => {
+      const card = lentById.get(id);
+      return card ? String(leadOf(card as never).ar || card.name || "").trim() : id;
+    };
+    const unitDrafts = held.filter((c) => c.status && c.status !== "published").length;
+    const unitLang = langOfDeck(d) || null;
+    /* Advice, not points (A6): blanks whose approved cards are all of one form. */
+    const sameForm = unitIn && unitLang
+      ? sameFormBlanks(
+        blankFills(held, countingFor(d.id, unitIn), unitLang),
+        (id) => lentById.get(id),
+        dimsOf(unitLang).map((dim) => dim.field),
+      )
+      : [];
+    const publishUnit = () => {
+      if (!unitIn) return;
+      run(async () => {
+        try {
+          const r: any = await API.publishUnit(unitIn.id, d.id);
+          setServerProblems(null);
+          if (r && r.course) {
+            setCourses((prev) => prev.map((x) => (x.id === unitIn.id
+              ? { ...x, path: r.course.path, pathLive: r.course.pathLive, opened: r.course.opened }
+              : x)));
+          }
+        } catch (e) {
+          const data = e && typeof e === "object" && "data" in e ? (e as { data?: any }).data : null;
+          if (data && data.error === "unit-not-ready" && Array.isArray(data.problems)) {
+            setServerProblems({ unitId: d.id, courseId: unitIn.id, problems: data.problems });
+            return;
+          }
+          throw e;
+        }
+      }, `${d.title} published in ${unitIn.title}`);
+    };
     /* Read and edited on one screen, as a card is: what is shown is the
        saved deck until Edit is pressed, and the draft after. */
     const editing = !!deckDraft;
@@ -8665,7 +9500,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       <Screen
         /* What is being done, not which deck: its name is the first
            thing on the screen. */
-        title={editing ? "Edit deck" : "Deck"}
+        title={editing ? (unitIn ? "Edit unit" : "Edit deck") : unitIn ? `Unit ${unitNo} · ${d.title}` : "Deck"}
         scrollKey={d.id}
         /* Laid out like a card's screen — see .at-screen.cardform: one
            sheet ruled into sections, each headed at the editor's size with
@@ -8676,7 +9511,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         onBack={
           editing
             ? () => (changed ? setDiscardingDeck(true) : setDeckDraft(null))
-            : () => { setOpenDeck(null); setCardAction(null); setTagAction(null); setManaging(false); setAdding(null); }
+            : () => { setOpenDeck(null); setCardAction(null); setTagAction(null); setManaging(false); setAdding(null); setServerProblems(null); }
         }
         backIcon={editing ? "close" : "back"}
         backLabel={editing ? "Cancel" : "Back"}
@@ -8708,7 +9543,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 the card's way — and its quality is read either way. */}
             <div className="at-formblock">
               <div className="at-formhead">
-                <span className="at-formnum">This deck</span>
+                <span className="at-formnum">{unitIn ? "This unit" : "This deck"}</span>
                 <span className="at-formacts">
                   <Button reads size="sm" className="iconly" aria-label="Export this deck" title="Export this deck"
                     onClick={() => exportDecks([d.id])}>
@@ -8810,6 +9645,53 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 )}
               </Field>
             </div>
+
+            {/* A personal set's wording, lists and ticks (0.632). Only on a
+                deck made as one (0.633). */}
+            {d.set && !d.personal && (
+              <SetSection
+                deck={d}
+                decks={decks}
+                cards={allCards}
+                busy={!!busy}
+                onSave={(next) =>
+                  run(async () => {
+                    const r: any = await API.saveSet(d.id, next);
+                    const set = r && r.deck ? r.deck.set : undefined;
+                    setDecks((prev) => prev.map((x) => {
+                      if (x.id !== d.id) return x;
+                      const { set: _was, ...rest } = x;
+                      return set ? { ...rest, set } : rest;
+                    }));
+                  }, `${d.title} saved`)
+                }
+              />
+            )}
+
+            {unitIn && (
+              <div className="at-formblock" data-el="unit-checklist-block">
+                <div className="at-formhead">
+                  <span className="at-formnum">{unitIn.title}</span>
+                  <span className="at-formrole">{unitLive ? "Published" : "Draft"}</span>
+                </div>
+                <UnitChecklist
+                  live={unitLive}
+                  problems={unitChecks}
+                  drafts={unitDrafts}
+                  textOf={cardText}
+                  busy={busy}
+                  onPublish={publishUnit}
+                />
+                {sameForm.length ? (
+                  <Field label="Forms">
+                    <Help>These blanks always take the same form. Adding cards of another gender or number would give more practice:</Help>
+                    <ul className="at-checklist">
+                      {sameForm.map((b, i) => <li key={i}>{`"${cardText(b.cardId)}": ${b.slot}`}</li>)}
+                    </ul>
+                  </Field>
+                ) : null}
+              </div>
+            )}
 
             {/* The cards, word sets among them, to read: which cards
                 the deck holds is changed on Manage cards. */}
@@ -8946,7 +9828,60 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       setCourseView(null);
       return null;
     }
-    const mine = decks.filter((d) => (d.courses || []).some((l) => l.courseId === c.id));
+    /* Units are on the path above, never among the ordinary decks, nor
+       among those that can be added beside it. */
+    const mine = decks.filter((d) => !isPathUnit(d) && (d.courses || []).some((l) => l.courseId === c.id));
+    const plainDecks = decks.filter((d) => !isPathUnit(d));
+    const units = pathUnits(c, allDecks) as Deck[];
+    /* What the server saved, put on screen as it is — see toggleDeck. */
+    const tookCourse = (r: any) => {
+      const next = r && r.course;
+      if (!next || next.id !== c.id) return;
+      setCourses((prev) => prev.map((x) => (x.id === c.id
+        ? { ...x, decks: next.decks || [], path: next.path, pathLive: next.pathLive, opened: next.opened }
+        : x)));
+    };
+    const tookDeck = (r: any) => {
+      const saved = r && r.deck;
+      if (!saved) return;
+      setDecks((prev) => (prev.some((d) => d.id === saved.id)
+        ? prev.map((d) => (d.id === saved.id ? { ...d, ...saved, courses: saved.courses || d.courses } : d))
+        : prev.concat([{ ...saved, cardCount: (saved.cardIds || []).length }])));
+    };
+    const pathSection = (
+      <PathSection
+        course={c}
+        units={units}
+        problemsOf={(id) => pathChecks.get(id) || []}
+        qualityOf={(u) => qualities.get(u.id) || qualityOf(u)}
+        spare={allDecks.filter((d) => isPathUnit(d) && !(c.decks || []).includes(d.id))}
+        othersOf={(id) => courses.filter((x) => x.id !== c.id && (x.decks || []).includes(id)).length}
+        busy={busy}
+        onOpen={(id) => { setUnitCourse(c.id); setOpenDeck(id); }}
+        onCreate={(title) => run(async () => {
+          const r = await API.createUnit(c.id, title);
+          tookDeck({ deck: { ...r.deck, courses: [{ courseId: c.id }] } });
+          tookCourse(r);
+        }, `${title} added to the path`)}
+        onAdd={(id) => run(async () => {
+          const r = await API.attachDeck(id, c.id);
+          tookDeck(r);
+          tookCourse(r);
+        })}
+        onMove={(id, to) => run(async () => tookCourse(await API.moveUnit(c.id, id, to)))}
+        onOpenForClass={(id, open) => run(async () => tookCourse(await API.openUnit(c.id, id, open)),
+          open ? "Opened for the class" : "Closed for the class")}
+        onRemove={(id) => run(async () => {
+          const r = await API.detachDeck(id, c.id);
+          tookDeck(r);
+          tookCourse(r);
+        })}
+        onDelete={(id) => run(async () => {
+          await API.deleteDeck(id);
+          await refresh(true);
+        })}
+      />
+    );
     const people = (title: string, list: string[], none: string) => (
       <Field label={`${title} · ${list.length}`}>
         {list.length ? (
@@ -9038,6 +9973,22 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               {people("Students", c.students, "Nobody has joined yet. Share the student code above.")}
             </div>
 
+            <PracticeSection
+              course={c}
+              cards={cards.filter((k) => (k.decks || []).some((d) => (c.decks || []).includes(d)))}
+              lang={languages[c.language as LangId] || null}
+              busy={busy}
+              onSave={(next) =>
+                run(async () => {
+                  const r: any = await API.setCoursePractice(c.id, next);
+                  const saved = r && r.course && r.course.practice;
+                  if (saved) setCourses((prev) => prev.map((x) => (x.id === c.id ? { ...x, practice: saved } : x)));
+                }, `${c.title} now asks ${next.mode === "custom" ? "the exercises you chose" : next.mode === "none" ? "no English" : next.mode === "little" ? "little English" : "everything, with translation"}`)
+              }
+            />
+
+            {pathSection}
+
             {/* What the course teaches, as a deck says which courses carry
                 it: the names, each with its way out, and the way to add
                 another on the end of the row. A name opens its deck. */}
@@ -9052,7 +10003,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               </div>
               {mine.length ? (
                 <DeckSwitch
-                  decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
+                  decks={plainDecks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
                   chosen={mine.map((d) => d.id)}
                   onOpen={(id) => setOpenDeck(id)}
                   onToggle={toggleDeck}
@@ -9076,7 +10027,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   tone="attention"
                   action={
                     <DeckSwitch
-                      decks={decks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
+                      decks={plainDecks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
                       chosen={mine.map((d) => d.id)}
                       onOpen={(id) => setOpenDeck(id)}
                       onToggle={toggleDeck}
@@ -9616,6 +10567,18 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 A deck is a set of cards. A deck can be used to group cards by theme, class, or objective. Students see a deck once it's added to a course they belong to.
               </Help>
 
+              {choosingKind && (
+                <PickSheet title="New deck" lede="What kind of deck? This can't be changed once it is made." onClose={() => setChoosingKind(false)}>
+                  {NEW_KINDS.map((k) => (
+                    <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
+                      setChoosingKind(false);
+                      setNewKind(k.kind);
+                      setNaming("new");
+                    }} />
+                  ))}
+                </PickSheet>
+              )}
+
               <ItemList
                 noun="deck"
                 items={onDecks}
@@ -9632,7 +10595,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   <Nudge
                     icon="folder"
                     action={
-                      <Button variant="primary" icon="add" onClick={() => setNaming("new")}>
+                      <Button variant="primary" icon="add" onClick={newDeck}>
                         New deck
                       </Button>
                     }
@@ -9642,7 +10605,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
                 tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
-                onNew={() => setNaming("new")}
+                onNew={newDeck}
                 selected={selDecks}
                 onSelectedChange={setSelDecks}
                 bulkActions={[
@@ -9760,6 +10723,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                             {d.practise !== false ? "Practised in your Learning" : "Not practised"}
                           </TileNote>
                         ) : (
+                        <>
+                        {d.set ? <TileNote live={live}>Personal set</TileNote> : null}
                         <TileNote live={live}>
                           {live ? (
                             <>
@@ -9771,6 +10736,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                             <>Not in a course yet — nobody can see it</>
                           )}
                         </TileNote>
+                        </>
                         )
                       }
                     />
@@ -9808,11 +10774,15 @@ export function StudentCourses({
   error,
   onJoin,
   onRefresh,
+  onRetry,
   onPractise,
   spaces,
   mySpaceIds,
 }: {
   courses: Course[];
+  /** Given when the courses could not be checked because the server was
+      out of reach: offered as Retry while this screen is open (0.636). */
+  onRetry?: () => unknown;
   /** Every space the account is in, to say so when a code joins another. */
   mySpaceIds?: string[];
   /** Your spaces, when Learning shows more than one: the courses go under
@@ -9828,6 +10798,9 @@ export function StudentCourses({
   onPractise: (deckTitle: string) => void;
 }) {
   const [note, setNote] = useState("");
+  useReachHold(onRetry, { detail: "Your own cards still work." });
+  const joinReach = useReach();
+  const joinRef = useRef<(code: string) => Promise<void>>(async () => {});
   const groups = spaces && spaces.length > 1
     ? spaces.map((o) => ({ key: o.id, title: o.name, courses: courses.filter((c) => (c as any).org === o.id) }))
     : undefined;
@@ -9844,9 +10817,10 @@ export function StudentCourses({
       joinHint="Enter the code your teacher gave you."
       joinPlaceholder="Course code"
       joinNote={note}
-      onJoin={onJoin && (async (code) => {
+      onJoin={onJoin && (joinRef.current = async (code) => {
         try {
           const r = await onJoin(code);
+          joinReach.ok();
           setNote(
             r && r.course
               ? r.space && mySpaceIds && mySpaceIds.length && !mySpaceIds.includes(r.space.id)
@@ -9855,7 +10829,7 @@ export function StudentCourses({
               : "Joined."
           );
         } catch (e) {
-          setNote(API.explain(e));
+          setNote(joinReach.caught(e, () => joinRef.current(code)) ? "" : API.explain(e));
         }
       })}
       renderCourse={(c) => {
@@ -9903,24 +10877,73 @@ export function StudentCourses({
  * deck's Edit, because it changes what students hear rather than what the
  * deck is called. Shown only on a deck that holds number parts.
  */
+/*
+ * The number screen while what is written for it is fetched. Its own
+ * component so the fetch is made once on the way in and again on Retry
+ * (0.636), rather than on every render as it was.
+ */
+function FetchingSystems({ name, load, onBack }: { name: string; load: () => Promise<void>; onBack: () => void }) {
+  const [error, setError] = useState("");
+  const reach = useReach();
+  useEffect(() => {
+    let live = true;
+    const go = (): Promise<void> =>
+      load().then(
+        () => reach.ok(),
+        (e) => {
+          if (live) setError(reach.caught(e, go) ? LOAD_UNREACHED : API.explain(e));
+        },
+      );
+    void go();
+    return () => {
+      live = false;
+    };
+  }, [load, reach]);
+  return (
+    <Screen title="Number system" onBack={onBack}>
+      <Help>Fetching what is written for {name}…</Help>
+      {error ? <Notice kind="warn">{error}</Notice> : null}
+    </Screen>
+  );
+}
+
 function NumbersFrom({ deckId }: { deckId: string }) {
   const [sources, setSources] = useState<{ handle: string; displayName: string }[] | null>(null);
   const [chosen, setChosen] = useState("");
   const [error, setError] = useState("");
+  /* Loading the choice, and making one: each its own Retry (0.636). */
+  const loadReach = useReach();
+  const saveReach = useReach();
   useEffect(() => {
     let live = true;
-    API.numberSources(deckId).then(
-      (r) => {
-        if (!live) return;
-        setSources(r.sources);
-        setChosen(r.chosen);
-      },
-      (e) => live && setError(API.explain(e)),
-    );
+    const go = (): Promise<void> =>
+      API.numberSources(deckId).then(
+        (r) => {
+          if (!live) return;
+          loadReach.ok();
+          setError("");
+          setSources(r.sources);
+          setChosen(r.chosen);
+        },
+        (e) => {
+          if (live) setError(loadReach.caught(e, go) ? LOAD_UNREACHED : API.explain(e));
+        },
+      );
+    void go();
     return () => {
       live = false;
     };
-  }, [deckId]);
+  }, [deckId, loadReach]);
+  async function choose(h: string, was: string): Promise<void> {
+    setChosen(h);
+    try {
+      await API.setDeckNumbers(deckId, h);
+      saveReach.ok();
+    } catch (e) {
+      setChosen(was);
+      if (!saveReach.caught(e, () => choose(h, was))) setError(API.explain(e));
+    }
+  }
   if (error) return <Notice kind="error">{error}</Notice>;
   if (!sources || !sources.length) return null;
   return (
@@ -9931,16 +10954,7 @@ function NumbersFrom({ deckId }: { deckId: string }) {
         quiet
         value={chosen}
         options={sources.map((x) => ({ value: x.handle, label: x.displayName }))}
-        onChange={async (h) => {
-          const was = chosen;
-          setChosen(h);
-          try {
-            await API.setDeckNumbers(deckId, h);
-          } catch (e) {
-            setChosen(was);
-            setError(API.explain(e));
-          }
-        }}
+        onChange={(h) => void choose(h, chosen)}
       />
     </Field>
   );
@@ -9981,13 +10995,15 @@ function SpacesTab() {
     },
   });
 
-  const load = useCallback(async () => {
+  const loadReach = useReach();
+  const load = useCallback(async function loadOrgs(): Promise<void> {
     try {
       setOrgs((await API.adminOrgs()).orgs);
+      loadReach.ok();
     } catch (e) {
-      setError(API.explain(e));
+      setError(loadReach.caught(e, loadOrgs) ? LOAD_UNREACHED : API.explain(e));
     }
-  }, [setError]);
+  }, [setError, loadReach]);
   useEffect(() => {
     load();
   }, [load]);
@@ -10023,6 +11039,17 @@ function SpacesTab() {
               run(async () => {
                 const r = await API.createOrg(making.name.trim(), making.slug.trim().toLowerCase(),
                   making.self ? "" : making.adminName.trim(), "", "", making.self);
+                /* You are in it now (0.637): the app learns of the new
+                   space at once, the way adding yourself to one does. */
+                if (making.self) {
+                  const acc = API.loadAccount();
+                  if (acc) {
+                    const me2 = await API.whoAmI(acc.key).catch(() => null);
+                    if (me2) API.saveAccount({ ...me2.user, key: acc.key });
+                  }
+                  window.location.reload();
+                  return;
+                }
                 /* No key to show when you are its admin yourself (0.552). */
                 setMade(r.key ? { name: r.org.name, admin: r.admin.displayName, key: r.key, slug: r.org.slug } : null);
                 setMaking(null);
@@ -10400,13 +11427,14 @@ function FormerMembers({ former, people, busy, ask }: {
         empty="Nobody matches."
         renderItem={(r) => {
         const suspended = r.why === "left" || r.why === "removed";
+        /* Folded like every list of people (0.640); no key or link here. */
         return (
-          <Tile key={r.handle}
+          <PersonFold key={r.handle}
             title={r.displayName}
             meta={`${FORMER_WHY[r.why] || r.why} · ${shortDate(r.left)} · joined ${shortDate(r.joined)}${
               r.courses.length ? ` · was in ${r.courses.map((c) => c.title).join(", ")}` : ""}`}
-            actions={
-              <>
+          >
+            <div className="at-row at-mt3">
                 {suspended && (
                   <Button size="sm" disabled={busy}
                     onClick={() => ask({
@@ -10443,9 +11471,8 @@ function FormerMembers({ former, people, busy, ask }: {
                       action: () => API.purgeFormer(r.handle),
                     })} />
                 )}
-              </>
-            }
-          />
+            </div>
+          </PersonFold>
         );
       }}
       />
@@ -10553,7 +11580,7 @@ function SpaceExtras({ org }: { org: API.OrgRow }) {
  * reactivating and deleting work wherever the person is: each call is sent
  * as from their space.
  */
-type Person = User & { org: string; orgs?: string[]; suspendedIn?: Record<string, unknown>; suspendedApp?: unknown };
+type Person = User & { org: string; orgs?: string[]; suspendedIn?: Record<string, unknown>; suspendedApp?: unknown; linkSlug?: string };
 
 function EveryonePeople({ me }: { me: string }) {
   const [data, setData] = useState<{
@@ -10575,7 +11602,20 @@ function EveryonePeople({ me }: { me: string }) {
   /* Taking one space away from someone (0.578): who, and which. */
   const [removing, setRemoving] = useState<Person | null>(null);
   const [removeFrom, setRemoveFrom] = useState("");
-  const load = useCallback(() => API.everyone().then((r) => setData(r), (e) => setError(API.explain(e))), [setError]);
+  const loadReach = useReach();
+  /* Adding someone, and taking a space away: the second is redone only
+     when Retry is pressed (0.636). */
+  const addReach = useReach();
+  const removeReach = useReach({ auto: false });
+  const load = useCallback(function loadPeople(): Promise<void> {
+    return API.everyone().then(
+      (r) => {
+        loadReach.ok();
+        setData(r);
+      },
+      (e) => setError(loadReach.caught(e, loadPeople) ? LOAD_UNREACHED : API.explain(e)),
+    );
+  }, [setError, loadReach]);
   useEffect(() => {
     load();
   }, [load]);
@@ -10592,6 +11632,15 @@ function EveryonePeople({ me }: { me: string }) {
     const why = whyIn(u, org);
     return why === "removed" || why === "left";
   };
+  /* One person, folded (0.640): opened, their new key if one was just
+     made, a student's sign-in link, and the actions. */
+  const fold = (u: Person, meta: string, o: API.SuperOrg | null) => (
+    <PersonFold key={u.handle} title={u.displayName} meta={meta} open={!!newKey && newKey.handle === u.handle}>
+      {newKey && newKey.handle === u.handle ? <NewKeyNote made={newKey} onDone={() => setNewKey(null)} /> : null}
+      <PersonLink name={u.displayName} slug={u.linkSlug} code={u.linkKey} />
+      <div className="at-row at-mt3">{actionsFor(u, o)}</div>
+    </PersonFold>
+  );
   /* The same actions in both views; `o` is the space a row is under, or
      null in All. */
   const actionsFor = (u: Person, o: API.SuperOrg | null) => {
@@ -10696,11 +11745,12 @@ function EveryonePeople({ me }: { me: string }) {
               </>
             }
             onCancel={() => setAdding(null)}
-            onConfirm={async () => {
+            onConfirm={async function addIt() {
               if (!addTo) return;
               setBusy(true);
               try {
                 await API.addMember(adding.handle, addTo);
+                addReach.ok();
                 /* Yourself (0.575): the app learns of the new space at
                    once, and starts again if it changes where you are. */
                 if (adding.handle === me) {
@@ -10715,7 +11765,7 @@ function EveryonePeople({ me }: { me: string }) {
                 setAdding(null);
                 await load();
               } catch (e) {
-                setError(API.explain(e));
+                if (!addReach.caught(e, addIt)) setError(API.explain(e));
               } finally {
                 setBusy(false);
               }
@@ -10747,15 +11797,16 @@ function EveryonePeople({ me }: { me: string }) {
               </>
             }
             onCancel={() => setRemoving(null)}
-            onConfirm={async () => {
+            onConfirm={async function removeIt() {
               if (!removeFrom) return;
               setBusy(true);
               try {
                 await API.removeFromSpace(removing.handle, removeFrom);
+                removeReach.ok();
                 setRemoving(null);
                 await load();
               } catch (e) {
-                setError(API.explain(e));
+                if (!removeReach.caught(e, removeIt)) setError(API.explain(e));
               } finally {
                 setBusy(false);
               }
@@ -10773,14 +11824,6 @@ function EveryonePeople({ me }: { me: string }) {
       />
       <SearchBox placeholder="Search everyone, in every space" aria-label="Search everyone, in every space"
         value={q} onChange={setQ} style={{ marginBottom: 14 }} />
-      {newKey && (
-        <div className="at-sub">
-          <CodeBox label={`New sign-in key for ${newKey.name}`} code={newKey.key} />
-          <div className="at-row" style={{ marginTop: 0, marginBottom: 10 }}>
-            <Button variant="ghost" size="sm" onClick={() => setNewKey(null)}>Done</Button>
-          </div>
-        </div>
-      )}
       {data && view === "all" && (() => {
         const everyone = data.people.filter(match).slice().sort((a, b) => a.displayName.localeCompare(b.displayName));
         return (
@@ -10799,12 +11842,10 @@ function EveryonePeople({ me }: { me: string }) {
                 const why = whyIn(u, id);
                 return `${o ? o.name : id}${why === "suspended" ? " (suspended)" : why === "removed" ? " (removed)" : why === "left" ? " (left)" : ""}`;
               });
-              return (
-                <Tile key={u.handle}
-                  title={u.displayName}
-                  meta={`${u.handle}${u.admin ? " · App admin" : ""}${u.suspendedApp ? " · Suspended everywhere" : ""} · ${names.join(", ") || "In no space"}`}
-                  actions={actionsFor(u, null)}
-                />
+              return fold(
+                u,
+                `${u.handle}${u.admin ? " · App admin" : ""}${u.suspendedApp ? " · Suspended everywhere" : ""} · ${names.join(", ") || "In no space"}`,
+                null,
               );
               }}
             />
@@ -10830,13 +11871,11 @@ function EveryonePeople({ me }: { me: string }) {
               match={(u, nq) => `${u.displayName} ${u.handle}`.toLowerCase().includes(nq)}
               renderItem={(u) => {
               const why = whyIn(u, o.id);
-              return (
-                <Tile key={u.handle}
-                  title={u.displayName}
-                  meta={`${u.handle}${u.admin ? " · App admin" : o.admins.includes(u.handle) ? " · Space admin" : ""}${
-                    u.suspendedApp ? " · Suspended everywhere" : why === "suspended" ? " · Suspended" : why === "removed" ? " · Removed" : why === "left" ? " · Left" : ""}`}
-                  actions={actionsFor(u, o)}
-                />
+              return fold(
+                u,
+                `${u.handle}${u.admin ? " · App admin" : o.admins.includes(u.handle) ? " · Space admin" : ""}${
+                  u.suspendedApp ? " · Suspended everywhere" : why === "suspended" ? " · Suspended" : why === "removed" ? " · Removed" : why === "left" ? " · Left" : ""}`,
+                o,
               );
               }}
             />
@@ -10877,7 +11916,18 @@ function EveryReport({ languages }: { languages: Record<string, any> }) {
       /* private browsing: it opens on card reports next time */
     }
   };
-  const load = useCallback(() => API.allReports().then((r) => setData(r), (e) => setError(API.explain(e))), []);
+  const loadReach = useReach();
+  const dismissReach = useReach();
+  const load = useCallback(function loadReports(): Promise<void> {
+    return API.allReports().then(
+      (r) => {
+        loadReach.ok();
+        setError("");
+        setData(r);
+      },
+      (e) => setError(loadReach.caught(e, loadReports) ? LOAD_UNREACHED : API.explain(e)),
+    );
+  }, [loadReach]);
   useEffect(() => {
     load();
   }, [load]);
@@ -10885,12 +11935,13 @@ function EveryReport({ languages }: { languages: Record<string, any> }) {
   const nameOf = (id: string) => (data.orgs.find((o) => o.id === id) || { name: id }).name;
   const flags = data.flags.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
   const feedback = (data.feedback || []).slice().sort((a, b) => (b.at || 0) - (a.at || 0));
-  const dismiss = async (work: () => Promise<unknown>) => {
+  const dismiss = async (work: () => Promise<unknown>): Promise<void> => {
     try {
       await work();
+      dismissReach.ok();
       await load();
     } catch (e) {
-      setError(API.explain(e));
+      if (!dismissReach.caught(e, () => dismiss(work))) setError(API.explain(e));
     }
   };
   return (

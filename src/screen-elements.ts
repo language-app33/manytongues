@@ -37,6 +37,8 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["question-form-tag", "Which form is being asked, only where the question could not otherwise say — written from its meaning, or with another form of the card among the tiles: only what tells it from the others, in whole words.", "feminine plural"],
     ["question-clue", "Which card the question means, where another card the learner studies shows the same word or the same meaning: the teacher's clue, or the other card's answer ruled out.", "not patience"],
     ["question-fill-tag", "What a word dropped into a sentence is, where its English could be more than one form of it. Only then; nothing on most sentences.", "Your name: plural"],
+    ["set-caption", "Under a personal set's picture, when the question asks for the learner's own word for it (0.631): the name of whoever is in the picture.", "Lan"],
+    ["set-voice", "Under the play button, where the teacher said who is speaking on the recording (0.631): one name, or two where a word and a name were recorded by different people.", "Recorded by Mai"],
     ["question-prompt", "The block being asked about. A word, a phrase with a gap in it, a play button, or a conversation, depending on the exercise.", ""],
     ["question-prompt-text", "The words inside it, when it is words. One size in every exercise.", "كِتاب"],
     ["question-prompt-meaning", "Under a scene's sentence with a word missing: what the sentence means, as the clue, when the word is to be typed — until it is answered. Only where the sentence has its English.", "I went to school today"],
@@ -88,6 +90,8 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["verdict-typo", "Says a right answer in English was one letter out, above the spelling it should have had.", "One letter out — counted as right. It is spelt:"],
     ["verdict-usual", "Says a right answer was written the textbook's way where people usually say it another way — in Palestinian Arabic, \"in\" or \"at\" before \"the\" — and gives the everyday form.", "Right. People usually say أنا بالشغل."],
     ["verdict-hinted", "Says so when a right answer was written with the nudge up, on the questions whose nudge is the answer said another way.", "Right — but the transliteration was on screen, so this one counts as a near miss and comes round again."],
+    ["verdict-meaning-lent", "Says so when a right answer's meaning was opened on the answer, in a course with little translation: it counts as a near miss.", "Right — but the meaning was shown, so this one counts as a near miss and comes round again."],
+    ["reveal-answer-meaning", "In a course with little translation, the English meaning on the answer is behind this tap. Opening it makes a right answer a near miss.", "Show the meaning"],
     ["verdict-marks-lent", "Says so when a right answer was given after putting back the harakat on a word being read without them.", "Right — but the harakat were shown, so this one counts as a near miss and comes round again."],
     ["answer-value", "The right answer. Shown only when you got it wrong or asked to see it — except on choosing a missing word, where the options themselves show it.", ""],
     ["question-prompt-filled", "On a missing word once answered: the word put back in the sentence, highlighted in green.", ""],
@@ -140,6 +144,10 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["where-you-are", "The button at the right of every tab's title, and under the app's name on Home (0.601): the place, the mode and the languages once some are off. It opens the sheet that changes them. Not there for someone with nothing to choose.", "Lingua · Teaching · Arabic only"],
     ["where-place", "A row of the sheet behind where you are: Super admin, All your spaces, or one of your spaces. Beside each space's name, Learn, Teach and Admin, as far as you can do each there; a space where you only learn has none, and its name takes you to learn there.", "Main · Learn Teach"],
     ["stranded", "The page someone sees when they have no space to open: suspended in, removed from or gone from each of theirs, with a box for an invitation link or a course code.", "You're suspended in Lingua."],
+    ["path-home", "On Home, above Start session (0.617): one line per course with a path — the course, its current unit and that unit's stages. It opens the unit.", "Arabic 101 · Unit 3 of 8 · Family · Words 4/6 · Sentences 1/5"],
+    ["progress-path", "On Progress, above the deck tiles: each course's units in order, each Finished, Current, Locked or Opened by your teacher.", "1. Greetings · Finished"],
+    ["set-waiting", "On Home, above Start session (0.630): how many pictures of a personal set still wait for the learner's answer, with Answer to give them.", "3 pictures in Our family are waiting for your answer."],
+    ["unit-page", "The top of a unit's page: where it stands, its stages, and Practise this unit where it is open.", "Current · Words 4/6 · Sentences 1/5"],
   ]],
 ];
 

@@ -8,6 +8,682 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.640 — 17 November 2026
+
+**Every student now has a private sign-in link, without anyone's key
+changing, and admins can see it whenever they need it.** Each person on a
+list of people is folded down to their name; opening them shows what can
+be done to them and, for a student, their link.
+
+- **Links for everyone at once.** Students who joined before sign-in links
+  get one the first time an admin opens a list they are on, or the next
+  time they open the app. Nobody's key is replaced, and nobody is signed
+  out.
+- **A link is no longer the key written as an address.** It carries a code
+  of its own that signs the student in, to the same progress. Giving a
+  student a new key gives them a new link too and stops the old one. Links
+  from 0.638, which carried the key, keep working until that key is
+  replaced.
+- **Folded people.** In a space's People, Super admin's list of everyone
+  (both views), a course's people in Admin, and Former members, each
+  person is folded under their name the way a form is in the card editor.
+  Opened: their actions, their courses and when they were last seen, and a
+  student's private sign-in link. On a course's people, the Teacher and
+  Student switches stay on the folded row, and only a student's row opens.
+- **Who sees which links.** The super admin sees every student's. A space
+  admin sees those of the students in their space who are in no other
+  space. Teachers and admins have no link.
+- **A new key shows once, in the person's tile.** The panel that used to
+  appear at the top of the list is gone: the person's tile opens by
+  itself with the new key, to be passed on, and their new link.
+- Keys are still never shown again after they are made.
+
+The links are worked out from the App admin key. If that key is changed,
+every student's link changes with it and the old ones stop working, so
+pass the new ones on. A copy of the site with no App admin key gives no
+links.
+
+To check by hand, on beta: open People as a space admin. Everyone is
+folded, and opening a student shows their link; open that link in a
+private window and you are signed in as them, with their progress. Open a
+teacher: no link. Give a student a new key: their tile opens with the key
+and a new link, and the old link no longer works. Open a course in Admin:
+the Teacher and Student switches work without opening anyone, and opening
+a student shows their link. As the super admin, check the same in the list
+of everyone. A student who joined before 0.638 now has a link, and their
+key still works.
+
+## 0.639 — 17 November 2026
+
+**When the space you have picked has nothing for you to practise, the home
+screen now says so and shows nothing else.** Until now it still showed
+Start session, Weak spots and Build a session, all greyed out, a saved
+session from another space, and a warning about "exercise types" that was
+written for teachers.
+
+- The "Nothing to practice yet" message gives the real reason in one line:
+  you're in no course in this space (with Join a course), this space's
+  courses have no cards yet, there are cards here but none is ready to
+  practise yet, or this space's cards are in languages you've switched off
+  (with a button to switch them back on).
+- Course counts in that message are this space's, as the Cards and
+  Progress tabs already count them.
+- Saved sessions are offered only in a space where they have something to
+  practise. None is deleted: each one is back in any space where it works.
+  A saved session whose cards have all gone everywhere is no longer shown.
+- A newly saved session's suggested name is its type alone, such as
+  "Regular", without a card count. A count in a name was fixed on the day
+  it was saved and went out of date. Names already saved are unchanged.
+
+## 0.638 — 16 November 2026
+
+**A student now has a private sign-in link beside their sign-in key.
+Opening it signs that device in and shows their space's home page, with
+nothing to type.** The key stays and works exactly as before; the link is
+only another way of carrying it.
+
+- **Students** see "Your private sign-in link" wherever they see their key:
+  on "Keep this somewhere safe" when they first join, and under "Show my
+  link" on their account page at any time. A student whose account was made
+  for them is no longer stopped to tick "I've saved my key" when they
+  arrive by link.
+- **Admins** adding a student, or giving one a new key, get the link under
+  the key, to pass on privately. A new key stops the old link working.
+- **Links are for students only.** Anyone who teaches a course, runs a
+  space or is the App admin signs in with their key, as today; an old link
+  of theirs says "Sign-in links are for students. Type your sign-in key
+  instead."
+- **Opened on a device someone else is signed in to**, the link asks
+  "Switch to …?" first. Staying keeps that person; switching sets their
+  progress aside for them, as Log out does.
+- A whole link pasted into the sign-in key box works too.
+- The key never stays in the address bar or the browser's history, and the
+  link is never sent to the server.
+
+On an iPhone, an app installed to the home screen still has to be signed
+in once by pasting the link or the key, because a link always opens the
+browser. There is no QR code yet, and setting up a whole class at once is
+left for later.
+
+To check by hand: as an admin, add a student (key and link shown) and a
+teacher (key only). Open the student's link in a private window: straight
+in, no tick box, no key in the address bar; open it again: nothing more
+happens. Signed in as one student, open another's link: you're asked
+before switching, and the first keeps their progress. Give the student a
+new key: the old link says it no longer works. Make them a teacher of a
+course: their link is refused, and typing the key works. A student's
+account page has "Show my link"; a teacher's doesn't. Pasting a whole link
+into "I already have a sign-in key" signs in. A new student joining with a
+course code sees both the key and the link.
+
+## 0.637 — 16 November 2026
+
+**A space you make with "I'll be this space's admin" now appears in your
+own list of spaces, so you can go into it and run it.** Until now the
+super admin who chose that option was recorded as the space's admin but
+not as one of its members, so the space never showed up for them and
+there was no way in.
+
+- Right after you create the space, the app refreshes and the new space is
+  in your list, marked as one you run.
+- Spaces already made this way are put right automatically the first time
+  you sign in after this release: they appear in your list without you
+  doing anything.
+
+## 0.636 — 16 November 2026
+
+**When the app can't reach the server, a large bar at the foot of the
+screen says so and offers Retry.** It replaces the "Can't reach the server"
+and "The server didn't answer" messages that used to appear under a form,
+in place of a list, or in a pop-up that faded before it could be acted on.
+
+- **Retry redoes exactly what failed**: it reloads the list, or sends the
+  join, sign-in, save or upload again, with what you had typed. While it
+  works the button reads "Retrying…"; if it fails again the bar says
+  "Still can't reach the server".
+- **It stays** until Retry works, the connection comes back, or you close
+  it. When the device comes back online it retries by itself.
+- Leaving a space, closing an account, clearing data and taking someone
+  off a space are only ever redone when you press Retry, never by
+  themselves.
+- A list that could not load keeps a short line where it would be, such as
+  "Couldn't load the latest from the server", so the screen doesn't look
+  empty for no reason.
+- Errors that retrying won't fix — a wrong code, a full device — are shown
+  where they were before.
+
+Background checks, like the courses check when the app opens, stay quiet;
+the Courses screen shows the bar for them while it is open. The sync dot
+in the corner keeps its own wording.
+
+To check by hand: with the network off, sign in, join a course, open the
+Courses screen, and in Teaching or Admin press refresh. Each should show
+the bar; Retry should show "Retrying…" and then "Still can't reach the
+server"; turning the network back on should make it go by itself.
+
+## 0.635 — 16 November 2026
+
+**A personal set's "word lists" are now called what they are: decks.** On
+a set's screen the heading reads **Words to choose from**, the button is
+**Add a deck**, and the warning for a set with none says no deck of words
+is chosen yet. Students choosing which words to learn are told "Your
+teacher has given two to choose from", and the button for changing it in
+Settings reads **Choose other words**. Nothing else changes.
+
+To check by hand: open a personal set and check the heading and the
+button; as a student of a set with two decks of words, check the choice
+screen's wording.
+
+## 0.634 — 16 November 2026
+
+**A card in a personal set is always a basic card, and its English is
+optional.** A set uses only a card's name, its photos and its recordings,
+so a card that is only in personal sets no longer offers "Build an
+advanced card"; a line says why instead. Its English box is no longer
+required, even before a photo is added: a name needs no translation, and
+a line says the English is only how the name is spelt in English.
+
+A card that is also in an ordinary deck keeps the advanced card, and a
+card that already has advanced details keeps showing them.
+
+To check by hand: in a personal set, add a card and check there is no
+"Build an advanced card" box and that it saves with a name and no English.
+Add the same card to an ordinary deck too and check the box comes back.
+
+## 0.633 — 15 November 2026
+
+**New deck now asks what kind of deck you want: a regular deck, a unit, or
+a personal set.** In Teaching, pressing New deck opens a short sheet with
+the three choices.
+
+- **Regular deck** is made exactly as before.
+- **Unit** asks for its name and which of your courses it belongs to, and
+  goes at the end of that course's path as a draft. The New unit button
+  on a course's page is still there too.
+- **Personal set** asks for its name (and language, where there is a
+  choice). Once it is in a course, its screen is where you choose its word
+  lists and write its wording.
+
+The kind is fixed once a deck is made. So the Personal set section no
+longer appears on every deck with an On/Off switch: it is only on decks
+made as personal sets, and has no switch. In My space, New deck makes a
+regular deck straight away, as before.
+
+To check by hand: in Teaching, press New deck and check the three choices.
+Make a unit and check it appears at the end of its course's path. Make a
+personal set, add it to a course, and check its screen offers that
+course's other decks as word lists. Open an ordinary deck and check it
+has no Personal set section.
+
+## 0.632 — 15 November 2026
+
+**Personal sets: a deck of pictures each student answers once, then
+practises with their own word.** Think of a family's photos: a student
+says once who each person is to them, and is then asked with the word
+they would use — *cô*, *bà* — rather than one word for everybody.
+
+For teachers, any deck's screen has a new section, **Personal set**, off
+until you switch it on. Switched on, the deck's cards that have a picture
+are the set's pictures, added, photographed and recorded as on any deck.
+The section holds the wording (the question, the "doesn't apply" button
+and the three practice questions), the **word lists** (other decks of the
+same course, each an ordinary deck of words; with two or more, each
+student picks one), which words are **said with the name**, and **what is
+asked**: the name, their word, both together, and whether the word goes
+before or after the name. Warnings say what is missing, and never stop a
+save. You won't see what each student chose; it is sent only in a problem
+report a student makes. In your list of decks a set says "Personal set".
+
+The recording screen, on every card, now asks **"Who is speaking?"**. A
+recording made or uploaded while it holds a name is saved with that name,
+which then shows beside the recording and under the play button.
+
+For students, as in the earlier steps: Home says how many pictures are
+waiting; before a session with new pictures they choose a list (if there
+are several) and answer the question for each, with a skip and a "doesn't
+apply"; in practice each picture takes turns between its name, their word
+and both together, from the picture or a recording; and Settings lists
+their answers and lets them change any of them, which starts that picture
+— or, for the list, the set — again.
+
+A phone that hasn't updated sees a set as an ordinary deck: it asks each
+picture's name and teaches the words of every list.
+
+To check by hand:
+
+- A teacher switches Personal set on for a deck, picks two lists, and every
+  part of the section saves and comes back after a reload.
+- Changing the wording changes every screen the student sees: the
+  question, the doesn't-apply button, the practice questions, Home,
+  Settings.
+- Two students of one course, answering differently, are each asked their
+  own word.
+- Each picture takes turns between name, word and both, from the picture
+  and from recordings.
+- Wrong choices are always of the same kind, and never from the list the
+  student did not choose.
+- With one list nobody is asked to choose; with two each student is asked
+  once, and is not taught the other list's words.
+- A skipped picture is asked its name only, and Home says how many are
+  waiting.
+- "Doesn't apply" removes the picture; changing it back brings it back
+  with its progress.
+- Changing an answer warns and starts that one picture again; changing
+  list warns and starts the set again.
+- Answers made on a phone are there on a laptop, and are still there after
+  Reset scheduling.
+- Signed in as an ordinary teacher, nothing shows a student's answers; a
+  report from a picture shows the answer to the admin.
+- A recording made with "Who is speaking?" filled in shows that name
+  wherever it is listed and under the play button.
+- "Both together", heard, plays one voice when one person recorded both,
+  and names two voices otherwise.
+- Hear it, pick the picture never offers two pictures the student calls by
+  the same word.
+- A person with three photos is shown a different one after each right
+  answer and the same one after a miss; so is an ordinary card with
+  several pictures.
+- A phone that has not updated since before 0.629 still opens, keeps its
+  progress, and treats the set as an ordinary deck.
+
+## 0.631 — 15 November 2026
+
+**A card with several pictures now shows a different one each time you get
+it right.** Where a teacher has given a card two, three or four photos,
+the questions that show its picture take turns between them: the next one
+after each right answer, and the same one again after a miss, so a
+question you missed comes back looking the same. The picture choices do
+the same. Lists of cards and the editors still show the first photo.
+
+Where a teacher has said who is speaking on a recording, the name now
+shows under the play button: "Recorded by …".
+
+The rest of this release is the third step towards personal sets: how a
+picture in a set is practised, taking turns between its name, the
+student's own word and both together. No teacher can make a set yet, so
+nobody meets that part.
+
+To check by hand: practise a card with three pictures from its picture
+(Picture → choose, or Picture → writing). Get it right and it should show
+the next photo the next time it comes round; get it wrong and the same
+photo again.
+
+## 0.630 — 15 November 2026
+
+**A second step towards personal sets, still with nothing you can see.**
+The app can now ask a student about a personal set: which of the
+teacher's word lists they want to learn from (only when there are
+several), and then the teacher's question once for each picture, with a
+button for "doesn't apply" and a Skip. Home would say how many pictures
+are waiting, and Settings would list a student's answers and let them
+change any of them. A student's answers are kept with their practice
+progress, sync between their devices, and survive Reset scheduling.
+
+No teacher can make a personal set yet, so nobody meets any of this.
+Practice does not use the answers yet either.
+
+To check by hand: nothing to see. Home, Settings and Start session should
+look and behave exactly as before; Reset scheduling should still send
+every card back to the beginning.
+
+## 0.629 — 15 November 2026
+
+**A first step towards personal sets, with nothing you can see yet.** A
+personal set will be a deck of pictures — the people in a family, say —
+that each student answers a question about once ("Who is this person to
+you?") and is then asked with their own word. This release teaches the
+server and the app to carry the two new pieces of information that needs:
+whether a deck is a personal set and how it is worded, and, on any
+recording, the name of whoever is speaking. Nothing yet sets either, so
+nothing changes for anyone.
+
+To check by hand: nothing to see. Cards, decks and recordings should
+behave exactly as before; a card saved and opened again keeps its
+recordings.
+
+## 0.628 — 15 November 2026
+
+**A small spelling slip no longer costs you a word you know.** When you
+write a word from its meaning (from its English, its picture, a phrase it
+is in, or its figures), getting it right twice running is what proves you
+know it. A near miss there, one letter out or the right letters with the
+wrong harakat, used to count as getting it wrong, so right, near miss,
+right wasn't "twice running" and you had to start again. A near miss now
+leaves the run as it was: it doesn't count towards it, and it doesn't
+break it.
+
+Everything else about a near miss is unchanged: it is still marked as a
+near miss and the word still comes round again soon. Other kinds of
+question are unchanged too.
+
+To check by hand: on a word you are writing from its English, answer
+right, then make a one-letter slip, then answer right. The word should
+count as right twice running.
+
+## 0.627 — 14 November 2026
+
+**Teachers can run a course with less English, or none.** A course's
+page has a new section, Exercises, with four choices at the top:
+
+- **With translation** — everything is asked, as before.
+- **Little translation** — an exercise that uses English is dropped
+  wherever the same word has one without English on the same level (a
+  picture instead of the English, say). On the answer, the English meaning
+  is behind a "Show the meaning" tap; opening it makes a right answer count
+  as a near miss.
+- **No translation** — no exercise that uses English is asked, and English
+  isn't shown on the question or the answer. A word with nothing but
+  English to teach it (no picture, recording or phrase) isn't asked at
+  all; the page says how many such words there are and lists them.
+- **Custom** — every exercise is yours to switch on or off.
+
+Under the choices, every exercise is listed by level with its own switch.
+The first three choices set the English ones for you and show them
+greyed; the others are yours. A change that would leave cards with no
+question at all says how many first and asks.
+
+A card that is in two courses is asked whatever either course allows. A
+student's own cards are never affected. Switching never deletes anything:
+a switched-off exercise just isn't asked, and its progress is still there
+if it's switched back on. No card loses its Cleared or Learnt status when
+a teacher changes these, either way round; a question switched back on
+joins the card's reviews.
+
+Phones on an older version of the app ignore the switches and keep asking
+everything until they update.
+
+To check by hand: set a course to each of the four choices in turn and
+practise as a student of it. In No translation, no English should appear
+anywhere on a question or its answer; in Little translation, the meaning
+on the answer should need a tap.
+
+## 0.626 — 14 November 2026
+
+**Getting ready for new kinds of question.** Coming releases add new
+exercises, and each keeps its own progress. Until now, a phone or laptop
+that had not updated would quietly throw that progress away each time it
+opened the app, and could wipe it from your other devices. From this
+release, the app keeps any progress it doesn't recognise, untouched, and
+takes no notice of it: nothing you see or are asked changes.
+
+This is out on its own, before any new exercise, so that it has reached
+your devices first. A device that hasn't been opened since will still
+drop such progress from its own copy until it updates; the copy kept
+online is unaffected.
+
+## 0.625 — 14 November 2026
+
+**A new form no longer picks up a removed form's progress.** When a
+teacher deleted a form from a card and added a different one in the same
+place, the new form arrived on students' phones carrying the old one's
+progress, as if it were the same word. It now starts fresh, and the
+removed form's progress is set aside (see 0.624) in case it comes back.
+
+Cards made before forms had names of their own are matched by place as
+before, including the first time a teacher saves such a card and its
+forms are given names. Nothing a student has already got changes.
+
+To check by hand: on a practised card, delete a form and add another in
+its place. On the student's phone the new form should show as not
+started.
+
+## 0.624 — 14 November 2026
+
+**A form or a line a teacher removes no longer takes students' progress
+with it.** When a teacher took a form off a card (a plural, say) or a
+line out of a conversation, every student's progress on it was thrown
+away on their next refresh, on all their devices. It is now set aside,
+the way a whole card's progress already is when it leaves a course. If
+the teacher puts the form or line back, under the same name, its progress
+comes back with it. What is never put back is cleared after six months,
+as before.
+
+Nothing changes for cards whose forms stay as they are, and a whole card
+leaving and returning works as it did.
+
+To check by hand: on a card a student has practised, remove one of its
+forms, let the student's app refresh, then put the form back. Its
+progress should return.
+
+## 0.623 — 13 November 2026
+
+**A short session no longer tops up with the same cards every time.** When
+a session has places left after the cards due and the cards being learnt,
+it fills them with Cleared and Learnt cards that are not due yet. It used
+to pick those nearest to falling due. A right answer before a card is due
+doesn't move its date, so the same few cards came back every sitting. It
+now picks the cards that have waited the largest share of their gap since
+you last answered them. A card you have just answered goes to the back,
+and weaker cards, which come round more often, still come first.
+
+Nothing else changes: cards that are due still come first, and cards
+practised in the last three hours still come last.
+
+To check by hand: with nothing due, do two short sessions a few hours
+apart. The second should top up with different cards from the first.
+
+## 0.622 — 13 November 2026
+
+**The next numbers open sooner.** A stretch of numbers, like 20 to 99,
+used to wait until 8 of the 10 words in the stretch below were learnt. It
+now waits for 6 of 10. A learner with 11, 12, 14 and 16 to 19 learnt, and
+10, 13 and 15 still climbing, now has twenty, thirty and the rest to start
+on, where before all of them waited on one more word.
+
+Nothing is asked before it can be: a number like 47 is still only asked
+once the words in it are learnt. The new words come in as new cards
+usually do, a few at a time.
+
+Sentences in a text are unchanged: one still waits until 8 in 10 of its
+words are known.
+
+To check by hand: with 6 of the 10 words for 10 to 19 learnt, the words
+for 20, 30 and so on should no longer show "Opens later".
+
+## 0.621 — 12 November 2026
+
+**A picture question's picture shrinks once you have answered it.** After
+you answer, the picture asked about (or the grid of pictures you chose
+from) eases down to half its size, so the verdict, the right answer and
+the button to go on fit on the screen without scrolling. Anyone whose
+device is set to reduce motion sees it shrink straight away, without the
+animation.
+
+To check by hand: on a phone, answer a "Which picture is…" question and a
+question that shows a picture; each picture should shrink to half once
+the answer is checked, and come back full size on the next question.
+## 0.620 — 12 November 2026
+
+**Marking a unit cleared now clears its numbers whole, in one press.**
+Until now a unit holding a number part was left with the part's
+questions in figures to answer, since those only open once the figures
+are cleared; it now counts as finished straight away and the next unit
+opens. Nothing else about marking changes: no undo, nothing becomes
+learnt, and the cards come back as reviews a day later.
+
+To check by hand: as a student, mark a unit that holds numbers 0 to 9 as
+cleared; it should read as finished at once, with the next unit open.
+
+## 0.619 — 12 November 2026
+
+**Units, written down.** Nothing changes in the app. The README now has
+the whole of how a course's path works, in one place, and the decisions
+file says why each rule is shaped as it is and what was weighed and left
+out of this first version: a class view of who is on which unit, a goal
+per unit, turning a deck into a unit, a teacher's switch for "Mark as
+cleared", undoing a marking, marking several units at once, and units in
+a learner's own space, among others. Which of those are wanted later is
+still to be said.
+
+## 0.618 — 12 November 2026
+
+**Units, step six: a student can mark a unit as cleared.**
+
+- **"Mark as cleared"** is on the page of a unit that is open for the
+  student — reached, or opened early by the teacher. Not on a locked or a
+  finished one. The app asks first, and there is no undo.
+- **Every word and sentence in it then counts as cleared**, everywhere it
+  appears, and comes back as ordinary reviews a day later, asked at its
+  top level. Nothing becomes learnt this way, and a card missed twice drops
+  back to be relearnt, as any card does. Cards already cleared or learnt,
+  and the unit's text or conversation, are left as they were.
+- The unit then shows as finished and the next one opens. To skip several
+  units, mark each in turn. Teachers cannot switch this off.
+- **One thing for the owner to decide (see the summary of this work):** a
+  unit holding numbers clears their words and the figures, but the number
+  part itself then gains its questions in figures, which only open once
+  the figures are cleared. So such a unit is not finished until those are
+  answered, or the unit is marked a second time.
+
+To check by hand: mark unit 2 as cleared and see the confirmation, then
+unit 2 finished and unit 3 open; the next sessions bring unit 2's cards
+back as reviews, at their top level; a unit 3 sentence can now use unit
+2's words in its blanks; and all of it after a sync to a second device.
+
+## 0.617 — 12 November 2026
+
+**Units, step five: students see their course's path.** Nothing changes
+for anyone whose courses have no units.
+
+- **Home shows a line for each course with a path**, above Start session:
+  the course, "Unit 3 of 8" and the unit's name, then how far it has got —
+  words, sentences, and its text or conversation if it has one. When every
+  unit is finished it says "Path complete". Tapping the line opens the
+  unit. There is still one Start session, and it still draws from all of
+  the student's courses at once.
+- **Progress shows the whole path above the deck tiles**, each unit as
+  Finished, Current, Locked or Opened by your teacher. A finished unit
+  whose every card is also learnt says so, more quietly. Units are no
+  longer among the deck tiles, nor among the decks a saved session or a
+  prep picks from.
+- **Any unit can be opened, locked ones too**: its words, sentences and
+  text or conversation, to read. A locked unit says which unit to finish
+  first.
+- **Practise this unit**, on a unit that is open — or one the teacher
+  opened early — starts a session of that unit alone, bringing in its new
+  words. Ordinary sessions keep bringing new words from the student's own
+  place on the path.
+- An open unit that an earlier unit has since slipped behind is shown as
+  "Open": the plan named four states, and this fifth case needed a word.
+
+To check by hand: as a student in a course with units, Home shows unit 1
+and Progress shows it current with the rest locked; a locked unit lists
+its cards with no button; clearing every word and sentence of unit 1 opens
+unit 2 without the text being read; a unit the teacher opens shows as
+opened by your teacher, and Practise this unit brings its new words while
+an ordinary session still brings unit 2's; all of it works offline after
+one download.
+
+## 0.616 — 11 November 2026
+
+**Units, step four: teachers can build a course's path.** Students see
+nothing of it yet; that comes next.
+
+For teachers, on a course's page:
+
+- **A Path section above the decks** lists the course's units in order,
+  each with its number, whether it is a draft or published in this
+  course, its quality score, and "Needs attention" when it is published
+  but something has since left its checklist unclear. It stays live for
+  students while it is fixed.
+- **New unit** and **Add an existing unit** (one already in another
+  course) put a unit at the end of the path, as a draft here. **Move up**
+  and **Move down** reorder it. **Open for the class** lets the whole
+  class practise a published unit early; **Close for the class** takes
+  that back without taking anyone's progress. **Remove from this course**
+  and **Delete unit** work as they do for a deck; deleting says so when
+  the unit is in other courses too.
+- **Units are no longer listed among the course's ordinary decks.**
+
+On a unit's page — the deck page, headed "Unit 3 · its title":
+
+- **A checklist** says what is missing before it can be published in
+  this course: sentences with a blank still needed, blanks with fewer than
+  five approved words from this unit or earlier ones, words not used in
+  any of its sentences, a second text or conversation. **Publish unit**
+  works once it is clear. Cards still in draft are not counted, and the
+  checklist says how many there are.
+- **The quality score counts a word as untaught** if only a later unit
+  teaches it.
+- **Advice on forms**: blanks whose approved words all share one gender
+  or number are listed under the score. Advice only: no points, and it
+  never stops publishing.
+- Adding, editing and reviewing cards work exactly as on a deck, including
+  adding a card that is already in other decks or units.
+
+To check by hand: make a course with three units, reorder, remove and
+delete one; fill unit 1 until its checklist clears and publish it; add
+unit 1 to a second course and see it there as a draft with its own
+checklist; take an approved word out of a published unit's blank and see
+"Needs attention" while it stays published.
+
+## 0.615 — 11 November 2026
+
+**Units, step three: a student's device follows the path. Still nothing
+on screen, and nothing changes for anyone whose courses have no units.**
+
+- **New words come in path order.** A word that has never come up is held
+  back while every place it lives is a unit the student has not reached.
+  A word that is also in an ordinary deck, or in a unit already open in
+  any of their courses, arrives as today. This holds in every kind of
+  session — regular, saved, prep and Ultimate — and the home screen's
+  count of what is waiting follows the same rule, so the two never
+  disagree.
+- **Words already met are never held back.** They come back for review
+  wherever they live, as today.
+- **Numbers and times in a unit wait with it**: a number part's skill, its
+  words and the figures arrive when the unit opens, and count toward
+  finishing it. A part also held by an ordinary deck arrives as today.
+- **A unit that has opened never closes again**, on any of the student's
+  devices: which units each student has reached is kept with their
+  settings and joined, never written over, when devices sync — also on the
+  server, so a phone still on an older version cannot take a unit back.
+- Trade-off: the server now reads a student's saved progress once more
+  each time a device uploads it, to make that join.
+- An older version of the app that receives a course with units shows
+  them as ordinary decks, in no order. Updating fixes it.
+
+## 0.614 — 11 November 2026
+
+**Units, step two: the server keeps a course's path, and checks a unit
+before it is published. Still nothing on screen.**
+
+- **A unit is made in a course, ordered on its path, published there and
+  opened early there**, each per course: the same unit can be in several
+  courses, a draft in one and published in another.
+- **A unit is published only once it is ready**, checked in that course:
+  at least five sentences with a blank; every word in the unit used in at
+  least one of them; and each blank with at least five different words a
+  teacher has approved in it, from this unit, the published units before
+  it, or names kept anywhere. Numbers count where a unit up to this one
+  holds their part. Only published cards are counted.
+- **A unit that is a draft in a course reaches none of its students**,
+  numbers and all. Once published there, it is sent like any deck.
+- **Removing a unit from a course, or deleting it, takes it off the path
+  too.** Backups keep units and paths.
+- A course with no units sends and stores exactly what it did before.
+
+## 0.613 — 11 November 2026
+
+**Units, step one: the rules of a course's path. Nothing changes on
+screen yet.**
+
+A course is getting a second kind of element beside its decks: the
+**unit**. Units sit in a fixed order, the path, and each opens when the
+one before it is finished. This release writes down the rules the rest of
+the work will follow, with tests, and nothing a teacher or student can see
+uses them yet:
+
+- **A unit opens when every word and sentence of the one before it is
+  cleared.** The first is always open. A text or conversation at the end
+  does not have to be done first.
+- **Nobody is ever sent back.** A unit that has opened for a student stays
+  open, whatever a teacher adds, reorders or inserts later, and even if
+  cards of an earlier unit slip back.
+- **A new word is held back only while every place it lives is a unit the
+  student has not reached.** A word that is also in an ordinary deck, or in
+  a unit already open, arrives as it does today.
+
 ## 0.612 — 11 November 2026
 
 **A reported problem now says what the learner was looking at.** Copied

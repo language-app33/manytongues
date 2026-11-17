@@ -59,6 +59,7 @@ import {
   narrowing,
   plural,
   useSnackbarState,
+  ReachBar,
 } from "./shared.tsx";
 
 /* Every icon the set has, so a name can be picked by eye. Kept in step with
@@ -120,6 +121,7 @@ const PARTS = "Inside another component";
 const PLACES: Record<string, [string, string]> = {
   /* The learner's app */
   ArabicTrainer: [LEARN, "The app around everything else"],
+  host: [LEARN, "Every screen · the bar saying the server can't be reached"],
   AccountPanel: [LEARN, "Account settings"],
   AccountSettings: [LEARN, "Account settings"],
   DeviceMedia: [LEARN, "Account settings · Recordings and pictures on this device"],
@@ -127,6 +129,7 @@ const PLACES: Record<string, [string, string]> = {
   ClaimAdmin: [LEARN, "Account settings · Becoming the administrator"],
   AppPreferences: [LEARN, "App preferences"],
   SettingsScreen: [LEARN, "Settings"],
+  SetQuestions: [LEARN, "A personal set · the list to learn from, the question asked once for each picture, and your answers in Settings"],
   AppVersion: [LEARN, "Settings · the version and the check for a newer one"],
   CornerMenu: [LEARN, "The menu behind your initial, in the bar at the foot of the window"],
   PlacePicker: [LEARN, "Choosing the space and the languages, in the menu behind your initial"],
@@ -152,6 +155,8 @@ const PLACES: Record<string, [string, string]> = {
   ProgressTab: [LEARN, "The Progress tab"],
   Lately: [LEARN, "The Progress tab · what moved today and this week"],
   DeckScreen: [LEARN, "The Progress tab · one deck, with when it could be learnt"],
+  UnitScreen: [LEARN, "A course's path · one unit, its words and sentences"],
+  PathHomeLine: [LEARN, "Home · a course's current unit"],
   PrepScreen: [LEARN, "The Progress tab · Prep mode, getting decks learnt by a date"],
   PrepLine: [LEARN, "The home screen · how long is left to prep, and whether your pace gets you there"],
   ReviewItem: [LEARN, "The Progress tab · one card"],
@@ -227,6 +232,10 @@ const PLACES: Record<string, [string, string]> = {
   FullImage: [TEACH, "Reading a card · a picture full screen"],
   StoredImage: [TEACH, "Editing a card · a picture on a form"],
   DeckQuality: [TEACH, "A deck · its quality, and what would raise it"],
+  PathSection: [TEACH, "A course · its path of units"],
+  PracticeSection: [TEACH, "A course · which exercises its students are asked"],
+  SetSection: [TEACH, "A deck · Personal set: its wording, the decks of words to choose from, words said with the name and what is asked"],
+  UnitChecklist: [TEACH, "A unit · what it needs before it is published"],
   PronounsEditor: [TEACH, "A language's pronouns, written once"],
   NumberSystemEditor: [TEACH, "A language's number system"],
   ReviewLine: [TEACH, "A card · where its sentences stand with review"],
@@ -236,6 +245,7 @@ const PLACES: Record<string, [string, string]> = {
   NarrowBlank: [TEACH, "Reviewing a card's sentences · narrowing a blank"],
   ReportsScreen: [TEACH, "Reports from students"],
   NumbersTab: [TEACH, "A language's number system · its parts, the clock, and the way to corrections"],
+  FetchingSystems: [TEACH, "A language's number system · while it is fetched"],
   FixScreen: [TEACH, "A language's number system · correcting how a number is said"],
   SampleRows: [TEACH, "A language's number system · numbers as a student will be asked them"],
   PartBlock: [TEACH, "A language's number system · a section of a part's screen"],
@@ -270,6 +280,8 @@ const PLACES: Record<string, [string, string]> = {
   EveryonePeople: [ADMIN, "Super admin · People in every space"],
   EveryReport: [ADMIN, "Super admin · Reports from every space"],
   PersonActions: [ADMIN, "The People list · a person's new key, suspending and removing"],
+  PersonFold: [ADMIN, "Lists of people · one person, folded under their name"],
+  NewKeyNote: [ADMIN, "Lists of people · a new sign-in key, shown once in the person's tile"],
   ReportList: [ADMIN, "The Reports tab · learners' reports about cards"],
   useConfirm: [ADMIN, "Admin · the question asked before something is done"],
   InviteLink: [ADMIN, "The People tab · the space's invitation link"],
@@ -311,6 +323,8 @@ const PLACES: Record<string, [string, string]> = {
   SpaceFrame: [PARTS, "The Teaching and Admin frame"],
   Snackbar: [PARTS, "The message that appears and goes"],
   useSnackbarState: [PARTS, "The message that appears and goes"],
+  ReachBar: [PARTS, "Can't reach the server, with Retry"],
+  ReachSnackbar: [PARTS, "Can't reach the server, with Retry"],
 };
 
 /* Not in the table: say something readable rather than nothing, and put
@@ -1171,6 +1185,19 @@ export function ComponentGallery() {
         what="The state behind the pill, for whichever component hosts it: { show, dismiss, node, current }."
         note="A hook. Render node once, near the end of the tree; the trainer does, and passes show down through SnackbarProvider."
       />
+
+      <Row
+        name="ReachBar"
+        what="Can't reach the server, with Retry. Large, and it stays until Retry works, the connection comes back, or it is closed."
+        note="Never drawn by hand: ReachSnackbar, beside the app in main.tsx, draws the one bar. A screen takes part with useReach() — caught(error, retry) on a failure, ok() when it works — or useReachHold(retry) for a failure found elsewhere. Shown here still, in the page."
+      >
+        <V label="first" wide><ReachBar still onRetry={() => {}} onDismiss={() => {}} /></V>
+        <V label="with a line of its own" wide>
+          <ReachBar still detail="Setting up needs a connection. Once you're set up, the app works without one." onRetry={() => {}} />
+        </V>
+        <V label="retrying" wide><ReachBar still retrying onRetry={() => {}} /></V>
+        <V label="after a retry that failed" wide><ReachBar still again onRetry={() => {}} onDismiss={() => {}} /></V>
+      </Row>
 
       <Row
         name="useLiveRefresh(fn, everyMs)"

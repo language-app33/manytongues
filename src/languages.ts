@@ -5078,6 +5078,9 @@ function inAtOf(item: Record<string, any> | null | undefined, spec: Record<strin
 
 export function checkAnswer(typed: string, item: Record<string, any>, key: string, settings: Settings) {
   const spec = EX[typeOf(key)];
+  /* An exercise this release does not know — a later one's, named in
+     something synced — is never marked right (0.626). */
+  if (!spec) return { ok: false, reason: "wrong" };
   const mode = spec.answerMode;
   /* Nothing to mark: a read-through is met, not answered. It is here so
      that every exercise can be handed to one function, rather than the

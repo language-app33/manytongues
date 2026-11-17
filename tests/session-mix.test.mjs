@@ -96,6 +96,39 @@ test("cards not yet due come after everything that is", () => {
   assert.ok(mix.cards.some((/** @type {any} */ c) => c.id.startsWith("a")), "and they still fill the session");
 });
 
+test("among cards not yet due, the one furthest through its wait comes first", () => {
+  /* How far through its wait: the time since it was answered over the gap
+     from then to its due date. A weak card answered three days ago and due
+     tomorrow is three quarters through; a strong one unseen for three
+     weeks and due in a month is two fifths; one answered four hours ago
+     and due tomorrow has barely started, so it goes last. */
+  const pool = [
+    row("soon", "cleared", { due: AT + DAY, lastSeen: AT - 4 * HOUR }),
+    row("strong", "learnt", { due: AT + 30 * DAY, lastSeen: AT - 21 * DAY }),
+    row("weak", "cleared", { due: AT + DAY, lastSeen: AT - 3 * DAY }),
+  ];
+  assert.deepEqual(mixSession(pool, OPTS).cards.map((/** @type {any} */ c) => c.id), ["weak", "strong", "soon"]);
+  /* Seen at the same moment, the nearer due comes first. */
+  const tied = [row("far", "cleared", { due: AT + 9 * DAY }), row("near", "cleared", { due: AT + 2 * DAY })];
+  assert.deepEqual(mixSession(tied, OPTS).cards.map((/** @type {any} */ c) => c.id), ["near", "far"]);
+});
+
+test("two sittings in a row with right answers between them top up with different cards", () => {
+  /* Twenty Cleared cards, none due, two places each sitting. A right answer
+     ahead of time moves no date, so only when it was seen changes — and the
+     next sitting, four hours on, reaches for cards the last one did not. */
+  const opts = { places: 2, at: AT, dayCards: 2 };
+  let pool = Array.from({ length: 20 }, (_, i) =>
+    row(`c${i + 1}`, "cleared", { due: AT + (i + 1) * DAY, lastSeen: AT - (10 + (i % 7)) * DAY }),
+  );
+  const first = mixSession(pool, opts).cards.slice(0, 2).map((/** @type {any} */ c) => c.id);
+  pool = pool.map((c) => (first.includes(c.id) ? { ...c, lastSeen: AT + 10 * 60000 } : c));
+  const later = AT + 4 * HOUR;
+  const second = mixSession(pool, { ...opts, at: later }).cards.slice(0, 2).map((/** @type {any} */ c) => c.id);
+  assert.equal(second.length, 2);
+  assert.ok(!second.some((/** @type {string} */ id) => first.includes(id)), `the same cards came back: ${first} then ${second}`);
+});
+
 test("new cards come in only to fill the learning share's gap", () => {
   /* Two in learning, plenty of reviews: two of the four learning places are
      a gap, and two new cards fill it — no more. */

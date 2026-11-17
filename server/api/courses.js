@@ -9,7 +9,7 @@ import {
   forgetSyncDoc, moveSyncDoc, readSyncDoc, readSyncAudio, recordingIdsOf, syncSize, mergeSyncDoc, writeSyncAudioIfAbsent,
   MAX_BYTES as SYNC_MAX_BYTES,
 } from "./sync.js";
-import { createHash, randomBytes } from "node:crypto";
+import { createHash, createHmac, randomBytes } from "node:crypto";
 import { AsyncLocalStorage } from "node:async_hooks";
 /* The one list of grammatical fields a card may carry, shared with the app so
    that adding an axis to a language does not silently drop it here. */
@@ -34,6 +34,14 @@ import { partsNow } from "../../src/numbers/types.ts";
 import { migrateCards } from "../../src/numbers/migrate.ts";
 import { liftSubtypeTagsIn } from "../../src/subtype-tags.ts";
 import { tickCapitals } from "../../src/capitals.ts";
+/* A course's path (0.613): every rule of it is in path.ts, read here the
+   way the app reads it. */
+import { countingCards, drawsFrom, isLiveIn, neverAskedAlone, unitProblems } from "../../src/path.ts";
+import { LANGUAGES } from "../../src/languages.ts";
+/* Personal sets (0.629): the one reader of what a teacher saves. */
+import { readSet } from "../../src/sets.ts";
+import { fillerCards } from "../../src/numbers/generate.ts";
+import { countedNouns, withNouns } from "../../src/numbers/nouns.ts";
 
 /* Locking a deck is set aside for now: a locked deck's flag is kept, but
    nothing is refused because of it. Turn back on to bring locks back. */
@@ -273,6 +281,23 @@ const clipList = (list) =>
     .filter((/** @type {unknown} */ h) => typeof h === "string" && /^[a-f0-9]{64}$/.test(h))
     .slice(0, 12);
 
+/* Who is speaking on each recording of a form, by its hash (0.629): kept
+   only for recordings the form has, each name trimmed and at most forty
+   characters, an empty one dropped. Absent rather than empty on a form
+   with none, which is every form written before it. */
+/** @param {unknown} raw @param {string[]} heard */
+const voiceMap = (raw, heard) => {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
+  /** @type {Record<string, string>} */
+  const out = {};
+  for (const h of heard) {
+    const v = /** @type {Record<string, unknown>} */ (raw)[h];
+    const name = typeof v === "string" ? v.trim().slice(0, 40) : "";
+    if (name) out[h] = name;
+  }
+  return Object.keys(out).length ? { voices: out } : null;
+};
+
 /* The images on one form, narrowed the way its recordings are — names an
    image can have, and a handful of them: a picture is there to say what
    the word means, and four is already a gallery. */
@@ -294,7 +319,7 @@ const imagesOfCard = (card) =>
 
 const RETIRED_CARD_FIELDS = Object.fromEntries(
   [
-    "ar", "en", "lat", "clips", "slowClips", "answers", "subs", "ask", "lend",
+    "ar", "en", "lat", "clips", "slowClips", "voices", "answers", "subs", "ask", "lend",
     "row", "col", "of",
     /* Whatever grammatical values the languages declare, which were the
        card's when the card was a form. */
@@ -738,7 +763,7 @@ function normalisedUser(u) {
 }
 /** What the server keeps about memberships, taken off anything sent out. @param {any} u */
 const withoutMemberships = (u) => {
-  const { keyHash: _k, orgs: _o, suspendedIn: _s, lastLearnedIn: _l, lastTaughtIn: _t, ...safe } = u;
+  const { keyHash: _k, linkHash: _h, linkN: _n, orgs: _o, suspendedIn: _s, lastLearnedIn: _l, lastTaughtIn: _t, ...safe } = u;
   return safe;
 };
 
@@ -772,7 +797,7 @@ const readDeck = async (store, id) => scoped(await readJson(store, K.deck(id)));
 const readCard = async (store, id) => scoped(await readJson(store, K.card(id)));
 /* The caller themselves is always readable: an App admin working in another
    org is still the person they are. */
-/** @type {(store: Store, h: string) => Promise<(User & { keyHash?: string }) | null>} */
+/** @type {(store: Store, h: string) => Promise<(User & { keyHash?: string, linkHash?: string, linkN?: number }) | null>} */
 const readUser = async (store, h) => {
   const u = await readJson(store, K.user(h));
   const at = orgScope.getStore();
@@ -804,7 +829,7 @@ async function indexAdd(store, what, id) {
 /**
  * @param {Request} req
  * @param {Store} store
- * @returns {Promise<(User & { keyHash?: string }) | null>}
+ * @returns {Promise<(User & { keyHash?: string, linkHash?: string, linkN?: number }) | null>}
  */
 async function currentUser(req, store) {
   const key = req.headers.get("x-key") || "";
@@ -841,6 +866,100 @@ const touch = (store, user, field, orgs = []) =>
     for (const o of orgs) map[o] = now;
     return { ...cur, [field]: now, ...(orgs.length ? { [per]: map } : {}) };
   });
+
+/*
+ * Key only (0.638): whoever teaches a course, runs a space or is the App
+ * admin signs in with their key, never by a sign-in link. Read straight
+ * from the store, across every space, whatever space the request acts in.
+ */
+/** @type {(store: Store, user: any) => Promise<boolean>} */
+async function keyOnly(store, user) {
+  if (!user) return true;
+  if (user.admin) return true;
+  for (const id of memberOf(user)) {
+    const o = await readJson(store, K.org(id));
+    if (o && (o.admins || []).includes(user.handle)) return true;
+  }
+  const ids = await readIndex(store, "courses");
+  const courses = await readManyJson(store, ids.map((/** @type {string} */ id) => K.course(id)));
+  return courses.some((/** @type {any} */ c) => c && (c.teachers || []).includes(user.handle));
+}
+
+/*
+ * Who is key only, for a whole list at once (0.640): the same rule as
+ * keyOnly, read once rather than once per person.
+ */
+/** @type {(store: Store) => Promise<(user: any) => boolean>} */
+async function keyOnlyJudge(store) {
+  const courses = await readManyJson(store, (await readIndex(store, "courses")).map((/** @type {string} */ id) => K.course(id)));
+  const orgs = await readManyJson(store, (await readIndex(store, "orgs")).map((/** @type {string} */ id) => K.org(id)));
+  const teach = new Set(courses.flatMap((/** @type {any} */ c) => (c && c.teachers) || []));
+  const run = new Set(orgs.flatMap((/** @type {any} */ o) => (o && o.admins) || []));
+  return (u) => !u || !!u.admin || teach.has(u.handle) || run.has(u.handle);
+}
+
+/*
+ * A student's sign-in link (0.640) carries a code of its own, not their
+ * key: the key is kept only as a digest and cannot be read back, and every
+ * student was to have a link without anyone's key changing. The code is
+ * worked out from the App admin key, the handle and a count, so nothing
+ * secret is stored: the account keeps the code's digest (`linkHash`),
+ * and `keyOf` maps that digest to the handle like a key's, so the code
+ * signs in wherever a key does. A new key raises the count, which makes a
+ * new code and ends the old one. With no App admin key set, there are no
+ * links; with a different one, the links are made again.
+ */
+/** @type {(handle: string, n: number) => string} */
+function linkCodeFor(handle, n) {
+  const secret = process.env.ADMIN_KEY || "";
+  if (!secret) return "";
+  const b = createHmac("sha256", secret).update(`sign-in-link:${handle}:${n}`).digest();
+  const pick = (/** @type {number} */ i) => WORDS[b[i] % WORDS.length];
+  return `${pick(0)}-${pick(1)}-${pick(2)}-${pick(3)}-${b.subarray(4, 6).toString("hex")}`;
+}
+
+/**
+ * The link codes of these students, made where missing, wrong or no longer
+ * findable. Answers handle → code; "" for anyone given no link.
+ * @param {Store} store
+ * @param {any[]} users  Account records, as stored; only students' are passed.
+ * @returns {Promise<Map<string, string>>}
+ */
+async function ensureLinks(store, users) {
+  /** @type {Map<string, string>} */
+  const out = new Map();
+  const list = users.filter((u) => u && u.handle);
+  if (!process.env.ADMIN_KEY || !list.length) return out;
+  const codes = list.map((u) => linkCodeFor(u.handle, Number(u.linkN) || 0));
+  const found = await readManyJson(store, codes.map((c) => K.keyOf(sha(c))));
+  for (let i = 0; i < list.length; i++) {
+    const u = list[i];
+    const code = codes[i];
+    if (u.linkHash !== sha(code) || found[i] !== u.handle) {
+      if (u.linkHash && u.linkHash !== sha(code)) await store.delete(K.keyOf(u.linkHash)).catch(() => {});
+      await writeJson(store, K.keyOf(sha(code)), u.handle);
+      await updateJson(store, K.user(u.handle), (/** @type {any} */ cur) =>
+        cur ? { ...cur, linkHash: sha(code), linkN: Number(u.linkN) || 0 } : null
+      );
+    }
+    out.set(u.handle, code);
+  }
+  return out;
+}
+
+/** One student's link code, made if missing. @type {(store: Store, user: any) => Promise<string>} */
+const ensureLink = async (store, user) => (await ensureLinks(store, [user])).get(user.handle) || "";
+
+/** Ending someone's link, as when they come to teach or run a space. @type {(store: Store, user: any) => Promise<void>} */
+async function dropLink(store, user) {
+  if (!user || !user.linkHash) return;
+  await store.delete(K.keyOf(user.linkHash)).catch(() => {});
+  await updateJson(store, K.user(user.handle), (/** @type {any} */ cur) => {
+    if (!cur || !cur.linkHash) return null;
+    const { linkHash: _h, ...rest } = cur;
+    return rest;
+  });
+}
 
 /** @type {(course: Course | null, h: string) => boolean} */
 const isTeacher = (course, h) => !!course && (course.teachers || []).includes(h);
@@ -924,13 +1043,44 @@ async function withLinks(store, decks, courses) {
  */
 async function dropFromCourses(store, deckId) {
   for (const c of await everyCourse(store)) {
-    if (!(c.decks || []).includes(deckId)) continue;
+    if (!(c.decks || []).includes(deckId) && !onPath(c, deckId)) continue;
     await updateJson(store, K.course(c.id), (/** @type {Course | null} */ fresh) =>
-      fresh && (fresh.decks || []).includes(deckId)
-        ? { ...fresh, decks: fresh.decks.filter((x) => x !== deckId) }
+      fresh && ((fresh.decks || []).includes(deckId) || onPath(fresh, deckId))
+        ? offPath({ ...fresh, decks: (fresh.decks || []).filter((x) => x !== deckId) }, deckId)
         : null
     );
   }
+}
+
+/**
+ * Whether a course has a deck anywhere on its path: in its order, among
+ * what is published there, or among what is opened early (0.613).
+ * @param {Course} course
+ * @param {string} deckId
+ */
+function onPath(course, deckId) {
+  return (course.path || []).includes(deckId) || isLiveIn(course, deckId) || (course.opened || []).includes(deckId);
+}
+
+/**
+ * The course with a unit taken off its path: out of its order, its
+ * publication there and its opening early, and nothing else. Fields left
+ * empty are dropped, so a course with no units stores what it always did.
+ * @param {Course} course
+ * @param {string} deckId
+ * @returns {Course}
+ */
+function offPath(course, deckId) {
+  const { path, pathLive, opened, ...rest } = course;
+  const nextPath = (path || []).filter((x) => x !== deckId);
+  const nextLive = Object.fromEntries(Object.entries(pathLive || {}).filter(([k]) => k !== deckId));
+  const nextOpened = (opened || []).filter((x) => x !== deckId);
+  return {
+    ...rest,
+    ...(nextPath.length ? { path: nextPath } : {}),
+    ...(Object.keys(nextLive).length ? { pathLive: nextLive } : {}),
+    ...(nextOpened.length ? { opened: nextOpened } : {}),
+  };
 }
 
 /* Who may change a deck.
@@ -979,10 +1129,30 @@ async function readManyJson(store, keys, opts) {
  */
 function materialVersion(courses, decks, fills = [], systems = []) {
   const summary = {
-    courses: courses.map((c) => [c.id, c.title, c.language || "", (c.decks || []).length]),
+    /* With its path, where it has one (0.613): an order changed, a unit
+       published or opened early moves nothing else a device compares.
+       Added only when there is something on it, so the version of a
+       course with no units is what it always was. */
+    courses: courses.map((c) => {
+      const row = [c.id, c.title, c.language || "", (c.decks || []).length];
+      const live = Object.keys(c.pathLive || {}).sort();
+      const path = c.path || [];
+      const opened = c.opened || [];
+      const withPath = path.length || live.length || opened.length ? row.concat([path.join(","), live.join(","), opened.join(",")]) : row;
+      /* And its switches, where it has any (0.627): a teacher changing what
+         is asked moves nothing else a device compares. */
+      return c.practice ? withPath.concat([JSON.stringify(c.practice)]) : withPath;
+    }),
     /* With the parts of the numbers it holds, which are not cards and so
-       move neither its version nor its count — see set-deck-parts. */
-    decks: decks.map((d) => [d.id, d.version || 1, d.title, (d.cardIds || []).length, (d.parts || []).join(",")]),
+       move neither its version nor its count — see set-deck-parts. And
+       whether it is a path unit, only where it is one. */
+    decks: decks.map((d) => {
+      const row = [d.id, d.version || 1, d.title, (d.cardIds || []).length, (d.parts || []).join(",")];
+      const unit = d.unit ? row.concat(["unit"]) : row;
+      /* And its personal set, only where it is one (0.629): a teacher
+         changing the wording or the lists moves nothing else. */
+      return d.set ? unit.concat([JSON.stringify(d.set)]) : unit;
+    }),
     /* The values a teacher has written are material too, and the only
        material that moves without a deck moving: a card that fills a
        variable is in no deck. Sorted, so two reads of the same site agree
@@ -1154,6 +1324,7 @@ async function wipeAccount(store, handle, how = {}) {
   await clearPersonal(store, handle, "");
 
   if (user.keyHash) await store.delete(K.keyOf(user.keyHash)).catch(() => {});
+  if (user.linkHash) await store.delete(K.keyOf(user.linkHash)).catch(() => {});
   /* And the practice history, which the key's digest finds (86a). */
   if (user.keyHash) await forgetSyncDoc(user.keyHash).catch(() => {});
   await store.delete(K.user(handle)).catch(() => {});
@@ -1484,6 +1655,37 @@ export function slugProblem(slug) {
 }
 /** A hex colour or nothing. @param {unknown} c */
 const colourOf = (c) => (/^#[0-9a-f]{6}$/i.test(String(c || "")) ? String(c).toLowerCase() : "");
+
+/**
+ * Spaces an App admin was made admin of without being put in (0.552–0.636):
+ * "I'll be this space's admin" wrote them on the space's admins and nothing
+ * else, so the space never appeared in their own list. Once, the first time
+ * this release runs, each such App admin is made a member of every open
+ * space they run. Stamped first, so two processes can't both do it.
+ */
+/** @type {Promise<void> | null} */
+let repairedRunners = null;
+/** @param {Store} store */
+function repairAdminMemberships(store) {
+  if (!repairedRunners) {
+    repairedRunners = (async () => {
+      const at = Date.now();
+      const stamp = await updateJson(store, "stamp:admin-runs-member-0637", (/** @type {any} */ cur) => (cur ? null : { at }));
+      if (!stamp || stamp.at !== at) return;
+      const orgs = (await readManyJson(store, (await readIndex(store, "orgs")).map((id) => K.org(id)))).filter(Boolean);
+      for (const o of orgs) {
+        if (o.archived) continue;
+        for (const h of o.admins || []) {
+          const u = await readJson(store, K.user(h));
+          if (u && u.admin && !memberOf(u).includes(o.id)) await addMembership(store, h, o.id);
+        }
+      }
+    })().catch(() => {
+      repairedRunners = null;
+    });
+  }
+  return repairedRunners;
+}
 
 /*
  * Students' My space, removed once (0.550, 7a). Since 0.550 only teachers
@@ -1935,7 +2137,23 @@ async function restoreOne(store, key, value, ctx) {
         return growOnly(store, key, (cur) => {
           const more = missingFrom(cur.decks, obj.decks);
           const base = (fromBefore && placeHere(cur)) || cur;
-          return more.length || base !== cur ? { ...base, decks: (base.decks || []).concat(more) } : null;
+          /* And the units among them back on its path, where the course has
+             lost them (0.613): a unit is on the path of every course that
+             holds it. Published where the copy says so; never opened early
+             by a restore. */
+          const decks = (base.decks || []).concat(more);
+          const lostPath = (Array.isArray(obj.path) ? obj.path : []).filter(
+            (/** @type {string} */ id) => decks.includes(id) && !(base.path || []).includes(id),
+          );
+          const live = obj.pathLive && typeof obj.pathLive === "object" ? obj.pathLive : {};
+          const lostLive = Object.entries(live).filter(([id]) => lostPath.includes(id));
+          if (!more.length && base === cur && !lostPath.length) return null;
+          return {
+            ...base,
+            decks,
+            ...(lostPath.length ? { path: (base.path || []).concat(lostPath) } : {}),
+            ...(lostLive.length ? { pathLive: { ...(base.pathLive || {}), ...Object.fromEntries(lostLive) } } : {}),
+          };
         }, obj);
       }
       const org = orgOf(obj);
@@ -2133,7 +2351,19 @@ async function handle(req) {
         );
       }
       // The key is shown once and cannot be read back from the digest.
-      return json({ ok: true, user: { ...withoutMemberships(user), org: orgCard(org), orgs: [orgCard(org)] }, key });
+      const asTeacher = !!(target && target.kind === "course" && target.asTeacher);
+      return json({
+        ok: true,
+        user: {
+          ...withoutMemberships(user),
+          org: orgCard(org),
+          orgs: [orgCard(org)],
+          keyOnly: asTeacher,
+          linkKey: asTeacher ? "" : await ensureLink(store, user),
+          syncToken: sha(key),
+        },
+        key,
+      });
     }
 
     /*
@@ -2147,10 +2377,23 @@ async function handle(req) {
      */
     if (action === "signin" || action === "whoami") {
       await ensureMain(store);
+      await repairAdminMemberships(store);
       const found = await currentUser(req, store);
       if (!found) return json({ error: "bad-key" }, 401);
       /* Suspended across the whole app by the super admin (0.578). */
       if (!found.admin && found.suspendedApp) return json({ error: "suspended-app" }, 403);
+      /* A sign-in link is for students only (0.638). Its own code (0.640)
+         is refused for anyone else whether or not the app says it came by
+         link, and someone who has come to teach or run a space loses theirs. */
+      const only = await keyOnly(store, found);
+      const byLink = !!found.linkHash && sha(req.headers.get("x-key") || "") === found.linkHash;
+      if (only && found.linkHash) await dropLink(store, found);
+      if ((url.searchParams.get("via") === "link" || byLink) && only) return json({ error: "key-only" }, 403);
+      /* Their own link code, for their account page; and where their practice
+         is kept, which a device signed in by link cannot work out from the
+         code it holds. */
+      const linkKey = only ? "" : await ensureLink(store, found);
+      const syncToken = found.keyHash || "";
       /** @type {any} */
       let me = found;
       let { orgDocs, active } = await standingOf(store, me);
@@ -2181,6 +2424,9 @@ async function handle(req) {
             orgAdmin: false,
             orgs: [],
             stranded,
+            keyOnly: only,
+            linkKey,
+            syncToken,
           },
         });
       }
@@ -2204,6 +2450,9 @@ async function handle(req) {
             .map((id) => orgDocs.get(id))
             .filter(Boolean)
             .map((o) => ({ ...orgCard(o), runs: (o.admins || []).includes(me.handle) })),
+          keyOnly: only,
+          linkKey,
+          syncToken,
         },
       });
     }
@@ -3234,6 +3483,8 @@ async function handle(req) {
               answers: storedAnswers(f),
               clips: clipList(f.clips),
               slowClips: clipList(f.slowClips),
+              /* And who is speaking on each, where the teacher said (0.629). */
+              ...voiceMap(f.voices, [...clipList(f.clips), ...clipList(f.slowClips)]),
               /* The pictures on this form — see imageList. Absent rather than
                  empty on a form with none, which is every form written before
                  a card could carry one. */
@@ -3315,6 +3566,7 @@ async function handle(req) {
                 lat: String(ln.lat || "").slice(0, 400),
                 clips: clipList(ln.clips),
                 slowClips: clipList(ln.slowClips),
+                ...voiceMap(ln.voices, [...clipList(ln.clips), ...clipList(ln.slowClips)]),
                 uses: Array.isArray(ln.uses)
                   ? [...new Set(ln.uses.map((/** @type {unknown} */ x) => String(x || "").replace(/[^A-Za-z0-9_-]/g, "")))]
                       .filter(Boolean)
@@ -4410,6 +4662,32 @@ async function handle(req) {
     }
 
     /*
+     * Whether a deck is a personal set, and how (0.629): its wording, its
+     * word lists (other decks, by id), which words are said with the name,
+     * and what is asked. The whole of it each time, or null to make the
+     * deck an ordinary one again. A deck in My space is never one: a set's
+     * answers are a course's students'. Locked like the cards are, because
+     * the lists are what the deck holds as much as its cards — see
+     * src/sets.ts.
+     */
+    if (action === "save-set") {
+      const deck = await readDeck(store, String(body.deckId || ""));
+      if (!deck) return json({ error: "no-deck" }, 404);
+      if (!(await canEditDeck(store, deck, mine, iManage)))
+        return json({ error: "not-yours" }, 403);
+      if (deck.personal) return json({ error: "personal-set" }, 400);
+      if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
+      const next = await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
+        if (!fresh) return null;
+        const { set: _was, ...rest } = /** @type {any} */ (fresh);
+        const set = body.set === null ? null : readSet(body.set, fresh.id);
+        return { ...rest, ...(set ? { set } : null), updated: Date.now() };
+      });
+      await taught();
+      return json({ ok: true, deck: next });
+    }
+
+    /*
      * Whose numbers a deck uses (0.541).
      *
      * A deck holding number parts is filled from one person's numbers and
@@ -4534,8 +4812,11 @@ async function handle(req) {
         await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).concat([newDeck]));
       }
       for (const c of courses) {
+        /* A path unit goes onto the path as well, as a draft (A1). */
         await updateJson(store, K.course(c.id), (/** @type {any} */ fresh) =>
-          fresh && !(fresh.decks || []).includes(landed.id) ? { ...fresh, decks: (fresh.decks || []).concat([landed.id]) } : null
+          fresh && !(fresh.decks || []).includes(landed.id)
+            ? { ...fresh, decks: (fresh.decks || []).concat([landed.id]), ...(landed.unit ? { path: (fresh.path || []).concat([landed.id]) } : {}) }
+            : null
         );
       }
       await taught();
@@ -4621,11 +4902,23 @@ async function handle(req) {
       const nextCourse = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) => {
         if (!fresh) return null;
         held = (fresh.decks || []).includes(deck.id);
-        if (adding === held) return null;
-        return {
-          ...fresh,
-          decks: adding ? (fresh.decks || []).concat([deck.id]) : fresh.decks.filter((d) => d !== deck.id),
-        };
+        if (adding === held) {
+          /* A unit the course holds but whose path lost it is put back at
+             the end; one taken out leaves nothing of itself on the path. */
+          if (deck.unit && adding && !(fresh.path || []).includes(deck.id)) return { ...fresh, path: (fresh.path || []).concat([deck.id]) };
+          if (!adding && onPath(fresh, deck.id)) return offPath(fresh, deck.id);
+          return null;
+        }
+        /* A path unit is always on the path of every course it is in (A1),
+           and starts there as a draft; taken away, it leaves that course's
+           path, publication and opening early, and no other course's. */
+        if (adding) {
+          const decks = (fresh.decks || []).concat([deck.id]);
+          return deck.unit
+            ? { ...fresh, decks, path: (fresh.path || []).filter((x) => x !== deck.id).concat([deck.id]) }
+            : { ...fresh, decks };
+        }
+        return offPath({ ...fresh, decks: fresh.decks.filter((d) => d !== deck.id) }, deck.id);
       });
       if (!nextCourse) return json({ error: "not-found" }, 404);
       const now = Date.now();
@@ -4644,6 +4937,170 @@ async function handle(req) {
       await taught();
       const [shown] = await withLinks(store, [nextDeck]);
       return json({ ok: true, deck: shown, course: nextCourse });
+    }
+
+    /* ================= a course's path (0.613) =================
+
+       A path unit is a deck with `unit: true`, on the path of every course
+       that holds it. Everything about the path is per course — its order,
+       which units are published there and which are opened early — and
+       every rule is in src/path.ts. Each of these changes the course as it
+       stands when the write lands (updateJson), so two teachers at once
+       cannot write over each other. */
+
+    /** The course, if this person teaches it or runs the space; else an answer to send. */
+    async function pathCourse() {
+      const course = await readCourse(store, String(body.courseId || ""));
+      if (!course) return { refused: json({ error: "not-found" }, 404) };
+      if (!isTeacher(course, mine) && !iManage) return { refused: json({ error: "not-teaching" }, 403) };
+      return { course };
+    }
+
+    if (action === "create-unit") {
+      const { course, refused } = await pathCourse();
+      if (refused) return refused;
+      const title = String(body.title || "").trim().slice(0, 60);
+      if (!title) return json({ error: "title-required" }, 400);
+      const id = `d${randomBytes(6).toString("hex")}`;
+      const now = Date.now();
+      const deck = {
+        id,
+        org: orgOf(course),
+        owner: mine,
+        title,
+        description: "",
+        lang: course.language || "",
+        unit: true,
+        version: 1,
+        courses: [{ courseId: course.id, addedAt: now }],
+        cardIds: [],
+        updated: now,
+      };
+      await writeJson(store, K.deck(id), deck);
+      await indexAdd(store, "decks", id);
+      const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) =>
+        fresh ? { ...fresh, decks: (fresh.decks || []).concat([id]), path: (fresh.path || []).concat([id]) } : null
+      );
+      await taught();
+      return json({ ok: true, deck, course: next });
+    }
+
+    if (action === "move-unit") {
+      const { course, refused } = await pathCourse();
+      if (refused) return refused;
+      const deckId = String(body.deckId || "");
+      if (!(course.path || []).includes(deckId)) return json({ error: "not-on-path" }, 404);
+      const to = Math.floor(Number(body.to));
+      if (!Number.isFinite(to)) return json({ error: "bad-position" }, 400);
+      const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) => {
+        if (!fresh || !(fresh.path || []).includes(deckId)) return null;
+        const rest = (fresh.path || []).filter((x) => x !== deckId);
+        const at = Math.max(0, Math.min(rest.length, to));
+        const path = rest.slice(0, at).concat([deckId], rest.slice(at));
+        return path.join() === (fresh.path || []).join() ? null : { ...fresh, path };
+      });
+      await taught();
+      return json({ ok: true, course: next || (await readCourse(store, course.id)) });
+    }
+
+    if (action === "publish-unit") {
+      const { course, refused } = await pathCourse();
+      if (refused) return refused;
+      const deckId = String(body.deckId || "");
+      if (!(course.path || []).includes(deckId)) return json({ error: "not-on-path" }, 404);
+      if (isLiveIn(course, deckId)) return json({ ok: true, course });
+      const problems = await unitCheck(course, deckId);
+      if (problems.length) return json({ error: "unit-not-ready", problems }, 409);
+      const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) =>
+        fresh && (fresh.path || []).includes(deckId) && !isLiveIn(fresh, deckId)
+          ? { ...fresh, pathLive: { ...(fresh.pathLive || {}), [deckId]: Date.now() } }
+          : null
+      );
+      await taught();
+      return json({ ok: true, course: next || (await readCourse(store, course.id)) });
+    }
+
+    if (action === "open-unit") {
+      const { course, refused } = await pathCourse();
+      if (refused) return refused;
+      const deckId = String(body.deckId || "");
+      if (!isLiveIn(course, deckId)) return json({ error: "unit-draft" }, 409);
+      const open = body.open === true;
+      const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) => {
+        if (!fresh) return null;
+        const was = fresh.opened || [];
+        if (open === was.includes(deckId)) return null;
+        const opened = open ? was.concat([deckId]) : was.filter((x) => x !== deckId);
+        const { opened: _o, ...rest } = fresh;
+        return opened.length ? { ...rest, opened } : rest;
+      });
+      await taught();
+      return json({ ok: true, course: next || (await readCourse(store, course.id)) });
+    }
+
+    /**
+     * The publishing checklist of one unit in one course, judged on what
+     * its students would actually receive: published cards only, as they
+     * are sent. What may count toward a blank's five is the cards of this
+     * unit and the published units before it here, every card never asked
+     * on its own in the libraries of the unit's owner and the course's
+     * teachers, and the number values of the parts those units hold — see
+     * countingCards in path.ts.
+     * @param {Course} course
+     * @param {string} deckId
+     */
+    async function unitCheck(course, deckId) {
+      const decks = (await readManyJson(store, (course.path || []).map((id) => K.deck(id)))).filter(Boolean);
+      const unitDeck = decks.find((d) => d.id === deckId);
+      if (!unitDeck) return [{ kind: "few-sentences", have: 0, need: 5 }];
+      const from = drawsFrom(course, decks, deckId);
+      /** @type {Map<string, string[]>} */
+      const decksOf = new Map();
+      for (const d of decks) {
+        if (!from.has(d.id)) continue;
+        for (const id of await deckCardIds(d)) decksOf.set(id, (decksOf.get(id) || []).concat([d.id]));
+      }
+      const ids = [...decksOf.keys()];
+      const rows = await readManyJson(store, ids.map((id) => K.card(id)));
+      /** @type {Map<string, any>} */
+      const byId = new Map();
+      rows.forEach((c, i) => {
+        if (c && inScope(c) && isPublished(c)) byId.set(ids[i], studentView(c));
+      });
+      const owners = [...new Set([unitDeck.owner, ...(course.teachers || [])])].filter(Boolean);
+      for (const owner of owners) {
+        /** @type {string[]} */
+        const lib = (await readJson(store, K.myCards(owner))) || [];
+        const libRows = await readManyJson(store, lib.filter((id) => !byId.has(id)).map((id) => K.card(id)));
+        for (const c of libRows) {
+          if (c && inScope(c) && isPublished(c) && neverAskedAlone(c) && !byId.has(c.id)) byId.set(c.id, studentView(c));
+        }
+      }
+      const lang = LANGUAGES[/** @type {import("../../src/types.ts").LangId} */ (unitDeck.lang || course.language || "")] || null;
+      /* The number values a blank may be filled with, from the system the
+         unit's numbers come from — counted with that teacher's nouns, as
+         the teacher's own screen counts them. */
+      const numLang = unitDeck.lang || course.language || "";
+      const numOwner = unitDeck.numbersFrom || unitDeck.owner;
+      const index = await systemIndex(numOwner);
+      const sysRow = index.numbers[numLang] ? await readJson(store, K.numSys(index.numbers[numLang])) : null;
+      const sys = sysRow ? readNumberSystem(sysRow) : null;
+      /** @type {any[]} */
+      let fillers = [];
+      if (sys) {
+        /** @type {string[]} */
+        const lib = (await readJson(store, K.myCards(numOwner))) || [];
+        const nounRows = (await readManyJson(store, lib.map((id) => K.card(id)))).filter((c) => c && inScope(c));
+        fillers = fillerCards(composerFor(numLang), withNouns(sys, countedNouns(nounRows, numLang)));
+      }
+      const all = [...byId.values()];
+      const counting = countingCards({
+        course, decks, unitId: deckId, cards: all,
+        deckIdsOf: (c) => decksOf.get(String(c.id)) || [],
+        fillers,
+      });
+      const own = (await deckCardIds(unitDeck)).map((id) => byId.get(id)).filter(Boolean);
+      return unitProblems({ cards: own, counting, lang });
     }
 
     /* ================= courses ================= */
@@ -4680,6 +5137,31 @@ async function handle(req) {
       await writeJson(store, K.code(teacherCode), id);
       await indexAdd(store, "courses", id);
       return json({ ok: true, course });
+    }
+
+    /*
+     * A course's switches (0.627): which exercises its students are asked —
+     * see src/course-practice.ts. One record on the course, `practice`,
+     * written whole by the course page and never taken away once set: a
+     * course going back to With translation keeps one saying so, which is
+     * what keeps every student's cards where they stood (see standingKeys in
+     * the app). No other write to a course touches it — each of them spreads
+     * the course as it stands — and it is in the material version, so
+     * students' devices fetch it when it changes.
+     */
+    if (action === "set-course-practice") {
+      const course = await readCourse(store, String(body.courseId || ""));
+      if (!course) return json({ error: "not-found" }, 404);
+      if (!isTeacher(course, mine) && !iManage) return json({ error: "not-teaching" }, 403);
+      const raw = body.practice && typeof body.practice === "object" ? body.practice : {};
+      const mode = ["with", "little", "none", "custom"].includes(raw.mode) ? raw.mode : "with";
+      const off = Array.isArray(raw.off)
+        ? [...new Set(raw.off.map((/** @type {unknown} */ t) => String(t || "").replace(/[^A-Za-z0-9_-]/g, "").slice(0, 24)).filter(Boolean))].slice(0, 120)
+        : [];
+      const practice = { mode, off };
+      const next = await updateJson(store, K.course(course.id), (/** @type {any} */ c) => (c ? { ...c, practice } : null));
+      if (!next) return json({ error: "not-found" }, 404);
+      return json({ ok: true, course: next });
     }
 
     /* Teaching a course and studying it are separate memberships, and someone
@@ -4958,10 +5440,20 @@ async function handle(req) {
       for (const c of courseRows) for (const did of c.decks || []) {
         if (!deckToCourse.has(did)) deckToCourse.set(did, c);
       }
-      const deckIds = [...deckToCourse.keys()];
-      const deckRows = (await readManyJson(store, deckIds.map((id) => K.deck(id)), EVENTUAL)).filter(
+      let deckRows = (await readManyJson(store, [...deckToCourse.keys()].map((id) => K.deck(id)), EVENTUAL)).filter(
         Boolean
       );
+      /* A path unit reaches a student only through a course where it is
+         published (0.613, R26): a draft is invisible, its cards, its number
+         parts and all. Where it is published in several of their courses,
+         the first of those is the one it is sent under. */
+      for (const d of deckRows) {
+        if (!d.unit) continue;
+        const live = courseRows.find((c) => (c.decks || []).includes(d.id) && isLiveIn(c, d.id));
+        if (live) deckToCourse.set(d.id, live);
+        else deckToCourse.delete(d.id);
+      }
+      deckRows = deckRows.filter((d) => deckToCourse.has(d.id));
 
       /* Whose values can reach this person: whoever owns a deck they hold,
          and whoever teaches a course they are in — the same two lists the
@@ -5580,6 +6072,14 @@ async function handle(req) {
           readManyJson(store, flagIds.map((id) => K.flag(id))).then(here),
         ]);
         const courses = courseRows.filter(Boolean);
+        /* Each student's sign-in link, for whoever may give them a new key
+           (0.640): the App admin, or a space admin for someone in their
+           space alone who runs nothing. Made here for anyone without one. */
+        const judge = await keyOnlyJudge(store);
+        const linkable = userRows.filter(
+          (u) => u && !judge(u) && (iAmAdmin || (!(actingOrgDoc.admins || []).includes(u.handle) && memberOf(u).length <= 1))
+        );
+        const links = await ensureLinks(store, linkable);
         const users = [];
         for (const u of userRows) {
           if (!u) continue;
@@ -5590,6 +6090,8 @@ async function handle(req) {
           const safe = withoutMemberships(u);
           users.push({
             ...safe,
+            keyOnly: judge(u),
+            linkKey: links.get(h) || "",
             suspended: suspensionIn(u, acting) || undefined,
             lastLearned: lastLearnedFor(u, acting),
             lastTaught: lastTaughtFor(u, acting),
@@ -5686,7 +6188,7 @@ async function handle(req) {
         const former = (await readJson(store, K.former(acting))) || [];
         /* And the space's invitation, for its admins to share (37a). */
         const invite = actingOrgDoc ? { code: actingOrgDoc.inviteCode, slug: actingOrgDoc.slug, name: actingOrgDoc.name, admins: actingOrgDoc.admins || [] } : null;
-        return jsonTagged(req, { ok: true, users, courses, decks, flags, former, invite });
+        return jsonTagged(req, { ok: true, users, courses, decks, flags, former, invite, linkSlug: actingOrgDoc ? actingOrgDoc.slug : "" });
       }
 
       /* A lost key: the handle survives, so memberships and progress do too. */
@@ -6251,6 +6753,7 @@ async function handle(req) {
           for (const u of users) {
             if (!u || u.handle === mine) continue;
             if (u.keyHash) await store.delete(K.keyOf(u.keyHash));
+            if (u.linkHash) await store.delete(K.keyOf(u.linkHash)).catch(() => {});
             await store.delete(K.user(u.handle));
             await store.delete(K.myCards(u.handle));
             removed.users += 1;
@@ -6474,6 +6977,10 @@ async function handle(req) {
         await updateJson(store, K.index("orgs"), (/** @type {any} */ cur) =>
           (cur || []).includes(id) ? null : (cur || []).concat([id])
         );
+        /* Running it means being in it (0.637): until then the App admin
+           was on its admins but not a member, so the space was missing
+           from their own list of spaces and they had no way in. */
+        if (selfAdmin) await addMembership(store, mine, id);
         return json({ ok: true, org, admin: user, key });
       }
 
@@ -6492,9 +6999,23 @@ async function handle(req) {
           const rows = (await readManyJson(store, (await readIndex(store, "users")).map((h) => K.user(h)))).filter(Boolean);
           /* Every space each person is in, and their account-wide moments
              (memberships, A2): Super admin sees the whole account. */
+          /* Every student's sign-in link (0.640), at the first space they are
+             still in. */
+          const judge = await keyOnlyJudge(store);
+          const links = await ensureLinks(store, rows.filter((u) => !judge(u)));
           const people = rows.map((u) => {
             const norm = normalisedUser(u);
-            return { ...withoutMemberships(u), suspended: undefined, org: orgOf(u), orgs: norm.orgs, suspendedIn: norm.suspendedIn };
+            const at = norm.orgs.map((/** @type {string} */ id) => orgs.find((/** @type {any} */ o) => o.id === id)).find((/** @type {any} */ o) => o && !o.archived);
+            return {
+              ...withoutMemberships(u),
+              suspended: undefined,
+              org: orgOf(u),
+              orgs: norm.orgs,
+              suspendedIn: norm.suspendedIn,
+              keyOnly: judge(u),
+              linkKey: links.get(u.handle) || "",
+              linkSlug: at ? at.slug : "",
+            };
           });
           return json({ ok: true, orgs, people });
         }
@@ -6744,7 +7265,15 @@ async function handle(req) {
             return next;
           });
         }
-        return json({ ok: true, user, key });
+        const only = await keyOnly(store, user);
+        return json({
+          ok: true,
+          user,
+          key,
+          keyOnly: only,
+          linkKey: only ? "" : await ensureLink(store, user),
+          slug: actingOrgDoc ? actingOrgDoc.slug : "",
+        });
       }
 
       if (action === "admin-reissue-key") {
@@ -6763,12 +7292,27 @@ async function handle(req) {
         }
         const key = makeKey();
         if (target.keyHash) await store.delete(K.keyOf(target.keyHash)).catch(() => {});
-        await writeJson(store, K.user(handle), { ...target, keyHash: sha(key) });
+        /* A new key ends their sign-in link too (0.640): the next count
+           makes a new code. */
+        if (target.linkHash) await store.delete(K.keyOf(target.linkHash)).catch(() => {});
+        const { linkHash: _h, ...unlinked } = /** @type {any} */ (target);
+        const renewed = { ...unlinked, keyHash: sha(key), linkN: (Number(target.linkN) || 0) + 1 };
+        await writeJson(store, K.user(handle), renewed);
         await writeJson(store, K.keyOf(sha(key)), handle);
         /* The practice document is stored under the key's token; carry it
            over, or the new key opens an empty one (0.580). */
         if (target.keyHash) await moveSyncDoc(target.keyHash, sha(key)).catch(() => {});
-        return json({ ok: true, handle, key });
+        /* The address of a space they are in, for their sign-in link (0.638). */
+        let slug = "";
+        for (const id of memberOf(target)) {
+          const o = await readJson(store, K.org(id));
+          if (o && !o.archived) {
+            slug = o.slug;
+            break;
+          }
+        }
+        const only = await keyOnly(store, target);
+        return json({ ok: true, handle, key, keyOnly: only, linkKey: only ? "" : await ensureLink(store, renewed), slug });
       }
 
       /* Removing a person: the same walk as closing your own account, so

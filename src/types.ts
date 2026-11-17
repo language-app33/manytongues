@@ -31,6 +31,7 @@
  * the two would be told apart by nothing but where you were standing.
  */
 import type { Range as SkillRange } from "./numbers/types.ts";
+import type { SetConfig } from "./sets.ts";
 export type { SkillRange };
 
 /**
@@ -766,7 +767,16 @@ export interface Lang {
  * listed here. `language` is the one every reader relies on, and the one
  * worth naming.
  */
-export type Settings = { language?: LangId } & Record<string, any>;
+export type Settings = {
+  language?: LangId;
+  /**
+   * By course id: the path units that have ever been open for this learner
+   * there (0.613). Merged across devices by union (mergeReached in
+   * src/path.ts), never overwritten — the one setting that is not
+   * last-writer-wins. Read it through pathReachedOf in the app.
+   */
+  pathReached?: Record<string, string[]>;
+} & Record<string, any>;
 
 /**
  * A session built by hand on the Build screen and kept.
@@ -833,6 +843,12 @@ export interface User {
   orgs?: { id: string; slug: string; name: string; logo: string; colour: string; runs?: boolean }[];
   /** False until the person has ticked that their key is saved (0.544). Absent: saved. */
   keySaved?: boolean;
+  /** Teaches, runs a space or is the App admin: key only, no sign-in link (0.638). Worked out by the server, never stored. Absent from an older server: treat as key only. */
+  keyOnly?: boolean;
+  /** A student's own sign-in link code (0.640): not their key, but signs in wherever it does. "" when they have none. */
+  linkKey?: string;
+  /** Where this account's practice is kept: the digest of its key, which a device signed in by link cannot work out (0.640). */
+  syncToken?: string;
   /** While suspended: when, by whom, why, and the courses to put back (0.544). */
   suspended?: {
     at: Millis;
@@ -878,6 +894,9 @@ export interface CardForm {
    * speeds.
    */
   slowClips?: string[];
+  /** Who is speaking on each recording of this form, by recording hash
+      (0.629). Only for hashes in `clips` or `slowClips`. */
+  voices?: Record<string, string>;
   /** Picture hashes — what this form means, shown. At most four; see
       ImageScreen. */
   images?: string[];
@@ -1293,11 +1312,30 @@ export interface Deck {
    * partsWaiting in server/api/courses.js.
    */
   partsWaiting?: string[];
+  /**
+   * Present means the deck is a path unit, in every course that holds it:
+   * one step of a course's path, opened in order (0.613). See src/path.ts.
+   * Not to be confused with `Unit` in the trainer, which is one form of a
+   * card that can be asked.
+   */
+  unit?: true;
+  /**
+   * Present means the deck is a personal set (0.629): its pictures are its
+   * cards with a picture, asked with each student's own word from one of
+   * its word lists. See src/sets.ts.
+   */
+  set?: SetConfig;
 }
 
 export interface Course {
   /** Its space (0.542); absent: Main. */
   org?: string;
+  /**
+   * Which exercises its students are asked (0.627): a shortcut and the
+   * switches turned off by hand — see src/course-practice.ts. Absent is
+   * everything on, which every course was before.
+   */
+  practice?: { mode: string; off: string[] };
   /** The "My space" group in Learning (0.545), made on the fly and never stored. */
   personal?: boolean;
   id: string;
@@ -1312,6 +1350,13 @@ export interface Course {
   /** Gives authority over the material. */
   teacherCode?: string;
   created?: Millis;
+  /* The path (0.613): everything about it is per course. See src/path.ts. */
+  /** The ids of its path units, in order. Drafts included. */
+  path?: string[];
+  /** The path units published in THIS course, by deck id, with when. */
+  pathLive?: Record<string, Millis>;
+  /** The ids of the path units a teacher has opened early for this course's class. */
+  opened?: string[];
 }
 
 /**
@@ -1329,6 +1374,8 @@ export interface AdminOverview {
   former?: FormerMember[];
   /** The space's invitation link and its admins (0.544). */
   invite?: { code: string; slug: string; name: string; admins: string[] } | null;
+  /** The space's address, for its students' sign-in links (0.640). */
+  linkSlug?: string;
 }
 
 /* ---- the schedule ---- */
@@ -1511,6 +1558,8 @@ export type Form = Record<string, any> & {
      a form on a device and a form on the server carry the same ones. */
   clips?: string[];
   slowClips?: string[];
+  /* Who is speaking on each recording, by hash, as CardForm holds it. */
+  voices?: Record<string, string>;
   /* Its pictures, by hash, as CardForm holds them. */
   images?: string[];
   s?: Record<string, ExerciseState>;
@@ -1603,6 +1652,13 @@ export type Line = Form & {
  */
 export type Item = {
   id: string;
+  /**
+   * For an item made from a number or time system: the ids of the decks
+   * that hold its part (0.615), beside the deck titles in `tags`. What a
+   * course's path reads to know which decks it is in — a course card is
+   * found through each deck's `cardIds` instead. See fileIntoDecks.
+   */
+  deckIds?: string[];
   /** Which language it is in. A device holds more than one. */
   lang?: LangId;
   kind?: string;

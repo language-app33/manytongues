@@ -2632,11 +2632,12 @@ test("a card's second accepted spelling keeps its schedule across a load", () =>
   assert.ok(lifted["ar2en@1"], "the second spelling's schedule is still there");
   assert.equal(lifted["ar2en@1"].reps, 2);
   assert.equal(lifted["ar2en@1"].interval, 2);
-  /* A key naming an exercise that no longer exists goes the way a retired
-     type's own state goes, and one nobody has answered is not invented:
-     an absent key is what let this be turned on without touching a
-     document. */
-  assert.equal(liftStates({ "gone2en@1": { phase: "review" } })["gone2en@1"], undefined);
+  /* A key naming an exercise this release does not know is carried as it
+     is (0.626, changed from dropped: it may be a later release's work,
+     synced here — see liftStates and tests/unknown-exercises.test.mjs).
+     One nobody has answered is still not invented: an absent key is what
+     let this be turned on without touching a document. */
+  assert.deepEqual(liftStates({ "gone2en@1": { phase: "review" } })["gone2en@1"], { phase: "review" });
   assert.equal(liftStates({})["ar2en@1"], undefined);
 });
 

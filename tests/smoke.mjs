@@ -59,6 +59,11 @@ const out = await buildOnce(
     /* And the review screens, reached from a card's page and a toolbar
        button this walk does not press — driven on their own at the foot. */
     "review-sheet.tsx",
+    /* And the recording screen, driven on its own at the foot (0.632). */
+    "card-editor.tsx",
+    /* And a person's folded tile on an admin's list, driven on its own in
+       the sign-in links walk (0.640). */
+    "spaces.tsx",
   ],
   {
     splitting: true,
@@ -279,6 +284,24 @@ const viTeach = {
   forms: [], updated: 1,
 };
 let teachesTwo = false;
+/* A course with a path (0.616): two units, the first published, served
+   to the teacher's screens only while a walk below sets it. */
+let withPath = false;
+/* And a learner's course with a path: two published units. */
+let studentPath = false;
+/* And a learner's course with a personal set (0.630): a deck of three
+   pictures and two word lists. */
+let studentSets = false;
+const PIC = (/** @type {string} */ c) => c.repeat(64);
+const setPicture = (/** @type {string} */ id, /** @type {string} */ ar, /** @type {string} */ c) => ({
+  id, owner: "t-1", lang: "ar-PS", rev: 1, updated: 1, forms: [{ ar, en: "", lat: "", images: [PIC(c)] }],
+});
+const setWord = (/** @type {string} */ id, /** @type {string} */ ar, /** @type {string} */ en) => ({
+  id, owner: "t-1", lang: "ar-PS", rev: 1, updated: 1, forms: [{ ar, en, lat: "" }],
+});
+const SET_PICTURES = [setPicture("ks0000000001", "لان", "1"), setPicture("ks0000000002", "مين", "2"), setPicture("ks0000000003", "هوا", "3")];
+const SET_NORTH = [setWord("ks0000000011", "عمة", "father's younger sister"), setWord("ks0000000012", "جدة", "grandmother"), setWord("ks0000000013", "أم", "mother")];
+const SET_SOUTH = [setWord("ks0000000021", "خالة", "father's younger sister"), setWord("ks0000000022", "ستي", "grandmother")];
 const rafa = nameCard("k555555555555", "رافائيل", "Raphael", "rafaa'iil");
 const viktor = nameCard("k666666666666", "فيكتور", "Victor", "fiktoor");
 let materialHits = 0;
@@ -300,6 +323,13 @@ let materialDecks = [];
 /* What the deck screen's Numbers and pronouns asked the server to keep. */
 /** @type {any[]} */
 const savedParts = [];
+/* What save-set was sent, and a third deck in the course for a set's
+   second list, while the walk at the foot asks for it (0.632). */
+/** @type {any[]} */
+const savedSets = [];
+/** @type {any[]} */
+const madeUnits = [];
+let teacherSets = false;
 /* What the deck screen's Lock asked the server to do. */
 /** @type {any[]} */
 const lockedDecks = [];
@@ -320,6 +350,10 @@ const joinedSpaces = [];
 /* Who whoami answers as, where a walk signs somebody else in. */
 /** @type {any} */
 let whoamiAs = null;
+/* Who whoami answers as for a given key, where a walk needs two people at
+   once — the device's account and a sign-in link's (0.638). */
+/** @type {Map<string, any>} */
+const whoamiKeys = new Map();
 /* Saves the stub takes, where a walk turns them on — see save-card below. */
 let takeSaves = false;
 /* A walk's own answer to a save, where it needs the server to fail, be
@@ -380,7 +414,10 @@ const fakeFetch = async (input, opts = {}) => {
     /* With every space the account may use (memberships): the account's
        own `orgs` where a test gives it several, else its one space. */
     if (action === "whoami") {
-      const own = /** @type {any} */ (whoamiAs || account);
+      const sentKey = (opts.headers && opts.headers["x-key"]) || "";
+      const own = /** @type {any} */ (whoamiKeys.get(sentKey) || whoamiAs || account);
+      /* A sign-in link is for students only (0.638). */
+      if (url.searchParams.get("via") === "link" && own && own.keyOnly === true) return json({ error: "key-only" }, 403);
       const orgs = own && Array.isArray(own.orgs) ? own.orgs : own && own.org ? [own.org] : [];
       return json({ ok: true, user: { ...own, key: undefined, orgs } });
     }
@@ -399,6 +436,39 @@ const fakeFetch = async (input, opts = {}) => {
             { id: "d9", title: "Lesson 1", owner: "t-9", cardIds: [lingua.id], cardCount: 1, courseId: "c9", courseTitle: "Lingua Arabic", courseLanguage: "ar-PS", courses: [{ courseId: "c9", addedAt: 1 }], version: 1 },
           ],
           cards: [{ deckId: "d1", cards: [card, phrase] }, { deckId: "d9", cards: [lingua] }],
+          systems: [],
+        });
+      }
+      if (studentSets) {
+        const deck = (/** @type {string} */ id, /** @type {string} */ title, /** @type {any[]} */ cards, /** @type {number} */ at, extra = {}) => ({
+          id, title, owner: "t-1", cardIds: cards.map((c) => c.id), cardCount: cards.length, courseId: "c1", courseTitle: "Vietnamese 1",
+          courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: at }], version: 1, ...extra,
+        });
+        return json({
+          ok: true, version: "v-sets", teaches: false,
+          courses: [{ id: "c1", org: "main", title: "Vietnamese 1", language: "ar-PS", decks: ["dFam", "dNorth", "dSouth"], role: "student", studying: true, teaching: false }],
+          decks: [
+            deck("dFam", "Our family", SET_PICTURES, 1, { set: {
+              wording: { question: "Who is she to you?", none: "Not someone I know", askName: "Who is this?", askWord: "What do you call her?", askBoth: "Name and word" },
+              lists: ["dNorth", "dSouth"], named: [], asks: { name: true, word: true, both: true }, order: "before",
+            } }),
+            deck("dNorth", "Hanoi", SET_NORTH, 2),
+            deck("dSouth", "Saigon", SET_SOUTH, 3),
+          ],
+          cards: [{ deckId: "dFam", cards: SET_PICTURES }, { deckId: "dNorth", cards: SET_NORTH }, { deckId: "dSouth", cards: SET_SOUTH }],
+          systems: [],
+        });
+      }
+      if (studentPath) {
+        return json({
+          ok: true, version: "v-path", teaches: false,
+          courses: [{ id: "c1", org: "main", title: "Arabic 101", language: "ar-PS", decks: ["u1", "u2"], path: ["u1", "u2"], pathLive: { u1: 1, u2: 1 },
+            role: "student", studying: true, teaching: false }],
+          decks: [
+            { id: "u1", unit: true, title: "Greetings unit", owner: "t-1", cardIds: [card.id], cardCount: 1, courseId: "c1", courseTitle: "Arabic 101", courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: 1 }], version: 1 },
+            { id: "u2", unit: true, title: "Family unit", owner: "t-1", cardIds: [phrase.id], cardCount: 1, courseId: "c1", courseTitle: "Arabic 101", courseLanguage: "ar-PS", courses: [{ courseId: "c1", addedAt: 2 }], version: 1 },
+          ],
+          cards: [{ deckId: "u1", cards: [card] }, { deckId: "u2", cards: [phrase] }],
           systems: [],
         });
       }
@@ -443,6 +513,25 @@ const fakeFetch = async (input, opts = {}) => {
        course hands out, which is what makes them worth trying an exercise
        on: one has a recording and one does not, and one is a phrase that
        teaches the other. */
+    if (action === "my-courses" && withPath) {
+      return json({
+        ok: true,
+        courses: [
+          { id: "c1", title: "Arabic 101", language: "ar-PS", decks: ["d1", "u1", "u2"], path: ["u1", "u2"], pathLive: { u1: 1 },
+            students: [], teachers: [account.handle], role: "teacher" },
+        ],
+      });
+    }
+    if (action === "my-decks" && withPath) {
+      return json({
+        ok: true,
+        decks: [
+          { id: "d1", title: "Lesson 1", owner: account.handle, lang: "ar-PS", cardIds: [card.id, phrase.id], cardCount: 2, courses: [{ courseId: "c1", addedAt: 1 }] },
+          { id: "u1", unit: true, title: "Greetings unit", owner: account.handle, lang: "ar-PS", cardIds: [card.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 2 }] },
+          { id: "u2", unit: true, title: "Family unit", owner: account.handle, lang: "ar-PS", cardIds: [], cardCount: 0, courses: [{ courseId: "c1", addedAt: 3 }] },
+        ],
+      });
+    }
     if (action === "my-courses") {
       return json({
         ok: true,
@@ -457,6 +546,12 @@ const fakeFetch = async (input, opts = {}) => {
         decks: [
           { id: "d1", title: "Lesson 1", owner: account.handle, lang: "ar-PS", cardIds: [card.id, phrase.id], cardCount: 2, courses: [{ courseId: "c1", addedAt: 1 }] },
           { id: "d2", title: "Introductions", owner: account.handle, lang: "ar-PS", cardIds: [frameCard.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 2 }] },
+          ...(teacherSets ? [
+            { id: "d4", title: "Family words", owner: account.handle, lang: "ar-PS", cardIds: [card.id], cardCount: 1, courses: [{ courseId: "c1", addedAt: 4 }] },
+            { id: "d5", title: "Our family", owner: account.handle, lang: "ar-PS", cardIds: ["k777777777777"], cardCount: 1, courses: [{ courseId: "c1", addedAt: 5 }],
+              set: { wording: { question: "Who is this person to you?", none: "I don't know this person", askName: "Who is this?", askWord: "What do you call this person?", askBoth: "Their name, with what you call them" },
+                lists: [], named: [], asks: { name: true, word: true, both: true }, order: "before" } },
+          ] : []),
         ],
       });
     }
@@ -464,7 +559,10 @@ const fakeFetch = async (input, opts = {}) => {
       return json({
         ok: true,
         cards: [
-          { ...card, decks: ["d1"] },
+          { ...card, decks: teacherSets ? ["d1", "d4"] : ["d1"] },
+          /* A person in the personal set, a picture and a name (0.634). */
+          ...(teacherSets ? [{ id: "k777777777777", owner: account.handle, lang: "ar-PS", rev: 1, updated: 1, decks: ["d5"],
+            forms: [{ ar: "لان", en: "", lat: "lan", images: ["7".repeat(64)] }] }] : []),
           { ...phrase, decks: ["d1"] },
           { ...talk, decks: [] },
           { ...frameCard, decks: ["d2"] },
@@ -488,6 +586,18 @@ const fakeFetch = async (input, opts = {}) => {
     }
     /* Whose numbers a deck uses (0.541): nobody here has any. */
     if (action === "number-sources") return json({ ok: true, sources: [], chosen: "" });
+    if (action === "create-unit" && teacherSets) {
+      const body = JSON.parse(opts.body || "{}");
+      madeUnits.push(body);
+      return json({ ok: true, deck: { id: "made-unit", unit: true, title: body.title, owner: account.handle, lang: "ar-PS", cardIds: [], cardCount: 0, courses: [{ courseId: body.courseId }] },
+        course: { id: "c1", title: "Arabic 101", language: "ar-PS", decks: ["d1", "made-unit"], path: ["made-unit"], students: [], teachers: [account.handle], role: "teacher" } });
+    }
+    if (action === "save-set") {
+      const body = JSON.parse(opts.body || "{}");
+      savedSets.push(body);
+      return json({ ok: true, deck: { id: body.deckId, title: "Lesson 1", ...(body.set ? { set: body.set } : null) } });
+    }
+    if (action === "put-clip") return json({ ok: true });
     if (action === "set-deck-parts") {
       const body = JSON.parse(opts.body || "{}");
       savedParts.push(body);
@@ -12049,6 +12159,188 @@ const openPronounTables = async () => {
   localStorage.setItem("arabic-account", JSON.stringify(account));
 }
 
+/* ---- sign-in links (0.638) ----
+
+   A student's private link is the space's address with their key after
+   `#`. Opened signed out, it signs them in with nothing to type and the key
+   leaves the address bar; opened while someone else is signed in, it asks
+   before switching; a teacher's or admin's is refused; and the account
+   page offers the link only to a student. */
+{
+  const MAIN_DOC = "arabic-trainer:arabic-trainer-v3";
+  const PARKED = `${MAIN_DOC}:parked:${account.handle}`;
+  const main = { id: "main", slug: "main", name: "Main", logo: "", colour: "" };
+  const lina = {
+    handle: "lina-5d6e", displayName: "Lina", key: "willow-amber-quartz-fjord-7e3a", admin: false,
+    keyOnly: false, keySaved: false, org: main,
+    /* Her link's own code (0.640): not her key, but it signs her in. */
+    linkKey: "meadow-raven-saffron-cedar-3c5d",
+  };
+  const tariq = {
+    handle: "tariq-8f9a", displayName: "Tariq", key: "harbour-gable-ember-cedar-2b4c", admin: false,
+    keyOnly: true, org: main,
+  };
+  const mine = {
+    id: "klinkwalk0001", kind: "word", tags: [], created: 1, updated: 1, lang: "ar-PS",
+    forms: [{ id: "klinkwalk0001-f", ar: "قمر", en: "moon", lat: "qamar", s: {} }],
+  };
+  const holds = (/** @type {any} */ doc) => !!doc && (doc.items || []).some((/** @type {any} */ it) => it.id === mine.id);
+  const signedInAs = () => {
+    try {
+      return (JSON.parse(localStorage.getItem("arabic-account") || "null") || {}).key || "";
+    } catch (e) {
+      return "";
+    }
+  };
+  whoamiAs = null;
+  whoamiKeys.clear();
+  whoamiKeys.set(lina.key, lina);
+  whoamiKeys.set(lina.linkKey, lina);
+  whoamiKeys.set(tariq.key, tariq);
+  /** Opens the app at an address, as a fresh page would. */
+  const open = async (/** @type {string} */ address) => {
+    window.history.replaceState(null, "", address);
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    await sleep(2500);
+    const here = (/** @type {RegExp} */ re) => [...host.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
+    /* A dialog is put at the foot of the page, outside the app's own box. */
+    const anywhere = (/** @type {RegExp} */ re) => [...document.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
+    const close = () => {
+      r.unmount();
+      host.remove();
+    };
+    return { host, here, anywhere, close };
+  };
+
+  /* 1. Signed out, a student's link opened: it carries its own code
+     (0.640), and her practice is kept under her key's digest, which the
+     server tells the device. */
+  const digestOf = async (/** @type {string} */ key) => {
+    const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
+    return [...new Uint8Array(d)].map((b) => b.toString(16).padStart(2, "0")).join("");
+  };
+  /** @type {any} */ (lina).syncToken = await digestOf(lina.key);
+  remoteDocs.clear();
+  localStorage.removeItem("arabic-account");
+  {
+    const app = await open(`/#key=${lina.linkKey}`);
+    check("a sign-in link opened signed out signs the student in", !app.here(/sign-in key/) && signedInAs() === lina.linkKey,
+      `${signedInAs() || "nobody"} · ${(app.host.textContent || "").slice(0, 100)}`);
+    check("and her practice is kept where her key keeps it, not under the link's code",
+      remoteDocs.has(/** @type {any} */ (lina).syncToken) && !remoteDocs.has(await digestOf(lina.linkKey)),
+      [...remoteDocs.keys()].map((k) => k.slice(0, 8)).join(", ") || "nothing synced");
+    check("without stopping them to tick that the key is saved", !/Keep this somewhere safe/.test(app.host.textContent || ""),
+      (app.host.textContent || "").slice(0, 100));
+    check("and the key is taken out of the address", window.location.hash === "", window.location.hash);
+    app.close();
+  }
+
+  /* 4. A key-only person's link, signed out. */
+  localStorage.removeItem("arabic-account");
+  {
+    const app = await open(`/#key=${tariq.key}`);
+    check("a teacher's sign-in link is refused, with the key box offered",
+      !!app.host.querySelector("#signin-key") && /Sign-in links are for students\./.test(app.host.textContent || ""),
+      (app.host.textContent || "").slice(0, 160));
+    check("and nobody is signed in", signedInAs() === "", signedInAs());
+    app.close();
+  }
+
+  /* 2. Signed in as one person, another's link opened: asked, and kept. */
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+  {
+    const app = await open(`/#key=${lina.key}`);
+    check("a link for someone else asks before switching", !!app.anywhere(/^Switch to Lina$/),
+      (document.body.textContent || "").slice(0, 160));
+    click([...document.querySelectorAll(".at-modal button")].find((b) => /^Cancel$/.test((b.textContent || "").trim())));
+    await sleep(800);
+    check("and Cancel keeps the person who was here", signedInAs() === account.key && !app.anywhere(/^Switch to Lina$/), signedInAs());
+    app.close();
+  }
+
+  /* 3. The same, and switching. */
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+  localStorage.setItem(MAIN_DOC, JSON.stringify({ version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, items: [mine] }));
+  localStorage.removeItem(PARKED);
+  {
+    const app = await open(`/#key=${lina.key}`);
+    click(app.anywhere(/^Switch to Lina$/));
+    await sleep(3500);
+    check("switching signs the link's person in", signedInAs() === lina.key, signedInAs() || "nobody");
+    check("and the first person's practice is set aside for them", holds(JSON.parse(localStorage.getItem(PARKED) || "null")),
+      localStorage.getItem(PARKED) ? "set aside without it" : "nothing set aside");
+
+    /* 5. The account page offers the link to a student. */
+    const settingsHave = async (/** @type {RegExp} */ re) => {
+      click(app.host.querySelector(".at-cornerbtn"));
+      await sleep(300);
+      click([...app.host.querySelectorAll("button.at-cline")].find((b) => /Settings$/.test((b.textContent || "").trim())));
+      await sleep(400);
+      return !!app.here(re);
+    };
+    check("a student's account page offers their sign-in link", await settingsHave(/^Show my link$/),
+      (app.host.textContent || "").slice(0, 160));
+    app.close();
+  }
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+  {
+    const app = await open("/");
+    click(app.host.querySelector(".at-cornerbtn"));
+    await sleep(300);
+    click([...app.host.querySelectorAll("button.at-cline")].find((b) => /Settings$/.test((b.textContent || "").trim())));
+    await sleep(400);
+    check("an account the server has not called a student is offered no link",
+      !!app.here(/^Show my key$/) && !app.here(/^Show my link$/), (app.host.textContent || "").slice(0, 160));
+    app.close();
+  }
+
+  /* 6. A person's tile on an admin's list (0.640): folded, and opened by
+     its name, to the student's sign-in link. */
+  {
+    const { PersonFold, PersonLink } = await import(path.join(out, "spaces.js"));
+    /* It is the form panel's fold, which this file opens as drawn. */
+    openFormsAsDrawn = false;
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    const tile = (/** @type {boolean} */ opened) =>
+      React.createElement(PersonFold, { title: "Lina", meta: lina.handle, open: opened },
+        React.createElement(PersonLink, { name: "Lina", slug: "lingua", code: lina.linkKey }));
+    r.render(tile(false));
+    await sleep(100);
+    const head = /** @type {HTMLElement | null} */ (host.querySelector('[aria-expanded]'));
+    check("a person's tile starts folded, with no link showing",
+      !!head && head.getAttribute("aria-expanded") === "false" && !/sign-in link/i.test(host.textContent || ""),
+      (host.textContent || "").slice(0, 120));
+    click(head);
+    await sleep(100);
+    check("opened by its name, it shows the student's private sign-in link",
+      /Private sign-in link for Lina/.test(host.textContent || "") &&
+        (host.textContent || "").includes(`/lingua#key=${lina.linkKey}`),
+      (host.textContent || "").slice(0, 200));
+    r.render(tile(false));
+    click(head);
+    await sleep(100);
+    r.render(tile(true));
+    await sleep(100);
+    check("and a tile whose person just had a key made opens by itself",
+      /Private sign-in link for Lina/.test(host.textContent || ""), (host.textContent || "").slice(0, 120));
+    r.unmount();
+    host.remove();
+    openFormsAsDrawn = true;
+  }
+
+  whoamiAs = null;
+  whoamiKeys.clear();
+  window.history.replaceState(null, "", "/");
+  localStorage.removeItem(PARKED);
+  localStorage.removeItem(`${MAIN_DOC}:parked:${lina.handle}`);
+  localStorage.setItem("arabic-account", JSON.stringify(account));
+}
+
 /* ---- the sound engine rests ----
 
    A running audio context keeps the phone's audio hardware switched on,
@@ -12268,6 +12560,427 @@ const openPronounTables = async () => {
   check("after three sessions the tip is not shown, and the tap still works",
     later.promptsBare > 0 && !later.tip && later.tappedShows, JSON.stringify(later));
   check("nothing went wrong on the way", errors.length === before, errors.slice(before).join("\n"));
+}
+
+/* ---- a course's path, for a learner (0.617) ----
+   Home shows the course's current unit above Start session, with its
+   stages; Progress shows the whole path above the deck tiles, where the
+   units are not; a locked unit opens read-only, with no button. And a
+   learner with no path is shown none of it. */
+{
+  const before = errors.length;
+  const KEY = "arabic-trainer:arabic-trainer-v3";
+  const mount = async () => {
+    localStorage.setItem(KEY, JSON.stringify({ version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [] }));
+    localStorage.removeItem("arabic-trainer:material");
+    /* This account teaches too, and a teacher opens into Teaching; asked
+       for Learning, as the space's own Learn button asks. */
+    window.history.replaceState(null, "", `${window.location.pathname}?open=learn`);
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    await sleep(1800);
+    return { host, r };
+  };
+  /* Last in the file: the app the walks above share is put away, so the
+     tab bar on screen is this one's. */
+  root.unmount();
+  await sleep(200);
+  const plain = await mount();
+  check("a learner with no path has no path line on Home",
+    !plain.host.querySelector('[data-el="path-home"]'), "a path line with no path");
+  plain.r.unmount();
+  plain.host.remove();
+
+  studentPath = true;
+  const { host, r } = await mount();
+  const homeLine = host.querySelector('[data-el="path-home"]');
+  const said = homeLine ? (homeLine.textContent || "").replace(/\s+/g, " ") : "";
+  check("Home shows the course's current unit, with its stages, above Start session",
+    /Arabic 101 · Unit 1 of 2 · Greetings unit/.test(said) && /Words 0\/1/.test(said) && /Sentences 0\/0/.test(said),
+    said || "no path line");
+  /* The current unit, opened from its line on Home. */
+  click(/** @type {any} */ (homeLine));
+  await sleep(500);
+  const openPage = document.querySelector('[data-el="unit-page"]');
+  check("the Home line opens its unit, which offers Practise this unit",
+    !!openPage && /Practise this unit/.test(openPage.textContent || ""), openPage ? openPage.textContent || "" : "no page");
+  check("and, being open, offers Mark as cleared", !!openPage && /Mark as cleared/.test(openPage.textContent || ""),
+    openPage ? openPage.textContent || "" : "no page");
+  backOut();
+  await sleep(300);
+  const tabsNow = () => [...document.querySelectorAll("[role=tab]")];
+  const progressTab = tabsNow().find((b) => /^Progress$/.test((b.textContent || "").trim()) && host.contains(b))
+    || tabsNow().find((b) => /^Progress$/.test((b.textContent || "").trim()));
+  click(progressTab || null);
+  await sleep(900);
+  const pathRows = [...host.querySelectorAll('[data-el="progress-path"] button')].map((b) => (b.textContent || "").replace(/\s+/g, " "));
+  check("Progress shows the path in order, current then locked",
+    pathRows.length === 2 && /1\. Greetings unit.*Current/.test(pathRows[0]) && /2\. Family unit.*Locked/.test(pathRows[1]),
+    pathRows.join(" | ") || `no path on Progress; bare: ${!!host.querySelector(".at-screen.bare")}; tabs: ${tabsNow().map((b) => `${(b.textContent || "").trim()}:${host.contains(b)}`).join(",")}; modes: ${[...document.querySelectorAll(".at-wheremode")].map((b) => b.textContent).join(",")}`);
+  const tiles = [...host.querySelectorAll(".at-deckstatname")].map((t) => t.textContent || "");
+  check("a unit is not among the deck tiles", !tiles.some((t) => /Greetings unit|Family unit/.test(t)), tiles.join(" | "));
+  click([...host.querySelectorAll('[data-el="progress-path"] button')][1] || null);
+  await sleep(500);
+  const page = document.querySelector('[data-el="unit-page"]');
+  const pageText = page ? (page.closest(".at-screen") || page).textContent || "" : "";
+  check("a locked unit opens read-only, says what opens it, and offers no practice",
+    /Finish unit 1 to open this one/.test(pageText) && !/Practise this unit|Mark as cleared/.test(pageText), pageText.replace(/\s+/g, " ").slice(0, 200));
+  backOut();
+  studentPath = false;
+  r.unmount();
+  host.remove();
+  localStorage.removeItem("arabic-trainer:material");
+  check("and nothing threw on a learner's path", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- a personal set, asked of a learner (0.630) ----
+   A set of three pictures with two word lists. Start session asks for the
+   list first, then the teacher's question for each picture, in the
+   teacher's own words; the answers are kept in the practice document, and
+   Home says what is still waiting. */
+{
+  const before = errors.length;
+  const KEY = "arabic-trainer:arabic-trainer-v3";
+  localStorage.setItem(KEY, JSON.stringify({ version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [] }));
+  localStorage.removeItem("arabic-trainer:material");
+  window.history.replaceState(null, "", `${window.location.pathname}?open=learn`);
+  studentSets = true;
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1800);
+  const waiting = () => {
+    const el = host.querySelector('[data-el="set-waiting"]');
+    return el ? (el.textContent || "").replace(/\s+/g, " ") : "";
+  };
+  check("Home says how many pictures of the set are waiting", /3 pictures in Our family are waiting for your answer/.test(waiting()), waiting() || "no line");
+  click(buttonNamed(/^Start session$/));
+  await sleep(500);
+  const top = () => [...document.querySelectorAll(".at-screen")].pop();
+  const text = () => ((top() || {}).textContent || "").replace(/\s+/g, " ");
+  check("before the session, the learner is asked which list", /Which words do you want to learn\?/.test(text()) && /Hanoi/.test(text()) && /Saigon/.test(text()), text().slice(0, 200));
+  const radio = (/** @type {RegExp} */ re) => [...(top() || document).querySelectorAll(".at-tickrow")].find((row) => re.test(row.textContent || ""));
+  click(radio(/Hanoi/)?.querySelector("input"));
+  await sleep(150);
+  click(buttonNamed(/^Continue$/));
+  await sleep(400);
+  check("then the teacher's question for the first picture, with the list's meanings and the teacher's own buttons",
+    /1 of 3/.test(text()) && /Who is she to you\?/.test(text()) && /father's younger sister/.test(text()) && /Not someone I know/.test(text()) && /Skip for now/.test(text()),
+    text().slice(0, 300));
+  click(radio(/grandmother/)?.querySelector("input"));
+  await sleep(150);
+  click(buttonNamed(/^Next$/));
+  await sleep(400);
+  check("the second picture comes next", /2 of 3/.test(text()), text().slice(0, 120));
+  click(buttonNamed(/^Not someone I know$/));
+  await sleep(400);
+  check("then the third", /3 of 3/.test(text()), text().slice(0, 120));
+  click(buttonNamed(/^Skip for now$/));
+  await sleep(400);
+  check("and at the end, thanks, with each answer", /Thanks\. That.s all for now\./.test(text()) && /grandmother/.test(text()) && /Not someone I know/.test(text()) && /Not answered yet/.test(text()),
+    text().slice(0, 300));
+  backOut();
+  await sleep(1000); // the 600 ms save debounce
+  const doc = JSON.parse(localStorage.getItem(KEY) || "{}");
+  const answerOf = (/** @type {string} */ id) => {
+    const it = (doc.items || []).find((/** @type {any} */ x) => x.id === `srv${id}`);
+    return it && it.forms && it.forms[0] && it.forms[0].s ? it.forms[0].s["set-answer"] : null;
+  };
+  const [a, b, c] = SET_PICTURES.map((p) => answerOf(p.id));
+  check("the practice document holds the three answers, each with the list",
+    !!a && a.meaning === "grandmother" && a.list === "dNorth" && !!b && b.none === true && b.list === "dNorth" && !!c && c.skip === true && !c.meaning,
+    JSON.stringify([a, b, c]));
+  check("and Home says one picture is waiting", /1 picture in Our family is waiting for your answer/.test(waiting()), waiting() || "no line");
+  studentSets = false;
+  r.unmount();
+  host.remove();
+  localStorage.removeItem("arabic-trainer:material");
+  check("and nothing threw asking a set's questions", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- a course's path, in Teaching (0.616) ----
+   A course with two units, the first published there: its page shows the
+   path above its decks, each unit with its number and whether it is
+   published, and a unit is not among the ordinary decks. Opened, a unit
+   is headed with its number and shows its checklist. */
+{
+  const before = errors.length;
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+  }));
+  teachesTwo = false;
+  withPath = true;
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1500);
+  if (!host.querySelector(".at-screen.bare")) {
+    click(host.querySelector('[data-el="where-you-are"]'));
+    await sleep(200);
+    click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+    await sleep(900);
+  }
+  const frame = () => host.querySelector(".at-screen.bare") || host;
+  const tab = [...host.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
+    .filter((b) => /^Courses$/.test((b.textContent || "").trim())).pop();
+  click(tab || null);
+  await sleep(500);
+  const courseTile = [...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || ""));
+  check("the teacher's course is listed", !!courseTile, "no Arabic 101 tile");
+  click(courseTile || null);
+  await sleep(500);
+  const pathBlock = [...document.querySelectorAll('[data-el="course-path"]')].pop();
+  const rows = pathBlock ? [...pathBlock.querySelectorAll('[data-el="path-unit"]')].map((x) => (x.textContent || "").replace(/\s+/g, " ")) : [];
+  check("a course page shows its path above its decks, in order, each published or a draft",
+    rows.length === 2 && /^1\. Greetings unit/.test(rows[0]) && /Published/.test(rows[0]) && /^2\. Family unit/.test(rows[1]) && /Draft/.test(rows[1]),
+    rows.join(" | ") || "no path section");
+  check("a published unit can be opened for the class; a draft cannot",
+    /Open for the class/.test(rows[0] || "") && !/Open for the class/.test(rows[1] || ""), rows.join(" | "));
+  const screenText = ((pathBlock && pathBlock.closest(".at-screen")) || document.body).textContent || "";
+  const decksPart = screenText.slice(screenText.lastIndexOf("Decks"));
+  check("a unit is not among the course's ordinary decks", /Lesson 1/.test(decksPart) && !/Greetings unit|Family unit/.test(decksPart),
+    decksPart.replace(/\s+/g, " ").slice(0, 200));
+  click(pathBlock ? pathBlock.querySelector('[data-el="path-unit"] button') : null);
+  await sleep(600);
+  const unitScreen = [...document.querySelectorAll(".at-screen.cardform")].pop();
+  const unitText = unitScreen ? (unitScreen.textContent || "").replace(/\s+/g, " ") : "";
+  check("a unit's page is headed with its number and shows its checklist",
+    /Unit 1 · Greetings unit/.test(unitText) && /Checklist/.test(unitText) && /Add 5 more sentences with a blank \(0 of 5\)/.test(unitText),
+    unitText.slice(0, 300));
+  withPath = false;
+  r.unmount();
+  host.remove();
+  check("and nothing threw on the path's screens", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- a new deck's kind, and a personal set's section (0.632, 0.633) ----
+   New deck asks first what kind: a regular deck, a unit or a personal
+   set. A unit asks for its course; a personal set is made as a deck and
+   marked as a set. An ordinary deck has no Personal set section; a set
+   has one, with no switch: its question changed, two lists added, a word
+   ticked, the word after the name, saved. */
+{
+  const before = errors.length;
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+  }));
+  teacherSets = true;
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1500);
+  if (!host.querySelector(".at-screen.bare")) {
+    click(host.querySelector('[data-el="where-you-are"]'));
+    await sleep(200);
+    click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+    await sleep(900);
+  }
+  const frame = () => host.querySelector(".at-screen.bare") || host;
+  const tab = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
+    .filter((b) => re.test((b.textContent || "").trim())).pop();
+  const toDecks = async () => {
+    click(tab(/^Material$/) || null);
+    await sleep(400);
+    click(tab(/^Decks$/) || null);
+    await sleep(500);
+  };
+  await toDecks();
+  const sheetRows = () => [...document.querySelectorAll(".at-sheet .at-openrow")].map((b) => (b.querySelector(".at-decktitle") || b).textContent || "");
+  const openSheet = async () => {
+    click(buttonNamed(/^New deck$/));
+    await sleep(300);
+  };
+  await openSheet();
+  check("New deck asks what kind: a regular deck, a unit or a personal set",
+    sheetRows().join(" | ") === "Regular deck | Unit | Personal set", sheetRows().join(" | ") || "no sheet");
+  const setValue = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set;
+  const name = async (/** @type {string} */ v) => {
+    const box = /** @type {HTMLInputElement | null} */ ([...document.querySelectorAll(".at-screen.cardform .at-formblock input.at-input")].pop() || null);
+    if (box) {
+      setValue?.call(box, v);
+      box.dispatchEvent(new w.Event("input", { bubbles: true }));
+      await sleep(120);
+    }
+  };
+  const save = async () => {
+    click([...document.querySelectorAll('.at-fab[aria-label="Save"]')].pop() || null);
+    await sleep(700);
+  };
+  click([...document.querySelectorAll(".at-sheet .at-openrow")].find((b) => /Personal set/.test(b.textContent || "")) || null);
+  await sleep(400);
+  const screenTitle = () => (([...document.querySelectorAll(".at-screen.cardform .at-screenhead h2")].pop() || {}).textContent || "").trim();
+  check("choosing Personal set opens Create personal set", screenTitle() === "Create personal set", screenTitle());
+  const madeBefore = madeDecks.length;
+  const setsBefore = savedSets.length;
+  await name("Grandparents");
+  await save();
+  const madeSet = madeDecks[madeDecks.length - 1];
+  const markedSet = savedSets[savedSets.length - 1];
+  check("saved, it is made as a deck and marked as a personal set",
+    madeDecks.length === madeBefore + 1 && madeSet.title === "Grandparents" && savedSets.length === setsBefore + 1
+      && markedSet.deckId === `made${madeDecks.length}` && !!markedSet.set,
+    JSON.stringify({ madeSet, markedSet }));
+  backOut();
+  await sleep(300);
+  await toDecks();
+  await openSheet();
+  click([...document.querySelectorAll(".at-sheet .at-openrow")].find((b) => /^Unit/.test((b.querySelector(".at-decktitle") || b).textContent || "")) || null);
+  await sleep(400);
+  check("choosing Unit asks for its course", screenTitle() === "Create unit" && /Course/.test((([...document.querySelectorAll(".at-screen.cardform")].pop() || {}).textContent) || ""),
+    screenTitle());
+  await name("Family unit 2");
+  await save();
+  const unitMade = madeUnits[madeUnits.length - 1];
+  check("and saved, it is made on that course's path", !!unitMade && unitMade.courseId === "c1" && unitMade.title === "Family unit 2", JSON.stringify(unitMade));
+  backOut();
+  await sleep(300);
+  await toDecks();
+  const openTile = async (/** @type {RegExp} */ re) => {
+    click([...frame().querySelectorAll(".at-deckcard, .at-minicard, .at-tile")].find((t) => re.test(t.textContent || "")) || null);
+    await sleep(600);
+  };
+  const section = () => /** @type {HTMLElement | null} */ ([...document.querySelectorAll('[data-el="set-section"]')].pop() || null);
+  await openTile(/Lesson 1/);
+  check("an ordinary deck has no Personal set section", !section(), "a section on Lesson 1");
+  backOut();
+  await sleep(400);
+  const setTile = [...frame().querySelectorAll(".at-deckcard, .at-minicard, .at-tile")].find((t) => /Our family/.test(t.textContent || ""));
+  check("a set's tile in the list says Personal set", !!setTile && /Personal set/.test(setTile.textContent || ""), setTile ? setTile.textContent || "" : "no tile");
+  await openTile(/Our family/);
+  check("a set's deck has its section, with no switch to turn it off",
+    !!section() && !/^(On|Off)$/m.test([...(section() || document).querySelectorAll(".at-segmented button")].map((b) => (b.textContent || "").trim()).join("\n")),
+    section() ? (section()?.textContent || "").slice(0, 200) : "no section");
+  const segment = (/** @type {RegExp} */ re) => [...(section() || document).querySelectorAll(".at-segmented button")].find((b) => re.test((b.textContent || "").trim()));
+  const box = /** @type {HTMLInputElement | null} */ ((section() || document).querySelector('input[aria-label="The question"]'));
+  check("it shows the wording, starting at the defaults", !!box && box.value === "Who is this person to you?", box ? box.value : "no box");
+  if (box) {
+    setValue?.call(box, "Who is she to you?");
+    box.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(150);
+  }
+  click(buttonNamed(/^Add a deck$/));
+  await sleep(400);
+  const pickRow = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-tickrow")].find((row) => re.test(row.textContent || ""));
+  check("the lists offered are the other decks of the course, not sets", !!pickRow(/Introductions/) && !!pickRow(/Family words/) && !pickRow(/Our family/),
+    [...document.querySelectorAll(".at-tickrow")].map((x) => x.textContent).join(" | "));
+  click(pickRow(/Introductions/)?.querySelector("input"));
+  await sleep(150);
+  click(pickRow(/Family words/)?.querySelector("input"));
+  await sleep(150);
+  click(buttonNamed(/^Done$/));
+  await sleep(400);
+  const wordRow = [...(section() || document).querySelectorAll(".at-tickrow")].find((row) => /book/.test(row.textContent || ""));
+  check("its lists' words can be ticked as said with the name", !!wordRow, (section()?.textContent || "").slice(0, 300));
+  click(wordRow?.querySelector("input"));
+  await sleep(150);
+  click(segment(/^After the name$/) || null);
+  await sleep(150);
+  click([...(section() || document).querySelectorAll("button")].find((b) => /^Save$/.test((b.textContent || "").trim())) || null);
+  await sleep(600);
+  const sent = savedSets[savedSets.length - 1];
+  check("Save sends the whole set to save-set",
+    !!sent && sent.deckId === "d5" && sent.set && sent.set.wording.question === "Who is she to you?"
+      && JSON.stringify(sent.set.lists) === JSON.stringify(["d2", "d4"]) && sent.set.named.includes(card.id) && sent.set.order === "after",
+    JSON.stringify(sent));
+  /* A picture of the set, edited: always a basic card, its English optional. */
+  const personTile = [...document.querySelectorAll(".at-screen.cardform .at-cardtile, .at-screen.cardform .at-minicard, .at-screen.cardform .at-tile")]
+    .find((t) => /لان/.test(t.textContent || ""));
+  click(/** @type {any} */ (personTile));
+  await sleep(600);
+  click([...document.querySelectorAll('.at-fab[aria-label="Edit"]')].pop() || null);
+  await sleep(500);
+  const editing = [...document.querySelectorAll(".at-screen")].pop();
+  const editText = editing ? (editing.textContent || "").replace(/\s+/g, " ") : "";
+  check("a card only in a personal set is not offered as an advanced card",
+    !!personTile && !!editing && !/Build an advanced card/.test(editText) && /always basic/.test(editText), editText.slice(0, 300) || (personTile ? "no editor" : "no card tile"));
+  check("and says its English is optional", /the English is optional/.test(editText), editText.slice(0, 300));
+  backOut();
+  await sleep(300);
+  backOut();
+  await sleep(300);
+  teacherSets = false;
+  r.unmount();
+  host.remove();
+  check("and nothing threw making decks of each kind, or on a set's section", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- who is speaking, on a recording (0.632) ----
+   The recording screen, mounted on its own: a recording uploaded while
+   "Who is speaking?" holds a name is saved with it; one uploaded with the
+   box empty is saved with none. */
+{
+  const before = errors.length;
+  const { RecordingScreen } = await import(path.join(out, "card-editor.js"));
+  /* The screen reads an upload with a FileReader, which this walk's
+     globals do not carry; lent from the page for the walk. */
+  const hadReader = /** @type {any} */ (globalThis).FileReader;
+  /** @type {any} */ (globalThis).FileReader = w.FileReader;
+  /** @type {any[]} */
+  const changes = [];
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  /** @type {any} */
+  let form = { clips: [], slowClips: [] };
+  /** @type {Record<string, string>} */
+  let voices = {};
+  const draw = () => r.render(React.createElement(RecordingScreen, {
+    name: "book", form, voices,
+    onChange: (/** @type {any} */ next) => {
+      changes.push(next);
+      form = { clips: next.clips, slowClips: next.slowClips };
+      voices = next.voices || {};
+      draw();
+    },
+    onClose: () => {},
+  }));
+  draw();
+  await sleep(300);
+  /* A screen sits over the whole app, so it is found in the document. */
+  const scr = () => [...document.querySelectorAll(".at-screen")].find((el) => /Recording for book/.test(el.textContent || "")) || host;
+  const who = /** @type {HTMLInputElement | null} */ (scr().querySelector('input[aria-label="Who is speaking?"]'));
+  check("the recording screen asks who is speaking", !!who, (scr().textContent || "").slice(0, 200));
+  const upload = async (/** @type {string} */ content) => {
+    const input = /** @type {HTMLInputElement | null} */ (scr().querySelector('input[type="file"]'));
+    const file = new w.File([content], "take.webm", { type: "audio/webm" });
+    /* jsdom's files cannot be read as bytes; this one can. */
+    Object.defineProperty(file, "arrayBuffer", { value: async () => new TextEncoder().encode(content).buffer });
+    if (input) {
+      Object.defineProperty(input, "files", { value: [file], configurable: true });
+      input.dispatchEvent(new w.Event("change", { bubbles: true }));
+    }
+    await sleep(600);
+  };
+  if (who) {
+    must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(who, "Layla");
+    who.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(150);
+  }
+  await upload("first take");
+  const first = changes[changes.length - 1];
+  const firstHash = first && first.clips && first.clips[0];
+  check("a recording made with a name is saved with it", !!firstHash && first.voices && first.voices[firstHash] === "Layla", JSON.stringify(first));
+  const box = /** @type {HTMLInputElement | null} */ (scr().querySelector('input[aria-label="Who is speaking?"]'));
+  if (box) {
+    must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set?.call(box, "");
+    box.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(150);
+  }
+  await upload("second take");
+  const second = changes[changes.length - 1];
+  const secondHash = second && second.clips && second.clips[1];
+  check("one made with the box empty is saved with no name, and the first keeps its own",
+    !!secondHash && second.voices && !(secondHash in second.voices) && second.voices[firstHash] === "Layla", JSON.stringify(second));
+  check("and the list says who recorded the first", /Recorded by Layla/.test(scr().textContent || ""), (scr().textContent || "").slice(0, 300));
+  r.unmount();
+  host.remove();
+  /** @type {any} */ (globalThis).FileReader = hadReader;
+  check("and nothing threw recording with a name", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
 report();

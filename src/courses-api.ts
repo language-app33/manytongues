@@ -7,6 +7,7 @@
  * something a person can read.
  */
 import type { Card, Feedback, Flag, LangId, User } from "./types.ts";
+import type { SetConfig } from "./sets.ts";
 import { renameLangIds } from "./lang-ids.ts";
 
 const ENDPOINT = "/api/courses";
@@ -270,8 +271,8 @@ export const signUp = (displayName: string, code?: string, org?: string) =>
    open, or the one last used on this device. `code` lets an account with
    no space it may use get back in with the invitation it followed
    (memberships). */
-export const whoAmI = (key: string, org?: string, code?: string) =>
-  call("whoami", { key, params: { ...(org ? { org } : {}), ...(code ? { code } : {}) } });
+export const whoAmI = (key: string, org?: string, code?: string, viaLink = false) =>
+  call("whoami", { key, params: { ...(org ? { org } : {}), ...(code ? { code } : {}), ...(viaLink ? { via: "link" } : {}) } });
 
 /* The space last used on this device, for landing there at the plain
    address (memberships, 2a). Per device, like the theme. */
@@ -357,6 +358,9 @@ export const assignTeacher = (courseId: string, handle: string) =>
 export const removeMember = (courseId: string, handle: string, role: "teacher" | "student") =>
   call("remove-member", { body: { courseId, handle, role } });
 export const joinCourse = (code: string) => call("join-course", { body: { code } });
+/* A course's switches (0.627) — see course-practice.ts. Written whole. */
+export const setCoursePractice = (courseId: string, practice: { mode: string; off: string[] }) =>
+  call("set-course-practice", { body: { courseId, practice } });
 /* A space's invitation, followed while signed in: adds the space to this
    account (memberships). */
 export const joinSpace = (code: string) => call("join-space", { body: { code } });
@@ -385,6 +389,9 @@ export const lockDeck = (deckId: string, locked: boolean) => call("lock-deck", {
    whole list each time. */
 export const setDeckParts = (deckId: string, parts: string[]) =>
   call("set-deck-parts", { body: { deckId, parts } });
+/* Whether a deck is a personal set, and how: the whole set each time, or
+   null for an ordinary deck again (0.629). See src/sets.ts. */
+export const saveSet = (deckId: string, set: SetConfig | null) => call("save-set", { body: { deckId, set } });
 export const myCards = () => call("my-cards");
 /** Who a deck may take its numbers from, owner first (0.541). */
 export const numberSources = (deckId: string): Promise<{
@@ -445,6 +452,17 @@ export const attachDeck = (deckId: string, courseId: string) =>
   call("attach-deck", { body: { deckId, courseId } });
 export const detachDeck = (deckId: string, courseId: string) =>
   call("detach-deck", { body: { deckId, courseId } });
+
+/* ---- a course's path (0.616): units, in order, per course ---- */
+export const createUnit = (courseId: string, title: string) =>
+  call("create-unit", { body: { courseId, title } });
+export const moveUnit = (courseId: string, deckId: string, to: number) =>
+  call("move-unit", { body: { courseId, deckId, to } });
+/** Refused with "unit-not-ready" and the server's `problems` on the error's `data`. */
+export const publishUnit = (courseId: string, deckId: string) =>
+  call("publish-unit", { body: { courseId, deckId } });
+export const openUnit = (courseId: string, deckId: string, open: boolean) =>
+  call("open-unit", { body: { courseId, deckId, open } });
 
 /* ---- clips ---- */
 /* ---- a language's numbers, and its clock ----
@@ -649,6 +667,7 @@ export function explain(err: unknown): string {
     {
       offline: "Can't reach the server. Your own cards still work.",
       "bad-key": "That sign-in key isn't recognised.",
+      "key-only": "Sign-in links are for students. Type your sign-in key instead.",
       "bad-code": "Nothing has that code. Check it with whoever gave it to you.",
       "code-required": "You need a code to join: an invitation link, or a course code from your teacher.",
       "other-space": "That belongs to another space.",
@@ -671,6 +690,7 @@ export function explain(err: unknown): string {
       "own-space": "You can't close or delete a space your own account is in.",
       "not-reportable": "That's your own card. You can change it in My space.",
       "personal-deck": "A deck in My space can't go on a course. Copy it to the space first.",
+      "personal-set": "A deck in My space can't be a personal set. Copy it to the space first.",
       "personal-card": "A card in My space can't go in a deck of the space. Copy its deck to the space first.",
       "confirm-name": "Type the space's name exactly to confirm.",
       "admin-only": "Only the administrator can do that.",
@@ -679,6 +699,9 @@ export function explain(err: unknown): string {
       "not-teaching": "You aren't teaching that course.",
       "no-deck": "That deck no longer exists.",
       "deck-locked": "That deck is locked. Unlock it in its settings first.",
+      "unit-draft": "This unit isn't published in this course yet",
+      "unit-not-ready": "This unit isn't ready to publish yet. The checklist says what is missing.",
+      "not-on-path": "That unit is no longer on this course's path.",
       "no-user": "No account with that handle.",
       "no-card": "That card no longer exists.",
       "stale-system":

@@ -113,6 +113,10 @@ export const TEST_DEFINES = {
   __APP_RELEASE__: '"0"',
   __APP_VERSION__: '"test"',
   __BUILT_AT__: '"0"',
+  /* The whole suite can be run with practice by skill switched on
+     (WORD_SKILLS=1), which is the gate for switching it on in the app —
+     see WORD_SKILLS_ON in the trainer. */
+  __WORD_SKILLS_TEST__: process.env.WORD_SKILLS === "1" ? "true" : "false",
 };
 
 /**

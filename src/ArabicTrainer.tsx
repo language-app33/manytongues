@@ -41,6 +41,7 @@ import {
   Segmented,
   fromDeck,
   serverCardId,
+  localIdFor,
   SnackbarProvider,
   DockContext,
   PlaceContext,
@@ -64,10 +65,22 @@ import {
   useSlowWait,
   useSnackbar,
   useSnackbarState,
+  useReach,
   WorkingNote,
   TabTitle,
+  /* Personal sets (0.630): the student's questions are built of these. */
+  Nudge,
+  RadioGroup,
+  SearchBox,
+  Tile,
 } from "./shared.tsx";
 import { renameLangIds } from "./lang-ids.ts";
+/* Personal sets (0.629): every rule of them is in sets.ts. */
+import {
+  answerLine, chosenOf, isRealChange, keptAcrossReset, kindsFor, pairClips, pairText, pictureState, readAnswer, readSet, resolve, SET_KEY,
+  stepsToAsk, withAnswer,
+} from "./sets.ts";
+import type { PictureState, SetAnswer, SetStep, SetView, TurnKind } from "./sets.ts";
 
 /* The onboarding, teaching, admin and course screens are their own chunk,
    fetched on the first tap that opens one of them. A student drilling cards
@@ -134,6 +147,7 @@ function ChunkFallback() {
   return slow ? <Help>Loading…</Help> : null;
 }
 import * as API from "./courses-api.ts";
+import { keyFromHash, signInLink } from "./sign-in-link.ts";
 import { whereRows, langsSummary } from "./places.ts";
 import type { WhereRow } from "./places.ts";
 import {
@@ -299,6 +313,7 @@ import { buildContextIndex } from "./context-index.ts";
 import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
+import { isUnreachable } from "./reach.ts";
 import { knownMissing as knownMissingAt, MISSING_CLIPS, pictureData } from "./pictures.ts";
 import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 import {
@@ -342,10 +357,16 @@ import {
   withAnswer as oneAnswer,
   fillerVariants,
 } from "./answers.ts";
-import { asMeaning, cellEnglish, fieldsLost, fillForm, fillsOf, hasSlots, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
+import { asMeaning, cellEnglish, fieldsLost, fillForm, fillsOf, hasSlots, isSentence, lentBy, refOf, slotsOf, valuesAt, valuesForTurn, valuesOf } from "./variables.ts";
 import type { Value } from "./variables.ts";
 import { agreeTook, countTook, finishTook, leadsOf, lineGate, passes, reviewOf, sentenceKey, SCAN_LIMIT } from "./review.ts";
 import { castFill as castScene, filledScene, hasCast } from "./cast.ts";
+import { cardHeld, isPathUnit, mergeReached, pathRows, reachesFurther } from "./path.ts";
+import { allowedTypes, englishShown, readPractice } from "./course-practice.ts";
+import { allMapped, counts, ofSkill, skillOf, WORD_SKILL_MAP } from "./word-skills.ts";
+import type { Skill } from "./word-skills.ts";
+import type { CoursePractice } from "./course-practice.ts";
+import type { PathCourse, PathDeck, PathRow } from "./path.ts";
 import type { Review } from "./review.ts";
 import { liftSubtypeTagsIn } from "./subtype-tags.ts";
 import { tickCapitals } from "./capitals.ts";
@@ -394,7 +415,7 @@ export const cardStandings = (
   it: Item,
   settings: Settings,
   among?: Item[],
-  keys: (unit: Form, settings: Settings) => string[] = laddered,
+  keys: (unit: Form, settings: Settings) => string[] = standingKeys,
 ): Standing[] => {
   /* A verb whose tenses are skills stands where the tense furthest behind
      stands, of the ones it can be asked; each tense, counted as a card of
@@ -830,6 +851,7 @@ export function mergeMoves(
    progress can be asked what it does without a browser — see grade.ts. */
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
 import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
+import { homeEmptySays, whyHomeIsEmpty } from "./home-empty.ts";
 import type { Filler, Mark } from "./grade.ts";
 
 import { applyUpdate, beforeReload, onUpdateReady, updateReady } from "./updates.ts";
@@ -1283,7 +1305,7 @@ let VALUE_INDEX: Map<string, Value[]> = new Map();
  * answered replaces, so a stale entry cannot outlive the form it is about
  * even between the clearings.
  */
-let TYPE_CACHE: WeakMap<Form, { lang: LangId; types: string[] }> = new WeakMap();
+let TYPE_CACHE: WeakMap<Form, { lang: LangId; types: string[]; raw: string[] }> = new WeakMap();
 /* And each scene's casting, filled whole — see sceneFill. Forgotten with the
    types, because it reads the same indexes they do. */
 let SCENE_FILLS: WeakMap<Item, Map<string, Record<string, Record<string, Value>> | null>> = new WeakMap();
@@ -1816,6 +1838,621 @@ function tenseHeld(unit: Form | null | undefined): { card: Item; spec: VerbSpec;
 }
 
 /* ------------------------------------------------------------------
+   A course's path (0.615)
+
+   A course may set its units in order, each opening when the one before
+   it is finished — see src/path.ts, where every rule is. The one thing the
+   path does to a session is hold back a never-met card while every deck it
+   lives in is a unit this learner has not reached (R22); it does not touch
+   the levels, the mix, review or how blanks are filled. So this is an
+   index like the ones above, built from the courses and decks last
+   downloaded and the learner's own progress, and read at the two places a
+   pool is made: buildSession, and the home screen's count of what is
+   waiting, which must agree.
+
+   A card's decks are worked out from each deck's `cardIds` — a card's
+   `source.deckId` names only one of them, and its tags are titles — and a
+   number or time item's from its `deckIds` (fileIntoDecks). Nothing here
+   is written to the cards; whether a unit is finished is read off them
+   each time, so a card cleared in another deck or course counts (R4).
+   ------------------------------------------------------------------ */
+
+export interface PathIndex {
+  /** Every downloaded deck each item is in, by item id. */
+  decksOfCard: Map<string, string[]>;
+  /** The downloaded decks that are path units. */
+  unitIds: Set<string>;
+  /** Each unit's items, by deck id: course cards and word-set items both. */
+  unitItemIds: Map<string, string[]>;
+  /** Where the learner stands on each course's path, by course id. */
+  rows: Map<string, PathRow[]>;
+  /** The units finished or open in at least one course. */
+  openUnits: Set<string>;
+  /** What pathRows returned to remember, by course id. */
+  reached: Record<string, string[]>;
+  /** Whether a unit's cards and sentences are all cleared now. */
+  finished: Map<string, boolean>;
+}
+
+const NO_PATH: PathIndex = {
+  decksOfCard: new Map(),
+  unitIds: new Set(),
+  unitItemIds: new Map(),
+  rows: new Map(),
+  openUnits: new Set(),
+  reached: {},
+  finished: new Map(),
+};
+
+let PATH_INDEX: PathIndex = NO_PATH;
+
+/* Exported for the reason setValueIndex is. Nothing a form can be asked
+   depends on it, so no cache is thrown away. */
+export function setPathIndex(next: PathIndex | null | undefined) {
+  PATH_INDEX = next || NO_PATH;
+}
+
+/** The learner's reached units, by course id, as stored. */
+export function pathReachedOf(settings: Settings | null | undefined): Record<string, string[]> {
+  const p = settings && settings.pathReached;
+  return p && typeof p === "object" && !Array.isArray(p) ? mergeReached(p, undefined) : {};
+}
+
+/**
+ * Met at all: anything on it ever answered, over the whole ladder. The one
+ * test of a never-met card — the mix's `fresh`, the home screen's count and
+ * the path's hold all read it. `units` narrows the forms looked at where a
+ * caller has already narrowed them.
+ */
+export function everMet(
+  it: Item,
+  settings: Settings,
+  units: { unit: Form }[] = drillableUnits(it, settings),
+): boolean {
+  return units.some(({ unit }) => laddered(unit, settings).some((t) => stateOf(unit, t).phase !== "new"));
+}
+
+/** Every downloaded deck an item is in. */
+function decksOfItem(it: Item, byCard: Map<string, string[]>): string[] {
+  const src = (it as { source?: Record<string, unknown> }).source;
+  if (src && typeof src.cardId === "string") return byCard.get(src.cardId) || [];
+  if (isFromSystem(it)) return Array.isArray(it.deckIds) ? it.deckIds : [];
+  return [];
+}
+
+/**
+ * The path index, from the courses and decks last downloaded, the items
+ * and the learner's settings. Pure: it reads progress and writes nothing —
+ * what it found reached is handed back in `reached`, for the caller to
+ * remember.
+ */
+export function pathIndexOf(
+  items: Item[],
+  courses: PathCourse[] | null | undefined,
+  decks: (PathDeck & { title?: string })[] | null | undefined,
+  settings: Settings,
+): PathIndex {
+  const units = (decks || []).filter(isPathUnit);
+  if (!units.length) return NO_PATH;
+  const unitIds = new Set(units.map((d) => d.id));
+  const byCard: Map<string, string[]> = new Map();
+  for (const d of decks || []) {
+    for (const id of d.cardIds || []) byCard.set(id, (byCard.get(id) || []).concat([d.id]));
+  }
+  const decksOfCard: Map<string, string[]> = new Map();
+  const unitItemIds: Map<string, string[]> = new Map(units.map((d) => [d.id, [] as string[]]));
+  const byId: Map<string, Item> = new Map();
+  for (const it of items) {
+    const ids = decksOfItem(it, byCard);
+    if (!ids.length) continue;
+    decksOfCard.set(it.id, ids);
+    byId.set(it.id, it);
+    for (const d of ids) if (unitIds.has(d)) (unitItemIds.get(d) as string[]).push(it.id);
+  }
+  /* A unit is finished when every word and sentence of it that can be
+     asked is cleared — its text or conversation not needed (R20), and a
+     card that can never be asked not counted. None left: finished. */
+  const clearedOf: Map<string, boolean> = new Map();
+  const isCleared = (it: Item) => {
+    const had = clearedOf.get(it.id);
+    if (had !== undefined) return had;
+    const at = towardsLearnt(it, settings, items);
+    const ok = !at || at.at.status === "cleared" || at.at.status === "done";
+    clearedOf.set(it.id, ok);
+    return ok;
+  };
+  const finished: Map<string, boolean> = new Map();
+  const finishedNow = (deckId: string) => {
+    const had = finished.get(deckId);
+    if (had !== undefined) return had;
+    const ok = (unitItemIds.get(deckId) || [])
+      .map((id) => byId.get(id) as Item)
+      .filter((it) => it && !isDialog(it))
+      .every(isCleared);
+    finished.set(deckId, ok);
+    return ok;
+  };
+  const stored = pathReachedOf(settings);
+  const rows: Map<string, PathRow[]> = new Map();
+  const reached: Record<string, string[]> = {};
+  const openUnits: Set<string> = new Set();
+  for (const course of courses || []) {
+    if (!course || !Array.isArray(course.path) || !course.path.length) continue;
+    const got = pathRows(course, units, finishedNow, stored[course.id] || []);
+    rows.set(course.id, got.rows);
+    reached[course.id] = got.reached;
+    for (const r of got.rows) if (r.state !== "locked") openUnits.add(r.id);
+  }
+  return { decksOfCard, unitIds, unitItemIds, rows, openUnits, reached, finished };
+}
+
+/* ------------------------------------------------------------------
+   Personal sets (0.630)
+
+   A set is a held deck with a `set` on it; its pictures are its cards
+   whose lead form has a picture, each with the answer in its progress;
+   its lists are the decks it names that the learner holds, in its order,
+   each with its words — cards that are not sentences or scenes and have
+   both a script and an English meaning. Every rule about what that means
+   is in sets.ts; this only finds them among what the device holds.
+   ------------------------------------------------------------------ */
+
+/**
+ * The sets as a teacher trying them meets them: the first list chosen, and
+ * every picture answered with that list's first word. With no list, each
+ * picture is tried as its name alone (0.632).
+ */
+export function standInSets(views: HeldSet[]): HeldSet[] {
+  return views.map((v) => {
+    const first = v.lists[0];
+    const meaning = first && first.words[0] ? first.words[0].en : "";
+    return {
+      ...v,
+      pictures: v.pictures.map((p) => ({ ...p, answer: first && meaning ? { updated: 0, list: first.id, meaning } : null })),
+    };
+  });
+}
+
+/** Which session a set's questions were asked before, to start after. */
+type SetStart =
+  | { kind: "begin"; practice?: boolean; only?: (it: Item) => boolean; pathUnit?: string }
+  | { kind: "weak" }
+  | { kind: "saved"; saved: SavedSession };
+
+export type SetPicture = { id: string; name: string; images: string[]; answer: SetAnswer | null };
+export type SetWord = { id: string; ar: string; lat: string; en: string };
+export type HeldSet = SetView<SetPicture, SetWord>;
+
+export function setViewsOf(
+  items: Item[],
+  decks: (Deck & { courseLanguage?: string })[] | null | undefined,
+  langsOff: string[] = [],
+): HeldSet[] {
+  const all = decks || [];
+  if (!all.some((d) => d && d.set)) return [];
+  const byCard: Map<string, Item> = new Map();
+  for (const it of items) {
+    const src = (it as { source?: Record<string, unknown> }).source;
+    if (src && typeof src.cardId === "string") byCard.set(src.cardId, it);
+  }
+  const held: Map<string, Deck> = new Map(all.map((d) => [d.id, d]));
+  const cardsOf = (d: Deck) => (d.cardIds || []).map((id) => byCard.get(id)).filter((it): it is Item => !!it);
+  const out: HeldSet[] = [];
+  for (const d of all) {
+    const set = readSet(d.set, d.id);
+    if (!set) continue;
+    if (langsOff.includes(d.lang || d.courseLanguage || "")) continue;
+    const pictures = cardsOf(d).flatMap((it) => {
+      const lead = formsOf(it)[0];
+      if (!lead || !Array.isArray(lead.images) || !lead.images.length) return [];
+      return [{ id: it.id, name: lead.ar || "", images: lead.images.slice(), answer: readAnswer(lead.s && (lead.s as Record<string, unknown>)[SET_KEY]) }];
+    });
+    const lists = set.lists.flatMap((id) => {
+      const list = held.get(id);
+      if (!list) return [];
+      const words = cardsOf(list).flatMap((it) => {
+        const lead = formsOf(it)[0];
+        if (!lead || isDialog(it) || isSentence(it) || !lead.ar || !lead.en) return [];
+        return [{ id: it.id, ar: lead.ar, lat: lead.lat || "", en: lead.en }];
+      });
+      return [{ id, title: list.title, words }];
+    });
+    out.push({ id: d.id, title: d.title, set, lists, pictures });
+  }
+  return out;
+}
+
+/* ------------------------------------------------------------------
+   Personal sets in practice (0.631)
+
+   Which items are a set's pictures, where each stands for this learner,
+   the word its answer resolves to, and the kinds it takes turns between;
+   and which items are out of play — a picture that doesn't apply, and a
+   word held only in a list the learner did not choose. Held at module
+   level, as the path is, because availableTypes is a function of a form
+   and cannot be handed the sets. Nothing in it is stored.
+   ------------------------------------------------------------------ */
+
+export type SetEntry = {
+  view: HeldSet;
+  picture: SetPicture;
+  state: PictureState;
+  /** The word card its answer resolves to in the chosen list, if it does. */
+  word: { item: Item; form: Form } | null;
+  kinds: TurnKind[];
+};
+type SetIndex = { pictures: Map<string, SetEntry>; out: Set<string>; byItem: Map<string, Item> };
+const NO_SETS: SetIndex = { pictures: new Map(), out: new Set(), byItem: new Map() };
+let SET_INDEX: SetIndex = NO_SETS;
+
+export function setSetIndex(next: SetIndex | null | undefined) {
+  const n = next || NO_SETS;
+  if (n === SET_INDEX) return;
+  SET_INDEX = n;
+  forgetTypes();
+}
+
+export function setIndexOf(
+  items: Item[],
+  decks: { id: string; cardIds?: string[] }[] | null | undefined,
+  views: HeldSet[],
+): SetIndex {
+  if (!views.length) return NO_SETS;
+  const byItem: Map<string, Item> = new Map(items.map((it) => [it.id, it]));
+  const pictures: Map<string, SetEntry> = new Map();
+  /* A list deck is in play where it is the chosen list of a set that
+     names it; one that is only ever a list not chosen is not. */
+  const lists: Set<string> = new Set();
+  const chosenLists: Set<string> = new Set();
+  for (const v of views) {
+    const chosen = chosenOf(v);
+    for (const l of v.lists) lists.add(l.id);
+    if (chosen) chosenLists.add(chosen.id);
+    for (const p of v.pictures) {
+      /* A card in two sets is the first's, in course order. */
+      if (pictures.has(p.id)) continue;
+      const state = pictureState(p.answer, chosen ? chosen.words : null);
+      const w = state === "ok" && chosen ? resolve(chosen.words, p.answer) : null;
+      const wordItem = w ? byItem.get(w.id) || null : null;
+      const word = wordItem ? { item: wordItem, form: leadOf(wordItem) } : null;
+      const named = !!wordItem && v.set.named.includes(serverCardId(wordItem));
+      pictures.set(p.id, { view: v, picture: p, state, word, kinds: kindsFor(v.set, !!word, named) });
+    }
+  }
+  const out: Set<string> = new Set();
+  for (const [id, e] of pictures) if (e.state === "none") out.add(id);
+  const byCard: Map<string, string[]> = new Map();
+  for (const d of decks || []) for (const id of d.cardIds || []) byCard.set(id, (byCard.get(id) || []).concat([d.id]));
+  for (const it of items) {
+    const src = (it as { source?: Record<string, unknown> }).source;
+    if (!src || typeof src.cardId !== "string") continue;
+    const held = byCard.get(src.cardId) || [];
+    if (held.length && held.every((d) => lists.has(d) && !chosenLists.has(d))) out.add(it.id);
+  }
+  return { pictures, out, byItem };
+}
+
+/** Whether a set leaves this item out of play: a picture that doesn't
+    apply, or a word in no list the learner chose. Kept, not deleted. */
+export const setHolds = (it: Item): boolean => SET_INDEX.out.has(it.id);
+
+/** The set a form is the picture of — only its card's own word; null for
+    any other form of such a card; undefined for a form in no set. */
+function setEntryOfUnit(it: Form): SetEntry | null | undefined {
+  if (!SET_INDEX.pictures.size) return undefined;
+  const card = cardIdOfUnit(it.id);
+  const e = SET_INDEX.pictures.get(card);
+  if (!e) return undefined;
+  return it.id === card ? e : null;
+}
+
+/** What one kind of asking plays: the recordings, and whose voices. */
+function setHeard(e: SetEntry, kind: TurnKind): { recs: any[]; seq?: string[][]; voices: string[] } | null {
+  const own = e.view.pictures.length ? (SET_INDEX.byItem.get(e.picture.id) ? leadOf(SET_INDEX.byItem.get(e.picture.id) as Item) : null) : null;
+  const voicesOf = (f: Form | null, recs: any[]) =>
+    [...new Set(recs.map((r) => ((f && f.voices) || {})[r.id]).filter((v): v is string => !!v))];
+  if (kind === "name") {
+    const recs = (own && own.recs) || [];
+    return recs.length ? { recs, voices: voicesOf(own, recs.slice(0, 1)) } : null;
+  }
+  if (!e.word) return null;
+  if (kind === "word") {
+    const recs = e.word.form.recs || [];
+    return recs.length ? { recs, voices: voicesOf(e.word.form, recs.slice(0, 1)) } : null;
+  }
+  if (!own) return null;
+  const pair = pairClips(e.view.set, e.word.form, own);
+  return pair ? { recs: [{ id: pair.groups[0][0], label: "", speed: "" }], seq: pair.groups, voices: pair.voices } : null;
+}
+
+/* The forms a picture's wrong choices are drawn from, for one kind. */
+function setPoolFor(e: SetEntry, kind: TurnKind): Form[] {
+  const v = e.view;
+  const others = v.pictures.filter((p) => p.id !== e.picture.id);
+  const leadOfId = (id: string) => {
+    const it = SET_INDEX.byItem.get(id);
+    return it ? leadOf(it) : null;
+  };
+  if (kind === "name") return others.map((p) => leadOfId(p.id)).filter((f): f is Form => !!f && !!f.ar);
+  const chosen = chosenOf(v);
+  const words = chosen ? chosen.words : [];
+  const right = e.word ? e.word.item.id : "";
+  if (kind === "word") return words.filter((w) => w.id !== right).map((w) => leadOfId(w.id)).filter((f): f is Form => !!f && !!f.ar);
+  /* Both: the learner's own pairs for the other pictures, then this
+     picture's name with the other ticked words — made up in memory. */
+  const name = e.picture.name;
+  const pairs: Form[] = [];
+  for (const p of others) {
+    const pe = SET_INDEX.pictures.get(p.id);
+    if (pe && pe.word) pairs.push({ id: `set:${p.id}`, ar: pairText(v.set, pe.word.form.ar, p.name), en: "", lat: "" } as Form);
+  }
+  for (const w of words) {
+    if (w.id === right) continue;
+    const it = SET_INDEX.byItem.get(w.id);
+    if (!it || !v.set.named.includes(serverCardId(it))) continue;
+    pairs.push({ id: `set:${e.picture.id}:${w.id}`, ar: pairText(v.set, w.ar, name), en: "", lat: "" } as Form);
+  }
+  return pairs;
+}
+
+/* The pictures a listening question offers beside the right one: the
+   set's others, never one the learner calls by the same word, nor one with
+   the same name. */
+function setPicturePool(e: SetEntry): Form[] {
+  const mine = e.word ? e.word.form.ar.trim() : "";
+  const name = e.picture.name.trim();
+  return e.view.pictures.flatMap((p) => {
+    if (p.id === e.picture.id || p.name.trim() === name) return [];
+    const pe = SET_INDEX.pictures.get(p.id);
+    if (mine && pe && pe.word && pe.word.form.ar.trim() === mine) return [];
+    const it = SET_INDEX.byItem.get(p.id);
+    return it ? [leadOf(it)] : [];
+  });
+}
+
+/* Which exercises a set's picture offers: the two that show its picture
+   while some kind is on, and the two that play a recording while some
+   kind has one. A choice is dropped where there are too few wrong
+   answers to fill it. */
+function setTypes(e: SetEntry | null): string[] {
+  if (!e || !e.kinds.length) return [];
+  const enough = (pool: Form[]) => new Set(pool.map((f) => f.ar)).size >= PICK_OPTIONS - 1;
+  const out: string[] = [];
+  for (const t of TYPES) {
+    const spec = EX[t];
+    if (!spec) continue;
+    if (spec.promptField === "image") {
+      if (spec.answerMode === "choice" && !e.kinds.every((k) => enough(setPoolFor(e, k)))) continue;
+      out.push(t);
+    } else if (t === "rec2ar" || t === "rec2img") {
+      if (!e.kinds.some((k) => setHeard(e, k))) continue;
+      if (t === "rec2img" && setPicturePool(e).length < PICK_OPTIONS - 1) continue;
+      out.push(t);
+    }
+  }
+  return out;
+}
+
+/**
+ * One asking of a set's picture, as it is shown: its name, the learner's
+ * word, or both, by the question's own turn — so a miss comes back the
+ * same — with the set's wording for the question. Keeps the picture's id,
+ * progress and pictures, so the answer is credited to the picture. Nothing
+ * here is stored.
+ */
+function castSet(resolved: { unit: Form; parent: Item; isSub: boolean } | null, type: string) {
+  if (!resolved || resolved.isSub) return resolved;
+  const e = setEntryOfUnit(resolved.unit);
+  if (!e) return resolved;
+  const listening = isListening(typeOf(type));
+  const kinds = listening ? e.kinds.filter((k) => setHeard(e, k)) : e.kinds;
+  if (!kinds.length) return resolved;
+  const kind = kinds[turnOf(statesOf(resolved.unit)[type]) % kinds.length];
+  const w = e.word ? e.word.form : null;
+  const wording = e.view.set.wording;
+  const said =
+    kind === "word" && w
+      ? { ar: w.ar, lat: w.lat || "", en: w.en || "", answers: w.answers }
+      : kind === "both" && w
+      ? { ar: pairText(e.view.set, w.ar, resolved.unit.ar), lat: pairText(e.view.set, w.lat || "", resolved.unit.lat || ""), en: "", answers: undefined }
+      : null;
+  const heard = listening ? setHeard(e, kind) : null;
+  const unit: Form = {
+    ...resolved.unit,
+    ...(said || {}),
+    setKind: kind,
+    setAsk: kind === "name" ? wording.askName : kind === "word" ? wording.askWord : wording.askBoth,
+    ...(kind === "word" ? { setCaption: resolved.unit.ar } : null),
+    ...(heard ? { recs: heard.recs, setVoices: heard.voices, ...(heard.seq ? { recSeq: heard.seq } : null) } : null),
+  };
+  return { ...resolved, unit, parent: withLead(resolved.parent, unit) };
+}
+
+/** The wrong choices for one asking of a set's picture, or null for a
+    question that is not about one. Exported for the tests. */
+export function setChoicePool(unit: Form, picks: string): Form[] | null {
+  const e = setEntryOfUnit({ ...unit, id: unit.id } as Form);
+  if (!e || !unit.setKind) return null;
+  return picks === "image" ? setPicturePool(e) : setPoolFor(e, unit.setKind as TurnKind);
+}
+
+/** The line a problem report about a set's picture carries: the learner's
+    answer for it. Empty for any other card. */
+export function setReportLine(itemId: string): string {
+  const e = SET_INDEX.pictures.get(itemId);
+  if (!e) return "";
+  const chosen = chosenOf(e.view);
+  return answerLine(e.view.set, e.picture.name, e.picture.answer, chosen ? chosen.title : "");
+}
+
+/**
+ * Whether a card is held out of sessions by the path: never met, and every
+ * deck it lives in a unit this learner has not reached in any course (R22).
+ * `pathUnit` is the one exception — "Practise this unit" on a unit opened
+ * early brings in that unit's new cards (R24).
+ */
+export function pathHolds(it: Item, settings: Settings, pathUnit?: string | null): boolean {
+  const idx = PATH_INDEX;
+  if (!idx.unitIds.size || !(it as { source?: unknown }).source) return false;
+  const decks = idx.decksOfCard.get(it.id) || [];
+  if (pathUnit && decks.includes(pathUnit)) return false;
+  if (!cardHeld(decks, (d) => idx.unitIds.has(d), idx.openUnits)) return false;
+  return !everMet(it, settings);
+}
+
+/** A unit's items: the course cards in its `cardIds` and the word-set items
+    filed under it. Every reader of a unit's items goes through here. */
+export function unitItems(deckId: string, items: Item[]): Item[] {
+  const ids = new Set(PATH_INDEX.unitItemIds.get(deckId) || []);
+  return ids.size ? items.filter((it) => ids.has(it.id)) : [];
+}
+
+/** The path as the index holds it, for the screens. */
+export const pathIndexNow = (): PathIndex => PATH_INDEX;
+
+/**
+ * A unit marked as cleared by the learner (R32–R36): every word and
+ * sentence of it — word-set items included — written as having been up
+ * every level it has, as "This was too easy" writes a form at its top.
+ * Modelled on creditNumbers: the list back with the new states in, or the
+ * same list where nothing changed; the caller saves it.
+ *
+ * liftLevel and nothing else does the writing. It gives no passes, so
+ * nothing becomes learnt (R33); it leaves solid keys alone, so what is
+ * already cleared or learnt is untouched, and a second call writes nothing
+ * (A7); and a key not yet in review goes into review a day out, so the
+ * cards come back as ordinary reviews, where two misses at the top drop
+ * one back by the existing rule. The unit's text or conversation is left
+ * as it was (A7).
+ */
+export function clearPathUnit(items: Item[], settings: Settings, deckId: string): Item[] {
+  const ids = new Set(
+    unitItems(deckId, items).filter((it) => !isDialog(it) && isDrillable(it, settings)).map((it) => it.id),
+  );
+  if (!ids.size) return items;
+  const at = Date.now();
+  const liftAll = (list: Item[]): Item[] => {
+    let out: Item[] | null = null;
+    list.forEach((it, i) => {
+      if (!ids.has(it.id)) return;
+      const lifts: Map<string, Record<string, ExerciseState>> = new Map();
+      const lift = (form: Form) => {
+        let keys = laddered(form, settings);
+        if (!keys.length) keys = ladderedOnceOpen(form, settings);
+        if (!keys.length) return;
+        const top = topLevelOf(keys);
+        const key = keys.find((k) => levelOf(k) === top) as string;
+        const lifted = liftLevel(keys, (k) => statesOf(form)[k], key);
+        if (Object.keys(lifted).length) lifts.set(form.id, { ...(lifts.get(form.id) || {}), ...lifted });
+      };
+      for (const { unit } of drillableUnits(it, settings)) lift(unit);
+      /* A part's skill reads as cleared only once the part itself is, not
+         only its words — as creditNumbers lifts it. */
+      if (isRangeSkill(it)) lift(leadOf(it));
+      if (!lifts.size) return;
+      const forms = formsOf(it).map((f) => {
+        const add = lifts.get(f.id);
+        return add ? { ...f, s: { ...f.s, ...add }, updated: at } : f;
+      });
+      if (!out) out = list.slice();
+      out[i] = { ...it, forms, updated: at };
+    });
+    return out || list;
+  };
+  const once = liftAll(items);
+  /*
+   * A number part's questions in figures open only once its ten figures
+   * are cleared — and the pass above is what cleared them. So one press
+   * clears the part whole (the owner's 1b): the figures are read as the
+   * app will read them from now on, and the part's skills are lifted again
+   * against the ladder that gives them. The figures index is put back as
+   * it was afterwards; the app installs it afresh from the saved cards.
+   */
+  const parts = once.filter((it) => ids.has(it.id) && isRangeSkill(it));
+  if (!parts.length) return once;
+  const before = NUMERALS_KNOWN;
+  try {
+    setNumeralsKnown(numeralsKnownOf(once, settings));
+    const twice = liftAll(once);
+    return twice;
+  } finally {
+    setNumeralsKnown(before);
+  }
+}
+
+/** How far a unit has got, in the three stages a learner is shown. */
+export interface UnitStages {
+  /** Word cards and word-set items together: a part's skill, its words, the figures. */
+  words: { done: number; all: number };
+  sentences: { done: number; all: number };
+  /** Its text or conversation, where it has one. */
+  final: { kind: "text" | "conversation"; done: boolean } | null;
+  /** Every item of it learnt — the quieter mark beside Finished (R31). */
+  learnt: boolean;
+}
+
+/**
+ * A unit's stages, counted the one way Home and Progress both show them:
+ * only items that can be asked (towardsLearnt not null), each cleared when
+ * it has been up every level it has. When Words and Sentences are both
+ * full, the unit is finished — the same reading as the path's.
+ */
+export function unitStages(deckId: string, items: Item[], settings: Settings): UnitStages {
+  const out: UnitStages = { words: { done: 0, all: 0 }, sentences: { done: 0, all: 0 }, final: null, learnt: true };
+  let any = false;
+  for (const it of unitItems(deckId, items)) {
+    const at = towardsLearnt(it, settings, items);
+    if (!at) continue;
+    any = true;
+    const done = at.at.status === "cleared" || at.at.status === "done";
+    if (at.at.status !== "done") out.learnt = false;
+    if (isDialog(it)) {
+      out.final = { kind: isText(it) ? "text" : "conversation", done: done && (!out.final || out.final.done) };
+      continue;
+    }
+    const stage = !isFromSystem(it) && isSentence(it) ? out.sentences : out.words;
+    stage.all += 1;
+    if (done) stage.done += 1;
+  }
+  if (!any) out.learnt = false;
+  return out;
+}
+
+/** A course's path as a learner's screens show it: each published unit's row with its title. */
+export interface PathLine {
+  courseId: string;
+  courseTitle: string;
+  rows: (PathRow & { title: string })[];
+}
+
+/** The paths of these courses, in their order, from the index. */
+export function pathLinesOf(courses: { id: string; title?: string }[], decks: { id: string; title?: string }[]): PathLine[] {
+  const titleOf = new Map(decks.map((d) => [d.id, String(d.title || "")]));
+  const out: PathLine[] = [];
+  for (const c of courses) {
+    const rows = PATH_INDEX.rows.get(c.id);
+    if (!rows || !rows.length) continue;
+    out.push({ courseId: c.id, courseTitle: String(c.title || ""), rows: rows.map((r) => ({ ...r, title: titleOf.get(r.id) || "" })) });
+  }
+  return out;
+}
+
+/** What a unit's row says on Progress (R28). */
+export function pathStateWord(r: PathRow): string {
+  if (r.state === "finished") return "Finished";
+  if (r.current) return "Current";
+  if (r.state === "open") return "Open";
+  return r.openedEarly ? "Opened by your teacher" : "Locked";
+}
+
+/** A unit's stages as Home lists them, in the owner's words. */
+export function stageWords(st: UnitStages): string[] {
+  const out = [`Words ${st.words.done}/${st.words.all}`, `Sentences ${st.sentences.done}/${st.sentences.all}`];
+  if (st.final) out.push(`${st.final.kind === "text" ? "Text" : "Conversation"}: ${st.final.done ? "done" : "not yet"}`);
+  return out;
+}
+
+/* ------------------------------------------------------------------
    Which card a verb's cell is on
 
    The practices of a tense ask about the rest of the tense — the persons
@@ -2037,17 +2674,31 @@ function stretchCleared(stretch: Item, lang: Lang): boolean {
 
 /*
  * The share of a stretch's words that lets the stretch above through:
- * eight of ten for 0 to 9. Rounded up, so a stretch of three or fewer
- * words still wants every one.
+ * six of ten for 0 to 9. Rounded up, so a stretch of two words wants
+ * both and one of three wants two.
  *
  * Until 0.416 it was every word, at every exercise, in every face, and
  * read afresh — so a learner who knew nine of the ten digits had nothing
  * above them to practise, and one slip on one digit shut everything over
- * it again. Nothing is asked early for this: a number is only ever asked
- * once each word in it is cleared (see askingsKnown), so 47 still waits
- * on *seven* however open 20 to 99 is.
+ * it again. From 0.416 to 0.621 it was eight in ten, and a learner with
+ * seven of 10 to 19's words learnt and the other three climbing had
+ * twenty cards waiting on one word (0.622, the owner's call).
+ *
+ * Nothing is asked early for this: a number is only ever asked once each
+ * word in it is cleared (see askingsKnown), so 47 still waits on *seven*
+ * however open 20 to 99 is. What opens sooner is the new words above —
+ * twenty, thirty — which come in through the learning share like any
+ * other new card.
  */
-const STRETCH_SHARE = 0.8;
+const STRETCH_SHARE = 0.6;
+
+/*
+ * The share of a sentence's words a learner must know before it is met:
+ * eight in ten — see sentenceWaits. The number line's share was the same
+ * until 0.622, when it was lowered and this was not: a sentence is read
+ * whole, and two unknown words in ten is already a lot to read past.
+ */
+const SENTENCE_SHARE = 0.8;
 
 /* An exercise the learner has been through once: cleared now, or out of
    its first learning and into review at some point, which a slip back to
@@ -2067,8 +2718,7 @@ function wordsCleared(stretch: Item, items: Item[], lang: Lang): boolean {
       /* Nor a face that counts things, which is asked with a noun and
          waits on one: counting never holds the next stretch back. */
       if (!isAsked(unit) || unit.countedAt) return true;
-      const types = availableTypes(unit, lang);
-      return !types.length || types.every((t) => throughOnce(statesOf(unit)[t]));
+      return onceThrough(unit, lang);
     }),
   ).length;
   return known >= Math.ceil(words.length * STRETCH_SHARE - 1e-9);
@@ -2107,8 +2757,7 @@ function withFacesWaiting(quiet: Set<string>, items: Item[], settings: Settings,
  * follow, so a sentence is not met until the learner can say what most of
  * the words in it mean: eight in ten of the word cards it was found to
  * contain, rounded up, so a sentence with three or fewer of them wants
- * every one — the share a stretch of the number line asks of its words
- * (STRETCH_SHARE). A word counts once the bottom level of its own ladder
+ * every one (SENTENCE_SHARE). A word counts once the bottom level of its own ladder
  * is cleared: reading a sentence asks for its words to be understood, not
  * written. A word with no card is not counted, since nothing could ever
  * make it known; the editor tells the teacher which words those are.
@@ -2155,16 +2804,16 @@ function sentenceWaits(line: Form, held: WordsHeld, lang: Lang): boolean {
   if (!hits.length) return false;
   const known = hits.filter(({ card: word, form }) => {
     const unit = isAsked(form) ? form : leadOf(word);
-    const types = availableTypes(unit, lang);
-    return !types.length || reachedLevel(types, (t) => statesOf(unit)[t], 2);
+    return levelGate(unit, lang, 2);
   }).length;
-  return known < Math.ceil(hits.length * STRETCH_SHARE - 1e-9);
+  return known < Math.ceil(hits.length * SENTENCE_SHARE - 1e-9);
 }
 
 /* Whether a form is shown without its vowel marks — see readsBare in the
    scheduler. Never in a language that has none to take off. */
 function formReadsBare(unit: Form | null | undefined, lang: Lang): boolean {
   if (!unit || !lang.marks) return false;
+  if (onSkillRules(unit, lang)) return skillReached(unit, lang);
   return readsBare(availableTypes(unit, lang), (t) => statesOf(unit)[t]);
 }
 
@@ -2342,8 +2991,7 @@ export function quietUnits(items: Item[], settings: Settings): Set<string> {
           const of = unit.id === card.id ? "" : unit.id;
           const mine = cellsIn(card, spec, of);
           if (!mine.length) continue;
-          const supported = availableTypes(unit, lang);
-          const known = reachedLevel(supported, (t) => statesOf(unit)[t], 2);
+          const known = availableTypes(unit, lang).length > 0 && levelGate(unit, lang, 2);
           if (!known) for (const cell of mine) out.add(cell.id);
         }
         /* And a cell hanging off a form the card no longer carries, which
@@ -2599,7 +3247,7 @@ export function valueReachOf(
     /* A person of a tense held as a skill stands once its tense is cleared
        and it has not gone wrong lately — see heldStands. */
     if (card && isHeld(form)) return heldStands(card, form, settings);
-    return cleared(laddered(form, settings), (key: string) => statesOf(form)[key]);
+    return cleared(standingKeys(form, settings), (key: string) => statesOf(form)[key]);
   };
   for (const it of items) {
     const langId = langIdOf(it, settings);
@@ -2653,8 +3301,20 @@ export function valueReachOf(
  * untestable: `buildSession` is a plain function of its arguments and
  * always was, and this is the rest of what it reads.
  */
-export function installIndexes(items: Item[], settings: Settings, systems: SystemSet[] = []): void {
+export function installIndexes(
+  items: Item[],
+  settings: Settings,
+  systems: SystemSet[] = [],
+  path: { courses?: PathCourse[]; decks?: PathDeck[] } = {},
+  /* The personal sets held, as setViewsOf finds them (0.631). */
+  sets: HeldSet[] = [],
+): void {
   setActiveLang(settings.language || DEFAULT_LANGUAGE);
+  /* The courses' switches first: everything below reads what a form can be
+     asked, and this changes it — see setPracticeIndex. */
+  setPracticeIndex(practiceIndexOf(path.courses || [], path.decks || []));
+  /* And the personal sets, which change it too. */
+  setSetIndex(setIndexOf(items, path.decks || [], sets));
   setContextIndex(contextIndexOf(items, settings));
   setDialogIndex(buildDialogIndex(items));
   setTaughtShortIndex(taughtShortOf(items, settings));
@@ -2688,6 +3348,9 @@ export function installIndexes(items: Item[], settings: Settings, systems: Syste
   setQuietUnits(withFacesWaiting(quiet, items, settings, systems));
   setEasedUnits(easedUnits(items, settings));
   setSkillCaps(skillCapsOf(items, settings));
+  /* And the path, last: it reads where each card stands, which the setters
+     above decide. */
+  setPathIndex(pathIndexOf(items, path.courses || [], path.decks || [], settings));
 }
 
 /* ------------------------------------------------------------------
@@ -3336,7 +3999,27 @@ function sceneFill(scene: Item, preview: boolean): Record<string, Record<string,
   return took;
 }
 
+/*
+ * A question, filled: a personal set's picture cast as the kind of asking
+ * it is on (0.631), then its holes filled — and, where it has several
+ * pictures, which of them this asking shows: the next after each right
+ * answer, the same after a miss, by the turn the question is on. Nothing
+ * of it is stored.
+ */
 function castFill(
+  resolved: { unit: Form, parent: Item, isSub: boolean } | null,
+  type: string,
+  preview = false,
+) {
+  const r = castFillOnly(castSet(resolved, type), type, preview);
+  if (!r) return r;
+  const images = Array.isArray(r.unit.images) ? r.unit.images : [];
+  if (images.length < 2) return r;
+  const unit = { ...r.unit, imageAt: turnOf(statesOf(r.unit)[type]) % images.length };
+  return { ...r, unit, parent: r.isSub ? r.parent : withLead(r.parent, unit) };
+}
+
+function castFillOnly(
   resolved: { unit: Form, parent: Item, isSub: boolean } | null,
   type: string,
   preview = false,
@@ -4141,6 +4824,268 @@ export function withoutQuestionAt(
   return exercises.slice(0, at).concat(standIn ? [standIn] : [], exercises.slice(at + 1));
 }
 
+/* ------------------------------------------------------------------
+   The doors (stage C of docs/PLAN-skills-switches-no-english.md)
+
+   A word form will one day climb by skill rather than by the four levels.
+   Everything that asks how far a form has got asks it through one of
+   these, so that change is made here and nowhere else:
+
+     * laddered — the keys a form climbs with;
+     * standingKeys — the keys its standing is read from;
+     * openPastPattern (and openTypes, reachedTypes on it) — what it may be
+       dealt now;
+     * atItsTop — whether it is asked its top alone;
+     * levelGate, onceThrough, formReadsBare — the gates other cards wait
+       on: a sentence on its words, a stretch of numbers on the one below,
+       a table's cells on their word, and when a word is read bare.
+
+   While WORD_SKILLS_ON is false every one of them answers exactly what it
+   always did.
+   ------------------------------------------------------------------ */
+
+export const WORD_SKILLS_ON = false;
+let wordSkills =
+  WORD_SKILLS_ON || (typeof __WORD_SKILLS_TEST__ !== "undefined" && __WORD_SKILLS_TEST__ === true);
+/** For the tests, which run the whole suite both ways. */
+export function setWordSkills(on: boolean) {
+  if (on === wordSkills) return;
+  wordSkills = on;
+  forgetTypes();
+}
+export const wordSkillsOn = (): boolean => wordSkills;
+/** What a form may be dealt now — for the tests, which ask it of the doors. */
+export const dealtNow = (it: Form, settings: Settings): string[] => openPastPattern(it, settings);
+/** And the gate a sentence waits on — level two, or its skill reading. */
+export const gateReached = (it: Form, settings: Settings): boolean => levelGate(it, langOf(settingsFor(settings, it)), 2);
+
+/* Whether a form climbs by skill: the switch on, and the form in scope —
+   a word, not from a number system, not a tense, a held person, a
+   conversation or a text's line, and every type it supports in the map. */
+export function onSkillRules(unit: Form, lang: Lang = activeLang()): boolean {
+  if (!wordSkills || !unit) return false;
+  return skillScoped(unit, lang);
+}
+function skillScoped(unit: Form, lang: Lang): boolean {
+  const id = String(unit.id || "");
+  if (id.startsWith("sys:") || isTenseForm(unit) || isHeld(unit) || sceneOf(id)) return false;
+  if (/-l(?:~|\d)/.test(id)) return false;
+  /* Nor a cell of a table — a pronoun on the end of a word — which climbs
+     a rung's worth at a time (see easedUnits) and is not a word of its own. */
+  if (unit.row || unit.col) return false;
+  const types = supportedRaw(unit, lang);
+  return types.length > 0 && allMapped(types);
+}
+
+/* ------------------------------------------------------------------
+   The skill rules (stage D) — read only by the doors, only for a form on
+   them. See section 3 of the plan for R1 to R14.
+   ------------------------------------------------------------------ */
+
+interface SkillState {
+  skill: Skill;
+  /** Recognise keys that can pass the step (R3). */
+  recog: string[];
+  /** Practice-only recognise keys: dealt, never required. */
+  practice: string[];
+  /** The stepping stone, where there is one (R4). */
+  stone: string[];
+  /** Proof keys, in the order they are tried (R5). */
+  proofs: string[];
+  proven: boolean;
+  recogPassed: boolean;
+  stonePassed: boolean;
+}
+
+const answeredState = (s: ExerciseState | null | undefined): boolean =>
+  !!s && (s.phase !== "new" || (s.hist || []).length > 0);
+const lastRight = (s: ExerciseState | null | undefined): boolean => {
+  const h = (s && s.hist) || [];
+  return h.length > 0 && !!h[h.length - 1];
+};
+const lastWrong = (s: ExerciseState | null | undefined): boolean => {
+  const h = (s && s.hist) || [];
+  return h.length > 0 && !h[h.length - 1];
+};
+
+/* What the form has of each skill, read from what it supports (R1) and
+   what its records say. Nothing stored. */
+function skillStates(unit: Form, lang: Lang): SkillState[] {
+  const types = availableTypes(unit, lang);
+  const st = statesOf(unit);
+  const keys = (list: string[]) => list.flatMap((t) => keysFor(unit, t));
+  const solidKey = (k: string) => !!st[k] && solid(st[k]);
+  const out: SkillState[] = [];
+  for (const skill of ["US", "UH", "WH", "WM"] as Skill[]) {
+    const mine = ofSkill(types, skill);
+    const recogTypes = mine.filter((t) => skillOf(t)!.step === "recognise" && !skillOf(t)!.many);
+    let proofTypes = mine.filter((t) => skillOf(t)!.step === "produce");
+    let stoneTypes: string[] = [];
+    if (skill === "WH") {
+      const heard = ["rec2ar", "rec2ctx"].filter((t) => proofTypes.includes(t));
+      if (heard.length) {
+        stoneTypes = proofTypes.includes("tr2ar") ? ["tr2ar"] : [];
+        proofTypes = heard;
+      } else proofTypes = proofTypes.filter((t) => t === "tr2ar");
+    }
+    if ((skill === "US" || skill === "UH") && !proofTypes.length) {
+      proofTypes = mine.filter((t) => skillOf(t)!.many);
+    }
+    /* A skill is had only where something can prove it (R1, R5). */
+    if (!proofTypes.length) continue;
+    const proofs = keys(proofTypes);
+    const recog = keys(recogTypes.filter(counts));
+    const practice = keys(recogTypes.filter((t) => !counts(t)));
+    const stone = keys(stoneTypes);
+    const proven = proofs.some(solidKey);
+    out.push({
+      skill,
+      recog,
+      practice,
+      stone,
+      proofs,
+      proven,
+      /* Any one recognise exercise right twice running (R3); and a skill
+         proven once does not send the learner back to it (R10). */
+      recogPassed: proven || !recog.length || recog.some(solidKey),
+      stonePassed: proven || !stone.length || stone.every(solidKey),
+    });
+  }
+  return out;
+}
+
+/* A pass made on any key writing the word from its meaning, whether or not
+   that exercise is still supported or allowed: the form has been cleared
+   before (D6). The key with the most, or null. */
+function clearedBefore(unit: Form): string | null {
+  const st = statesOf(unit);
+  let best: string | null = null;
+  for (const [k, s] of Object.entries(st)) {
+    const m = WORD_SKILL_MAP[typeOf(k)];
+    if (!m || m.skill !== "WM" || m.step !== "produce" || !s || !((s.passes || 0) > 0)) continue;
+    if (!best || (s.passes || 0) > (st[best].passes || 0)) best = k;
+  }
+  return best;
+}
+
+/* The keys a form on the skill rules climbs with (R7): for each skill it
+   has, a solid proof where it is proven; otherwise what stands between it
+   and being proven. Cleared over these is every skill proven; the top of
+   them is the proof that writes the word from its meaning. */
+function skillLadder(unit: Form, lang: Lang): string[] {
+  const st = statesOf(unit);
+  const solidKey = (k: string) => !!st[k] && solid(st[k]);
+  const passesOf = (k: string) => (st[k] && st[k].passes) || 0;
+  const out: string[] = [];
+  for (const k of skillStates(unit, lang)) {
+    if (k.proven) {
+      const best = k.proofs.filter(solidKey).sort((a, b) => passesOf(b) - passesOf(a))[0];
+      out.push(best);
+      continue;
+    }
+    if (!k.recogPassed) out.push(...k.recog);
+    else if (k.recog.length) out.push(k.recog.find(solidKey)!);
+    if (!k.stonePassed) out.push(...k.stone);
+    out.push(...k.proofs);
+  }
+  return [...new Set(out)];
+}
+
+/* And the keys its standing is read from: the same, or — where the form
+   has made a pass writing the word from its meaning and is not cleared
+   over them — that key alone, which keeps it Cleared, and Learnt once it
+   holds two (D6, R14). */
+function skillStanding(unit: Form, lang: Lang): string[] {
+  const ladder = skillLadder(unit, lang);
+  const st = statesOf(unit);
+  if (ladder.length && cleared(ladder, (k) => st[k])) return ladder;
+  const before = clearedBefore(unit);
+  return before ? [before] : ladder;
+}
+
+/* Whether a form on the skill rules stands cleared. */
+const skillCleared = (unit: Form, lang: Lang): boolean => {
+  const keys = skillStanding(unit, lang);
+  return keys.length > 0 && cleared(keys, (k) => statesOf(unit)[k]);
+};
+
+/* What a form on the skill rules may be dealt now (R2, R4, R5, R9, R11). */
+function skillDeal(unit: Form, lang: Lang): string[] {
+  const st = statesOf(unit);
+  const solidKey = (k: string) => !!st[k] && solid(st[k]);
+  const all = skillStates(unit, lang);
+  const out: string[] = [];
+  if (skillCleared(unit, lang)) {
+    /* Reviews: the solid proofs of writing it from its meaning (R9). A
+       skill the form has gained since it cleared — a recording added, a
+       switch turned on — joins them, from its first step (R14). */
+    const wm = all.find((k) => k.skill === "WM");
+    const solidWm = wm ? wm.proofs.filter(solidKey) : [];
+    const before = clearedBefore(unit);
+    if (solidWm.length) out.push(...solidWm);
+    else if (before && availableTypes(unit, lang).includes(typeOf(before))) out.push(before);
+  }
+  const of = (skill: Skill) => all.find((k) => k.skill === skill);
+  const answeredAny = Object.values(st).some(answeredState);
+  const us = of("US");
+  const wmShown = !!clearedBefore(unit) || (of("WM") ? of("WM")!.proven : false);
+  const open = (skill: Skill) =>
+    skill === "US" || skill === "UH" ? true
+    : skill === "WH" ? answeredAny
+    : !us || us.proven || wmShown;
+  for (const k of all) {
+    if (k.proven || !open(k.skill)) continue;
+    if (!k.recogPassed) {
+      /* One of them at a time, varied by how many have been answered —
+         never all of them in one sitting (R11). */
+      const types = [...new Set(k.recog.concat(k.practice).map(typeOf))];
+      const n = k.recog.concat(k.practice).reduce((sum, key) => sum + ((st[key] && st[key].hist) || []).length, 0);
+      const pick = types[n % types.length];
+      out.push(...k.recog.concat(k.practice).filter((key) => typeOf(key) === pick));
+      continue;
+    }
+    if (!k.stonePassed) {
+      out.push(...k.stone);
+      continue;
+    }
+    /* A proof whose last answer was right finishes its run; after a miss,
+       the next proof the form supports (R5). */
+    const running = k.proofs.filter((p) => lastRight(st[p]));
+    if (running.length) {
+      out.push(...running);
+      continue;
+    }
+    const fresh = k.proofs.filter((p) => !lastWrong(st[p]));
+    out.push(...(fresh.length ? (k.skill === "WM" ? fresh : [fresh[0]]) : k.proofs));
+  }
+  return [...new Set(out)];
+}
+
+/* R13: "level two reached" for a form on the skill rules. */
+function skillReached(unit: Form, lang: Lang): boolean {
+  const all = skillStates(unit, lang);
+  const us = all.find((k) => k.skill === "US");
+  return us ? us.proven : all.some((k) => k.proven);
+}
+
+/* A gate other cards wait on: this form has reached `level` of its
+   ladder, over what it supports. */
+function levelGate(unit: Form, lang: Lang, level: number): boolean {
+  if (level === 2 && onSkillRules(unit, lang)) return skillReached(unit, lang);
+  const types = availableTypes(unit, lang);
+  return !types.length || reachedLevel(types, (t) => statesOf(unit)[t], level);
+}
+
+/* And the stretch gate: every exercise the form supports through once. */
+function onceThrough(unit: Form, lang: Lang): boolean {
+  if (onSkillRules(unit, lang)) {
+    const keys = skillLadder(unit, lang);
+    return !keys.length || keys.every((k) => throughOnce(statesOf(unit)[k]));
+  }
+  const types = availableTypes(unit, lang);
+  return !types.length || types.every((t) => throughOnce(statesOf(unit)[t]));
+}
+
 /* Which exercise types this card's data can support.
 
    Note this is not filtered by the quiet window: it answers what the card
@@ -4176,13 +5121,23 @@ function availableTypes(
    */
   const held = own ? TYPE_CACHE.get(it) : null;
   if (held && held.lang === lang.id) return held.types;
+  /* A personal set's picture is asked only from its picture or its
+     recordings, by its own rules (0.631); the card's other forms, never. */
+  const setAt = setEntryOfUnit(it);
+  if (setAt !== undefined) {
+    const raw = setTypes(setAt);
+    const allowed = allowedTypes(practicesOf(it), raw);
+    if (own) TYPE_CACHE.set(it, { lang: lang.id, types: allowed, raw });
+    return allowed;
+  }
   /* A tense held as a skill can be asked whatever one of its persons can:
      each question about it is asked of a person — see drawPerson. */
   const tense = tenseHeld(it);
   if (tense) {
     const can = new Set(tense.tense.places.flatMap((p) => availableTypes(p.form, lang)));
     const types = TYPES.filter((t) => can.has(t));
-    if (own) TYPE_CACHE.set(it, { lang: lang.id, types });
+    const rawCan = new Set(tense.tense.places.flatMap((p) => supportedRaw(p.form, lang)));
+    if (own) TYPE_CACHE.set(it, { lang: lang.id, types, raw: TYPES.filter((t) => rawCan.has(t)) });
     return types;
   }
   /* What its variables can be filled with, if it has any: a hole with
@@ -4207,9 +5162,84 @@ function availableTypes(
          too is asked on that card — see siblingStateOf. */
       && !(WORD_LEFT.has(it.id) && onlyAboutWord(EX[t]))
   );
-  if (own) TYPE_CACHE.set(it, { lang: lang.id, types });
-  return types;
+  /* And of those, the ones the courses the card came through allow — see
+     course-practice.ts. The one place that is decided (0.627). */
+  const allowed = allowedTypes(practicesOf(it), types);
+  if (own) TYPE_CACHE.set(it, { lang: lang.id, types: allowed, raw: types });
+  return allowed;
 }
+
+/*
+ * What a form supports before its courses' switches: what availableTypes
+ * says with every exercise switched on. Read only to keep a card's standing
+ * across a switch — see standingKeys — never to deal a question.
+ */
+function supportedRaw(it: Form, lang: Lang = activeLang()): string[] {
+  availableTypes(it, lang);
+  const held = TYPE_CACHE.get(it);
+  return held && held.lang === lang.id ? held.raw : availableTypes(it, lang);
+}
+
+/* ------------------------------------------------------------------
+   A course's switches (0.627)
+
+   Which courses each course card came through, with each one's switches
+   (null for a course that has none, which allows everything). A card of the
+   learner's own, or a value borrowed by a deck, is in none of them and is
+   asked everything — see allowedTypes. Held here for the reason the counts
+   are: availableTypes is a function of a unit and cannot be handed the
+   courses as well.
+   ------------------------------------------------------------------ */
+
+let PRACTICE: Map<string, (CoursePractice | null)[]> = new Map();
+
+export function setPracticeIndex(next: Map<string, (CoursePractice | null)[]>) {
+  if (next === PRACTICE) return;
+  PRACTICE = next;
+  forgetTypes();
+}
+
+/** By card, the switches of every course it reaches the learner through —
+    only for cards where at least one of those courses has any. */
+export function practiceIndexOf(
+  courses: { id: string; decks?: string[]; practice?: unknown }[],
+  decks: { id: string; cardIds?: string[] }[],
+): Map<string, (CoursePractice | null)[]> {
+  const cardsOf = new Map(decks.map((d) => [d.id, d.cardIds || []]));
+  const by: Map<string, (CoursePractice | null)[]> = new Map();
+  for (const c of courses || []) {
+    const p = readPractice(c.practice);
+    const seen = new Set<string>();
+    for (const d of c.decks || []) {
+      for (const id of cardsOf.get(d) || []) {
+        const local = localIdFor(id);
+        if (seen.has(local)) continue;
+        seen.add(local);
+        by.set(local, (by.get(local) || []).concat([p]));
+      }
+    }
+  }
+  for (const [id, list] of by) if (!list.some(Boolean)) by.delete(id);
+  return by.size ? by : PRACTICE.size ? new Map() : PRACTICE;
+}
+
+/* The card a form is on, by the form's id: a card's own word answers to
+   the card's id, and every other form, line and tense is named after it. */
+const cardIdOfUnit = (id: string): string => {
+  const m = /^(.*?)-[flt](?:~|\d)/.exec(String(id || ""));
+  return m ? m[1] : String(id || "");
+};
+
+const practicesOf = (it: Form): (CoursePractice | null)[] =>
+  PRACTICE.size ? PRACTICE.get(cardIdOfUnit(it.id)) || [] : [];
+
+/** The switches of every course a card came through. */
+export const practicesOfCard = (it: Item): (CoursePractice | null)[] => practicesOf(leadOf(it));
+
+/** How much English a card's questions may show: plainly, behind a tap
+    (Little translation) or not at all (No translation) — see englishShown. */
+export const englishModeFor = (cardId: string): "shown" | "tap" | "hidden" =>
+  englishShown(PRACTICE.size ? PRACTICE.get(cardIdOfUnit(cardId)) || [] : []);
 
 /*
  * Which exercises a form supports, read in the language the form is
@@ -4273,6 +5303,52 @@ export function laddered(it: Form, settings: Settings): string[] {
 }
 
 /*
+ * The keys a form's standing is read from: laddered, kept true to what the
+ * learner has shown across a course's switches (0.627).
+ *
+ * A switch changes what a form is asked, and what is asked is what Cleared
+ * and Learnt are read over — so without this a teacher flipping a switch
+ * could take a card's status away. Two ways, both corrected here and only
+ * for a card whose courses have switches at all; every other card reads
+ * laddered exactly as before.
+ *
+ *   * A question switched on that the form has not shown yet does not hold
+ *     back a form that has been cleared before (it has a pass to show for
+ *     it). It joins the form's reviews and is dealt as one; it counts once
+ *     it is solid, or once it has gone wrong twice running — a slip, which
+ *     takes the card back as a slip anywhere does.
+ *   * A question switched off on a level above everything the form is now
+ *     asked, that has passes on it, still counts towards its standing: a
+ *     word learnt by writing it from its English stays learnt when English
+ *     is switched off. It is never dealt — dealing reads laddered.
+ *
+ * Nothing is stored for either: both read the records as they are. See
+ * DECISIONS.md, "A course's switches".
+ */
+function standingKeys(it: Form, settings: Settings): string[] {
+  if (!isQuiet(it) && onSkillRules(it, langOf(settingsFor(settings, it)))) {
+    return isAsked(it) ? skillStanding(it, langOf(settingsFor(settings, it))) : [];
+  }
+  const keys = laddered(it, settings);
+  if (!practicesOf(it).some(Boolean) || !keys.length) return keys;
+  const st = statesOf(it);
+  const all = supportedRaw(it, langOf(settingsFor(settings, it))).flatMap((t) => keysFor(it, t));
+  const shown = all.some((k) => ((st[k] && st[k].passes) || 0) > 0);
+  if (!shown) return keys;
+  const counted = keys.filter((k) => {
+    const s = st[k];
+    if (s && solid(s)) return true;
+    const h = (s && s.hist) || [];
+    return h.some((x, i) => i > 0 && !x && !h[i - 1]);
+  });
+  const top = topLevelOf(keys);
+  const off = all.filter(
+    (k) => !keys.includes(k) && levelOf(k) > top && ((st[k] && st[k].passes) || 0) > 0,
+  );
+  return counted.concat(off);
+}
+
+/*
  * The same, through the quiet gate: what a form will climb with once the
  * row or the stretch it waits on opens.
  *
@@ -4292,6 +5368,8 @@ function ladderedOnceOpen(it: Form, settings: Settings): string[] {
   /* Nor for a person of a tense held as a skill, or the word of such a
      verb: the tense is what climbs — see HELD_UNITS. */
   if (isHeld(it)) return [];
+  /* A word form on the skill rules climbs by skill (stage D). */
+  if (onSkillRules(it, langOf(settingsFor(settings, it)))) return skillLadder(it, langOf(settingsFor(settings, it)));
   /* And a rung's worth rather than all of it, for a pronoun on the end of a
      word the learner can already write — see easedUnits. Said here because
      this is the list everything downstream reads, so what is dealt, what
@@ -4357,6 +5435,10 @@ function openTypes(it: Form, settings: Settings): string[] {
 /* What openTypes would say once the tense's table has been got: the one
    thing a question dealt to follow the table may be asked before it is. */
 function openPastPattern(it: Form, settings: Settings): string[] {
+  if (onSkillRules(it, langOf(settingsFor(settings, it)))) {
+    if (isQuiet(it) || !isAsked(it)) return [];
+    return skillDeal(it, langOf(settingsFor(settings, it))).filter((k) => typeAllowedNow(k, it));
+  }
   const cap = SKILL_CAPS.get(it && it.id);
   const open = reachedTypes(it, settings).filter((k) => typeAllowedNow(k, it) && (cap == null || levelOf(k) <= cap));
   return atItsTop(it, settings) ? open.filter((k) => levelOf(k) === topLevelOf(laddered(it, settings))) : open;
@@ -4381,6 +5463,8 @@ function openPastPattern(it: Form, settings: Settings): string[] {
  */
 function atItsTop(it: Form, settings: Settings): boolean {
   if (SKILL_CAPS.get(it && it.id) != null) return false;
+  /* A form on the skill rules is asked its reviews alone once cleared. */
+  if (onSkillRules(it, langOf(settingsFor(settings, it)))) return !isQuiet(it) && isAsked(it) && skillCleared(it, langOf(settingsFor(settings, it)));
   const ladder = laddered(it, settings);
   const top = topLevelOf(ladder);
   const below = ladder.filter((k) => levelOf(k) < top);
@@ -4475,22 +5559,18 @@ export function mixCardsOf(
     if (!units.length) continue;
     const dues: number[] = [];
     let lastSeen = 0;
-    let fresh = true;
     for (const { unit } of units) {
       for (const t of typesOf(unit)) {
         const st = stateOf(unit, t);
         dues.push(st.due || 0);
       }
-      /* Met and last seen over the whole ladder, not only what can be
-         asked now: a form on its top is asked its top alone, and a top
-         not answered yet is a card in learning that has just climbed,
-         not a new one. */
-      for (const t of laddered(unit, settings)) {
-        const st = stateOf(unit, t);
-        lastSeen = Math.max(lastSeen, st.updated || 0);
-        if (st.phase !== "new") fresh = false;
-      }
+      /* Last seen over the whole ladder, not only what can be asked now. */
+      for (const t of laddered(unit, settings)) lastSeen = Math.max(lastSeen, stateOf(unit, t).updated || 0);
     }
+    /* Met over the whole ladder too: a form on its top is asked its top
+       alone, and a top not answered yet is a card in learning that has
+       just climbed, not a new one. The one test — see everMet. */
+    const fresh = !everMet(it, settings, units);
     const held = fresh ? null : standing(cardStandings(it, settings, items));
     /* A question never asked on a card already met — a level that has just
        opened — is waiting from the moment it exists, so it reads as due now
@@ -4715,7 +5795,7 @@ const UNSEEN_DAYS = 3;
  */
 function notSeenLately(unit: Form, settings: Settings) {
   const st = (t: string) => stateOf(unit, t);
-  if (cleared(laddered(unit, settings), st)) return false;
+  if (cleared(standingKeys(unit, settings), st)) return false;
   const last = Math.max(0, ...Object.values(statesOf(unit)).map((x) => (x && x.updated) || 0));
   return now() - last >= UNSEEN_DAYS * 86400000;
 }
@@ -4895,7 +5975,7 @@ function knownNumbers(items: Item[], settings: Settings, sets: SystemSet[]): Kno
     let ok: boolean;
     if (!isAsked(form)) ok = true;
     else {
-      const keys = laddered(form, settings);
+      const keys = standingKeys(form, settings);
       ok = keys.length ? cleared(keys, (t) => statesOf(form)[t]) : !isQuiet(form);
     }
     done.set(at, ok);
@@ -5165,11 +6245,19 @@ export function buildSession({
   perDay,
   systems,
   mode = "regular",
+  pathUnit,
 }: {
   items: Item[];
   settings: Settings;
   /** The pool: the cards this session may draw from. */
   inDeck: (it: Item) => boolean;
+  /**
+   * A path unit whose new cards this session may bring in although the
+   * learner has not reached it: "Practise this unit" on a unit the teacher
+   * opened early (R24). Every other never-met card the path holds stays
+   * out — see pathHolds.
+   */
+  pathUnit?: string | null;
   /**
    * Deal everything in the pool, by due date, without the mix. Nothing the
    * learner can open does this; tests and the pace simulation use it to
@@ -5198,7 +6286,8 @@ export function buildSession({
   const sets = systems || [];
   const numbers = knownNumbers(items, settings, sets);
   const drillable = items
-    .filter((it) => inDeck(it) && isDrillable(it, settings))
+    /* And not held back by a course's path — see pathHolds. */
+    .filter((it) => inDeck(it) && isDrillable(it, settings) && !pathHolds(it, settings, pathUnit))
     /* A skill whose system this device no longer holds — a course left,
        a teacher's language dropped — is a schedule with nothing behind
        it. Left in the collection, so the work comes back if the material
@@ -5528,6 +6617,9 @@ function withGrids(
       for (const card of items) {
         if (!isDrillable(card, settings) || langIdOf(card, settings) !== lang) continue;
         if (isDialog(card) || hasSlots(card)) continue;
+        /* A spare tile is marked like any other, so a card the path holds
+           back would be met here — see pathHolds. */
+        if (pathHolds(card, settings)) continue;
         for (const { unit, isSub } of unitsOf(card)) {
           if (!unit.ar || !gridOther(type, unit) || mine.has(unit.id)) continue;
           /* A word on the left of the grid of recordings is a play button,
@@ -7042,6 +8134,29 @@ function liftState(s: Record<string, any> | null | undefined): ExerciseState {
    on its way in, so what it drops is dropped on every load, after every
    sync and on every import — which is exactly the sort of thing worth
    asserting rather than hoping about. */
+/**
+ * One form sent back to the beginning by Reset scheduling: every schedule
+ * fresh and what its fillings were met with forgotten — but a personal
+ * set's answer kept, stamped with the reset's time so the merge between
+ * devices, which drops what is older than a reset, keeps it too (0.630).
+ */
+/** One item started again: every form and turn reset as Reset scheduling
+    resets them, and stamped so the reset holds across devices (0.631). */
+export function restartItem(it: Item, at: Millis): Item {
+  return {
+    ...it,
+    forms: formsOf(it).map((f) => resetForm(f, at)),
+    ...(it.lines ? { lines: linesOf(it).map((f) => resetForm(f, at)) } : null),
+    reset: at,
+    updated: at,
+  };
+}
+
+export function resetForm<T extends Form>(f: T, at: Millis): T {
+  const { met: _forgotten, ...rest } = f;
+  return { ...rest, s: { ...freshStates(), ...(keptAcrossReset(f.s, at) as unknown as Record<string, ExerciseState>) } } as T;
+}
+
 export function liftStates(old: Record<string, any> = {}): Record<string, ExerciseState> {
   const s = freshStates();
   for (const [oldKey, newKey] of Object.entries(V2_MAP)) {
@@ -7072,6 +8187,22 @@ export function liftStates(old: Record<string, any> = {}): Record<string, Exerci
     if (key in s || !st) continue;
     if (!TYPES.includes(typeOf(key))) continue;
     s[key] = liftState(st);
+  }
+  /*
+   * And every other key, carried untouched (0.626).
+   *
+   * A record for an exercise this release does not know is a later
+   * release's work, synced here from the learner's other device, or one
+   * for an exercise retired since. It used to be dropped on every load, so
+   * a device that replaced the server's copy took it with it. Carried as
+   * it is — not lifted, so nothing is written for it that was not already
+   * there, which is what the `newKey in s` guard above protects — and read
+   * by nothing: every reader asks of the types this release knows. Only the
+   * oldest shape's names, lifted above to their own, are left behind.
+   */
+  for (const [key, st] of Object.entries(old)) {
+    if (key in s || !st || key in V2_MAP) continue;
+    s[key] = st;
   }
   return s;
 }
@@ -8636,6 +9767,19 @@ function audibleOf(unit: Form): any[] {
   return first ? [{ id: first, label: "", speed: "" }] : NO_RECS;
 }
 
+/* Who is speaking on what a question plays, where the teacher said: a
+   personal set's pair names one voice or two; any other card, the voice of
+   the recording it starts with (0.631). */
+export function voiceLineOf(unit: Form): string {
+  const set = (unit as Record<string, any>).setVoices as string[] | undefined;
+  const names = set && set.length ? set : (() => {
+    const first = audibleOf(unit)[0];
+    const v = first && unit.voices ? unit.voices[first.id] : "";
+    return v ? [v] : [];
+  })();
+  return names.length ? `Recorded by ${names.join(" and ")}` : "";
+}
+
 function chainOf(unit: Form): string[] {
   const seq = (unit as Record<string, any>).recSeq as string[][] | undefined;
   if (!seq || seq.length < 2) return [];
@@ -8703,6 +9847,17 @@ const sideClass = (card: any, line: any) => {
  *   words — what it means and how it sounds. Separate, because reading a
  *   scene through takes them one at a time and on request.
  */
+/* The English meaning behind a tap, on the answer to a question in a Little
+   translation course (0.627). Opening it makes a right answer a near miss
+   — see meaningLeaned. */
+function MeaningTap({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button type="button" className="at-linkbtn" data-el="reveal-answer-meaning" onClick={onOpen}>
+      Show the meaning
+    </button>
+  );
+}
+
 function Scene({ card, lines, lang, blankId = null, meanings = false, said = false, numbers }: {
   card: any;
   lines: any[];
@@ -8730,7 +9885,7 @@ function Scene({ card, lines, lang, blankId = null, meanings = false, said = fal
             {join("lat")}
           </p>
         )}
-        {meanings && join("en") && (
+        {meanings && join("en") && englishModeFor(card.id) !== "hidden" && (
           <p className="at-scenemeaning" data-el="scene-text-meaning">
             {join("en")}
           </p>
@@ -8775,7 +9930,7 @@ function Scene({ card, lines, lang, blankId = null, meanings = false, said = fal
                   {line.lat}
                 </p>
               )}
-              {meanings && line.en && (
+              {meanings && line.en && englishModeFor(card.id) !== "hidden" && (
                 <p className="at-scenemeaning" data-el="scene-line-meaning">
                   {asMeaning(line.en)}
                 </p>
@@ -9533,16 +10688,23 @@ function VerbRowFill({ tense, lang, tiles, placed, at, onAt, onPlace, checked }:
  * Named by position for a screen reader, since naming them by what they
  * show would be reading the answer out.
  */
-function PictureChoices({ options, value, onChange, disabled }: {
+function PictureChoices({ options, value, onChange, disabled, turn = 0 }: {
   options: any[];
   value: string;
   onChange: (v: string) => void;
   disabled?: boolean;
+  /** The question's turn: a card with several pictures shows the next of
+      them each time (0.631). Which card a tile is stays its first. */
+  turn?: number;
 }) {
   return (
-    <div className="at-picchoices" data-el="answer-choices">
+    /* Answered, the tiles shrink to half, as the prompt picture does, so
+       the verdict fits on the screen without scrolling. */
+    <div className={`at-picchoices${disabled ? " settled" : ""}`} data-el="answer-choices">
       {options.map((option, i) => {
         const hash = String((option && Array.isArray(option.images) && option.images[0]) || "");
+        const count = option && Array.isArray(option.images) ? option.images.length : 0;
+        const shown = count > 1 ? String(option.images[(turn + i) % count] || hash) : hash;
         return (
           <button
             type="button"
@@ -9553,7 +10715,7 @@ function PictureChoices({ options, value, onChange, disabled }: {
             disabled={disabled}
             onClick={() => onChange(hash)}
           >
-            <CardPicture hash={hash} alt="" />
+            <CardPicture hash={shown} alt="" />
           </button>
         );
       })}
@@ -10077,6 +11239,13 @@ export default function ArabicTrainer() {
     const join = new URLSearchParams(window.location.search).get("join") || "";
     return { slug, join };
   });
+  /* A sign-in link's key (0.638), read once from `#key=`. Held in memory
+     only, and taken out of the address bar and the history at once. */
+  const [linkKey, setLinkKey] = useState(() => keyFromHash(window.location.hash));
+  useEffect(() => {
+    if (!window.location.hash.startsWith("#key=")) return;
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+  }, []);
   const [addressSpace, setAddressSpace] = useState<OnboardingPlace["org"] | null>(null);
   const [addressUnknown, setAddressUnknown] = useState(false);
   /* Read by the course refresh, which must not ask before it is known
@@ -10218,7 +11387,33 @@ export default function ArabicTrainer() {
    * call sites.
    */
   const accountKey = account && account.key;
+  const accountSync = account && account.syncToken;
   const accountHandle = account && account.handle;
+  /* A sign-in link opened on a device that is signed in (0.638). The same
+     person: nothing to do. Someone else: ask before switching. */
+  const [linkAsk, setLinkAsk] = useState<{ name: string } | null>(null);
+  const linkPeeked = useRef(false);
+  useEffect(() => {
+    if (!ready || !account || !linkKey || linkPeeked.current) return;
+    if (linkKey === account.key || linkKey === account.linkKey) {
+      setLinkKey("");
+      return;
+    }
+    linkPeeked.current = true;
+    API.whoAmI(linkKey, "", "", true).then(
+      (r) => {
+        /* Their own link, holding its own code (0.640): nothing to do. */
+        if (r.user.handle === account.handle) setLinkKey("");
+        else setLinkAsk({ name: r.user.displayName || r.user.handle });
+      },
+      (e) => {
+        setLinkKey("");
+        const why = String(e && (e as Error).message);
+        flash(why === "bad-key" ? "That sign-in link no longer works." : API.explain(e), "warn");
+      },
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, accountKey, linkKey]);
   /* Like the handle: a value rather than the object, so a re-fetch that
      changes nothing about the person does not rebuild everything that
      depends on it. */
@@ -10358,6 +11553,11 @@ export default function ArabicTrainer() {
   );
   const [courseBusy, setCourseBusy] = useState(false);
   const [courseError, setCourseError] = useState("");
+  /* The last check of the courses could not reach the server: the Courses
+     screen, while open, offers Retry for it (0.636). */
+  const [courseUnreached, setCourseUnreached] = useState(false);
+  /* The unit a learner has open from Home or Progress (0.617). */
+  const [unitOpen, setUnitOpen] = useState<{ courseId: string; deckId: string } | null>(null);
 
   /* Teaching is a role on a course, so it has to be asked about — and the
      material request answers it, so it is no longer asked twice. */
@@ -10500,6 +11700,10 @@ export default function ArabicTrainer() {
      they were asked on rather than cleared by resetExercise, so no way onto
      the next question can carry them over. */
   const [lentFor, setLentFor] = useState<{ ex: unknown; keys: string[] }>({ ex: null, keys: [] });
+  /* The question whose English the learner opened on the answer, in a
+     Little translation course (0.627): a right answer then counts as a
+     near miss, as one written with the marks put back does. */
+  const [meaningFor, setMeaningFor] = useState<unknown>(null);
   /* Sessions that have shown the tap tip, and the session it was last
      counted in — known by its first question, which stays put when later
      questions are swapped out mid-session. */
@@ -10544,6 +11748,10 @@ export default function ArabicTrainer() {
   /* Every short-lived message the app says, here and in the teaching and
      admin screens below, which reach it through SnackbarProvider. */
   const snack = useSnackbarState();
+  /* Can't reach the server, with Retry (0.636): feedback sent from the
+     menu, and joining a space from its invitation. */
+  const feedbackReach = useReach();
+  const inviteReach = useReach();
   const kb = useSoftKeyboard();
 
   /* ---- sync ---- */
@@ -10832,7 +12040,9 @@ export default function ArabicTrainer() {
     /* Trying a space (0.574): no sync, so no token. */
     if (TRYING) return;
     let alive = true;
-    tokenFor(account.key).then((token) => {
+    /* A device signed in by a sign-in link holds the link's code, not the
+       key, so the server says where the practice is (0.640). */
+    (account.syncToken ? Promise.resolve(account.syncToken) : tokenFor(account.key)).then((token) => {
       if (!alive) return;
       saveSyncConfig({ ...loadSyncConfig(), token });
       setSyncCfg((c) => ({ ...c, token }));
@@ -10844,7 +12054,7 @@ export default function ArabicTrainer() {
   /* As above. The account object changes identity far more often
      than the person behind it does. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, accountKey, runSync]);
+  }, [ready, accountKey, accountSync, runSync]);
 
   /* Once a sync has settled, and never while a session is running: the
      recordings and pictures nothing names any more are cleared from the
@@ -11253,6 +12463,7 @@ export default function ArabicTrainer() {
    * has to be able to find the phrases that word turns up in.
    */
   const [preview, setPreview] = useState<Item[]>([]);
+  const [previewDecks, setPreviewDecks] = useState<Deck[]>([]);
   /* And where to put the teacher back down afterwards: the card they
      pressed the button on, and the screen they were looking at it from. */
   const [trialBack, setTrialBack] = useState<any>(null);
@@ -11301,6 +12512,11 @@ export default function ArabicTrainer() {
   // Keep the module-level pointer in step, for the pure helpers that have no
   // settings to hand. Derived from state, so it cannot drift.
   setActiveLang(settings.language || DEFAULT_LANGUAGE);
+  /* And which courses each card came through, with their switches — what
+     each form may be asked (0.627). First of the indexes, because the rest
+     read what a form can be asked and this changes it. */
+  const practiceIndex = useMemo(() => practiceIndexOf(myCourses, courseDecks), [myCourses, courseDecks]);
+  setPracticeIndex(practiceIndex);
 
   /* And the same for where each word turns up. Rebuilt only when the cards
      change: it walks every phrase against every word it claims to teach,
@@ -11339,6 +12555,17 @@ export default function ArabicTrainer() {
     [valueCards, settings.language],
   );
   setValueIndex(valueIndex);
+
+  /* And where the learner stands on each course's path, which decides the
+     never-met cards a session may bring in — see pathHolds. Built from the
+     courses and decks last downloaded, so it works with no connection.
+     Computes only: what it finds reached is remembered by the effect
+     below, never from in here. */
+  const pathIndex = useMemo(
+    () => pathIndexOf(items, myCourses as PathCourse[], courseDecks as PathDeck[], settings),
+    [items, myCourses, courseDecks, settings],
+  );
+  setPathIndex(pathIndex);
 
   /* And which sentences a teacher has approved, on the cards they have
      reviewed. Rebuilt with the cards, which is when a review can change. */
@@ -11457,9 +12684,30 @@ export default function ArabicTrainer() {
      languages to choose between has to be the whole of them, or switching
      one off would take it out of the list that switched it off. */
   const drillableAll = useMemo(
-    () => items.filter((it) => inDeck(it) && isDrillable(it, settings)),
-    [items, settings, inDeck]
+    /* Held back by a path exactly as buildSession holds them, so the count
+       here and the session it promises cannot disagree. pathIndex is what
+       pathHolds reads. */
+    () => items.filter((it) => inDeck(it) && isDrillable(it, settings) && !pathHolds(it, settings)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [items, settings, inDeck, pathIndex]
   );
+
+  /*
+   * Remember every unit the path has reached, so that one that has opened
+   * never locks again (R25), on this device or any other: written only
+   * when there is an id the settings do not hold yet, so a render that
+   * finds nothing new writes nothing. Not stamped as a settings change —
+   * the union in mergeData carries it to the learner's other devices, and
+   * a stamp would hand this device's other choices to them too.
+   */
+  useEffect(() => {
+    if (!reachesFurther(pathReachedOf(settings), pathIndex.reached)) return;
+    persist((cur) => {
+      const had = pathReachedOf(cur.settings);
+      if (!reachesFurther(had, pathIndex.reached)) return null;
+      return { ...cur, settings: { ...cur.settings, pathReached: mergeReached(had, pathIndex.reached) } };
+    });
+  }, [pathIndex, settings, persist]);
 
   /*
    * How much is actually waiting — the number under "Cards ready to
@@ -11503,21 +12751,18 @@ export default function ArabicTrainer() {
       /* Met at all: anything on it ever answered. A level that has just
          opened on a card already met is that card waiting, as the session
          mix reads it — not a new card. */
-      const everMet = (it: Item) =>
-        drillableUnits(it, settings).some(({ unit }) =>
-          laddered(unit, settings).some((t) => stateOf(unit, t).phase !== "new")
-        );
+      const met = (it: Item) => everMet(it, settings);
       /* Ready to review: Cleared and Learnt cards with a question due — what
          Catch up would ask, by the same rule (0.603). */
       const reviewing = new Set(pool.filter((it) => dueForReview(it, settings, items)).map((it) => it.id));
       /* The rest of what is genuinely waiting on cards already met: cards
          still climbing, a level just opened, a card asked for by name. A
          regular session deals them; Catch up does not. */
-      const climbing = pool.filter((it) => !reviewing.has(it.id) && (everMet(it) ? waiting(it, true) : waiting(it, false))).length;
+      const climbing = pool.filter((it) => !reviewing.has(it.id) && (met(it) ? waiting(it, true) : waiting(it, false))).length;
       /* Plus as many never-met cards as the session mix has room for in
          this pool — the same reckoning buildSession does, so the two cannot
          come to disagree. None while the learner is catching up. */
-      const fresh = pool.filter((it) => !everMet(it) && !waiting(it, false) && waiting(it, true)).length;
+      const fresh = pool.filter((it) => !met(it) && !waiting(it, false) && waiting(it, true)).length;
       const mix = mixCardsOf(pool, items, settings);
       const pace = { at: now(), places: SESSION_SIZE / PER_UNIT, dayCards: (perDay || 0) / PER_UNIT };
       /* Behind only matters while there are new cards it is keeping out:
@@ -11625,16 +12870,45 @@ export default function ArabicTrainer() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [learnSpaces.map((o) => `${o.id}:${o.name}`).join(" ")]);
   const spaceNow = learnSpaces.length > 1 && learnSpaces.some((o) => o.id === spaceFilter) ? spaceFilter : "";
+  /* The personal sets held, in the languages in play, and what is still
+     to ask in them (0.630). */
+  const heldSets = useMemo(() => setViewsOf(items, courseDecks, langsOff), [items, courseDecks, langsOff]);
+  const setSteps = useMemo(() => stepsToAsk(heldSets), [heldSets]);
+  /* And what they mean for practice: which items are pictures, how each
+     is asked, and which are out of play (0.631). */
+  const setIndex = useMemo(() => setIndexOf(items, courseDecks, heldSets), [items, courseDecks, heldSets]);
+  /* A teacher trying a set's picture has no answers: a stand-in does, the
+     first word of the first list for every picture (0.632). */
+  const trialSets = useMemo(
+    () => (preview.length && previewDecks.length ? setIndexOf(preview, previewDecks, standInSets(setViewsOf(preview, previewDecks))) : null),
+    [preview, previewDecks],
+  );
+  setSetIndex(trialSets || setIndex);
   const inPlay = useCallback(
     (it: Item) => {
       if (langsOff.includes(langIdOf(it, settings))) return false;
+      /* A picture that doesn't apply, or a word in a list not chosen: kept,
+         and not asked (0.631). */
+      if (setIndex.out.has(it.id)) return false;
       if (!spaceNow) return true;
       const at = spaceOfItem(it);
       return at === null || at === spaceNow;
     },
-    [langsOff, settings, spaceNow, spaceOfItem]
+    [langsOff, settings, spaceNow, spaceOfItem, setIndex]
   );
-  const narrowed = langsOff.length > 0 || !!spaceNow;
+  const [setAsk, setSetAsk] = useState<null | { steps?: SetStep[]; openSet?: string; start?: SetStart }>(null);
+  const [setStartNow, setSetStartNow] = useState<SetStart | null>(null);
+  const passSets = useRef(false);
+  const setWaiting = useMemo(() => {
+    const bySet: Map<string, number> = new Map();
+    for (const st of setSteps) if (st.kind === "picture") bySet.set(st.setId, (bySet.get(st.setId) || 0) + 1);
+    const first = heldSets.find((v) => bySet.has(v.id));
+    if (!first) return "";
+    const n = bySet.get(first.id) || 0;
+    const more = bySet.size - 1;
+    return `${n === 1 ? "1 picture" : `${n} pictures`} in ${first.title}${more ? ` and ${more} more ${more === 1 ? "set" : "sets"}` : ""} ${n === 1 && !more ? "is" : "are"} waiting for your answer.`;
+  }, [setSteps, heldSets]);
+  const narrowed = langsOff.length > 0 || !!spaceNow || setIndex.out.size > 0;
   const shown = useMemo(
     () => (narrowed ? items.filter(inPlay) : items),
     [items, narrowed, inPlay]
@@ -11652,6 +12926,20 @@ export default function ArabicTrainer() {
     () => (spaceNow ? courseDecks.filter((d: any) => orgOfCourse.get(d.courseId) === spaceNow) : courseDecks),
     [courseDecks, spaceNow, orgOfCourse]
   );
+  /* Each course's path, for Home and Progress (0.617): the courses of the
+     space and languages shown, in the order they are listed elsewhere. */
+  const pathLines = useMemo(
+    () => pathLinesOf(learnCourses.filter((c) => !langsOff.includes(c.language)), courseDecks),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [learnCourses, langsOff, courseDecks, pathIndex],
+  );
+  /* The names of the downloaded units, which are on the path and not
+     among the deck tiles or the decks a saved session or a prep picks. */
+  const unitTitles = useMemo(
+    () => new Set(courseDecks.filter((d) => isPathUnit(d as PathDeck)).map((d) => String(d.title || ""))),
+    [courseDecks],
+  );
+  const deckTags = useMemo(() => allTags.filter((t) => !unitTitles.has(t)), [allTags, unitTitles]);
 
   /* How much is waiting, in the languages that are switched on: the number
      on the home screen, and what decides whether there is a session to
@@ -11665,6 +12953,32 @@ export default function ArabicTrainer() {
     const p = prepOf(settings);
     return p && prepStatus(p, shown, settings) === "active" ? p : null;
   }, [settings, shown]);
+
+  /* Whether the home screen has anything to offer in the space on screen,
+     and if not, why (0.639). Read off what can be practised here — not
+     off whether the device holds a card anywhere, which is what left a
+     space with nothing for you showing every button greyed out. See
+     home-empty.ts. */
+  const homeEmpty = useMemo(() => {
+    if (drillable.length) return null;
+    const inSpace = (it: Item) => {
+      if (!spaceNow) return true;
+      const at = spaceOfItem(it);
+      return at === null || at === spaceNow;
+    };
+    const off: LangId[] = [];
+    for (const it of drillableAll) {
+      if (!inSpace(it) || setIndex.out.has(it.id)) continue;
+      const lang = langIdOf(it, settings);
+      if (langsOff.includes(lang) && !off.includes(lang)) off.push(lang);
+    }
+    return whyHomeIsEmpty({
+      practisable: 0,
+      offLangs: off,
+      cardsHere: items.filter(inSpace).length,
+      coursesHere: learnCourses.length,
+    });
+  }, [drillable, drillableAll, items, spaceNow, spaceOfItem, setIndex, settings, langsOff, learnCourses]);
 
   /* And how much is going wrong, which is what the Weak spots button is
      offered on. The same test the session itself picks with — see isWeak —
@@ -11691,12 +13005,15 @@ export default function ArabicTrainer() {
    * progress is written when it is answered, and leaving asks nothing,
    * because there is nothing to lose.
    */
-  function tryExercise({ items: material, exercise, back }: {
+  function tryExercise({ items: material, exercise, back, decks: setDecks }: {
     items: Item[];
     exercise: Question;
     back?: any;
+    /** The personal sets and their lists, where a teacher has any (0.632). */
+    decks?: Deck[];
   }) {
     setPreview(material || []);
+    setPreviewDecks(setDecks || []);
     /* Where the teacher was standing when they pressed it. The teaching
        space is unmounted while the question is up — it is a different
        screen, not a layer over this one — so getting back to the card
@@ -11755,6 +13072,14 @@ export default function ArabicTrainer() {
       }));
   }, [settings.savedSessions]);
 
+  /* The saved sessions with something to practise in the space on screen
+     (0.639). One saved in another space, or whose cards have all gone, is
+     kept and simply not offered here; it is back wherever it works. */
+  const savedHere = useMemo(
+    () => savedSessions.filter((s) => cardsOfSaved(s, drillable).length > 0),
+    [savedSessions, drillable]
+  );
+
   function keepSession(session: Omit<SavedSession, "id" | "created">) {
     const kept: SavedSession = {
       ...session,
@@ -11776,9 +13101,65 @@ export default function ArabicTrainer() {
     flash(`Saved changes to ${changed.name}`);
   }
 
+  /*
+   * A personal set's questions, before a session (0.630).
+   *
+   * Whatever is new — a list to choose, a picture never answered — is asked
+   * first, and the session the learner pressed for starts from the last of
+   * those screens. Started on the next render rather than from here, so the
+   * session is built from the answers just given and not from the cards as
+   * they were when the button was pressed.
+   */
+  function askFirst(start: SetStart): boolean {
+    if (passSets.current) {
+      passSets.current = false;
+      return false;
+    }
+    const fresh = setSteps.filter((st) => st.kind === "list" || st.fresh);
+    if (!fresh.length) return false;
+    setSetAsk({ steps: fresh, start });
+    return true;
+  }
+  useEffect(() => {
+    if (!setStartNow) return;
+    const st = setStartNow;
+    setSetStartNow(null);
+    passSets.current = true;
+    if (st.kind === "begin") begin(st.practice, st.only, st.pathUnit);
+    else if (st.kind === "weak") beginWeak();
+    else startSaved(st.saved);
+    passSets.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [setStartNow]);
+  /* Every answer goes out through here, stamped and saved as a graded
+     answer is — see withAnswer. */
+  /* `restart`, from Settings, where a change is confirmed: a picture whose
+     answer moves from one meaning to another — or every picture, on a
+     change of list — starts again, as Reset scheduling would start it, and
+     the new answer is written with the same time (0.631). A first answer,
+     one after a skip, and anything about "doesn't apply" start nothing. */
+  const writeAnswers = (ids: string[], change: Partial<Omit<SetAnswer, "updated">>, restart = false) => {
+    const want = new Set(ids);
+    if (!want.size) return;
+    const at = now();
+    persist((cur) => ({
+      ...cur,
+      items: cur.items.map((it) => {
+        if (!want.has(it.id)) return it;
+        const lead = formsOf(it)[0];
+        const before = readAnswer(lead && lead.s && (lead.s as Record<string, unknown>)[SET_KEY]);
+        const again = restart && (change.list !== undefined
+          ? !!before && !!before.list && before.list !== change.list
+          : isRealChange(before, { ...(before || { updated: at }), ...change } as SetAnswer));
+        return withAnswer(again ? restartItem(it, at) : it, change, at);
+      }),
+    }));
+  };
+
   /* The decks it names are read now, against the cards the Build screen
      shows, so a card added to one since it was kept is in the session. */
   function startSaved(s: SavedSession) {
+    if (askFirst({ kind: "saved", saved: s })) return;
     const ids = new Set([...s.ids, ...cardsOfSaved(s, shown).map((it) => it.id)]);
     beginManual({ ids, mode: s.mode, count: s.count, minutes: s.minutes });
   }
@@ -11867,6 +13248,7 @@ export default function ArabicTrainer() {
         }
         materialVersion.current = r.version || "";
         answered = true;
+        setCourseUnreached(false);
         if (r.unchanged) {
           setCourseError("");
           if (announce === true) flash("Nothing new");
@@ -11949,7 +13331,11 @@ export default function ArabicTrainer() {
           );
         }
       } catch (e) {
-        setCourseError(API.explain(e));
+        /* Out of reach: the snackbar says so and offers Retry; the screen
+           keeps a short line, because what it shows may be out of date. */
+        const away = isUnreachable(e);
+        setCourseUnreached(away);
+        setCourseError(away ? "Couldn't check your courses for anything new." : API.explain(e));
       } finally {
         refreshing.current = false;
         setCourseBusy(false);
@@ -12101,6 +13487,7 @@ export default function ArabicTrainer() {
    * in a language you have switched off is not what you came to fix.
    */
   function beginWeak() {
+    if (askFirst({ kind: "weak" })) return;
     const built = buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
     if (!built.exercises.length) {
       flash(
@@ -12126,10 +13513,13 @@ export default function ArabicTrainer() {
     if (built.catchingUp) flash("Catching up first — new cards wait until your reviews are back in hand");
   }
 
-  function begin(practice?: boolean, only?: (it: Item) => boolean) {
+  function begin(practice?: boolean, only?: (it: Item) => boolean, pathUnit?: string) {
     /* `only` narrows the session to some cards — a prep's decks — in place
-       of the deck chosen on the home screen. */
-    const built = buildSession({ items: shown, settings, inDeck: only || inDeck, practice, perDay, systems });
+       of the deck chosen on the home screen. `pathUnit` lets that unit's
+       new cards in although the path has not reached it: "Practise this
+       unit" (R30, R24). */
+    if (askFirst({ kind: "begin", practice, only, pathUnit })) return;
+    const built = buildSession({ items: shown, settings, inDeck: only || inDeck, practice, perDay, systems, pathUnit });
     if (!built.exercises.length) {
       /* This used to return in silence, which reads as a broken button. It
          mattered little when the only way to get here was a card list that
@@ -12184,11 +13574,8 @@ export default function ArabicTrainer() {
    * card marked high priority — is theirs and stays.
    */
   function resetScheduling() {
-    const wiped = <T extends Form>(f: T): T => {
-      const { met: _forgotten, ...rest } = f;
-      return { ...rest, s: freshStates() } as T;
-    };
     const at = now();
+    const wiped = <T extends Form>(f: T): T => resetForm(f, at);
     const cleared: Item[] = items.map((it) => ({
       ...it,
       forms: formsOf(it).map(wiped),
@@ -12631,6 +14018,22 @@ export default function ArabicTrainer() {
         : [];
     }
     if (!item) return [];
+    /* A personal set's picture: wrong choices of the same kind as the
+       asking — other names, other words of the list, other pairs — or, for
+       a picture to pick, the set's other pictures (0.631). */
+    if (item.setKind) {
+      const pool = setChoicePool(item, spec.picks);
+      if (pool) {
+        const reps = (statesOf(item)[(exercise && exercise.type) || ""] || {}).reps || 0;
+        return optionsFor({
+          answer: item,
+          pool,
+          wanted: PICK_OPTIONS,
+          seed: `${item.id} set ${reps}`,
+          textOf: spec.picks === "image" ? (w) => (Array.isArray(w.images) && w.images[0]) || "" : (w) => String(w.ar || ""),
+        });
+      }
+    }
     /*
      * A verb's own example, and a form of its subjunctive in the gap.
      *
@@ -12781,7 +14184,12 @@ export default function ArabicTrainer() {
      transliteration that spelt the word, or the marks put back on a word
      that was being read bare. Either is marked as a near miss. */
   const marksLeaned = marksLent && answerStands && !toldAnswer;
-  const leaned = toldAnswer || marksLeaned;
+  /* And how much English this card's courses let a question show — see
+     course-practice.ts. Opened behind its tap, it leans the same way. */
+  const englishMode = englishModeFor(exercise ? String(exercise.id || "") : "");
+  const meaningOpened = englishMode !== "tap" || meaningFor === exercise;
+  const meaningLeaned = englishMode === "tap" && meaningFor === exercise && answerStands && !toldAnswer && !marksLeaned;
+  const leaned = toldAnswer || marksLeaned || meaningLeaned;
   /*
    * And the one exception, which is the language's rather than the
    * learner's: the marks stay, words and sentences alike, where they are
@@ -13404,7 +14812,11 @@ export default function ArabicTrainer() {
         : field === "audio"
           ? "a recording, with nothing written"
           : String((item as any)[field] || "");
-    if (shown && shown !== prompt) out.shown = shown.slice(0, 300);
+    /* A personal set's picture: the learner's answer for it, which the
+       teacher sees nowhere else (0.631). */
+    const setLine = parentItem ? setReportLine(parentItem.id) : "";
+    const told = setLine ? [shown || prompt, setLine].filter(Boolean).join(" · ") : shown;
+    if (told && told !== prompt) out.shown = told.slice(0, 300);
     const line = dialog && item.gap ? linesOf(dialog)[item.gap.line] : null;
     const phrase = context || line;
     if (phrase && phrase.ar) {
@@ -13831,9 +15243,14 @@ export default function ArabicTrainer() {
    */
   function sendFeedback(kind: FeedbackKind, note: string) {
     const where = [SPACE_LABEL[space] || space, session ? "practice session" : tab].filter(Boolean).join(" · ");
-    API.sendFeedback({ kind, note: note.slice(0, FLAG_NOTE_MAX), screen: where, release: APP_BUILD })
-      .then(() => flash("Thank you for the feedback 🫶", "good"))
-      .catch((e) => flash(API.explain(e), "warn"));
+    return API.sendFeedback({ kind, note: note.slice(0, FLAG_NOTE_MAX), screen: where, release: APP_BUILD })
+      .then(() => {
+        feedbackReach.ok();
+        flash("Thank you for the feedback 🫶", "good");
+      })
+      .catch((e) => {
+        if (!feedbackReach.caught(e, () => sendFeedback(kind, note))) flash(API.explain(e), "warn");
+      });
   }
 
   function undoDelete() {
@@ -13914,7 +15331,7 @@ export default function ArabicTrainer() {
             </Lede>
             {joinError ? <Notice kind="warn">{joinError}</Notice> : null}
             <Button variant="primary" wide className="at-mt4" disabled={joinBusy}
-              onClick={async () => {
+              onClick={async function joinIt() {
                 setJoinBusy(true);
                 setJoinError("");
                 try {
@@ -13925,7 +15342,7 @@ export default function ArabicTrainer() {
                   /* Into the space just joined, the way switching space is. */
                   window.location.assign(`/${addressSpace.slug}`);
                 } catch (e) {
-                  setJoinError(API.explain(e));
+                  if (!inviteReach.caught(e, joinIt)) setJoinError(API.explain(e));
                   setJoinBusy(false);
                 }
               }}
@@ -13956,6 +15373,7 @@ export default function ArabicTrainer() {
                  tries it (0.574): its practice has its own key on the
                  device, read at start, so start again. */
               if (API.tryingSpace() !== TRYING) {
+                setLinkKey("");
                 window.location.reload();
                 return;
               }
@@ -13963,12 +15381,15 @@ export default function ArabicTrainer() {
                  back before their first sync, which setAccount starts. */
               if (a && a.handle) await adoptParked(a.handle);
               setSignedOutWhy("");
+              setLinkKey("");
               setAccount(a);
             }}
             place={{
               org: addressSpace || undefined,
               unknown: addressUnknown,
               joinCode: address.join,
+              linkKey,
+              linkReady: !address.slug || !!addressSpace || addressUnknown,
               notice: signedOutWhy,
             }}
           />
@@ -13987,6 +15408,25 @@ export default function ArabicTrainer() {
       </div>
     );
   }
+
+  /* Logging out of this device: from Settings, and when switching to the
+     person whose sign-in link was opened here (0.638). */
+  const logOutHere = async () => {
+    /* This person's practice is set aside first, so the next
+       person to sign in starts clean (0.580). */
+    await parkForLogOut();
+    /* Every space tried on this device goes too (0.574). */
+    API.dropTrial();
+    API.clearAccount();
+    setAccount(null);
+    setSpace("learn");
+    setScreen(null);
+    setTab("home");
+    setMyCourses([]);
+    setCourseDecks([]);
+    setTeaches(false);
+    forgetTeaches();
+  };
 
   const theme = settings.theme || "auto";
   setSounds(settings.sounds);
@@ -14291,32 +15731,58 @@ export default function ArabicTrainer() {
                 </Notice>
               </div>
             )}
-            {items.length === 0 && (
-              /* The same component the Progress and Cards tabs use for the
-                 same situation. It was a hand-rolled block here, which is
-                 how it came to say something different from both. */
-              <Empty
-                title="Nothing to practice yet"
-                /* The invitation is for someone who has nowhere to get
-                   cards from, and only once we know that. An enrolled
-                   student is waiting on their teacher, not on a code, and
-                   a button telling them otherwise is the whole reason this
-                   read wrong. Courses is a tap away either way — the tab
-                   strip above does not go anywhere. */
-                action={
-                  /* Not while trying a space: there is no joining there (0.574). */
-                  coursesKnown && myCourses.length === 0 && !TRYING ? (
-                    <Button variant="primary" onClick={openCourses} icon="school">
-                      Join a course
-                    </Button>
-                  ) : null
-                }
-              >
-                {noCardsYet(myCourses.length)}
-              </Empty>
+            {homeEmpty && !session && (
+              /* Nothing to practise in the space on screen (0.639): this
+                 and nothing else, rather than every button greyed out. */
+              <>
+                {/* A personal set's pictures waiting for an answer are the
+                    way forward when they are all there is, so the line
+                    that asks for them stays. */}
+                {setWaiting && (
+                  <div data-el="set-waiting" className="at-mb3">
+                    <Nudge icon="person" action={<Button size="sm" onClick={() => setSetAsk({ steps: setSteps })}>Answer</Button>}>
+                      {setWaiting}
+                    </Nudge>
+                  </div>
+                )}
+                {/* The same component the Progress and Cards tabs use for
+                    the same situation. It was a hand-rolled block here,
+                    which is how it came to say something different from
+                    both. */}
+                <Empty
+                  title="Nothing to practice yet"
+                  /* The invitation is for someone who has nowhere to get
+                     cards from, and only once we know that. An enrolled
+                     student is waiting on their teacher, not on a code, and
+                     a button telling them otherwise is the whole reason this
+                     read wrong. Courses is a tap away either way — the tab
+                     strip above does not go anywhere. Counted in the space
+                     on screen, as the Cards and Progress tabs count. */
+                  action={
+                    homeEmpty.kind === "langs" ? (
+                      <Button variant="primary"
+                        onClick={() => setSetting("langsOff", langsOff.filter((l) => !homeEmpty.langs.includes(l)))}
+                      >
+                        Switch {homeEmpty.langs.length === 1 ? "it" : "them"} back on
+                      </Button>
+                    ) : homeEmpty.kind === "no-cards" && coursesKnown && homeEmpty.courses === 0 && !TRYING ? (
+                      /* Not while trying a space: there is no joining there (0.574). */
+                      <Button variant="primary" onClick={openCourses} icon="school">
+                        Join a course
+                      </Button>
+                    ) : null
+                  }
+                >
+                  {homeEmpty.kind === "no-cards"
+                    ? noCardsYet(homeEmpty.courses)
+                    : homeEmptySays(homeEmpty, homeEmpty.kind === "langs"
+                      ? homeEmpty.langs.map((l) => (LANGUAGES[l] || {}).name || l)
+                      : [])}
+                </Empty>
+              </>
             )}
 
-            {items.length > 0 && !session && (
+            {!homeEmpty && !session && (
               <>
                 {/* The count of what is waiting rides on the card as an
                     attribute rather than a line of text: nothing reads it at
@@ -14357,6 +15823,24 @@ export default function ArabicTrainer() {
                   {!homePrep && drillable.length > 0 && (
                     <p className="at-homeline">{homeLine(homeWaiting)}</p>
                   )}
+
+                  {/* A personal set's pictures still waiting for an answer
+                      (0.630): one line, naming the first set, and the way
+                      to answer them. */}
+                  {setWaiting && (
+                    <div data-el="set-waiting">
+                      <Nudge icon="person" action={<Button size="sm" onClick={() => setSetAsk({ steps: setSteps })}>Answer</Button>}>
+                        {setWaiting}
+                      </Nudge>
+                    </div>
+                  )}
+
+                  {/* Each course's path, one line each, above the one
+                      Start session (R27). */}
+                  {pathLines.map((p) => (
+                    <PathHomeLine key={p.courseId} line={p} items={shown} settings={settings}
+                      onOpen={(deckId) => setUnitOpen({ courseId: p.courseId, deckId })} />
+                  ))}
 
                   <div className="at-row">
                     {/* Always live while there is anything to drill. Being
@@ -14420,7 +15904,9 @@ export default function ArabicTrainer() {
                       an empty screen is a promise the app has not kept, and
                       the way to find this is to save one, which the Build
                       screen offers where the session is finished. */}
-                  {savedSessions.length > 0 && (
+                  {/* And only the ones with something to practise in the
+                      space on screen (0.639). */}
+                  {savedHere.length > 0 && (
                     <>
                       <div className="at-row at-mt3">
                         <Button variant="ghost" onClick={() => setShowingSaved(true)}>
@@ -14428,21 +15914,18 @@ export default function ArabicTrainer() {
                         </Button>
                       </div>
                       <SavedTiles
-                        sessions={savedSessions}
-                        items={items}
+                        sessions={savedHere}
+                        items={shown}
                         settings={settings}
                         onStart={startSaved}
                       />
                     </>
                   )}
-
-                  {!drillable.length && items.length > 0 && (
-                    <Notice kind="warn">
-                      No card here has two usable exercise types. A card needs the{" "}
-                      {langOf(settings).scriptLabel} and at least one more field
-                      before it can be practiced.
-                    </Notice>
-                  )}
+                  {/* The warning that sat here — "No card here has two
+                      usable exercise types" — was written for a teacher and
+                      shown to learners. With nothing to practise the home
+                      screen is the Empty above now, which says why in a
+                      learner's terms (0.639). */}
                 </div>
               </>
             )}
@@ -14566,6 +16049,10 @@ export default function ArabicTrainer() {
                           ? "Read the sentence"
                           : "Read the text"
                         : "Read the whole text"
+                      : item.setAsk
+                      /* A personal set's own wording for this kind of
+                         asking (0.631). */
+                      ? String(item.setAsk)
                       : instructionFor(spec, item)}
                   </p>
                   <div className="at-ask" data-el="question-prompt">
@@ -14633,7 +16120,7 @@ export default function ArabicTrainer() {
                       verbCue && verbPlace ? (
                         <>
                           <Field value={verbCue.form.ar} field="ar" kind={item.kind} name="question-prompt-text" />
-                          {verbCue.form.en ? (
+                          {verbCue.form.en && englishMode !== "hidden" ? (
                             <p className="at-ctxmeaning" data-el="question-prompt-meaning">
                               {asMeaning(String(verbCue.form.en))}
                             </p>
@@ -14685,13 +16172,15 @@ export default function ArabicTrainer() {
                               >
                                 {showSaid ? "Hide" : "Show"} the {qLang.translitLabel.toLowerCase()}
                               </Button>
+                              {englishMode !== "hidden" && (
                               <Button
-                                size="sm"
-                                data-el="reveal-meaning"
-                                onClick={() => setShowMeaning((v) => !v)}
-                              >
-                                {showMeaning ? "Hide" : "Show"} the meaning
-                              </Button>
+                                  size="sm"
+                                  data-el="reveal-meaning"
+                                  onClick={() => setShowMeaning((v) => !v)}
+                                >
+                                  {showMeaning ? "Hide" : "Show"} the meaning
+                                </Button>
+                              )}
                             </div>
                           )}
                         </>
@@ -14713,10 +16202,19 @@ export default function ArabicTrainer() {
                          what the word means, shown. The first one — a card
                          with several is a teacher's choice of which to lead
                          with, and it is the one the tiles use too. */
-                      <CardPicture
-                        hash={(Array.isArray(item.images) && item.images[0]) || ""}
-                        className="prompt"
-                      />
+                      <>
+                        <CardPicture
+                          /* Which of them takes turns, after each right
+                             answer (0.631) — see castFill. */
+                          hash={(Array.isArray(item.images) && item.images[Number(item.imageAt) || 0]) || ""}
+                          /* Once answered it shrinks to half, so the verdict
+                             and what comes with it fit without scrolling. */
+                          className={checked ? "prompt settled" : "prompt"}
+                        />
+                        {/* A personal set asking for the learner's own word
+                            names whose picture it is (0.631). */}
+                        {item.setCaption ? <p className="at-hint" data-el="set-caption" dir="auto">{String(item.setCaption)}</p> : null}
+                      </>
                     ) : spec.promptField === "audio" ? (
                       /* A context question plays the whole phrase, not the
                          word: hearing it in running speech is the exercise.
@@ -14727,12 +16225,16 @@ export default function ArabicTrainer() {
                          recordings are ever joined, and they are played in
                          order rather than stitched — the joins are where a
                          dialect lives. */
-                      <AudioPrompt
-                        recs={context ? context.recs : audibleOf(item)}
-                        after={context ? [] : chainOf(item)}
-                        autoPlay
-                        lead={leadSpeed(item, exercise.type)}
-                      />
+                      <>
+                        <AudioPrompt
+                          recs={context ? context.recs : audibleOf(item)}
+                          after={context ? [] : chainOf(item)}
+                          autoPlay
+                          lead={leadSpeed(item, exercise.type)}
+                        />
+                        {/* Who is speaking, where the teacher said (0.631). */}
+                        {!context && voiceLineOf(item) ? <p className="at-hint" data-el="set-voice">{voiceLineOf(item)}</p> : null}
+                      </>
                     ) : spec.promptField === "gap" ? (
                       /* One sentence of the scene, the word taken out of
                          it; put back once the question is answered. When
@@ -14753,7 +16255,7 @@ export default function ArabicTrainer() {
                         {/* Once answered the sentence is whole again, and
                             what it means is said with the answer below —
                             see answeredMeaning — not left up here. */}
-                        {spec.answerMode === "ar" && !checked && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
+                        {spec.answerMode === "ar" && !checked && englishMode !== "hidden" && dialog && item.gap && (linesOf(dialog)[item.gap.line] || {}).en ? (
                           <p className="at-ctxmeaning" data-el="question-prompt-meaning">
                             {asMeaning(String(linesOf(dialog)[item.gap.line].en))}
                           </p>
@@ -14815,7 +16317,7 @@ export default function ArabicTrainer() {
                         anything saying what it meant. The verb's own
                         meaning ("to keep"), not the form's ("I keep"),
                         which would be the answer. */}
-                    {spec.picks === "person" && whoMeaning && (
+                    {spec.picks === "person" && whoMeaning && englishMode !== "hidden" && (
                       <p className="at-ctxmeaning" data-el="question-verb-meaning">
                         {asMeaning(whoMeaning)}
                       </p>
@@ -14861,7 +16363,7 @@ export default function ArabicTrainer() {
                         a gap all but names the word. Once answered, the
                         phrase's English is said with the answer below
                         instead — see answeredMeaning. */}
-                    {context && (!phraseHint || hintShown) && !(checked && answeredMeaning) && (
+                    {context && (!phraseHint || hintShown) && !(checked && answeredMeaning) && englishMode !== "hidden" && (
                       <p className="at-ctxmeaning" data-el="question-context-meaning">
                         {asMeaning((spec.promptField === "context" && context.en) || item.en)}
                       </p>
@@ -14973,6 +16475,7 @@ export default function ArabicTrainer() {
                         value={typed}
                         disabled={!!checked}
                         onChange={setTyped}
+                        turn={turnOf(statesOf(item)[exercise.type])}
                       />
                     ) : spec.picks ? (
                       <TextChoices
@@ -15203,6 +16706,12 @@ export default function ArabicTrainer() {
                       )}
                       {/* The same, for the vowel marks put back on a word
                           that was being read without them (0.608). */}
+                      {meaningLeaned && (
+                        <Help data-el="verdict-meaning-lent">
+                          Right — but the meaning was shown, so this one counts as a near miss and
+                          comes round again.
+                        </Help>
+                      )}
                       {marksLeaned && qLang.marks && (
                         <Help data-el="verdict-marks-lent">
                           Right — but the {qLang.marks.name} were shown, so this one counts as a near
@@ -15263,7 +16772,7 @@ export default function ArabicTrainer() {
                             /* The picture that was wanted, which is the
                                answer to a question asked in pictures. */
                             <CardPicture
-                              hash={(Array.isArray(item.images) && item.images[0]) || ""}
+                              hash={(Array.isArray(item.images) && item.images[Number(item.imageAt) || 0]) || ""}
                               className="answer"
                               alt="The right picture"
                             />
@@ -15318,11 +16827,13 @@ export default function ArabicTrainer() {
                       {checked.reason === "bare" && (
                         <Help data-el="bare-note">{verdictWord(qLang, "bare")}</Help>
                       )}
-                      {answeredMeaning && (
+                      {answeredMeaning && englishMode !== "hidden" && (meaningOpened ? (
                         <p className="at-ctxmeaning" data-el="answer-meaning">
                           {asMeaning(answeredMeaning)}
                         </p>
-                      )}
+                      ) : (
+                        <MeaningTap onOpen={() => setMeaningFor(exercise)} />
+                      ))}
 
                       {/* Everything after the answer is a second thing worth
                           noticing, so each says what it is, they are set
@@ -15370,9 +16881,13 @@ export default function ArabicTrainer() {
                                 name="also-context-said"
                               />
                             ) : null}
-                            <p className="at-ctxmeaning" data-el="also-context-meaning">
-                              {asMeaning((context || alsoContext).en)}
-                            </p>
+                            {englishMode === "hidden" ? null : meaningOpened ? (
+                              <p className="at-ctxmeaning" data-el="also-context-meaning">
+                                {asMeaning((context || alsoContext).en)}
+                              </p>
+                            ) : (
+                              <MeaningTap onOpen={() => setMeaningFor(exercise)} />
+                            )}
                           </div>
                         )}
                         {/* The whole phrase, said, once a gap in it has
@@ -15443,7 +16958,7 @@ export default function ArabicTrainer() {
                             still what is shown; where it names none, the
                             field neither the prompt nor the answer used
                             is the one worth having. */}
-                        {alsoField && item[alsoField] && (
+                        {alsoField && item[alsoField] && !(alsoField === "en" && englishMode === "hidden") && (
                           <div className="at-answeralso" data-el="also-hint">
                             <p className="at-alsolabel" data-el="also-hint-label">
                               {alsoField === "lat"
@@ -15452,12 +16967,16 @@ export default function ArabicTrainer() {
                                 ? "How it's written"
                                 : "This is what it means"}
                             </p>
-                            <Field
-                              value={item[alsoField]}
-                              field={alsoField}
-                              kind={item.kind}
-                              name="also-hint-text"
-                            />
+                            {alsoField === "en" && !meaningOpened ? (
+                              <MeaningTap onOpen={() => setMeaningFor(exercise)} />
+                            ) : (
+                              <Field
+                                value={item[alsoField]}
+                                field={alsoField}
+                                kind={item.kind}
+                                name="also-hint-text"
+                              />
+                            )}
                           </div>
                         )}
                         {/* Was below the notes, which put it three blocks
@@ -15654,6 +17173,9 @@ export default function ArabicTrainer() {
         {!stranded && tab === "progress" && (
           <ProgressTab
             items={shown}
+            paths={pathLines}
+            unitTitles={unitTitles}
+            onUnit={(courseId, deckId) => setUnitOpen({ courseId, deckId })}
             myCourses={learnCourses}
             spaceOf={!spaceNow && learnSpaces.length > 1 ? spaceOfItem : undefined}
             spaceNames={!spaceNow && learnSpaces.length > 1 ? spaceNameOf : undefined}
@@ -15665,12 +17187,44 @@ export default function ArabicTrainer() {
           />
         )}
 
+        {/* A unit's page, opened from Home or Progress (0.617). */}
+        {unitOpen && (() => {
+          const line = pathLines.find((p) => p.courseId === unitOpen.courseId);
+          const row = line && line.rows.find((r) => r.id === unitOpen.deckId);
+          if (!line || !row) return null;
+          return (
+            <UnitScreen
+              line={line}
+              row={row}
+              items={shown}
+              settings={settings}
+              perDay={perDay}
+              onBack={() => setUnitOpen(null)}
+              onPractise={() => {
+                const ids = new Set(unitItems(row.id, shown).map((it) => it.id));
+                setUnitOpen(null);
+                setTab("home");
+                begin(false, (it) => ids.has(it.id), row.id);
+              }}
+              onMarkCleared={() => {
+                /* Saved as "This was too easy" saves: the cards with their
+                   new states, through persist. No undo (R36). */
+                persist((cur) => {
+                  const next = clearPathUnit(cur.items, cur.settings, row.id);
+                  return next === cur.items ? null : { ...cur, items: next };
+                });
+                flash(`Unit ${row.number} marked as cleared`);
+              }}
+            />
+          );
+        })()}
+
         {/* ============ SETTINGS ============ */}
 
         {building && (
           <ManualSessionSheet
             items={shown}
-            allTags={allTags}
+            allTags={deckTags}
             settings={settings}
             onStart={beginManual}
             onSave={keepSession}
@@ -15680,8 +17234,10 @@ export default function ArabicTrainer() {
 
         {showingSaved && !editingSaved && (
           <SavedSessionsSheet
-            sessions={savedSessions}
-            items={items}
+            /* The ones that can run here, as the home screen offers
+               them (0.639). */
+            sessions={savedHere}
+            items={shown}
             onStart={(s) => {
               setShowingSaved(false);
               startSaved(s);
@@ -15697,7 +17253,7 @@ export default function ArabicTrainer() {
         {editingSaved && (
           <ManualSessionSheet
             items={shown}
-            allTags={allTags}
+            allTags={deckTags}
             settings={settings}
             editing={editingSaved}
             onStart={beginManual}
@@ -15720,6 +17276,7 @@ export default function ArabicTrainer() {
             languages={LANGUAGES}
             busy={courseBusy}
             error={courseError}
+            onRetry={courseUnreached ? () => refreshCourses("changes") : undefined}
             /* Trying a space is not joining it (0.574). */
             onJoin={TRYING ? undefined : async (code: string) => {
               const r = await API.joinCourse(code);
@@ -15804,6 +17361,28 @@ export default function ArabicTrainer() {
           </React.Suspense>
         )}
 
+        {linkAsk && account ? (
+          <ConfirmModal
+            title={`Switch to ${linkAsk.name}?`}
+            danger={false}
+            confirmLabel={`Switch to ${linkAsk.name}`}
+            body={
+              <p>
+                This device is signed in as {account.displayName}. The sign-in link you opened is
+                for {linkAsk.name}. {account.displayName}'s progress stays safe.
+              </p>
+            }
+            onCancel={() => {
+              setLinkAsk(null);
+              setLinkKey("");
+            }}
+            onConfirm={async () => {
+              setLinkAsk(null);
+              await logOutHere();
+            }}
+          />
+        ) : null}
+
         {leaving && (
           <ConfirmModal
             title="Leave this session?"
@@ -15829,6 +17408,8 @@ export default function ArabicTrainer() {
             settings={settings}
             setSetting={setSetting}
             onReset={resetScheduling}
+            sets={heldSets.filter((v) => v.lists.length > 0 && v.pictures.length > 0)}
+            onOpenSet={(id) => setSetAsk({ openSet: id })}
             allClipIds={allClipIds}
             onDevice={audible}
             allImageIds={allImageIds}
@@ -15843,22 +17424,7 @@ export default function ArabicTrainer() {
               setSpace("learn");
               setScreen(null);
             }}
-            onLogOut={async () => {
-              /* This person's practice is set aside first, so the next
-                 person to sign in starts clean (0.580). */
-              await parkForLogOut();
-              /* Every space tried on this device goes too (0.574). */
-              API.dropTrial();
-              API.clearAccount();
-              setAccount(null);
-              setSpace("learn");
-              setScreen(null);
-              setTab("home");
-              setMyCourses([]);
-              setCourseDecks([]);
-              setTeaches(false);
-              forgetTeaches();
-            }}
+            onLogOut={logOutHere}
             onBecameAdmin={() =>
               account &&
               API.whoAmI(account.key).then((r) => {
@@ -15875,6 +17441,28 @@ export default function ArabicTrainer() {
               API.saveAccount(merged);
               setAccount(merged);
             }}
+          />
+        )}
+
+        {/* A personal set's questions: before a session, from Home, or one
+            set's answers from Settings (0.630). */}
+        {setAsk && (
+          <SetQuestions
+            sets={heldSets}
+            steps={setAsk.steps}
+            openSet={setAsk.openSet}
+            onAnswer={(id, change, restart) => writeAnswers([id], change, restart)}
+            onList={(setId, listId, restart) => {
+              const v = heldSets.find((x) => x.id === setId);
+              if (v) writeAnswers(v.pictures.map((p) => p.id), { list: listId }, restart);
+            }}
+            onSkipRest={(ids) => writeAnswers(ids, { skip: true })}
+            onClose={() => setSetAsk(null)}
+            onStart={setAsk.start ? () => {
+              const st = setAsk.start || null;
+              setSetAsk(null);
+              setSetStartNow(st);
+            } : undefined}
           />
         )}
 
@@ -16903,11 +18491,11 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   const said = tried ? need : { mode: "", cards: "", length: "" };
   const problem = need.mode || need.cards || typesShort || need.length;
 
-  /* Named after what it is, so a list of them reads without opening any:
-     the mode is the shape of the session and the count is its size. */
-  const suggestion = mode
-    ? `${(MODES as Record<string, { label: string }>)[mode].label} · ${plural(picked.size, "card")}`
-    : "";
+  /* Named after what it is: the mode, the shape of the session. Not its
+     size any more (0.639) — a count written into a name is fixed the day
+     it is saved and wrong from the day a deck changes, and the home
+     screen's tile already says the live figure. */
+  const suggestion = mode ? (MODES as Record<string, { label: string }>)[mode].label : "";
 
   function start() {
     /* Ticked, it is kept as it is started — there is no Save to forget. */
@@ -17585,7 +19173,7 @@ export function nextPassAt(it: Item, settings: Settings): Millis {
  */
 export function nextPass(it: Item, settings: Settings): { at: Millis; retry: boolean } {
   const forms = unitsOf(it)
-    .map(({ unit }) => ({ unit, keys: laddered(unit, settings) }))
+    .map(({ unit }) => ({ unit, keys: standingKeys(unit, settings) }))
     .filter(({ keys }) => keys.length);
   if (!forms.length) return { at: 0, retry: false };
   const made = Math.min(
@@ -18204,7 +19792,10 @@ function DeckScreen({
   perDay,
   onBack,
   onCard,
+  head,
 }: {
+  /** Above the deck's own figures: a unit's stages, its state and what it offers (0.617). */
+  head?: Node;
   name: string;
   cards: Item[];
   progressOf: Map<string, Standing | null>;
@@ -18235,6 +19826,7 @@ function DeckScreen({
   const when = (t: Millis | null) => `learnt by ${forecastWords(t)}`;
   return (
     <Screen title={name} onBack={onBack}>
+      {head}
       <div className="at-deckhead">
         <p className="at-deckstatnote">
           {learnt} of {plural(shown.length, "card")} fully learnt
@@ -18300,8 +19892,118 @@ function DeckScreen({
   );
 }
 
+/*
+ * One course's line on Home (R27): the course, its current unit and that
+ * unit's stages — or that the path is complete. Tapping it opens the unit.
+ */
+function PathHomeLine({ line, items, settings, onOpen }: {
+  line: PathLine;
+  items: Item[];
+  settings: Settings;
+  onOpen: (deckId: string) => void;
+}) {
+  const current = line.rows.find((r) => r.current);
+  if (!current) {
+    if (!line.rows.length || line.rows.some((r) => r.state !== "finished")) return null;
+    return <p className="at-pathhome" data-el="path-home">{`${line.courseTitle} · Path complete`}</p>;
+  }
+  const st = unitStages(current.id, items, settings);
+  return (
+    <button type="button" className="at-pathhome" data-el="path-home" onClick={() => onOpen(current.id)}>
+      <span className="at-pathhomehead">{`${line.courseTitle} · Unit ${current.number} of ${line.rows.length} · ${current.title}`}</span>
+      <span className="at-pathhomestages">
+        {stageWords(st).map((w) => <span key={w}>{w}</span>)}
+      </span>
+    </button>
+  );
+}
+
+/*
+ * A unit's page (R29–R31): its words, sentences and text or conversation,
+ * read only, for every published unit, locked ones too; with "Practise
+ * this unit" where it is open for the learner. The deck page, fed by
+ * unitItems.
+ */
+function UnitScreen({ line, row, items, settings, perDay, onBack, onPractise, onMarkCleared }: {
+  line: PathLine;
+  row: PathLine["rows"][number];
+  items: Item[];
+  settings: Settings;
+  perDay: number;
+  onBack: () => void;
+  onPractise: () => void;
+  /** Marks every word and sentence of it cleared — see clearPathUnit. */
+  onMarkCleared: () => void;
+}) {
+  const [viewing, setViewing] = useState<Item | null>(null);
+  const [marking, setMarking] = useState(false);
+  /* Only a unit open for the learner: reached, or opened early by the
+     teacher (R34); never one locked or already finished. */
+  const markable = row.state === "open" || (row.state === "locked" && row.openedEarly);
+  const cards = useMemo(() => unitItems(row.id, items), [row.id, items]);
+  const progress = useMemo(() => {
+    const at: Map<string, Standing | null> = new Map();
+    const toward: Map<string, { at: Standing; share: number } | null> = new Map();
+    for (const it of cards) {
+      at.set(it.id, standing(cardStandings(it, settings, items)));
+      toward.set(it.id, towardsLearnt(it, settings, items));
+    }
+    return { at, toward };
+  }, [cards, items, settings]);
+  const st = useMemo(() => unitStages(row.id, items, settings), [row.id, items, settings]);
+  const open = row.state !== "locked" || row.openedEarly;
+  const before = line.rows.find((r) => r.number === row.number - 1);
+  return (
+    <>
+      <DeckScreen
+        name={`Unit ${row.number} · ${row.title}`}
+        cards={cards}
+        progressOf={progress.at}
+        towardOf={progress.toward}
+        settings={settings}
+        perDay={perDay}
+        onBack={onBack}
+        onCard={(it) => setViewing(it)}
+        head={
+          <div className="at-unithead" data-el="unit-page">
+            <p className="at-pathunitstate">
+              {pathStateWord(row)}
+              {row.state === "finished" && st.learnt ? <i>{" · Learnt"}</i> : null}
+            </p>
+            <p className="at-pathhomestages">{stageWords(st).map((w) => <span key={w}>{w}</span>)}</p>
+            {row.state === "locked" && before ? <Help>{`Finish unit ${before.number} to open this one`}</Help> : null}
+            {open ? (
+              <div className="at-row">
+                <Button variant="primary" onClick={onPractise}>Practise this unit</Button>
+                {markable ? <Button variant="ghost" onClick={() => setMarking(true)}>Mark as cleared</Button> : null}
+              </div>
+            ) : null}
+          </div>
+        }
+      />
+      {viewing && <CardScreen card={viewing} items={items} settings={settings} onBack={() => setViewing(null)} />}
+      {marking && (
+        <ConfirmModal
+          title={`Mark unit ${row.number} as cleared?`}
+          body={<p>Every word and sentence in it will count as cleared and come back as reviews. This can't be undone.</p>}
+          confirmLabel="Mark as cleared"
+          danger={false}
+          onCancel={() => setMarking(false)}
+          onConfirm={() => {
+            setMarking(false);
+            onMarkCleared();
+          }}
+        />
+      )}
+    </>
+  );
+}
+
 function ProgressTab({
   items,
+  paths = [],
+  unitTitles,
+  onUnit,
   myCourses = [],
   settings,
   moves,
@@ -18312,6 +20014,11 @@ function ProgressTab({
   spaceNames,
 }: {
   items: Item[];
+  /** Each course's path, shown above the deck tiles (0.617). */
+  paths?: PathLine[];
+  /** The titles of the downloaded units, which are not deck tiles. */
+  unitTitles?: Set<string>;
+  onUnit?: (courseId: string, deckId: string) => void;
   myCourses?: Course[];
   /** A card's space, and every space's name, when Learning shows more than
       one (memberships): two decks of one name in two spaces are then two
@@ -18463,6 +20170,8 @@ function ProgressTab({
       if (!toward) continue;
       const space = (spaceNames && spaceOf && spaceOf(it)) || "";
       for (const deck of it.tags || []) {
+        /* A unit is on the path above, not a tile here. */
+        if (unitTitles && unitTitles.has(deck)) continue;
         const key = `${space}|${deck}`;
         const row = held.get(key) || { name: deck, space, n: 0, learnt: 0, got: 0 };
         row.n++;
@@ -18482,7 +20191,7 @@ function ProgressTab({
         pct: deckPercent({ n, learnt, got }),
       }))
       .sort((a, b) => b.pct - a.pct || a.name.localeCompare(b.name));
-  }, [counted, progress, spaceOf, spaceNames]);
+  }, [counted, progress, spaceOf, spaceNames, unitTitles]);
   const deckOpenRow = deckRows.find((d) => d.key === deckOpen) || null;
 
   /* Where the prep stands, for the line beside the button. */
@@ -18647,6 +20356,25 @@ function ProgressTab({
           deck of thirty and a deck of three hundred are not comparable by
           how many are left, and a bar beside it because a number alone is
           read and a bar is seen. */}
+      {/* Each course's path, whole and in order, above the decks (R28):
+          every published unit, locked ones too, can be opened (R29). */}
+      {paths.map((p) => (
+        <Section head key={p.courseId} title={p.courseTitle}>
+          <h4 className="at-sectionhead">Path</h4>
+          <div className="at-pathlist" data-el="progress-path">
+            {p.rows.map((r) => (
+              <button type="button" key={r.id} className={`at-pathunit ${r.state}${r.current ? " current" : ""}`}
+                aria-haspopup="dialog" onClick={() => onUnit && onUnit(p.courseId, r.id)}>
+                <span className="at-pathunitname">{`${r.number}. ${r.title}`}</span>
+                <span className="at-pathunitstate">
+                  {pathStateWord(r)}
+                  {r.state === "finished" && unitStages(r.id, items, settings).learnt ? <i>{" · Learnt"}</i> : null}
+                </span>
+              </button>
+            ))}
+          </div>
+        </Section>
+      ))}
       {deckRows.length > 0 && (
         <Section head title="Decks" lede="How you're doing on each deck you're studying.">
           <div className="at-deckprog">
@@ -18846,6 +20574,23 @@ function Guide() {
 function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: (name: string) => void }) {
   const [showKey, setShowKey] = useState(false);
   const [copied, setCopied] = useState(false);
+  /* A student's private sign-in link (0.638): built here from the key, never sent anywhere. */
+  const [showLink, setShowLink] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const link =
+    me.keyOnly === false && me.linkKey && me.org && typeof me.org === "object" && me.org.slug
+      ? signInLink(window.location.origin, me.org.slug, me.linkKey)
+      : "";
+
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(link);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 1800);
+    } catch (e) {
+      /* clipboard blocked — the field is selectable instead */
+    }
+  }
 
   async function copyKey() {
     try {
@@ -18919,6 +20664,40 @@ function AccountPanel({ me, onRename }: { me: User & { key: string }; onRename: 
           </Button>
         )}
       </FormField>
+
+      {link ? (
+        <FormField
+          label="Sign-in link"
+          lede="Opens the app already signed in as you, on any device. Keep it private: anyone who has it is you."
+        >
+          {showLink ? (
+            <>
+              {/* No name, so a password manager does not take it for the password. */}
+              <input
+                className="at-input at-keyfield"
+                type="text"
+                readOnly
+                autoComplete="off"
+                aria-label="Your sign-in link"
+                value={link}
+                onFocus={(e) => e.target.select()}
+              />
+              <div className="at-row at-mt3">
+                <Button variant="ghost" size="sm" onClick={() => setShowLink(false)}>
+                  Hide
+                </Button>
+                <Button variant="ghost" size="sm" onClick={copyLink}>
+                  {copiedLink ? "Copied" : "Copy"}
+                </Button>
+              </div>
+            </>
+          ) : (
+            <Button variant="ghost" size="sm" onClick={() => setShowLink(true)}>
+              Show my link
+            </Button>
+          )}
+        </FormField>
+      ) : null}
     </div>
   );
 }
@@ -18947,6 +20726,9 @@ function LeaveSpace({ onLeft, space, others = 0, admin = false }: {
   const [asking, setAsking] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  /* Leaving is redone only when Retry is pressed, never by the connection
+     coming back on its own (0.636). */
+  const reach = useReach({ auto: false });
   const name = space && others > 0 ? space.name : "this space";
   return (
     <>
@@ -18967,10 +20749,11 @@ function LeaveSpace({ onLeft, space, others = 0, admin = false }: {
             )
           }
           onCancel={() => setAsking(false)}
-          onConfirm={async () => {
+          onConfirm={async function leave() {
             setBusy(true);
             try {
               await API.leaveSpace(space && space.id);
+              reach.ok();
               if (others > 0) {
                 window.location.assign("/");
                 return;
@@ -18978,7 +20761,7 @@ function LeaveSpace({ onLeft, space, others = 0, admin = false }: {
               API.clearAccount();
               onLeft();
             } catch (e) {
-              setError(API.explain(e));
+              if (!reach.caught(e, leave)) setError(API.explain(e));
               setBusy(false);
               setAsking(false);
             }
@@ -18994,6 +20777,8 @@ function CloseAccount({ handle, onClosed }: { handle: string; onClosed: () => vo
   const [typed, setTyped] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  /* Only ever redone by pressing Retry (0.636). */
+  const reach = useReach({ auto: false });
 
   if (!open)
     return (
@@ -19029,14 +20814,15 @@ function CloseAccount({ handle, onClosed }: { handle: string; onClosed: () => vo
         </Button>
         <Button variant="danger" size="sm"
           disabled={typed.trim() !== handle || busy}
-          onClick={async () => {
+          onClick={async function closeIt() {
             setBusy(true);
             try {
               await API.deleteAccount();
+              reach.ok();
               API.clearAccount();
               onClosed();
             } catch (e) {
-              setError(API.explain(e));
+              if (!reach.caught(e, closeIt)) setError(API.explain(e));
               setBusy(false);
             }
           }}
@@ -19171,6 +20957,10 @@ function AppVersion() {
   const [reloading, setReloading] = useState(false);
   const alive = useRef(true);
   const snack = useSnackbar();
+  /* A Check that found no server: the snackbar says so, and its Retry
+     checks again (0.636). */
+  const { caught, ok } = useReach();
+  const checkRef = useRef<(announce?: boolean) => unknown>(() => {});
 
   useEffect(
     () => () => {
@@ -19201,19 +20991,21 @@ function AppVersion() {
              Reload, which is louder and more useful than a pill. The other
              two outcomes change nothing on screen, so without a word the
              button reads as dead. */
+          if (found) ok();
           if (!announce) return;
-          if (!found) snack("Couldn't reach the server");
+          if (!found) caught(new Error("offline"), () => checkRef.current(true));
           else if (found.commit === APP_COMMIT) snack("You're on the latest version");
         })
         .catch(() => {
           if (!alive.current) return;
           setDeployed(false);
           setBusy(false);
-          if (announce) snack("Couldn't reach the server");
+          if (announce) caught(new Error("offline"), () => checkRef.current(true));
         });
     },
-    [snack],
+    [snack, caught, ok],
   );
+  checkRef.current = check;
 
   useEffect(() => {
     check();
@@ -19402,9 +21194,288 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, onCourses, onSett
  * is why they are asked for together — there is one caller and it passes
  * both sets.
  */
-function SettingsScreen({ kind, onClose, ...rest }: {
+/*
+ * A personal set's questions (0.630): the list to learn from, where there
+ * are several; the teacher's question for each picture; and, from
+ * Settings, the learner's answers, each of which can be changed.
+ *
+ * Every word on it but the app's own (Next, Skip for now, Continue) is the
+ * teacher's: the set's wording and the decks' titles. It writes nothing
+ * itself — each answer goes out through `onAnswer` or `onList`, and comes
+ * back in `sets`, so what it shows is always what is stored.
+ */
+type SetAsking =
+  | { view: "steps"; at: number }
+  | { view: "done" }
+  | { view: "answers"; setId: string }
+  | { view: "picture"; setId: string; pictureId: string }
+  | { view: "list"; setId: string };
+
+function SetQuestions({ sets, steps, openSet, onAnswer, onList, onSkipRest, onClose, onStart }: {
+  sets: HeldSet[];
+  /** What to ask, in order; absent to open one set's answers instead. */
+  steps?: SetStep[];
+  /** The set whose answers are shown, from Settings. */
+  openSet?: string;
+  /** `restart` where the change was made from Settings and confirmed. */
+  onAnswer: (pictureId: string, change: Partial<Omit<SetAnswer, "updated">>, restart?: boolean) => void;
+  onList: (setId: string, listId: string, restart?: boolean) => void;
+  onSkipRest: (pictureIds: string[]) => void;
+  onClose: () => void;
+  /** Where asking leads: a session's Start, said on the last screen. */
+  onStart?: () => void;
+}) {
+  const [at, setAt] = useState<SetAsking>(steps ? { view: "steps", at: 0 } : { view: "answers", setId: openSet || "" });
+  const [picked, setPicked] = useState("");
+  const [query, setQuery] = useState("");
+  const [photo, setPhoto] = useState(0);
+  const [asking, setAsking] = useState<null | { list: true; setId: string } | { setId: string; pictureId: string; name: string }>(null);
+
+  const setOf = (id: string) => sets.find((v) => v.id === id) || null;
+  const pictureOf = (v: HeldSet | null, id: string) => (v ? v.pictures.find((p) => p.id === id) || null : null);
+  const pictureSteps = (steps || []).filter((st): st is Extract<SetStep, { kind: "picture" }> => st.kind === "picture");
+
+  /* Whether a step still wants asking: a list chosen since, or a picture
+     answered by that choice, is passed over. */
+  const live = (st: SetStep): boolean => {
+    const v = setOf(st.setId);
+    if (!v || !v.lists.length) return false;
+    const chosen = chosenOf(v);
+    if (st.kind === "list") return !chosen;
+    const p = pictureOf(v, st.pictureId);
+    if (!p) return false;
+    const state = pictureState(p.answer, chosen ? chosen.words : null);
+    return state === "new" || state === "waiting" || state === "skip";
+  };
+  const nextFrom = (i: number): SetAsking => {
+    for (let j = i; j < (steps || []).length; j++) if (live((steps as SetStep[])[j])) return { view: "steps", at: j };
+    return { view: "done" };
+  };
+  const go = (next: SetAsking) => {
+    setPicked("");
+    setQuery("");
+    setPhoto(0);
+    setAt(next);
+  };
+  /* The first step may already be answered — on another device, say. */
+  const here: SetAsking = at.view === "steps" ? nextFrom(at.at) : at;
+  const after = () => go(here.view === "steps" ? nextFrom(here.at + 1) : openSet ? { view: "answers", setId: openSet } : { view: "done" });
+
+  /* What a picture's answer reads as, in a list of them. */
+  const answerText = (v: HeldSet, p: SetPicture) => {
+    const chosen = chosenOf(v);
+    const state = pictureState(p.answer, chosen ? chosen.words : null);
+    if (state === "none") return v.set.wording.none;
+    if (state === "ok" && chosen && p.answer && p.answer.meaning) {
+      const w = chosen.words.find((x) => x.en.trim().toLowerCase() === String(p.answer && p.answer.meaning).trim().toLowerCase());
+      return w ? `${w.en} · ${w.ar}` : p.answer.meaning;
+    }
+    return "Not answered yet";
+  };
+
+  /* A picture opened from Settings before any list is chosen asks for the
+     list first, and then is the picture. */
+  const unchosen = here.view === "picture" ? setOf(here.setId) : null;
+  const choosing = here.view === "list"
+    ? setOf(here.setId)
+    : here.view === "steps" && (steps as SetStep[])[here.at].kind === "list"
+    ? setOf((steps as SetStep[])[here.at].setId)
+    : unchosen && unchosen.lists.length && !chosenOf(unchosen)
+    ? unchosen
+    : null;
+  if (choosing) {
+    const chosen = chosenOf(choosing);
+    const value = picked || (chosen ? chosen.id : "");
+    return (
+      <Screen title={choosing.title} onBack={here.view === "list" ? () => go({ view: "answers", setId: choosing.id }) : onClose} backLabel={here.view === "list" ? "Back" : "Close"} backIcon={here.view === "list" ? "back" : "close"}>
+        <p className="at-eyebrow">Before you start</p>
+        <RadioGroup
+          label="Which words do you want to learn?"
+          name="set-list"
+          lede={`Your teacher has given ${choosing.lists.length === 2 ? "two" : choosing.lists.length} to choose from. You can change this later in Settings.`}
+          value={value || null}
+          onChange={(id) => setPicked(id)}
+          options={choosing.lists.map((l) => ({
+            value: l.id,
+            label: l.title,
+            note: l.words.length ? `${l.words.slice(0, 3).map((w) => w.ar).join(" · ")}${l.words.length > 3 ? " …" : ""}` : undefined,
+          }))}
+        />
+        <div className="at-row at-mt4">
+          <Button variant="primary" disabled={!value} onClick={() => {
+            onList(choosing.id, value, here.view === "list");
+            if (here.view === "list") go({ view: "answers", setId: choosing.id });
+            else if (here.view === "steps") after();
+          }}>
+            Continue
+          </Button>
+        </div>
+      </Screen>
+    );
+  }
+
+  const asked = here.view === "picture"
+    ? { v: setOf(here.setId), id: here.pictureId }
+    : here.view === "steps"
+    ? { v: setOf((steps as SetStep[])[here.at].setId), id: ((steps as SetStep[])[here.at] as { pictureId: string }).pictureId }
+    : null;
+  if (asked && asked.v) {
+    const v = asked.v;
+    const p = pictureOf(v, asked.id);
+    const chosen = chosenOf(v);
+    if (!p || !chosen) return null;
+    const n = pictureSteps.findIndex((st) => st.pictureId === p.id) + 1;
+    const current = p.answer && p.answer.meaning ? p.answer.meaning : "";
+    const value = picked || (chosen.words.some((w) => w.en === current) ? current : "");
+    const q = query.trim().toLowerCase();
+    const meanings = [...new Set(chosen.words.map((w) => w.en))];
+    const shownMeanings = meanings.filter((m) => !q || m.toLowerCase().includes(q) || m === value);
+    const big = p.images[Math.min(photo, p.images.length - 1)] || "";
+    const remaining = () => {
+      if (here.view !== "steps") return [];
+      return (steps as SetStep[])
+        .slice(here.at)
+        .filter((st): st is Extract<SetStep, { kind: "picture" }> => st.kind === "picture")
+        .map((st) => pictureOf(setOf(st.setId), st.pictureId))
+        .filter((x): x is SetPicture => !!x && pictureState(x.answer, null) === "new")
+        .map((x) => x.id);
+    };
+    return (
+      <Screen
+        title={v.title}
+        onBack={here.view === "picture" ? () => go({ view: "answers", setId: v.id }) : onClose}
+        backLabel={here.view === "picture" ? "Back" : "Close"}
+        backIcon={here.view === "picture" ? "back" : "close"}
+        action={here.view === "steps" ? (
+          <Button size="sm" variant="ghost" onClick={() => { onSkipRest(remaining()); go({ view: "done" }); }}>Skip the rest</Button>
+        ) : undefined}
+      >
+        {here.view === "steps" && n > 0 && <p className="at-eyebrow">{`${n} of ${pictureSteps.length}`}</p>}
+        <CardPicture hash={big} className="prompt" alt={p.name} />
+        {p.images.length > 1 && (
+          <div className="at-picthumbs at-mt3">
+            {p.images.map((h, i) => (
+              <button type="button" key={h} className={`at-picchoice${i === photo ? " on" : ""}`} aria-pressed={i === photo}
+                aria-label={`Photo ${i + 1}`} onClick={() => setPhoto(i)}>
+                <CardPicture hash={h} alt="" />
+              </button>
+            ))}
+          </div>
+        )}
+        <p className="at-lede at-mt3" dir="auto">{p.name}</p>
+        {meanings.length > 8 && (
+          <SearchBox value={query} onChange={setQuery} placeholder="Search" aria-label="Search the choices" boxClassName="at-mt3" />
+        )}
+        <RadioGroup
+          label={v.set.wording.question}
+          name="set-answer"
+          value={value || null}
+          onChange={(m) => setPicked(m)}
+          options={shownMeanings.map((m) => ({ value: m, label: m }))}
+        />
+        <div className="at-row at-mt4">
+          <Button variant="primary" disabled={!value} onClick={() => {
+            onAnswer(p.id, { meaning: value, none: undefined, skip: undefined }, here.view === "picture");
+            after();
+          }}>
+            Next
+          </Button>
+        </div>
+        <div className="at-row at-mt3">
+          <Button variant="ghost" onClick={() => { onAnswer(p.id, { none: true, meaning: undefined, skip: undefined }); after(); }}>
+            {v.set.wording.none}
+          </Button>
+          {here.view === "steps" && (
+            <Button variant="ghost" onClick={() => { onAnswer(p.id, { skip: true, meaning: undefined, none: undefined }); after(); }}>
+              Skip for now
+            </Button>
+          )}
+        </div>
+      </Screen>
+    );
+  }
+
+  if (here.view === "answers") {
+    const v = setOf(here.setId);
+    if (!v) return <Screen title="Personal set" onBack={onClose} />;
+    const chosen = chosenOf(v);
+    return (
+      <Screen title={v.title} onBack={onClose}>
+        {v.lists.length > 1 && (
+          <>
+            <p className="at-eyebrow">Words you&rsquo;re learning</p>
+            <Tile
+              title={chosen ? chosen.title : "Not chosen yet"}
+              actions={<Button size="sm" onClick={() => (chosen ? setAsking({ list: true, setId: v.id }) : go({ view: "list", setId: v.id }))}>Change</Button>}
+            />
+          </>
+        )}
+        <p className="at-eyebrow at-mt4">{v.set.wording.question}</p>
+        {v.pictures.map((p) => (
+          <Tile
+            key={p.id}
+            title={p.name}
+            meta={answerText(v, p)}
+            onOpen={() => {
+              const state = pictureState(p.answer, chosen ? chosen.words : null);
+              if (state === "ok" || state === "none") setAsking({ setId: v.id, pictureId: p.id, name: p.name });
+              else go({ view: "picture", setId: v.id, pictureId: p.id });
+            }}
+          />
+        ))}
+        <Help className="at-mt4">
+          Only you see these. If you report a problem with one of these pictures, your answer for it is sent with the report.
+        </Help>
+        {asking && (
+          <ConfirmModal
+            danger={false}
+            title={"list" in asking ? "Change the words you learn?" : `Change your answer for ${asking.name}?`}
+            body={<p>{"list" in asking
+              ? "This starts all these pictures again. Your answers are kept and matched to the new words."
+              : "This starts this picture again. Nothing else changes."}</p>}
+            confirmLabel={"list" in asking ? "Choose other words" : "Change"}
+            onCancel={() => setAsking(null)}
+            onConfirm={() => {
+              const was = asking;
+              setAsking(null);
+              if ("list" in was) go({ view: "list", setId: was.setId });
+              else go({ view: "picture", setId: was.setId, pictureId: was.pictureId });
+            }}
+          />
+        )}
+      </Screen>
+    );
+  }
+
+  /* Done: what was answered, and the way on. */
+  const shown = pictureSteps.flatMap((st) => {
+    const v = setOf(st.setId);
+    const p = pictureOf(v, st.pictureId);
+    return v && p ? [{ v, p }] : [];
+  });
+  const names = [...new Set(shown.map((x) => x.v.title))];
+  return (
+    <Screen title={names.length === 1 ? names[0] : "Personal sets"} onBack={onClose} backLabel="Close" backIcon="close">
+      <p className="at-lede">Thanks. That&rsquo;s all for now.</p>
+      {shown.map(({ v, p }) => (
+        <Tile key={p.id} title={p.name} meta={answerText(v, p)} />
+      ))}
+      <Help className="at-mt3">
+        {`You can change any of these in Settings, under ${names.join(", ")}.`}
+      </Help>
+      <div className="at-row at-mt4">
+        <Button variant="primary" onClick={onStart || onClose}>{onStart ? "Start session" : "Done"}</Button>
+      </div>
+    </Screen>
+  );
+}
+
+function SettingsScreen({ kind, onClose, sets = [], onOpenSet, ...rest }: {
   kind?: string;
   onClose: () => void;
+  /** The personal sets the learner holds, each opening their answers (0.630). */
+  sets?: { id: string; title: string }[];
+  onOpenSet?: (id: string) => void;
 } & React.ComponentProps<typeof AccountSettings> & React.ComponentProps<typeof AppPreferences>) {
   const title = kind === "guide" ? "How it works" : "Settings";
   return (
@@ -19415,6 +21486,15 @@ function SettingsScreen({ kind, onClose, ...rest }: {
         <>
           {/* One screen: how the app behaves first, then you. */}
           <AppPreferences {...rest} />
+          {/* Your answers in each personal set, only where you hold one. */}
+          {sets.length > 0 && onOpenSet && (
+            <>
+              <p className="at-eyebrow at-mt4">Personal sets</p>
+              {sets.map((v) => (
+                <Tile key={v.id} title={v.title} meta="Your answers" onOpen={() => onOpenSet(v.id)} />
+              ))}
+            </>
+          )}
           <AccountSettings {...rest} />
         </>
       )}
@@ -19678,7 +21758,7 @@ function AccountSettings({
           confirmLabel="Log out"
           body={
             <p>
-              You'll need your sign-in key to get back in, and nobody can recover it for you except
+              You'll need your sign-in key{account.keyOnly === false ? " or your sign-in link" : ""} to get back in, and nobody can recover it for you except
               your space's admin. Your account, courses and progress stay exactly as they are.
             </p>
           }
@@ -19983,6 +22063,7 @@ function StrandedPanel({ stranded, onJoined }: {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const reach = useReach();
   const said = (why: string, name: string) =>
     why === "removed" ? `You were removed from ${name}.` : why === "left" ? `You left ${name}.` : `You're suspended in ${name}.`;
   return (
@@ -20013,13 +22094,18 @@ function StrandedPanel({ stranded, onJoined }: {
             } catch (e) {
               /* not a link: a code */
             }
-            try {
-              await API.joinCourse(given);
-              onJoined();
-            } catch (e) {
-              setError(API.explain(e));
-              setBusy(false);
-            }
+            const join = async (): Promise<void> => {
+              setBusy(true);
+              try {
+                await API.joinCourse(given);
+                reach.ok();
+                onJoined();
+              } catch (e) {
+                if (!reach.caught(e, join)) setError(API.explain(e));
+                setBusy(false);
+              }
+            };
+            await join();
           }}>
           Join
         </Button>

@@ -148,10 +148,12 @@ const crossing = () => /** @type {[string, any][]} */ ([
   ["rename-deck", { body: { deckId: b.deck.id, title: "Mine now" } }],
   ["lock-deck", { body: { deckId: b.deck.id, locked: true } }],
   ["set-deck-parts", { body: { deckId: b.deck.id, parts: ["numbers:0-10"] } }],
+  ["save-set", { body: { deckId: b.deck.id, set: { lists: [] } } }],
   ["set-deck-numbers", { body: { deckId: b.deck.id, from: main.teacher.handle } }],
   ["delete-deck", { body: { deckId: b.deck.id } }],
   ["attach-deck", { body: { deckId: b.deck.id, courseId: main.course.id } }],
   ["detach-deck", { body: { deckId: b.deck.id, courseId: b.course.id } }],
+  ["set-course-practice", { body: { courseId: b.course.id, practice: { mode: "none", off: [] } } }],
   ["save-card", { body: { card: { ...b.card, forms: [{ ar: "x", en: "x", lat: "x" }] }, decks: [] } }],
   ["card-status", { body: { cardId: b.card.id, to: "draft" } }],
   ["review-card", { body: { cardId: b.card.id, ok: [] } }],
@@ -229,6 +231,11 @@ test("admin actions refuse another space's people, courses and reports", async (
     ["assign-student", { courseId: b.course.id, handle: main.student.handle }],
     ["assign-teacher", { courseId: main.course.id, handle: b.teacher.handle }],
     ["remove-member", { courseId: b.course.id, handle: b.student.handle, role: "student" }],
+    /* A course's path (0.614): another space's course is not found. */
+    ["create-unit", { courseId: b.course.id, title: "x" }],
+    ["move-unit", { courseId: b.course.id, deckId: b.deck.id, to: 0 }],
+    ["publish-unit", { courseId: b.course.id, deckId: b.deck.id }],
+    ["open-unit", { courseId: b.course.id, deckId: b.deck.id, open: true }],
   ];
   for (const [action, body] of probes) {
     const res = await api(/** @type {string} */ (action), { key: admin.key, body });
@@ -263,6 +270,11 @@ const PLACED = {
     "admin-new-code", "admin-card", "admin-delete-flags", "assign-student", "assign-teacher",
     "remove-member", "export-plan", "export-chunk", "create-course", "create-deck", "report-flag",
     "admin-create-user", "admin-create-org", "join-space",
+    "create-unit", "move-unit", "publish-unit", "open-unit",
+    /* 0.627: a course's switches. */
+    "set-course-practice",
+    /* 0.629: a personal set. */
+    "save-set",
   ],
   /* The App admin's tools for spaces themselves (stage 3), tried below. */
   spaces: [
@@ -555,6 +567,12 @@ test("the App admin can be a new space's admin, with no account made (0.552)", a
   assert.equal(r.json.key, "");
   assert.deepEqual(r.json.org.admins, [r.json.admin.handle]);
   assert.equal(r.json.admin.admin, true);
+  /* And it is one of their spaces, which they run (0.637): before, they
+     were its admin but not in it, so it was missing from their list. */
+  const who = (await api("whoami", { key: admin.key })).json;
+  const listed = who.user.orgs.find((/** @type {any} */ o) => o.id === r.json.org.id);
+  assert.ok(listed, "the new space is in the App admin's own list");
+  assert.equal(listed.runs, true);
   /* Without it, a name is still owed. */
   assert.equal((await api("admin-create-org", { key: admin.key, body: { name: "No admin", slug: "no-admin" } })).status, 400);
 });
