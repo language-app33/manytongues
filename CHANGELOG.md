@@ -8,6 +8,17 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.645 — 17 November 2026
+
+**Join a course from Home without leaving it.** The Join a course button
+on the empty home screen opens a sheet over Home instead of the whole
+Courses screen. It takes a course code or a pasted invitation link. A
+code that does not work keeps the sheet open with the reason, so a typo
+can be fixed on the spot; offline, it says joining needs a connection.
+A code that works closes the sheet, says "Joined …", and Home shows what
+the new course holds. The Courses screen, reached from the You menu,
+keeps its own join box as before.
+
 ## 0.644 — 17 November 2026
 
 **The empty home screen says what happens next.** Under the large line, a
