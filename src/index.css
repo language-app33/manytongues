@@ -976,7 +976,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    took, and Duplicate and Remove stay beside it. Folded, the panel is its
    heading alone, so the rule under the heading goes with what it ruled. */
 .at-formhead > .at-formfold { flex:1 1 auto; width:auto; min-width:0; margin:0; min-height:0; }
-/* A folded person on a list of people (0.639) is its heading alone: no
+/* A folded person on a list of people (0.640) is its heading alone: no
    rule and no gap under it when nothing follows. */
 .at-formtile > .at-formhead:last-child:has(> .at-formfold[aria-expanded="false"]) { margin-bottom:0;
   padding-bottom:0; border-bottom:0; }

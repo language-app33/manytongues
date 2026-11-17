@@ -62,7 +62,7 @@ const out = await buildOnce(
     /* And the recording screen, driven on its own at the foot (0.632). */
     "card-editor.tsx",
     /* And a person's folded tile on an admin's list, driven on its own in
-       the sign-in links walk (0.639). */
+       the sign-in links walk (0.640). */
     "spaces.tsx",
   ],
   {
@@ -12173,7 +12173,7 @@ const openPronounTables = async () => {
   const lina = {
     handle: "lina-5d6e", displayName: "Lina", key: "willow-amber-quartz-fjord-7e3a", admin: false,
     keyOnly: false, keySaved: false, org: main,
-    /* Her link's own code (0.639): not her key, but it signs her in. */
+    /* Her link's own code (0.640): not her key, but it signs her in. */
     linkKey: "meadow-raven-saffron-cedar-3c5d",
   };
   const tariq = {
@@ -12216,7 +12216,7 @@ const openPronounTables = async () => {
   };
 
   /* 1. Signed out, a student's link opened: it carries its own code
-     (0.639), and her practice is kept under her key's digest, which the
+     (0.640), and her practice is kept under her key's digest, which the
      server tells the device. */
   const digestOf = async (/** @type {string} */ key) => {
     const d = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(key));
@@ -12297,7 +12297,7 @@ const openPronounTables = async () => {
     app.close();
   }
 
-  /* 6. A person's tile on an admin's list (0.639): folded, and opened by
+  /* 6. A person's tile on an admin's list (0.640): folded, and opened by
      its name, to the student's sign-in link. */
   {
     const { PersonFold, PersonLink } = await import(path.join(out, "spaces.js"));

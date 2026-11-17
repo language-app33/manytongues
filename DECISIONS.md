@@ -8734,7 +8734,7 @@ always opens the browser.
 
 ---
 
-## A sign-in link carries a code of its own (0.639)
+## A sign-in link carries a code of its own (0.640)
 
 **17 November 2026** · `linkCodeFor` and `ensureLinks` in `server/api/courses.js`
 

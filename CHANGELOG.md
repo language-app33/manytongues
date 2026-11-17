@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.639 — 17 November 2026
+## 0.640 — 17 November 2026
 
 **Every student now has a private sign-in link, without anyone's key
 changing, and admins can see it whenever they need it.** Each person on a
@@ -52,6 +52,28 @@ the Teacher and Student switches work without opening anyone, and opening
 a student shows their link. As the super admin, check the same in the list
 of everyone. A student who joined before 0.638 now has a link, and their
 key still works.
+
+## 0.639 — 17 November 2026
+
+**When the space you have picked has nothing for you to practise, the home
+screen now says so and shows nothing else.** Until now it still showed
+Start session, Weak spots and Build a session, all greyed out, a saved
+session from another space, and a warning about "exercise types" that was
+written for teachers.
+
+- The "Nothing to practice yet" message gives the real reason in one line:
+  you're in no course in this space (with Join a course), this space's
+  courses have no cards yet, there are cards here but none is ready to
+  practise yet, or this space's cards are in languages you've switched off
+  (with a button to switch them back on).
+- Course counts in that message are this space's, as the Cards and
+  Progress tabs already count them.
+- Saved sessions are offered only in a space where they have something to
+  practise. None is deleted: each one is back in any space where it works.
+  A saved session whose cards have all gone everywhere is no longer shown.
+- A newly saved session's suggested name is its type alone, such as
+  "Regular", without a card count. A count in a name was fixed on the day
+  it was saved and went out of date. Names already saved are unchanged.
 
 ## 0.638 — 16 November 2026
 

@@ -886,7 +886,7 @@ async function keyOnly(store, user) {
 }
 
 /*
- * Who is key only, for a whole list at once (0.639): the same rule as
+ * Who is key only, for a whole list at once (0.640): the same rule as
  * keyOnly, read once rather than once per person.
  */
 /** @type {(store: Store) => Promise<(user: any) => boolean>} */
@@ -899,7 +899,7 @@ async function keyOnlyJudge(store) {
 }
 
 /*
- * A student's sign-in link (0.639) carries a code of its own, not their
+ * A student's sign-in link (0.640) carries a code of its own, not their
  * key: the key is kept only as a digest and cannot be read back, and every
  * student was to have a link without anyone's key changing. The code is
  * worked out from the App admin key, the handle and a count, so nothing
@@ -2382,7 +2382,7 @@ async function handle(req) {
       if (!found) return json({ error: "bad-key" }, 401);
       /* Suspended across the whole app by the super admin (0.578). */
       if (!found.admin && found.suspendedApp) return json({ error: "suspended-app" }, 403);
-      /* A sign-in link is for students only (0.638). Its own code (0.639)
+      /* A sign-in link is for students only (0.638). Its own code (0.640)
          is refused for anyone else whether or not the app says it came by
          link, and someone who has come to teach or run a space loses theirs. */
       const only = await keyOnly(store, found);
@@ -6073,7 +6073,7 @@ async function handle(req) {
         ]);
         const courses = courseRows.filter(Boolean);
         /* Each student's sign-in link, for whoever may give them a new key
-           (0.639): the App admin, or a space admin for someone in their
+           (0.640): the App admin, or a space admin for someone in their
            space alone who runs nothing. Made here for anyone without one. */
         const judge = await keyOnlyJudge(store);
         const linkable = userRows.filter(
@@ -6999,7 +6999,7 @@ async function handle(req) {
           const rows = (await readManyJson(store, (await readIndex(store, "users")).map((h) => K.user(h)))).filter(Boolean);
           /* Every space each person is in, and their account-wide moments
              (memberships, A2): Super admin sees the whole account. */
-          /* Every student's sign-in link (0.639), at the first space they are
+          /* Every student's sign-in link (0.640), at the first space they are
              still in. */
           const judge = await keyOnlyJudge(store);
           const links = await ensureLinks(store, rows.filter((u) => !judge(u)));
@@ -7292,7 +7292,7 @@ async function handle(req) {
         }
         const key = makeKey();
         if (target.keyHash) await store.delete(K.keyOf(target.keyHash)).catch(() => {});
-        /* A new key ends their sign-in link too (0.639): the next count
+        /* A new key ends their sign-in link too (0.640): the next count
            makes a new code. */
         if (target.linkHash) await store.delete(K.keyOf(target.linkHash)).catch(() => {});
         const { linkHash: _h, ...unlinked } = /** @type {any} */ (target);

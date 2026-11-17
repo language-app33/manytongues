@@ -845,9 +845,9 @@ export interface User {
   keySaved?: boolean;
   /** Teaches, runs a space or is the App admin: key only, no sign-in link (0.638). Worked out by the server, never stored. Absent from an older server: treat as key only. */
   keyOnly?: boolean;
-  /** A student's own sign-in link code (0.639): not their key, but signs in wherever it does. "" when they have none. */
+  /** A student's own sign-in link code (0.640): not their key, but signs in wherever it does. "" when they have none. */
   linkKey?: string;
-  /** Where this account's practice is kept: the digest of its key, which a device signed in by link cannot work out (0.639). */
+  /** Where this account's practice is kept: the digest of its key, which a device signed in by link cannot work out (0.640). */
   syncToken?: string;
   /** While suspended: when, by whom, why, and the courses to put back (0.544). */
   suspended?: {
@@ -1374,7 +1374,7 @@ export interface AdminOverview {
   former?: FormerMember[];
   /** The space's invitation link and its admins (0.544). */
   invite?: { code: string; slug: string; name: string; admins: string[] } | null;
-  /** The space's address, for its students' sign-in links (0.639). */
+  /** The space's address, for its students' sign-in links (0.640). */
   linkSlug?: string;
 }
 

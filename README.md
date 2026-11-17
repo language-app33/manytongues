@@ -1733,7 +1733,7 @@ Addresses and joining (since 0.543):
   space, also erases each account's practice history (`forgetSyncDoc` in
   `server/api/sync.js`).
 - A student's sign-in link is `<origin>/<address>#key=<code>`
-  (`src/sign-in-link.ts`). Since 0.639 the code is not the key: it is
+  (`src/sign-in-link.ts`). Since 0.640 the code is not the key: it is
   worked out from `ADMIN_KEY`, the handle and a count (`linkCodeFor` in
   `server/api/courses.js`), and only its digest is kept (`linkHash`, with a
   `keyOf` entry like a key's), so it signs in wherever a key does. A new

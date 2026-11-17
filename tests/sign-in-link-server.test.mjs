@@ -161,7 +161,7 @@ test("signing up with a teacher's course code is key only; a student's is not", 
   assert.equal(asTeacher.json.user.keyOnly, true);
 });
 
-/* ------------------------------------------- a link's own code (0.639) */
+/* ------------------------------------------- a link's own code (0.640) */
 
 const { createHash } = await import("node:crypto");
 const { getStore } = await import("../server/store.js");
@@ -188,7 +188,7 @@ test("a student's link carries a code of its own, which signs in to the same pra
 test("a student made before links gets one without their key changing", async () => {
   const r = await api("admin-create-user", { key: admin.key, body: { displayName: "Zaid", courseId: course.id, roles: ["student"] } });
   const handle = r.json.user.handle;
-  /* As an account from before 0.639 is stored: no link. */
+  /* As an account from before 0.640 is stored: no link. */
   const store = getStore("arabic-courses");
   const rec = JSON.parse(String(await store.get(`user:${handle}`, { type: "text" })));
   await store.delete(`key:${rec.linkHash}`).catch(() => {});

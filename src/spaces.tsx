@@ -731,7 +731,7 @@ export function PersonActions({ person, org, keyOrg, mayKey, mayAct, suspendable
           ),
           action: async () => {
             const r = await API.reissueKey(u.handle, keyOrg);
-            /* Their tile opens by itself, with the key and the new link (0.639). */
+            /* Their tile opens by itself, with the key and the new link (0.640). */
             onNewKey({ name: u.displayName, handle: u.handle, key: r.key });
           },
         })} />
@@ -1018,7 +1018,7 @@ export function CodeBox({ label, code, hint, onNew, busy, long = false }: {
 }
 
 /*
- * One person on a list of people, folded (0.639). Built as a form's panel
+ * One person on a list of people, folded (0.640). Built as a form's panel
  * is in the card editor: the name is the heading that opens it, with what
  * says who they are under it, and the arrow. `lead` stays on the folded
  * tile (a course's Teacher and Student switches); `flags` under the
@@ -1053,7 +1053,7 @@ export function PersonFold({ title, meta, lead, flags, open: opened = false, chi
   );
 }
 
-/* A student's private sign-in link, for an admin to pass on (0.639). Built
+/* A student's private sign-in link, for an admin to pass on (0.640). Built
    here from the code the server answered with; nothing for anyone else. */
 export function PersonLink({ name, slug, code }: { name: string; slug?: string; code?: string }) {
   if (!code || !slug) return null;
@@ -1067,7 +1067,7 @@ export function PersonLink({ name, slug, code }: { name: string; slug?: string; 
   );
 }
 
-/* A key just made, shown once inside the person's tile (0.639): it is kept
+/* A key just made, shown once inside the person's tile (0.640): it is kept
    only as a digest, so this is the one time it can be read. */
 export function NewKeyNote({ made, onDone }: {
   made: { name: string; key: string; handle?: string; fresh?: boolean };
@@ -1849,7 +1849,7 @@ function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole, insi
   studying: boolean;
   busy?: boolean;
   onSetRole: (role: "teacher" | "student", on: boolean) => void;
-  /** What opening the row shows — a student's sign-in link (0.639). Without it, nothing opens. */
+  /** What opening the row shows — a student's sign-in link (0.640). Without it, nothing opens. */
   inside?: Node;
 }) {
   const role: (key: "teacher" | "student", cls: string, label: string, on: boolean) => Node = (key, cls, label, on) => (
@@ -1869,7 +1869,7 @@ function RosterRow({ handle, name, me, teaching, studying, busy, onSetRole, insi
       {role("student", "study", "Student", studying)}
     </span>
   );
-  /* Folded where there is something to open (0.639), with the switches
+  /* Folded where there is something to open (0.640), with the switches
      kept on the folded row, so setting up a class is still a tap each. */
   if (inside) {
     return (
@@ -2194,7 +2194,7 @@ function CourseSettings({
 }: {
   course: Course;
   users: User[];
-  /** The space's address, for its students' sign-in links (0.639). */
+  /** The space's address, for its students' sign-in links (0.640). */
   linkSlug?: string;
   languages: Record<LangId, Lang>;
   account: User;
@@ -2227,7 +2227,7 @@ function CourseSettings({
     return u ? u.displayName : h;
   };
   const outsiders = users.filter((u) => !people.includes(u.handle));
-  /* A student's sign-in link, where the admin may see it (0.639). */
+  /* A student's sign-in link, where the admin may see it (0.640). */
   const linkOf = (h: string, name: string) => {
     const u = users.find((x) => x.handle === h);
     return u && u.linkKey && linkSlug ? <PersonLink name={name} slug={linkSlug} code={u.linkKey} /> : undefined;
@@ -3029,7 +3029,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                               makingUser.courseId || "",
                               (makingUser.roles as ("teacher" | "student")[])
                             );
-                            /* Their tile opens by itself, with the key (0.639). */
+                            /* Their tile opens by itself, with the key (0.640). */
                             setNewKey({
                               name: r.user.displayName,
                               handle: r.user.handle,
@@ -3184,7 +3184,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 ]}
                 itemKey={(u) => u.handle}
                 renderItem={(u) => (
-                  /* Folded (0.639): the name opens it, as a form opens in the
+                  /* Folded (0.640): the name opens it, as a form opens in the
                      card editor. Opened, what can be done to them, and for a
                      student their private sign-in link. */
                   <PersonFold
@@ -11427,7 +11427,7 @@ function FormerMembers({ former, people, busy, ask }: {
         empty="Nobody matches."
         renderItem={(r) => {
         const suspended = r.why === "left" || r.why === "removed";
-        /* Folded like every list of people (0.639); no key or link here. */
+        /* Folded like every list of people (0.640); no key or link here. */
         return (
           <PersonFold key={r.handle}
             title={r.displayName}
@@ -11632,7 +11632,7 @@ function EveryonePeople({ me }: { me: string }) {
     const why = whyIn(u, org);
     return why === "removed" || why === "left";
   };
-  /* One person, folded (0.639): opened, their new key if one was just
+  /* One person, folded (0.640): opened, their new key if one was just
      made, a student's sign-in link, and the actions. */
   const fold = (u: Person, meta: string, o: API.SuperOrg | null) => (
     <PersonFold key={u.handle} title={u.displayName} meta={meta} open={!!newKey && newKey.handle === u.handle}>
