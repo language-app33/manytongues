@@ -294,6 +294,7 @@ const PLACES: Record<string, [string, string]> = {
   SpaceBadge: [LEARN, "A space's logo or initials, in a small square"],
   PlaceButton: [LEARN, "Where you are · the line at the top of every page"],
   WhereSheet: [LEARN, "Where you are · the sheet: places, modes and languages"],
+  JoinSheet: [LEARN, "The home screen · joining a course with a code or an invitation link"],
   StrandedPanel: [LEARN, "Signed in with no space to open: suspended, removed or left"],
   BackupScreen: [ADMIN, "App · backing up and restoring"],
   RestoreResult: [ADMIN, "App · what a restore did"],
