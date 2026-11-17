@@ -852,7 +852,7 @@ export function mergeMoves(
    progress can be asked what it does without a browser — see grade.ts. */
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
 import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
-import { homeEmptySays, listOf as listOfNames, whyHomeIsEmpty } from "./home-empty.ts";
+import { homeEmptyHint, homeEmptySays, listOf as listOfNames, whyHomeIsEmpty } from "./home-empty.ts";
 import { rememberedTheme, rememberTheme } from "./theme-memory.ts";
 import type { Filler, Mark } from "./grade.ts";
 
@@ -15794,6 +15794,15 @@ export default function ArabicTrainer() {
                       to say. */}
                   <span className="at-emptybig">
                     {homeEmptySays(homeEmpty, Math.max(langChoices.length - langsOff.length, 1))}
+                  </span>
+                  {/* What has to happen first, in a line (0.644). */}
+                  <span className="at-emptysub">
+                    {homeEmptyHint(homeEmpty, {
+                      courses: learnCourses.length,
+                      langNames: homeEmpty.kind === "langs"
+                        ? homeEmpty.langs.map((l) => (LANGUAGES[l] || {}).name || l)
+                        : [],
+                    })}
                   </span>
                 </Empty>
               </>

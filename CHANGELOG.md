@@ -8,6 +8,20 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.644 — 17 November 2026
+
+**The empty home screen says what happens next.** Under the large line, a
+smaller one, in plain words:
+
+- Not in any course: "Ask your teacher for a course code, then tap Join a
+  course."
+- In a course with nothing in it yet, or nothing ready yet: "Your teacher
+  is getting your lessons ready. Check back shortly!" ("Your teachers
+  are…" for someone in more than one course).
+- Everything in a switched-off language: the large line is now "Nothing
+  to practice in the selected language." and the smaller one names the
+  language: "Switch on French to pick up where you left off."
+
 ## 0.643 — 17 November 2026
 
 **No more flash on coming back to the app.**

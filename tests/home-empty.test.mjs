@@ -9,7 +9,7 @@ import path from "node:path";
 import { readFileSync } from "node:fs";
 
 const here = path.dirname(new URL(import.meta.url).pathname);
-const { whyHomeIsEmpty, homeEmptySays } = await import(path.join(here, "..", "src", "home-empty.ts"));
+const { whyHomeIsEmpty, homeEmptySays, homeEmptyHint } = await import(path.join(here, "..", "src", "home-empty.ts"));
 const { cardsOfSaved } = await import(path.join(here, "..", "src", "saved-sessions.ts"));
 
 test("anything to practise here, and the home screen is not empty", () => {
@@ -45,9 +45,9 @@ test("languages switched off come first: they are one tap away", () => {
   const why = whyHomeIsEmpty({ practisable: 0, offLangs: ["ar-PS", "fr"], cardsHere: 12, coursesHere: 1 });
   assert.deepEqual(why, { kind: "langs", langs: ["ar-PS", "fr"] });
   assert.equal(homeEmptySays(why, 1),
-    "Nothing to practice in the selected language. Switch on a language to get started.");
+    "Nothing to practice in the selected language.");
   assert.equal(homeEmptySays(why, 2),
-    "Nothing to practice in the selected languages. Switch on a language to get started.");
+    "Nothing to practice in the selected languages.");
 });
 
 test("a saved session is offered only where it has something to practise", () => {
@@ -68,4 +68,22 @@ test("the home screen reads the space on screen, not the whole device", () => {
   assert.doesNotMatch(src, /two usable exercise types/, "the teacher's warning is gone from the learner's home");
   assert.match(src, /savedHere\.length > 0 && \(/, "saved sessions are the ones that run here");
   assert.doesNotMatch(src, /label\} · \$\{plural\(picked\.size, "card"\)\}/, "a suggested name carries no count");
+});
+
+test("under the line, what has to happen first, in plain words (0.644)", () => {
+  assert.equal(homeEmptyHint({ kind: "no-cards", courses: 0 }),
+    "Ask your teacher for a course code, then tap Join a course.");
+  assert.equal(homeEmptyHint({ kind: "no-cards", courses: 1 }),
+    "Your teacher is getting your lessons ready. Check back shortly!");
+  assert.equal(homeEmptyHint({ kind: "no-cards", courses: 2 }),
+    "Your teachers are getting your lessons ready. Check back shortly!");
+  /* Not ready yet reads the same as nothing yet: the student waits either way. */
+  assert.equal(homeEmptyHint({ kind: "not-ready" }, { courses: 1 }),
+    "Your teacher is getting your lessons ready. Check back shortly!");
+  assert.equal(homeEmptyHint({ kind: "not-ready" }, { courses: 3 }),
+    "Your teachers are getting your lessons ready. Check back shortly!");
+  assert.equal(homeEmptyHint({ kind: "langs", langs: ["fr"] }, { langNames: ["French"] }),
+    "Switch on French to pick up where you left off.");
+  assert.equal(homeEmptyHint({ kind: "langs", langs: ["fr", "es"] }, { langNames: ["French", "Spanish"] }),
+    "Switch on French and Spanish to pick up where you left off.");
 });

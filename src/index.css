@@ -2796,6 +2796,9 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
    the screen's headline, not a footnote under the picture. */
 .at-emptybig { display:block; font-family: var(--ui); font-size:24px; font-weight:800;
   line-height:1.25; letter-spacing:-.01em; color: var(--text); text-wrap: balance; }
+/* And under it, smaller, what has to happen first (0.644). */
+.at-emptysub { display:block; margin-top:8px; font-size:16px; font-weight:500; line-height:1.5;
+  color: var(--muted); text-wrap: pretty; }
 /* The loading line, shown only if loading takes long enough to need it. */
 .at-latecome { opacity:0; animation: at-latecome 200ms ease-out 600ms forwards; }
 @keyframes at-latecome { to { opacity:1; } }

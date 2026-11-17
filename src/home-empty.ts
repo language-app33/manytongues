@@ -50,7 +50,7 @@ export function whyHomeIsEmpty({ practisable, offLangs, cardsHere, coursesHere }
  */
 export function homeEmptySays(why: HomeEmpty, langsOn = 1): string {
   if (why.kind === "langs") {
-    return `Nothing to practice in the selected ${langsOn === 1 ? "language" : "languages"}. Switch on a language to get started.`;
+    return `Nothing to practice in the selected ${langsOn === 1 ? "language" : "languages"}.`;
   }
   if (why.kind === "no-cards" && why.courses === 0) return "Join a course to get started!";
   return "Nothing to practice yet!";
@@ -60,4 +60,24 @@ export function homeEmptySays(why: HomeEmpty, langsOn = 1): string {
 export function listOf(names: string[]): string {
   if (names.length < 2) return names.join("");
   return `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`;
+}
+
+/**
+ * The smaller line under it (0.644): what has to happen before there is
+ * something to practise, without the detail of why. `courses` is how many
+ * of this space's courses the student is in, which decides "teacher" or
+ * "teachers"; `langNames` names the languages switched off.
+ */
+export function homeEmptyHint(why: HomeEmpty, { courses = 0, langNames = [] }: {
+  courses?: number;
+  langNames?: string[];
+} = {}): string {
+  if (why.kind === "langs") {
+    return `Switch on ${langNames.length ? listOf(langNames) : "a language"} to pick up where you left off.`;
+  }
+  if (why.kind === "no-cards" && why.courses === 0) {
+    return "Ask your teacher for a course code, then tap Join a course.";
+  }
+  const many = (why.kind === "no-cards" ? why.courses : courses) > 1;
+  return `Your ${many ? "teachers are" : "teacher is"} getting your lessons ready. Check back shortly!`;
 }
