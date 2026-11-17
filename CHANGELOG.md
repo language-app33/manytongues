@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.639 — 17 November 2026
+
+**When the space you have picked has nothing for you to practise, the home
+screen now says so and shows nothing else.** Until now it still showed
+Start session, Weak spots and Build a session, all greyed out, a saved
+session from another space, and a warning about "exercise types" that was
+written for teachers.
+
+- The "Nothing to practice yet" message gives the real reason in one line:
+  you're in no course in this space (with Join a course), this space's
+  courses have no cards yet, there are cards here but none is ready to
+  practise yet, or this space's cards are in languages you've switched off
+  (with a button to switch them back on).
+- Course counts in that message are this space's, as the Cards and
+  Progress tabs already count them.
+- Saved sessions are offered only in a space where they have something to
+  practise. None is deleted: each one is back in any space where it works.
+  A saved session whose cards have all gone everywhere is no longer shown.
+- A newly saved session's suggested name is its type alone, such as
+  "Regular", without a card count. A count in a name was fixed on the day
+  it was saved and went out of date. Names already saved are unchanged.
+
 ## 0.638 — 16 November 2026
 
 **A student now has a private sign-in link beside their sign-in key.

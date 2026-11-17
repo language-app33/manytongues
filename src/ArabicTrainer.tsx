@@ -851,6 +851,7 @@ export function mergeMoves(
    progress can be asked what it does without a browser — see grade.ts. */
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
 import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
+import { homeEmptySays, whyHomeIsEmpty } from "./home-empty.ts";
 import type { Filler, Mark } from "./grade.ts";
 
 import { applyUpdate, beforeReload, onUpdateReady, updateReady } from "./updates.ts";
@@ -12946,6 +12947,32 @@ export default function ArabicTrainer() {
     return p && prepStatus(p, shown, settings) === "active" ? p : null;
   }, [settings, shown]);
 
+  /* Whether the home screen has anything to offer in the space on screen,
+     and if not, why (0.639). Read off what can be practised here — not
+     off whether the device holds a card anywhere, which is what left a
+     space with nothing for you showing every button greyed out. See
+     home-empty.ts. */
+  const homeEmpty = useMemo(() => {
+    if (drillable.length) return null;
+    const inSpace = (it: Item) => {
+      if (!spaceNow) return true;
+      const at = spaceOfItem(it);
+      return at === null || at === spaceNow;
+    };
+    const off: LangId[] = [];
+    for (const it of drillableAll) {
+      if (!inSpace(it) || setIndex.out.has(it.id)) continue;
+      const lang = langIdOf(it, settings);
+      if (langsOff.includes(lang) && !off.includes(lang)) off.push(lang);
+    }
+    return whyHomeIsEmpty({
+      practisable: 0,
+      offLangs: off,
+      cardsHere: items.filter(inSpace).length,
+      coursesHere: learnCourses.length,
+    });
+  }, [drillable, drillableAll, items, spaceNow, spaceOfItem, setIndex, settings, langsOff, learnCourses]);
+
   /* And how much is going wrong, which is what the Weak spots button is
      offered on. The same test the session itself picks with — see isWeak —
      so a number here is a session that builds. */
@@ -13037,6 +13064,14 @@ export default function ArabicTrainer() {
         created: Number(x.created) || 0,
       }));
   }, [settings.savedSessions]);
+
+  /* The saved sessions with something to practise in the space on screen
+     (0.639). One saved in another space, or whose cards have all gone, is
+     kept and simply not offered here; it is back wherever it works. */
+  const savedHere = useMemo(
+    () => savedSessions.filter((s) => cardsOfSaved(s, drillable).length > 0),
+    [savedSessions, drillable]
+  );
 
   function keepSession(session: Omit<SavedSession, "id" | "created">) {
     const kept: SavedSession = {
@@ -15689,32 +15724,58 @@ export default function ArabicTrainer() {
                 </Notice>
               </div>
             )}
-            {items.length === 0 && (
-              /* The same component the Progress and Cards tabs use for the
-                 same situation. It was a hand-rolled block here, which is
-                 how it came to say something different from both. */
-              <Empty
-                title="Nothing to practice yet"
-                /* The invitation is for someone who has nowhere to get
-                   cards from, and only once we know that. An enrolled
-                   student is waiting on their teacher, not on a code, and
-                   a button telling them otherwise is the whole reason this
-                   read wrong. Courses is a tap away either way — the tab
-                   strip above does not go anywhere. */
-                action={
-                  /* Not while trying a space: there is no joining there (0.574). */
-                  coursesKnown && myCourses.length === 0 && !TRYING ? (
-                    <Button variant="primary" onClick={openCourses} icon="school">
-                      Join a course
-                    </Button>
-                  ) : null
-                }
-              >
-                {noCardsYet(myCourses.length)}
-              </Empty>
+            {homeEmpty && !session && (
+              /* Nothing to practise in the space on screen (0.639): this
+                 and nothing else, rather than every button greyed out. */
+              <>
+                {/* A personal set's pictures waiting for an answer are the
+                    way forward when they are all there is, so the line
+                    that asks for them stays. */}
+                {setWaiting && (
+                  <div data-el="set-waiting" className="at-mb3">
+                    <Nudge icon="person" action={<Button size="sm" onClick={() => setSetAsk({ steps: setSteps })}>Answer</Button>}>
+                      {setWaiting}
+                    </Nudge>
+                  </div>
+                )}
+                {/* The same component the Progress and Cards tabs use for
+                    the same situation. It was a hand-rolled block here,
+                    which is how it came to say something different from
+                    both. */}
+                <Empty
+                  title="Nothing to practice yet"
+                  /* The invitation is for someone who has nowhere to get
+                     cards from, and only once we know that. An enrolled
+                     student is waiting on their teacher, not on a code, and
+                     a button telling them otherwise is the whole reason this
+                     read wrong. Courses is a tap away either way — the tab
+                     strip above does not go anywhere. Counted in the space
+                     on screen, as the Cards and Progress tabs count. */
+                  action={
+                    homeEmpty.kind === "langs" ? (
+                      <Button variant="primary"
+                        onClick={() => setSetting("langsOff", langsOff.filter((l) => !homeEmpty.langs.includes(l)))}
+                      >
+                        Switch {homeEmpty.langs.length === 1 ? "it" : "them"} back on
+                      </Button>
+                    ) : homeEmpty.kind === "no-cards" && coursesKnown && homeEmpty.courses === 0 && !TRYING ? (
+                      /* Not while trying a space: there is no joining there (0.574). */
+                      <Button variant="primary" onClick={openCourses} icon="school">
+                        Join a course
+                      </Button>
+                    ) : null
+                  }
+                >
+                  {homeEmpty.kind === "no-cards"
+                    ? noCardsYet(homeEmpty.courses)
+                    : homeEmptySays(homeEmpty, homeEmpty.kind === "langs"
+                      ? homeEmpty.langs.map((l) => (LANGUAGES[l] || {}).name || l)
+                      : [])}
+                </Empty>
+              </>
             )}
 
-            {items.length > 0 && !session && (
+            {!homeEmpty && !session && (
               <>
                 {/* The count of what is waiting rides on the card as an
                     attribute rather than a line of text: nothing reads it at
@@ -15836,7 +15897,9 @@ export default function ArabicTrainer() {
                       an empty screen is a promise the app has not kept, and
                       the way to find this is to save one, which the Build
                       screen offers where the session is finished. */}
-                  {savedSessions.length > 0 && (
+                  {/* And only the ones with something to practise in the
+                      space on screen (0.639). */}
+                  {savedHere.length > 0 && (
                     <>
                       <div className="at-row at-mt3">
                         <Button variant="ghost" onClick={() => setShowingSaved(true)}>
@@ -15844,21 +15907,18 @@ export default function ArabicTrainer() {
                         </Button>
                       </div>
                       <SavedTiles
-                        sessions={savedSessions}
-                        items={items}
+                        sessions={savedHere}
+                        items={shown}
                         settings={settings}
                         onStart={startSaved}
                       />
                     </>
                   )}
-
-                  {!drillable.length && items.length > 0 && (
-                    <Notice kind="warn">
-                      No card here has two usable exercise types. A card needs the{" "}
-                      {langOf(settings).scriptLabel} and at least one more field
-                      before it can be practiced.
-                    </Notice>
-                  )}
+                  {/* The warning that sat here — "No card here has two
+                      usable exercise types" — was written for a teacher and
+                      shown to learners. With nothing to practise the home
+                      screen is the Empty above now, which says why in a
+                      learner's terms (0.639). */}
                 </div>
               </>
             )}
@@ -17167,8 +17227,10 @@ export default function ArabicTrainer() {
 
         {showingSaved && !editingSaved && (
           <SavedSessionsSheet
-            sessions={savedSessions}
-            items={items}
+            /* The ones that can run here, as the home screen offers
+               them (0.639). */
+            sessions={savedHere}
+            items={shown}
             onStart={(s) => {
               setShowingSaved(false);
               startSaved(s);
@@ -18422,11 +18484,11 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   const said = tried ? need : { mode: "", cards: "", length: "" };
   const problem = need.mode || need.cards || typesShort || need.length;
 
-  /* Named after what it is, so a list of them reads without opening any:
-     the mode is the shape of the session and the count is its size. */
-  const suggestion = mode
-    ? `${(MODES as Record<string, { label: string }>)[mode].label} · ${plural(picked.size, "card")}`
-    : "";
+  /* Named after what it is: the mode, the shape of the session. Not its
+     size any more (0.639) — a count written into a name is fixed the day
+     it is saved and wrong from the day a deck changes, and the home
+     screen's tile already says the live figure. */
+  const suggestion = mode ? (MODES as Record<string, { label: string }>)[mode].label : "";
 
   function start() {
     /* Ticked, it is kept as it is started — there is no Save to forget. */
