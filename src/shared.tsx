@@ -6,6 +6,7 @@
  */
 
 import { decksForSystem } from "./number-decks.ts";
+import { installHow } from "./install-steps.ts";
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
 import type { Card, Course, Deck, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
 import { formsOf, leadOf, wordOf } from "./cards.ts";
@@ -770,13 +771,44 @@ export function Section({ title, count, lede, action, children, className = "", 
 /* --- Empty --------------------------------------------------------
    Sixteen different ad-hoc versions of "there is nothing here",
    fifteen of which did not use the class that existed for it. */
-export function Empty({ title, children, action }: { title?: Node; children?: Node; action?: Node }) {
+export function Empty({ title, children, action, art }: { title?: Node; children?: Node; action?: Node;
+  /** A small picture above the words, where the screen is otherwise bare
+      (0.642: the home screen with nothing to practise). */
+  art?: Node }) {
   return (
     <div className="at-empty2">
+      {art ? <div className="at-emptyart" aria-hidden="true">{art}</div> : null}
       {title ? <p className="at-eyebrow">{title}</p> : null}
       {children ? <p className="at-hint">{children}</p> : null}
       {action ? <div className="at-row">{action}</div> : null}
     </div>
+  );
+}
+
+/* --- ChatArt ------------------------------------------------------
+   Three speech bubbles in the colours of the dialect-map mark, for a
+   screen with nothing on it yet (0.642). Like the mark, the bubbles carry
+   their own colours, so it reads the same in either theme; only the faint
+   sparkles follow the page. */
+export function ChatArt() {
+  return (
+    <svg className="at-chatart" viewBox="0 0 160 120" width="160" height="120" focusable="false">
+      <path d="M22 30c0-9 7-16 16-16h46c9 0 16 7 16 16v26c0 9-7 16-16 16H52l-16 14 3-14h-1c-9 0-16-7-16-16z"
+        fill="#FF7A59" />
+      <circle cx="44" cy="43" r="4.5" fill="#0F2A28" />
+      <circle cx="61" cy="43" r="4.5" fill="#0F2A28" />
+      <circle cx="78" cy="43" r="4.5" fill="#0F2A28" />
+      <path d="M70 66c0-8 7-15 15-15h43c8 0 15 7 15 15v22c0 8-7 15-15 15h-2l3 12-15-12H85c-8 0-15-7-15-15z"
+        fill="#7FD1C7" />
+      <path d="M86 74h40M86 86h26" stroke="#0F2A28" strokeWidth="5" strokeLinecap="round" />
+      <path d="M112 12c0-5 4-9 9-9h21c5 0 9 4 9 9v11c0 5-4 9-9 9h-10l-8 7 1-7h-4c-5 0-9-4-9-9z" fill="#F7C548" />
+      <path d="M131 13l2 4 4 1-4 2-2 4-2-4-4-2 4-1z" fill="#0F2A28" />
+      <g fill="currentColor" opacity=".35">
+        <circle cx="12" cy="88" r="3" />
+        <circle cx="150" cy="52" r="2.5" />
+        <circle cx="58" cy="104" r="2" />
+      </g>
+    </svg>
   );
 }
 
@@ -6248,7 +6280,17 @@ export function useInstallOffer() {
     }
   }, []);
 
-  return { show: !installed && !dismissed, prompt, dismiss };
+  /* What to say, in this browser's words (0.642) — or nothing, where this
+     browser cannot install a site at all. */
+  const how = useMemo(
+    () =>
+      typeof navigator === "undefined"
+        ? null
+        : installHow({ ua: navigator.userAgent || "", touch: navigator.maxTouchPoints || 0 }, !!prompt),
+    [prompt]
+  );
+
+  return { show: !installed && !dismissed && !!how, prompt, dismiss, how };
 }
 
 /*

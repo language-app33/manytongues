@@ -2788,6 +2788,8 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-nudgeact { margin-top:10px; }
 .at-empty2 { text-align:center; padding: var(--s6) var(--s4); border:2px dashed var(--line); border-radius: var(--r); background: var(--well); }
 .at-empty2 .at-eyebrow { margin:0 0 var(--s2); }
+.at-emptyart { display:flex; justify-content:center; margin:0 0 var(--s4); color: var(--muted); }
+.at-chatart { display:block; width:128px; height:auto; }
 .at-empty2 .at-hint { margin:0 auto; max-width: 46ch; }
 .at-empty2 .at-row { justify-content:center; margin-top: var(--s4); }
 /* --- Segmented: pick one of a few ---
@@ -3466,6 +3468,9 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-brand.at-brand-home { left:12px; right:auto; margin:0; width:max-content; height:64px;
   padding:0 12px 0 6px; gap:12px; font-size:32px; color: var(--text); }
 .at-brand.at-brand-home .at-brandmark { width:48px; height:48px; }
+/* With no place button in the top right, nothing needs the room it was
+   moved left to make (0.642): centred again. */
+.at-brand.at-brand-home.centred { left:0; right:0; margin-inline:auto; }
 .at.on-home { padding-top:104px; }
 /* Progress and Cards are headed by their tab title (0.553), which is held
    at the very top as a space's is (0.557): nothing above it to scroll. */

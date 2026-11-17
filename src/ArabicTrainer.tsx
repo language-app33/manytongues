@@ -23,6 +23,7 @@ import {
   usePicture,
   ConfirmModal,
   Empty,
+  ChatArt,
   Field as FormField,
   FLAG_KINDS,
   FEEDBACK_KINDS,
@@ -12979,6 +12980,11 @@ export default function ArabicTrainer() {
       coursesHere: learnCourses.length,
     });
   }, [drillable, drillableAll, items, spaceNow, spaceOfItem, setIndex, settings, langsOff, learnCourses]);
+  /* With nothing to practise the bar offers no Progress or Cards (0.642),
+     so nobody is left on one of them with no way back but Home. */
+  useEffect(() => {
+    if (homeEmpty && (tab === "progress" || tab === "items")) setTab("home");
+  }, [homeEmpty, tab]);
 
   /* And how much is going wrong, which is what the Weak spots button is
      offered on. The same test the session itself picks with — see isWeak —
@@ -15655,7 +15661,10 @@ export default function ArabicTrainer() {
               place you work in every day. */}
           {/* Not while there is no space to use (0.580, audit finding 15):
               the panel above is the whole page. */}
-          {!inExercise && space === "learn" && !stranded && (
+          {/* Nor while there is nothing to practise (0.642): Progress and
+              Cards would only say the same "nothing yet" again, and Home on
+              its own is not a choice. The You menu stays. */}
+          {!inExercise && space === "learn" && !stranded && !homeEmpty && (
             <Tabs
               dock
               tabs={[
@@ -15715,14 +15724,14 @@ export default function ArabicTrainer() {
               <div className="at-mb3">
                 <Notice kind="info">
                   <span>
-                    Add ManyTongues to your home screen to keep your cards safe and open it like an
-                    app.{" "}
+                    {install.how ? install.how.lead : ""}{" "}
                     {install.prompt ? (
                       <button className="at-linkbtn" onClick={() => install.prompt?.prompt()}>
                         Install
                       </button>
                     ) : (
-                      <i>Use your browser&apos;s Share menu, then &ldquo;Add to Home Screen&rdquo;.</i>
+                      /* In this browser's own words: see install-steps.ts. */
+                      <i>{install.how ? install.how.steps : ""}</i>
                     )}{" "}
                     <button className="at-linkbtn" onClick={install.dismiss}>
                       Not now
@@ -15750,6 +15759,7 @@ export default function ArabicTrainer() {
                     which is how it came to say something different from
                     both. */}
                 <Empty
+                  art={<ChatArt />}
                   /* The invitation is for someone who has nowhere to get
                      cards from, and only once we know that. An enrolled
                      student is waiting on their teacher, not on a code, and
@@ -17527,8 +17537,10 @@ export default function ArabicTrainer() {
       {/* Home has it large, at the left (0.576), as the page's title. Progress and
           Cards are headed with their name, as every tab is (0.553);
           Courses, reached from the menu, is headed with its own. */}
+      {/* Centred where there is no place button beside it to make room
+          for (0.642): one space, one language, nothing to switch. */}
       {!inExercise && space === "learn" && tab === "home" && (
-        <div className="at-brand at-brand-home">
+        <div className={`at-brand at-brand-home${placeButton ? "" : " centred"}`}>
           <img className="at-brandmark" src="/logo.svg" alt="" width={48} height={48} />
           ManyTongues
         </div>

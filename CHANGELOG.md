@@ -8,6 +8,33 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.642 — 17 November 2026
+
+**A friendlier empty home screen, and directions to install that match
+the browser you are in.**
+
+- **Install, in your browser's words.** The offer to add the app to your
+  home screen said "Use your browser's Share menu" to everyone, which is
+  right only for Safari on an iPhone. It now names the button in the
+  browser the app is open in: Safari, Chrome, Firefox and Edge on an
+  iPhone or iPad; Chrome, Samsung Internet, Firefox, Edge and Opera on
+  Android; Chrome, Edge and Safari on a computer. Inside another app's
+  browser (Instagram, Facebook and the like) it says to open the page in
+  Safari or Chrome first, since those cannot install anything. Firefox on
+  a computer cannot install a site at all, so it is no longer offered
+  there. Where the browser has its own Install button, that is offered
+  as before.
+- **No Progress or Cards with nothing to practise.** In every case where
+  the home screen says there is nothing to practise (no course, a course
+  with no cards yet, cards not ready yet, or every card in a switched-off
+  language), the bar at the bottom shows only your menu. Progress and
+  Cards come back as soon as there is something to practise.
+- **A picture on the empty home screen.** Three speech bubbles in the
+  app's colours sit above the line saying what to do next.
+- **The name centred when there is nothing to switch.** With one space
+  and one language there is no switcher in the top corner, so the app's
+  name and logo sit in the middle of the top again.
+
 ## 0.641 — 17 November 2026
 
 **The home screen says less when there is nothing to practise, and counts
