@@ -8,6 +8,51 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.639 — 17 November 2026
+
+**Every student now has a private sign-in link, without anyone's key
+changing, and admins can see it whenever they need it.** Each person on a
+list of people is folded down to their name; opening them shows what can
+be done to them and, for a student, their link.
+
+- **Links for everyone at once.** Students who joined before sign-in links
+  get one the first time an admin opens a list they are on, or the next
+  time they open the app. Nobody's key is replaced, and nobody is signed
+  out.
+- **A link is no longer the key written as an address.** It carries a code
+  of its own that signs the student in, to the same progress. Giving a
+  student a new key gives them a new link too and stops the old one. Links
+  from 0.638, which carried the key, keep working until that key is
+  replaced.
+- **Folded people.** In a space's People, Super admin's list of everyone
+  (both views), a course's people in Admin, and Former members, each
+  person is folded under their name the way a form is in the card editor.
+  Opened: their actions, their courses and when they were last seen, and a
+  student's private sign-in link. On a course's people, the Teacher and
+  Student switches stay on the folded row, and only a student's row opens.
+- **Who sees which links.** The super admin sees every student's. A space
+  admin sees those of the students in their space who are in no other
+  space. Teachers and admins have no link.
+- **A new key shows once, in the person's tile.** The panel that used to
+  appear at the top of the list is gone: the person's tile opens by
+  itself with the new key, to be passed on, and their new link.
+- Keys are still never shown again after they are made.
+
+The links are worked out from the App admin key. If that key is changed,
+every student's link changes with it and the old ones stop working, so
+pass the new ones on. A copy of the site with no App admin key gives no
+links.
+
+To check by hand, on beta: open People as a space admin. Everyone is
+folded, and opening a student shows their link; open that link in a
+private window and you are signed in as them, with their progress. Open a
+teacher: no link. Give a student a new key: their tile opens with the key
+and a new link, and the old link no longer works. Open a course in Admin:
+the Teacher and Student switches work without opening anyone, and opening
+a student shows their link. As the super admin, check the same in the list
+of everyone. A student who joined before 0.638 now has a link, and their
+key still works.
+
 ## 0.638 — 16 November 2026
 
 **A student now has a private sign-in link beside their sign-in key.

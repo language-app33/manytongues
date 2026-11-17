@@ -1732,15 +1732,20 @@ Addresses and joining (since 0.543):
   reopened and deleted in Admin → Spaces. Deleting an account, or a whole
   space, also erases each account's practice history (`forgetSyncDoc` in
   `server/api/sync.js`).
-- A student's sign-in link (0.638) is `<origin>/<address>#key=<sign-in key>`
-  (`src/sign-in-link.ts`). The key rides after `#`, so it never reaches a
-  server, and the app reads it once at start and takes it out of the
-  address and the history at once. The server says who may use one:
-  `keyOnly` on `whoami`, `signup`, `admin-create-user` and
-  `admin-reissue-key` is true for anyone who teaches a course, runs a space
-  or is the App admin, and a `whoami` sent from a link (`via=link`) for
-  such an account is refused with `key-only`. The link is built on the
-  device from the key it holds; it is never stored or sent.
+- A student's sign-in link is `<origin>/<address>#key=<code>`
+  (`src/sign-in-link.ts`). Since 0.639 the code is not the key: it is
+  worked out from `ADMIN_KEY`, the handle and a count (`linkCodeFor` in
+  `server/api/courses.js`), and only its digest is kept (`linkHash`, with a
+  `keyOf` entry like a key's), so it signs in wherever a key does. A new
+  key raises the count, which ends the old link. `ensureLinks` makes one
+  for any student without one when an admin lists them or they ask
+  `whoami`. `whoami` answers `syncToken`, the key's digest, because a
+  device signed in by link cannot work out where its practice is kept.
+  The code rides after `#`, so it never reaches a server, and the app
+  takes it out of the address at start. `keyOnly` (teaches, runs a space,
+  or is the App admin) means no link: `whoami` refuses one with
+  `key-only`, and drops it. A 0.638 link, which carried the key, still
+  works.
 
 Running a space (since 0.544):
 

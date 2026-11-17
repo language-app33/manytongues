@@ -280,6 +280,8 @@ const PLACES: Record<string, [string, string]> = {
   EveryonePeople: [ADMIN, "Super admin · People in every space"],
   EveryReport: [ADMIN, "Super admin · Reports from every space"],
   PersonActions: [ADMIN, "The People list · a person's new key, suspending and removing"],
+  PersonFold: [ADMIN, "Lists of people · one person, folded under their name"],
+  NewKeyNote: [ADMIN, "Lists of people · a new sign-in key, shown once in the person's tile"],
   ReportList: [ADMIN, "The Reports tab · learners' reports about cards"],
   useConfirm: [ADMIN, "Admin · the question asked before something is done"],
   InviteLink: [ADMIN, "The People tab · the space's invitation link"],

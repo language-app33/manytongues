@@ -8731,3 +8731,39 @@ anyone's key.
 once; both are for later. On an iPhone, an app installed to the home
 screen must be signed in once by pasting the link or key, because a link
 always opens the browser.
+
+---
+
+## A sign-in link carries a code of its own (0.639)
+
+**17 November 2026** · `linkCodeFor` and `ensureLinks` in `server/api/courses.js`
+
+In 0.638 a link was the key written as an address. The owner then wanted
+every student to have a link at once, without any key changing. Keys are
+kept only as digests, so an existing student's key cannot be read back to
+make one. So a link now carries its own code.
+
+**Worked out, not stored.** The code comes from the App admin key, the
+handle and a count, so the server keeps only its digest, as it does a
+key's, and can work the code out again whenever an admin opens a list.
+Storing the codes encrypted would have meant keeping a secret readable on
+disk; working them out means nothing secret is stored at all. A new key
+raises the count, so the old link ends with the old key. The cost: a
+changed App admin key changes every link, and a site with no App admin key
+has none.
+
+**Two things sign a student in.** The code is accepted wherever a key is.
+Practice is kept under the key's digest, which a device holding only the
+code cannot work out, so `whoami` tells the device where it is
+(`syncToken`).
+
+**Keys are still shown once.** The owner chose to keep keys unreadable
+(2b) once the link did the key's job for students. A new key appears
+once, inside the person's tile.
+
+**Folded people.** Every list of people that an admin works in uses the
+card editor's form fold. There is no fold component to reuse, only that
+markup, so `PersonFold` copies it. A row with nothing to open (a teacher
+on a course's people) stays a plain row rather than a fold with nothing
+inside.
+
