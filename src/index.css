@@ -2794,7 +2794,7 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-empty2 .at-eyebrow { margin:0 0 var(--s2); }
 /* The home screen's one line when there is nothing to practise (0.643):
    the screen's headline, not a footnote under the picture. */
-.at-emptybig { display:block; font-family: var(--wordmark); font-size:24px; font-weight:800;
+.at-emptybig { display:block; font-family: var(--ui); font-size:24px; font-weight:800;
   line-height:1.25; letter-spacing:-.01em; color: var(--text); text-wrap: balance; }
 /* The loading line, shown only if loading takes long enough to need it. */
 .at-latecome { opacity:0; animation: at-latecome 200ms ease-out 600ms forwards; }

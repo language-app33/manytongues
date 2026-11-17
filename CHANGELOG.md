@@ -29,8 +29,7 @@ and moves once per batch of work you would notice, not once per commit.
   window. Progress and Cards still come back when there is something to
   practise.
 - **A larger line.** "Nothing to practice yet!", and the other lines in
-  its place, are now the screen's headline: larger, bolder and in the
-  app's own lettering.
+  its place, are now the screen's headline: larger and bolder.
 
 ## 0.642 — 17 November 2026
 
