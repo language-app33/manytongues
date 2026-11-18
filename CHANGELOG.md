@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.649 — 18 November 2026
+
+**Home has one thing to do: Start session.** Weak spots, Build a session
+and your saved sessions have moved off the home screen to a new screen,
+**Focused training**, opened by the dumbbell button at the right of Start
+session. They work as they did: Weak spots is dimmed when nothing is
+slipping, and pressing it then says so. Starting a session from Focused
+training closes it, so when the session ends you are back on Home.
+
+There is no mark on the dumbbell when something is slipping, so weak
+spots are found by opening Focused training.
+
 ## 0.648 — 18 November 2026
 
 **The feedback box stays above the phone's keyboard, for real this

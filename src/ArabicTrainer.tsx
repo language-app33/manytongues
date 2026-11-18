@@ -11662,6 +11662,8 @@ export default function ArabicTrainer() {
   /* Teaching is a role on a course, so it has to be asked about — and the
      material request answers it, so it is no longer asked twice. */
   const [building, setBuilding] = useState(false);
+  /* Focused training (0.649): the screen behind the dumbbell on Home. */
+  const [training, setTraining] = useState(false);
   const [showingSaved, setShowingSaved] = useState(false);
   const [editingSaved, setEditingSaved] = useState<SavedSession | null>(null);
   /* Which language the session on screen is drawn from: a language id, ""
@@ -13093,6 +13095,12 @@ export default function ArabicTrainer() {
     () => drillable.filter((it) => isWeak(it, settings)).length,
     [drillable, settings]
   );
+  /* A session started from Focused training — weak spots, a built one, a
+     kept one — closes it, so the session's end comes back to Home rather
+     than to the screen it was started from (0.649). */
+  useEffect(() => {
+    if (session) setTraining(false);
+  }, [session]);
 
   /* ---------------- session ---------------- */
 
@@ -16009,7 +16017,11 @@ export default function ArabicTrainer() {
                       onOpen={(deckId) => setUnitOpen({ courseId: p.courseId, deckId })} />
                   ))}
 
-                  <div className="at-row">
+                  {/* Start session, and beside it on the right the way to
+                      Focused training (0.649): weak spots, a session built
+                      by hand and the ones kept, on a screen of their own,
+                      so the home screen has one thing to do. */}
+                  <div className="at-row at-startrow">
                     {/* Always live while there is anything to drill. Being
                         due decides what a session leads with, not whether
                         there is one — so a learner who is up to date, or
@@ -16024,70 +16036,13 @@ export default function ArabicTrainer() {
                     >
                       Start session
                     </Button>
+                    {/* An icon alone, as the owner asked: its name is what a
+                        screen reader says, and the screen's title. No dot
+                        for weak spots waiting (the owner's 3b). */}
+                    <IconButton icon="dumbbell" label="Focused training" ghost
+                      className="at-trainbtn" data-el="focused-training"
+                      onClick={() => setTraining(true)} />
                   </div>
-                  {/* And the other kind of session there is a one-tap case
-                      for: everything going wrong, worst first. It sits
-                      directly under Start session because it is the same
-                      offer narrowed — a session, dealt for you — rather
-                      than something to be assembled, and because the
-                      moment to reach for it is the moment you have just
-                      seen the ladder say a level is paused.
-
-                      Always shown, and dimmed when there is nothing to fix.
-                      The app's habit is to leave out a button that would
-                      open on an empty screen, but a learner has to be able
-                      to find this one to learn what it does.
-
-                      Dimmed, and still worth pressing: `off` rather than
-                      `disabled`, so the press arrives and is answered with
-                      the reason. That line used to sit beside the button on
-                      every single day, saying what is slipping and how
-                      much — a standing caption for a question nobody had
-                      asked yet. It is said now on the one occasion it is an
-                      answer, which is the moment somebody presses the
-                      button and nothing happens. */}
-                  <div className="at-row at-mt3">
-                    <Button variant="ghost"
-                      off={!weakCount}
-                      onClick={() =>
-                        weakCount
-                          ? beginWeak()
-                          : flash("There is no weak spot to fix right now")
-                      }
-                    >
-                      Weak spots
-                    </Button>
-                  </div>
-                  <div className="at-row at-mt3">
-                    <Button variant="ghost"
-                      onClick={() => setBuilding(true)}
-                      disabled={!drillable.length}
-                    >
-                      Build a session
-                    </Button>
-
-                  </div>
-                  {/* Only once there is one to open. A button that leads to
-                      an empty screen is a promise the app has not kept, and
-                      the way to find this is to save one, which the Build
-                      screen offers where the session is finished. */}
-                  {/* And only the ones with something to practise in the
-                      space on screen (0.639). */}
-                  {savedHere.length > 0 && (
-                    <>
-                      <div className="at-row at-mt3">
-                        <Button variant="ghost" onClick={() => setShowingSaved(true)}>
-                          Saved sessions
-                        </Button>
-                      </div>
-                      <SavedTiles
-                        sessions={savedHere}
-                        items={shown}
-                        settings={settings}
-                        onStart={startSaved}
-                      />
-                    </>
-                  )}
                   {/* The warning that sat here — "No card here has two
                       usable exercise types" — was written for a teacher and
                       shown to learners. With nothing to practise the home
@@ -17388,6 +17343,26 @@ export default function ArabicTrainer() {
 
         {/* ============ SETTINGS ============ */}
 
+        {/* Under the Build and Saved sessions screens, which open over it
+            and come back to it; a session started from any of them closes
+            it (see the effect on `session`). */}
+        {training && !session && (
+          <FocusedTrainingSheet
+            weakCount={weakCount}
+            onWeak={() =>
+              weakCount ? beginWeak() : flash("There is no weak spot to fix right now")
+            }
+            canBuild={drillable.length > 0}
+            onBuild={() => setBuilding(true)}
+            saved={savedHere}
+            items={shown}
+            settings={settings}
+            onSavedList={() => setShowingSaved(true)}
+            onStartSaved={startSaved}
+            onClose={() => setTraining(false)}
+          />
+        )}
+
         {building && (
           <ManualSessionSheet
             items={shown}
@@ -18418,6 +18393,69 @@ function ItemsTab({
 
 const COUNT_CHOICES = [10, 20, 30, 50];
 const TIME_CHOICES = [2, 5, 10, 15, 30];
+
+/* ------------------------------------------------------------------
+   Full-screen: Focused training (0.649)
+
+   Behind the dumbbell beside Start session. The sessions a learner aims
+   themselves rather than has dealt: what is going wrong, one built by
+   hand, and the ones they kept. They were three more buttons and a row of
+   tiles under Start session, which made the home screen a menu; now Home
+   has one thing to do and this screen has the rest.
+
+   The buttons behave as they did on Home. Weak spots is always here and
+   dimmed when nothing is slipping, and pressing it then says so, which is
+   how a learner finds out what it is for. Saved sessions, and its tiles,
+   only once there is one.
+   ------------------------------------------------------------------ */
+
+function FocusedTrainingSheet({
+  weakCount, onWeak, canBuild, onBuild, saved, items, settings, onSavedList, onStartSaved, onClose,
+}: {
+  weakCount: number;
+  onWeak: () => void;
+  canBuild: boolean;
+  onBuild: () => void;
+  saved: SavedSession[];
+  items: Item[];
+  settings: Settings;
+  onSavedList: () => void;
+  onStartSaved: (session: SavedSession) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <Screen title="Focused training" onBack={onClose} className="training">
+      <div className="at-training">
+        <div className="at-row">
+          <Button variant="ghost" off={!weakCount} onClick={onWeak}>
+            Weak spots
+          </Button>
+        </div>
+        <div className="at-row">
+          <Button variant="ghost" onClick={onBuild} disabled={!canBuild}>
+            Build a session
+          </Button>
+        </div>
+        {saved.length > 0 && (
+          <>
+            <div className="at-row">
+              <Button variant="ghost" onClick={onSavedList}>
+                Saved sessions
+              </Button>
+            </div>
+            <SavedTiles sessions={saved} items={items} settings={settings} onStart={onStartSaved} />
+          </>
+        )}
+      </div>
+    </Screen>
+  );
+}
 
 /* ------------------------------------------------------------------
    Full-screen: the sessions somebody kept

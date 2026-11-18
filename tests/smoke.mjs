@@ -1187,6 +1187,21 @@ const buttonNamed = (re) =>
      see Pressable. */
   /** @type {HTMLButtonElement | undefined} */ ([...document.querySelectorAll('button, [role="button"].at-pressable')]
     .find((b) => re.test(spokenName(b))));
+/* Weak spots, Build a session and the sessions kept are on Focused
+   training, behind the dumbbell beside Start session (0.649). Opened from
+   Home, and left by its own Back. */
+const toTraining = async (/** @type {ParentNode} */ root = document) => {
+  const b = root.querySelector('[data-el="focused-training"]');
+  click(b);
+  await sleep(250);
+  return !!b;
+};
+const leaveTraining = async () => {
+  const back = document.querySelector(".at-screen.training .at-back");
+  click(back);
+  await sleep(250);
+  return !!back;
+};
 
 /*
  * Play the matching grid, if that is what is up.
@@ -1347,6 +1362,7 @@ const sessionModeSaid = () =>
   ((document.querySelector(".at-screen.cardform .at-shutrow .at-shutname") || {}).textContent || "").trim();
 const sessionPills = () => [...document.querySelectorAll(".at-screen.cardform .at-deckpill")].map((p) => (p.textContent || "").trim());
 
+await toTraining();
 check("the manual session builder opens", clickNamed(/Build a session|Choose what to practice|Pick cards/) || true);
 await sleep(300);
 if (/Build a session/.test(document.body.textContent)) {
@@ -1951,14 +1967,14 @@ if (/Build a session/.test(document.body.textContent)) {
 
   /* And the session kept a few steps ago, which is only worth keeping if
      there is a way back to it. */
-  check("a kept session puts a way back to it on the home screen",
-    !!buttonNamed(/^Saved sessions$/),
+  check("a kept session puts a way back to it in Focused training",
+    (await toTraining()) && !!buttonNamed(/^Saved sessions$/),
     [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(0, 120));
   /* And as a tile under that button, with how much of it is learnt —
      a glance at each without opening the list. */
   const tile = [...document.querySelectorAll(".at-savedtile")]
     .find((b) => /Thursday's verbs/.test(b.textContent || ""));
-  check("a kept session is a tile on the home screen too", !!tile,
+  check("a kept session is a tile in Focused training too", !!tile,
     [...document.querySelectorAll(".at-savedtile")].map((b) => b.textContent).join("|") || "no tiles");
   check("and the tile says how much of its cards is learnt",
     !!tile && /^\d{1,3}%$/.test(((tile.querySelector(".pc") || {}).textContent || "").trim()),
@@ -1983,6 +1999,9 @@ if (/Build a session/.test(document.body.textContent)) {
 
     /* Changed rather than built again: the Build screen opens on what was
        kept, and saving puts the change back under the same session. */
+    check("starting a kept session closed Focused training behind it",
+      !document.querySelector(".at-screen.training"), "Focused training still open");
+    await toTraining();
     clickNamed(/^Saved sessions$/);
     await sleep(250);
     click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Edit Thursday's verbs"));
@@ -2007,9 +2026,10 @@ if (/Build a session/.test(document.body.textContent)) {
     const listed = document.querySelector(".at-list")?.textContent || "";
     check("and the change is kept under the same session",
       /Friday's verbs/.test(listed) && !/Thursday's verbs/.test(listed), listed.slice(0, 120));
-    click(document.querySelector('[aria-label="Back"]'));
+    click([...document.querySelectorAll('[aria-label="Back"]')].pop());
     await sleep(250);
   }
+  await leaveTraining();
 
   /* Kept for the browser check, which needs cards to have a session at
      all and cannot make them through the UI in reasonable time. */
@@ -2775,7 +2795,7 @@ if (/Build a session/.test(document.body.textContent)) {
       prepTile() ? (prepTile()?.textContent || "").replace(/\s+/g, " ").slice(0, 120) : "(no prep tile)");
     check("the climb over everything is left off, and the sessions tile below has no primary button",
       !homeCard()?.querySelector(".at-climb") && !homeCard()?.querySelector(".at-btn.primary") &&
-        !!buttonNamed(/^Start session$/) && homeCard()?.contains(buttonNamed(/^Weak spots$/) || null),
+        !!buttonNamed(/^Start session$/) && !!homeCard()?.querySelector('[data-el="focused-training"]'),
       (homeCard()?.textContent || "").replace(/\s+/g, " ").slice(0, 120));
     const counter = () => ((document.querySelector(".at-preptoday") || {}).textContent || "");
     check("under it, today's sessions against what today needs, as a count and a row of dots",
@@ -2972,15 +2992,26 @@ const schedules = () => {
 const writtenSince = (/** @type {Map<string, number>} */ before) =>
   [...schedules()].filter(([k, at]) => !before.has(k) || before.get(k) !== at).map(([k]) => k);
 const beforeAnswer = schedules();
-/* ---- the weak-skills button sits under Start session ----
+/* ---- the weak-skills button, on Focused training (0.649) ----
    Its own walk at the foot of this file drives it on a deck with something
    actually going wrong. Here it is the offer itself: on the ordinary home
    screen it is there, nothing is written beside it, and when there is
    nothing to fix it is dimmed and says so on being pressed rather than
    swallowing the press. */
 {
+  const startRow = buttonNamed(/^Start session$/)?.closest(".at-row");
+  const dumbbell = document.querySelector('[data-el="focused-training"]');
+  check("the dumbbell sits at the right of Start session, an icon with a name",
+    !!startRow && startRow.lastElementChild === dumbbell && dumbbell?.getAttribute("aria-label") === "Focused training" &&
+      !(dumbbell?.textContent || "").trim(),
+    startRow ? (startRow.textContent || "").replace(/\s+/g, " ") : "no row");
+  check("and Home no longer carries Weak spots, Build a session or Saved sessions",
+    !buttonNamed(/^(Weak spots|Build a session|Saved sessions)$/), "one of them is still on Home");
+  await toTraining();
+  check("the dumbbell opens Focused training",
+    !!document.querySelector('.at-screen.training[aria-label="Focused training"]'), "no Focused training screen");
   const weakBtn = buttonNamed(/^Weak spots$/);
-  check("the home screen offers a weak-spots session", !!weakBtn,
+  check("which offers a weak-spots session", !!weakBtn,
     (document.body.textContent || "").slice(0, 120).replace(/\s+/g, " "));
   const row = weakBtn && weakBtn.closest(".at-row");
   check("and nothing is written beside it either way",
@@ -3006,6 +3037,8 @@ const beforeAnswer = schedules();
     if (shut) click(shut);
     await sleep(200);
   }
+  check("and Focused training's Back goes home", (await leaveTraining()) && !document.querySelector(".at-screen.training"),
+    "still open");
 }
 click(buttonNamed(/^Start session$/));
 await sleep(400);
@@ -3733,6 +3766,7 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   /* ---- practise it ---- */
   click(buttonNamed(/^Home$/));
   await sleep(300);
+  await toTraining();
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
   await sessionMode(/Regular/);
@@ -4002,6 +4036,7 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   click(buttonNamed(/^Leave$/));
   await sleep(300);
 
+  await toTraining();
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
   await sessionMode(/Regular/);
@@ -4131,6 +4166,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await setPriority(PICKED_OUT, true);
   click(buttonNamed(/^Home$/));
   await sleep(300);
+  await toTraining();
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
   await sessionMode(/Ultimate/);
@@ -4429,6 +4465,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   }
   click(buttonNamed(/^Home$/));
   await sleep(300);
+  await toTraining();
   click(buttonNamed(/Build a session|Choose what to practice|Pick cards/));
   await sleep(300);
   await sessionMode(/Ultimate/);
@@ -9434,7 +9471,8 @@ const openPronounTables = async () => {
   root3.render(React.createElement(App));
   await sleep(1500);
 
-  const weakBtn = [...host3.querySelectorAll("button")]
+  await toTraining(host3);
+  const weakBtn = [...document.querySelectorAll(".at-screen.training button")]
     .find((b) => /^Weak spots$/.test((b.textContent || "").trim()));
   check("a card missed twice running lights the weak-spots button",
     !!weakBtn && weakBtn.getAttribute("aria-disabled") !== "true",

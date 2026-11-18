@@ -8767,3 +8767,31 @@ markup, so `PersonFold` copies it. A row with nothing to open (a teacher
 on a course's people) stays a plain row rather than a fold with nothing
 inside.
 
+
+## Home has one button; the rest is Focused training (0.649)
+
+**18 November 2026** · `src/ArabicTrainer.tsx` (`FocusedTrainingSheet`)
+
+Home had Start session, then Weak spots, Build a session and Saved
+sessions with its tiles, stacked under it at nearly the same weight. That
+made the home screen a menu, and Weak spots, dimmed on most days, was the
+second thing a learner saw. The owner moved the three to a screen of their
+own, **Focused training**, opened by an icon-only dumbbell at the right of
+Start session.
+
+**Named for both halves.** Weak spots narrows a session to what is
+slipping, and Build a session to what the learner picks. "Focused
+training" covers both and matches the icon. "Practice" was not used
+because the app already uses it for a session that leaves the schedule
+alone ("Practice done").
+
+**No dot on the dumbbell** (the owner's 3b). The cost is that nothing on
+Home says when something is slipping: a learner finds weak spots only by
+opening the screen. Weak spots keeps its dimmed-but-pressable behaviour
+there, which is still how a learner learns what it is for.
+
+**The dumbbell is drawn level.** The usual icon, on a slant, read as an
+"expand" arrow at button size.
+
+**A session started from the screen closes it**, so the end of a session
+comes back to Home, not to the screen it was started from.

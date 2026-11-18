@@ -3499,6 +3499,20 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-home + .at-home { margin-top:28px; padding-top:28px; border-top:1px solid var(--line); }
 .at-home .at-row { max-width:420px; margin-inline:auto; }
 .at.kb-open .at-home { padding:0; }
+/* Start session and, at its right, the dumbbell to Focused training
+   (0.649). The row counts as one column, so Start session's type is sized
+   as it was alone; the dumbbell is a square as tall as the button beside
+   it, in the button's own corner and outline, not a share of the row. */
+.at-row.at-startrow { --cols: 1; flex-wrap: nowrap; }
+.at-row > .at-trainbtn { flex:0 0 auto; width:52px; min-height:52px; padding:0;
+  border-radius: var(--r); color: var(--text); }
+/* A size up from the usual icon: a dumbbell is all bar at 20px. */
+.at-trainbtn .at-ic { width:26px; height:26px; }
+/* Focused training: its buttons stacked as they stood on Home. */
+.at-training { text-align:center; }
+.at-training .at-row { max-width:420px; margin-inline:auto; }
+.at-training > :first-child { margin-top:0; }
+.at-training .at-row + .at-row { margin-top:12px; }
 
 /* --- the floating button ---------------------------------------------
    Edit on a card or deck being read, Save on one being written: in the

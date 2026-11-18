@@ -198,6 +198,11 @@ const ICONS: Record<string, string> = {
   /* The padlock open, for unlocking a deck. */
   unlock:
     "M12 17c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2zm0 12H6V10h12v10z",
+  /* A dumbbell, level rather than on the slant the usual one takes, which
+     at this size read as an "expand" arrow: training on top of the daily
+     session — weak spots, a session built by hand, the ones kept (0.649). */
+  dumbbell:
+    "M4 11h16v2H4zM5 6.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1zM16 6.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1zM2 9.5a1 1 0 0 1 1-1h1v7H3a1 1 0 0 1-1-1zM20 8.5h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1z",
   /* The number sign, for the screen a language's numbers are written on. */
   hash: "M20 10V8h-4V4h-2v4h-4V4H8v4H4v2h4v4H4v2h4v4h2v-4h4v4h2v-4h4v-2h-4v-4h4zm-6 4h-4v-4h4v4z",
   /* A cloud struck through: the server out of reach (0.636). */
