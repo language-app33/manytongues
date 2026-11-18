@@ -1188,7 +1188,7 @@ const buttonNamed = (re) =>
   /** @type {HTMLButtonElement | undefined} */ ([...document.querySelectorAll('button, [role="button"].at-pressable')]
     .find((b) => re.test(spokenName(b))));
 /* Weak spots, Build a session and the sessions kept are on Focused
-   training, behind the dumbbell beside Start session (0.649). Opened from
+   training, behind the dumbbell beside Start session (0.650). Opened from
    Home, and left by its own Back. */
 const toTraining = async (/** @type {ParentNode} */ root = document) => {
   const b = root.querySelector('[data-el="focused-training"]');
@@ -2992,7 +2992,7 @@ const schedules = () => {
 const writtenSince = (/** @type {Map<string, number>} */ before) =>
   [...schedules()].filter(([k, at]) => !before.has(k) || before.get(k) !== at).map(([k]) => k);
 const beforeAnswer = schedules();
-/* ---- the weak-skills button, on Focused training (0.649) ----
+/* ---- the weak-skills button, on Focused training (0.650) ----
    Its own walk at the foot of this file drives it on a deck with something
    actually going wrong. Here it is the offer itself: on the ordinary home
    screen it is there, nothing is written beside it, and when there is

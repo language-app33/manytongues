@@ -8768,7 +8768,7 @@ on a course's people) stays a plain row rather than a fold with nothing
 inside.
 
 
-## Home has one button; the rest is Focused training (0.649)
+## Home has one button; the rest is Focused training (0.650)
 
 **18 November 2026** · `src/ArabicTrainer.tsx` (`FocusedTrainingSheet`)
 

@@ -210,17 +210,20 @@ button {
   }}
 .at {
   background: var(--bg); color: var(--text); font-family: var(--ui);
-  min-height: 100vh; min-height: 100dvh; box-sizing: border-box;
+  box-sizing: border-box;
   padding: 66px 16px 108px; -webkit-font-smoothing: antialiased;
   /* clip, not hidden (0.556): hidden makes this a scroll container of its
      own, and a tab's title, held at the top with position:sticky, then
      held to this box — which never scrolls — instead of the window. */
   max-width: 100%; overflow-x: hidden; overflow-x: clip;
 }
-/* The padding counts inside the screen's height, not on top of it: as a
-   content box the page was always a screen plus 174px tall, so a home
-   screen with room to spare still scrolled. dvh because 100vh on a phone is
-   the height with the browser bars hidden, taller than what is on show. */
+/* No minimum height (0.649). The page used to be held at least a screen
+   tall (100dvh), to paint its background to the bottom — but the shell
+   behind it (html, body) is the same colour in both themes, so that bought
+   nothing on show. And "a screen" is the browser's word for it: DuckDuckGo
+   counts the room behind its own address bar, so a home screen with plenty
+   to spare was taller than what was visible and scrolled. Now the page is
+   as tall as what is on it, and only scrolls when that is more than fits. */
 /* The 66px above is room for the fixed chrome — the wordmark, the space
    selector, the corner menu. During an exercise none of that is rendered
    (see inExercise), so the room stayed reserved for nothing and every
@@ -3500,7 +3503,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-home .at-row { max-width:420px; margin-inline:auto; }
 .at.kb-open .at-home { padding:0; }
 /* Start session and, at its right, the dumbbell to Focused training
-   (0.649). The row counts as one column, so Start session's type is sized
+   (0.650). The row counts as one column, so Start session's type is sized
    as it was alone; the dumbbell is a square as tall as the button beside
    it, in the button's own corner and outline, not a share of the row. */
 .at-row.at-startrow { --cols: 1; flex-wrap: nowrap; }

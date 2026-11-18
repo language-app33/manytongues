@@ -11662,7 +11662,7 @@ export default function ArabicTrainer() {
   /* Teaching is a role on a course, so it has to be asked about — and the
      material request answers it, so it is no longer asked twice. */
   const [building, setBuilding] = useState(false);
-  /* Focused training (0.649): the screen behind the dumbbell on Home. */
+  /* Focused training (0.650): the screen behind the dumbbell on Home. */
   const [training, setTraining] = useState(false);
   const [showingSaved, setShowingSaved] = useState(false);
   const [editingSaved, setEditingSaved] = useState<SavedSession | null>(null);
@@ -13097,7 +13097,7 @@ export default function ArabicTrainer() {
   );
   /* A session started from Focused training — weak spots, a built one, a
      kept one — closes it, so the session's end comes back to Home rather
-     than to the screen it was started from (0.649). */
+     than to the screen it was started from (0.650). */
   useEffect(() => {
     if (session) setTraining(false);
   }, [session]);
@@ -16018,7 +16018,7 @@ export default function ArabicTrainer() {
                   ))}
 
                   {/* Start session, and beside it on the right the way to
-                      Focused training (0.649): weak spots, a session built
+                      Focused training (0.650): weak spots, a session built
                       by hand and the ones kept, on a screen of their own,
                       so the home screen has one thing to do. */}
                   <div className="at-row at-startrow">
@@ -18395,7 +18395,7 @@ const COUNT_CHOICES = [10, 20, 30, 50];
 const TIME_CHOICES = [2, 5, 10, 15, 30];
 
 /* ------------------------------------------------------------------
-   Full-screen: Focused training (0.649)
+   Full-screen: Focused training (0.650)
 
    Behind the dumbbell beside Start session. The sessions a learner aims
    themselves rather than has dealt: what is going wrong, one built by

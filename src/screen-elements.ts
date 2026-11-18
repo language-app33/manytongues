@@ -147,7 +147,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["path-home", "On Home, above Start session (0.617): one line per course with a path — the course, its current unit and that unit's stages. It opens the unit.", "Arabic 101 · Unit 3 of 8 · Family · Words 4/6 · Sentences 1/5"],
     ["progress-path", "On Progress, above the deck tiles: each course's units in order, each Finished, Current, Locked or Opened by your teacher.", "1. Greetings · Finished"],
     ["set-waiting", "On Home, above Start session (0.630): how many pictures of a personal set still wait for the learner's answer, with Answer to give them.", "3 pictures in Our family are waiting for your answer."],
-    ["focused-training", "On Home, at the right of Start session (0.649): the dumbbell, which opens Focused training — Weak spots, Build a session and the sessions you kept.", ""],
+    ["focused-training", "On Home, at the right of Start session (0.650): the dumbbell, which opens Focused training — Weak spots, Build a session and the sessions you kept.", ""],
     ["unit-page", "The top of a unit's page: where it stands, its stages, and Practise this unit where it is open.", "Current · Words 4/6 · Sentences 1/5"],
   ]],
 ];
