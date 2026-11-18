@@ -556,7 +556,28 @@ export const allReports = (): Promise<{ ok: true; orgs: SuperOrg[]; flags: (Flag
   call("admin-all-reports");
 /* Feedback about the app (0.552): anyone signed in sends it; the App admin
    alone reads and dismisses it. */
-export const sendFeedback = (f: { kind: Feedback["kind"]; note: string; screen: string; release?: string }): Promise<{ ok: true; id: string }> =>
+export interface FeedbackSent {
+  kind: Feedback["kind"];
+  note: string;
+  screen: string;
+  release?: string;
+  /* What the app knows about where they were (0.646); the server adds
+     their role and courses itself. */
+  context?: {
+    courseId?: string;
+    deckId?: string;
+    cardId?: string;
+    exercise?: string;
+    language?: string;
+    question?: string;
+    langsOff?: string[];
+    screenSize?: string;
+    installed?: boolean;
+    online?: boolean;
+    locale?: string;
+  };
+}
+export const sendFeedback = (f: FeedbackSent): Promise<{ ok: true; id: string }> =>
   call("send-feedback", { body: f });
 export const deleteFeedback = (ids: string[]) => call("admin-delete-feedback", { body: { ids } });
 /* Deleting a former member for good (0.552): their account if it is still

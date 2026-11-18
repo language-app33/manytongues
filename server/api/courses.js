@@ -2663,6 +2663,66 @@ async function handle(req) {
      * a space admin never sees it. It carries the space and where in the
      * app it was sent from. Both kinds need words.
      */
+    /*
+     * Everything about the sender that tells where a problem came from
+     * (0.646), copied in as it stood when they wrote, since a name, a role
+     * or a roster can change before anyone reads it: the space's name,
+     * what they are in it, every course they are on there with its
+     * language and their role, and the course and deck of the question on
+     * screen if they were practising. What the app says about the device
+     * is kept as sent, short and plain.
+     */
+    async function feedbackContext() {
+      const courses = (await everyCourse(store))
+        .filter((c) => inCourse(c, mine))
+        .map((c) => ({
+          id: c.id,
+          title: String(c.title || ""),
+          language: String(c.language || ""),
+          roles: /** @type {string[]} */ ([]).concat(isTeacher(c, mine) ? ["teacher"] : [], isStudent(c, mine) ? ["student"] : []),
+        }));
+      const role = trying
+        ? "App admin, trying the space as a learner"
+        : iAmAdmin
+          ? "App admin"
+          : iRunThis
+            ? "Space admin"
+            : courses.some((c) => c.roles.includes("teacher"))
+              ? "Teacher"
+              : "Learner";
+      const raw = body.context && typeof body.context === "object" ? body.context : {};
+      /** @param {unknown} v @param {number} n */
+      const cut = (v, n) => String(v == null ? "" : v).slice(0, n);
+      const courseId = cut(raw.courseId, 64);
+      const deckId = cut(raw.deckId, 64);
+      const course = courseId ? await readCourse(store, courseId) : null;
+      const deck = deckId ? await readDeck(store, deckId) : null;
+      const context = Object.fromEntries(
+        Object.entries({
+          courseId,
+          courseTitle: course ? String(course.title || "") : "",
+          deckId,
+          deckTitle: deck ? String(deck.title || "") : "",
+          cardId: cut(raw.cardId, 64),
+          exercise: cut(raw.exercise, 40),
+          language: cut(raw.language, 20),
+          question: cut(raw.question, 200),
+          langsOff: Array.isArray(raw.langsOff) ? raw.langsOff.slice(0, 20).map((/** @type {unknown} */ x) => cut(x, 20)).join(", ") : "",
+          screenSize: cut(raw.screenSize, 20),
+          installed: raw.installed === true ? "yes" : raw.installed === false ? "no" : "",
+          online: raw.online === true ? "yes" : raw.online === false ? "no" : "",
+          locale: cut(raw.locale, 20),
+        }).filter(([, v]) => v),
+      );
+      return {
+        spaceName: actingOrgDoc ? String(actingOrgDoc.name || "") : "",
+        role,
+        courses,
+        ...(Object.keys(context).length ? { context } : {}),
+        device: String(req.headers.get("user-agent") || "").slice(0, 300),
+      };
+    }
+
     if (action === "send-feedback") {
       const kind = String(body.kind || "");
       if (!FEEDBACK_KINDS.includes(kind)) return json({ error: "bad-feedback" }, 400);
@@ -2677,6 +2737,7 @@ async function handle(req) {
         handleName: me.displayName || mine,
         screen: String(body.screen || "").slice(0, 80),
         release: String(body.release || "").slice(0, 40),
+        ...(await feedbackContext()),
         at: Date.now(),
       };
       await writeJson(store, K.feedback(item.id), item);

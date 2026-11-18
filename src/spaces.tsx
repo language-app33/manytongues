@@ -116,7 +116,7 @@ import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend
    what keeps a teacher's cards and a learner's reports apart. */
 const CARD_OUTBOX = "card";
 import { buildDialogIndex } from "./dialogs.ts";
-import { flagsToText } from "./flag-export.ts";
+import { feedbackToText, flagsToText } from "./flag-export.ts";
 import { IMPORTED_STATUS, matchImport, mediaOf, mentions, readImportFile, remapIds, tickedAtFirst, toSave } from "./imports.ts";
 import type { CardMatch, DeckMatch, ImportFile } from "./imports.ts";
 import { freshStates, unitsOf } from "./scheduler.ts";
@@ -11897,6 +11897,9 @@ function EveryReport({ languages }: { languages: Record<string, any> }) {
   /* Ticked reports, per space (0.580: the same list Admin's Flags tab is). */
   const [picked, setPicked] = useState<Record<string, Set<string>>>({});
   const [clearing, setClearing] = useState<{ ids: string[]; org: string } | null>(null);
+  /* Ticked feedback, and feedback waiting on "Clear?" (0.646). */
+  const [pickedFeedback, setPickedFeedback] = useState<Set<string>>(new Set());
+  const [clearingFeedback, setClearingFeedback] = useState<string[] | null>(null);
   const [data, setData] = useState<{ orgs: API.SuperOrg[]; flags: (Flag & { org: string })[]; feedback?: Feedback[] } | null>(null);
   const [error, setError] = useState("");
   /* Card reports or feedback about the app (0.552), and whichever was
@@ -11935,6 +11938,14 @@ function EveryReport({ languages }: { languages: Record<string, any> }) {
   const nameOf = (id: string) => (data.orgs.find((o) => o.id === id) || { name: id }).name;
   const flags = data.flags.slice().sort((a, b) => (b.at || 0) - (a.at || 0));
   const feedback = (data.feedback || []).slice().sort((a, b) => (b.at || 0) - (a.at || 0));
+  const copyFeedback = (chosen: Feedback[]) => {
+    const text = feedbackToText(chosen, {
+      at: Date.now(),
+      release: APP_BUILD,
+      names: { kind: feedbackTitle, space: nameOf, when: dateTime },
+    });
+    if (navigator.clipboard) void navigator.clipboard.writeText(text);
+  };
   const dismiss = async (work: () => Promise<unknown>): Promise<void> => {
     try {
       await work();
@@ -12008,24 +12019,123 @@ function EveryReport({ languages }: { languages: Record<string, any> }) {
       ) : (
         <>
           {!feedback.length ? <Help>No feedback from any space.</Help> : null}
-          <ItemList
-            noun="report"
-            items={feedback}
-            itemKey={(f) => f.id}
-            match={(f, q) => `${feedbackTitle(f.kind)} ${f.handleName || f.handle} ${f.note || ""}`.toLowerCase().includes(q)}
-            empty="Nothing matches."
-            renderItem={(f) => (
-              <Tile key={f.id}
-                title={feedbackTitle(f.kind)}
-                meta={`${nameOf(f.org)} · ${f.handleName || f.handle} · ${shortDate(f.at)}${f.screen ? ` · on ${f.screen}` : ""} · "${f.note}"`}
-                actions={
-                  <Button variant="ghost" size="sm" onClick={() => dismiss(() => API.deleteFeedback([f.id]))}>
-                    Dismiss
-                  </Button>
-                }
-              />
-            )}
-          />
+          {/* The same list card reports are (0.646): Copy all in the
+              toolbar, select for Copy and Clear on what is ticked, and
+              Copy and Clear on each. */}
+          {feedback.length ? (
+            <ItemList
+              noun="message"
+              items={feedback}
+              itemKey={(f) => f.id}
+              size="large"
+              match={(f, q) =>
+                `${feedbackTitle(f.kind)} ${f.handleName || f.handle} ${nameOf(f.org)} ${f.screen || ""} ${f.note || ""}`
+                  .toLowerCase()
+                  .includes(q)
+              }
+              empty="Nothing matches."
+              tools={
+                <Button size="sm" icon="copy" onClick={() => copyFeedback(feedback)}>
+                  {`Copy all ${plural(feedback.length, "message")}`}
+                </Button>
+              }
+              selected={pickedFeedback}
+              onSelectedChange={setPickedFeedback}
+              bulkActions={[
+                {
+                  label: "Copy",
+                  icon: "copy",
+                  /* In the order on screen, as card reports are. */
+                  onClick: (ids) => copyFeedback(feedback.filter((f) => ids.includes(f.id))),
+                },
+                {
+                  label: "Clear",
+                  danger: true,
+                  onClick: (ids) => setClearingFeedback(ids),
+                },
+              ]}
+              renderItem={(f) => {
+                const gist = gistOf(f.note);
+                const said = String(f.note || "").trim();
+                const rest = said && said !== gist ? f.note : "";
+                return (
+                  <Tile key={f.id}
+                    title={
+                      <>
+                        {feedbackTitle(f.kind)}
+                        {gist && <span className="at-flagsaid">: {gist}</span>}
+                      </>
+                    }
+                    meta={`Submitted by ${f.handleName || f.handle} · ${nameOf(f.org)} · ${dateTime(f.at)}${f.screen ? ` · on ${f.screen}` : ""}`}
+                    actions={
+                      <>
+                        <IconButton
+                          icon="copy"
+                          label="Copy this message"
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            copyFeedback([f]);
+                          }}
+                        />
+                        <IconButton
+                          icon="delete"
+                          label="Clear this message"
+                          danger
+                          onClick={(e: React.MouseEvent) => {
+                            e.stopPropagation();
+                            setClearingFeedback([f.id]);
+                          }}
+                        />
+                      </>
+                    }
+                    footer={rest || f.role || f.courses || f.context ? (
+                      <div className="at-flagreport">
+                        {rest && <p className="at-flagreport-note">{rest}</p>}
+                        {/* Who they are there and what they were doing
+                            (0.646): the facts to find the source by. The
+                            rest, device included, is in what Copy gives. */}
+                        {(f.role || f.courses) && (
+                          <p className="at-flagreport-facts">
+                            {[
+                              f.role,
+                              f.courses
+                                ? f.courses.length
+                                  ? f.courses.map((c) => `${c.title || c.id} (${c.roles.join(" and ")})`).join(", ")
+                                  : "on no course here"
+                                : "",
+                            ].filter(Boolean).join(" · ")}
+                          </p>
+                        )}
+                        {f.context && (f.context.courseTitle || f.context.deckTitle || f.context.question) && (
+                          <p className="at-flagreport-facts">
+                            {`Practising ${[
+                              f.context.question ? `"${f.context.question}"` : "",
+                              f.context.courseTitle ? `in ${f.context.courseTitle}` : "",
+                              f.context.deckTitle ? `› ${f.context.deckTitle}` : "",
+                            ].filter(Boolean).join(" ")}`}
+                          </p>
+                        )}
+                      </div>
+                    ) : undefined}
+                  />
+                );
+              }}
+            />
+          ) : null}
+          {clearingFeedback && (
+            <ConfirmModal
+              title={`Clear ${plural(clearingFeedback.length, "message")}?`}
+              confirmLabel="Clear"
+              body={<p>They go for good.</p>}
+              onCancel={() => setClearingFeedback(null)}
+              onConfirm={async () => {
+                const ids = clearingFeedback;
+                setClearingFeedback(null);
+                setPickedFeedback(new Set());
+                await dismiss(() => API.deleteFeedback(ids));
+              }}
+            />
+          )}
         </>
       )}
     </>

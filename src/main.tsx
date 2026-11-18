@@ -5,6 +5,10 @@ import { watchForUpdates } from "./updates.ts";
 import ArabicTrainer from "./ArabicTrainer.tsx";
 import { ReachSnackbar } from "./shared.tsx";
 import "./index.css";
+import { applyRememberedTheme } from "./theme-memory.ts";
+
+/* The page in the theme last used, before anything paints (0.643). */
+applyRememberedTheme();
 
 // The component reads window.storage, so point it at the local adapter.
 window.storage = storage;

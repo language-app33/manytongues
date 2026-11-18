@@ -1925,7 +1925,37 @@ export interface Feedback {
   /** Where in the app they were when they sent it, in words. */
   screen: string;
   release?: string;
+  /* What tells where a problem came from (0.646), as it stood when sent.
+     Absent on feedback sent before 0.646. */
+  /** The space's name then. */
+  spaceName?: string;
+  /** What they were in the space: App admin, Space admin, Teacher, Learner. */
+  role?: string;
+  /** Every course they were on in that space, with their part in it. */
+  courses?: { id: string; title: string; language: string; roles: string[] }[];
+  /** What they were doing, where the app could say: the question on
+      screen and where it came from, and the device. */
+  context?: FeedbackContext;
+  /** The browser's own description of itself. */
+  device?: string;
   at: Millis;
+}
+
+export interface FeedbackContext {
+  courseId?: string;
+  courseTitle?: string;
+  deckId?: string;
+  deckTitle?: string;
+  cardId?: string;
+  exercise?: string;
+  language?: string;
+  question?: string;
+  /** Languages they had switched off, joined with commas. */
+  langsOff?: string;
+  screenSize?: string;
+  installed?: string;
+  online?: string;
+  locale?: string;
 }
 
 /* ---- reported problems ---- */

@@ -531,6 +531,22 @@ test("feedback about the app reaches the App admin alone, with its space (0.552)
   const got = all.feedback.find((/** @type {any} */ f) => f.id === sent.json.id);
   assert.equal(got.org, c.id);
   assert.equal(got.screen, "Learning · home");
+  /* And who they are there (0.646): their part, and every course they
+     are on in that space, so the source of a problem can be found. */
+  assert.equal(got.role, "Learner");
+  assert.ok(got.spaceName);
+  assert.deepEqual(got.courses.map((/** @type {any} */ x) => [x.id, x.roles]), [[c.course.id, ["student"]]]);
+  assert.equal(got.context, undefined, "nothing claimed that was not sent");
+  /* What the app says about the question on screen, with its course named. */
+  const doing = await api("send-feedback", {
+    key: c.student.key,
+    body: { kind: "broken", note: "Wrong answer", screen: "practice", context: { courseId: c.course.id, question: "x", online: false, langsOff: ["fr"] } },
+  });
+  const had = (await api("admin-all-reports", { key: admin.key })).json.feedback.find((/** @type {any} */ f) => f.id === doing.json.id);
+  assert.equal(had.context.courseId, c.course.id);
+  assert.ok(had.context.courseTitle);
+  assert.equal(had.context.online, "no");
+  assert.equal(had.context.langsOff, "fr");
   assert.equal((await api("admin-delete-feedback", { key: c.lead.key, body: { ids: [sent.json.id] } })).status, 403);
   assert.equal((await api("admin-delete-feedback", { key: admin.key, body: { ids: [sent.json.id] } })).json.deleted, 1);
   assert.ok(!(await api("admin-all-reports", { key: admin.key })).json.feedback.some((/** @type {any} */ f) => f.id === sent.json.id));

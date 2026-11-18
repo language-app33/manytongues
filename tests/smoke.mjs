@@ -1036,13 +1036,13 @@ check("untouched states are not stored",
    text: the number came off the screen when the climb went on it, and what
    is being tested here is the counting, not the wording. */
 check("every card with something due counts, and a value is never one", homeCard()?.getAttribute("data-ready") === "6", homeCard()?.getAttribute("data-ready") ?? "no home card");
-/* And said in one line above Start session: the reviews and the new words
+/* And said in one line above Start session: the reviews and the new cards
    beside them add up to the same count the attribute carries. */
 {
   const line = (homeCard()?.querySelector(".at-homeline")?.textContent || "").replace(/\s+/g, " ");
   /* Ready to review is Cleared and Learnt cards alone (0.603); cards still
      climbing are "in progress" beside it, or in its place. */
-  const m = /^(?:(\d+) cards? ready to review|Nothing to review —)(?:(?: ·)? (\d+) cards? in progress)?(?: · (\d+) new words? waiting)?/.exec(line);
+  const m = /^(?:(\d+) cards? ready to review|Nothing to review —)(?:(?: ·)? (\d+) cards? in progress)?(?: · (\d+) new cards? waiting)?/.exec(line);
   check("the home screen says how many cards are ready to review, above Start session",
     !!m && Number(m[1] || 0) + Number(m[2] || 0) + Number(m[3] || 0) === 6 &&
       !!homeCard()?.querySelector(".at-homeline + .at-row"),
@@ -3479,7 +3479,9 @@ check("no console errors during the session", errors.length === 0, errors.slice(
     check("the invitation is written once, not once per screen", invites === 1,
       `${invites} copies`);
     const uses = src.split("noCardsYet(").length - 1;
-    check("and every screen that says it calls the same function", uses >= 4,
+    /* Cards and Progress; the home screen has its own shorter line
+       since 0.641 — see homeEmptySays. */
+    check("and every screen that says it calls the same function", uses >= 3,
       `${uses} mentions, one of them the declaration`);
 
     /* Arriving somewhere starts at the top of it. jsdom reports every

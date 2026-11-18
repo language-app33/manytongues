@@ -8,6 +8,135 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.646 — 17 November 2026
+
+**Feedback in Super admin's Reports works like card reports.** The
+Feedback list now has the same tools as Card reports:
+
+- **Copy all** at the top puts every message on the clipboard as plain
+  text — who sent it, from which space and screen, when, and what they
+  said — ready to paste somewhere.
+- **Select** ticks messages, and the bar that rises offers **Copy** and
+  **Clear** for the ticked ones.
+- Each message has its own **Copy** and **Clear** buttons. Clear asks
+  first, as it does for card reports, where Dismiss used to remove a
+  message at once.
+
+Each message now leads with what was said, like a card report, with the
+rest of a long message underneath.
+
+**Feedback says enough to find where a problem came from.** A message
+now records, as things stood when it was sent:
+
+- the sender's part in the space (Learner, Teacher, Space admin, App
+  admin, or App admin trying the space) and the space's name;
+- every course they are on in that space, its language, and whether they
+  teach it, learn in it, or both;
+- if they were practising: the question on screen, its exercise and
+  language, and the course, deck and card it came from;
+- the languages they had switched off;
+- their device: screen size, installed app or browser, offline or not,
+  the device's language, and the browser's own description.
+
+The tile shows their part, their courses and what they were practising;
+Copy gives all of it. Feedback sent before this release has none of it.
+
+## 0.645 — 17 November 2026
+
+**Join a course from Home without leaving it.** The Join a course button
+on the empty home screen opens a sheet over Home instead of the whole
+Courses screen. It takes a course code or a pasted invitation link. A
+code that does not work keeps the sheet open with the reason, so a typo
+can be fixed on the spot; offline, it says joining needs a connection.
+A code that works closes the sheet, says "Joined …", and Home shows what
+the new course holds. The Courses screen, reached from the You menu,
+keeps its own join box as before.
+
+## 0.644 — 17 November 2026
+
+**The empty home screen says what happens next.** Under the large line, a
+smaller one, in plain words:
+
+- Not in any course: "Ask your teacher for a course code, then tap Join a
+  course."
+- In a course with nothing in it yet, or nothing ready yet: "Your teacher
+  is getting your lessons ready. Check back shortly!" ("Your teachers
+  are…" for someone in more than one course).
+- Everything in a switched-off language: the large line is now "Nothing
+  to practice in the selected language." and the smaller one names the
+  language: "Switch on French to pick up where you left off."
+
+## 0.643 — 17 November 2026
+
+**No more flash on coming back to the app.**
+
+- **The flash.** When a phone had let the app go in the background,
+  coming back to it opened it afresh, and the moment of loading was always
+  in the dark theme. On a light phone that was light, dark, light. The
+  loading moment now uses the theme the device last used, and its "Loading
+  your items…" line only appears if loading takes longer than a moment.
+- **New versions wait for the next launch.** Coming back to the app after
+  a new version went out used to reload it in front of you if you had not
+  tapped anything yet, which on an empty home screen was every time. Now
+  the "A new version is ready" banner says so, as it already did once you
+  had tapped something, and the next launch opens the new version. A
+  version that arrives while the app is still opening is still taken
+  straight away.
+- **Home stays in the bar.** With nothing to practise the bar holds Home
+  and your menu, side by side in the middle rather than across the whole
+  window. Progress and Cards still come back when there is something to
+  practise.
+- **A larger line.** "Nothing to practice yet!", and the other lines in
+  its place, are now the screen's headline: larger and bolder.
+
+## 0.642 — 17 November 2026
+
+**A friendlier empty home screen, and directions to install that match
+the browser you are in.**
+
+- **Install, in your browser's words.** The offer to add the app to your
+  home screen said "Use your browser's Share menu" to everyone, which is
+  right only for Safari on an iPhone. It now names the button in the
+  browser the app is open in: Safari, Chrome, Firefox and Edge on an
+  iPhone or iPad; Chrome, Samsung Internet, Firefox, Edge and Opera on
+  Android; Chrome, Edge and Safari on a computer. Inside another app's
+  browser (Instagram, Facebook and the like) it says to open the page in
+  Safari or Chrome first, since those cannot install anything. Firefox on
+  a computer cannot install a site at all, so it is no longer offered
+  there. Where the browser has its own Install button, that is offered
+  as before.
+- **No Progress or Cards with nothing to practise.** In every case where
+  the home screen says there is nothing to practise (no course, a course
+  with no cards yet, cards not ready yet, or every card in a switched-off
+  language), the bar at the bottom shows only your menu. Progress and
+  Cards come back as soon as there is something to practise.
+- **A picture on the empty home screen.** Three speech bubbles in the
+  app's colours sit above the line saying what to do next.
+- **The name centred when there is nothing to switch.** With one space
+  and one language there is no switcher in the top corner, so the app's
+  name and logo sit in the middle of the top again.
+
+## 0.641 — 17 November 2026
+
+**The home screen says less when there is nothing to practise, and counts
+cards as cards.**
+
+- **Nothing to practise, in one line.** The heading over it is gone.
+  Someone in no course reads "Join a course to get started!", with the Join
+  a course button as before. Someone whose course has no cards yet, or
+  whose cards are not ready yet, reads "Nothing to practice yet!". Someone
+  whose cards are all in languages they have switched off reads "Nothing
+  to practice in the selected language. Switch on a language to get
+  started." ("languages" when more than one is still on), and the button
+  under it names the language it switches back on: "Switch on French".
+- **Cards, not words.** The line above Start session counted new cards as
+  "new words", though a new card can be a phrase, a sentence or a number.
+  It now says "5 new cards waiting", "ready to learn 5 new cards" and "new
+  cards wait until you've caught up". The note on a card marked high
+  priority says "a card" for the same reason.
+
+The Cards and Progress tabs keep their longer wording for having no cards.
+
 ## 0.640 — 17 November 2026
 
 **Every student now has a private sign-in link, without anyone's key

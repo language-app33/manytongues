@@ -23,6 +23,7 @@ import {
   usePicture,
   ConfirmModal,
   Empty,
+  ChatArt,
   Field as FormField,
   FLAG_KINDS,
   FEEDBACK_KINDS,
@@ -851,7 +852,8 @@ export function mergeMoves(
    progress can be asked what it does without a browser — see grade.ts. */
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
 import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
-import { homeEmptySays, whyHomeIsEmpty } from "./home-empty.ts";
+import { homeEmptyHint, homeEmptySays, listOf as listOfNames, whyHomeIsEmpty } from "./home-empty.ts";
+import { rememberedTheme, rememberTheme } from "./theme-memory.ts";
 import type { Filler, Mark } from "./grade.ts";
 
 import { applyUpdate, beforeReload, onUpdateReady, updateReady } from "./updates.ts";
@@ -11204,6 +11206,9 @@ export default function ArabicTrainer() {
     if (tab !== "courses") setCoursesBack(tab);
     setTab("courses");
   };
+  /* The sheet Home's Join a course opens (0.645), rather than the whole
+     Courses screen: the one thing that button is for. */
+  const [joinOpen, setJoinOpen] = useState(false);
 
   /* The deck filter. Nothing sets it any more — the control that used
      to toggle it was removed, and this was left reading as though it
@@ -12220,6 +12225,7 @@ export default function ArabicTrainer() {
     document.documentElement.dataset.theme = t;
     document.documentElement.style.colorScheme =
       t === "auto" ? "light dark" : t;
+    rememberTheme(t);
   }, [data.settings.theme]);
 
   /* Anything recorded before clips moved to IndexedDB gets moved across. */
@@ -12979,6 +12985,11 @@ export default function ArabicTrainer() {
       coursesHere: learnCourses.length,
     });
   }, [drillable, drillableAll, items, spaceNow, spaceOfItem, setIndex, settings, langsOff, learnCourses]);
+  /* With nothing to practise the bar offers no Progress or Cards (0.642),
+     so nobody is left on one of them with no way back but Home. */
+  useEffect(() => {
+    if (homeEmpty && (tab === "progress" || tab === "items")) setTab("home");
+  }, [homeEmpty, tab]);
 
   /* And how much is going wrong, which is what the Weak spots button is
      offered on. The same test the session itself picks with — see isWeak —
@@ -13431,6 +13442,23 @@ export default function ArabicTrainer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, accountHandle, refreshCourses]);
   useLiveRefresh(recheckCourses);
+
+  /* Joining by a code, from the Courses screen or Home's sheet (0.645). */
+  const joinWithCode = async (code: string) => {
+    const r = await API.joinCourse(code);
+    /* A course in another space joins that space too (memberships): the
+       account learns of it, so the You menu and Settings list it. */
+    if (account && r && r.space && !accountOrgs.some((o) => o.id === r.space.id)) {
+      const who = await API.whoAmI(account.key, accountOrgId).catch(() => null);
+      if (who) {
+        const merged = { ...who.user, key: account.key };
+        API.saveAccount(merged);
+        setAccount(merged);
+      }
+    }
+    await refreshCourses(true);
+    return r;
+  };
 
   /* Fetch, in the background, the recordings a session is about to play.
      Done here on purpose rather than as a side effect of sync, so the first
@@ -15243,7 +15271,28 @@ export default function ArabicTrainer() {
    */
   function sendFeedback(kind: FeedbackKind, note: string) {
     const where = [SPACE_LABEL[space] || space, session ? "practice session" : tab].filter(Boolean).join(" · ");
-    return API.sendFeedback({ kind, note: note.slice(0, FLAG_NOTE_MAX), screen: where, release: APP_BUILD })
+    /* And what tells where a problem came from (0.646): the question on
+       screen and the course and deck it came from, the languages switched
+       off, and the device. The server adds their role and courses. */
+    const from = session && parentItem ? fromDeck(parentItem) : null;
+    const context: API.FeedbackSent["context"] = {
+      ...(session && parentItem
+        ? {
+            courseId: (from && from.courseId) || "",
+            deckId: (from && from.deckId) || "",
+            cardId: serverCardId(parentItem) || "",
+            exercise: exercise ? String(typeOf(exercise.type)) : "",
+            language: qLang.id,
+            question: String((item && item.ar) || leadOf(parentItem).ar || "").slice(0, 200),
+          }
+        : {}),
+      langsOff: langsOff.slice(),
+      screenSize: typeof window !== "undefined" ? `${window.innerWidth}×${window.innerHeight}` : "",
+      installed: typeof window !== "undefined" && !!window.matchMedia && window.matchMedia("(display-mode: standalone)").matches,
+      online: !isOffline(),
+      locale: typeof navigator !== "undefined" ? navigator.language || "" : "",
+    };
+    return API.sendFeedback({ kind, note: note.slice(0, FLAG_NOTE_MAX), screen: where, release: APP_BUILD, context })
       .then(() => {
         feedbackReach.ok();
         flash("Thank you for the feedback 🫶", "good");
@@ -15399,11 +15448,16 @@ export default function ArabicTrainer() {
   }
 
   if (!ready) {
+    /* In the theme this device last used (0.643). Before, it was always
+       the dark one, so on a light device every launch went light, dark,
+       light — the flash on coming back to the app, whenever the phone had
+       let it go in the background. And the line waits a moment before it
+       shows, so a launch that is quick shows nothing but the page. */
     return (
-      <div className="at">
+      <div className={`at ${rememberedTheme()}`}>
         <div className="at-wrap">
 
-          <p className="at-eyebrow">Loading your items…</p>
+          <p className="at-eyebrow at-latecome">Loading your items…</p>
         </div>
       </div>
     );
@@ -15655,10 +15709,12 @@ export default function ArabicTrainer() {
               place you work in every day. */}
           {/* Not while there is no space to use (0.580, audit finding 15):
               the panel above is the whole page. */}
+          {/* With nothing to practise, Home alone (0.642, 0.643): Progress
+              and Cards would only say the same "nothing yet" again. */}
           {!inExercise && space === "learn" && !stranded && (
             <Tabs
               dock
-              tabs={[
+              tabs={homeEmpty ? [["home", "Home", "school"]] : [
                 ["home", "Home", "school"],
                 ["progress", "Progress", "verify"],
                 ["items", "Cards", "cards"],
@@ -15715,14 +15771,14 @@ export default function ArabicTrainer() {
               <div className="at-mb3">
                 <Notice kind="info">
                   <span>
-                    Add ManyTongues to your home screen to keep your cards safe and open it like an
-                    app.{" "}
+                    {install.how ? install.how.lead : ""}{" "}
                     {install.prompt ? (
                       <button className="at-linkbtn" onClick={() => install.prompt?.prompt()}>
                         Install
                       </button>
                     ) : (
-                      <i>Use your browser&apos;s Share menu, then &ldquo;Add to Home Screen&rdquo;.</i>
+                      /* In this browser's own words: see install-steps.ts. */
+                      <i>{install.how ? install.how.steps : ""}</i>
                     )}{" "}
                     <button className="at-linkbtn" onClick={install.dismiss}>
                       Not now
@@ -15750,7 +15806,7 @@ export default function ArabicTrainer() {
                     which is how it came to say something different from
                     both. */}
                 <Empty
-                  title="Nothing to practice yet"
+                  art={<ChatArt />}
                   /* The invitation is for someone who has nowhere to get
                      cards from, and only once we know that. An enrolled
                      student is waiting on their teacher, not on a code, and
@@ -15763,21 +15819,32 @@ export default function ArabicTrainer() {
                       <Button variant="primary"
                         onClick={() => setSetting("langsOff", langsOff.filter((l) => !homeEmpty.langs.includes(l)))}
                       >
-                        Switch {homeEmpty.langs.length === 1 ? "it" : "them"} back on
+                        {/* Named, since the line above no longer names them. */}
+                        {`Switch on ${listOfNames(homeEmpty.langs.map((l) => (LANGUAGES[l] || {}).name || l))}`}
                       </Button>
                     ) : homeEmpty.kind === "no-cards" && coursesKnown && homeEmpty.courses === 0 && !TRYING ? (
                       /* Not while trying a space: there is no joining there (0.574). */
-                      <Button variant="primary" onClick={openCourses} icon="school">
+                      <Button variant="primary" onClick={() => setJoinOpen(true)} icon="school">
                         Join a course
                       </Button>
                     ) : null
                   }
                 >
-                  {homeEmpty.kind === "no-cards"
-                    ? noCardsYet(homeEmpty.courses)
-                    : homeEmptySays(homeEmpty, homeEmpty.kind === "langs"
-                      ? homeEmpty.langs.map((l) => (LANGUAGES[l] || {}).name || l)
-                      : [])}
+                  {/* One line, as the owner worded it (0.641): no heading
+                      over it, since the line is the whole of what there is
+                      to say. */}
+                  <span className="at-emptybig">
+                    {homeEmptySays(homeEmpty, Math.max(langChoices.length - langsOff.length, 1))}
+                  </span>
+                  {/* What has to happen first, in a line (0.644). */}
+                  <span className="at-emptysub">
+                    {homeEmptyHint(homeEmpty, {
+                      courses: learnCourses.length,
+                      langNames: homeEmpty.kind === "langs"
+                        ? homeEmpty.langs.map((l) => (LANGUAGES[l] || {}).name || l)
+                        : [],
+                    })}
+                  </span>
                 </Empty>
               </>
             )}
@@ -17278,22 +17345,7 @@ export default function ArabicTrainer() {
             error={courseError}
             onRetry={courseUnreached ? () => refreshCourses("changes") : undefined}
             /* Trying a space is not joining it (0.574). */
-            onJoin={TRYING ? undefined : async (code: string) => {
-              const r = await API.joinCourse(code);
-              /* A course in another space joins that space too
-                 (memberships): the account learns of it, so the You menu
-                 and Settings list it. */
-              if (account && r && r.space && !accountOrgs.some((o) => o.id === r.space.id)) {
-                const who = await API.whoAmI(account.key, accountOrgId).catch(() => null);
-                if (who) {
-                  const merged = { ...who.user, key: account.key };
-                  API.saveAccount(merged);
-                  setAccount(merged);
-                }
-              }
-              await refreshCourses(true);
-              return r;
-            }}
+            onJoin={TRYING ? undefined : joinWithCode}
             onRefresh={() => refreshCourses(true)}
             onPractise={(deckTitle: string) => {
               /* The cards tab owns its own filter, so ask for it by name and
@@ -17528,8 +17580,10 @@ export default function ArabicTrainer() {
       {/* Home has it large, at the left (0.576), as the page's title. Progress and
           Cards are headed with their name, as every tab is (0.553);
           Courses, reached from the menu, is headed with its own. */}
+      {/* Centred where there is no place button beside it to make room
+          for (0.642): one space, one language, nothing to switch. */}
       {!inExercise && space === "learn" && tab === "home" && (
-        <div className="at-brand at-brand-home">
+        <div className={`at-brand at-brand-home${placeButton ? "" : " centred"}`}>
           <img className="at-brandmark" src="/logo.svg" alt="" width={48} height={48} />
           ManyTongues
         </div>
@@ -17540,7 +17594,10 @@ export default function ArabicTrainer() {
           taken down during an exercise. Two halves: the space's own
           sections, and beside them what is true wherever you are — which
           space and which languages, and you. */}
-      <nav className={`at-dock${inExercise ? " off" : ""}`} aria-label="App">
+      {/* Home and You alone are two buttons, not a bar to stretch across
+          the window (0.643). */}
+      <nav className={`at-dock${inExercise ? " off" : ""}${
+        !inExercise && space === "learn" && !stranded && homeEmpty ? " few" : ""}`} aria-label="App">
         {/* One bar: the space's sections, then you. The holders inside it
             draw nothing, so every item is a sibling in the one row and they
             share it evenly. Where you are is at the top of the page (0.601). */}
@@ -17585,6 +17642,16 @@ export default function ArabicTrainer() {
         </div>
       </nav>
 
+      {joinOpen && (
+        <JoinSheet
+          onJoin={joinWithCode}
+          onClose={() => setJoinOpen(false)}
+          onJoined={(said) => {
+            setJoinOpen(false);
+            flash(said, "good");
+          }}
+        />
+      )}
       {whereOpen && (
         <WhereSheet
           rows={where.rows}
@@ -18072,7 +18139,7 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
         <div className="at-card at-mt4">
           <p className="at-eyebrow">High priority</p>
           <Help>
-            For a word you want to get on with. Marked, it joins your very next
+            For a card you want to get on with. Marked, it joins your very next
             session whatever its schedule says, and opens it — and it stays in
             every session until you take the mark off. Nothing else about it
             changes: what you have learnt, and when it would have come round
@@ -21999,13 +22066,13 @@ export type Ready = { review: number; climbing: number; fresh: number; behind: b
  */
 export function homeLine({ review, climbing, fresh, behind }: Ready): string {
   const news = fresh
-    ? ` · ${plural(fresh, "new word")} waiting`
+    ? ` · ${plural(fresh, "new card")} waiting`
     : behind
-    ? " · new words wait until you've caught up"
+    ? " · new cards wait until you've caught up"
     : "";
   if (review) return `${plural(review, "card")} ready to review${climbing ? ` · ${climbing} in progress` : ""}${news}`;
   if (climbing) return `Nothing to review — ${plural(climbing, "card")} in progress${news}`;
-  if (fresh) return `Nothing to review — ready to learn ${fresh === 1 ? "a new word" : `${fresh} new words`}`;
+  if (fresh) return `Nothing to review — ready to learn ${fresh === 1 ? "a new card" : `${fresh} new cards`}`;
   return "All caught up — a practice session now still helps them stick";
 }
 
@@ -22056,6 +22123,84 @@ function SpaceBadge({ space, icon }: { space?: { name: string; logoData?: string
  * gone from each space they were in. Said plainly, with the way back in:
  * an invitation link or a course code, typed or pasted.
  */
+/*
+ * Join a course, in a sheet over Home (0.645).
+ *
+ * Home's Join a course used to open the whole Courses screen, whose list is
+ * empty for somebody with no course, to reach the box at the foot of it.
+ * The sheet is that box alone. A wrong code keeps it open with the reason,
+ * so a typo can be fixed where it was made; a good one closes it and Home
+ * shows what the course holds. A pasted invitation link is read for its
+ * code, as the stranded panel reads one.
+ */
+function JoinSheet({ onJoin, onJoined, onClose }: {
+  onJoin: (code: string) => Promise<any>;
+  /** Joined: what to say about it. */
+  onJoined: (said: string) => void;
+  onClose: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const input = useRef<HTMLInputElement | null>(null);
+  useEffect(() => {
+    const t = setTimeout(() => input.current && input.current.focus(), 200);
+    return () => clearTimeout(t);
+  }, []);
+  const join = async () => {
+    let given = code.trim();
+    if (!given || busy) return;
+    try {
+      given = new URL(given).searchParams.get("join") || given;
+    } catch (e) {
+      /* not a link: a code */
+    }
+    if (isOffline()) {
+      setError("Joining needs a connection. Try again when you're back online.");
+      return;
+    }
+    setBusy(true);
+    setError("");
+    try {
+      const r = await onJoin(given);
+      onJoined(r && r.course ? `Joined ${r.course.title}.` : r && r.space ? `Joined ${r.space.name}.` : "Joined.");
+    } catch (e) {
+      setError(API.explain(e));
+      setBusy(false);
+    }
+  };
+  return (
+    <PickSheet title="Join a course" lede="Enter the course code your teacher gave you, or paste their invitation link." onClose={onClose}>
+      <form
+        className="at-joinsheet"
+        onSubmit={(e) => {
+          e.preventDefault();
+          void join();
+        }}
+      >
+        <input
+          ref={input}
+          className={`at-input${error ? " bad" : ""}`}
+          placeholder="Course code or invitation link"
+          aria-label="Course code or invitation link"
+          autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
+          value={code}
+          onChange={(e) => {
+            setCode(e.target.value);
+            setError("");
+          }}
+        />
+        <Notice kind="error">{error}</Notice>
+        <Button variant="primary" type="submit" disabled={!code.trim() || busy}>
+          {busy ? "Joining…" : "Join"}
+        </Button>
+      </form>
+    </PickSheet>
+  );
+}
+
 function StrandedPanel({ stranded, onJoined }: {
   stranded: { space: { name: string }; why: string }[];
   onJoined: () => void;
