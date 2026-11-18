@@ -10876,6 +10876,100 @@ function ReportScreen({ title, backLabel, options, picked, onPick, note, onNote,
      left of a phone, and scrolled inside itself to do it; a screen has the
      whole window, the way out where every other screen keeps it, and Send
      at its foot. */
+  /*
+   * The box stays in sight while it is typed in, by this screen's own doing
+   * (0.648), for a card report and for feedback alike.
+   *
+   * It used to be left to the phone, and the phone only managed it by
+   * accident. An iPhone's keyboard does not shrink the page; it covers the
+   * lower half and the browser scrolls whatever it can to uncover the box.
+   * Flag a problem has four options, so its screen was taller than the
+   * window and sat over a session page that was taller still: there was
+   * something to scroll. Share feedback has two, fits the window exactly
+   * and sits over a page that fits too: nothing to scroll, and the box
+   * stayed under the keyboard. Measured side by side, that was the whole
+   * difference. And wherever the screen did get squeezed, Send, pinned to
+   * its foot, lay over the bottom of the box.
+   *
+   * So, while the box has the focus: the screen is cut to the part of the
+   * window the keyboard leaves (the visual viewport, followed as it moves),
+   * and the box is scrolled clear of Send inside it. Set straight on the
+   * elements rather than through state: the viewport reports on every
+   * frame of the keyboard's slide, and none of that should render anything.
+   */
+  /* Held in state, not a ref: a screen draws itself once in place and then
+     again at the app's root, so the box of the first draw is not the box
+     that is typed in. */
+  const [box, setBox] = useState<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const screen = box ? (box.closest(".at-screen") as HTMLElement | null) : null;
+    const body = box ? (box.closest(".at-screenbody") as HTMLElement | null) : null;
+    if (!box || !screen || !body || typeof window === "undefined") return undefined;
+    const vv = window.visualViewport;
+    /* Where the stylesheet puts the screen's top: under the banner, if one is up. */
+    let ownTop = 0;
+    let pinned = false;
+    const unpin = () => {
+      if (!pinned) return;
+      pinned = false;
+      screen.style.top = "";
+      screen.style.bottom = "";
+      screen.style.height = "";
+    };
+    const fit = () => {
+      const typing = document.activeElement === box;
+      /* How much of the window the keyboard is sitting on. Nothing where
+         the browser shrinks the window itself, as Android's does. */
+      const covered = vv ? window.innerHeight - vv.height : 0;
+      if (vv && typing && covered > 80) {
+        if (!pinned) ownTop = parseFloat(getComputedStyle(screen).top) || 0;
+        pinned = true;
+        const top = Math.max(ownTop, vv.offsetTop);
+        screen.style.top = `${top}px`;
+        screen.style.bottom = "auto";
+        screen.style.height = `${Math.max(0, vv.offsetTop + vv.height - top)}px`;
+      } else {
+        unpin();
+      }
+      if (!typing) return;
+      /* Clear of Send, which is pinned to the foot of what scrolls, and
+         with its label where there is room for both. */
+      const foot = screen.querySelector(".at-screenfoot");
+      const frame = body.getBoundingClientRect();
+      const floor = Math.min(frame.bottom, foot ? foot.getBoundingClientRect().top : frame.bottom) - 8;
+      const ceiling = frame.top + 8;
+      const whole = (box.closest(".at-flagnote") || box).getBoundingClientRect();
+      const r = box.getBoundingClientRect();
+      const top = whole.bottom - whole.top <= floor - ceiling ? whole.top : r.top;
+      if (r.bottom > floor) body.scrollTop += Math.min(r.bottom - floor, top - ceiling);
+      else if (top < ceiling) body.scrollTop -= ceiling - top;
+    };
+    /* And again as the keyboard finishes arriving: its last report can come
+       before the screen has taken its new height. */
+    let timers: ReturnType<typeof setTimeout>[] = [];
+    const settle = () => {
+      timers.forEach(clearTimeout);
+      timers = [0, 120, 350, 700].map((ms) => setTimeout(fit, ms));
+    };
+    box.addEventListener("focus", settle);
+    box.addEventListener("blur", settle);
+    window.addEventListener("resize", fit);
+    if (vv) {
+      vv.addEventListener("resize", fit);
+      vv.addEventListener("scroll", fit);
+    }
+    return () => {
+      timers.forEach(clearTimeout);
+      box.removeEventListener("focus", settle);
+      box.removeEventListener("blur", settle);
+      window.removeEventListener("resize", fit);
+      if (vv) {
+        vv.removeEventListener("resize", fit);
+        vv.removeEventListener("scroll", fit);
+      }
+      unpin();
+    };
+  }, [box]);
   return (
     <Screen
       title={title}
@@ -10923,6 +11017,7 @@ function ReportScreen({ title, backLabel, options, picked, onPick, note, onNote,
           <textarea
             id="flag-note-input"
             data-el="flag-note-input"
+            ref={setBox}
             className="at-input at-flagtext"
             rows={4}
             maxLength={FLAG_NOTE_MAX}

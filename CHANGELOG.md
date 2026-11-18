@@ -8,6 +8,23 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.648 — 18 November 2026
+
+**The feedback box stays above the phone's keyboard, for real this
+time.** The two earlier attempts (0.647) did not fix it. Run side by side
+on a phone-sized screen, the cause was plain: Flag a problem has four
+options, so its screen is taller than the phone and the phone had
+something to scroll when the keyboard came up. Share feedback has two,
+fits the phone exactly, and had nothing to scroll, so its box stayed
+under the keyboard. In both, Send could sit over the bottom of the box.
+
+The screen now looks after this itself instead of leaving it to the
+phone. While you type, it shrinks to the part of the display the
+keyboard leaves and moves the box, with its "Tell us what happened"
+label, clear of Send. Share feedback and Flag a problem are the same
+screen, so both now behave identically, and both return to full height
+when the keyboard goes.
+
 ## 0.647 — 18 November 2026
 
 **The phone's keyboard no longer hides the feedback box.** Share
