@@ -1593,10 +1593,6 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
    is what makes it read as a panel rather than as somewhere new. Only the
    opening is animated — a way out that lingers is a way out that feels
    slow. */
-/* A screen that ends where the phone's keyboard starts (0.647): the report
-   and feedback screens, whose box sits low and must stay in sight while it
-   is typed in. --kb-overlap is zero with no keyboard up. */
-.at-screen.kbfit { bottom: var(--kb-overlap, 0px); }
 .at-screen.rise { animation: at-rise 140ms cubic-bezier(.2,.7,.3,1); }
 @keyframes at-rise { from { transform: translateY(6%); opacity:.4; } to { transform:none; opacity:1; } }
 @media (prefers-reduced-motion: reduce) { .at-screen.rise { animation:none; } }

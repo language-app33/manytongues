@@ -10,13 +10,13 @@ and moves once per batch of work you would notice, not once per commit.
 
 ## 0.647 — 18 November 2026
 
-**The phone's keyboard no longer hides the feedback box.** Typing in
-Share feedback from the You menu could leave the box under the keyboard.
-Share feedback and Flag a problem already used the same screen, but only
-Flag a problem, opened during a session, had room to move up out of the
-keyboard's way. Now the screen itself stops where the keyboard starts and
-keeps the box in view while you type, so both behave the same wherever
-they are opened from.
+**The phone's keyboard no longer hides the feedback box.** Share
+feedback from the You menu is the same screen as Flag a problem in a
+session, but while the keyboard was up only a session trimmed the page
+underneath to the room left above the keyboard. Without that, tapping the
+feedback box scrolled the page behind it and pushed the screen out of
+place. Share feedback now gets exactly what a session gets, so typing in
+it works the way typing in a card report does.
 
 ## 0.646 — 17 November 2026
 
