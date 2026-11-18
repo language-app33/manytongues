@@ -10876,11 +10876,32 @@ function ReportScreen({ title, backLabel, options, picked, onPick, note, onNote,
      left of a phone, and scrolled inside itself to do it; a screen has the
      whole window, the way out where every other screen keeps it, and Send
      at its foot. */
+  /* Clear of the phone's keyboard, whatever is under it (0.647). It used
+     to be clear only by luck: in a session the page beneath had room to
+     scroll, so the phone lifted the box above the keyboard; from the You
+     menu over a short page it had none, and the keyboard covered the box.
+     Now the screen itself ends where the keyboard starts (`kbfit`, from
+     --kb-overlap on the app root) and the box is brought into view inside
+     it when it gains focus and whenever the keyboard changes size. */
+  const boxRef = useRef<HTMLTextAreaElement | null>(null);
+  const kb = useSoftKeyboard();
+  const reveal = useCallback(() => {
+    const el = boxRef.current;
+    if (!el || typeof document === "undefined" || document.activeElement !== el) return;
+    el.scrollIntoView({ block: "nearest" });
+  }, []);
+  useEffect(() => {
+    if (!kb.open) return undefined;
+    /* After the screen has taken its new height, not before it. */
+    const t = setTimeout(reveal, 60);
+    return () => clearTimeout(t);
+  }, [kb.open, kb.height, kb.overlap, reveal]);
   return (
     <Screen
       title={title}
       onBack={onClose}
       rise
+      className="kbfit"
       backLabel={backLabel}
       footer={
         <Button variant="primary" disabled={!ready} onClick={onSend}>
@@ -10923,6 +10944,8 @@ function ReportScreen({ title, backLabel, options, picked, onPick, note, onNote,
           <textarea
             id="flag-note-input"
             data-el="flag-note-input"
+            ref={boxRef}
+            onFocus={() => setTimeout(reveal, 300)}
             className="at-input at-flagtext"
             rows={4}
             maxLength={FLAG_NOTE_MAX}

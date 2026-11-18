@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.647 — 18 November 2026
+
+**The phone's keyboard no longer hides the feedback box.** Typing in
+Share feedback from the You menu could leave the box under the keyboard.
+Share feedback and Flag a problem already used the same screen, but only
+Flag a problem, opened during a session, had room to move up out of the
+keyboard's way. Now the screen itself stops where the keyboard starts and
+keeps the box in view while you type, so both behave the same wherever
+they are opened from.
+
 ## 0.646 — 17 November 2026
 
 **Feedback in Super admin's Reports works like card reports.** The
