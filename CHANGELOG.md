@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.649 — 18 November 2026
+
+**A screen with little on it no longer scrolls in DuckDuckGo.** Every
+screen was made at least as tall as the browser said a screen was.
+DuckDuckGo counts the room behind its own address bar in that, so even a
+nearly empty home screen came out a little taller than what you could see,
+and moved under your finger. Screens are now only as tall as what is on
+them, and scroll only when there is more than fits. Nothing looks
+different: the colour behind the page was already the same as the page.
+Still to check by hand: the home screen in DuckDuckGo on the phone where
+it was seen.
+
 ## 0.648 — 18 November 2026
 
 **The feedback box stays above the phone's keyboard, for real this
