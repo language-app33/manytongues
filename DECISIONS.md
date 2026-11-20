@@ -8850,7 +8850,7 @@ A teacher's one-question trial has no recipe and no button.
 Given up: one extra build of a session each time the end screen opens.
 
 
-## A picture question waits for its picture; pictures sync with the cards (0.657)
+## A picture question waits for its picture; pictures sync with the cards (0.658)
 
 **20 November 2026** · `pictureHere`, `canSeeHere`, `pictureTurn`, the
 picture-sync effect beside `allImageIds`, in `src/ArabicTrainer.tsx`

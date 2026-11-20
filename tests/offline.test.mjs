@@ -411,7 +411,7 @@ test("the listing landing late is the same fact arriving a moment later", () => 
 const pictured = (/** @type {string[]} */ types) =>
   types.filter((t) => ["rec2img", "img2pick", "img2ar"].includes(t.split("@")[0]));
 
-test("a card with a picture is asked from it only once the picture is here, online or not (0.657)", () => {
+test("a card with a picture is asked from it only once the picture is here, online or not (0.658)", () => {
   const card = { ...form(""), images: ["p".repeat(64)] };
   setMateCounts(new Map([[DEFAULT_LANGUAGE, 10]]));
   setPicturedCounts(new Map([[DEFAULT_LANGUAGE, 10]]));

@@ -4606,7 +4606,7 @@ export function setVisibleImages(ids: Set<string> | null) {
 /*
  * Whether this browser can keep pictures at all (it has IndexedDB). Where
  * it cannot, there is nowhere for the sync to put them, so online a
- * picture is fetched when its question comes up, as before 0.657.
+ * picture is fetched when its question comes up, as before 0.658.
  */
 let picturesKept = true;
 export function setPicturesKept(kept: boolean) {
@@ -4615,7 +4615,7 @@ export function setPicturesKept(kept: boolean) {
 
 /*
  * Whether this one picture can be shown now, without waiting on the
- * network (0.657).
+ * network (0.658).
  *
  * It used to be asked only offline: online, a picture question was dealt
  * whether or not its picture had come down, and a picture that was slow
@@ -11893,7 +11893,7 @@ export default function ArabicTrainer() {
      they were asked on rather than cleared by resetExercise, so no way onto
      the next question can carry them over. */
   const [lentFor, setLentFor] = useState<{ ex: unknown; keys: string[] }>({ ex: null, keys: [] });
-  /* The matching grid's harakat, put back from the hint button and then put
+  /* The options' harakat, put back from the hint button and then put
      away again (0.653), on this question. Putting them away does not undo
      the near miss: they were on the screen. */
   const [marksAwayFor, setMarksAwayFor] = useState<unknown>(null);
@@ -12914,7 +12914,7 @@ export default function ArabicTrainer() {
   }, [items, lacksImages]);
 
   /*
-   * Bring every card's pictures down with everything else (0.657).
+   * Bring every card's pictures down with everything else (0.658).
    *
    * They used to come down only for the session about to start, and only
    * the first picture of each card, while a card with several shows the
@@ -14653,13 +14653,16 @@ export default function ArabicTrainer() {
   const choicesCanBeBare =
     !!qLang.marks && !marksTell && !checked && choicesInScript && (choicesRun === "sentence" || wordsBare);
   const choicesBare = choicesCanBeBare && !lentKeys.includes(CHOICES_LENT);
-  /* On a matching grid the harakat come back from the hint button in the
-     bar at the foot rather than a button above the tiles (0.653): the grid
-     has no other hint, and it is the same kind of thing — a nudge that
-     makes the question easier and is counted for it. Like the hint, it
-     stays pressed and can put them away again. */
-  const gridMarksHint = choicesCanBeBare && !!spec && spec.picks === "pair" && !hintAt;
-  const gridMarksShown = gridMarksHint && lentKeys.includes(CHOICES_LENT) && !marksAway;
+  /* Options shown bare get their harakat back from the hint button in the
+     bar at the foot rather than a button above them: the matching grids
+     first (0.653), then every question with options in the script (0.654).
+     None of them has another hint, and it is the same kind of thing — a
+     nudge that makes the question easier and is counted for it. Like the
+     hint, it stays pressed and can put them away again. A question whose
+     hint button already holds a nudge would keep the button above the
+     options; none does today. */
+  const marksHint = choicesCanBeBare && !hintAt;
+  const marksHintShown = marksHint && lentKeys.includes(CHOICES_LENT) && !marksAway;
 
   /*
    * Whether the prompt has to say which form it wants.
@@ -16766,7 +16769,7 @@ export default function ArabicTrainer() {
                   {/* The options can't be tapped a word at a time — a tap
                       on one chooses it — so their marks come back all at
                       once, and the question counts as a near miss. */}
-                  {choicesBare && !gridMarksHint && qLang.marks && marksView.lend && (
+                  {choicesBare && !marksHint && qLang.marks && marksView.lend && (
                     <div className="at-row at-reveals">
                       <Button
                         size="sm"
@@ -17454,16 +17457,16 @@ export default function ArabicTrainer() {
                             }}
                           />
                         )}
-                        {gridMarksHint && qLang.marks && (
+                        {marksHint && qLang.marks && (
                           <IconButton
                             icon="help"
                             ghost
-                            label={`${gridMarksShown ? "Hide" : "Show"} the ${qLang.marks.name}`}
-                            className={`at-hintbtn${gridMarksShown ? " on" : ""}`}
+                            label={`${marksHintShown ? "Hide" : "Show"} the ${qLang.marks.name}`}
+                            className={`at-hintbtn${marksHintShown ? " on" : ""}`}
                             data-el="hint-button"
-                            aria-pressed={gridMarksShown}
+                            aria-pressed={marksHintShown}
                             onClick={() => {
-                              if (gridMarksShown) {
+                              if (marksHintShown) {
                                 setMarksAwayFor(exercise);
                                 return;
                               }

@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.657 — 20 November 2026
+## 0.658 — 20 November 2026
 
 **A picture question is asked only when its picture is ready.** A question
 that shows a picture could come up before the picture had reached the
@@ -36,6 +36,28 @@ changes: there, a picture is still fetched when its question comes up.
 To check by hand: on a phone, open a course whose cards have pictures,
 start a session, and see the picture questions show their pictures at
 once.
+
+## 0.657 — 20 November 2026
+
+**Every question with options in the script now has its harakat behind
+the hint button**, as the matching grids got in 0.653. The "Show the
+harakat" button above the options is gone from:
+
+- Choose the word (from the English, and from a picture)
+- Which word is missing? (in a phrase, and in a sentence)
+- Choose the number
+- Put each form beside its person
+- Choose what you say next
+- Which sentence means this?
+- Put the scene back in order
+
+The question-mark button in the bar at the foot puts the harakat back on
+every option, stays lit while they show, and a second tap puts them away.
+Using it still makes a right answer a near miss.
+
+To check by hand: on a phone, a word whose meaning is known on "Choose the
+word", and a conversation on "Choose what you say next".
+
 ## 0.656 — 20 November 2026
 
 **"Keep going" at the end of a session starts the same session again.**
