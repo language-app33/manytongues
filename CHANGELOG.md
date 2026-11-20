@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.653 — 20 November 2026
+## 0.654 — 20 November 2026
 
 **The You menu says when you last synced and what is waiting, and a
 failed sync is said in the bar at the foot of the screen, with Retry.**
@@ -39,6 +39,22 @@ failed sync is said in the bar at the foot of the screen, with Retry.**
 To check by hand: on a phone, put it in airplane mode, answer a few cards
 and open the You menu; then, back online, check the time updates after
 Sync now.
+
+## 0.653 — 20 November 2026
+
+**On "Match each word to its meaning", the harakat are behind the hint
+button.** The "Show the harakat" button above the tiles is gone; the
+question-mark button in the bar at the foot, beside "I don't know", now
+puts the harakat back on every tile. Like the hint on other questions, it
+stays lit while they are showing and a second tap puts them away again.
+Using it still makes a right answer a near miss, even if they are put
+away before checking.
+
+"Match each recording to its word", the same grid heard, does the same.
+Other questions with options keep their "Show the harakat" button.
+
+To check by hand: a matching grid with words whose meaning is already
+known, on a phone.
 
 ## 0.652 — 20 November 2026
 

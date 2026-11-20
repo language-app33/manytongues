@@ -42,7 +42,7 @@ export interface Held {
   /** A line under the headline, where the general one is wrong. */
   detail?: string;
   /** The headline itself, where the failure is not the server being out of
-      reach: "Sync failed" (0.653). The last one held wins, like detail. */
+      reach: "Sync failed" (0.654). The last one held wins, like detail. */
   title?: string;
   /** False for something that should only be redone when asked: a delete,
       or leaving a space. The connection coming back does not redo it. */

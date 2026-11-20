@@ -4146,7 +4146,7 @@ export function ReachBar({ again = false, retrying = false, detail = "", title =
   again?: boolean;
   retrying?: boolean;
   detail?: string;
-  /** In place of "Can't reach the server": "Sync failed" (0.653). */
+  /** In place of "Can't reach the server": "Sync failed" (0.654). */
   title?: string;
   onRetry?: () => void;
   onDismiss?: () => void;

@@ -678,7 +678,7 @@ const joined = (parts: string[]) =>
   parts.length < 2 ? parts.join("") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
 
 /*
- * What the You menu says about sync (0.653): where it has got to, and
+ * What the You menu says about sync (0.654): where it has got to, and
  * under that when the last one was and what is waiting for the next.
  *
  * It used to name what went wrong instead — "Sync failed", for most things
