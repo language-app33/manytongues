@@ -1,6 +1,6 @@
 // @ts-check
 /*
- * The You menu's sync line (0.654): when the last sync was and what is
+ * The You menu's sync line (0.655): when the last sync was and what is
  * waiting for the next, instead of "Sync failed" — which is now the bar at
  * the foot of the app, with Retry.
  */

@@ -11898,7 +11898,7 @@ export default function ArabicTrainer() {
   const [spacesBusy, setSpacesBusy] = useState(false);
   /*
    * "Sync failed" with Retry, in the large bar at the foot of the app
-   * (0.654), held from the first failure until a sync works. It used to be
+   * (0.655), held from the first failure until a sync works. It used to be
    * a line in the You menu, which said that something was wrong and nothing
    * about what to do; the menu now says when the last sync was and what is
    * waiting. Held once: a background sync failing again into the same wall
@@ -12081,7 +12081,7 @@ export default function ArabicTrainer() {
         }
 
         /* How far this sync accounted for the cards, which is what the You
-           menu counts "to sync" from (0.654): the moment it set out, or the
+           menu counts "to sync" from (0.655): the moment it set out, or the
            newest change it brought down if another device's clock is ahead. */
         const syncedThrough = Math.max(setOut, latestStamp(merged as Doc));
         const cfg = { ...prevCfg, token: key, lastSync: now(), syncedThrough, uploaded };
@@ -12156,7 +12156,7 @@ export default function ArabicTrainer() {
             : "Sync failed";
         setSyncState("error");
         /*
-         * Said in the bar with Retry (0.654), not in the menu. Its
+         * Said in the bar with Retry (0.655), not in the menu. Its
          * headline is "Sync failed" and the line under it why, where the
          * app knows. Not when the connection went: the menu says that, and
          * the sync goes again on its own when it comes back.
@@ -15707,7 +15707,7 @@ export default function ArabicTrainer() {
   const kbOpen = kb.open && (inExercise || sharing);
 
   /*
-   * What the corner menu says about sync (0.654): see syncLine. Worked out
+   * What the corner menu says about sync (0.655): see syncLine. Worked out
    * only while the menu is open, because counting the cards walks every one
    * of them, and the menu is closed nearly all the time.
    */
@@ -16665,6 +16665,9 @@ export default function ArabicTrainer() {
                           <Button
                             key={answer}
                             variant={typed === answer ? "primary" : undefined}
+                            /* A choice that shows it is chosen, so Enter
+                               leaves it be and presses Check (0.654). */
+                            aria-pressed={typed === answer}
                             disabled={!!checked}
                             onClick={() => setTyped(answer)}
                           >
@@ -16791,15 +16794,17 @@ export default function ArabicTrainer() {
                           readOnly={!!checked || ownFigures}
                           placeholder={figures ? "Type the number" : ownFigures ? ownPrompt : spec.placeholder}
                           onChange={(e) => setTyped(e.target.value)}
-                          /* Only the Check button checks. Enter — and a
-                             phone keyboard's Go, which is the same key —
-                             used to, and a learner reaching for a letter
-                             on the keyboard's bottom row sent a half-typed
-                             answer to be marked. The key now does nothing,
-                             and says so: "done" rather than "go". */
+                          /* On a phone, only the Check button checks. Enter
+                             — and a phone keyboard's Go, which is the same
+                             key — used to, and a learner reaching for a
+                             letter on the keyboard's bottom row sent a
+                             half-typed answer to be marked. There the key
+                             does nothing, and says so: "done" rather than
+                             "go". On a computer Enter presses Check, as it
+                             presses every screen's main button (0.654,
+                             enter-key.ts), which tells the two apart. */
                           enterKeyHint="done"
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") e.preventDefault();
                             /* The read-only box takes nothing typed, so a
                                keyboard that does have ٤ on it — or a colon,
                                or backspace — goes through the pad's own
@@ -21394,7 +21399,7 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, onCourses, onSett
   spaceShown?: { name: string; logoData?: string; logo?: string } | null;
   syncState?: string;
   /** What to say about it: where sync has got to, and under that when the
-      last one was and what is waiting (0.654). Asked only while the menu
+      last one was and what is waiting (0.655). Asked only while the menu
       is open, because working it out walks every card. */
   syncNote?: () => { main: string; sub: string };
   onSyncNow: () => void;

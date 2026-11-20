@@ -1199,7 +1199,7 @@ export function ComponentGallery() {
         </V>
         <V label="retrying" wide><ReachBar still retrying onRetry={() => {}} /></V>
         <V label="after a retry that failed" wide><ReachBar still again onRetry={() => {}} onDismiss={() => {}} /></V>
-        <V label="a sync that failed (0.654)" wide>
+        <V label="a sync that failed (0.655)" wide>
           <ReachBar still title="Sync failed" detail="Your work is saved on this device." onRetry={() => {}} onDismiss={() => {}} />
         </V>
       </Row>

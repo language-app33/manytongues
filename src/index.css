@@ -1497,7 +1497,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* A row that names a choice rather than being one: no hover, no pointer,
    because the thing you tap is the picker underneath it. */
 .at-cline.as-field { cursor:default; }
-/* The sync row's two lines (0.654): where it has got to, then when the
+/* The sync row's two lines (0.655): where it has got to, then when the
    last one was and what is waiting. */
 .at-csync { display:flex; flex-direction:column; gap:2px; }
 .at-csync b { font-weight:inherit; }
@@ -1803,7 +1803,7 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 html.at-reaching .at-snack { bottom: calc(176px + env(safe-area-inset-bottom)); }
 /* And the You menu, which opens from the dock under the bar: lifted clear
    of it, so its sync row — the one Sync now is pressed from — is not hidden
-   by the "Sync failed" that pressing it can bring up (0.654). */
+   by the "Sync failed" that pressing it can bring up (0.655). */
 html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
   max-height: calc(100vh - 224px - env(safe-area-inset-bottom));
   max-height: calc(100dvh - 224px - env(safe-area-inset-bottom)); }

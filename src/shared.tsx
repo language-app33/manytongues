@@ -4146,7 +4146,7 @@ export function ReachBar({ again = false, retrying = false, detail = "", title =
   again?: boolean;
   retrying?: boolean;
   detail?: string;
-  /** In place of "Can't reach the server": "Sync failed" (0.654). */
+  /** In place of "Can't reach the server": "Sync failed" (0.655). */
   title?: string;
   onRetry?: () => void;
   onDismiss?: () => void;
@@ -4767,7 +4767,7 @@ export function ConfirmModal({
               autoFocus
               placeholder={confirmWord}
               onChange={(e) => setTyped(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && ready && !busy && onConfirm()}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (ready && !busy) onConfirm(); } }}
             />
           </div>
         )}
@@ -6627,7 +6627,7 @@ export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHi
                 value={name}
                 autoFocus
                 onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && make()}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); make(); } }}
               />
             </Field>
             <div className="at-row at-mt3">
