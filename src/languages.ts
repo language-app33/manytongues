@@ -1802,6 +1802,42 @@ export function askLabel(
 }
 
 /**
+ * What a picture question says about the form it wants: "female" or
+ * "male", and nothing else.
+ *
+ * A picture shows how many there are, so "dual" or "plural" under it said
+ * what the picture already did, and a learner reported it (0.651). It
+ * cannot show whether a dog is male or female: asked for كلبة from a
+ * picture of a dog, nothing said the female was wanted, and a learner
+ * reported that too. So a picture names the gender where another form of
+ * the card is the other gender at the same count — كلب beside كلبة, كلبين
+ * beside كلبتين — and is silent everywhere else. Never on a table's cell,
+ * which no picture asks about by its grammar.
+ */
+export function pictureLabel(
+  unit: Record<string, any> | null | undefined,
+  card: unknown,
+  lang: Lang = activeLang(),
+): string {
+  if (!unit || !card || isCell(unit)) return "";
+  const dim = dimsOf(lang).find((d) => d.field === "gender" && !d.retired);
+  if (!dim) return "";
+  const mine = valuesOf(unit, lang);
+  const gender = String(mine.gender || "");
+  if (!gender || gender === "na") return "";
+  const count = String(mine.number || "");
+  const told = othersOnCard(unit, card).some((o) => {
+    const theirs = valuesOf(o, lang);
+    return String(theirs.number || "") === count && !!theirs.gender && theirs.gender !== "na" && theirs.gender !== gender;
+  });
+  if (!told) return "";
+  const PICTURED: Record<string, string> = { feminine: "female", masculine: "male" };
+  if (PICTURED[gender]) return PICTURED[gender];
+  const opt = dim.options.find(([v]) => v === gender);
+  return opt ? opt[1] : gender;
+}
+
+/**
  * The meanings two forms of a card share with nothing to tell them apart.
  *
  * مِش منيح and مِش منيحة, both "Not good", with neither marked masculine

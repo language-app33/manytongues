@@ -8,6 +8,101 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.651 — 20 November 2026
+
+**Fixes from a learner's 16 reports.** Most were already settled by
+0.605–0.621. These four were not.
+
+For students:
+
+- **"Which word is missing?" is never asked of a phrase that is only the
+  word.** A one-word reply in a conversation, عفواً, was used as a phrase
+  for عفواً, so the screen showed nothing but the blank and the answer
+  was obvious. Reported twice. Such a reply is no longer used as a
+  phrase for its word, in questions or under "Where it turned up". Its
+  longer phrases are still used.
+- **Counting questions write the noun in small letters: "3 sisters", not
+  "3 Sisters".** The capital came from how the word is written on its
+  card. A word whose second letter is a capital too (TVs) keeps its
+  capitals, and so does a card ticked "keeps its capital letters".
+- **A picture question says "female" or "male" when the picture can't
+  show it.** Asked for كلبة from a picture of a dog, nothing said the
+  female was wanted. Now "female" is under the picture. It says "male"
+  for the male form too, where the card has a female form of the same
+  number, and says nothing on a card with only one gender.
+- **A picture question no longer says "dual" or "plural".** The picture
+  shows how many. Which form it was is still said beside the answer, as
+  on other questions.
+
+Trade-off: in "Picture → choose", where the plural and the pair are both
+offered, only the picture now tells them apart.
+
+To check by hand: a picture question on كلبة shows "female" under the
+picture; one on نَبتِتين shows nothing under it; a counting question
+reads "3 sisters".
+
+Checked and left alone:
+
+- **"Sisters" every time** in counting questions: the app rotates among
+  the nouns already learnt in the shape the number needs, and the
+  learner had two (sisters and brothers). More arrive as more are learnt.
+- **The whole phrase's pronunciation** after choosing a missing word is
+  shown where the phrase has one written; the phrase reported has none.
+  A teacher can add it.
+- **The learner's app was still on 0.612 on 17 November**, a week after
+  it came out. Nothing in the app changes for this; the learner is to reload it.
+
+## 0.650 — 18 November 2026
+
+**Home has one thing to do: Start session.** Weak spots, Build a session
+and your saved sessions have moved off the home screen to a new screen,
+**Focused training**, opened by the dumbbell button at the right of Start
+session. They work as they did: Weak spots is dimmed when nothing is
+slipping, and pressing it then says so. Starting a session from Focused
+training closes it, so when the session ends you are back on Home.
+
+There is no mark on the dumbbell when something is slipping, so weak
+spots are found by opening Focused training.
+
+## 0.649 — 18 November 2026
+
+**A screen with little on it no longer scrolls in DuckDuckGo.** Every
+screen was made at least as tall as the browser said a screen was.
+DuckDuckGo counts the room behind its own address bar in that, so even a
+nearly empty home screen came out a little taller than what you could see,
+and moved under your finger. Screens are now only as tall as what is on
+them, and scroll only when there is more than fits. Nothing looks
+different: the colour behind the page was already the same as the page.
+Still to check by hand: the home screen in DuckDuckGo on the phone where
+it was seen.
+
+## 0.648 — 18 November 2026
+
+**The feedback box stays above the phone's keyboard, for real this
+time.** The two earlier attempts (0.647) did not fix it. Run side by side
+on a phone-sized screen, the cause was plain: Flag a problem has four
+options, so its screen is taller than the phone and the phone had
+something to scroll when the keyboard came up. Share feedback has two,
+fits the phone exactly, and had nothing to scroll, so its box stayed
+under the keyboard. In both, Send could sit over the bottom of the box.
+
+The screen now looks after this itself instead of leaving it to the
+phone. While you type, it shrinks to the part of the display the
+keyboard leaves and moves the box, with its "Tell us what happened"
+label, clear of Send. Share feedback and Flag a problem are the same
+screen, so both now behave identically, and both return to full height
+when the keyboard goes.
+
+## 0.647 — 18 November 2026
+
+**The phone's keyboard no longer hides the feedback box.** Share
+feedback from the You menu is the same screen as Flag a problem in a
+session, but while the keyboard was up only a session trimmed the page
+underneath to the room left above the keyboard. Without that, tapping the
+feedback box scrolled the page behind it and pushed the screen out of
+place. Share feedback now gets exactly what a session gets, so typing in
+it works the way typing in a card report does.
+
 ## 0.646 — 17 November 2026
 
 **Feedback in Super admin's Reports works like card reports.** The

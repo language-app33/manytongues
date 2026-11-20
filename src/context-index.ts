@@ -144,6 +144,11 @@ export function buildContextIndex(items: Item[], lang: Lang): Map<string, Contex
          of each form is looked for on its own — see answerWords. */
       const words = wordsOfCard(target);
       const hit = written.map((said) => ({ said, found: bestWordIn(said.ar, words, lang) })).find((h) => h.found);
+      /* Not where the word is the whole of it. A reply of one word, عفواً,
+         names the word it is (see wordsOffered), and as a phrase for it
+         was a gap with nothing round it: a learner was shown "____" and
+         asked which word was missing, twice (0.651). */
+      if (hit && hit.found && contextTokens(hit.said.ar, lang).length <= hit.found.span.len) continue;
       if (hit && hit.found) {
         const { said, found: { item: { unit, answer }, span } } = hit;
         const list = index.get(unit.id) || [];

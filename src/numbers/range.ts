@@ -636,8 +636,27 @@ function carriedHour(h: number, m: number, mark: number | undefined): number {
  */
 function englishFor(noun: CountedNoun, value: number): string {
   const word = String(noun.en || noun.id || "").trim();
-  if (value === 1) return word;
-  return String(noun.enPl || "").trim() || word;
+  const said = value === 1 ? word : String(noun.enPl || "").trim() || word;
+  return noun.keepsCase ? said : midSentence(said);
+}
+
+/*
+ * A meaning as it reads after a number: "3 sisters", not "3 Sisters".
+ *
+ * A card's English is written to stand on its own, so it usually opens
+ * with a capital, and a learner reported the capital after the number
+ * (0.651). Each word loses its first capital, as a card's meaning does
+ * in a sentence (see fitEnglish), except where its second letter is a
+ * capital too — TVs, CDs. A card ticked "keeps its capital letters" is
+ * left as written: 3 Mondays.
+ */
+function midSentence(said: string): string {
+  return said.replace(/[\p{L}\p{M}'’]+/gu, (word) => {
+    const [first, next = ""] = Array.from(word);
+    const cased = (c: string) => c.toUpperCase() !== c.toLowerCase();
+    if (!cased(first) || (next && cased(next) && next === next.toUpperCase())) return word;
+    return first.toLowerCase() + word.slice(first.length);
+  });
 }
 
 /* ---- wrong answers worth offering ---- */

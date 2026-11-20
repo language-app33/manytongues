@@ -108,6 +108,10 @@ export interface CountedNoun {
       no English is not counted; the clock's *minute* may lack it, and is
       then said in its singular's words. Never made up. */
   enPl?: string;
+  /** Where the card is ticked "keeps its capital letters": its English is
+      said after a number as written, *3 Mondays*. Otherwise a capital
+      opening it is dropped there, *3 sisters*. */
+  keepsCase?: boolean;
   /**
    * The plural as it is said after three to ten, where that is not the
    * plural itself.

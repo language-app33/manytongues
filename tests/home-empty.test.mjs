@@ -66,7 +66,8 @@ test("the home screen reads the space on screen, not the whole device", () => {
   assert.doesNotMatch(src, /\{items\.length === 0 && \(\s*\/\* The same component/,
     "not by whether the device holds any card anywhere");
   assert.doesNotMatch(src, /two usable exercise types/, "the teacher's warning is gone from the learner's home");
-  assert.match(src, /savedHere\.length > 0 && \(/, "saved sessions are the ones that run here");
+  /* On Focused training since 0.650, handed the same list. */
+  assert.match(src, /saved=\{savedHere\}/, "saved sessions are the ones that run here");
   assert.doesNotMatch(src, /label\} · \$\{plural\(picked\.size, "card"\)\}/, "a suggested name carries no count");
 });
 

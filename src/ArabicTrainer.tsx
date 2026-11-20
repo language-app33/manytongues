@@ -177,6 +177,7 @@ import {
   groupAttrOf,
   answerLabel,
   askLabel,
+  pictureLabel,
   lentLabel,
   langOf,
   quizAttrOf,
@@ -10876,6 +10877,100 @@ function ReportScreen({ title, backLabel, options, picked, onPick, note, onNote,
      left of a phone, and scrolled inside itself to do it; a screen has the
      whole window, the way out where every other screen keeps it, and Send
      at its foot. */
+  /*
+   * The box stays in sight while it is typed in, by this screen's own doing
+   * (0.648), for a card report and for feedback alike.
+   *
+   * It used to be left to the phone, and the phone only managed it by
+   * accident. An iPhone's keyboard does not shrink the page; it covers the
+   * lower half and the browser scrolls whatever it can to uncover the box.
+   * Flag a problem has four options, so its screen was taller than the
+   * window and sat over a session page that was taller still: there was
+   * something to scroll. Share feedback has two, fits the window exactly
+   * and sits over a page that fits too: nothing to scroll, and the box
+   * stayed under the keyboard. Measured side by side, that was the whole
+   * difference. And wherever the screen did get squeezed, Send, pinned to
+   * its foot, lay over the bottom of the box.
+   *
+   * So, while the box has the focus: the screen is cut to the part of the
+   * window the keyboard leaves (the visual viewport, followed as it moves),
+   * and the box is scrolled clear of Send inside it. Set straight on the
+   * elements rather than through state: the viewport reports on every
+   * frame of the keyboard's slide, and none of that should render anything.
+   */
+  /* Held in state, not a ref: a screen draws itself once in place and then
+     again at the app's root, so the box of the first draw is not the box
+     that is typed in. */
+  const [box, setBox] = useState<HTMLTextAreaElement | null>(null);
+  useEffect(() => {
+    const screen = box ? (box.closest(".at-screen") as HTMLElement | null) : null;
+    const body = box ? (box.closest(".at-screenbody") as HTMLElement | null) : null;
+    if (!box || !screen || !body || typeof window === "undefined") return undefined;
+    const vv = window.visualViewport;
+    /* Where the stylesheet puts the screen's top: under the banner, if one is up. */
+    let ownTop = 0;
+    let pinned = false;
+    const unpin = () => {
+      if (!pinned) return;
+      pinned = false;
+      screen.style.top = "";
+      screen.style.bottom = "";
+      screen.style.height = "";
+    };
+    const fit = () => {
+      const typing = document.activeElement === box;
+      /* How much of the window the keyboard is sitting on. Nothing where
+         the browser shrinks the window itself, as Android's does. */
+      const covered = vv ? window.innerHeight - vv.height : 0;
+      if (vv && typing && covered > 80) {
+        if (!pinned) ownTop = parseFloat(getComputedStyle(screen).top) || 0;
+        pinned = true;
+        const top = Math.max(ownTop, vv.offsetTop);
+        screen.style.top = `${top}px`;
+        screen.style.bottom = "auto";
+        screen.style.height = `${Math.max(0, vv.offsetTop + vv.height - top)}px`;
+      } else {
+        unpin();
+      }
+      if (!typing) return;
+      /* Clear of Send, which is pinned to the foot of what scrolls, and
+         with its label where there is room for both. */
+      const foot = screen.querySelector(".at-screenfoot");
+      const frame = body.getBoundingClientRect();
+      const floor = Math.min(frame.bottom, foot ? foot.getBoundingClientRect().top : frame.bottom) - 8;
+      const ceiling = frame.top + 8;
+      const whole = (box.closest(".at-flagnote") || box).getBoundingClientRect();
+      const r = box.getBoundingClientRect();
+      const top = whole.bottom - whole.top <= floor - ceiling ? whole.top : r.top;
+      if (r.bottom > floor) body.scrollTop += Math.min(r.bottom - floor, top - ceiling);
+      else if (top < ceiling) body.scrollTop -= ceiling - top;
+    };
+    /* And again as the keyboard finishes arriving: its last report can come
+       before the screen has taken its new height. */
+    let timers: ReturnType<typeof setTimeout>[] = [];
+    const settle = () => {
+      timers.forEach(clearTimeout);
+      timers = [0, 120, 350, 700].map((ms) => setTimeout(fit, ms));
+    };
+    box.addEventListener("focus", settle);
+    box.addEventListener("blur", settle);
+    window.addEventListener("resize", fit);
+    if (vv) {
+      vv.addEventListener("resize", fit);
+      vv.addEventListener("scroll", fit);
+    }
+    return () => {
+      timers.forEach(clearTimeout);
+      box.removeEventListener("focus", settle);
+      box.removeEventListener("blur", settle);
+      window.removeEventListener("resize", fit);
+      if (vv) {
+        vv.removeEventListener("resize", fit);
+        vv.removeEventListener("scroll", fit);
+      }
+      unpin();
+    };
+  }, [box]);
   return (
     <Screen
       title={title}
@@ -10923,6 +11018,7 @@ function ReportScreen({ title, backLabel, options, picked, onPick, note, onNote,
           <textarea
             id="flag-note-input"
             data-el="flag-note-input"
+            ref={setBox}
             className="at-input at-flagtext"
             rows={4}
             maxLength={FLAG_NOTE_MAX}
@@ -11567,6 +11663,8 @@ export default function ArabicTrainer() {
   /* Teaching is a role on a course, so it has to be asked about — and the
      material request answers it, so it is no longer asked twice. */
   const [building, setBuilding] = useState(false);
+  /* Focused training (0.650): the screen behind the dumbbell on Home. */
+  const [training, setTraining] = useState(false);
   const [showingSaved, setShowingSaved] = useState(false);
   const [editingSaved, setEditingSaved] = useState<SavedSession | null>(null);
   /* Which language the session on screen is drawn from: a language id, ""
@@ -12998,6 +13096,12 @@ export default function ArabicTrainer() {
     () => drillable.filter((it) => isWeak(it, settings)).length,
     [drillable, settings]
   );
+  /* A session started from Focused training — weak spots, a built one, a
+     kept one — closes it, so the session's end comes back to Home rather
+     than to the screen it was started from (0.650). */
+  useEffect(() => {
+    if (session) setTraining(false);
+  }, [session]);
 
   /* ---------------- session ---------------- */
 
@@ -14361,8 +14465,11 @@ export default function ArabicTrainer() {
   /* Where the form is named — under the prompt, beside the answer — and
      what it is called. See formTagsAt. */
   const formLabelText = item && parentItem ? askLabel(item, parentItem, qLang) : "";
+  /* A picture says only what it cannot show — see pictureLabel. */
+  const pictured = item && parentItem && spec && spec.promptField === "image" ? pictureLabel(item, parentItem, qLang) : "";
   const tagsAt = formTagsAt({
     label: formLabelText,
+    pictured,
     ambiguous: tellForm,
     kin: parentItem ? unitsOf(parentItem).length - 1 : 0,
     lent: lentLines.length > 0,
@@ -15485,7 +15592,12 @@ export default function ArabicTrainer() {
   const theme = settings.theme || "auto";
   setSounds(settings.sounds);
   const inExercise = !!(session && exercise);
-  const kbOpen = kb.open && inExercise;
+  /* Share feedback from the You menu (0.647) is typed in the same report
+     screen as Flag a problem in a session, and gets what a session gets
+     while the phone's keyboard is up: the page under it cut to the height
+     left above the keyboard. Without that the page stayed full height, and
+     tapping the box scrolled it and carried the screen out of place. */
+  const kbOpen = kb.open && (inExercise || sharing);
 
   /*
    * What the corner menu says about sync.
@@ -15909,7 +16021,11 @@ export default function ArabicTrainer() {
                       onOpen={(deckId) => setUnitOpen({ courseId: p.courseId, deckId })} />
                   ))}
 
-                  <div className="at-row">
+                  {/* Start session, and beside it on the right the way to
+                      Focused training (0.650): weak spots, a session built
+                      by hand and the ones kept, on a screen of their own,
+                      so the home screen has one thing to do. */}
+                  <div className="at-row at-startrow">
                     {/* Always live while there is anything to drill. Being
                         due decides what a session leads with, not whether
                         there is one — so a learner who is up to date, or
@@ -15924,70 +16040,13 @@ export default function ArabicTrainer() {
                     >
                       Start session
                     </Button>
+                    {/* An icon alone, as the owner asked: its name is what a
+                        screen reader says, and the screen's title. No dot
+                        for weak spots waiting (the owner's 3b). */}
+                    <IconButton icon="dumbbell" label="Focused training" ghost
+                      className="at-trainbtn" data-el="focused-training"
+                      onClick={() => setTraining(true)} />
                   </div>
-                  {/* And the other kind of session there is a one-tap case
-                      for: everything going wrong, worst first. It sits
-                      directly under Start session because it is the same
-                      offer narrowed — a session, dealt for you — rather
-                      than something to be assembled, and because the
-                      moment to reach for it is the moment you have just
-                      seen the ladder say a level is paused.
-
-                      Always shown, and dimmed when there is nothing to fix.
-                      The app's habit is to leave out a button that would
-                      open on an empty screen, but a learner has to be able
-                      to find this one to learn what it does.
-
-                      Dimmed, and still worth pressing: `off` rather than
-                      `disabled`, so the press arrives and is answered with
-                      the reason. That line used to sit beside the button on
-                      every single day, saying what is slipping and how
-                      much — a standing caption for a question nobody had
-                      asked yet. It is said now on the one occasion it is an
-                      answer, which is the moment somebody presses the
-                      button and nothing happens. */}
-                  <div className="at-row at-mt3">
-                    <Button variant="ghost"
-                      off={!weakCount}
-                      onClick={() =>
-                        weakCount
-                          ? beginWeak()
-                          : flash("There is no weak spot to fix right now")
-                      }
-                    >
-                      Weak spots
-                    </Button>
-                  </div>
-                  <div className="at-row at-mt3">
-                    <Button variant="ghost"
-                      onClick={() => setBuilding(true)}
-                      disabled={!drillable.length}
-                    >
-                      Build a session
-                    </Button>
-
-                  </div>
-                  {/* Only once there is one to open. A button that leads to
-                      an empty screen is a promise the app has not kept, and
-                      the way to find this is to save one, which the Build
-                      screen offers where the session is finished. */}
-                  {/* And only the ones with something to practise in the
-                      space on screen (0.639). */}
-                  {savedHere.length > 0 && (
-                    <>
-                      <div className="at-row at-mt3">
-                        <Button variant="ghost" onClick={() => setShowingSaved(true)}>
-                          Saved sessions
-                        </Button>
-                      </div>
-                      <SavedTiles
-                        sessions={savedHere}
-                        items={shown}
-                        settings={settings}
-                        onStart={startSaved}
-                      />
-                    </>
-                  )}
                   {/* The warning that sat here — "No card here has two
                       usable exercise types" — was written for a teacher and
                       shown to learners. With nothing to practise the home
@@ -16376,7 +16435,7 @@ export default function ArabicTrainer() {
                         grammar to say it with: Vietnamese has none. */}
                     {tagsAt.question && (
                       <p className="at-asktag" data-el="question-form-tag">
-                        {formLabelText}
+                        {pictured || formLabelText}
                       </p>
                     )}
                     {/* What the verb means, on "who is it?": a learner
@@ -17287,6 +17346,26 @@ export default function ArabicTrainer() {
         })()}
 
         {/* ============ SETTINGS ============ */}
+
+        {/* Under the Build and Saved sessions screens, which open over it
+            and come back to it; a session started from any of them closes
+            it (see the effect on `session`). */}
+        {training && !session && (
+          <FocusedTrainingSheet
+            weakCount={weakCount}
+            onWeak={() =>
+              weakCount ? beginWeak() : flash("There is no weak spot to fix right now")
+            }
+            canBuild={drillable.length > 0}
+            onBuild={() => setBuilding(true)}
+            saved={savedHere}
+            items={shown}
+            settings={settings}
+            onSavedList={() => setShowingSaved(true)}
+            onStartSaved={startSaved}
+            onClose={() => setTraining(false)}
+          />
+        )}
 
         {building && (
           <ManualSessionSheet
@@ -18320,6 +18399,69 @@ const COUNT_CHOICES = [10, 20, 30, 50];
 const TIME_CHOICES = [2, 5, 10, 15, 30];
 
 /* ------------------------------------------------------------------
+   Full-screen: Focused training (0.650)
+
+   Behind the dumbbell beside Start session. The sessions a learner aims
+   themselves rather than has dealt: what is going wrong, one built by
+   hand, and the ones they kept. They were three more buttons and a row of
+   tiles under Start session, which made the home screen a menu; now Home
+   has one thing to do and this screen has the rest.
+
+   The buttons behave as they did on Home. Weak spots is always here and
+   dimmed when nothing is slipping, and pressing it then says so, which is
+   how a learner finds out what it is for. Saved sessions, and its tiles,
+   only once there is one.
+   ------------------------------------------------------------------ */
+
+function FocusedTrainingSheet({
+  weakCount, onWeak, canBuild, onBuild, saved, items, settings, onSavedList, onStartSaved, onClose,
+}: {
+  weakCount: number;
+  onWeak: () => void;
+  canBuild: boolean;
+  onBuild: () => void;
+  saved: SavedSession[];
+  items: Item[];
+  settings: Settings;
+  onSavedList: () => void;
+  onStartSaved: (session: SavedSession) => void;
+  onClose: () => void;
+}) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <Screen title="Focused training" onBack={onClose} className="training">
+      <div className="at-training">
+        <div className="at-row">
+          <Button variant="ghost" off={!weakCount} onClick={onWeak}>
+            Weak spots
+          </Button>
+        </div>
+        <div className="at-row">
+          <Button variant="ghost" onClick={onBuild} disabled={!canBuild}>
+            Build a session
+          </Button>
+        </div>
+        {saved.length > 0 && (
+          <>
+            <div className="at-row">
+              <Button variant="ghost" onClick={onSavedList}>
+                Saved sessions
+              </Button>
+            </div>
+            <SavedTiles sessions={saved} items={items} settings={settings} onStart={onStartSaved} />
+          </>
+        )}
+      </div>
+    </Screen>
+  );
+}
+
+/* ------------------------------------------------------------------
    Full-screen: the sessions somebody kept
 
    A saved session is a description, not a snapshot — which cards, which
@@ -18955,9 +19097,13 @@ function readAlike(
  * Nothing on a grid or a scene, where every word is asked and a tag on one
  * would say which English is its — see kinTags.
  */
-export function formTagsAt({ label, ambiguous, kin, lent, promptField }: {
+export function formTagsAt({ label, ambiguous, kin, lent, promptField, pictured = "" }: {
   /** What the form is called, from askLabel. Empty where nothing tells it apart. */
   label: string;
+  /** On a picture, what it says instead — pictureLabel: "female" or
+      "male" where the picture cannot show it, and never the count, which
+      it does. Under the picture whenever it says anything. */
+  pictured?: string;
   /** Whether the prompt leaves which form open — formIsAmbiguous. */
   ambiguous: boolean;
   /** How many other forms the card has. */
@@ -18969,7 +19115,7 @@ export function formTagsAt({ label, ambiguous, kin, lent, promptField }: {
   /* Nor a verb's example, whose words already say which form is in the
      gap — and naming its person would be its English given away. */
   const none = ["pairs", "scene", "gap", "sentence", "sentenceMeaning", "example"].includes(promptField);
-  const question = !none && !!label && ambiguous;
+  const question = promptField === "image" ? !!pictured : !none && !!label && ambiguous;
   const lentQuestion = !none && lent && !PROMPT_SHOWS_FORM.includes(promptField);
   return {
     question,

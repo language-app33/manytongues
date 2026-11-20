@@ -115,3 +115,19 @@ questions, every time:
 
 Where there is only one sensible fix, still say which it is and why, rather
 than presenting it as a list of one.
+
+## Reproduce before fixing
+
+**When a bug is reported, see it happen before changing code,** above all
+one that shows only on a phone, or only on one of two screens that should
+behave alike. Run the real app, put the working case and the broken case
+side by side, and measure the difference. A fix reasoned from reading the
+code alone and pushed untested costs the owner a deploy and a test on
+their own phone to learn it did not work.
+
+- `docs/DEBUGGING-on-a-phone.md` has the method that works here: the
+  built app with its own server, an emulated phone, both kinds of phone
+  keyboard simulated, and what to measure.
+- If a fix has already failed once, stop guessing and do this next.
+- When reporting, say what was checked this way and what still needs a
+  real device.

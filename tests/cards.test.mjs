@@ -3085,3 +3085,14 @@ test("a verb blank's subjunctive readings are named in words on the screen", () 
   assert.equal(blankLabel("verb2-who"), "verb2: person", "another verb blank keeps its name");
   assert.equal(blankLabel("name"), "name", "every other blank is its own name");
 });
+
+test("a picture question names the form only with what the picture cannot show", () => {
+  /* "dual" under a picture of two plants was reported (0.651): even with
+     the plural among the choices, the picture says how many. */
+  const at = formTagsAt({ label: "dual", ambiguous: true, kin: 2, lent: false, promptField: "image" });
+  assert.equal(at.question, false);
+  assert.equal(at.answer, true, "the grammar is still said beside the answer");
+  const female = formTagsAt({ label: "feminine", ambiguous: false, kin: 4, lent: false, promptField: "image", pictured: "female" });
+  assert.equal(female.question, true);
+  assert.equal(female.answer, false, "never both");
+});
