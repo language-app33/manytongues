@@ -3951,6 +3951,27 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   /* A scene of three exercises runs out inside the loop above, so what is
      on screen is the end of the session rather than the middle of one —
      and a finished session is a screen over the tabs, not a tab. */
+
+  /* Keep going (0.656): above Done, the primary button, and it starts this
+     session over the way it was built — the same one scene, the same ten
+     questions — dealt afresh. */
+  {
+    const keep = document.querySelector('[data-el="keep-going-button"]');
+    const done = document.querySelector('[data-el="done-button"]');
+    check("the end of a built session offers Keep going above Done, as the primary button",
+      !!keep && !!done && keep.parentElement === done.parentElement &&
+        !!(keep.compareDocumentPosition(done) & 4) && /primary/.test(keep.className) && !/primary/.test(done.className),
+      `keep:${!!keep} done:${!!done} ${keep ? keep.className : ""}`);
+    if (keep) {
+      click(keep);
+      await sleep(300);
+      const again = instruction();
+      check("and Keep going starts the same session again, on the scene",
+        !!document.querySelector('[data-el="leave-session"]') && /scene|lines|follow|read|missing/i.test(again), again);
+      click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Leave session") || null);
+      await sleep(300);
+    }
+  }
   if (buttonNamed(/^Done$/)) {
     click(buttonNamed(/^Done$/));
     await sleep(250);

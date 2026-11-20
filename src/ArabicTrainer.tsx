@@ -315,7 +315,7 @@ import { buildContextIndex } from "./context-index.ts";
 import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
-import { isUnreachable } from "./reach.ts";
+import { holdReach, isUnreachable, releaseReach, showReach, updateReach } from "./reach.ts";
 import { knownMissing as knownMissingAt, MISSING_CLIPS, MISSING_FOR_MS, pictureData } from "./pictures.ts";
 import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 import {
@@ -872,6 +872,10 @@ import {
   mergeData,
   syncAfterChange,
   SESSION_END_SYNC_MS,
+  cardsToSync,
+  clipsToSync,
+  latestStamp,
+  syncLine,
 } from "./sync.ts";
 
 /* ==================================================================
@@ -2021,6 +2025,17 @@ type SetStart =
   | { kind: "begin"; practice?: boolean; only?: (it: Item) => boolean; pathUnit?: string }
   | { kind: "weak" }
   | { kind: "saved"; saved: SavedSession };
+
+/*
+ * How a session was started, kept on it so the screen at its end can start
+ * another the same way: "Keep going" (0.656). The settings, not the
+ * questions — what is dealt is dealt afresh, so it is what is due now. A
+ * session built by hand keeps its cards, its kind, and its length or its
+ * minutes.
+ */
+export type Again =
+  | SetStart
+  | { kind: "manual"; ids: string[]; mode: string; count?: number; minutes?: number };
 
 export type SetPicture = { id: string; name: string; images: string[]; answer: SetAnswer | null };
 export type SetWord = { id: string; ar: string; lat: string; en: string };
@@ -4591,7 +4606,7 @@ export function setVisibleImages(ids: Set<string> | null) {
 /*
  * Whether this browser can keep pictures at all (it has IndexedDB). Where
  * it cannot, there is nowhere for the sync to put them, so online a
- * picture is fetched when its question comes up, as before 0.655.
+ * picture is fetched when its question comes up, as before 0.657.
  */
 let picturesKept = true;
 export function setPicturesKept(kept: boolean) {
@@ -4600,7 +4615,7 @@ export function setPicturesKept(kept: boolean) {
 
 /*
  * Whether this one picture can be shown now, without waiting on the
- * network (0.655).
+ * network (0.657).
  *
  * It used to be asked only offline: online, a picture question was dealt
  * whether or not its picture had come down, and a picture that was slow
@@ -7883,8 +7898,8 @@ export function buildWeakSession({ items, settings, inDeck, budget, systems, per
   systems?: SystemSet[];
   perDay?: number;
 }) {
-  /* Not a dealt session: the screen at the end reads `manual` to know that
-     "Keep going" would be a change of subject rather than more of the same. */
+  /* `manual`: not a dealt session. "Keep going" at the end starts another
+     of these, not a dealt one — see Again (0.656). */
   return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "weak" }), manual: true, mode: "weak" };
 }
 
@@ -11937,17 +11952,24 @@ export default function ArabicTrainer() {
   const kb = useSoftKeyboard();
 
   /* ---- sync ---- */
-  const [syncCfg, setSyncCfg] = useState(() => ({ token: "", lastSync: 0 }));
+  const [syncCfg, setSyncCfg] = useState<{ token: string; lastSync: number; syncedThrough?: number; uploaded?: string[] }>(
+    () => ({ token: "", lastSync: 0 }),
+  );
   const [syncState, setSyncState] = useState("idle"); // idle|syncing|ok|error|off
   /* True only while a deliberate Sync now is fetching the spaces. The
      background check every forty-five seconds sets nothing here, so the dot
      stays still for it. */
   const [spacesBusy, setSpacesBusy] = useState(false);
-  /* Why the last sync failed, in words. It used to be recorded and read by
-     nobody: the dot in the corner went red and the line beside it said
-     "Offline — will retry" whatever had actually happened, including the
-     two failures that never clear by themselves. */
-  const [syncError, setSyncError] = useState("");
+  /*
+   * "Sync failed" with Retry, in the large bar at the foot of the app
+   * (0.655), held from the first failure until a sync works. It used to be
+   * a line in the You menu, which said that something was wrong and nothing
+   * about what to do; the menu now says when the last sync was and what is
+   * waiting. Held once: a background sync failing again into the same wall
+   * changes what the bar says but does not bring it back once closed —
+   * only Sync now or Retry, pressed by hand, does.
+   */
+  const syncFailHeld = useRef(0);
   /* The round trip waiting to go, if one is. Emptied when it fires, so
      "is one waiting?" can be asked of it. */
   const syncTimer: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = useRef(null);
@@ -11990,7 +12012,7 @@ export default function ArabicTrainer() {
 
   /* So that a sync can ask for another one when something was written
      while it was in flight, without naming itself as its own dependency. */
-  const runSyncRef = useRef<(token?: string) => void>(() => {});
+  const runSyncRef = useRef<(token?: string, byHand?: boolean) => unknown>(() => {});
   /* Arm the round trip for what is owed. `keep` leaves one already
      waiting where it is, which is what lets a session's answers ride along
      on the next sync rather than each pushing it back. A trip with nothing
@@ -12008,11 +12030,16 @@ export default function ArabicTrainer() {
   const runSync = useCallback(
     /* Defaulted rather than required: most callers have no token in hand
        and want whatever this device is already signed in with. */
-    async (token: string = "") => {
+    async (token: string = "", byHand: boolean = false) => {
       /* Trying a space (0.574): its practice stays on this device. */
       if (TRYING) return;
       const key = token || loadSyncConfig().token;
       if (!key || syncing.current) return;
+      /* For the bar, should this one fail: Sync now and Retry. */
+      const letGo = () => {
+        if (syncFailHeld.current) releaseReach(syncFailHeld.current);
+        syncFailHeld.current = 0;
+      };
       /*
        * Offline, the round trip can only fail, and failing at it says
        * nothing the connection has not already said. What is on this
@@ -12021,16 +12048,21 @@ export default function ArabicTrainer() {
        */
       if (isOffline()) {
         setSyncState("off");
+        /* Offline is not a failure: the menu says the work is safe and
+           the sync goes again when the connection comes back. */
+        letGo();
         return;
       }
       syncing.current = true;
       setSyncState("syncing");
-      setSyncError("");
       /* Everything up to here goes in this trip, which reads the document
          as it stands now. Anything written while it is in flight sets this
          again, and is owed a trip of its own — see the end. */
       owed.current = false;
       let sent = false;
+      /* What this trip carries is everything up to now, so a change from
+         here on is still to send — see syncedThrough below. */
+      const setOut = now();
       try {
         const { merged, changed, lost, serverNow } = await syncOnce(dataRef.current, key);
         sent = true;
@@ -12112,10 +12144,15 @@ export default function ArabicTrainer() {
           /* the document is synced; clips can catch up next time */
         }
 
-        const cfg = { ...prevCfg, token: key, lastSync: now(), uploaded };
+        /* How far this sync accounted for the cards, which is what the You
+           menu counts "to sync" from (0.655): the moment it set out, or the
+           newest change it brought down if another device's clock is ahead. */
+        const syncedThrough = Math.max(setOut, latestStamp(merged as Doc));
+        const cfg = { ...prevCfg, token: key, lastSync: now(), syncedThrough, uploaded };
         saveSyncConfig(cfg);
         setSyncCfg(cfg);
         setSyncState("ok");
+        letGo();
 
         /* And how close the document is to the size the server refuses.
            Past that, sync stops for good and everything after it stays on
@@ -12181,9 +12218,38 @@ export default function ArabicTrainer() {
             : isOffline()
             ? "Offline — your work is saved on this device"
             : "Sync failed";
-        setSyncError(said);
-        if (msg === "too-large" || msg === "would-empty") flash(said, "warn");
         setSyncState("error");
+        /*
+         * Said in the bar with Retry (0.655), not in the menu. Its
+         * headline is "Sync failed" and the line under it why, where the
+         * app knows. Not when the connection went: the menu says that, and
+         * the sync goes again on its own when it comes back.
+         */
+        if (isOffline()) letGo();
+        else {
+          const detail =
+            said === "Sync failed"
+              ? /* The sync's own requests say a gateway's answer as
+                   pull-failed-502 and a request that never went as a
+                   TypeError, not reach.ts's words for them. */
+                isUnreachable(err) || err instanceof TypeError || /-50[234]$/.test(msg)
+                ? "Couldn't reach the server. Your work is saved on this device."
+                : "Your work is saved on this device."
+              : said;
+          if (syncFailHeld.current) {
+            updateReach(syncFailHeld.current, { detail });
+            if (byHand) showReach();
+          } else {
+            syncFailHeld.current = holdReach({
+              title: "Sync failed",
+              detail,
+              /* The connection coming back already syncs; Retry is the
+                 only other thing that should. */
+              auto: false,
+              retry: () => runSyncRef.current("", true),
+            });
+          }
+        }
         /* Nothing went up, so everything this trip carried is still owed. */
         if (!sent) owed.current = true;
       } finally {
@@ -12848,7 +12914,7 @@ export default function ArabicTrainer() {
   }, [items, lacksImages]);
 
   /*
-   * Bring every card's pictures down with everything else (0.655).
+   * Bring every card's pictures down with everything else (0.657).
    *
    * They used to come down only for the session about to start, and only
    * the first picture of each card, while a card with several shows the
@@ -13398,8 +13464,39 @@ export default function ArabicTrainer() {
      shows, so a card added to one since it was kept is in the session. */
   function startSaved(s: SavedSession) {
     if (askFirst({ kind: "saved", saved: s })) return;
+    beginManual(manualOfSaved(s), { kind: "saved", saved: s });
+  }
+
+  function manualOfSaved(s: SavedSession) {
     const ids = new Set([...s.ids, ...cardsOfSaved(s, shown).map((it) => it.id)]);
-    beginManual({ ids, mode: s.mode, count: s.count, minutes: s.minutes });
+    return { ids, mode: s.mode, count: s.count, minutes: s.minutes };
+  }
+
+  /* What a session started this way would be dealt now — the one place
+     each kind is built, read by the buttons that start it and by the end
+     of a session, to offer "Keep going" only when there is something to
+     keep going with. */
+  function buildAgain(a: Again) {
+    if (a.kind === "begin") {
+      return buildSession({
+        items: shown, settings, inDeck: a.only || inDeck, practice: a.practice, perDay, systems, pathUnit: a.pathUnit,
+      });
+    }
+    if (a.kind === "weak") return buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
+    const m = a.kind === "saved" ? manualOfSaved(a.saved) : a;
+    /* Regular is dealt as the home screen deals, so it reads the cards the
+       home screen does: the language switch has its say over which words
+       count as in hand, exactly as it does for a prep. */
+    return buildManualSession({
+      items: m.mode === "regular" ? shown : items, settings, ids: m.ids, mode: m.mode, count: m.count, minutes: m.minutes, perDay, systems,
+    });
+  }
+
+  function startAgain(a: Again) {
+    if (a.kind === "begin") begin(a.practice, a.only, a.pathUnit);
+    else if (a.kind === "weak") beginWeak();
+    else if (a.kind === "saved") startSaved(a.saved);
+    else beginManual(a);
   }
 
   /* A session assembled by hand on the Build screen. */
@@ -13408,13 +13505,9 @@ export default function ArabicTrainer() {
     mode: string;
     count?: number;
     minutes?: number;
-  }) {
-    /* Regular is dealt as the home screen deals, so it reads the cards the
-       home screen does: the language switch has its say over which words
-       count as in hand, exactly as it does for a prep. */
-    const built = buildManualSession({
-      items: mode === "regular" ? shown : items, settings, ids, mode, count, minutes, perDay, systems,
-    });
+  }, again?: Again) {
+    const recipe: Again = again || { kind: "manual", ids: [...ids], mode, count, minutes };
+    const built = buildAgain(recipe);
     setBuilding(false);
     if (!built.exercises.length) {
       flash(
@@ -13441,6 +13534,7 @@ export default function ArabicTrainer() {
       practice: false,
       startedAt: now(),
       endsAt: minutes ? now() + minutes * 60000 : 0,
+      again: recipe,
     });
     setQi(0);
     setTally(NO_SCORE);
@@ -13633,7 +13727,7 @@ export default function ArabicTrainer() {
     setSpacesBusy(true);
     try {
       /* Only whether each one settled matters here, not what it returned. */
-      const jobs: Promise<unknown>[] = [runSync()];
+      const jobs: Promise<unknown>[] = [runSync("", true)];
       if (account) jobs.push(refreshCourses("changes"));
       if (account && (teaches || account.admin))
         jobs.push(
@@ -13743,7 +13837,7 @@ export default function ArabicTrainer() {
    */
   function beginWeak() {
     if (askFirst({ kind: "weak" })) return;
-    const built = buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
+    const built = buildAgain({ kind: "weak" });
     if (!built.exercises.length) {
       flash(
         built.reason === "nothing-weak"
@@ -13753,7 +13847,7 @@ export default function ArabicTrainer() {
       return;
     }
     warmSession(built);
-    setSession({ ...built, practice: false, startedAt: now(), endsAt: 0 });
+    setSession({ ...built, practice: false, startedAt: now(), endsAt: 0, again: { kind: "weak" } });
     setQi(0);
     setTally(NO_SCORE);
     setMoved([]);
@@ -13774,7 +13868,8 @@ export default function ArabicTrainer() {
        new cards in although the path has not reached it: "Practise this
        unit" (R30, R24). */
     if (askFirst({ kind: "begin", practice, only, pathUnit })) return;
-    const built = buildSession({ items: shown, settings, inDeck: only || inDeck, practice, perDay, systems, pathUnit });
+    const again: Again = { kind: "begin", practice, only, pathUnit };
+    const built = buildAgain(again);
     if (!built.exercises.length) {
       /* This used to return in silence, which reads as a broken button. It
          mattered little when the only way to get here was a card list that
@@ -13804,7 +13899,7 @@ export default function ArabicTrainer() {
     }
     catchingUpNote(built);
     warmSession(built);
-    setSession({ ...built, practice });
+    setSession({ ...built, practice, again });
     setQi(0);
     setTally(NO_SCORE);
     setMoved([]);
@@ -13867,6 +13962,15 @@ export default function ArabicTrainer() {
   }
 
   const exercise = session && qi < session.exercises.length ? session.exercises[qi] : null;
+  /* At the end of a session, whether starting it again the same way would
+     ask anything: worked out once, when the end screen opens, and the
+     button that offers it left off when it would not. */
+  const endedAgain: Again | null = session && !exercise && session.again ? session.again : null;
+  const canKeepGoing = useMemo(
+    () => !!endedAgain && buildAgain(endedAgain).exercises.length > 0,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [endedAgain],
+  );
   /* The card, narrowed to the question being asked of it: its variables
      filled in, one accepted answer where the question is about how a word
      sounds, one meaning where the meaning is the question. All three before
@@ -15749,31 +15853,23 @@ export default function ArabicTrainer() {
   const kbOpen = kb.open && (inExercise || sharing);
 
   /*
-   * What the corner menu says about sync.
-   *
-   * One line, and it used to say one of three things — syncing, "Offline —
-   * will retry", or up to date — with the middle one standing for every
-   * way a sync can fail. Two of those never clear by themselves, so a
-   * learner whose passphrase had been refused or whose collection had
-   * outgrown the limit was told, once a minute for ever, that they were
-   * offline and it would sort itself out.
-   *
-   * Offline comes first because it explains every other failure under it,
-   * and it says where the work is rather than only what is missing: the
-   * answer to "am I losing anything?" is no, and that is the question
-   * behind the look at the dot.
+   * What the corner menu says about sync (0.655): see syncLine. Worked out
+   * only while the menu is open, because counting the cards walks every one
+   * of them, and the menu is closed nearly all the time.
    */
-  const syncNote = TRYING
-    ? "Practice here stays on this device"
-    : offline
-    ? `Offline — your work is saved on this device${
-        toSend ? ` · ${plural(toSend, "report")} to send` : ""
-      }`
-    : syncState === "syncing" || spacesBusy || (syncState === "idle" && courseBusy)
-    ? "Syncing now"
-    : syncState === "error"
-    ? syncError || "Sync failed"
-    : "Up to date";
+  const syncNote = () => {
+    const last = syncCfg.lastSync || 0;
+    return syncLine({
+      trying: !!TRYING,
+      offline,
+      busy: syncState === "syncing" || spacesBusy || (syncState === "idle" && courseBusy),
+      failed: syncState === "error",
+      lastSync: last,
+      reports: toSend,
+      cards: cardsToSync(data, syncCfg.syncedThrough || last),
+      clips: clipsToSync(data, audible, syncCfg.uploaded || []),
+    });
+  };
 
 
   /*
@@ -17436,15 +17532,17 @@ export default function ArabicTrainer() {
                     : `${tally.asked - tally.first} lapsed and will come back shortly.`}
                 </Help>
                 <WhatMoved moved={moved} items={items} settings={settings} />
-                <div className="at-row">
-                  <Button variant="ghost" onClick={() => setSession(null)}>
-                    Done
-                  </Button>
-                  {readyCount > 0 && !session.manual && (
-                    <Button variant="primary" onClick={() => begin(false)}>
+                {/* Another session started exactly as this one was, on top
+                    and full width, with the way out under it (0.656). */}
+                <div className="at-stack">
+                  {canKeepGoing && (
+                    <Button variant="primary" data-el="keep-going-button" onClick={() => startAgain(session.again)}>
                       Keep going
                     </Button>
                   )}
+                  <Button variant="ghost" data-el="done-button" onClick={() => setSession(null)}>
+                    Done
+                  </Button>
                 </div>
               </div>
             )}
@@ -21448,9 +21546,10 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, onCourses, onSett
       for somebody with no line at the top of the page to say it. */
   spaceShown?: { name: string; logoData?: string; logo?: string } | null;
   syncState?: string;
-  /** What to say about it. Worked out by the app, which is the only thing
-      that knows whether this was the connection or the passphrase. */
-  syncNote?: string;
+  /** What to say about it: where sync has got to, and under that when the
+      last one was and what is waiting (0.655). Asked only while the menu
+      is open, because working it out walks every card. */
+  syncNote?: () => { main: string; sub: string };
   onSyncNow: () => void;
   /** The courses you are in, and joining another: Learning's Courses
       page, which has no section of its own in the bar. */
@@ -21555,7 +21654,15 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, onCourses, onSett
             <span className="at-cico">
               <span className={`at-cdot ${syncState}`} />
             </span>
-            <span className="at-clinetext">{syncNote || "Up to date"}</span>
+            {(() => {
+              const note = syncNote ? syncNote() : { main: "Up to date", sub: "" };
+              return (
+                <span className="at-clinetext at-csync">
+                  <b>{note.main}</b>
+                  {note.sub ? <i>{note.sub}</i> : null}
+                </span>
+              );
+            })()}
             <button className="at-cact" onClick={onSyncNow}>
               Sync now
             </button>

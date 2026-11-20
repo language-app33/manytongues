@@ -1497,6 +1497,11 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* A row that names a choice rather than being one: no hover, no pointer,
    because the thing you tap is the picker underneath it. */
 .at-cline.as-field { cursor:default; }
+/* The sync row's two lines (0.655): where it has got to, then when the
+   last one was and what is waiting. */
+.at-csync { display:flex; flex-direction:column; gap:2px; }
+.at-csync b { font-weight:inherit; }
+.at-csync i { font-style:normal; font-size:12px; font-weight:500; color: var(--muted); }
 /* Courses, Settings and How it works: the menu's main doors, a size up. */
 .at-cline.at-cbig { padding-top:15px; padding-bottom:15px; }
 .at-cline.at-cbig .at-cico { width:24px; }
@@ -1796,6 +1801,12 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 .at-reachretry:disabled { opacity:.6; cursor:default; }
 .at-reachbar.still { position: static; transform:none; animation:none; width:auto; }
 html.at-reaching .at-snack { bottom: calc(176px + env(safe-area-inset-bottom)); }
+/* And the You menu, which opens from the dock under the bar: lifted clear
+   of it, so its sync row — the one Sync now is pressed from — is not hidden
+   by the "Sync failed" that pressing it can bring up (0.655). */
+html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
+  max-height: calc(100vh - 224px - env(safe-area-inset-bottom));
+  max-height: calc(100dvh - 224px - env(safe-area-inset-bottom)); }
 @media (prefers-reduced-motion: reduce) { .at-reachbar { animation: none; } }
 /* "Working…" while a space is fetching or a save is in flight. The
    snackbar's place and the snackbar's manners — it sits over the content
@@ -2115,6 +2126,10 @@ html.at-reaching .at-snack { bottom: calc(176px + env(safe-area-inset-bottom)); 
    The basis stays zero so that buttons which do fit on one line come out
    the same width as each other rather than as wide as their labels. */
 .at-row > * { flex:1 1 0; min-width: min-content; }
+/* Buttons one above the other, each the full width: the way on first,
+   the way out under it. The end of a session (0.656). */
+.at-stack { display:flex; flex-direction:column; gap:10px; margin-top:20px; }
+.at-stack > .at-btn { width:100%; }
 /* Direct children only. A row can hold a Segmented, whose own buttons are
    .at-btn too — sizing those from the row's share would hand a three-way
    picker the type of a full-width button. */
