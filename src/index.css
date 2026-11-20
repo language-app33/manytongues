@@ -3160,7 +3160,6 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
 .at-vform { font-size: calc(var(--ask) * .7); line-height:1.3; text-align:end; }
 .at-vsaid { display:flex; flex-wrap:wrap; gap:4px 10px; justify-content:flex-end;
   font-size: var(--fs-sm); color: var(--text-soft); }
-.at-ven { color: var(--muted); }
 .at-vhidden { border:1px dashed var(--line); border-radius: var(--r-sm); background: var(--well);
   padding:2px 8px; cursor:pointer; color: var(--text-soft); }
 .at-vhidden > span { filter: blur(5px); user-select:none; }
