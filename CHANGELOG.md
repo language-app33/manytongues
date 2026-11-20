@@ -8,6 +8,38 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.653 — 20 November 2026
+
+**The You menu says when you last synced and what is waiting, and a
+failed sync is said in the bar at the foot of the screen, with Retry.**
+
+- **The sync line at the bottom of the You menu** now has two parts. The
+  first says where things stand: "Up to date", "Syncing now", "Offline —
+  your work is saved on this device", or what is waiting, such as
+  "2 reports, 23 cards and 1 recording to sync". The second says when the
+  last sync was: "Last synced today at 14:32", "yesterday at 09:10", or a
+  date for anything older. A device that has never synced says "Not synced
+  yet" and what it would send.
+- **A card counts as waiting** once it has been answered, edited, marked,
+  added or removed since the last sync. A recording counts if it was made
+  or downloaded on this device and has not been sent yet.
+- **"Sync failed" now appears in the large bar at the foot of the screen,
+  with Retry**, the same bar as "Can't reach the server". Underneath it
+  says why when the app knows ("Passphrase rejected", "Your cards are too
+  big to sync…"), and otherwise that your work is saved on this device.
+  It shows the first time a sync fails, and again whenever you press Sync
+  now or Retry and it still fails. A background sync failing again does
+  not bring it back after you've closed it. It goes away by itself once a
+  sync works.
+- **Offline is not a failure**: no bar. The menu says your work is safe
+  and what is waiting, and the sync goes again on its own when the
+  connection comes back.
+- While the bar is up, the You menu opens above it rather than under it.
+
+To check by hand: on a phone, put it in airplane mode, answer a few cards
+and open the You menu; then, back online, check the time updates after
+Sync now.
+
 ## 0.652 — 20 November 2026
 
 **A verb's tense reads as English on the left and the language on the

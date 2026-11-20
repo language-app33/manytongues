@@ -592,6 +592,146 @@ export async function pushClip(token: string, id: string, dataUrl: string) {
   return true;
 }
 
+/* ---------------- what is waiting to go up ---------------- */
+
+/*
+ * When a card last changed, by any stamp it carries: its own (an edit, or
+ * a graded answer, which stamps the card), each form's exercise states,
+ * the learner's mark and a reset. The latest of them is what a sync has
+ * or has not yet carried.
+ */
+export function cardChangedAt(it: Item): number {
+  let at = Math.max(Number(it.updated) || 0, Number(it.priorityAt) || 0, Number(it.reset) || 0);
+  for (const f of formsOf(it)) {
+    for (const st of Object.values(f.s || {})) {
+      const u = Number(st && st.updated) || 0;
+      if (u > at) at = u;
+    }
+  }
+  return at;
+}
+
+/*
+ * The newest stamp anywhere in a document's cards and withdrawals.
+ *
+ * What a sync has carried is everything up to the moment it set out — and
+ * also anything it brought down, whose stamps are another device's clock
+ * and may be ahead of this one's. Taking the later of the two keeps a card
+ * just pulled from a fast-clocked phone from reading as still to send.
+ */
+export function latestStamp(doc: Pick<Doc, "items" | "tombstones">): number {
+  let at = 0;
+  for (const it of doc.items || []) at = Math.max(at, cardChangedAt(it));
+  for (const t of Object.values(doc.tombstones || {})) at = Math.max(at, Number(t) || 0);
+  return at;
+}
+
+/*
+ * How many cards have changed here since the last sync carried them:
+ * answered, edited, marked, added or removed. `through` is the moment the
+ * last successful sync accounted for; nought, never synced, counts all.
+ */
+export function cardsToSync(doc: Pick<Doc, "items" | "tombstones">, through: number): number {
+  let n = 0;
+  for (const it of doc.items || []) if (cardChangedAt(it) > through) n += 1;
+  for (const t of Object.values(doc.tombstones || {})) if ((Number(t) || 0) > through) n += 1;
+  return n;
+}
+
+/*
+ * How many recordings this device holds that the shared store has not had
+ * from it: on the device (`here`), named by a card, and not yet sent.
+ */
+export function clipsToSync(doc: WireDoc, here: Set<string> | null, sent: string[]): number {
+  if (!here) return 0;
+  const done = new Set(sent || []);
+  let n = 0;
+  for (const id of new Set(clipIdsIn(doc))) if (here.has(id) && !done.has(id)) n += 1;
+  return n;
+}
+
+/*
+ * When a sync happened, the way you would say it: "today at 14:32",
+ * "yesterday at 09:10", then "3 Nov at 09:10", with the year only when it
+ * is not this one.
+ */
+export function syncedWhen(ms: number, at: number = Date.now()): string {
+  if (!ms) return "";
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return "";
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const day = new Date(at);
+  day.setHours(0, 0, 0, 0);
+  if (ms >= day.getTime()) return `today at ${time}`;
+  day.setDate(day.getDate() - 1);
+  if (ms >= day.getTime()) return `yesterday at ${time}`;
+  const date = d.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    ...(d.getFullYear() === new Date(at).getFullYear() ? null : { year: "numeric" }),
+  });
+  return `${date} at ${time}`;
+}
+
+const count = (n: number, one: string) => (n ? `${n} ${n === 1 ? one : `${one}s`}` : "");
+const joined = (parts: string[]) =>
+  parts.length < 2 ? parts.join("") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+
+/*
+ * What the You menu says about sync (0.653): where it has got to, and
+ * under that when the last one was and what is waiting for the next.
+ *
+ * It used to name what went wrong instead — "Sync failed", for most things
+ * — which said there was trouble and nothing about what was at stake. The
+ * trouble is now the bar at the foot of the app, with Retry; this answers
+ * "am I losing anything, and since when?".
+ *
+ * Offline comes first because it explains everything under it, and it
+ * says where the work is rather than only what is missing.
+ */
+export function syncLine({
+  trying = false,
+  offline = false,
+  busy = false,
+  failed = false,
+  lastSync = 0,
+  reports = 0,
+  cards = 0,
+  clips = 0,
+  at = Date.now(),
+}: {
+  trying?: boolean;
+  offline?: boolean;
+  /** A sync, or anything Sync now started, is under way. */
+  busy?: boolean;
+  /** The last one failed. */
+  failed?: boolean;
+  lastSync?: number;
+  reports?: number;
+  cards?: number;
+  clips?: number;
+  at?: number;
+}): { main: string; sub: string } {
+  if (trying) return { main: "Practice here stays on this device", sub: "" };
+  const waiting = joined(
+    [count(reports, "report"), count(cards, "card"), count(clips, "recording")].filter(Boolean),
+  );
+  const toSync = waiting ? `${waiting} to sync` : "";
+  const when = lastSync ? `last synced ${syncedWhen(lastSync, at)}` : "";
+  /* Parts joined with a dot, the first of them capitalised. */
+  const line = (...parts: string[]) => {
+    const t = parts.filter(Boolean).join(" · ");
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
+  if (offline) return { main: "Offline — your work is saved on this device", sub: line(toSync, when) };
+  if (busy) return { main: "Syncing now", sub: line(when) };
+  if (!lastSync) return { main: "Not synced yet", sub: line(toSync) };
+  if (toSync) return { main: line(toSync), sub: line(when) };
+  /* A sync that failed with nothing of this device's waiting has still not
+     brought down what the other devices did, so not "up to date". */
+  return { main: failed ? "Nothing waiting to sync" : "Up to date", sub: line(when) };
+}
+
 /* Every recording id the document refers to, across items, their forms and
    the lines of a dialog. A line's recording is a recording like any other:
    left out of here it would be dropped from the device it was made on. */

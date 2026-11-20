@@ -41,6 +41,9 @@ export interface Held {
   retry: () => unknown;
   /** A line under the headline, where the general one is wrong. */
   detail?: string;
+  /** The headline itself, where the failure is not the server being out of
+      reach: "Sync failed" (0.653). The last one held wins, like detail. */
+  title?: string;
   /** False for something that should only be redone when asked: a delete,
       or leaving a space. The connection coming back does not redo it. */
   auto?: boolean;
@@ -52,6 +55,7 @@ export interface ReachState {
   /** A retry was made and something is still waiting: "Still can't…". */
   again: boolean;
   detail: string;
+  title: string;
 }
 
 const held: Map<number, Held> = new Map();
@@ -72,6 +76,7 @@ export function reachState(): ReachState {
     retrying,
     again: again && held.size > 0,
     detail: (last && last.detail) || "",
+    title: (last && last.title) || "",
   };
 }
 
@@ -103,6 +108,15 @@ export function holdReach(h: Held): number {
   dismissed = false;
   tell();
   return id;
+}
+
+/** What a held failure says, changed in place: the same thing failed
+    again, for a different reason. Not shown again if it was closed. */
+export function updateReach(id: number, h: Partial<Held>) {
+  const was = held.get(id);
+  if (!was) return;
+  held.set(id, { ...was, ...h });
+  tell();
 }
 
 /** A held failure happened again (pressed a second time, say): show it,

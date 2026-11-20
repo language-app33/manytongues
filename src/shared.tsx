@@ -4142,10 +4142,12 @@ export function useReach({ detail, auto = true }: { detail?: string; auto?: bool
 }
 
 /** The bar itself, drawn from what it is told: the gallery shows it still. */
-export function ReachBar({ again = false, retrying = false, detail = "", onRetry, onDismiss, still = false }: {
+export function ReachBar({ again = false, retrying = false, detail = "", title = "", onRetry, onDismiss, still = false }: {
   again?: boolean;
   retrying?: boolean;
   detail?: string;
+  /** In place of "Can't reach the server": "Sync failed" (0.653). */
+  title?: string;
   onRetry?: () => void;
   onDismiss?: () => void;
   /** In the page rather than floating over it: the gallery. */
@@ -4155,7 +4157,7 @@ export function ReachBar({ again = false, retrying = false, detail = "", onRetry
     <div className={`at-reachbar${still ? " still" : ""}`} role="alert">
       <Icon name="cloud-off" size={22} />
       <span className="msg">
-        <strong>{again ? "Still can't reach the server" : "Can't reach the server"}</strong>
+        <strong>{title || (again ? "Still can't reach the server" : "Can't reach the server")}</strong>
         {detail ? <span className="detail">{detail}</span> : null}
       </span>
       <button className="at-reachretry" onClick={onRetry} disabled={retrying}>
@@ -4190,6 +4192,7 @@ export function ReachSnackbar() {
       again={s.again}
       retrying={s.retrying}
       detail={s.detail}
+      title={s.title}
       onRetry={() => void retryReach()}
       onDismiss={dismissReach}
     />

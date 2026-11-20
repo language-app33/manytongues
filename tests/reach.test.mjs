@@ -57,7 +57,7 @@ test("Retry redoes everything waiting, and says nothing more if it all worked", 
   assert.equal(reachState().retrying, true);
   await going;
   assert.deepEqual(done.sort(), ["courses", "join"]);
-  assert.deepEqual(reachState(), { shown: false, retrying: false, again: false, detail: "" });
+  assert.deepEqual(reachState(), { shown: false, retrying: false, again: false, detail: "", title: "" });
 });
 
 test("a retry that fails again says so, and keeps Retry", async () => {
