@@ -316,7 +316,7 @@ import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
 import { isUnreachable } from "./reach.ts";
-import { knownMissing as knownMissingAt, MISSING_CLIPS, pictureData } from "./pictures.ts";
+import { knownMissing as knownMissingAt, MISSING_CLIPS, MISSING_FOR_MS, pictureData } from "./pictures.ts";
 import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 import {
   ORDER_SEP,
@@ -3531,7 +3531,9 @@ function countPictured(items: Item[], settings: Settings): Map<LangId, number> {
     if (isDialog(card) || card.drill === false) continue;
     const id = langIdOf(card, settings);
     for (const { unit } of unitsOf(card)) {
-      if (unit.ar && !hasSlots(unit) && Array.isArray(unit.images) && unit.images.length) {
+      /* Only those whose picture is here: a tile that cannot be drawn is
+         no company (see canSeeHere). */
+      if (unit.ar && !hasSlots(unit) && Array.isArray(unit.images) && unit.images.length && canSeeHere(unit)) {
         counts.set(id, (counts.get(id) || 0) + 1);
       }
     }
@@ -4018,7 +4020,7 @@ function castFill(
   if (!r) return r;
   const images = Array.isArray(r.unit.images) ? r.unit.images : [];
   if (images.length < 2) return r;
-  const unit = { ...r.unit, imageAt: turnOf(statesOf(r.unit)[type]) % images.length };
+  const unit = { ...r.unit, imageAt: pictureTurn(images, turnOf(statesOf(r.unit)[type])) };
   return { ...r, unit, parent: r.isSub ? r.parent : withLead(r.parent, unit) };
 }
 
@@ -4586,12 +4588,52 @@ export function setVisibleImages(ids: Set<string> | null) {
   visibleImages = ids;
 }
 
-/** Whether this form's picture can be shown without a connection. */
+/*
+ * Whether this browser can keep pictures at all (it has IndexedDB). Where
+ * it cannot, there is nowhere for the sync to put them, so online a
+ * picture is fetched when its question comes up, as before 0.655.
+ */
+let picturesKept = true;
+export function setPicturesKept(kept: boolean) {
+  picturesKept = !!kept;
+}
+
+/*
+ * Whether this one picture can be shown now, without waiting on the
+ * network (0.655).
+ *
+ * It used to be asked only offline: online, a picture question was dealt
+ * whether or not its picture had come down, and a picture that was slow
+ * or missing on the server left the learner looking at an empty frame for
+ * twenty seconds and then "The picture isn't on this device yet." Now a
+ * picture question is asked only once its picture is here; the sync
+ * brings every card's pictures down alongside everything else (see the
+ * effect beside allImageIds), so in practice this holds back only the
+ * minutes between a picture being added and its arriving.
+ */
+function pictureHere(hash: string) {
+  if (!visibleImages) return true;
+  if (visibleImages.has(hash) || IMAGES_READY.has(hash)) return true;
+  return !offlineNow && !picturesKept;
+}
+
+/** Whether this form has a picture that can be shown now. */
 function canSeeHere(unit?: Form) {
-  if (!offlineNow || !visibleImages || !unit) return true;
+  if (!unit) return true;
   const images = Array.isArray(unit.images) ? unit.images : [];
   if (!images.length) return true;
-  return images.some((h) => visibleImages !== null && visibleImages.has(h));
+  return images.some(pictureHere);
+}
+
+/* Which of a form's pictures to show on a given turn: they take turns
+   (0.631), but only among those that are here, so a card whose second
+   picture has not arrived yet shows its first again rather than a gap.
+   An index into `images`. */
+function pictureTurn(images: string[], turn: number) {
+  const here: number[] = [];
+  images.forEach((h, i) => { if (pictureHere(h)) here.push(i); });
+  if (!here.length) return images.length ? turn % images.length : 0;
+  return here[turn % here.length];
 }
 
 /*
@@ -9125,6 +9167,9 @@ async function warmClips(
    remembered in memory either way, so one question does not ask twice. */
 
 const IMAGES_HELD: Map<string, Promise<Blob | null>> = new Map();
+/* The pictures fetched this session, kept or not: a picture in memory can
+   be shown as surely as one in the database (see pictureHere). */
+const IMAGES_READY: Set<string> = new Set();
 
 async function localImageIds(): Promise<Set<string>> {
   const ids: Set<string> = new Set();
@@ -9138,14 +9183,19 @@ function imageBlob(hash: string): Promise<Blob | null> {
   if (held) return held;
   const got = (async () => {
     const here = await idbRun("readonly", (st) => st.get(hash), IMAGE_STORE);
-    if (here) return here as Blob;
+    if (here) {
+      IMAGES_READY.add(hash);
+      return here as Blob;
+    }
     try {
       /* Through the one picture fetch, so a picture the editor or the menu
          already asked for this session is not asked for again. */
       const data = await pictureData(hash);
       if (data) {
         const blob = base64ToBlob(data);
-        if ((await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE)) !== undefined) clipsChanged();
+        await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE);
+        IMAGES_READY.add(hash);
+        clipsChanged();
         return blob;
       }
     } catch (e) {
@@ -10729,7 +10779,7 @@ function PictureChoices({ options, value, onChange, disabled, turn = 0 }: {
       {options.map((option, i) => {
         const hash = String((option && Array.isArray(option.images) && option.images[0]) || "");
         const count = option && Array.isArray(option.images) ? option.images.length : 0;
-        const shown = count > 1 ? String(option.images[(turn + i) % count] || hash) : hash;
+        const shown = count > 1 ? String(option.images[pictureTurn(option.images, turn + i)] || hash) : hash;
         return (
           <button
             type="button"
@@ -11635,8 +11685,11 @@ export default function ArabicTrainer() {
       });
     /* The pictures too: whatever brought recordings down may have brought
        pictures with it, and the question is the same one. */
-    localImageIds()
-      .then((ids) => setVisible(ids))
+    Promise.all([localImageIds(), openClipDb()])
+      .then(([ids, db]) => {
+        setPicturesKept(!!db);
+        setVisible(ids);
+      })
       .catch(() => {});
   }, []);
   /* And whenever a recording is saved or removed, wherever that happened —
@@ -12728,7 +12781,10 @@ export default function ArabicTrainer() {
   setUnitShapes(unitShapes);
   const mateCounts = useMemo(() => countMates(asking, settings), [asking, settings]);
   setMateCounts(mateCounts);
-  const picturedCounts = useMemo(() => countPictured(asking, settings), [asking, settings]);
+  /* Asked again as pictures arrive and the connection comes and goes:
+     only a picture that is here counts (see canSeeHere). */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const picturedCounts = useMemo(() => countPictured(asking, settings), [asking, settings, visible, offline]);
   setPicturedCounts(picturedCounts);
   const heardCounts = useMemo(() => countHeard(asking, settings), [asking, settings]);
   setHeardCounts(heardCounts);
@@ -12790,6 +12846,47 @@ export default function ArabicTrainer() {
     }
     return ids;
   }, [items, lacksImages]);
+
+  /*
+   * Bring every card's pictures down with everything else (0.655).
+   *
+   * They used to come down only for the session about to start, and only
+   * the first picture of each card, while a card with several shows the
+   * next on each turn — so a picture question could be dealt with nothing
+   * to show. Now, whenever the cards change (a sync, a course refreshed, a
+   * card made) or the connection comes back, whatever pictures are not on
+   * this device yet are fetched in the background, three at a time, and a
+   * picture question is asked once its picture is here (see pictureHere).
+   *
+   * Not where the browser cannot keep them: there they would be fetched
+   * again at every launch and held in memory meanwhile. A picture that
+   * could not be fetched is not asked for again for five minutes, so a
+   * server that is down is not asked in a loop.
+   */
+  const imagesSyncing = useRef(false);
+  const imageTried = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (offline || !visible || !picturesKept || imagesSyncing.current) return;
+    const at = Date.now();
+    const wanted = [...new Set(allImageIds)].filter((h) => {
+      if (visible.has(h)) return false;
+      const tried = imageTried.current.get(h);
+      return tried === undefined || at - tried > MISSING_FOR_MS;
+    });
+    if (!wanted.length) return;
+    imagesSyncing.current = true;
+    void (async () => {
+      try {
+        for (const h of wanted) imageTried.current.set(h, at);
+        await warmImages(wanted);
+      } catch (e) {
+        /* tried again with the next change */
+      } finally {
+        imagesSyncing.current = false;
+        refreshAudible();
+      }
+    })();
+  }, [allImageIds, visible, offline, refreshAudible]);
 
   /* How many of them are not here. Read on the home screen while offline,
      and in Account settings beside the button that fetches them. */

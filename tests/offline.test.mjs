@@ -35,6 +35,7 @@ const {
   setAudibleClips,
   setOfflineNow,
   setVisibleImages,
+  setPicturesKept,
   setPicturedCounts,
   setMateCounts,
 } = await import(path.join(built, "ArabicTrainer.js"));
@@ -410,14 +411,21 @@ test("the listing landing late is the same fact arriving a moment later", () => 
 const pictured = (/** @type {string[]} */ types) =>
   types.filter((t) => ["rec2img", "img2pick", "img2ar"].includes(t.split("@")[0]));
 
-test("a card with a picture is asked from it online, and offline only once the picture is here", () => {
+test("a card with a picture is asked from it only once the picture is here, online or not (0.655)", () => {
   const card = { ...form(""), images: ["p".repeat(64)] };
   setMateCounts(new Map([[DEFAULT_LANGUAGE, 10]]));
   setPicturedCounts(new Map([[DEFAULT_LANGUAGE, 10]]));
   try {
     state({ offline: false, here: [] });
+    setVisibleImages(null);
+    assert.ok(pictured(enabledTypes(card, settings)).includes("img2ar"), "before the device has looked: asked");
+
     setVisibleImages(new Set());
-    assert.ok(pictured(enabledTypes(card, settings)).includes("img2ar"), "online, it is a fetch away");
+    assert.deepEqual(pictured(enabledTypes({ ...card }, settings)), [],
+      "online but not here: not asked, rather than a twenty-second wait for a picture that may not come");
+
+    setVisibleImages(new Set(["p".repeat(64)]));
+    assert.ok(pictured(enabledTypes({ ...card }, settings)).includes("img2ar"), "online and here: asked");
 
     state({ offline: true, here: [] });
     setVisibleImages(new Set(["someone-else"]));
@@ -425,7 +433,18 @@ test("a card with a picture is asked from it online, and offline only once the p
 
     setVisibleImages(new Set(["p".repeat(64)]));
     assert.ok(pictured(enabledTypes({ ...card }, settings)).includes("img2ar"), "offline and here: asked");
+
+    /* A browser that cannot keep pictures has nowhere for the sync to put
+       them, so online it fetches each when asked, as before. */
+    setPicturesKept(false);
+    state({ offline: false, here: [] });
+    setVisibleImages(new Set());
+    assert.ok(pictured(enabledTypes({ ...card }, settings)).includes("img2ar"), "cannot keep pictures, online: asked");
+    state({ offline: true, here: [] });
+    setVisibleImages(new Set());
+    assert.deepEqual(pictured(enabledTypes({ ...card }, settings)), [], "cannot keep pictures, offline: not asked");
   } finally {
+    setPicturesKept(true);
     setVisibleImages(null);
     setPicturedCounts(new Map());
     setMateCounts(new Map());

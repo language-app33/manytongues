@@ -8825,3 +8825,41 @@ A field that does its own thing on Enter cancels the key
 (`preventDefault`), and a cancelled key is read as taken. That is the
 contract for any new field with an Enter of its own: without it, Enter
 would do the field's thing *and* press the screen's button.
+
+## A picture question waits for its picture; pictures sync with the cards (0.655)
+
+**20 November 2026** · `pictureHere`, `canSeeHere`, `pictureTurn`, the
+picture-sync effect beside `allImageIds`, in `src/ArabicTrainer.tsx`
+
+`canSeeHere` used to hold back picture questions only offline. Online a
+picture question was dealt whether or not its picture was here, and
+`CardPicture` then waited on `getImage`, whose 20-second call timeout is
+what the learner sat through before "The picture isn't on this device
+yet". `warmSession` only fetched `images[0]` of each card, but since
+0.631 a card with several pictures shows `images[turn % count]`, so the
+other pictures were often never fetched in advance. Reproduced in the
+built app with image requests held open: 8 picture questions, 8 "isn't on
+this device yet"; after the change, none asked, and with pictures served
+normally 10 asked and drawn in both builds.
+
+Now a picture counts as showable once it is in IndexedDB or was fetched
+this session (`IMAGES_READY`), online or offline, and `countPictured`
+counts only those, so "choose the picture" is not dealt short of tiles.
+`imageAt` and the choice tiles take turns only among pictures that are
+here. Before the first look at the device (`visibleImages` null) every
+picture is assumed reachable, as before.
+
+Every card's pictures are fetched in the background, three at a time,
+whenever the cards, the device listing or the connection change. This
+departs from the earlier decision to fetch media per session rather than
+on sync, which was about not making the first sync wait on every
+recording: this does not block anything, and covers pictures only, not
+recordings. A picture whose fetch failed is not asked for again for five
+minutes (`MISSING_FOR_MS`), so a server that is down is not asked in a
+loop.
+
+Where IndexedDB is missing (`setPicturesKept(false)`), the sync does not
+run — the pictures would be held in memory and fetched again every launch
+— and online a picture question is dealt as before, its picture fetched
+when asked. The smoke walk runs without IndexedDB, so it still exercises
+that path; `tests/offline.test.mjs` covers the stricter one.

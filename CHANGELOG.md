@@ -8,6 +8,35 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.655 — 20 November 2026
+
+**A picture question is asked only when its picture is ready.** A question
+that shows a picture could come up before the picture had reached the
+phone; the learner then looked at empty frames for about twenty seconds
+before being told "The picture isn't on this device yet", and had to skip
+a question they could never answer. Now a picture question is asked only
+once its picture is on the device, online as well as offline. Until then
+the card is asked in its other ways.
+
+**Pictures come down with everything else.** They used to be fetched only
+when a session was about to start, and only each card's first picture — a
+card with several pictures shows the next on each turn, so the others were
+often missing. Now every card's pictures are brought down in the
+background whenever the cards sync, a course is refreshed, or the
+connection comes back, so picture questions are ready by the time a
+session starts. A card with several pictures takes turns only among those
+that have arrived.
+
+The cost: pictures now download on sync rather than when needed, which
+uses more data the first time a course with many pictures is opened (each
+picture is a few hundred kilobytes, and only ever downloaded once). In the
+rare browser that cannot store pictures (some private windows), nothing
+changes: there, a picture is still fetched when its question comes up.
+
+To check by hand: on a phone, open a course whose cards have pictures,
+start a session, and see the picture questions show their pictures at
+once.
+
 ## 0.654 — 20 November 2026
 
 **On a computer, Enter presses the screen's main button.** Wherever a
