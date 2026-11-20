@@ -35,7 +35,7 @@ const {
   setAudibleClips,
   setOfflineNow,
   setVisibleImages,
-  setPicturesKept,
+  setMediaKept,
   setPicturedCounts,
   setMateCounts,
 } = await import(path.join(built, "ArabicTrainer.js"));
@@ -74,13 +74,25 @@ function state({ offline = false, here: held = null }) {
    A question is never asked without the sound it needs
    ------------------------------------------------------------------ */
 
-test("online, a card is asked its listening exercises whether or not the clip is here", () => {
-  /* The recording is a fetch away, which is what the player does. */
+test("online, a card is asked its listening exercises only once the clip is here (0.660)", () => {
+  /* As a picture (0.658): the sync brings every recording down in the
+     background, and a question is not dealt onto a silent player while it
+     comes. */
   state({ offline: false, here: [] });
-  assert.ok(
-    listening(enabledTypes(form("clip-1"), settings)).length > 0,
-    "a recorded card is asked about its recording",
-  );
+  assert.deepEqual(listening(enabledTypes(form("clip-1"), settings)), [], "online but not here: not asked");
+  state({ offline: false, here: ["clip-1"] });
+  assert.ok(listening(enabledTypes(form("clip-1"), settings)).length > 0, "online and here: asked");
+  /* A browser that cannot keep recordings has nowhere for the sync to put
+     them, so online it fetches each when asked, as before. */
+  setMediaKept(false);
+  try {
+    state({ offline: false, here: [] });
+    assert.ok(listening(enabledTypes(form("clip-1"), settings)).length > 0, "cannot keep them, online: asked");
+    state({ offline: true, here: [] });
+    assert.deepEqual(listening(enabledTypes(form("clip-1"), settings)), [], "cannot keep them, offline: not asked");
+  } finally {
+    setMediaKept(true);
+  }
 });
 
 test("offline, a card whose recording is elsewhere is not asked to listen to it", () => {
@@ -189,8 +201,8 @@ test("with the recording here, the session asks about it as usual", () => {
   assert.ok(heard(session).length > 0, "a downloaded course is practised in full");
 });
 
-test("online, a recording that is a fetch away is still asked about", () => {
-  state({ offline: false, here: [] });
+test("online, a recording that is here is asked about (0.660: and only then)", () => {
+  state({ offline: false, here: ["clip-1"] });
   installIndexes([card()], settings);
   const session = buildSession({
     items: [card()],
@@ -304,11 +316,11 @@ test("a queue carried offline loses the recordings it cannot play", () => {
   installIndexes(items, settings);
   const queue = queueOf([{ id: "c1", type: "rec2en" }, { id: "c1", type: "ar2en" }]);
 
-  state({ offline: false, here: [] });
+  state({ offline: false, here: ["clip-1"] });
   assert.deepEqual(
     requeueUnaskable(queue, 0, items, settings).map((/** @type {any} */ q) => q.type),
     ["rec2en", "ar2en"],
-    "online it is a fetch away, so nothing moves",
+    "online and here, so nothing moves",
   );
 
   state({ offline: true, here: [] });
@@ -436,7 +448,7 @@ test("a card with a picture is asked from it only once the picture is here, onli
 
     /* A browser that cannot keep pictures has nowhere for the sync to put
        them, so online it fetches each when asked, as before. */
-    setPicturesKept(false);
+    setMediaKept(false);
     state({ offline: false, here: [] });
     setVisibleImages(new Set());
     assert.ok(pictured(enabledTypes({ ...card }, settings)).includes("img2ar"), "cannot keep pictures, online: asked");
@@ -444,7 +456,7 @@ test("a card with a picture is asked from it only once the picture is here, onli
     setVisibleImages(new Set());
     assert.deepEqual(pictured(enabledTypes({ ...card }, settings)), [], "cannot keep pictures, offline: not asked");
   } finally {
-    setPicturesKept(true);
+    setMediaKept(true);
     setVisibleImages(null);
     setPicturedCounts(new Map());
     setMateCounts(new Map());

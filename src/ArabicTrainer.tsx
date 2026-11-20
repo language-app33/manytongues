@@ -3587,7 +3587,8 @@ function countHeard(items: Item[], settings: Settings): Map<LangId, number> {
     if (isDialog(card) || card.drill === false) continue;
     const id = langIdOf(card, settings);
     for (const { unit } of unitsOf(card)) {
-      if (unit.ar && !hasSlots(unit) && (unit.recs || []).length) {
+      /* Only those whose recording is here, as countPictured (0.660). */
+      if (unit.ar && !hasSlots(unit) && (unit.recs || []).length && canHearHere(unit)) {
         counts.set(id, (counts.get(id) || 0) + 1);
         if (isFigureForm(unit)) {
           const key = FIGURES_KEY(id) as LangId;
@@ -4603,13 +4604,15 @@ export function setVisibleImages(ids: Set<string> | null) {
 }
 
 /*
- * Whether this browser can keep pictures at all (it has IndexedDB). Where
- * it cannot, there is nowhere for the sync to put them, so online a
- * picture is fetched when its question comes up, as before 0.658.
+ * Whether this browser can keep pictures and recordings at all (it has
+ * IndexedDB). Where it cannot, there is nowhere for the sync to put them,
+ * so online each is fetched when its question comes up, as before 0.658.
+ * One flag for both, because they are kept in the same database and the
+ * two never behave differently (0.660).
  */
-let picturesKept = true;
-export function setPicturesKept(kept: boolean) {
-  picturesKept = !!kept;
+let mediaKept = true;
+export function setMediaKept(kept: boolean) {
+  mediaKept = !!kept;
 }
 
 /*
@@ -4628,7 +4631,7 @@ export function setPicturesKept(kept: boolean) {
 function pictureHere(hash: string) {
   if (!visibleImages) return true;
   if (visibleImages.has(hash) || IMAGES_READY.has(hash)) return true;
-  return !offlineNow && !picturesKept;
+  return !offlineNow && !mediaKept;
 }
 
 /** Whether this form has a picture that can be shown now. */
@@ -4678,15 +4681,39 @@ export function setAudibleClips(ids: Set<string> | null) {
   audibleClips = ids;
 }
 
-/** Whether this form has a recording that can be played without a connection. */
+/*
+ * Whether this one recording can be played now, without waiting on the
+ * network — the same rule as pictureHere, online as well as offline
+ * (0.660). A listening question used to be dealt online whether or not
+ * its recording had come down, and a slow one left the learner pressing
+ * Play on silence. Every card's recordings now come down in the
+ * background with the sync, the same as its pictures (see the effect
+ * beside allClipIds).
+ */
+function clipHere(id: string) {
+  if (!audibleClips) return true;
+  if (audibleClips.has(id) || CLIPS_READY.has(id)) return true;
+  return !offlineNow && !mediaKept;
+}
+
+/** Whether this form has a recording that can be played now. A form with
+    no recordings is not this rule's business: nothing offers it a
+    listening exercise in the first place. */
 function canHearHere(unit?: Form) {
-  /* Online, anything the server holds is a fetch away, and a form with no
-     recordings at all is not this rule's business — nothing offers it a
-     listening exercise in the first place. */
-  if (!offlineNow || !audibleClips || !unit) return true;
+  if (!unit) return true;
   const recs = unit.recs || [];
   if (!recs.length) return true;
-  return recs.some((r) => audibleClips !== null && audibleClips.has(r.id));
+  return recs.some((r) => clipHere(r.id));
+}
+
+/* The recordings to play from a form's list: only those that are here,
+   where any are, so a card whose slow take has not arrived plays the
+   ordinary one rather than silence — as pictures take turns only among
+   those that have arrived (0.660). */
+function recsHere<T extends { id: string }>(recs: T[] | undefined): T[] {
+  const list = recs || [];
+  const here = list.filter((r) => clipHere(r.id));
+  return here.length ? here : list;
 }
 
 /* How long "can't listen right now" lasts. Long enough to cover the walk, the
@@ -8974,7 +9001,18 @@ async function localClipIds(): Promise<Set<string>> {
   return ids;
 }
 
+/* The recordings found or fetched this session, kept or not: one in
+   memory can be played as surely as one in the database (see clipHere),
+   the same as IMAGES_READY. */
+const CLIPS_READY: Set<string> = new Set();
+
 async function clipBlob(id: string) {
+  const blob = await clipBlobFrom(id);
+  if (blob) CLIPS_READY.add(id);
+  return blob;
+}
+
+async function clipBlobFrom(id: string) {
   const here = await localClipBlob(id);
   if (here) return here;
 
@@ -9840,7 +9878,7 @@ function chainOf(unit: Form): string[] {
 /* The player itself is shared — see AudioPrompt in shared.tsx — and reads
    this device's copies of the recordings. */
 function AudioPrompt(props: Omit<React.ComponentProps<typeof SharedAudioPrompt>, "load">) {
-  return <SharedAudioPrompt load={clipUrl} {...props} />;
+  return <SharedAudioPrompt load={clipUrl} {...props} recs={props.recs ? recsHere(props.recs) : props.recs} />;
 }
 
 function Field({ value, field, kind, lang, name }: {
@@ -10290,7 +10328,7 @@ function MatchGrid({
   };
   useEffect(() => hush, []);
   const sound = async (w: Form) => {
-    const recs = w.recs || [];
+    const recs = recsHere(w.recs);
     /* The ordinary take: a grid is the word at speed, among others. */
     const rec = recs.find((r) => r.speed !== "slow") || recs[0];
     hush();
@@ -11700,7 +11738,7 @@ export default function ArabicTrainer() {
        pictures with it, and the question is the same one. */
     Promise.all([localImageIds(), openClipDb()])
       .then(([ids, db]) => {
-        setPicturesKept(!!db);
+        setMediaKept(!!db);
         setVisible(ids);
       })
       .catch(() => {});
@@ -12836,7 +12874,10 @@ export default function ArabicTrainer() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const picturedCounts = useMemo(() => countPictured(asking, settings), [asking, settings, visible, offline]);
   setPicturedCounts(picturedCounts);
-  const heardCounts = useMemo(() => countHeard(asking, settings), [asking, settings]);
+  /* Asked again as recordings arrive and the connection comes and goes,
+     as the pictures are (0.660). */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const heardCounts = useMemo(() => countHeard(asking, settings), [asking, settings, audible, offline]);
   setHeardCounts(heardCounts);
 
   /*
@@ -12916,7 +12957,7 @@ export default function ArabicTrainer() {
   const imagesSyncing = useRef(false);
   const imageTried = useRef<Map<string, number>>(new Map());
   useEffect(() => {
-    if (offline || !visible || !picturesKept || imagesSyncing.current) return;
+    if (offline || !visible || !mediaKept || imagesSyncing.current) return;
     const at = Date.now();
     const wanted = [...new Set(allImageIds)].filter((h) => {
       if (visible.has(h)) return false;
@@ -12937,6 +12978,37 @@ export default function ArabicTrainer() {
       }
     })();
   }, [allImageIds, visible, offline, refreshAudible]);
+
+  /*
+   * And every card's recordings, the same way and for the same reason
+   * (0.660): a listening question is asked once its recording is here
+   * (see clipHere), so they come down with everything else rather than
+   * only for the session about to start.
+   */
+  const clipsSyncing = useRef(false);
+  const clipTried = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (offline || !audible || !mediaKept || clipsSyncing.current) return;
+    const at = Date.now();
+    const wanted = [...new Set(allClipIds)].filter((id) => {
+      if (audible.has(id)) return false;
+      const tried = clipTried.current.get(id);
+      return tried === undefined || at - tried > MISSING_FOR_MS;
+    });
+    if (!wanted.length) return;
+    clipsSyncing.current = true;
+    void (async () => {
+      try {
+        for (const id of wanted) clipTried.current.set(id, at);
+        await warmClips(wanted);
+      } catch (e) {
+        /* tried again with the next change */
+      } finally {
+        clipsSyncing.current = false;
+        refreshAudible();
+      }
+    })();
+  }, [allClipIds, audible, offline, refreshAudible]);
 
   /* How many of them are not here. Read on the home screen while offline,
      and in Account settings beside the button that fetches them. */

@@ -8,6 +8,31 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.660 — 20 November 2026
+
+**Recordings come down with everything else, and a listening question
+waits for its recording**, exactly as pictures have since 0.658.
+
+- **Recordings download in the background** whenever the cards sync, a
+  course is refreshed, or the connection comes back. They used to come
+  down only when a session was about to start.
+- **A listening question is asked only once its recording is on the
+  phone**, online as well as offline. Until then the card is asked in its
+  other ways. Before, online, it could be asked while the recording was
+  still on its way, and Play gave silence.
+- **A card with an ordinary and a slow recording** plays whichever has
+  arrived, rather than waiting on the other.
+
+The cost: recordings now download on sync rather than when needed, so
+the first time a course is opened uses more data than before. Recordings
+are small (a few kilobytes each) and are only ever downloaded once. In the
+rare browser that cannot store files, nothing changes: there, a
+recording is fetched when its question comes up.
+
+To check by hand: on a phone, join a course with recorded cards, wait a
+moment on the home screen without starting a session, then turn on
+airplane mode and start one: the listening questions are there.
+
 ## 0.659 — 20 November 2026
 
 **Pictures and recordings can be added to a card while offline, and the

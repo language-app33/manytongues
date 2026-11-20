@@ -32,6 +32,13 @@ for learners or for teachers. Three gaps were closed to get there.
 - **No text-store fallback.** Recordings are kept in IndexedDB or not at
   all, like pictures. Old text-store copies are moved across where there
   is IndexedDB and let go of where there is not.
+- **Fetched ahead, asked when here (0.660).** 0.658 made pictures come
+  down in the background with the sync and a picture question wait for
+  its picture, online too. Recordings now do the same: `clipHere` mirrors
+  `pictureHere`, `recsHere` mirrors `pictureTurn`, `CLIPS_READY` mirrors
+  `IMAGES_READY`, and an effect beside `allClipIds` mirrors the one beside
+  `allImageIds`. One `mediaKept` flag stands for both, since they share a
+  database.
 
 ## Grammar belongs to an accepted answer, not to the form
 
