@@ -9,6 +9,7 @@
 import type { Card, Feedback, Flag, LangId, User } from "./types.ts";
 import type { SetConfig } from "./sets.ts";
 import { renameLangIds } from "./lang-ids.ts";
+import { heldData, holdMedia, type HeldKind } from "./held-media.ts";
 
 const ENDPOINT = "/api/courses";
 const KEY_STORE = "arabic-account";
@@ -483,8 +484,12 @@ export const deleteSystem = (kind: "numbers" | "times", languageId: LangId) =>
   call("delete-system", { body: { kind, languageId } });
 
 export const putClip = (hash: string, data: string) => call("put-clip", { body: { hash, data } });
-export const getClip = (hash: string): Promise<{ ok: true; hash: string; data: string }> =>
-  call("clip", { params: { hash } });
+/* A recording added offline and not sent yet is answered from this
+   device (0.656): see held-media.ts. */
+export const getClip = async (hash: string): Promise<{ ok: true; hash: string; data: string }> => {
+  const held = await heldData(hash);
+  return held ? { ok: true, hash, data: held } : call("clip", { params: { hash } });
+};
 
 /* A card's pictures, stored and fetched the way its recordings are. */
 export const putImage = (hash: string, data: string) => call("put-image", { body: { hash, data } });
@@ -496,8 +501,33 @@ export const mediaSizes = (clips: string[], images: string[]): Promise<{
   clips: Record<string, number>;
   images: Record<string, number>;
 }> => call("media-sizes", { body: { clips, images } });
-export const getImage = (hash: string): Promise<{ ok: true; hash: string; data: string }> =>
-  call("image", { params: { hash } });
+/* The same for a picture added offline (0.656). */
+export const getImage = async (hash: string): Promise<{ ok: true; hash: string; data: string }> => {
+  const held = await heldData(hash);
+  return held ? { ok: true, hash, data: held } : call("image", { params: { hash } });
+};
+
+/** Send one picture or recording to the server. */
+export const putMedia = (kind: HeldKind, hash: string, data: string) =>
+  kind === "image" ? putImage(hash, data) : putClip(hash, data);
+
+/**
+ * Send a picture or recording, or keep it on this device until it can go
+ * (0.656). Offline, the card editor adds it all the same and it goes up
+ * before the card that names it; `kept` says which happened. Throws
+ * "media-full" when there was nowhere to keep it, and whatever the server
+ * said when it refused.
+ */
+export async function putOrHold(kind: HeldKind, hash: string, data: string): Promise<{ kept: boolean }> {
+  try {
+    await putMedia(kind, hash, data);
+    return { kept: false };
+  } catch (e) {
+    if (String((e && (e as Error).message) || e) !== "offline") throw e;
+    if (!(await holdMedia(kind, hash, data))) throw new Error("media-full");
+    return { kept: true };
+  }
+}
 
 export const deleteAccount = () => call("delete-account", { body: {} });
 
@@ -695,6 +725,7 @@ export function explain(err: unknown): string {
       "trying-space": "You're trying this space, not joining it.",
       /* A save that could not be sent or kept (0.580). */
       "device-full": "This device's storage is full, so the card could not be kept. Free some space and save again.",
+      "media-full": "This device's storage is full, so it could not be kept until you're back online. Free some space and try again.",
       "trying-space-save": "You are only trying this space; nothing can be saved here.",
       "suspended-app": "Your account is suspended. Ask the super admin.",
       "suspended-here": "You're suspended in that space. Ask its admin to let you back in.",

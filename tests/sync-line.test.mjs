@@ -8,7 +8,7 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
-const { syncLine, syncedWhen, cardsToSync, clipsToSync, latestStamp } = await import("../src/sync.ts");
+const { syncLine, syncedWhen, cardsToSync, latestStamp } = await import("../src/sync.ts");
 const { holdReach, updateReach, reachState, resetReach, dismissReach, showReach } = await import("../src/reach.ts");
 
 beforeEach(() => resetReach());
@@ -43,6 +43,8 @@ test("what is waiting is counted, reports then cards then recordings", () => {
   assert.equal(l.sub, `Last synced today at ${hm(14, 32)}`);
   assert.equal(syncLine({ lastSync: last, cards: 1, at }).main, "1 card to sync");
   assert.equal(syncLine({ lastSync: last, reports: 1, cards: 3, at }).main, "1 report and 3 cards to sync");
+  /* Pictures and recordings added offline in the card editor (0.656). */
+  assert.equal(syncLine({ lastSync: last, cards: 3, pictures: 2, clips: 1, at }).main, "3 cards, 2 pictures and 1 recording to sync");
 });
 
 test("never synced says so, and what is at stake", () => {
@@ -94,14 +96,6 @@ test("a card counts once it has changed since the sync, by any of its stamps", (
   assert.equal(cardsToSync(doc, 0), 6, "never synced: everything");
   assert.equal(cardsToSync(doc, latestStamp(doc)), 0);
   assert.equal(latestStamp(doc), 500);
-});
-
-test("a recording counts if it is here, named by a card, and not yet sent", () => {
-  const doc = /** @type {any} */ ({
-    items: [{ ...card("a", 1), recs: [{ id: "r1" }, { id: "r2" }, { id: "r3" }] }],
-  });
-  assert.equal(clipsToSync(doc, new Set(["r1", "r2", "elsewhere"]), ["r1"]), 1);
-  assert.equal(clipsToSync(doc, null, []), 0, "not looked yet: nothing claimed");
 });
 
 /* -------- the bar -------- */

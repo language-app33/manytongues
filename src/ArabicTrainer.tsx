@@ -317,7 +317,8 @@ import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
 import { holdReach, isUnreachable, releaseReach, showReach, updateReach } from "./reach.ts";
 import { knownMissing as knownMissingAt, MISSING_CLIPS, pictureData } from "./pictures.ts";
-import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { CARD_OUTBOX, drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { heldCounts, watchHeld } from "./held-media.ts";
 import {
   ORDER_SEP,
   SELF_ALL,
@@ -860,7 +861,6 @@ import type { Filler, Mark } from "./grade.ts";
 import { applyUpdate, beforeReload, onUpdateReady, updateReady } from "./updates.ts";
 import {
   syncClips,
-  clipIdsIn,
   loadSyncConfig,
   saveSyncConfig,
   tokenFor,
@@ -873,7 +873,6 @@ import {
   syncAfterChange,
   SESSION_END_SYNC_MS,
   cardsToSync,
-  clipsToSync,
   latestStamp,
   syncLine,
 } from "./sync.ts";
@@ -8818,20 +8817,19 @@ function clipsChanged() {
   }, 300);
 }
 
+/*
+ * Kept in IndexedDB or not at all, the same as a picture (0.656).
+ *
+ * A browser without it used to put recordings in the small text store the
+ * practice itself is saved in, where enough of them could leave no room
+ * for the progress. Now such a browser fetches each one while online, and
+ * offline the questions that need one are not asked — as for pictures.
+ */
 async function saveClipBlob(id: string, blob: Blob) {
   const ok = await idbRun("readwrite", (st) => st.put(blob, id));
-  if (ok !== undefined) {
-    clipsChanged();
-    return true;
-  }
-  // No IndexedDB: fall back to the text store.
-  try {
-    const kept = !!(await window.storage.set(AUDIO_KEY(id), await blobToBase64(blob)));
-    if (kept) clipsChanged();
-    return kept;
-  } catch (e) {
-    return false;
-  }
+  if (ok === undefined) return false;
+  clipsChanged();
+  return true;
 }
 
 /* Clips the server has already said it doesn't hold: one list, shared with
@@ -8898,26 +8896,13 @@ function setServerLacks(ids: string[], kind: MediaKind = "clip") {
 /* What this device holds, and nothing else: no network, no side effects. */
 async function localClipBlob(id: string): Promise<Blob | null> {
   const found = await idbRun("readonly", (st) => st.get(id));
-  if (found) return found;
-  try {
-    const r = await window.storage.get(AUDIO_KEY(id));
-    if (r && r.value) return base64ToBlob(r.value);
-  } catch (e) {
-    /* not here */
-  }
-  return null;
+  return found || null;
 }
 
 /* Is it here? Answered from the key alone, without reading the bytes. */
 async function hasClipLocal(id: string) {
   const key = await idbRun("readonly", (st) => st.getKey(id));
-  if (key !== undefined && key !== null) return true;
-  try {
-    const r = await window.storage.get(AUDIO_KEY(id));
-    return !!(r && r.value);
-  } catch (e) {
-    return false;
-  }
+  return key !== undefined && key !== null;
 }
 
 /*
@@ -8927,27 +8912,13 @@ async function hasClipLocal(id: string) {
  * on it while the app is offline, so it has to be cheap enough to ask
  * again whenever the answer could have moved — at launch, when the
  * connection goes, and after anything has been downloaded. One key listing
- * does the whole store; the text store behind it is listed too, because a
- * browser without IndexedDB keeps its recordings there and a learner on
- * one is exactly who should not be asked a question they cannot hear.
+ * does the whole store.
  */
 async function localClipIds(): Promise<Set<string>> {
   const ids: Set<string> = new Set();
   const keys = (await idbRun("readonly", (st) => st.getAllKeys())) || [];
   for (const k of keys) if (typeof k === "string") ids.add(k);
-  try {
-    const listed = await window.storage.list("audio-");
-    for (const k of (listed && listed.keys) || []) ids.add(String(k).slice("audio-".length));
-  } catch (e) {
-    /* No text store, or nothing in it. */
-  }
   return ids;
-}
-
-/* The recording as a data URL, for sending to the sync store. */
-async function clipDataUrl(id: string) {
-  const blob = await localClipBlob(id);
-  return blob ? blobToBase64(blob) : null;
 }
 
 async function clipBlob(id: string) {
@@ -9233,10 +9204,22 @@ async function saveClipBase64(id: string, dataUrl: string) {
   return saveClipBlob(id, base64ToBlob(dataUrl));
 }
 
-/* One-off move of anything left in the old text store. */
+/* One-off move of anything left in the old text store. Where there is no
+   IndexedDB to move it to, it is let go instead (0.656): nothing reads it
+   any more, and it takes room the practice is saved in. Each one is on
+   the server and comes back while online. */
 async function migrateClips(ids: string[]) {
   const db = await openClipDb();
-  if (!db) return 0;
+  if (!db) {
+    for (const id of ids) {
+      try {
+        await window.storage.delete(AUDIO_KEY(id));
+      } catch (e) {
+        /* nothing stored under that key */
+      }
+    }
+    return 0;
+  }
   let moved = 0;
   for (const id of ids) {
     const already = await idbRun("readonly", (st) => st.get(id));
@@ -11601,6 +11584,21 @@ export default function ArabicTrainer() {
   /* How many reported problems are waiting for one, so the corner menu can
      say so rather than leaving someone to wonder whether it went. */
   const [toSend, setToSend] = useState(0);
+  /* And the pictures and recordings added offline in the card editor,
+     waiting to go up before their cards (0.656). */
+  const [heldMedia, setHeldMedia] = useState({ clips: 0, images: 0 });
+  useEffect(() => {
+    let live = true;
+    const look = () => {
+      heldCounts().then((n) => live && setHeldMedia(n)).catch(() => {});
+    };
+    look();
+    const stop = watchHeld(look);
+    return () => {
+      live = false;
+      stop();
+    };
+  }, []);
   /* Whether to offer installing the app, which on iOS is what keeps its
      data from being cleared after a week away. */
   const install = useInstallOffer();
@@ -11888,7 +11886,7 @@ export default function ArabicTrainer() {
   const kb = useSoftKeyboard();
 
   /* ---- sync ---- */
-  const [syncCfg, setSyncCfg] = useState<{ token: string; lastSync: number; syncedThrough?: number; uploaded?: string[] }>(
+  const [syncCfg, setSyncCfg] = useState<{ token: string; lastSync: number; syncedThrough?: number }>(
     () => ({ token: "", lastSync: 0 }),
   );
   const [syncState, setSyncState] = useState("idle"); // idle|syncing|ok|error|off
@@ -12040,36 +12038,19 @@ export default function ArabicTrainer() {
           await writeNow();
         }
 
-        // Clips travel separately, one key each, only when missing.
+        /* Recordings from the learner's own store, one key each and only
+           when missing. Nothing is sent there any more (0.656): see
+           syncClips. */
         const prevCfg = loadSyncConfig();
-        let uploaded = prevCfg.uploaded || [];
         try {
-          /* Existence is a key lookup and the upload is a data URL: neither
-             touches the network nor makes an object URL. The old version did
-             both, which fetched every course recording on the first sync and
-             sent "blob:" strings to the server as recordings. */
           const res = await syncClips(key, merged, {
             hasLocal: hasClipLocal,
-            readLocal: clipDataUrl,
             /* The result is dropped on purpose: a clip that will not save
                locally is a slower next launch, not a failed sync. */
             writeLocal: async (id: string, url: string) => {
               await saveClip(id, url);
             },
-            uploaded,
           });
-          /*
-           * Pruned to what the document still refers to.
-           *
-           * This ledger exists so a clip already sent is not offered again,
-           * and it only ever grew: one id per recording ever uploaded from
-           * this device, kept for good in the same small store the whole
-           * document lives in. A recording that no card mentions any more
-           * will never be offered again whatever this says, so holding its
-           * id is paying rent on a fact nobody will ask for.
-           */
-          const mentioned = new Set(clipIdsIn(merged));
-          uploaded = res.uploaded.filter((id) => mentioned.has(id));
           if (res.pulled) {
             flash(`${plural(res.pulled, "recording")} downloaded`);
             /* Something new can be heard now, which offline decides what a
@@ -12084,7 +12065,10 @@ export default function ArabicTrainer() {
            menu counts "to sync" from (0.655): the moment it set out, or the
            newest change it brought down if another device's clock is ahead. */
         const syncedThrough = Math.max(setOut, latestStamp(merged as Doc));
-        const cfg = { ...prevCfg, token: key, lastSync: now(), syncedThrough, uploaded };
+        /* The ledger of recordings sent up is gone with the sending (0.656). */
+        const { uploaded: _sent, ...kept } = prevCfg;
+        void _sent;
+        const cfg = { ...kept, token: key, lastSync: now(), syncedThrough };
         saveSyncConfig(cfg);
         setSyncCfg(cfg);
         setSyncState("ok");
@@ -15720,8 +15704,11 @@ export default function ArabicTrainer() {
       failed: syncState === "error",
       lastSync: last,
       reports: toSend,
-      cards: cardsToSync(data, syncCfg.syncedThrough || last),
-      clips: clipsToSync(data, audible, syncCfg.uploaded || []),
+      /* This device's practice, and the cards the card editor saved
+         offline and keeps until they can go (0.656). */
+      cards: cardsToSync(data, syncCfg.syncedThrough || last) + waitingToSend(CARD_OUTBOX),
+      pictures: heldMedia.images,
+      clips: heldMedia.clips,
     });
   };
 

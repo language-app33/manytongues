@@ -1451,7 +1451,9 @@ export function ImageScreen({ title, images, onChange, onClose }: {
       const small = await shrinkImage(file);
       const hash = await hashOf(small);
       const data = await blobToDataUrl(small);
-      await API.putImage(hash, data);
+      /* Offline it is kept on this device and goes up before the card
+         that names it, the same as a recording (0.656). */
+      await API.putOrHold("image", hash, data);
       /* Into the one picture cache, so it is drawn without a fetch. */
       primePicture(hash, data);
       if (!images.includes(hash)) onChange(images.concat([hash]).slice(0, MAX_IMAGES));
@@ -1722,7 +1724,9 @@ export function RecordingScreen({ name, form, onChange, onClose, voices }: {
       for (const blob of audio) {
         setBusy(audio.length > 1 ? `Saving ${added.length + 1} of ${audio.length}…` : "Saving…");
         const hash = await hashOf(blob);
-        await API.putClip(hash, await blobToDataUrl(blob));
+        /* Offline it is kept on this device and goes up before the card
+           that names it, the same as a picture (0.656). */
+        await API.putOrHold("clip", hash, await blobToDataUrl(blob));
         added.push(hash);
       }
       reach.ok();
@@ -11057,16 +11061,13 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
       >
           {error && <Notice kind="error">{error}</Notice>}
           {about}
-          {/* Said before the typing rather than after it.
-              A save that cannot be made is now kept on the device and sent
-              when the connection returns — but a teacher about to write a
-              card with four recordings on it should know where they stand
-              first, because the recordings are the part that cannot wait:
-              they are uploaded as they are made. */}
+          {/* Said before the typing rather than after it. Everything on
+              the card — its pictures and recordings too, since 0.656 — is
+              kept on this device and goes up when the connection returns. */}
           {offline && (
             <Notice kind="warn">
-              You&apos;re offline. What you write here is saved on this device and goes up when
-              you&apos;re back online — but recordings can&apos;t be added until then.
+              You&apos;re offline. What you write, record and add here is saved on this device
+              and goes up when you&apos;re back online.
             </Notice>
           )}
           {/* Outside the lock: a card being read is moved round as freely

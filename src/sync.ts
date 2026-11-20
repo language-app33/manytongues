@@ -31,11 +31,11 @@ const TOMBSTONE_DAYS = 180;
 export function loadSyncConfig() {
   try {
     const raw = localStorage.getItem(CFG_KEY);
-    if (raw) return { token: "", phrase: "", lastSync: 0, uploaded: [], ...JSON.parse(raw) };
+    if (raw) return { token: "", phrase: "", lastSync: 0, ...JSON.parse(raw) };
   } catch (e) {
     /* nothing saved */
   }
-  return { token: "", phrase: "", lastSync: 0, uploaded: [] };
+  return { token: "", phrase: "", lastSync: 0 };
 }
 
 export function saveSyncConfig(cfg: Record<string, any>) {
@@ -566,10 +566,15 @@ export function syncAfterChange(answering: boolean): { wait: number; keep: boole
 /* ------------------------------------------------------------------
    Clip transport
 
-   Clips are immutable and addressed by id, so reconciling is simple:
-   fetch anything the document references that isn't on this device, and
-   upload anything on this device the server hasn't seen. A local ledger
-   of uploaded ids keeps this from re-checking every clip every sync.
+   Clips are immutable and addressed by id. A sync fetches anything the
+   document references that isn't on this device from the learner's own
+   store, where recordings made by builds before the teaching space were
+   kept.
+
+   It no longer sends anything there (0.656). Every recording a card can
+   name is on the server with the course or the personal card it belongs
+   to, the same as a picture, so copying each one into every learner's own
+   store again protected nothing and cost every learner the upload.
    ------------------------------------------------------------------ */
 
 export async function pullClip(token: string, id: string) {
@@ -639,18 +644,6 @@ export function cardsToSync(doc: Pick<Doc, "items" | "tombstones">, through: num
 }
 
 /*
- * How many recordings this device holds that the shared store has not had
- * from it: on the device (`here`), named by a card, and not yet sent.
- */
-export function clipsToSync(doc: WireDoc, here: Set<string> | null, sent: string[]): number {
-  if (!here) return 0;
-  const done = new Set(sent || []);
-  let n = 0;
-  for (const id of new Set(clipIdsIn(doc))) if (here.has(id) && !done.has(id)) n += 1;
-  return n;
-}
-
-/*
  * When a sync happened, the way you would say it: "today at 14:32",
  * "yesterday at 09:10", then "3 Nov at 09:10", with the year only when it
  * is not this one.
@@ -697,6 +690,7 @@ export function syncLine({
   lastSync = 0,
   reports = 0,
   cards = 0,
+  pictures = 0,
   clips = 0,
   at = Date.now(),
 }: {
@@ -709,12 +703,14 @@ export function syncLine({
   lastSync?: number;
   reports?: number;
   cards?: number;
+  /** Pictures and recordings added offline in the card editor (0.656). */
+  pictures?: number;
   clips?: number;
   at?: number;
 }): { main: string; sub: string } {
   if (trying) return { main: "Practice here stays on this device", sub: "" };
   const waiting = joined(
-    [count(reports, "report"), count(cards, "card"), count(clips, "recording")].filter(Boolean),
+    [count(reports, "report"), count(cards, "card"), count(pictures, "picture"), count(clips, "recording")].filter(Boolean),
   );
   const toSync = waiting ? `${waiting} to sync` : "";
   const when = lastSync ? `last synced ${syncedWhen(lastSync, at)}` : "";
@@ -750,7 +746,7 @@ export function clipIdsIn(data: WireDoc) {
 }
 
 /*
- * This device's recordings, as the three things syncing them needs to ask.
+ * This device's recordings, as the two things fetching them needs to ask.
  * Passed in rather than imported: what a clip is stored in differs between
  * the app (IndexedDB) and a test (a Map), and this module has no business
  * knowing which.
@@ -759,13 +755,7 @@ export interface ClipStore {
   /** Must only look at this device's store: no network, and nothing
       created as a side effect. */
   hasLocal: (id: string) => boolean | Promise<boolean>;
-  /** A data URL (data:audio/...;base64,...), or null. An object URL is not
-      a recording — sending one stored a "blob:" string on the server and an
-      empty clip on every other device. */
-  readLocal: (id: string) => Promise<string | null>;
   writeLocal: (id: string, url: string) => void | Promise<void>;
-  /** Clips this device has already sent up, so they are not offered again. */
-  uploaded?: Iterable<string>;
 }
 
 /* Clips the server said it doesn't have. Remembered for this session only,
@@ -781,12 +771,10 @@ const KNOWN_MISSING = new Set();
 export async function syncClips(
   token: string,
   data: WireDoc,
-  { hasLocal, readLocal, writeLocal, uploaded }: ClipStore,
+  { hasLocal, writeLocal }: ClipStore,
 ) {
   const ids = clipIdsIn(data);
   let pulled = 0;
-  let pushed = 0;
-  const known = new Set(uploaded || []);
 
   /* Clips are small and independent, so a fresh device fetching a course's
      worth of recordings shouldn't queue them one behind another. A few at a
@@ -804,18 +792,9 @@ export async function syncClips(
           if (url) {
             await writeLocal(id, url);
             pulled += 1;
-            known.add(id);
             KNOWN_MISSING.delete(id);
           } else {
             KNOWN_MISSING.add(id);
-          }
-        } else if (!known.has(id)) {
-          const url = await readLocal(id);
-          if (url && /^data:/.test(url)) {
-            await pushClip(token, id, url);
-            pushed += 1;
-            known.add(id);
-            KNOWN_MISSING.delete(id);
           }
         }
       } catch (e) {
@@ -824,7 +803,7 @@ export async function syncClips(
     }
   };
   await Promise.all(Array.from({ length: Math.min(5, ids.length || 1) }, worker));
-  return { pulled, pushed, uploaded: [...known] };
+  return { pulled };
 }
 
 /**

@@ -106,6 +106,11 @@ export type Verdict = "sent" | "keep" | "drop";
 export const isTransient = (msg: string) =>
   msg === "offline" || msg === "bad-response" || /^http-5\d\d$/.test(msg);
 
+/* What a teacher's card that could not be sent is filed under while it
+   waits: here rather than in the teaching screens, so the You menu can
+   count them without loading those (0.656). */
+export const CARD_OUTBOX = "card";
+
 /* ---------------- storage ---------------- */
 
 const OUTBOX_KEY = "arabic-trainer:outbox";
