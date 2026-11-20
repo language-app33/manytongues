@@ -8796,7 +8796,7 @@ there, which is still how a learner learns what it is for.
 **A session started from the screen closes it**, so the end of a session
 comes back to Home, not to the screen it was started from.
 
-## Enter presses the one primary button, by one rule for the whole app (0.653)
+## Enter presses the one primary button, by one rule for the whole app (0.654)
 
 **20 November 2026** · `src/enter-key.ts`
 

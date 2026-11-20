@@ -1,5 +1,5 @@
 /*
- * Enter presses the screen's main button, on a computer (0.653).
+ * Enter presses the screen's main button, on a computer (0.654).
  *
  * Every screen with one main action draws it as the one primary button,
  * and on a computer Enter now presses it, wherever the cursor is — so a

@@ -21,7 +21,7 @@ requestPersistence();
    moment, including during the first paint, and this is what notices. */
 watchForUpdates();
 
-/* On a computer, Enter presses the screen's main button (0.653). */
+/* On a computer, Enter presses the screen's main button (0.654). */
 pressPrimaryOnEnter();
 
 /*

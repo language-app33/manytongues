@@ -1,6 +1,6 @@
 // @ts-check
 /*
- * Enter presses the screen's main button, on a computer (0.653).
+ * Enter presses the screen's main button, on a computer (0.654).
  *
  * jsdom lays nothing out, so "shown" is stood in for here: an element is
  * shown unless it or something round it is `hidden`. The real browser is
