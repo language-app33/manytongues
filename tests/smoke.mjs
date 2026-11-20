@@ -12521,6 +12521,7 @@ const openPronounTables = async () => {
       promptsInScript: 0, promptsMarked: 0, promptsBare: 0, tip: false, tapped: false, tappedShows: false,
       choiceSets: 0, choicesBare: 0, revealButton: false, revealed: false, nearMiss: false, nearVerdict: "",
       afterMarked: false, tilesBare: false, asked: /** @type {string[]} */ ([]),
+      gridHintTried: false, gridNoReveal: false, gridHintShows: false, gridHintHides: false,
     };
     for (let n = 0; n < 30 && host.querySelector(".at-instruction"); n++) {
       const promptEl = host.querySelector('[data-el="question-prompt-text"]');
@@ -12568,6 +12569,22 @@ const openPronounTables = async () => {
           click(choices.querySelector("button"));
         }
       } else if (host.querySelector('[data-el="answer-match"]')) {
+        /* A grid read bare has its harakat behind the hint button in the
+           bar at the foot, not a button over the tiles (0.653). */
+        const wordsText = () => [...host.querySelectorAll('[data-el="match-word"]')].map(text).join(" ");
+        if (!met.gridHintTried && !HARAKA.test(wordsText())) {
+          met.gridHintTried = true;
+          const hint = host.querySelector('[data-el="hint-button"]');
+          met.gridNoReveal = !host.querySelector('[data-el="reveal-marks"]');
+          if (hint) {
+            click(hint);
+            await sleep(60);
+            met.gridHintShows = HARAKA.test(wordsText()) && hint.getAttribute("aria-pressed") === "true";
+            click(hint);
+            await sleep(60);
+            met.gridHintHides = !HARAKA.test(wordsText()) && hint.getAttribute("aria-pressed") === "false";
+          }
+        }
         await playGrid();
       } else {
         const dunno = [...host.querySelectorAll("button")].find((b) => /^I don't know$/.test((b.textContent || "").trim()));
@@ -12618,6 +12635,8 @@ const openPronounTables = async () => {
     known.revealButton && known.revealed, JSON.stringify(known));
   check("which makes a right answer a near miss, and says so",
     known.nearMiss && /near miss/.test(known.nearVerdict), JSON.stringify(known));
+  check("a bare matching grid puts its harakat back from the hint button, and away again",
+    known.gridHintTried && known.gridNoReveal && known.gridHintShows && known.gridHintHides, JSON.stringify(known));
   if (known.promptsBare > 0) {
     check("a bare word on the prompt says it can be tapped, and a tap puts its harakat back",
       known.tip && known.tappedShows, JSON.stringify(known));
