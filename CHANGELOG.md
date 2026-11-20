@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.654 — 20 November 2026
+
+**Every question with options in the script now has its harakat behind
+the hint button**, as the matching grids got in 0.653. The "Show the
+harakat" button above the options is gone from:
+
+- Choose the word (from the English, and from a picture)
+- Which word is missing? (in a phrase, and in a sentence)
+- Choose the number
+- Put each form beside its person
+- Choose what you say next
+- Which sentence means this?
+- Put the scene back in order
+
+The question-mark button in the bar at the foot puts the harakat back on
+every option, stays lit while they show, and a second tap puts them away.
+Using it still makes a right answer a near miss.
+
+To check by hand: on a phone, a word whose meaning is known on "Choose the
+word", and a conversation on "Choose what you say next".
+
 ## 0.653 — 20 November 2026
 
 **On "Match each word to its meaning", the harakat are behind the hint

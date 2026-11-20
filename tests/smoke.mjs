@@ -12547,7 +12547,9 @@ const openPronounTables = async () => {
       if (choices && /[؀-ۿ]/.test(text(choices))) {
         met.choiceSets += 1;
         if (!HARAKA.test(text(choices))) met.choicesBare += 1;
-        const reveal = host.querySelector('[data-el="reveal-marks"]');
+        /* From the hint button in the bar at the foot (0.654), with no
+           button over the options any more. */
+        const reveal = host.querySelector('[data-el="reveal-marks"]') ? null : host.querySelector('[data-el="hint-button"]');
         met.revealButton = met.revealButton || !!reveal;
         /* The meaning asked, which the prompt may say with more round it. */
         const ask = text(promptEl).toLowerCase();
@@ -12631,7 +12633,7 @@ const openPronounTables = async () => {
      marks back. */
   check("once its meaning is known, its options are shown without them",
     known.choiceSets > 0 && known.choicesBare > 0, JSON.stringify(known));
-  check("with a button that puts them back on every option",
+  check("with the hint button, which puts them back on every option",
     known.revealButton && known.revealed, JSON.stringify(known));
   check("which makes a right answer a near miss, and says so",
     known.nearMiss && /near miss/.test(known.nearVerdict), JSON.stringify(known));
