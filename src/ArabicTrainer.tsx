@@ -2026,6 +2026,17 @@ type SetStart =
   | { kind: "weak" }
   | { kind: "saved"; saved: SavedSession };
 
+/*
+ * How a session was started, kept on it so the screen at its end can start
+ * another the same way: "Keep going" (0.656). The settings, not the
+ * questions — what is dealt is dealt afresh, so it is what is due now. A
+ * session built by hand keeps its cards, its kind, and its length or its
+ * minutes.
+ */
+export type Again =
+  | SetStart
+  | { kind: "manual"; ids: string[]; mode: string; count?: number; minutes?: number };
+
 export type SetPicture = { id: string; name: string; images: string[]; answer: SetAnswer | null };
 export type SetWord = { id: string; ar: string; lat: string; en: string };
 export type HeldSet = SetView<SetPicture, SetWord>;
@@ -7845,8 +7856,8 @@ export function buildWeakSession({ items, settings, inDeck, budget, systems, per
   systems?: SystemSet[];
   perDay?: number;
 }) {
-  /* Not a dealt session: the screen at the end reads `manual` to know that
-     "Keep going" would be a change of subject rather than more of the same. */
+  /* `manual`: not a dealt session. "Keep going" at the end starts another
+     of these, not a dealt one — see Again (0.656). */
   return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "weak" }), manual: true, mode: "weak" };
 }
 
@@ -13356,8 +13367,39 @@ export default function ArabicTrainer() {
      shows, so a card added to one since it was kept is in the session. */
   function startSaved(s: SavedSession) {
     if (askFirst({ kind: "saved", saved: s })) return;
+    beginManual(manualOfSaved(s), { kind: "saved", saved: s });
+  }
+
+  function manualOfSaved(s: SavedSession) {
     const ids = new Set([...s.ids, ...cardsOfSaved(s, shown).map((it) => it.id)]);
-    beginManual({ ids, mode: s.mode, count: s.count, minutes: s.minutes });
+    return { ids, mode: s.mode, count: s.count, minutes: s.minutes };
+  }
+
+  /* What a session started this way would be dealt now — the one place
+     each kind is built, read by the buttons that start it and by the end
+     of a session, to offer "Keep going" only when there is something to
+     keep going with. */
+  function buildAgain(a: Again) {
+    if (a.kind === "begin") {
+      return buildSession({
+        items: shown, settings, inDeck: a.only || inDeck, practice: a.practice, perDay, systems, pathUnit: a.pathUnit,
+      });
+    }
+    if (a.kind === "weak") return buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
+    const m = a.kind === "saved" ? manualOfSaved(a.saved) : a;
+    /* Regular is dealt as the home screen deals, so it reads the cards the
+       home screen does: the language switch has its say over which words
+       count as in hand, exactly as it does for a prep. */
+    return buildManualSession({
+      items: m.mode === "regular" ? shown : items, settings, ids: m.ids, mode: m.mode, count: m.count, minutes: m.minutes, perDay, systems,
+    });
+  }
+
+  function startAgain(a: Again) {
+    if (a.kind === "begin") begin(a.practice, a.only, a.pathUnit);
+    else if (a.kind === "weak") beginWeak();
+    else if (a.kind === "saved") startSaved(a.saved);
+    else beginManual(a);
   }
 
   /* A session assembled by hand on the Build screen. */
@@ -13366,13 +13408,9 @@ export default function ArabicTrainer() {
     mode: string;
     count?: number;
     minutes?: number;
-  }) {
-    /* Regular is dealt as the home screen deals, so it reads the cards the
-       home screen does: the language switch has its say over which words
-       count as in hand, exactly as it does for a prep. */
-    const built = buildManualSession({
-      items: mode === "regular" ? shown : items, settings, ids, mode, count, minutes, perDay, systems,
-    });
+  }, again?: Again) {
+    const recipe: Again = again || { kind: "manual", ids: [...ids], mode, count, minutes };
+    const built = buildAgain(recipe);
     setBuilding(false);
     if (!built.exercises.length) {
       flash(
@@ -13399,6 +13437,7 @@ export default function ArabicTrainer() {
       practice: false,
       startedAt: now(),
       endsAt: minutes ? now() + minutes * 60000 : 0,
+      again: recipe,
     });
     setQi(0);
     setTally(NO_SCORE);
@@ -13701,7 +13740,7 @@ export default function ArabicTrainer() {
    */
   function beginWeak() {
     if (askFirst({ kind: "weak" })) return;
-    const built = buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
+    const built = buildAgain({ kind: "weak" });
     if (!built.exercises.length) {
       flash(
         built.reason === "nothing-weak"
@@ -13711,7 +13750,7 @@ export default function ArabicTrainer() {
       return;
     }
     warmSession(built);
-    setSession({ ...built, practice: false, startedAt: now(), endsAt: 0 });
+    setSession({ ...built, practice: false, startedAt: now(), endsAt: 0, again: { kind: "weak" } });
     setQi(0);
     setTally(NO_SCORE);
     setMoved([]);
@@ -13732,7 +13771,8 @@ export default function ArabicTrainer() {
        new cards in although the path has not reached it: "Practise this
        unit" (R30, R24). */
     if (askFirst({ kind: "begin", practice, only, pathUnit })) return;
-    const built = buildSession({ items: shown, settings, inDeck: only || inDeck, practice, perDay, systems, pathUnit });
+    const again: Again = { kind: "begin", practice, only, pathUnit };
+    const built = buildAgain(again);
     if (!built.exercises.length) {
       /* This used to return in silence, which reads as a broken button. It
          mattered little when the only way to get here was a card list that
@@ -13762,7 +13802,7 @@ export default function ArabicTrainer() {
     }
     catchingUpNote(built);
     warmSession(built);
-    setSession({ ...built, practice });
+    setSession({ ...built, practice, again });
     setQi(0);
     setTally(NO_SCORE);
     setMoved([]);
@@ -13825,6 +13865,15 @@ export default function ArabicTrainer() {
   }
 
   const exercise = session && qi < session.exercises.length ? session.exercises[qi] : null;
+  /* At the end of a session, whether starting it again the same way would
+     ask anything: worked out once, when the end screen opens, and the
+     button that offers it left off when it would not. */
+  const endedAgain: Again | null = session && !exercise && session.again ? session.again : null;
+  const canKeepGoing = useMemo(
+    () => !!endedAgain && buildAgain(endedAgain).exercises.length > 0,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [endedAgain],
+  );
   /* The card, narrowed to the question being asked of it: its variables
      filled in, one accepted answer where the question is about how a word
      sounds, one meaning where the meaning is the question. All three before
@@ -17389,15 +17438,17 @@ export default function ArabicTrainer() {
                     : `${tally.asked - tally.first} lapsed and will come back shortly.`}
                 </Help>
                 <WhatMoved moved={moved} items={items} settings={settings} />
-                <div className="at-row">
-                  <Button variant="ghost" onClick={() => setSession(null)}>
-                    Done
-                  </Button>
-                  {readyCount > 0 && !session.manual && (
-                    <Button variant="primary" onClick={() => begin(false)}>
+                {/* Another session started exactly as this one was, on top
+                    and full width, with the way out under it (0.656). */}
+                <div className="at-stack">
+                  {canKeepGoing && (
+                    <Button variant="primary" data-el="keep-going-button" onClick={() => startAgain(session.again)}>
                       Keep going
                     </Button>
                   )}
+                  <Button variant="ghost" data-el="done-button" onClick={() => setSession(null)}>
+                    Done
+                  </Button>
                 </div>
               </div>
             )}
