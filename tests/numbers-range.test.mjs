@@ -273,6 +273,25 @@ test("a counted question says what it is counting, in both languages", () => {
   assert.equal(two.nounForm, "dual");
 });
 
+test("a counted noun loses the capital its card opens with, unless the card keeps its capitals", () => {
+  /* Reported by a learner: "3 Sisters" (0.651). A card's English is
+     written to stand alone, so it opens with a capital; after a number it
+     is mid-sentence. */
+  const range = countingOf(must(arComposer.ranges().find((r) => r.counts), "a stretch counted with"));
+  const book = (/** @type {any} */ more) => ({
+    ...SYS,
+    nouns: SYS.nouns.map((/** @type {any} */ n) => (n.id === "book" ? { ...n, en: "Book", enPl: "Big Books", ...more } : n)),
+  });
+  const ask = (/** @type {number} */ value, /** @type {any} */ sys) =>
+    renderAsk({ rangeId: range.id, kind: "numbers", value, nounId: "book" }, arComposer, sys).en;
+  assert.equal(ask(3, book({})), "3 big books");
+  assert.equal(ask(1, book({})), "1 book");
+  /* A word whose second letter is a capital too is an abbreviation. */
+  assert.equal(ask(3, book({ enPl: "TVs" })), "3 TVs");
+  /* And a card ticked to keep its capitals keeps them: 3 Mondays. */
+  assert.equal(ask(3, book({ enPl: "Mondays", keepsCase: true })), "3 Mondays");
+});
+
 test("a time question is answered against the time it actually said", () => {
   /* The colloquial style rounds, so marking a learner against the minute
      that was *drawn* would be marking them on the rounding rather than on

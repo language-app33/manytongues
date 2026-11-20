@@ -268,3 +268,16 @@ test("an example reads back as it was written, and for the others as they will b
   assert.deepEqual(sentenceOf(eat.examples[0], [], "to eat", spec), { ar: "لازم …", lat: "laazim …", en: "… must …" });
   assert.equal(verbExamplesOf({ examples: [{ ...mine }] })[0].as, "she", "and who it was for is kept on the card");
 });
+
+test("a reply of one word is no phrase for that word", () => {
+  /* Reported twice by a learner: "Which word is missing?" on عفواً, with
+     the phrase being عفواً alone, showed nothing but the blank (0.651). */
+  /** @type {any[]} */
+  const items = [
+    { id: "w", ar: "عَفْواً", en: "You're welcome", uses: [] },
+    { id: "p1", ar: "عفواً", en: "You're welcome", uses: ["w"] },
+    { id: "p2", ar: "عفواً يا أستاذ", en: "You're welcome, sir", uses: ["w"] },
+  ];
+  const found = (buildContextIndex(items, ar).get("w") || []).map((c) => c.id);
+  assert.deepEqual(found, ["p2"], "only the phrase with something round the word");
+});

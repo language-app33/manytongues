@@ -19,6 +19,7 @@ import {
   labelFor,
   answerLabel,
   askLabel,
+  pictureLabel,
   untoldMeanings,
   lentLabel,
   formLabel,
@@ -1499,4 +1500,23 @@ test("Vietnamese is plain Vietnamese, with all six tones, and its old id is carr
   assert.deepEqual(renameLangIds(doc), { items: [{ lang: "vi", forms: [{ lang: "vi", ar: "nhà" }] }], settings: { byLang: { vi: 1 } } });
   const already = { items: [{ lang: "vi" }] };
   assert.equal(renameLangIds(already), already);
+});
+
+test("a picture names only the gender it cannot show, and never the count", () => {
+  /* Two reports (0.651): كلبة asked from a picture of a dog with nothing
+     saying female, and "dual" under a picture of two plants. */
+  const ar = LANGUAGES["ar-PS"];
+  const f = (/** @type {string} */ id, /** @type {string} */ word, /** @type {string} */ en, /** @type {string} */ number, /** @type {string} */ gender) =>
+    ({ id, ar: word, en, lat: "", number, gender });
+  const dog = { ...f("k", "كَلب", "Dog", "singular", "masculine"), category: "noun",
+    subs: [f("k-f0", "كَلبة", "Dog", "singular", "feminine"), f("k-f1", "كلبين", "Two dogs", "dual", "masculine"),
+      f("k-f2", "كلاب", "Dogs", "plural", "masculine"), f("k-f3", "كَلبتين", "Two dogs", "dual", "feminine")] };
+  assert.equal(pictureLabel(dog.subs[0], dog, ar), "female");
+  assert.equal(pictureLabel(dog, dog, ar), "male");
+  assert.equal(pictureLabel(dog.subs[3], dog, ar), "female", "two female dogs beside two male ones");
+  assert.equal(pictureLabel(dog.subs[2], dog, ar), "", "no female plural beside it: the picture is enough");
+  const plant = { ...f("p", "نَبتِة", "Plant", "singular", "feminine"), category: "noun",
+    subs: [f("p-f0", "نباتات", "plants", "plural", "feminine"), f("p-f1", "نَبتِتين", "Two plants", "dual", "feminine")] };
+  assert.equal(askLabel(plant.subs[1], plant, ar), "dual", "said beside the answer, as before");
+  assert.equal(pictureLabel(plant.subs[1], plant, ar), "", "but not under the picture");
 });

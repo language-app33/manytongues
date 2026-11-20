@@ -258,10 +258,12 @@ const englishOf = (/** @type {string} */ sg, /** @type {string} */ pl, /** @type
 };
 
 test("the English is the card's own, never a plural made up", () => {
-  assert.equal(englishOf("Books", "Books", 10), "10 Books");
-  assert.equal(englishOf("Book", "Book", 10), "10 Book", "as written, even the singular's word");
-  assert.equal(englishOf("Child", "Children", 10), "10 Children");
-  assert.equal(englishOf("Glass", "Glasses", 10), "10 Glasses");
+  /* Its words, not its capitals: after a number the English is
+     mid-sentence (0.651). */
+  assert.equal(englishOf("Books", "Books", 10), "10 books");
+  assert.equal(englishOf("Book", "Book", 10), "10 book", "as written, even the singular's word");
+  assert.equal(englishOf("Child", "Children", 10), "10 children");
+  assert.equal(englishOf("Glass", "Glasses", 10), "10 glasses");
 });
 
 test("a noun whose plural has no English is not counted, and says why", () => {

@@ -177,6 +177,7 @@ import {
   groupAttrOf,
   answerLabel,
   askLabel,
+  pictureLabel,
   lentLabel,
   langOf,
   quizAttrOf,
@@ -14464,8 +14465,11 @@ export default function ArabicTrainer() {
   /* Where the form is named — under the prompt, beside the answer — and
      what it is called. See formTagsAt. */
   const formLabelText = item && parentItem ? askLabel(item, parentItem, qLang) : "";
+  /* A picture says only what it cannot show — see pictureLabel. */
+  const pictured = item && parentItem && spec && spec.promptField === "image" ? pictureLabel(item, parentItem, qLang) : "";
   const tagsAt = formTagsAt({
     label: formLabelText,
+    pictured,
     ambiguous: tellForm,
     kin: parentItem ? unitsOf(parentItem).length - 1 : 0,
     lent: lentLines.length > 0,
@@ -16431,7 +16435,7 @@ export default function ArabicTrainer() {
                         grammar to say it with: Vietnamese has none. */}
                     {tagsAt.question && (
                       <p className="at-asktag" data-el="question-form-tag">
-                        {formLabelText}
+                        {pictured || formLabelText}
                       </p>
                     )}
                     {/* What the verb means, on "who is it?": a learner
@@ -19093,9 +19097,13 @@ function readAlike(
  * Nothing on a grid or a scene, where every word is asked and a tag on one
  * would say which English is its — see kinTags.
  */
-export function formTagsAt({ label, ambiguous, kin, lent, promptField }: {
+export function formTagsAt({ label, ambiguous, kin, lent, promptField, pictured = "" }: {
   /** What the form is called, from askLabel. Empty where nothing tells it apart. */
   label: string;
+  /** On a picture, what it says instead — pictureLabel: "female" or
+      "male" where the picture cannot show it, and never the count, which
+      it does. Under the picture whenever it says anything. */
+  pictured?: string;
   /** Whether the prompt leaves which form open — formIsAmbiguous. */
   ambiguous: boolean;
   /** How many other forms the card has. */
@@ -19107,7 +19115,7 @@ export function formTagsAt({ label, ambiguous, kin, lent, promptField }: {
   /* Nor a verb's example, whose words already say which form is in the
      gap — and naming its person would be its English given away. */
   const none = ["pairs", "scene", "gap", "sentence", "sentenceMeaning", "example"].includes(promptField);
-  const question = !none && !!label && ambiguous;
+  const question = promptField === "image" ? !!pictured : !none && !!label && ambiguous;
   const lentQuestion = !none && lent && !PROMPT_SHOWS_FORM.includes(promptField);
   return {
     question,

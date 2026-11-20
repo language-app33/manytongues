@@ -137,6 +137,7 @@ export function readNounCard(card: Held | null | undefined): ReadNoun | null {
     en,
     /* As written, even where it is the singular's own word. */
     enPl: many.en,
+    ...(card.capitals === true ? { keepsCase: true } : null),
     ...((one.human || human) ? { human: one.human || human } : null),
     ...(Object.keys(lat).length ? { lat } : null),
   };

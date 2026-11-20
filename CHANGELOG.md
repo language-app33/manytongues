@@ -8,6 +8,50 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.651 — 20 November 2026
+
+**Fixes from a learner's 16 reports.** Most were already settled by
+0.605–0.621. These four were not.
+
+For students:
+
+- **"Which word is missing?" is never asked of a phrase that is only the
+  word.** A one-word reply in a conversation, عفواً, was used as a phrase
+  for عفواً, so the screen showed nothing but the blank and the answer
+  was obvious. Reported twice. Such a reply is no longer used as a
+  phrase for its word, in questions or under "Where it turned up". Its
+  longer phrases are still used.
+- **Counting questions write the noun in small letters: "3 sisters", not
+  "3 Sisters".** The capital came from how the word is written on its
+  card. A word whose second letter is a capital too (TVs) keeps its
+  capitals, and so does a card ticked "keeps its capital letters".
+- **A picture question says "female" or "male" when the picture can't
+  show it.** Asked for كلبة from a picture of a dog, nothing said the
+  female was wanted. Now "female" is under the picture. It says "male"
+  for the male form too, where the card has a female form of the same
+  number, and says nothing on a card with only one gender.
+- **A picture question no longer says "dual" or "plural".** The picture
+  shows how many. Which form it was is still said beside the answer, as
+  on other questions.
+
+Trade-off: in "Picture → choose", where the plural and the pair are both
+offered, only the picture now tells them apart.
+
+To check by hand: a picture question on كلبة shows "female" under the
+picture; one on نَبتِتين shows nothing under it; a counting question
+reads "3 sisters".
+
+Checked and left alone:
+
+- **"Sisters" every time** in counting questions: the app rotates among
+  the nouns already learnt in the shape the number needs, and the
+  learner had two (sisters and brothers). More arrive as more are learnt.
+- **The whole phrase's pronunciation** after choosing a missing word is
+  shown where the phrase has one written; the phrase reported has none.
+  A teacher can add it.
+- **The learner's app was still on 0.612 on 17 November**, a week after
+  it came out. Nothing in the app changes for this; the learner is to reload it.
+
 ## 0.650 — 18 November 2026
 
 **Home has one thing to do: Start session.** Weak spots, Build a session
