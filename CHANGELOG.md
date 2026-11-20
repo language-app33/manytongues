@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.656 — 20 November 2026
+## 0.657 — 20 November 2026
 
 **Every question with options in the script now has its harakat behind
 the hint button**, as the matching grids got in 0.653. The "Show the
@@ -28,6 +28,9 @@ Using it still makes a right answer a near miss.
 
 To check by hand: on a phone, a word whose meaning is known on "Choose the
 word", and a conversation on "Choose what you say next".
+
+## 0.656 — 20 November 2026
+
 **"Keep going" at the end of a session starts the same session again.**
 It sits above "Done" as the main button, both full width. It used to be a
 small button beside "Done" that always started an ordinary session, and
