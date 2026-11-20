@@ -3144,15 +3144,21 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
    spelt the same included, so the table keeps its shape. Nothing in it is
    coloured — the pattern is for the learner to see. */
 .at-vtense { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; width:100%; }
-.at-vrow { display:grid; grid-template-columns: minmax(64px, auto) 1fr; column-gap:12px; row-gap:2px;
+.at-vrow { display:grid; grid-template-columns: minmax(64px, auto) 1fr; column-gap:12px; row-gap:6px;
   align-items:center; padding:8px 12px; border:1px solid var(--line); border-radius: var(--r-sm);
   background: var(--surface); }
+/* Since 0.652: the whole form in English on the left, the whole form in the
+   language on the right with how it is said under it. */
+.at-vrow.at-vpair { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+.at-vpair .at-vperson { text-align:start; justify-self:start; }
+.at-vtarget { display:flex; flex-direction:column; align-items:flex-end; gap:2px; min-width:0; }
+.at-vtarget .at-vform { max-width:100%; overflow-wrap:anywhere; }
 /* Who each row is, in English, at reading size: a learner looking at a
    tense asked for the English pronouns, which were there in small grey
    and went unseen (0.586). */
 .at-vperson { color: var(--text); font-size: var(--fs-md); font-weight:600; }
 .at-vform { font-size: calc(var(--ask) * .7); line-height:1.3; text-align:end; }
-.at-vsaid { grid-column: 2; display:flex; flex-wrap:wrap; gap:4px 10px; justify-content:flex-end;
+.at-vsaid { display:flex; flex-wrap:wrap; gap:4px 10px; justify-content:flex-end;
   font-size: var(--fs-sm); color: var(--text-soft); }
 .at-ven { color: var(--muted); }
 .at-vhidden { border:1px dashed var(--line); border-radius: var(--r-sm); background: var(--well);

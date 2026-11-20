@@ -42,7 +42,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["question-prompt", "The block being asked about. A word, a phrase with a gap in it, a play button, or a conversation, depending on the exercise.", ""],
     ["question-prompt-text", "The words inside it, when it is words. One size in every exercise.", "كِتاب"],
     ["question-prompt-meaning", "Under a scene's sentence with a word missing: what the sentence means, as the clue, when the word is to be typed — until it is answered. Only where the sentence has its English.", "I went to school today"],
-    ["verb-tense", "On a verb practice: one tense of the verb laid out by person — the person, the form, how it is said and what it means. One row a person, two forms spelt the same included.", ""],
+    ["verb-tense", "On a verb practice: one tense of the verb laid out by person — on the left the whole form in English, who it is about included; on the right the whole form in the language, its pronoun included, with how it is said under it. One row a person, two forms spelt the same included.", ""],
     ["verb-reveal", "On Read the forms: a form's pronunciation, blurred until tapped.", "btaakul"],
     ["verb-read-mark", "On Read the forms, once a pronunciation is uncovered: whether you had read that form right. Each form is marked on its own.", "Read it right · Misread"],
     ["verb-tiles", "On Fill the row: the forms as tiles, one a person, to put beside each person in the table above.", ""],

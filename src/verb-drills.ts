@@ -264,6 +264,22 @@ export function meaningWithoutWho(en: unknown, persons: VerbPerson[]): string {
   return [plainVerb(first)].concat(rest).join(" ");
 }
 
+/**
+ * What a form means with who it is about on the front: the other way from
+ * meaningWithoutWho, for the tense laid out with the English on one side
+ * (0.652). The teacher's own meaning where it already starts with a person
+ * — "she ate" — and otherwise the person put in front of it, so "ate" on
+ * the *she* column reads "she ate" and nothing ever reads "she she ate".
+ * The person alone where there is no meaning.
+ */
+export function meaningWithWho(en: unknown, person: VerbPerson, persons: VerbPerson[]): string {
+  const text = String(en || "").trim();
+  const who = String((person && person.label) || "").trim();
+  if (!text) return who;
+  if (!who || withoutWho(text, persons) !== text) return text;
+  return `${who} ${text}`;
+}
+
 function withoutWho(en: unknown, persons: VerbPerson[]): string {
   const text = String(en || "").trim();
   if (!text) return "";

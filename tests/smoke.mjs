@@ -10651,6 +10651,7 @@ const openPronounTables = async () => {
       order: /** @type {string[]} */ ([]), pattern: 0, patternRows: 0, read: 0, readRight: 0, hidden: 0,
       who: 0, whoRight: 0, whoOptions: /** @type {string[]} */ ([]), row: 0, rowRight: 0, tiles: 0,
       shift: 0, shiftRight: 0, verdicts: /** @type {string[]} */ ([]), patternMore: false,
+      readRows: /** @type {string[][]} */ ([]), readSaid: /** @type {string[]} */ ([]),
     };
     const btn = (/** @type {RegExp} */ re) => [...host.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
     for (let n = 0; n < 30 && host.querySelector(".at-instruction"); n++) {
@@ -10678,12 +10679,17 @@ const openPronounTables = async () => {
         kind = "read";
         met.read += 1;
         met.hidden = table.querySelectorAll('[data-el="verb-reveal"]').length;
+        met.readRows = [...table.querySelectorAll("li")].map((li) => [
+          ((li.querySelector('[data-el="verb-row-english"]') || {}).textContent || "").trim(),
+          ((li.querySelector('[data-el="verb-row-form"]') || {}).textContent || "").replace(/\s+/g, " ").trim(),
+        ]);
         for (let k = 0; k < 10; k++) {
           const hidden = host.querySelector('[data-el="verb-reveal"]');
           if (!hidden) break;
           click(hidden);
           await sleep(30);
         }
+        met.readSaid = [...table.querySelectorAll(".at-vlat")].map((el) => (el.textContent || "").trim());
         for (const mark of [...host.querySelectorAll('[data-el="verb-read-mark"]')]) {
           click([...mark.querySelectorAll("button")].find((b) => /Read it right/.test(b.textContent || "")));
           await sleep(20);
@@ -10766,9 +10772,28 @@ const openPronounTables = async () => {
     JSON.stringify(tense && tense.s));
   check("and for no person in it", marked.length === 0, `${marked.length} marked`);
 
+  /* Pronouns the Pronouns screen wrote, for some persons and not "they",
+     already learnt so they are not what the walk is asked. */
+  const pronouns = [["i", "انا", "ana"], ["she", "هي", "hiyye"]].map(([person, ar, lat]) => ({
+    id: `vpron-${person}`, kind: "word", tags: ["Lesson 1"], created: 1, updated: Date.now(), lang: "ar-PS",
+    category: "pronoun", person, forms: [{ id: `vpron-${person}`, ar, en: person === "i" ? "I" : person, lat, s: pastDone }],
+  }));
   const reading = await walk([verbCard(settled(1, ["vread", "vwho"])), ...others]);
+  const paired = await walk([verbCard(settled(1, ["vread"])), ...others, ...pronouns]);
   check("then the forms are read with their pronunciation hidden", reading.met.read > 0 && reading.met.hidden === 6,
     JSON.stringify(reading.met));
+  /* Since 0.652: the whole form in English on the left, the whole form in
+     the language on the right, its pronoun included where there is one. */
+  const rowOf = (/** @type {string} */ en) => paired.met.readRows.find(([e]) => e === en) || [];
+  check("each row reads the whole form in English, who it is about included",
+    rowOf("I write")[0] === "I write" && rowOf("She writes")[0] === "She writes" && rowOf("You (f) write")[0] === "You (f) write",
+    JSON.stringify(paired.met.readRows));
+  check("and the whole form in the language, with its pronoun",
+    rowOf("I write")[1] === "انا بكتب" && rowOf("She writes")[1] === "هي بتكتب", JSON.stringify(paired.met.readRows));
+  check("and the verb alone for a person with no pronoun card", rowOf("They write")[1] === "بيكتبوا",
+    JSON.stringify(paired.met.readRows));
+  check("and what was hidden is how the whole of it is said", paired.met.readSaid.includes("ana baktub") &&
+    paired.met.readSaid.includes("hiyye btiktub") && paired.met.readSaid.includes("biktbu"), JSON.stringify(paired.met.readSaid));
   check("and marked form by form as the learner says", reading.met.readRight > 0, JSON.stringify(reading.met.verdicts));
   const readMarks = (reading.verb && reading.verb.forms || []).filter((/** @type {any} */ f) => f.row === "present" && f.s && f.s.vread);
   check("each form read has a mark of its own", readMarks.length === 6, `${readMarks.length} marked`);

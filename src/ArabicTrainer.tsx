@@ -373,7 +373,7 @@ import type { Review } from "./review.ts";
 import { liftSubtypeTagsIn } from "./subtype-tags.ts";
 import { tickCapitals } from "./capitals.ts";
 import { spellRuns, typoed } from "./spelling.ts";
-import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, meaningWithoutWho, whoAllRight, whoChoices, whoIsRight, WHO_JOIN } from "./verb-drills.ts";
+import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, meaningWithoutWho, meaningWithWho, whoAllRight, whoChoices, whoIsRight, WHO_JOIN } from "./verb-drills.ts";
 import type { Tense } from "./verb-drills.ts";
 import { cappedAt, skillSeed } from "./skills.ts";
 import type { SkillCaps } from "./skills.ts";
@@ -10530,9 +10530,17 @@ const NO_KEYS: string[] = [];
  * read it right — which is the mark, form by form. A form without a
  * transliteration is shown as it is, with nothing to uncover.
  */
-function VerbTable({ tense, lang, reading, checked }: {
+/* Since 0.652 each row is two sides: on the left the whole form in English,
+   who it is about included ("she ate"), and on the right the whole form in
+   the language, its pronoun included (هي أكلت), with how that is said under
+   it. The pronoun is the one the Pronouns screen wrote for that person; a
+   person with no pronoun card shows the verb alone. What is hidden in "Read
+   the forms" is how the whole right side is said, pronoun and all. */
+function VerbTable({ tense, lang, reading, checked, pronouns }: {
   tense: Tense;
   lang: Lang;
+  /** This language's pronoun for each person, by the person's id. */
+  pronouns?: Record<string, { ar: string; lat: string }>;
   reading?: {
     /** The forms marked by this question: the rest are shown and not asked. */
     asked: Set<string>;
@@ -10545,35 +10553,49 @@ function VerbTable({ tense, lang, reading, checked }: {
 }) {
   const script = { fontFamily: lang.fontStack, direction: lang.direction } as React.CSSProperties;
   const said = String(lang.translitLabel || "pronunciation").toLowerCase();
+  const persons = tense.places.map((p) => p.person);
   return (
     <ol className="at-vtense" data-el="verb-tense" aria-label={tense.tense.label || "The tense"}>
       {tense.places.map(({ person, form }) => {
         const asked = !!reading && reading.asked.has(form.id) && !!String(form.lat || "").trim();
         const shown = !reading || !asked || checked || reading.revealed.has(form.id);
         const mark = reading ? reading.marks[form.id] : undefined;
+        const pronoun = (pronouns && pronouns[person.id]) || null;
+        const formLat = String(form.lat || "").trim();
+        /* How the whole right side is said: the pronoun's reading with the
+           verb's, where both are written; the verb's alone otherwise. */
+        const lat = formLat ? [pronoun ? pronoun.lat : "", formLat].filter(Boolean).join(" ") : "";
         return (
-          <li key={form.id} className="at-vrow">
-            <span className="at-vperson">{person.label}</span>
-            <span className="at-vform" lang={lang.id} dir={lang.direction} style={script}>
-              <Marked text={String(form.ar || "")} lang={lang} />
+          <li key={form.id} className="at-vrow at-vpair">
+            <span className="at-vperson" data-el="verb-row-english">
+              {asMeaning(meaningWithWho(form.en, person, persons))}
             </span>
-            <span className="at-vsaid">
-              {form.lat ? (
-                shown ? (
-                  <span className="at-vlat">{String(form.lat)}</span>
-                ) : (
-                  <button
-                    type="button"
-                    className="at-vhidden"
-                    data-el="verb-reveal"
-                    aria-label={`Show the ${said}`}
-                    onClick={() => reading && reading.onReveal(form.id)}
-                  >
-                    <span aria-hidden="true">{String(form.lat)}</span>
-                  </button>
-                )
+            <span className="at-vtarget">
+              <span className="at-vform" lang={lang.id} dir={lang.direction} style={script} data-el="verb-row-form">
+                {pronoun ? (
+                  <>
+                    <Marked text={pronoun.ar} lang={lang} />{" "}
+                  </>
+                ) : null}
+                <Marked text={String(form.ar || "")} lang={lang} />
+              </span>
+              {lat ? (
+                <span className="at-vsaid">
+                  {shown ? (
+                    <span className="at-vlat">{lat}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="at-vhidden"
+                      data-el="verb-reveal"
+                      aria-label={`Show the ${said}`}
+                      onClick={() => reading && reading.onReveal(form.id)}
+                    >
+                      <span aria-hidden="true">{lat}</span>
+                    </button>
+                  )}
+                </span>
               ) : null}
-              {form.en ? <span className="at-ven">{asMeaning(String(form.en))}</span> : null}
             </span>
             {asked && reading && (reading.revealed.has(form.id) || checked) && (
               <span className="at-vreadmark" data-el="verb-read-mark">
@@ -13797,6 +13819,23 @@ export default function ArabicTrainer() {
     return table ? tenseOf(parentItem, table, rowOf(item)) : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spec, item && item.id, parentItem, qLang.id]);
+  /* This language's pronouns by the person each is, from the cards the
+     Pronouns screen wrote, for the tense table's target-language side: the
+     first way each is written, and how that is said. */
+  const verbPronouns: Record<string, { ar: string; lat: string }> = useMemo(() => {
+    const out: Record<string, { ar: string; lat: string }> = {};
+    if (!verbTense) return out;
+    for (const it of items as any[]) {
+      if (!it || String(it.category || "") !== "pronoun" || !it.person) continue;
+      if (langIdOf(it, settings) !== qLang.id) continue;
+      const lead: any = leadOf(it) || it;
+      const ar = (splitAlternatives(String(lead.ar || it.ar || ""))[0] || "").trim();
+      if (!ar || out[String(it.person)]) continue;
+      out[String(it.person)] = { ar, lat: (splitAlternatives(String(lead.lat || it.lat || ""))[0] || "").trim() };
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verbTense, items, qLang.id]);
   const verbAsked: Set<string> = useMemo(() => {
     if (!verbTense || !exercise) return new Set();
     const type = typeOf(exercise.type);
@@ -16217,6 +16256,7 @@ export default function ArabicTrainer() {
                           <VerbTable
                             tense={verbTense}
                             lang={qLang}
+                            pronouns={verbPronouns}
                             checked={!!checked}
                             reading={
                               spec.answerMode === "vread"

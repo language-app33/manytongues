@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.652 — 20 November 2026
+
+**A verb's tense reads as English on the left and the language on the
+right.** On "Read the forms" and "See the pattern", each row of the tense
+is now two sides:
+
+- **On the left, the whole form in English**, who it is about included:
+  "she writes", not "she" in one place and "writes" in another. Where a
+  teacher wrote the meaning without the person ("write"), the person is
+  put in front ("You (f) write").
+- **On the right, the whole form in the language, its pronoun included**:
+  هي بتكتب rather than بتكتب. The pronoun is the one written on the
+  space's Pronouns screen. A person with no pronoun there shows the verb
+  on its own, as before.
+- **What "Read the forms" hides is how the whole right side is said**,
+  pronoun and all ("hiyye btiktub"), under the form it belongs to.
+
+"Fill the row" is unchanged.
+
+To check by hand: a space with its Pronouns screen filled in, on a phone,
+on "See the pattern" and "Read the forms".
+
 ## 0.651 — 20 November 2026
 
 **Fixes from a learner's 16 reports.** Most were already settled by
