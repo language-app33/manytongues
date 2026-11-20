@@ -8795,3 +8795,33 @@ there, which is still how a learner learns what it is for.
 
 **A session started from the screen closes it**, so the end of a session
 comes back to Home, not to the screen it was started from.
+
+## Enter presses the one primary button, by one rule for the whole app (0.653)
+
+**20 November 2026** · `src/enter-key.ts`
+
+On a computer, Enter presses the screen's primary button. It is one
+listener on the document, not a handler beside each button, because there
+are over a hundred primary buttons and a rule each screen had to remember
+would be forgotten on the next one. The primary variant was already the
+app's way of saying "this is the main action here" (Home's "one primary
+button on the screen"), so the rule reads that rather than a new marker.
+
+It asks the uppermost open dialog first, else the page, and presses only
+when that layer shows exactly one primary: two is ambiguous, and choosing
+by position is how the wrong thing gets done. Toggles (`aria-pressed`)
+are passed over — a choice drawn primary because it is chosen is a state,
+not an action — and `danger` is never primary, so Enter cannot confirm a
+delete. A disabled button is left dead; an `off` one takes the press,
+because that is how it says why.
+
+It does nothing on a phone or tablet — `(hover: hover) and (pointer: fine)`
+is the test. A phone keyboard's Go is the same key, and the answer box
+gave it up there (a thumb on the bottom row marked half-typed answers).
+The answer box no longer cancels Enter itself; the pointer test is what
+keeps the phone as it was.
+
+A field that does its own thing on Enter cancels the key
+(`preventDefault`), and a cancelled key is read as taken. That is the
+contract for any new field with an Enter of its own: without it, Enter
+would do the field's thing *and* press the screen's button.

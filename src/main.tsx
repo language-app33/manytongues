@@ -6,6 +6,7 @@ import ArabicTrainer from "./ArabicTrainer.tsx";
 import { ReachSnackbar } from "./shared.tsx";
 import "./index.css";
 import { applyRememberedTheme } from "./theme-memory.ts";
+import { pressPrimaryOnEnter } from "./enter-key.ts";
 
 /* The page in the theme last used, before anything paints (0.643). */
 applyRememberedTheme();
@@ -19,6 +20,9 @@ requestPersistence();
 /* Before anything renders: a newly deployed worker can take charge at any
    moment, including during the first paint, and this is what notices. */
 watchForUpdates();
+
+/* On a computer, Enter presses the screen's main button (0.653). */
+pressPrimaryOnEnter();
 
 /*
  * The last line of defence. A render error anywhere used to leave a blank

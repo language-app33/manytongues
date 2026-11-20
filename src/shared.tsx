@@ -4764,7 +4764,7 @@ export function ConfirmModal({
               autoFocus
               placeholder={confirmWord}
               onChange={(e) => setTyped(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && ready && !busy && onConfirm()}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (ready && !busy) onConfirm(); } }}
             />
           </div>
         )}
@@ -6624,7 +6624,7 @@ export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHi
                 value={name}
                 autoFocus
                 onChange={(e) => setName(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && make()}
+                onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); make(); } }}
               />
             </Field>
             <div className="at-row at-mt3">

@@ -16605,6 +16605,9 @@ export default function ArabicTrainer() {
                           <Button
                             key={answer}
                             variant={typed === answer ? "primary" : undefined}
+                            /* A choice that shows it is chosen, so Enter
+                               leaves it be and presses Check (0.653). */
+                            aria-pressed={typed === answer}
                             disabled={!!checked}
                             onClick={() => setTyped(answer)}
                           >
@@ -16731,15 +16734,17 @@ export default function ArabicTrainer() {
                           readOnly={!!checked || ownFigures}
                           placeholder={figures ? "Type the number" : ownFigures ? ownPrompt : spec.placeholder}
                           onChange={(e) => setTyped(e.target.value)}
-                          /* Only the Check button checks. Enter — and a
-                             phone keyboard's Go, which is the same key —
-                             used to, and a learner reaching for a letter
-                             on the keyboard's bottom row sent a half-typed
-                             answer to be marked. The key now does nothing,
-                             and says so: "done" rather than "go". */
+                          /* On a phone, only the Check button checks. Enter
+                             — and a phone keyboard's Go, which is the same
+                             key — used to, and a learner reaching for a
+                             letter on the keyboard's bottom row sent a
+                             half-typed answer to be marked. There the key
+                             does nothing, and says so: "done" rather than
+                             "go". On a computer Enter presses Check, as it
+                             presses every screen's main button (0.653,
+                             enter-key.ts), which tells the two apart. */
                           enterKeyHint="done"
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") e.preventDefault();
                             /* The read-only box takes nothing typed, so a
                                keyboard that does have ٤ on it — or a colon,
                                or backspace — goes through the pad's own
