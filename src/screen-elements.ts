@@ -44,7 +44,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["question-prompt-meaning", "Under a scene's sentence with a word missing: what the sentence means, as the clue, when the word is to be typed — until it is answered. Only where the sentence has its English.", "I went to school today"],
     ["verb-tense", "On a verb practice: one tense of the verb laid out by person — on the left the whole form in English, who it is about included; on the right the whole form in the language, its pronoun included, with how it is said under it. One row a person, two forms spelt the same included.", ""],
     ["verb-row-english", "In a row of the tense (0.652): the whole form in English, who it is about included.", "She writes"],
-    ["verb-row-form", "In a row of the tense (0.652): the whole form in the language, its pronoun from the Pronouns screen included where there is one.", "هي بتكتب"],
+    ["verb-row-form", "In a row of the tense (0.652): the whole form in the language, its pronoun from the Pronouns screen included where there is one.", ""],
     ["verb-reveal", "On Read the forms: a form's pronunciation, blurred until tapped.", "btaakul"],
     ["verb-read-mark", "On Read the forms, once a pronunciation is uncovered: whether you had read that form right. Each form is marked on its own.", "Read it right · Misread"],
     ["verb-tiles", "On Fill the row: the forms as tiles, one a person, to put beside each person in the table above.", ""],
