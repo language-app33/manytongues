@@ -8,6 +8,74 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.658 — 20 November 2026
+
+**A picture question is asked only when its picture is ready.** A question
+that shows a picture could come up before the picture had reached the
+phone; the learner then looked at empty frames for about twenty seconds
+before being told "The picture isn't on this device yet", and had to skip
+a question they could never answer. Now a picture question is asked only
+once its picture is on the device, online as well as offline. Until then
+the card is asked in its other ways.
+
+**Pictures come down with everything else.** They used to be fetched only
+when a session was about to start, and only each card's first picture — a
+card with several pictures shows the next on each turn, so the others were
+often missing. Now every card's pictures are brought down in the
+background whenever the cards sync, a course is refreshed, or the
+connection comes back, so picture questions are ready by the time a
+session starts. A card with several pictures takes turns only among those
+that have arrived.
+
+The cost: pictures now download on sync rather than when needed, which
+uses more data the first time a course with many pictures is opened (each
+picture is a few hundred kilobytes, and only ever downloaded once). In the
+rare browser that cannot store pictures (some private windows), nothing
+changes: there, a picture is still fetched when its question comes up.
+
+To check by hand: on a phone, open a course whose cards have pictures,
+start a session, and see the picture questions show their pictures at
+once.
+
+## 0.657 — 20 November 2026
+
+**Every question with options in the script now has its harakat behind
+the hint button**, as the matching grids got in 0.653. The "Show the
+harakat" button above the options is gone from:
+
+- Choose the word (from the English, and from a picture)
+- Which word is missing? (in a phrase, and in a sentence)
+- Choose the number
+- Put each form beside its person
+- Choose what you say next
+- Which sentence means this?
+- Put the scene back in order
+
+The question-mark button in the bar at the foot puts the harakat back on
+every option, stays lit while they show, and a second tap puts them away.
+Using it still makes a right answer a near miss.
+
+To check by hand: on a phone, a word whose meaning is known on "Choose the
+word", and a conversation on "Choose what you say next".
+
+## 0.656 — 20 November 2026
+
+**"Keep going" at the end of a session starts the same session again.**
+It sits above "Done" as the main button, both full width. It used to be a
+small button beside "Done" that always started an ordinary session, and
+was missing after a session built by hand or a weak-spots session.
+
+- **The same settings, dealt afresh:** the same deck, unit or prep, the
+  same practice or weak-spots choice, or, for a session built by hand or a
+  saved one, the same cards, the same kind and the same length or number
+  of minutes. The questions are chosen again, so it is what is due now,
+  not a replay of the ones just answered.
+- **Only shown when it has something to ask.** If the same session would
+  come up empty (every weak spot fixed, nothing left in that unit), the
+  button is left off rather than leading to "nothing to do".
+
+To check by hand: on a phone, finish an ordinary session, a weak-spots
+session and a timed session built by hand, and press "Keep going" on each.
 ## 0.655 — 20 November 2026
 
 **The You menu says when you last synced and what is waiting, and a

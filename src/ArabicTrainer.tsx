@@ -316,7 +316,7 @@ import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
 import { holdReach, isUnreachable, releaseReach, showReach, updateReach } from "./reach.ts";
-import { knownMissing as knownMissingAt, MISSING_CLIPS, pictureData } from "./pictures.ts";
+import { knownMissing as knownMissingAt, MISSING_CLIPS, MISSING_FOR_MS, pictureData } from "./pictures.ts";
 import { CARD_OUTBOX, drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 import { heldCounts, watchHeld } from "./held-media.ts";
 import {
@@ -2025,6 +2025,17 @@ type SetStart =
   | { kind: "weak" }
   | { kind: "saved"; saved: SavedSession };
 
+/*
+ * How a session was started, kept on it so the screen at its end can start
+ * another the same way: "Keep going" (0.656). The settings, not the
+ * questions — what is dealt is dealt afresh, so it is what is due now. A
+ * session built by hand keeps its cards, its kind, and its length or its
+ * minutes.
+ */
+export type Again =
+  | SetStart
+  | { kind: "manual"; ids: string[]; mode: string; count?: number; minutes?: number };
+
 export type SetPicture = { id: string; name: string; images: string[]; answer: SetAnswer | null };
 export type SetWord = { id: string; ar: string; lat: string; en: string };
 export type HeldSet = SetView<SetPicture, SetWord>;
@@ -3534,7 +3545,9 @@ function countPictured(items: Item[], settings: Settings): Map<LangId, number> {
     if (isDialog(card) || card.drill === false) continue;
     const id = langIdOf(card, settings);
     for (const { unit } of unitsOf(card)) {
-      if (unit.ar && !hasSlots(unit) && Array.isArray(unit.images) && unit.images.length) {
+      /* Only those whose picture is here: a tile that cannot be drawn is
+         no company (see canSeeHere). */
+      if (unit.ar && !hasSlots(unit) && Array.isArray(unit.images) && unit.images.length && canSeeHere(unit)) {
         counts.set(id, (counts.get(id) || 0) + 1);
       }
     }
@@ -4021,7 +4034,7 @@ function castFill(
   if (!r) return r;
   const images = Array.isArray(r.unit.images) ? r.unit.images : [];
   if (images.length < 2) return r;
-  const unit = { ...r.unit, imageAt: turnOf(statesOf(r.unit)[type]) % images.length };
+  const unit = { ...r.unit, imageAt: pictureTurn(images, turnOf(statesOf(r.unit)[type])) };
   return { ...r, unit, parent: r.isSub ? r.parent : withLead(r.parent, unit) };
 }
 
@@ -4589,12 +4602,52 @@ export function setVisibleImages(ids: Set<string> | null) {
   visibleImages = ids;
 }
 
-/** Whether this form's picture can be shown without a connection. */
+/*
+ * Whether this browser can keep pictures at all (it has IndexedDB). Where
+ * it cannot, there is nowhere for the sync to put them, so online a
+ * picture is fetched when its question comes up, as before 0.658.
+ */
+let picturesKept = true;
+export function setPicturesKept(kept: boolean) {
+  picturesKept = !!kept;
+}
+
+/*
+ * Whether this one picture can be shown now, without waiting on the
+ * network (0.658).
+ *
+ * It used to be asked only offline: online, a picture question was dealt
+ * whether or not its picture had come down, and a picture that was slow
+ * or missing on the server left the learner looking at an empty frame for
+ * twenty seconds and then "The picture isn't on this device yet." Now a
+ * picture question is asked only once its picture is here; the sync
+ * brings every card's pictures down alongside everything else (see the
+ * effect beside allImageIds), so in practice this holds back only the
+ * minutes between a picture being added and its arriving.
+ */
+function pictureHere(hash: string) {
+  if (!visibleImages) return true;
+  if (visibleImages.has(hash) || IMAGES_READY.has(hash)) return true;
+  return !offlineNow && !picturesKept;
+}
+
+/** Whether this form has a picture that can be shown now. */
 function canSeeHere(unit?: Form) {
-  if (!offlineNow || !visibleImages || !unit) return true;
+  if (!unit) return true;
   const images = Array.isArray(unit.images) ? unit.images : [];
   if (!images.length) return true;
-  return images.some((h) => visibleImages !== null && visibleImages.has(h));
+  return images.some(pictureHere);
+}
+
+/* Which of a form's pictures to show on a given turn: they take turns
+   (0.631), but only among those that are here, so a card whose second
+   picture has not arrived yet shows its first again rather than a gap.
+   An index into `images`. */
+function pictureTurn(images: string[], turn: number) {
+  const here: number[] = [];
+  images.forEach((h, i) => { if (pictureHere(h)) here.push(i); });
+  if (!here.length) return images.length ? turn % images.length : 0;
+  return here[turn % here.length];
 }
 
 /*
@@ -7844,8 +7897,8 @@ export function buildWeakSession({ items, settings, inDeck, budget, systems, per
   systems?: SystemSet[];
   perDay?: number;
 }) {
-  /* Not a dealt session: the screen at the end reads `manual` to know that
-     "Keep going" would be a change of subject rather than more of the same. */
+  /* `manual`: not a dealt session. "Keep going" at the end starts another
+     of these, not a dealt one — see Again (0.656). */
   return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "weak" }), manual: true, mode: "weak" };
 }
 
@@ -9100,6 +9153,9 @@ async function warmClips(
    remembered in memory either way, so one question does not ask twice. */
 
 const IMAGES_HELD: Map<string, Promise<Blob | null>> = new Map();
+/* The pictures fetched this session, kept or not: a picture in memory can
+   be shown as surely as one in the database (see pictureHere). */
+const IMAGES_READY: Set<string> = new Set();
 
 async function localImageIds(): Promise<Set<string>> {
   const ids: Set<string> = new Set();
@@ -9113,14 +9169,19 @@ function imageBlob(hash: string): Promise<Blob | null> {
   if (held) return held;
   const got = (async () => {
     const here = await idbRun("readonly", (st) => st.get(hash), IMAGE_STORE);
-    if (here) return here as Blob;
+    if (here) {
+      IMAGES_READY.add(hash);
+      return here as Blob;
+    }
     try {
       /* Through the one picture fetch, so a picture the editor or the menu
          already asked for this session is not asked for again. */
       const data = await pictureData(hash);
       if (data) {
         const blob = base64ToBlob(data);
-        if ((await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE)) !== undefined) clipsChanged();
+        await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE);
+        IMAGES_READY.add(hash);
+        clipsChanged();
         return blob;
       }
     } catch (e) {
@@ -10716,7 +10777,7 @@ function PictureChoices({ options, value, onChange, disabled, turn = 0 }: {
       {options.map((option, i) => {
         const hash = String((option && Array.isArray(option.images) && option.images[0]) || "");
         const count = option && Array.isArray(option.images) ? option.images.length : 0;
-        const shown = count > 1 ? String(option.images[(turn + i) % count] || hash) : hash;
+        const shown = count > 1 ? String(option.images[pictureTurn(option.images, turn + i)] || hash) : hash;
         return (
           <button
             type="button"
@@ -11637,8 +11698,11 @@ export default function ArabicTrainer() {
       });
     /* The pictures too: whatever brought recordings down may have brought
        pictures with it, and the question is the same one. */
-    localImageIds()
-      .then((ids) => setVisible(ids))
+    Promise.all([localImageIds(), openClipDb()])
+      .then(([ids, db]) => {
+        setPicturesKept(!!db);
+        setVisible(ids);
+      })
       .catch(() => {});
   }, []);
   /* And whenever a recording is saved or removed, wherever that happened —
@@ -11827,7 +11891,7 @@ export default function ArabicTrainer() {
      they were asked on rather than cleared by resetExercise, so no way onto
      the next question can carry them over. */
   const [lentFor, setLentFor] = useState<{ ex: unknown; keys: string[] }>({ ex: null, keys: [] });
-  /* The matching grid's harakat, put back from the hint button and then put
+  /* The options' harakat, put back from the hint button and then put
      away again (0.653), on this question. Putting them away does not undo
      the near miss: they were on the screen. */
   const [marksAwayFor, setMarksAwayFor] = useState<unknown>(null);
@@ -12767,7 +12831,10 @@ export default function ArabicTrainer() {
   setUnitShapes(unitShapes);
   const mateCounts = useMemo(() => countMates(asking, settings), [asking, settings]);
   setMateCounts(mateCounts);
-  const picturedCounts = useMemo(() => countPictured(asking, settings), [asking, settings]);
+  /* Asked again as pictures arrive and the connection comes and goes:
+     only a picture that is here counts (see canSeeHere). */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const picturedCounts = useMemo(() => countPictured(asking, settings), [asking, settings, visible, offline]);
   setPicturedCounts(picturedCounts);
   const heardCounts = useMemo(() => countHeard(asking, settings), [asking, settings]);
   setHeardCounts(heardCounts);
@@ -12829,6 +12896,47 @@ export default function ArabicTrainer() {
     }
     return ids;
   }, [items, lacksImages]);
+
+  /*
+   * Bring every card's pictures down with everything else (0.658).
+   *
+   * They used to come down only for the session about to start, and only
+   * the first picture of each card, while a card with several shows the
+   * next on each turn — so a picture question could be dealt with nothing
+   * to show. Now, whenever the cards change (a sync, a course refreshed, a
+   * card made) or the connection comes back, whatever pictures are not on
+   * this device yet are fetched in the background, three at a time, and a
+   * picture question is asked once its picture is here (see pictureHere).
+   *
+   * Not where the browser cannot keep them: there they would be fetched
+   * again at every launch and held in memory meanwhile. A picture that
+   * could not be fetched is not asked for again for five minutes, so a
+   * server that is down is not asked in a loop.
+   */
+  const imagesSyncing = useRef(false);
+  const imageTried = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (offline || !visible || !picturesKept || imagesSyncing.current) return;
+    const at = Date.now();
+    const wanted = [...new Set(allImageIds)].filter((h) => {
+      if (visible.has(h)) return false;
+      const tried = imageTried.current.get(h);
+      return tried === undefined || at - tried > MISSING_FOR_MS;
+    });
+    if (!wanted.length) return;
+    imagesSyncing.current = true;
+    void (async () => {
+      try {
+        for (const h of wanted) imageTried.current.set(h, at);
+        await warmImages(wanted);
+      } catch (e) {
+        /* tried again with the next change */
+      } finally {
+        imagesSyncing.current = false;
+        refreshAudible();
+      }
+    })();
+  }, [allImageIds, visible, offline, refreshAudible]);
 
   /* How many of them are not here. Read on the home screen while offline,
      and in Account settings beside the button that fetches them. */
@@ -13340,8 +13448,39 @@ export default function ArabicTrainer() {
      shows, so a card added to one since it was kept is in the session. */
   function startSaved(s: SavedSession) {
     if (askFirst({ kind: "saved", saved: s })) return;
+    beginManual(manualOfSaved(s), { kind: "saved", saved: s });
+  }
+
+  function manualOfSaved(s: SavedSession) {
     const ids = new Set([...s.ids, ...cardsOfSaved(s, shown).map((it) => it.id)]);
-    beginManual({ ids, mode: s.mode, count: s.count, minutes: s.minutes });
+    return { ids, mode: s.mode, count: s.count, minutes: s.minutes };
+  }
+
+  /* What a session started this way would be dealt now — the one place
+     each kind is built, read by the buttons that start it and by the end
+     of a session, to offer "Keep going" only when there is something to
+     keep going with. */
+  function buildAgain(a: Again) {
+    if (a.kind === "begin") {
+      return buildSession({
+        items: shown, settings, inDeck: a.only || inDeck, practice: a.practice, perDay, systems, pathUnit: a.pathUnit,
+      });
+    }
+    if (a.kind === "weak") return buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
+    const m = a.kind === "saved" ? manualOfSaved(a.saved) : a;
+    /* Regular is dealt as the home screen deals, so it reads the cards the
+       home screen does: the language switch has its say over which words
+       count as in hand, exactly as it does for a prep. */
+    return buildManualSession({
+      items: m.mode === "regular" ? shown : items, settings, ids: m.ids, mode: m.mode, count: m.count, minutes: m.minutes, perDay, systems,
+    });
+  }
+
+  function startAgain(a: Again) {
+    if (a.kind === "begin") begin(a.practice, a.only, a.pathUnit);
+    else if (a.kind === "weak") beginWeak();
+    else if (a.kind === "saved") startSaved(a.saved);
+    else beginManual(a);
   }
 
   /* A session assembled by hand on the Build screen. */
@@ -13350,13 +13489,9 @@ export default function ArabicTrainer() {
     mode: string;
     count?: number;
     minutes?: number;
-  }) {
-    /* Regular is dealt as the home screen deals, so it reads the cards the
-       home screen does: the language switch has its say over which words
-       count as in hand, exactly as it does for a prep. */
-    const built = buildManualSession({
-      items: mode === "regular" ? shown : items, settings, ids, mode, count, minutes, perDay, systems,
-    });
+  }, again?: Again) {
+    const recipe: Again = again || { kind: "manual", ids: [...ids], mode, count, minutes };
+    const built = buildAgain(recipe);
     setBuilding(false);
     if (!built.exercises.length) {
       flash(
@@ -13383,6 +13518,7 @@ export default function ArabicTrainer() {
       practice: false,
       startedAt: now(),
       endsAt: minutes ? now() + minutes * 60000 : 0,
+      again: recipe,
     });
     setQi(0);
     setTally(NO_SCORE);
@@ -13685,7 +13821,7 @@ export default function ArabicTrainer() {
    */
   function beginWeak() {
     if (askFirst({ kind: "weak" })) return;
-    const built = buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
+    const built = buildAgain({ kind: "weak" });
     if (!built.exercises.length) {
       flash(
         built.reason === "nothing-weak"
@@ -13695,7 +13831,7 @@ export default function ArabicTrainer() {
       return;
     }
     warmSession(built);
-    setSession({ ...built, practice: false, startedAt: now(), endsAt: 0 });
+    setSession({ ...built, practice: false, startedAt: now(), endsAt: 0, again: { kind: "weak" } });
     setQi(0);
     setTally(NO_SCORE);
     setMoved([]);
@@ -13716,7 +13852,8 @@ export default function ArabicTrainer() {
        new cards in although the path has not reached it: "Practise this
        unit" (R30, R24). */
     if (askFirst({ kind: "begin", practice, only, pathUnit })) return;
-    const built = buildSession({ items: shown, settings, inDeck: only || inDeck, practice, perDay, systems, pathUnit });
+    const again: Again = { kind: "begin", practice, only, pathUnit };
+    const built = buildAgain(again);
     if (!built.exercises.length) {
       /* This used to return in silence, which reads as a broken button. It
          mattered little when the only way to get here was a card list that
@@ -13746,7 +13883,7 @@ export default function ArabicTrainer() {
     }
     catchingUpNote(built);
     warmSession(built);
-    setSession({ ...built, practice });
+    setSession({ ...built, practice, again });
     setQi(0);
     setTally(NO_SCORE);
     setMoved([]);
@@ -13809,6 +13946,15 @@ export default function ArabicTrainer() {
   }
 
   const exercise = session && qi < session.exercises.length ? session.exercises[qi] : null;
+  /* At the end of a session, whether starting it again the same way would
+     ask anything: worked out once, when the end screen opens, and the
+     button that offers it left off when it would not. */
+  const endedAgain: Again | null = session && !exercise && session.again ? session.again : null;
+  const canKeepGoing = useMemo(
+    () => !!endedAgain && buildAgain(endedAgain).exercises.length > 0,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [endedAgain],
+  );
   /* The card, narrowed to the question being asked of it: its variables
      filled in, one accepted answer where the question is about how a word
      sounds, one meaning where the meaning is the question. All three before
@@ -14491,13 +14637,16 @@ export default function ArabicTrainer() {
   const choicesCanBeBare =
     !!qLang.marks && !marksTell && !checked && choicesInScript && (choicesRun === "sentence" || wordsBare);
   const choicesBare = choicesCanBeBare && !lentKeys.includes(CHOICES_LENT);
-  /* On a matching grid the harakat come back from the hint button in the
-     bar at the foot rather than a button above the tiles (0.653): the grid
-     has no other hint, and it is the same kind of thing — a nudge that
-     makes the question easier and is counted for it. Like the hint, it
-     stays pressed and can put them away again. */
-  const gridMarksHint = choicesCanBeBare && !!spec && spec.picks === "pair" && !hintAt;
-  const gridMarksShown = gridMarksHint && lentKeys.includes(CHOICES_LENT) && !marksAway;
+  /* Options shown bare get their harakat back from the hint button in the
+     bar at the foot rather than a button above them: the matching grids
+     first (0.653), then every question with options in the script (0.654).
+     None of them has another hint, and it is the same kind of thing — a
+     nudge that makes the question easier and is counted for it. Like the
+     hint, it stays pressed and can put them away again. A question whose
+     hint button already holds a nudge would keep the button above the
+     options; none does today. */
+  const marksHint = choicesCanBeBare && !hintAt;
+  const marksHintShown = marksHint && lentKeys.includes(CHOICES_LENT) && !marksAway;
 
   /*
    * Whether the prompt has to say which form it wants.
@@ -16607,7 +16756,7 @@ export default function ArabicTrainer() {
                   {/* The options can't be tapped a word at a time — a tap
                       on one chooses it — so their marks come back all at
                       once, and the question counts as a near miss. */}
-                  {choicesBare && !gridMarksHint && qLang.marks && marksView.lend && (
+                  {choicesBare && !marksHint && qLang.marks && marksView.lend && (
                     <div className="at-row at-reveals">
                       <Button
                         size="sm"
@@ -17295,16 +17444,16 @@ export default function ArabicTrainer() {
                             }}
                           />
                         )}
-                        {gridMarksHint && qLang.marks && (
+                        {marksHint && qLang.marks && (
                           <IconButton
                             icon="help"
                             ghost
-                            label={`${gridMarksShown ? "Hide" : "Show"} the ${qLang.marks.name}`}
-                            className={`at-hintbtn${gridMarksShown ? " on" : ""}`}
+                            label={`${marksHintShown ? "Hide" : "Show"} the ${qLang.marks.name}`}
+                            className={`at-hintbtn${marksHintShown ? " on" : ""}`}
                             data-el="hint-button"
-                            aria-pressed={gridMarksShown}
+                            aria-pressed={marksHintShown}
                             onClick={() => {
-                              if (gridMarksShown) {
+                              if (marksHintShown) {
                                 setMarksAwayFor(exercise);
                                 return;
                               }
@@ -17373,15 +17522,17 @@ export default function ArabicTrainer() {
                     : `${tally.asked - tally.first} lapsed and will come back shortly.`}
                 </Help>
                 <WhatMoved moved={moved} items={items} settings={settings} />
-                <div className="at-row">
-                  <Button variant="ghost" onClick={() => setSession(null)}>
-                    Done
-                  </Button>
-                  {readyCount > 0 && !session.manual && (
-                    <Button variant="primary" onClick={() => begin(false)}>
+                {/* Another session started exactly as this one was, on top
+                    and full width, with the way out under it (0.656). */}
+                <div className="at-stack">
+                  {canKeepGoing && (
+                    <Button variant="primary" data-el="keep-going-button" onClick={() => startAgain(session.again)}>
                       Keep going
                     </Button>
                   )}
+                  <Button variant="ghost" data-el="done-button" onClick={() => setSession(null)}>
+                    Done
+                  </Button>
                 </div>
               </div>
             )}

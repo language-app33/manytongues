@@ -3951,6 +3951,27 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   /* A scene of three exercises runs out inside the loop above, so what is
      on screen is the end of the session rather than the middle of one —
      and a finished session is a screen over the tabs, not a tab. */
+
+  /* Keep going (0.656): above Done, the primary button, and it starts this
+     session over the way it was built — the same one scene, the same ten
+     questions — dealt afresh. */
+  {
+    const keep = document.querySelector('[data-el="keep-going-button"]');
+    const done = document.querySelector('[data-el="done-button"]');
+    check("the end of a built session offers Keep going above Done, as the primary button",
+      !!keep && !!done && keep.parentElement === done.parentElement &&
+        !!(keep.compareDocumentPosition(done) & 4) && /primary/.test(keep.className) && !/primary/.test(done.className),
+      `keep:${!!keep} done:${!!done} ${keep ? keep.className : ""}`);
+    if (keep) {
+      click(keep);
+      await sleep(300);
+      const again = instruction();
+      check("and Keep going starts the same session again, on the scene",
+        !!document.querySelector('[data-el="leave-session"]') && /scene|lines|follow|read|missing/i.test(again), again);
+      click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Leave session") || null);
+      await sleep(300);
+    }
+  }
   if (buttonNamed(/^Done$/)) {
     click(buttonNamed(/^Done$/));
     await sleep(250);
@@ -12547,7 +12568,9 @@ const openPronounTables = async () => {
       if (choices && /[؀-ۿ]/.test(text(choices))) {
         met.choiceSets += 1;
         if (!HARAKA.test(text(choices))) met.choicesBare += 1;
-        const reveal = host.querySelector('[data-el="reveal-marks"]');
+        /* From the hint button in the bar at the foot (0.654), with no
+           button over the options any more. */
+        const reveal = host.querySelector('[data-el="reveal-marks"]') ? null : host.querySelector('[data-el="hint-button"]');
         met.revealButton = met.revealButton || !!reveal;
         /* The meaning asked, which the prompt may say with more round it. */
         const ask = text(promptEl).toLowerCase();
@@ -12631,7 +12654,7 @@ const openPronounTables = async () => {
      marks back. */
   check("once its meaning is known, its options are shown without them",
     known.choiceSets > 0 && known.choicesBare > 0, JSON.stringify(known));
-  check("with a button that puts them back on every option",
+  check("with the hint button, which puts them back on every option",
     known.revealButton && known.revealed, JSON.stringify(known));
   check("which makes a right answer a near miss, and says so",
     known.nearMiss && /near miss/.test(known.nearVerdict), JSON.stringify(known));
