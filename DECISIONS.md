@@ -8795,3 +8795,27 @@ there, which is still how a learner learns what it is for.
 
 **A session started from the screen closes it**, so the end of a session
 comes back to Home, not to the screen it was started from.
+
+## Keep going repeats how a session was started (0.653)
+
+**20 November 2026** · `src/ArabicTrainer.tsx` (`Again`, `buildAgain`, `startAgain`)
+
+The end of a session offered "Keep going", which always started a dealt
+session on the home screen's deck, and was left off after anything built
+by hand or Weak spots, because those were a change of subject. The owner
+asked for it to start "the exact same session" instead, and chose (1a, 2a,
+3a, 4a): every kind of session repeats, built and saved ones included; the
+settings repeat, not the questions; the button is left off when the same
+settings would deal nothing; and it sits above Done, full width.
+
+So a session carries `again`, the recipe it was started from, and every
+start goes through `buildAgain`, which is the one place each kind is
+built. The end screen builds that recipe once when it opens to decide
+whether to show the button; pressing it builds again for real, through
+the same start functions as the buttons on Home, so a personal set's
+questions are still asked first. A saved session is kept as itself rather
+than as its cards, so a card added to its decks since is in the repeat.
+A teacher's one-question trial has no recipe and no button.
+
+Given up: one extra build of a session each time the end screen opens.
+

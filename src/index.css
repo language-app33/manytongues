@@ -2115,6 +2115,10 @@ html.at-reaching .at-snack { bottom: calc(176px + env(safe-area-inset-bottom)); 
    The basis stays zero so that buttons which do fit on one line come out
    the same width as each other rather than as wide as their labels. */
 .at-row > * { flex:1 1 0; min-width: min-content; }
+/* Buttons one above the other, each the full width: the way on first,
+   the way out under it. The end of a session (0.653). */
+.at-stack { display:flex; flex-direction:column; gap:10px; margin-top:20px; }
+.at-stack > .at-btn { width:100%; }
 /* Direct children only. A row can hold a Segmented, whose own buttons are
    .at-btn too — sizing those from the row's share would hand a three-way
    picker the type of a full-width button. */

@@ -8,6 +8,25 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.653 — 20 November 2026
+
+**"Keep going" at the end of a session starts the same session again.**
+It sits above "Done" as the main button, both full width. It used to be a
+small button beside "Done" that always started an ordinary session, and
+was missing after a session built by hand or a weak-spots session.
+
+- **The same settings, dealt afresh:** the same deck, unit or prep, the
+  same practice or weak-spots choice, or, for a session built by hand or a
+  saved one, the same cards, the same kind and the same length or number
+  of minutes. The questions are chosen again, so it is what is due now,
+  not a replay of the ones just answered.
+- **Only shown when it has something to ask.** If the same session would
+  come up empty (every weak spot fixed, nothing left in that unit), the
+  button is left off rather than leading to "nothing to do".
+
+To check by hand: on a phone, finish an ordinary session, a weak-spots
+session and a timed session built by hand, and press "Keep going" on each.
+
 ## 0.652 — 20 November 2026
 
 **A verb's tense reads as English on the left and the language on the

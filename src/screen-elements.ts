@@ -141,6 +141,8 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
   ]],
   [END, [
     ["what-moved", "The cards this sitting moved up a level, cleared, or learnt — left out altogether when none did.", "airport — learnt · key — up to writing it from a cue"],
+    ["keep-going-button", "Starts another session the way this one was started — the same deck, unit or prep, practice or weak spots, or the same cards, kind and length built by hand — dealt afresh. Above Done, and only when that session would have something to ask.", "Keep going"],
+    ["done-button", "Back to the home screen.", "Done"],
   ]],
   [SPACES, [
     ["where-you-are", "The button at the right of every tab's title, and under the app's name on Home (0.601): the place, the mode and the languages once some are off. It opens the sheet that changes them. Not there for someone with nothing to choose.", "Lingua · Teaching · Arabic only"],
