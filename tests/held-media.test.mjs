@@ -1,6 +1,6 @@
 // @ts-check
 /*
- * Pictures and recordings added offline in the card editor (0.656): which
+ * Pictures and recordings added offline in the card editor (0.659): which
  * a card names, and the card without the ones the server refused. The
  * storage half needs IndexedDB and is checked in the app.
  */

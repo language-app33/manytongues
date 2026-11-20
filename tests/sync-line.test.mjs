@@ -43,7 +43,7 @@ test("what is waiting is counted, reports then cards then recordings", () => {
   assert.equal(l.sub, `Last synced today at ${hm(14, 32)}`);
   assert.equal(syncLine({ lastSync: last, cards: 1, at }).main, "1 card to sync");
   assert.equal(syncLine({ lastSync: last, reports: 1, cards: 3, at }).main, "1 report and 3 cards to sync");
-  /* Pictures and recordings added offline in the card editor (0.656). */
+  /* Pictures and recordings added offline in the card editor (0.659). */
   assert.equal(syncLine({ lastSync: last, cards: 3, pictures: 2, clips: 1, at }).main, "3 cards, 2 pictures and 1 recording to sync");
 });
 

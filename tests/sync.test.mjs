@@ -358,7 +358,7 @@ test("the exercise types this file merges are the ones the app has", () => {
   assert.deepEqual(Object.keys(states()).sort(), [...TYPES].sort());
 });
 
-test("syncClips fetches only what is missing, and never sends anything up (0.656)", async () => {
+test("syncClips fetches only what is missing, and never sends anything up (0.659)", async () => {
   /** @type {WireDoc} */
   const data = { items: [item("x", { forms: [{ id: "x", ar: "", en: "", lat: "", recs: [{ id: "here" }, { id: "there" }] }] })] };
   /** @type {(string | null)[]} */

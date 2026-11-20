@@ -571,7 +571,7 @@ export function syncAfterChange(answering: boolean): { wait: number; keep: boole
    store, where recordings made by builds before the teaching space were
    kept.
 
-   It no longer sends anything there (0.656). Every recording a card can
+   It no longer sends anything there (0.659). Every recording a card can
    name is on the server with the course or the personal card it belongs
    to, the same as a picture, so copying each one into every learner's own
    store again protected nothing and cost every learner the upload.
@@ -703,7 +703,7 @@ export function syncLine({
   lastSync?: number;
   reports?: number;
   cards?: number;
-  /** Pictures and recordings added offline in the card editor (0.656). */
+  /** Pictures and recordings added offline in the card editor (0.659). */
   pictures?: number;
   clips?: number;
   at?: number;

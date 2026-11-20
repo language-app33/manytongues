@@ -7725,7 +7725,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   };
   /*
    * The pictures and recordings a card names that were added offline and
-   * are still on this device go up before the card does (0.656), so no
+   * are still on this device go up before the card does (0.659), so no
    * student is ever handed a card whose picture or recording the server
    * has not got. `waiting`: some could not go yet, and the card waits with
    * them. One the server refuses is taken off the card, which goes without
@@ -7763,7 +7763,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   };
   const sendOrKeep = useCallback(async (given0: Partial<Card>, decks: string[], given: API.SaveExtra = {}) => {
     /* Its offline pictures and recordings first; if they cannot go, the
-       card is kept with them (0.656). */
+       card is kept with them (0.659). */
     const media = await sendCardMedia(given0);
     const card = media.card;
     /* A new card made on the My space side is personal, for good (0.545). */
@@ -7803,7 +7803,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     const { sent } = await drainOutbox(CARD_OUTBOX, async (body) => {
       const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra; org?: string };
       try {
-        /* Its pictures and recordings kept offline go first (0.656). */
+        /* Its pictures and recordings kept offline go first (0.659). */
         const media = await sendCardMedia(held.card);
         if (media.waiting) return "keep";
         absorbSaved(await API.saveCard(media.card, held.decks, held.extra || {}, held.org));

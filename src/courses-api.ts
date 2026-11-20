@@ -485,7 +485,7 @@ export const deleteSystem = (kind: "numbers" | "times", languageId: LangId) =>
 
 export const putClip = (hash: string, data: string) => call("put-clip", { body: { hash, data } });
 /* A recording added offline and not sent yet is answered from this
-   device (0.656): see held-media.ts. */
+   device (0.659): see held-media.ts. */
 export const getClip = async (hash: string): Promise<{ ok: true; hash: string; data: string }> => {
   const held = await heldData(hash);
   return held ? { ok: true, hash, data: held } : call("clip", { params: { hash } });
@@ -501,7 +501,7 @@ export const mediaSizes = (clips: string[], images: string[]): Promise<{
   clips: Record<string, number>;
   images: Record<string, number>;
 }> => call("media-sizes", { body: { clips, images } });
-/* The same for a picture added offline (0.656). */
+/* The same for a picture added offline (0.659). */
 export const getImage = async (hash: string): Promise<{ ok: true; hash: string; data: string }> => {
   const held = await heldData(hash);
   return held ? { ok: true, hash, data: held } : call("image", { params: { hash } });
@@ -513,7 +513,7 @@ export const putMedia = (kind: HeldKind, hash: string, data: string) =>
 
 /**
  * Send a picture or recording, or keep it on this device until it can go
- * (0.656). Offline, the card editor adds it all the same and it goes up
+ * (0.659). Offline, the card editor adds it all the same and it goes up
  * before the card that names it; `kept` says which happened. Throws
  * "media-full" when there was nowhere to keep it, and whatever the server
  * said when it refused.

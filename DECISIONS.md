@@ -11,6 +11,28 @@ anything that was never really a choice.
 
 ---
 
+## Pictures and recordings travel the same way (0.659)
+
+The owner's rule: a picture and a recording never behave differently,
+for learners or for teachers. Three gaps were closed to get there.
+
+- **Added offline, held and sent first.** `held-media.ts` keeps a
+  picture or recording added in the card editor while offline (its own
+  IndexedDB database, because the trainer's media store is a cache that
+  "Clear device media" and the sweep empty). `courses-api`'s `getClip`
+  and `getImage` answer from it first, so the editor and this device's
+  practice show it at once. `spaces.tsx` sends a card's held media before
+  the card, keeps the card in the outbox while any cannot go, and strips
+  a refused one from the card and says so. With no card left waiting,
+  anything else held (added to a card closed unsaved) goes up too.
+- **No per-learner copy.** `syncClips` pulls only. Every recording a card
+  names is on the server with its course or personal card, like a
+  picture; copying each into every learner's sync store cost every
+  learner the upload and protected nothing.
+- **No text-store fallback.** Recordings are kept in IndexedDB or not at
+  all, like pictures. Old text-store copies are moved across where there
+  is IndexedDB and let go of where there is not.
+
 ## Grammar belongs to an accepted answer, not to the form
 
 **11 September 2026** · `src/answers.ts`, `src/languages.ts` (`answerFields`)

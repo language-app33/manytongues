@@ -1452,7 +1452,7 @@ export function ImageScreen({ title, images, onChange, onClose }: {
       const hash = await hashOf(small);
       const data = await blobToDataUrl(small);
       /* Offline it is kept on this device and goes up before the card
-         that names it, the same as a recording (0.656). */
+         that names it, the same as a recording (0.659). */
       await API.putOrHold("image", hash, data);
       /* Into the one picture cache, so it is drawn without a fetch. */
       primePicture(hash, data);
@@ -1725,7 +1725,7 @@ export function RecordingScreen({ name, form, onChange, onClose, voices }: {
         setBusy(audio.length > 1 ? `Saving ${added.length + 1} of ${audio.length}…` : "Saving…");
         const hash = await hashOf(blob);
         /* Offline it is kept on this device and goes up before the card
-           that names it, the same as a picture (0.656). */
+           that names it, the same as a picture (0.659). */
         await API.putOrHold("clip", hash, await blobToDataUrl(blob));
         added.push(hash);
       }
@@ -11062,7 +11062,7 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
           {error && <Notice kind="error">{error}</Notice>}
           {about}
           {/* Said before the typing rather than after it. Everything on
-              the card — its pictures and recordings too, since 0.656 — is
+              the card — its pictures and recordings too, since 0.659 — is
               kept on this device and goes up when the connection returns. */}
           {offline && (
             <Notice kind="warn">

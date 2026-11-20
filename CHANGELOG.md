@@ -8,6 +8,47 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.659 — 20 November 2026
+
+**Pictures and recordings can be added to a card while offline, and the
+two now work the same way everywhere.**
+
+For teachers (and anyone making their own cards in My space):
+
+- **Offline, adding a picture or a recording just works.** It is kept on
+  the device, shown or played in the editor straight away, and goes up
+  when the connection comes back. It used to fail with "Can't reach the
+  server", even though the card itself could be saved offline.
+- **The picture or recording goes first, then the card.** A student is
+  never sent a card whose picture or recording the server has not got.
+  If it cannot go yet, the card waits on the device with it.
+- **If the server refuses one** (too big, say), the card is still sent
+  without it, and a message says which card lost which picture or
+  recording.
+- **The offline note in the editor** now says that what you write,
+  record and add is all kept until you're back online.
+
+For everyone:
+
+- **The You menu counts what the editor is holding**: "3 cards,
+  2 pictures and 1 recording to sync".
+- **Recordings are no longer copied into each learner's own backup.**
+  Like pictures, they already live on the server with the course or card
+  they belong to, so the copy protected nothing and cost every learner
+  data. Recordings already in someone's backup still come back to their
+  devices. A recording no longer counts as "to sync" on a learner's
+  device.
+- **In the rare browser that cannot store files** (some private windows),
+  recordings are now treated like pictures: fetched while online, and the
+  questions that need one are not asked offline. They used to be squeezed
+  into the small store the practice itself is saved in, where enough of
+  them could leave no room to save progress.
+
+To check by hand: on a phone in Teaching, turn on airplane mode, make a
+card with a picture and a recording, save it, and look at the You menu;
+then go back online and check the card, its picture and its recording
+reach a student's device.
+
 ## 0.658 — 20 November 2026
 
 **A picture question is asked only when its picture is ready.** A question
@@ -90,7 +131,8 @@ failed sync is said in the bar at the foot of the screen, with Retry.**
   yet" and what it would send.
 - **A card counts as waiting** once it has been answered, edited, marked,
   added or removed since the last sync. A recording counts if it was made
-  or downloaded on this device and has not been sent yet.
+  or downloaded on this device and has not been sent yet (until 0.659:
+  see there).
 - **"Sync failed" now appears in the large bar at the foot of the screen,
   with Retry**, the same bar as "Can't reach the server". Underneath it
   says why when the app knows ("Passphrase rejected", "Your cards are too

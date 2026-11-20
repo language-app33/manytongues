@@ -108,7 +108,7 @@ export const isTransient = (msg: string) =>
 
 /* What a teacher's card that could not be sent is filed under while it
    waits: here rather than in the teaching screens, so the You menu can
-   count them without loading those (0.656). */
+   count them without loading those (0.659). */
 export const CARD_OUTBOX = "card";
 
 /* ---------------- storage ---------------- */

@@ -8871,7 +8871,7 @@ function clipsChanged() {
 }
 
 /*
- * Kept in IndexedDB or not at all, the same as a picture (0.656).
+ * Kept in IndexedDB or not at all, the same as a picture (0.659).
  *
  * A browser without it used to put recordings in the small text store the
  * practice itself is saved in, where enough of them could leave no room
@@ -9266,7 +9266,7 @@ async function saveClipBase64(id: string, dataUrl: string) {
 }
 
 /* One-off move of anything left in the old text store. Where there is no
-   IndexedDB to move it to, it is let go instead (0.656): nothing reads it
+   IndexedDB to move it to, it is let go instead (0.659): nothing reads it
    any more, and it takes room the practice is saved in. Each one is on
    the server and comes back while online. */
 async function migrateClips(ids: string[]) {
@@ -11646,7 +11646,7 @@ export default function ArabicTrainer() {
      say so rather than leaving someone to wonder whether it went. */
   const [toSend, setToSend] = useState(0);
   /* And the pictures and recordings added offline in the card editor,
-     waiting to go up before their cards (0.656). */
+     waiting to go up before their cards (0.659). */
   const [heldMedia, setHeldMedia] = useState({ clips: 0, images: 0 });
   useEffect(() => {
     let live = true;
@@ -12103,7 +12103,7 @@ export default function ArabicTrainer() {
         }
 
         /* Recordings from the learner's own store, one key each and only
-           when missing. Nothing is sent there any more (0.656): see
+           when missing. Nothing is sent there any more (0.659): see
            syncClips. */
         const prevCfg = loadSyncConfig();
         try {
@@ -12129,7 +12129,7 @@ export default function ArabicTrainer() {
            menu counts "to sync" from (0.655): the moment it set out, or the
            newest change it brought down if another device's clock is ahead. */
         const syncedThrough = Math.max(setOut, latestStamp(merged as Doc));
-        /* The ledger of recordings sent up is gone with the sending (0.656). */
+        /* The ledger of recordings sent up is gone with the sending (0.659). */
         const { uploaded: _sent, ...kept } = prevCfg;
         void _sent;
         const cfg = { ...kept, token: key, lastSync: now(), syncedThrough };
@@ -15854,7 +15854,7 @@ export default function ArabicTrainer() {
       lastSync: last,
       reports: toSend,
       /* This device's practice, and the cards the card editor saved
-         offline and keeps until they can go (0.656). */
+         offline and keeps until they can go (0.659). */
       cards: cardsToSync(data, syncCfg.syncedThrough || last) + waitingToSend(CARD_OUTBOX),
       pictures: heldMedia.images,
       clips: heldMedia.clips,

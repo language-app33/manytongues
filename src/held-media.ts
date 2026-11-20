@@ -1,5 +1,5 @@
 /*
- * Pictures and recordings added while offline (0.656).
+ * Pictures and recordings added while offline (0.659).
  *
  * A card's pictures and recordings are sent to the server the moment they
  * are added in the card editor. Offline that used to fail, with "Can't
