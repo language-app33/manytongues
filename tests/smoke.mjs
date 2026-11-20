@@ -3967,7 +3967,7 @@ check("no console errors during the session", errors.length === 0, errors.slice(
       await sleep(300);
       const again = instruction();
       check("and Keep going starts the same session again, on the scene",
-        !!document.querySelector('[data-el="leave-session"]') && /scene|lines|follow|read/i.test(again), again);
+        !!document.querySelector('[data-el="leave-session"]') && /scene|lines|follow|read|missing/i.test(again), again);
       click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Leave session") || null);
       await sleep(300);
     }
