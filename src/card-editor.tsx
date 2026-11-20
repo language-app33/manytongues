@@ -2665,7 +2665,7 @@ function BlankNameBox({ label, placeholder, taken, onName, value, onType }: {
         placeholder={placeholder}
         aria-label={label}
         onChange={(next) => setMade(next.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24))}
-        onKeyDown={(e) => e.key === "Enter" && add()}
+        onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); add(); } }}
       />
       <Button variant="ghost" size="sm" disabled={!name || taken.includes(name)} onClick={add}>
         Add
@@ -3281,7 +3281,9 @@ function BlankScreen({ lang, offers, onPick, onClose, behindOf, start = null, ta
         aria-label="Find a blank, or name a new one"
         onChange={setTyped}
         onKeyDown={(e) => {
-          if (e.key !== "Enter" || !name) return;
+          if (e.key !== "Enter") return;
+          e.preventDefault();
+          if (!name) return;
           /* The row's own name asks how it reads, as tapping it does. */
           const row = offers.find((o) => o.name === name);
           /* A number blank typed out in full — `0-99` — is the teacher
@@ -8470,7 +8472,7 @@ function IdBox({ word }: { word: WordDraft }) {
               autoComplete="off"
               spellCheck={false}
               onChange={(e) => setRef(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && shutRef()}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); shutRef(); } }}
             />
             <IconButton
               icon="check"
@@ -8692,7 +8694,9 @@ function TagSheet({ word, rows, maker, full, onClose }: {
                       onChange={(e) => setRenaming({ from: b.name, to: e.target.value })}
                       onKeyDown={(e) => {
                         if (e.key === "Escape") setRenaming(null);
-                        if (e.key !== "Enter" || !canRename) return;
+                        if (e.key !== "Enter") return;
+                        e.preventDefault();
+                        if (!canRename) return;
                         renameFill(b.name, renaming.to);
                         setRenaming(null);
                       }}

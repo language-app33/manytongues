@@ -421,7 +421,7 @@ export function Onboarding({ onDone, place = {} }: {
               value={name}
               autoFocus
               onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && name.trim() && create()}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (name.trim()) create(); } }}
             />
             <Help className="at-mt3 at-mb2">
               Your invitation code, or a course code from your teacher.
@@ -434,7 +434,7 @@ export function Onboarding({ onDone, place = {} }: {
                 setSignupCode(e.target.value);
                 setError("");
               }}
-              onKeyDown={(e) => e.key === "Enter" && name.trim() && create()}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (name.trim()) create(); } }}
             />
             <Notice kind="error">{error}</Notice>
             <Button variant="primary" wide
@@ -2272,6 +2272,7 @@ function CourseSettings({
                   onChange={(e) => setRenaming(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Escape") setRenaming(null);
+                    if (e.key === "Enter") e.preventDefault();
                     if (e.key === "Enter" && renaming.trim() && renaming.trim() !== c.title) {
                       onRename(renaming.trim());
                       setRenaming(null);
@@ -8814,7 +8815,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   aria-label="Name a new tag"
                   value={newTagName}
                   onChange={(e) => setNewTagName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24))}
-                  onKeyDown={(e) => e.key === "Enter" && makeTag()}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); makeTag(); } }}
                 />
                 <Button variant="ghost" size="sm" icon="add" disabled={!typed || !!typedTrouble} onClick={makeTag}>
                   Create

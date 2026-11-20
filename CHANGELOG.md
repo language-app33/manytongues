@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.654 — 20 November 2026
+## 0.656 — 20 November 2026
 
 **Every question with options in the script now has its harakat behind
 the hint button**, as the matching grids got in 0.653. The "Show the
@@ -28,6 +28,65 @@ Using it still makes a right answer a near miss.
 
 To check by hand: on a phone, a word whose meaning is known on "Choose the
 word", and a conversation on "Choose what you say next".
+## 0.655 — 20 November 2026
+
+**The You menu says when you last synced and what is waiting, and a
+failed sync is said in the bar at the foot of the screen, with Retry.**
+
+- **The sync line at the bottom of the You menu** now has two parts. The
+  first says where things stand: "Up to date", "Syncing now", "Offline —
+  your work is saved on this device", or what is waiting, such as
+  "2 reports, 23 cards and 1 recording to sync". The second says when the
+  last sync was: "Last synced today at 14:32", "yesterday at 09:10", or a
+  date for anything older. A device that has never synced says "Not synced
+  yet" and what it would send.
+- **A card counts as waiting** once it has been answered, edited, marked,
+  added or removed since the last sync. A recording counts if it was made
+  or downloaded on this device and has not been sent yet.
+- **"Sync failed" now appears in the large bar at the foot of the screen,
+  with Retry**, the same bar as "Can't reach the server". Underneath it
+  says why when the app knows ("Passphrase rejected", "Your cards are too
+  big to sync…"), and otherwise that your work is saved on this device.
+  It shows the first time a sync fails, and again whenever you press Sync
+  now or Retry and it still fails. A background sync failing again does
+  not bring it back after you've closed it. It goes away by itself once a
+  sync works.
+- **Offline is not a failure**: no bar. The menu says your work is safe
+  and what is waiting, and the sync goes again on its own when the
+  connection comes back.
+- While the bar is up, the You menu opens above it rather than under it.
+
+To check by hand: on a phone, put it in airplane mode, answer a few cards
+and open the You menu; then, back online, check the time updates after
+Sync now.
+
+## 0.654 — 20 November 2026
+
+**On a computer, Enter presses the screen's main button.** Wherever a
+screen has one main button — the filled one — Enter now presses it, from
+anywhere on the screen, including from the box being typed in. So a
+session can be done from the keyboard alone: type the answer, Enter to
+check, Enter to go on, and the cursor is back in the box for the next
+question. Setting up, signing in, joining a course, saving and the rest
+work the same way. When a sheet or dialog is open, Enter is its button,
+not the screen's behind it.
+
+Where Enter still does nothing, on purpose:
+
+- **On a phone or tablet.** Its keyboard's Go is the same key, and the
+  answer box stopped checking on it because a thumb reaching for the
+  bottom row sent half-typed answers. That stays.
+- **Where a screen has two main buttons, or none.** Enter will not guess
+  between two.
+- **On a red button.** Delete and remove are never pressed by Enter.
+- **While a greyed-out button is waiting** for something to be filled in
+  or ticked first.
+- **In a box that already uses Enter for itself** — a search box, a
+  longer text, naming a tag — and on a button or link that has the
+  cursor, which Enter presses as it always has.
+
+To check by hand: on a laptop, a whole session from the keyboard; on a
+phone, that the keyboard's Go/Done in an answer box still does nothing.
 
 ## 0.653 — 20 November 2026
 
