@@ -315,7 +315,7 @@ import { buildContextIndex } from "./context-index.ts";
 import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
-import { isUnreachable } from "./reach.ts";
+import { holdReach, isUnreachable, releaseReach, showReach, updateReach } from "./reach.ts";
 import { knownMissing as knownMissingAt, MISSING_CLIPS, pictureData } from "./pictures.ts";
 import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
 import {
@@ -872,6 +872,10 @@ import {
   mergeData,
   syncAfterChange,
   SESSION_END_SYNC_MS,
+  cardsToSync,
+  clipsToSync,
+  latestStamp,
+  syncLine,
 } from "./sync.ts";
 
 /* ==================================================================
@@ -2024,7 +2028,7 @@ type SetStart =
 
 /*
  * How a session was started, kept on it so the screen at its end can start
- * another the same way: "Keep going" (0.653). The settings, not the
+ * another the same way: "Keep going" (0.656). The settings, not the
  * questions — what is dealt is dealt afresh, so it is what is due now. A
  * session built by hand keeps its cards, its kind, and its length or its
  * minutes.
@@ -7853,7 +7857,7 @@ export function buildWeakSession({ items, settings, inDeck, budget, systems, per
   perDay?: number;
 }) {
   /* `manual`: not a dealt session. "Keep going" at the end starts another
-     of these, not a dealt one — see Again (0.653). */
+     of these, not a dealt one — see Again (0.656). */
   return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "weak" }), manual: true, mode: "weak" };
 }
 
@@ -11836,6 +11840,10 @@ export default function ArabicTrainer() {
      they were asked on rather than cleared by resetExercise, so no way onto
      the next question can carry them over. */
   const [lentFor, setLentFor] = useState<{ ex: unknown; keys: string[] }>({ ex: null, keys: [] });
+  /* The matching grid's harakat, put back from the hint button and then put
+     away again (0.653), on this question. Putting them away does not undo
+     the near miss: they were on the screen. */
+  const [marksAwayFor, setMarksAwayFor] = useState<unknown>(null);
   /* The question whose English the learner opened on the answer, in a
      Little translation course (0.627): a right answer then counts as a
      near miss, as one written with the marks put back does. */
@@ -11891,17 +11899,24 @@ export default function ArabicTrainer() {
   const kb = useSoftKeyboard();
 
   /* ---- sync ---- */
-  const [syncCfg, setSyncCfg] = useState(() => ({ token: "", lastSync: 0 }));
+  const [syncCfg, setSyncCfg] = useState<{ token: string; lastSync: number; syncedThrough?: number; uploaded?: string[] }>(
+    () => ({ token: "", lastSync: 0 }),
+  );
   const [syncState, setSyncState] = useState("idle"); // idle|syncing|ok|error|off
   /* True only while a deliberate Sync now is fetching the spaces. The
      background check every forty-five seconds sets nothing here, so the dot
      stays still for it. */
   const [spacesBusy, setSpacesBusy] = useState(false);
-  /* Why the last sync failed, in words. It used to be recorded and read by
-     nobody: the dot in the corner went red and the line beside it said
-     "Offline — will retry" whatever had actually happened, including the
-     two failures that never clear by themselves. */
-  const [syncError, setSyncError] = useState("");
+  /*
+   * "Sync failed" with Retry, in the large bar at the foot of the app
+   * (0.655), held from the first failure until a sync works. It used to be
+   * a line in the You menu, which said that something was wrong and nothing
+   * about what to do; the menu now says when the last sync was and what is
+   * waiting. Held once: a background sync failing again into the same wall
+   * changes what the bar says but does not bring it back once closed —
+   * only Sync now or Retry, pressed by hand, does.
+   */
+  const syncFailHeld = useRef(0);
   /* The round trip waiting to go, if one is. Emptied when it fires, so
      "is one waiting?" can be asked of it. */
   const syncTimer: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = useRef(null);
@@ -11944,7 +11959,7 @@ export default function ArabicTrainer() {
 
   /* So that a sync can ask for another one when something was written
      while it was in flight, without naming itself as its own dependency. */
-  const runSyncRef = useRef<(token?: string) => void>(() => {});
+  const runSyncRef = useRef<(token?: string, byHand?: boolean) => unknown>(() => {});
   /* Arm the round trip for what is owed. `keep` leaves one already
      waiting where it is, which is what lets a session's answers ride along
      on the next sync rather than each pushing it back. A trip with nothing
@@ -11962,11 +11977,16 @@ export default function ArabicTrainer() {
   const runSync = useCallback(
     /* Defaulted rather than required: most callers have no token in hand
        and want whatever this device is already signed in with. */
-    async (token: string = "") => {
+    async (token: string = "", byHand: boolean = false) => {
       /* Trying a space (0.574): its practice stays on this device. */
       if (TRYING) return;
       const key = token || loadSyncConfig().token;
       if (!key || syncing.current) return;
+      /* For the bar, should this one fail: Sync now and Retry. */
+      const letGo = () => {
+        if (syncFailHeld.current) releaseReach(syncFailHeld.current);
+        syncFailHeld.current = 0;
+      };
       /*
        * Offline, the round trip can only fail, and failing at it says
        * nothing the connection has not already said. What is on this
@@ -11975,16 +11995,21 @@ export default function ArabicTrainer() {
        */
       if (isOffline()) {
         setSyncState("off");
+        /* Offline is not a failure: the menu says the work is safe and
+           the sync goes again when the connection comes back. */
+        letGo();
         return;
       }
       syncing.current = true;
       setSyncState("syncing");
-      setSyncError("");
       /* Everything up to here goes in this trip, which reads the document
          as it stands now. Anything written while it is in flight sets this
          again, and is owed a trip of its own — see the end. */
       owed.current = false;
       let sent = false;
+      /* What this trip carries is everything up to now, so a change from
+         here on is still to send — see syncedThrough below. */
+      const setOut = now();
       try {
         const { merged, changed, lost, serverNow } = await syncOnce(dataRef.current, key);
         sent = true;
@@ -12066,10 +12091,15 @@ export default function ArabicTrainer() {
           /* the document is synced; clips can catch up next time */
         }
 
-        const cfg = { ...prevCfg, token: key, lastSync: now(), uploaded };
+        /* How far this sync accounted for the cards, which is what the You
+           menu counts "to sync" from (0.655): the moment it set out, or the
+           newest change it brought down if another device's clock is ahead. */
+        const syncedThrough = Math.max(setOut, latestStamp(merged as Doc));
+        const cfg = { ...prevCfg, token: key, lastSync: now(), syncedThrough, uploaded };
         saveSyncConfig(cfg);
         setSyncCfg(cfg);
         setSyncState("ok");
+        letGo();
 
         /* And how close the document is to the size the server refuses.
            Past that, sync stops for good and everything after it stays on
@@ -12135,9 +12165,38 @@ export default function ArabicTrainer() {
             : isOffline()
             ? "Offline — your work is saved on this device"
             : "Sync failed";
-        setSyncError(said);
-        if (msg === "too-large" || msg === "would-empty") flash(said, "warn");
         setSyncState("error");
+        /*
+         * Said in the bar with Retry (0.655), not in the menu. Its
+         * headline is "Sync failed" and the line under it why, where the
+         * app knows. Not when the connection went: the menu says that, and
+         * the sync goes again on its own when it comes back.
+         */
+        if (isOffline()) letGo();
+        else {
+          const detail =
+            said === "Sync failed"
+              ? /* The sync's own requests say a gateway's answer as
+                   pull-failed-502 and a request that never went as a
+                   TypeError, not reach.ts's words for them. */
+                isUnreachable(err) || err instanceof TypeError || /-50[234]$/.test(msg)
+                ? "Couldn't reach the server. Your work is saved on this device."
+                : "Your work is saved on this device."
+              : said;
+          if (syncFailHeld.current) {
+            updateReach(syncFailHeld.current, { detail });
+            if (byHand) showReach();
+          } else {
+            syncFailHeld.current = holdReach({
+              title: "Sync failed",
+              detail,
+              /* The connection coming back already syncs; Retry is the
+                 only other thing that should. */
+              auto: false,
+              retry: () => runSyncRef.current("", true),
+            });
+          }
+        }
         /* Nothing went up, so everything this trip carried is still owed. */
         if (!sent) owed.current = true;
       } finally {
@@ -13571,7 +13630,7 @@ export default function ArabicTrainer() {
     setSpacesBusy(true);
     try {
       /* Only whether each one settled matters here, not what it returned. */
-      const jobs: Promise<unknown>[] = [runSync()];
+      const jobs: Promise<unknown>[] = [runSync("", true)];
       if (account) jobs.push(refreshCourses("changes"));
       if (account && (teaches || account.admin))
         jobs.push(
@@ -14400,6 +14459,7 @@ export default function ArabicTrainer() {
    */
   const lentKeys = lentFor.ex === exercise ? lentFor.keys : NO_KEYS;
   const marksLent = lentKeys.length > 0;
+  const marksAway = !!exercise && marksAwayFor === exercise;
   /* Right, but with something on the screen that did part of it: the
      transliteration that spelt the word, or the marks put back on a word
      that was being read bare. Either is marked as a near miss. */
@@ -14437,7 +14497,7 @@ export default function ArabicTrainer() {
         ? {
             lang: qLang,
             words: wordsBare,
-            lent: new Set(lentKeys),
+            lent: new Set(marksAway ? lentKeys.filter((k) => k !== CHOICES_LENT) : lentKeys),
             lend: checked
               ? null
               : (key: string) =>
@@ -14447,7 +14507,7 @@ export default function ArabicTrainer() {
                   }),
           }
         : NO_MARKS,
-    [qLang, marksTell, wordsBare, lentKeys, checked, exercise],
+    [qLang, marksTell, wordsBare, lentKeys, marksAway, checked, exercise],
   );
   /* Whether the answer is chosen from options in the script that are bare
      now — which is when "Show the harakat" is offered. A grid of
@@ -14493,8 +14553,16 @@ export default function ArabicTrainer() {
     saveMarksTip(n);
     setMarksTipShown(n);
   }, [promptBareNow, sessionToken, marksTipShown]);
-  const choicesBare =
-    !!qLang.marks && !marksTell && !checked && choicesInScript && (choicesRun === "sentence" || wordsBare) && !lentKeys.includes(CHOICES_LENT);
+  const choicesCanBeBare =
+    !!qLang.marks && !marksTell && !checked && choicesInScript && (choicesRun === "sentence" || wordsBare);
+  const choicesBare = choicesCanBeBare && !lentKeys.includes(CHOICES_LENT);
+  /* On a matching grid the harakat come back from the hint button in the
+     bar at the foot rather than a button above the tiles (0.653): the grid
+     has no other hint, and it is the same kind of thing — a nudge that
+     makes the question easier and is counted for it. Like the hint, it
+     stays pressed and can put them away again. */
+  const gridMarksHint = choicesCanBeBare && !!spec && spec.picks === "pair" && !hintAt;
+  const gridMarksShown = gridMarksHint && lentKeys.includes(CHOICES_LENT) && !marksAway;
 
   /*
    * Whether the prompt has to say which form it wants.
@@ -15688,31 +15756,23 @@ export default function ArabicTrainer() {
   const kbOpen = kb.open && (inExercise || sharing);
 
   /*
-   * What the corner menu says about sync.
-   *
-   * One line, and it used to say one of three things — syncing, "Offline —
-   * will retry", or up to date — with the middle one standing for every
-   * way a sync can fail. Two of those never clear by themselves, so a
-   * learner whose passphrase had been refused or whose collection had
-   * outgrown the limit was told, once a minute for ever, that they were
-   * offline and it would sort itself out.
-   *
-   * Offline comes first because it explains every other failure under it,
-   * and it says where the work is rather than only what is missing: the
-   * answer to "am I losing anything?" is no, and that is the question
-   * behind the look at the dot.
+   * What the corner menu says about sync (0.655): see syncLine. Worked out
+   * only while the menu is open, because counting the cards walks every one
+   * of them, and the menu is closed nearly all the time.
    */
-  const syncNote = TRYING
-    ? "Practice here stays on this device"
-    : offline
-    ? `Offline — your work is saved on this device${
-        toSend ? ` · ${plural(toSend, "report")} to send` : ""
-      }`
-    : syncState === "syncing" || spacesBusy || (syncState === "idle" && courseBusy)
-    ? "Syncing now"
-    : syncState === "error"
-    ? syncError || "Sync failed"
-    : "Up to date";
+  const syncNote = () => {
+    const last = syncCfg.lastSync || 0;
+    return syncLine({
+      trying: !!TRYING,
+      offline,
+      busy: syncState === "syncing" || spacesBusy || (syncState === "idle" && courseBusy),
+      failed: syncState === "error",
+      lastSync: last,
+      reports: toSend,
+      cards: cardsToSync(data, syncCfg.syncedThrough || last),
+      clips: clipsToSync(data, audible, syncCfg.uploaded || []),
+    });
+  };
 
 
   /*
@@ -16609,7 +16669,7 @@ export default function ArabicTrainer() {
                   {/* The options can't be tapped a word at a time — a tap
                       on one chooses it — so their marks come back all at
                       once, and the question counts as a near miss. */}
-                  {choicesBare && qLang.marks && marksView.lend && (
+                  {choicesBare && !gridMarksHint && qLang.marks && marksView.lend && (
                     <div className="at-row at-reveals">
                       <Button
                         size="sm"
@@ -16654,6 +16714,9 @@ export default function ArabicTrainer() {
                           <Button
                             key={answer}
                             variant={typed === answer ? "primary" : undefined}
+                            /* A choice that shows it is chosen, so Enter
+                               leaves it be and presses Check (0.654). */
+                            aria-pressed={typed === answer}
                             disabled={!!checked}
                             onClick={() => setTyped(answer)}
                           >
@@ -16780,15 +16843,17 @@ export default function ArabicTrainer() {
                           readOnly={!!checked || ownFigures}
                           placeholder={figures ? "Type the number" : ownFigures ? ownPrompt : spec.placeholder}
                           onChange={(e) => setTyped(e.target.value)}
-                          /* Only the Check button checks. Enter — and a
-                             phone keyboard's Go, which is the same key —
-                             used to, and a learner reaching for a letter
-                             on the keyboard's bottom row sent a half-typed
-                             answer to be marked. The key now does nothing,
-                             and says so: "done" rather than "go". */
+                          /* On a phone, only the Check button checks. Enter
+                             — and a phone keyboard's Go, which is the same
+                             key — used to, and a learner reaching for a
+                             letter on the keyboard's bottom row sent a
+                             half-typed answer to be marked. There the key
+                             does nothing, and says so: "done" rather than
+                             "go". On a computer Enter presses Check, as it
+                             presses every screen's main button (0.654,
+                             enter-key.ts), which tells the two apart. */
                           enterKeyHint="done"
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") e.preventDefault();
                             /* The read-only box takes nothing typed, so a
                                keyboard that does have ٤ on it — or a colon,
                                or backspace — goes through the pad's own
@@ -17292,6 +17357,24 @@ export default function ArabicTrainer() {
                             }}
                           />
                         )}
+                        {gridMarksHint && qLang.marks && (
+                          <IconButton
+                            icon="help"
+                            ghost
+                            label={`${gridMarksShown ? "Hide" : "Show"} the ${qLang.marks.name}`}
+                            className={`at-hintbtn${gridMarksShown ? " on" : ""}`}
+                            data-el="hint-button"
+                            aria-pressed={gridMarksShown}
+                            onClick={() => {
+                              if (gridMarksShown) {
+                                setMarksAwayFor(exercise);
+                                return;
+                              }
+                              setMarksAwayFor(null);
+                              if (marksView.lend) marksView.lend(CHOICES_LENT);
+                            }}
+                          />
+                        )}
                         {!spec.intro && !(spec.verbDrill && (spec.answerMode === "self" || spec.answerMode === "vread")) && (
                           <Button variant="ghost" data-el="dont-know-button" onClick={giveUp}>
                             I don't know
@@ -17353,7 +17436,7 @@ export default function ArabicTrainer() {
                 </Help>
                 <WhatMoved moved={moved} items={items} settings={settings} />
                 {/* Another session started exactly as this one was, on top
-                    and full width, with the way out under it (0.653). */}
+                    and full width, with the way out under it (0.656). */}
                 <div className="at-stack">
                   {canKeepGoing && (
                     <Button variant="primary" data-el="keep-going-button" onClick={() => startAgain(session.again)}>
@@ -21366,9 +21449,10 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, onCourses, onSett
       for somebody with no line at the top of the page to say it. */
   spaceShown?: { name: string; logoData?: string; logo?: string } | null;
   syncState?: string;
-  /** What to say about it. Worked out by the app, which is the only thing
-      that knows whether this was the connection or the passphrase. */
-  syncNote?: string;
+  /** What to say about it: where sync has got to, and under that when the
+      last one was and what is waiting (0.655). Asked only while the menu
+      is open, because working it out walks every card. */
+  syncNote?: () => { main: string; sub: string };
   onSyncNow: () => void;
   /** The courses you are in, and joining another: Learning's Courses
       page, which has no section of its own in the bar. */
@@ -21473,7 +21557,15 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, onCourses, onSett
             <span className="at-cico">
               <span className={`at-cdot ${syncState}`} />
             </span>
-            <span className="at-clinetext">{syncNote || "Up to date"}</span>
+            {(() => {
+              const note = syncNote ? syncNote() : { main: "Up to date", sub: "" };
+              return (
+                <span className="at-clinetext at-csync">
+                  <b>{note.main}</b>
+                  {note.sub ? <i>{note.sub}</i> : null}
+                </span>
+              );
+            })()}
             <button className="at-cact" onClick={onSyncNow}>
               Sync now
             </button>
