@@ -315,9 +315,10 @@ import { buildContextIndex } from "./context-index.ts";
 import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
 import { isOffline } from "./net.ts";
-import { isUnreachable } from "./reach.ts";
-import { knownMissing as knownMissingAt, MISSING_CLIPS, pictureData } from "./pictures.ts";
-import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { holdReach, isUnreachable, releaseReach, showReach, updateReach } from "./reach.ts";
+import { knownMissing as knownMissingAt, MISSING_CLIPS, MISSING_FOR_MS, pictureData } from "./pictures.ts";
+import { CARD_OUTBOX, drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { heldCounts, watchHeld } from "./held-media.ts";
 import {
   ORDER_SEP,
   SELF_ALL,
@@ -373,7 +374,7 @@ import type { Review } from "./review.ts";
 import { liftSubtypeTagsIn } from "./subtype-tags.ts";
 import { tickCapitals } from "./capitals.ts";
 import { spellRuns, typoed } from "./spelling.ts";
-import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, meaningWithoutWho, whoAllRight, whoChoices, whoIsRight, WHO_JOIN } from "./verb-drills.ts";
+import { drillFits, drillTable, isRowDrill, placeOf as placeInTense, rowMarks, shiftCue, tenseOf, meaningWithoutWho, meaningWithWho, whoAllRight, whoChoices, whoIsRight, WHO_JOIN } from "./verb-drills.ts";
 import type { Tense } from "./verb-drills.ts";
 import { cappedAt, skillSeed } from "./skills.ts";
 import type { SkillCaps } from "./skills.ts";
@@ -860,7 +861,6 @@ import type { Filler, Mark } from "./grade.ts";
 import { applyUpdate, beforeReload, onUpdateReady, updateReady } from "./updates.ts";
 import {
   syncClips,
-  clipIdsIn,
   loadSyncConfig,
   saveSyncConfig,
   tokenFor,
@@ -872,6 +872,9 @@ import {
   mergeData,
   syncAfterChange,
   SESSION_END_SYNC_MS,
+  cardsToSync,
+  latestStamp,
+  syncLine,
 } from "./sync.ts";
 
 /* ==================================================================
@@ -2021,6 +2024,17 @@ type SetStart =
   | { kind: "begin"; practice?: boolean; only?: (it: Item) => boolean; pathUnit?: string }
   | { kind: "weak" }
   | { kind: "saved"; saved: SavedSession };
+
+/*
+ * How a session was started, kept on it so the screen at its end can start
+ * another the same way: "Keep going" (0.656). The settings, not the
+ * questions — what is dealt is dealt afresh, so it is what is due now. A
+ * session built by hand keeps its cards, its kind, and its length or its
+ * minutes.
+ */
+export type Again =
+  | SetStart
+  | { kind: "manual"; ids: string[]; mode: string; count?: number; minutes?: number };
 
 export type SetPicture = { id: string; name: string; images: string[]; answer: SetAnswer | null };
 export type SetWord = { id: string; ar: string; lat: string; en: string };
@@ -3531,7 +3545,9 @@ function countPictured(items: Item[], settings: Settings): Map<LangId, number> {
     if (isDialog(card) || card.drill === false) continue;
     const id = langIdOf(card, settings);
     for (const { unit } of unitsOf(card)) {
-      if (unit.ar && !hasSlots(unit) && Array.isArray(unit.images) && unit.images.length) {
+      /* Only those whose picture is here: a tile that cannot be drawn is
+         no company (see canSeeHere). */
+      if (unit.ar && !hasSlots(unit) && Array.isArray(unit.images) && unit.images.length && canSeeHere(unit)) {
         counts.set(id, (counts.get(id) || 0) + 1);
       }
     }
@@ -3571,7 +3587,8 @@ function countHeard(items: Item[], settings: Settings): Map<LangId, number> {
     if (isDialog(card) || card.drill === false) continue;
     const id = langIdOf(card, settings);
     for (const { unit } of unitsOf(card)) {
-      if (unit.ar && !hasSlots(unit) && (unit.recs || []).length) {
+      /* Only those whose recording is here, as countPictured (0.660). */
+      if (unit.ar && !hasSlots(unit) && (unit.recs || []).length && canHearHere(unit)) {
         counts.set(id, (counts.get(id) || 0) + 1);
         if (isFigureForm(unit)) {
           const key = FIGURES_KEY(id) as LangId;
@@ -4018,7 +4035,7 @@ function castFill(
   if (!r) return r;
   const images = Array.isArray(r.unit.images) ? r.unit.images : [];
   if (images.length < 2) return r;
-  const unit = { ...r.unit, imageAt: turnOf(statesOf(r.unit)[type]) % images.length };
+  const unit = { ...r.unit, imageAt: pictureTurn(images, turnOf(statesOf(r.unit)[type])) };
   return { ...r, unit, parent: r.isSub ? r.parent : withLead(r.parent, unit) };
 }
 
@@ -4586,12 +4603,54 @@ export function setVisibleImages(ids: Set<string> | null) {
   visibleImages = ids;
 }
 
-/** Whether this form's picture can be shown without a connection. */
+/*
+ * Whether this browser can keep pictures and recordings at all (it has
+ * IndexedDB). Where it cannot, there is nowhere for the sync to put them,
+ * so online each is fetched when its question comes up, as before 0.658.
+ * One flag for both, because they are kept in the same database and the
+ * two never behave differently (0.660).
+ */
+let mediaKept = true;
+export function setMediaKept(kept: boolean) {
+  mediaKept = !!kept;
+}
+
+/*
+ * Whether this one picture can be shown now, without waiting on the
+ * network (0.658).
+ *
+ * It used to be asked only offline: online, a picture question was dealt
+ * whether or not its picture had come down, and a picture that was slow
+ * or missing on the server left the learner looking at an empty frame for
+ * twenty seconds and then "The picture isn't on this device yet." Now a
+ * picture question is asked only once its picture is here; the sync
+ * brings every card's pictures down alongside everything else (see the
+ * effect beside allImageIds), so in practice this holds back only the
+ * minutes between a picture being added and its arriving.
+ */
+function pictureHere(hash: string) {
+  if (!visibleImages) return true;
+  if (visibleImages.has(hash) || IMAGES_READY.has(hash)) return true;
+  return !offlineNow && !mediaKept;
+}
+
+/** Whether this form has a picture that can be shown now. */
 function canSeeHere(unit?: Form) {
-  if (!offlineNow || !visibleImages || !unit) return true;
+  if (!unit) return true;
   const images = Array.isArray(unit.images) ? unit.images : [];
   if (!images.length) return true;
-  return images.some((h) => visibleImages !== null && visibleImages.has(h));
+  return images.some(pictureHere);
+}
+
+/* Which of a form's pictures to show on a given turn: they take turns
+   (0.631), but only among those that are here, so a card whose second
+   picture has not arrived yet shows its first again rather than a gap.
+   An index into `images`. */
+function pictureTurn(images: string[], turn: number) {
+  const here: number[] = [];
+  images.forEach((h, i) => { if (pictureHere(h)) here.push(i); });
+  if (!here.length) return images.length ? turn % images.length : 0;
+  return here[turn % here.length];
 }
 
 /*
@@ -4622,15 +4681,39 @@ export function setAudibleClips(ids: Set<string> | null) {
   audibleClips = ids;
 }
 
-/** Whether this form has a recording that can be played without a connection. */
+/*
+ * Whether this one recording can be played now, without waiting on the
+ * network — the same rule as pictureHere, online as well as offline
+ * (0.660). A listening question used to be dealt online whether or not
+ * its recording had come down, and a slow one left the learner pressing
+ * Play on silence. Every card's recordings now come down in the
+ * background with the sync, the same as its pictures (see the effect
+ * beside allClipIds).
+ */
+function clipHere(id: string) {
+  if (!audibleClips) return true;
+  if (audibleClips.has(id) || CLIPS_READY.has(id)) return true;
+  return !offlineNow && !mediaKept;
+}
+
+/** Whether this form has a recording that can be played now. A form with
+    no recordings is not this rule's business: nothing offers it a
+    listening exercise in the first place. */
 function canHearHere(unit?: Form) {
-  /* Online, anything the server holds is a fetch away, and a form with no
-     recordings at all is not this rule's business — nothing offers it a
-     listening exercise in the first place. */
-  if (!offlineNow || !audibleClips || !unit) return true;
+  if (!unit) return true;
   const recs = unit.recs || [];
   if (!recs.length) return true;
-  return recs.some((r) => audibleClips !== null && audibleClips.has(r.id));
+  return recs.some((r) => clipHere(r.id));
+}
+
+/* The recordings to play from a form's list: only those that are here,
+   where any are, so a card whose slow take has not arrived plays the
+   ordinary one rather than silence — as pictures take turns only among
+   those that have arrived (0.660). */
+function recsHere<T extends { id: string }>(recs: T[] | undefined): T[] {
+  const list = recs || [];
+  const here = list.filter((r) => clipHere(r.id));
+  return here.length ? here : list;
 }
 
 /* How long "can't listen right now" lasts. Long enough to cover the walk, the
@@ -7841,8 +7924,8 @@ export function buildWeakSession({ items, settings, inDeck, budget, systems, per
   systems?: SystemSet[];
   perDay?: number;
 }) {
-  /* Not a dealt session: the screen at the end reads `manual` to know that
-     "Keep going" would be a change of subject rather than more of the same. */
+  /* `manual`: not a dealt session. "Keep going" at the end starts another
+     of these, not a dealt one — see Again (0.656). */
   return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "weak" }), manual: true, mode: "weak" };
 }
 
@@ -8814,20 +8897,19 @@ function clipsChanged() {
   }, 300);
 }
 
+/*
+ * Kept in IndexedDB or not at all, the same as a picture (0.659).
+ *
+ * A browser without it used to put recordings in the small text store the
+ * practice itself is saved in, where enough of them could leave no room
+ * for the progress. Now such a browser fetches each one while online, and
+ * offline the questions that need one are not asked — as for pictures.
+ */
 async function saveClipBlob(id: string, blob: Blob) {
   const ok = await idbRun("readwrite", (st) => st.put(blob, id));
-  if (ok !== undefined) {
-    clipsChanged();
-    return true;
-  }
-  // No IndexedDB: fall back to the text store.
-  try {
-    const kept = !!(await window.storage.set(AUDIO_KEY(id), await blobToBase64(blob)));
-    if (kept) clipsChanged();
-    return kept;
-  } catch (e) {
-    return false;
-  }
+  if (ok === undefined) return false;
+  clipsChanged();
+  return true;
 }
 
 /* Clips the server has already said it doesn't hold: one list, shared with
@@ -8894,26 +8976,13 @@ function setServerLacks(ids: string[], kind: MediaKind = "clip") {
 /* What this device holds, and nothing else: no network, no side effects. */
 async function localClipBlob(id: string): Promise<Blob | null> {
   const found = await idbRun("readonly", (st) => st.get(id));
-  if (found) return found;
-  try {
-    const r = await window.storage.get(AUDIO_KEY(id));
-    if (r && r.value) return base64ToBlob(r.value);
-  } catch (e) {
-    /* not here */
-  }
-  return null;
+  return found || null;
 }
 
 /* Is it here? Answered from the key alone, without reading the bytes. */
 async function hasClipLocal(id: string) {
   const key = await idbRun("readonly", (st) => st.getKey(id));
-  if (key !== undefined && key !== null) return true;
-  try {
-    const r = await window.storage.get(AUDIO_KEY(id));
-    return !!(r && r.value);
-  } catch (e) {
-    return false;
-  }
+  return key !== undefined && key !== null;
 }
 
 /*
@@ -8923,30 +8992,27 @@ async function hasClipLocal(id: string) {
  * on it while the app is offline, so it has to be cheap enough to ask
  * again whenever the answer could have moved — at launch, when the
  * connection goes, and after anything has been downloaded. One key listing
- * does the whole store; the text store behind it is listed too, because a
- * browser without IndexedDB keeps its recordings there and a learner on
- * one is exactly who should not be asked a question they cannot hear.
+ * does the whole store.
  */
 async function localClipIds(): Promise<Set<string>> {
   const ids: Set<string> = new Set();
   const keys = (await idbRun("readonly", (st) => st.getAllKeys())) || [];
   for (const k of keys) if (typeof k === "string") ids.add(k);
-  try {
-    const listed = await window.storage.list("audio-");
-    for (const k of (listed && listed.keys) || []) ids.add(String(k).slice("audio-".length));
-  } catch (e) {
-    /* No text store, or nothing in it. */
-  }
   return ids;
 }
 
-/* The recording as a data URL, for sending to the sync store. */
-async function clipDataUrl(id: string) {
-  const blob = await localClipBlob(id);
-  return blob ? blobToBase64(blob) : null;
-}
+/* The recordings found or fetched this session, kept or not: one in
+   memory can be played as surely as one in the database (see clipHere),
+   the same as IMAGES_READY. */
+const CLIPS_READY: Set<string> = new Set();
 
 async function clipBlob(id: string) {
+  const blob = await clipBlobFrom(id);
+  if (blob) CLIPS_READY.add(id);
+  return blob;
+}
+
+async function clipBlobFrom(id: string) {
   const here = await localClipBlob(id);
   if (here) return here;
 
@@ -9125,6 +9191,9 @@ async function warmClips(
    remembered in memory either way, so one question does not ask twice. */
 
 const IMAGES_HELD: Map<string, Promise<Blob | null>> = new Map();
+/* The pictures fetched this session, kept or not: a picture in memory can
+   be shown as surely as one in the database (see pictureHere). */
+const IMAGES_READY: Set<string> = new Set();
 
 async function localImageIds(): Promise<Set<string>> {
   const ids: Set<string> = new Set();
@@ -9138,14 +9207,19 @@ function imageBlob(hash: string): Promise<Blob | null> {
   if (held) return held;
   const got = (async () => {
     const here = await idbRun("readonly", (st) => st.get(hash), IMAGE_STORE);
-    if (here) return here as Blob;
+    if (here) {
+      IMAGES_READY.add(hash);
+      return here as Blob;
+    }
     try {
       /* Through the one picture fetch, so a picture the editor or the menu
          already asked for this session is not asked for again. */
       const data = await pictureData(hash);
       if (data) {
         const blob = base64ToBlob(data);
-        if ((await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE)) !== undefined) clipsChanged();
+        await idbRun("readwrite", (st) => st.put(blob, hash), IMAGE_STORE);
+        IMAGES_READY.add(hash);
+        clipsChanged();
         return blob;
       }
     } catch (e) {
@@ -9229,10 +9303,22 @@ async function saveClipBase64(id: string, dataUrl: string) {
   return saveClipBlob(id, base64ToBlob(dataUrl));
 }
 
-/* One-off move of anything left in the old text store. */
+/* One-off move of anything left in the old text store. Where there is no
+   IndexedDB to move it to, it is let go instead (0.659): nothing reads it
+   any more, and it takes room the practice is saved in. Each one is on
+   the server and comes back while online. */
 async function migrateClips(ids: string[]) {
   const db = await openClipDb();
-  if (!db) return 0;
+  if (!db) {
+    for (const id of ids) {
+      try {
+        await window.storage.delete(AUDIO_KEY(id));
+      } catch (e) {
+        /* nothing stored under that key */
+      }
+    }
+    return 0;
+  }
   let moved = 0;
   for (const id of ids) {
     const already = await idbRun("readonly", (st) => st.get(id));
@@ -9792,7 +9878,7 @@ function chainOf(unit: Form): string[] {
 /* The player itself is shared — see AudioPrompt in shared.tsx — and reads
    this device's copies of the recordings. */
 function AudioPrompt(props: Omit<React.ComponentProps<typeof SharedAudioPrompt>, "load">) {
-  return <SharedAudioPrompt load={clipUrl} {...props} />;
+  return <SharedAudioPrompt load={clipUrl} {...props} recs={props.recs ? recsHere(props.recs) : props.recs} />;
 }
 
 function Field({ value, field, kind, lang, name }: {
@@ -10242,7 +10328,7 @@ function MatchGrid({
   };
   useEffect(() => hush, []);
   const sound = async (w: Form) => {
-    const recs = w.recs || [];
+    const recs = recsHere(w.recs);
     /* The ordinary take: a grid is the word at speed, among others. */
     const rec = recs.find((r) => r.speed !== "slow") || recs[0];
     hush();
@@ -10530,9 +10616,17 @@ const NO_KEYS: string[] = [];
  * read it right — which is the mark, form by form. A form without a
  * transliteration is shown as it is, with nothing to uncover.
  */
-function VerbTable({ tense, lang, reading, checked }: {
+/* Since 0.652 each row is two sides: on the left the whole form in English,
+   who it is about included ("she ate"), and on the right the whole form in
+   the language, its pronoun included (هي أكلت), with how that is said under
+   it. The pronoun is the one the Pronouns screen wrote for that person; a
+   person with no pronoun card shows the verb alone. What is hidden in "Read
+   the forms" is how the whole right side is said, pronoun and all. */
+function VerbTable({ tense, lang, reading, checked, pronouns }: {
   tense: Tense;
   lang: Lang;
+  /** This language's pronoun for each person, by the person's id. */
+  pronouns?: Record<string, { ar: string; lat: string }>;
   reading?: {
     /** The forms marked by this question: the rest are shown and not asked. */
     asked: Set<string>;
@@ -10545,35 +10639,49 @@ function VerbTable({ tense, lang, reading, checked }: {
 }) {
   const script = { fontFamily: lang.fontStack, direction: lang.direction } as React.CSSProperties;
   const said = String(lang.translitLabel || "pronunciation").toLowerCase();
+  const persons = tense.places.map((p) => p.person);
   return (
     <ol className="at-vtense" data-el="verb-tense" aria-label={tense.tense.label || "The tense"}>
       {tense.places.map(({ person, form }) => {
         const asked = !!reading && reading.asked.has(form.id) && !!String(form.lat || "").trim();
         const shown = !reading || !asked || checked || reading.revealed.has(form.id);
         const mark = reading ? reading.marks[form.id] : undefined;
+        const pronoun = (pronouns && pronouns[person.id]) || null;
+        const formLat = String(form.lat || "").trim();
+        /* How the whole right side is said: the pronoun's reading with the
+           verb's, where both are written; the verb's alone otherwise. */
+        const lat = formLat ? [pronoun ? pronoun.lat : "", formLat].filter(Boolean).join(" ") : "";
         return (
-          <li key={form.id} className="at-vrow">
-            <span className="at-vperson">{person.label}</span>
-            <span className="at-vform" lang={lang.id} dir={lang.direction} style={script}>
-              <Marked text={String(form.ar || "")} lang={lang} />
+          <li key={form.id} className="at-vrow at-vpair">
+            <span className="at-vperson" data-el="verb-row-english">
+              {asMeaning(meaningWithWho(form.en, person, persons))}
             </span>
-            <span className="at-vsaid">
-              {form.lat ? (
-                shown ? (
-                  <span className="at-vlat">{String(form.lat)}</span>
-                ) : (
-                  <button
-                    type="button"
-                    className="at-vhidden"
-                    data-el="verb-reveal"
-                    aria-label={`Show the ${said}`}
-                    onClick={() => reading && reading.onReveal(form.id)}
-                  >
-                    <span aria-hidden="true">{String(form.lat)}</span>
-                  </button>
-                )
+            <span className="at-vtarget">
+              <span className="at-vform" lang={lang.id} dir={lang.direction} style={script} data-el="verb-row-form">
+                {pronoun ? (
+                  <>
+                    <Marked text={pronoun.ar} lang={lang} />{" "}
+                  </>
+                ) : null}
+                <Marked text={String(form.ar || "")} lang={lang} />
+              </span>
+              {lat ? (
+                <span className="at-vsaid">
+                  {shown ? (
+                    <span className="at-vlat">{lat}</span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="at-vhidden"
+                      data-el="verb-reveal"
+                      aria-label={`Show the ${said}`}
+                      onClick={() => reading && reading.onReveal(form.id)}
+                    >
+                      <span aria-hidden="true">{lat}</span>
+                    </button>
+                  )}
+                </span>
               ) : null}
-              {form.en ? <span className="at-ven">{asMeaning(String(form.en))}</span> : null}
             </span>
             {asked && reading && (reading.revealed.has(form.id) || checked) && (
               <span className="at-vreadmark" data-el="verb-read-mark">
@@ -10707,7 +10815,7 @@ function PictureChoices({ options, value, onChange, disabled, turn = 0 }: {
       {options.map((option, i) => {
         const hash = String((option && Array.isArray(option.images) && option.images[0]) || "");
         const count = option && Array.isArray(option.images) ? option.images.length : 0;
-        const shown = count > 1 ? String(option.images[(turn + i) % count] || hash) : hash;
+        const shown = count > 1 ? String(option.images[pictureTurn(option.images, turn + i)] || hash) : hash;
         return (
           <button
             type="button"
@@ -11575,6 +11683,21 @@ export default function ArabicTrainer() {
   /* How many reported problems are waiting for one, so the corner menu can
      say so rather than leaving someone to wonder whether it went. */
   const [toSend, setToSend] = useState(0);
+  /* And the pictures and recordings added offline in the card editor,
+     waiting to go up before their cards (0.659). */
+  const [heldMedia, setHeldMedia] = useState({ clips: 0, images: 0 });
+  useEffect(() => {
+    let live = true;
+    const look = () => {
+      heldCounts().then((n) => live && setHeldMedia(n)).catch(() => {});
+    };
+    look();
+    const stop = watchHeld(look);
+    return () => {
+      live = false;
+      stop();
+    };
+  }, []);
   /* Whether to offer installing the app, which on iOS is what keeps its
      data from being cleared after a week away. */
   const install = useInstallOffer();
@@ -11613,8 +11736,11 @@ export default function ArabicTrainer() {
       });
     /* The pictures too: whatever brought recordings down may have brought
        pictures with it, and the question is the same one. */
-    localImageIds()
-      .then((ids) => setVisible(ids))
+    Promise.all([localImageIds(), openClipDb()])
+      .then(([ids, db]) => {
+        setMediaKept(!!db);
+        setVisible(ids);
+      })
       .catch(() => {});
   }, []);
   /* And whenever a recording is saved or removed, wherever that happened —
@@ -11803,6 +11929,10 @@ export default function ArabicTrainer() {
      they were asked on rather than cleared by resetExercise, so no way onto
      the next question can carry them over. */
   const [lentFor, setLentFor] = useState<{ ex: unknown; keys: string[] }>({ ex: null, keys: [] });
+  /* The options' harakat, put back from the hint button and then put
+     away again (0.653), on this question. Putting them away does not undo
+     the near miss: they were on the screen. */
+  const [marksAwayFor, setMarksAwayFor] = useState<unknown>(null);
   /* The question whose English the learner opened on the answer, in a
      Little translation course (0.627): a right answer then counts as a
      near miss, as one written with the marks put back does. */
@@ -11858,17 +11988,24 @@ export default function ArabicTrainer() {
   const kb = useSoftKeyboard();
 
   /* ---- sync ---- */
-  const [syncCfg, setSyncCfg] = useState(() => ({ token: "", lastSync: 0 }));
+  const [syncCfg, setSyncCfg] = useState<{ token: string; lastSync: number; syncedThrough?: number }>(
+    () => ({ token: "", lastSync: 0 }),
+  );
   const [syncState, setSyncState] = useState("idle"); // idle|syncing|ok|error|off
   /* True only while a deliberate Sync now is fetching the spaces. The
      background check every forty-five seconds sets nothing here, so the dot
      stays still for it. */
   const [spacesBusy, setSpacesBusy] = useState(false);
-  /* Why the last sync failed, in words. It used to be recorded and read by
-     nobody: the dot in the corner went red and the line beside it said
-     "Offline — will retry" whatever had actually happened, including the
-     two failures that never clear by themselves. */
-  const [syncError, setSyncError] = useState("");
+  /*
+   * "Sync failed" with Retry, in the large bar at the foot of the app
+   * (0.655), held from the first failure until a sync works. It used to be
+   * a line in the You menu, which said that something was wrong and nothing
+   * about what to do; the menu now says when the last sync was and what is
+   * waiting. Held once: a background sync failing again into the same wall
+   * changes what the bar says but does not bring it back once closed —
+   * only Sync now or Retry, pressed by hand, does.
+   */
+  const syncFailHeld = useRef(0);
   /* The round trip waiting to go, if one is. Emptied when it fires, so
      "is one waiting?" can be asked of it. */
   const syncTimer: React.MutableRefObject<ReturnType<typeof setTimeout> | null> = useRef(null);
@@ -11911,7 +12048,7 @@ export default function ArabicTrainer() {
 
   /* So that a sync can ask for another one when something was written
      while it was in flight, without naming itself as its own dependency. */
-  const runSyncRef = useRef<(token?: string) => void>(() => {});
+  const runSyncRef = useRef<(token?: string, byHand?: boolean) => unknown>(() => {});
   /* Arm the round trip for what is owed. `keep` leaves one already
      waiting where it is, which is what lets a session's answers ride along
      on the next sync rather than each pushing it back. A trip with nothing
@@ -11929,11 +12066,16 @@ export default function ArabicTrainer() {
   const runSync = useCallback(
     /* Defaulted rather than required: most callers have no token in hand
        and want whatever this device is already signed in with. */
-    async (token: string = "") => {
+    async (token: string = "", byHand: boolean = false) => {
       /* Trying a space (0.574): its practice stays on this device. */
       if (TRYING) return;
       const key = token || loadSyncConfig().token;
       if (!key || syncing.current) return;
+      /* For the bar, should this one fail: Sync now and Retry. */
+      const letGo = () => {
+        if (syncFailHeld.current) releaseReach(syncFailHeld.current);
+        syncFailHeld.current = 0;
+      };
       /*
        * Offline, the round trip can only fail, and failing at it says
        * nothing the connection has not already said. What is on this
@@ -11942,16 +12084,21 @@ export default function ArabicTrainer() {
        */
       if (isOffline()) {
         setSyncState("off");
+        /* Offline is not a failure: the menu says the work is safe and
+           the sync goes again when the connection comes back. */
+        letGo();
         return;
       }
       syncing.current = true;
       setSyncState("syncing");
-      setSyncError("");
       /* Everything up to here goes in this trip, which reads the document
          as it stands now. Anything written while it is in flight sets this
          again, and is owed a trip of its own — see the end. */
       owed.current = false;
       let sent = false;
+      /* What this trip carries is everything up to now, so a change from
+         here on is still to send — see syncedThrough below. */
+      const setOut = now();
       try {
         const { merged, changed, lost, serverNow } = await syncOnce(dataRef.current, key);
         sent = true;
@@ -11993,36 +12140,19 @@ export default function ArabicTrainer() {
           await writeNow();
         }
 
-        // Clips travel separately, one key each, only when missing.
+        /* Recordings from the learner's own store, one key each and only
+           when missing. Nothing is sent there any more (0.659): see
+           syncClips. */
         const prevCfg = loadSyncConfig();
-        let uploaded = prevCfg.uploaded || [];
         try {
-          /* Existence is a key lookup and the upload is a data URL: neither
-             touches the network nor makes an object URL. The old version did
-             both, which fetched every course recording on the first sync and
-             sent "blob:" strings to the server as recordings. */
           const res = await syncClips(key, merged, {
             hasLocal: hasClipLocal,
-            readLocal: clipDataUrl,
             /* The result is dropped on purpose: a clip that will not save
                locally is a slower next launch, not a failed sync. */
             writeLocal: async (id: string, url: string) => {
               await saveClip(id, url);
             },
-            uploaded,
           });
-          /*
-           * Pruned to what the document still refers to.
-           *
-           * This ledger exists so a clip already sent is not offered again,
-           * and it only ever grew: one id per recording ever uploaded from
-           * this device, kept for good in the same small store the whole
-           * document lives in. A recording that no card mentions any more
-           * will never be offered again whatever this says, so holding its
-           * id is paying rent on a fact nobody will ask for.
-           */
-          const mentioned = new Set(clipIdsIn(merged));
-          uploaded = res.uploaded.filter((id) => mentioned.has(id));
           if (res.pulled) {
             flash(`${plural(res.pulled, "recording")} downloaded`);
             /* Something new can be heard now, which offline decides what a
@@ -12033,10 +12163,18 @@ export default function ArabicTrainer() {
           /* the document is synced; clips can catch up next time */
         }
 
-        const cfg = { ...prevCfg, token: key, lastSync: now(), uploaded };
+        /* How far this sync accounted for the cards, which is what the You
+           menu counts "to sync" from (0.655): the moment it set out, or the
+           newest change it brought down if another device's clock is ahead. */
+        const syncedThrough = Math.max(setOut, latestStamp(merged as Doc));
+        /* The ledger of recordings sent up is gone with the sending (0.659). */
+        const { uploaded: _sent, ...kept } = prevCfg;
+        void _sent;
+        const cfg = { ...kept, token: key, lastSync: now(), syncedThrough };
         saveSyncConfig(cfg);
         setSyncCfg(cfg);
         setSyncState("ok");
+        letGo();
 
         /* And how close the document is to the size the server refuses.
            Past that, sync stops for good and everything after it stays on
@@ -12102,9 +12240,38 @@ export default function ArabicTrainer() {
             : isOffline()
             ? "Offline — your work is saved on this device"
             : "Sync failed";
-        setSyncError(said);
-        if (msg === "too-large" || msg === "would-empty") flash(said, "warn");
         setSyncState("error");
+        /*
+         * Said in the bar with Retry (0.655), not in the menu. Its
+         * headline is "Sync failed" and the line under it why, where the
+         * app knows. Not when the connection went: the menu says that, and
+         * the sync goes again on its own when it comes back.
+         */
+        if (isOffline()) letGo();
+        else {
+          const detail =
+            said === "Sync failed"
+              ? /* The sync's own requests say a gateway's answer as
+                   pull-failed-502 and a request that never went as a
+                   TypeError, not reach.ts's words for them. */
+                isUnreachable(err) || err instanceof TypeError || /-50[234]$/.test(msg)
+                ? "Couldn't reach the server. Your work is saved on this device."
+                : "Your work is saved on this device."
+              : said;
+          if (syncFailHeld.current) {
+            updateReach(syncFailHeld.current, { detail });
+            if (byHand) showReach();
+          } else {
+            syncFailHeld.current = holdReach({
+              title: "Sync failed",
+              detail,
+              /* The connection coming back already syncs; Retry is the
+                 only other thing that should. */
+              auto: false,
+              retry: () => runSyncRef.current("", true),
+            });
+          }
+        }
         /* Nothing went up, so everything this trip carried is still owed. */
         if (!sent) owed.current = true;
       } finally {
@@ -12702,9 +12869,15 @@ export default function ArabicTrainer() {
   setUnitShapes(unitShapes);
   const mateCounts = useMemo(() => countMates(asking, settings), [asking, settings]);
   setMateCounts(mateCounts);
-  const picturedCounts = useMemo(() => countPictured(asking, settings), [asking, settings]);
+  /* Asked again as pictures arrive and the connection comes and goes:
+     only a picture that is here counts (see canSeeHere). */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const picturedCounts = useMemo(() => countPictured(asking, settings), [asking, settings, visible, offline]);
   setPicturedCounts(picturedCounts);
-  const heardCounts = useMemo(() => countHeard(asking, settings), [asking, settings]);
+  /* Asked again as recordings arrive and the connection comes and goes,
+     as the pictures are (0.660). */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const heardCounts = useMemo(() => countHeard(asking, settings), [asking, settings, audible, offline]);
   setHeardCounts(heardCounts);
 
   /*
@@ -12764,6 +12937,78 @@ export default function ArabicTrainer() {
     }
     return ids;
   }, [items, lacksImages]);
+
+  /*
+   * Bring every card's pictures down with everything else (0.658).
+   *
+   * They used to come down only for the session about to start, and only
+   * the first picture of each card, while a card with several shows the
+   * next on each turn — so a picture question could be dealt with nothing
+   * to show. Now, whenever the cards change (a sync, a course refreshed, a
+   * card made) or the connection comes back, whatever pictures are not on
+   * this device yet are fetched in the background, three at a time, and a
+   * picture question is asked once its picture is here (see pictureHere).
+   *
+   * Not where the browser cannot keep them: there they would be fetched
+   * again at every launch and held in memory meanwhile. A picture that
+   * could not be fetched is not asked for again for five minutes, so a
+   * server that is down is not asked in a loop.
+   */
+  const imagesSyncing = useRef(false);
+  const imageTried = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (offline || !visible || !mediaKept || imagesSyncing.current) return;
+    const at = Date.now();
+    const wanted = [...new Set(allImageIds)].filter((h) => {
+      if (visible.has(h)) return false;
+      const tried = imageTried.current.get(h);
+      return tried === undefined || at - tried > MISSING_FOR_MS;
+    });
+    if (!wanted.length) return;
+    imagesSyncing.current = true;
+    void (async () => {
+      try {
+        for (const h of wanted) imageTried.current.set(h, at);
+        await warmImages(wanted);
+      } catch (e) {
+        /* tried again with the next change */
+      } finally {
+        imagesSyncing.current = false;
+        refreshAudible();
+      }
+    })();
+  }, [allImageIds, visible, offline, refreshAudible]);
+
+  /*
+   * And every card's recordings, the same way and for the same reason
+   * (0.660): a listening question is asked once its recording is here
+   * (see clipHere), so they come down with everything else rather than
+   * only for the session about to start.
+   */
+  const clipsSyncing = useRef(false);
+  const clipTried = useRef<Map<string, number>>(new Map());
+  useEffect(() => {
+    if (offline || !audible || !mediaKept || clipsSyncing.current) return;
+    const at = Date.now();
+    const wanted = [...new Set(allClipIds)].filter((id) => {
+      if (audible.has(id)) return false;
+      const tried = clipTried.current.get(id);
+      return tried === undefined || at - tried > MISSING_FOR_MS;
+    });
+    if (!wanted.length) return;
+    clipsSyncing.current = true;
+    void (async () => {
+      try {
+        for (const id of wanted) clipTried.current.set(id, at);
+        await warmClips(wanted);
+      } catch (e) {
+        /* tried again with the next change */
+      } finally {
+        clipsSyncing.current = false;
+        refreshAudible();
+      }
+    })();
+  }, [allClipIds, audible, offline, refreshAudible]);
 
   /* How many of them are not here. Read on the home screen while offline,
      and in Account settings beside the button that fetches them. */
@@ -13275,8 +13520,39 @@ export default function ArabicTrainer() {
      shows, so a card added to one since it was kept is in the session. */
   function startSaved(s: SavedSession) {
     if (askFirst({ kind: "saved", saved: s })) return;
+    beginManual(manualOfSaved(s), { kind: "saved", saved: s });
+  }
+
+  function manualOfSaved(s: SavedSession) {
     const ids = new Set([...s.ids, ...cardsOfSaved(s, shown).map((it) => it.id)]);
-    beginManual({ ids, mode: s.mode, count: s.count, minutes: s.minutes });
+    return { ids, mode: s.mode, count: s.count, minutes: s.minutes };
+  }
+
+  /* What a session started this way would be dealt now — the one place
+     each kind is built, read by the buttons that start it and by the end
+     of a session, to offer "Keep going" only when there is something to
+     keep going with. */
+  function buildAgain(a: Again) {
+    if (a.kind === "begin") {
+      return buildSession({
+        items: shown, settings, inDeck: a.only || inDeck, practice: a.practice, perDay, systems, pathUnit: a.pathUnit,
+      });
+    }
+    if (a.kind === "weak") return buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
+    const m = a.kind === "saved" ? manualOfSaved(a.saved) : a;
+    /* Regular is dealt as the home screen deals, so it reads the cards the
+       home screen does: the language switch has its say over which words
+       count as in hand, exactly as it does for a prep. */
+    return buildManualSession({
+      items: m.mode === "regular" ? shown : items, settings, ids: m.ids, mode: m.mode, count: m.count, minutes: m.minutes, perDay, systems,
+    });
+  }
+
+  function startAgain(a: Again) {
+    if (a.kind === "begin") begin(a.practice, a.only, a.pathUnit);
+    else if (a.kind === "weak") beginWeak();
+    else if (a.kind === "saved") startSaved(a.saved);
+    else beginManual(a);
   }
 
   /* A session assembled by hand on the Build screen. */
@@ -13285,13 +13561,9 @@ export default function ArabicTrainer() {
     mode: string;
     count?: number;
     minutes?: number;
-  }) {
-    /* Regular is dealt as the home screen deals, so it reads the cards the
-       home screen does: the language switch has its say over which words
-       count as in hand, exactly as it does for a prep. */
-    const built = buildManualSession({
-      items: mode === "regular" ? shown : items, settings, ids, mode, count, minutes, perDay, systems,
-    });
+  }, again?: Again) {
+    const recipe: Again = again || { kind: "manual", ids: [...ids], mode, count, minutes };
+    const built = buildAgain(recipe);
     setBuilding(false);
     if (!built.exercises.length) {
       flash(
@@ -13318,6 +13590,7 @@ export default function ArabicTrainer() {
       practice: false,
       startedAt: now(),
       endsAt: minutes ? now() + minutes * 60000 : 0,
+      again: recipe,
     });
     setQi(0);
     setTally(NO_SCORE);
@@ -13510,7 +13783,7 @@ export default function ArabicTrainer() {
     setSpacesBusy(true);
     try {
       /* Only whether each one settled matters here, not what it returned. */
-      const jobs: Promise<unknown>[] = [runSync()];
+      const jobs: Promise<unknown>[] = [runSync("", true)];
       if (account) jobs.push(refreshCourses("changes"));
       if (account && (teaches || account.admin))
         jobs.push(
@@ -13620,7 +13893,7 @@ export default function ArabicTrainer() {
    */
   function beginWeak() {
     if (askFirst({ kind: "weak" })) return;
-    const built = buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
+    const built = buildAgain({ kind: "weak" });
     if (!built.exercises.length) {
       flash(
         built.reason === "nothing-weak"
@@ -13630,7 +13903,7 @@ export default function ArabicTrainer() {
       return;
     }
     warmSession(built);
-    setSession({ ...built, practice: false, startedAt: now(), endsAt: 0 });
+    setSession({ ...built, practice: false, startedAt: now(), endsAt: 0, again: { kind: "weak" } });
     setQi(0);
     setTally(NO_SCORE);
     setMoved([]);
@@ -13651,7 +13924,8 @@ export default function ArabicTrainer() {
        new cards in although the path has not reached it: "Practise this
        unit" (R30, R24). */
     if (askFirst({ kind: "begin", practice, only, pathUnit })) return;
-    const built = buildSession({ items: shown, settings, inDeck: only || inDeck, practice, perDay, systems, pathUnit });
+    const again: Again = { kind: "begin", practice, only, pathUnit };
+    const built = buildAgain(again);
     if (!built.exercises.length) {
       /* This used to return in silence, which reads as a broken button. It
          mattered little when the only way to get here was a card list that
@@ -13681,7 +13955,7 @@ export default function ArabicTrainer() {
     }
     catchingUpNote(built);
     warmSession(built);
-    setSession({ ...built, practice });
+    setSession({ ...built, practice, again });
     setQi(0);
     setTally(NO_SCORE);
     setMoved([]);
@@ -13744,6 +14018,15 @@ export default function ArabicTrainer() {
   }
 
   const exercise = session && qi < session.exercises.length ? session.exercises[qi] : null;
+  /* At the end of a session, whether starting it again the same way would
+     ask anything: worked out once, when the end screen opens, and the
+     button that offers it left off when it would not. */
+  const endedAgain: Again | null = session && !exercise && session.again ? session.again : null;
+  const canKeepGoing = useMemo(
+    () => !!endedAgain && buildAgain(endedAgain).exercises.length > 0,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [endedAgain],
+  );
   /* The card, narrowed to the question being asked of it: its variables
      filled in, one accepted answer where the question is about how a word
      sounds, one meaning where the meaning is the question. All three before
@@ -13797,6 +14080,23 @@ export default function ArabicTrainer() {
     return table ? tenseOf(parentItem, table, rowOf(item)) : null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spec, item && item.id, parentItem, qLang.id]);
+  /* This language's pronouns by the person each is, from the cards the
+     Pronouns screen wrote, for the tense table's target-language side: the
+     first way each is written, and how that is said. */
+  const verbPronouns: Record<string, { ar: string; lat: string }> = useMemo(() => {
+    const out: Record<string, { ar: string; lat: string }> = {};
+    if (!verbTense) return out;
+    for (const it of items as any[]) {
+      if (!it || String(it.category || "") !== "pronoun" || !it.person) continue;
+      if (langIdOf(it, settings) !== qLang.id) continue;
+      const lead: any = leadOf(it) || it;
+      const ar = (splitAlternatives(String(lead.ar || it.ar || ""))[0] || "").trim();
+      if (!ar || out[String(it.person)]) continue;
+      out[String(it.person)] = { ar, lat: (splitAlternatives(String(lead.lat || it.lat || ""))[0] || "").trim() };
+    }
+    return out;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [verbTense, items, qLang.id]);
   const verbAsked: Set<string> = useMemo(() => {
     if (!verbTense || !exercise) return new Set();
     const type = typeOf(exercise.type);
@@ -14312,6 +14612,7 @@ export default function ArabicTrainer() {
    */
   const lentKeys = lentFor.ex === exercise ? lentFor.keys : NO_KEYS;
   const marksLent = lentKeys.length > 0;
+  const marksAway = !!exercise && marksAwayFor === exercise;
   /* Right, but with something on the screen that did part of it: the
      transliteration that spelt the word, or the marks put back on a word
      that was being read bare. Either is marked as a near miss. */
@@ -14349,7 +14650,7 @@ export default function ArabicTrainer() {
         ? {
             lang: qLang,
             words: wordsBare,
-            lent: new Set(lentKeys),
+            lent: new Set(marksAway ? lentKeys.filter((k) => k !== CHOICES_LENT) : lentKeys),
             lend: checked
               ? null
               : (key: string) =>
@@ -14359,7 +14660,7 @@ export default function ArabicTrainer() {
                   }),
           }
         : NO_MARKS,
-    [qLang, marksTell, wordsBare, lentKeys, checked, exercise],
+    [qLang, marksTell, wordsBare, lentKeys, marksAway, checked, exercise],
   );
   /* Whether the answer is chosen from options in the script that are bare
      now — which is when "Show the harakat" is offered. A grid of
@@ -14405,8 +14706,19 @@ export default function ArabicTrainer() {
     saveMarksTip(n);
     setMarksTipShown(n);
   }, [promptBareNow, sessionToken, marksTipShown]);
-  const choicesBare =
-    !!qLang.marks && !marksTell && !checked && choicesInScript && (choicesRun === "sentence" || wordsBare) && !lentKeys.includes(CHOICES_LENT);
+  const choicesCanBeBare =
+    !!qLang.marks && !marksTell && !checked && choicesInScript && (choicesRun === "sentence" || wordsBare);
+  const choicesBare = choicesCanBeBare && !lentKeys.includes(CHOICES_LENT);
+  /* Options shown bare get their harakat back from the hint button in the
+     bar at the foot rather than a button above them: the matching grids
+     first (0.653), then every question with options in the script (0.654).
+     None of them has another hint, and it is the same kind of thing — a
+     nudge that makes the question easier and is counted for it. Like the
+     hint, it stays pressed and can put them away again. A question whose
+     hint button already holds a nudge would keep the button above the
+     options; none does today. */
+  const marksHint = choicesCanBeBare && !hintAt;
+  const marksHintShown = marksHint && lentKeys.includes(CHOICES_LENT) && !marksAway;
 
   /*
    * Whether the prompt has to say which form it wants.
@@ -15600,31 +15912,26 @@ export default function ArabicTrainer() {
   const kbOpen = kb.open && (inExercise || sharing);
 
   /*
-   * What the corner menu says about sync.
-   *
-   * One line, and it used to say one of three things — syncing, "Offline —
-   * will retry", or up to date — with the middle one standing for every
-   * way a sync can fail. Two of those never clear by themselves, so a
-   * learner whose passphrase had been refused or whose collection had
-   * outgrown the limit was told, once a minute for ever, that they were
-   * offline and it would sort itself out.
-   *
-   * Offline comes first because it explains every other failure under it,
-   * and it says where the work is rather than only what is missing: the
-   * answer to "am I losing anything?" is no, and that is the question
-   * behind the look at the dot.
+   * What the corner menu says about sync (0.655): see syncLine. Worked out
+   * only while the menu is open, because counting the cards walks every one
+   * of them, and the menu is closed nearly all the time.
    */
-  const syncNote = TRYING
-    ? "Practice here stays on this device"
-    : offline
-    ? `Offline — your work is saved on this device${
-        toSend ? ` · ${plural(toSend, "report")} to send` : ""
-      }`
-    : syncState === "syncing" || spacesBusy || (syncState === "idle" && courseBusy)
-    ? "Syncing now"
-    : syncState === "error"
-    ? syncError || "Sync failed"
-    : "Up to date";
+  const syncNote = () => {
+    const last = syncCfg.lastSync || 0;
+    return syncLine({
+      trying: !!TRYING,
+      offline,
+      busy: syncState === "syncing" || spacesBusy || (syncState === "idle" && courseBusy),
+      failed: syncState === "error",
+      lastSync: last,
+      reports: toSend,
+      /* This device's practice, and the cards the card editor saved
+         offline and keeps until they can go (0.659). */
+      cards: cardsToSync(data, syncCfg.syncedThrough || last) + waitingToSend(CARD_OUTBOX),
+      pictures: heldMedia.images,
+      clips: heldMedia.clips,
+    });
+  };
 
 
   /*
@@ -16217,6 +16524,7 @@ export default function ArabicTrainer() {
                           <VerbTable
                             tense={verbTense}
                             lang={qLang}
+                            pronouns={verbPronouns}
                             checked={!!checked}
                             reading={
                               spec.answerMode === "vread"
@@ -16520,7 +16828,7 @@ export default function ArabicTrainer() {
                   {/* The options can't be tapped a word at a time — a tap
                       on one chooses it — so their marks come back all at
                       once, and the question counts as a near miss. */}
-                  {choicesBare && qLang.marks && marksView.lend && (
+                  {choicesBare && !marksHint && qLang.marks && marksView.lend && (
                     <div className="at-row at-reveals">
                       <Button
                         size="sm"
@@ -16565,6 +16873,9 @@ export default function ArabicTrainer() {
                           <Button
                             key={answer}
                             variant={typed === answer ? "primary" : undefined}
+                            /* A choice that shows it is chosen, so Enter
+                               leaves it be and presses Check (0.654). */
+                            aria-pressed={typed === answer}
                             disabled={!!checked}
                             onClick={() => setTyped(answer)}
                           >
@@ -16691,15 +17002,17 @@ export default function ArabicTrainer() {
                           readOnly={!!checked || ownFigures}
                           placeholder={figures ? "Type the number" : ownFigures ? ownPrompt : spec.placeholder}
                           onChange={(e) => setTyped(e.target.value)}
-                          /* Only the Check button checks. Enter — and a
-                             phone keyboard's Go, which is the same key —
-                             used to, and a learner reaching for a letter
-                             on the keyboard's bottom row sent a half-typed
-                             answer to be marked. The key now does nothing,
-                             and says so: "done" rather than "go". */
+                          /* On a phone, only the Check button checks. Enter
+                             — and a phone keyboard's Go, which is the same
+                             key — used to, and a learner reaching for a
+                             letter on the keyboard's bottom row sent a
+                             half-typed answer to be marked. There the key
+                             does nothing, and says so: "done" rather than
+                             "go". On a computer Enter presses Check, as it
+                             presses every screen's main button (0.654,
+                             enter-key.ts), which tells the two apart. */
                           enterKeyHint="done"
                           onKeyDown={(e) => {
-                            if (e.key === "Enter") e.preventDefault();
                             /* The read-only box takes nothing typed, so a
                                keyboard that does have ٤ on it — or a colon,
                                or backspace — goes through the pad's own
@@ -17203,6 +17516,24 @@ export default function ArabicTrainer() {
                             }}
                           />
                         )}
+                        {marksHint && qLang.marks && (
+                          <IconButton
+                            icon="help"
+                            ghost
+                            label={`${marksHintShown ? "Hide" : "Show"} the ${qLang.marks.name}`}
+                            className={`at-hintbtn${marksHintShown ? " on" : ""}`}
+                            data-el="hint-button"
+                            aria-pressed={marksHintShown}
+                            onClick={() => {
+                              if (marksHintShown) {
+                                setMarksAwayFor(exercise);
+                                return;
+                              }
+                              setMarksAwayFor(null);
+                              if (marksView.lend) marksView.lend(CHOICES_LENT);
+                            }}
+                          />
+                        )}
                         {!spec.intro && !(spec.verbDrill && (spec.answerMode === "self" || spec.answerMode === "vread")) && (
                           <Button variant="ghost" data-el="dont-know-button" onClick={giveUp}>
                             I don't know
@@ -17263,15 +17594,17 @@ export default function ArabicTrainer() {
                     : `${tally.asked - tally.first} lapsed and will come back shortly.`}
                 </Help>
                 <WhatMoved moved={moved} items={items} settings={settings} />
-                <div className="at-row">
-                  <Button variant="ghost" onClick={() => setSession(null)}>
-                    Done
-                  </Button>
-                  {readyCount > 0 && !session.manual && (
-                    <Button variant="primary" onClick={() => begin(false)}>
+                {/* Another session started exactly as this one was, on top
+                    and full width, with the way out under it (0.656). */}
+                <div className="at-stack">
+                  {canKeepGoing && (
+                    <Button variant="primary" data-el="keep-going-button" onClick={() => startAgain(session.again)}>
                       Keep going
                     </Button>
                   )}
+                  <Button variant="ghost" data-el="done-button" onClick={() => setSession(null)}>
+                    Done
+                  </Button>
                 </div>
               </div>
             )}
@@ -21275,9 +21608,10 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, onCourses, onSett
       for somebody with no line at the top of the page to say it. */
   spaceShown?: { name: string; logoData?: string; logo?: string } | null;
   syncState?: string;
-  /** What to say about it. Worked out by the app, which is the only thing
-      that knows whether this was the connection or the passphrase. */
-  syncNote?: string;
+  /** What to say about it: where sync has got to, and under that when the
+      last one was and what is waiting (0.655). Asked only while the menu
+      is open, because working it out walks every card. */
+  syncNote?: () => { main: string; sub: string };
   onSyncNow: () => void;
   /** The courses you are in, and joining another: Learning's Courses
       page, which has no section of its own in the bar. */
@@ -21382,7 +21716,15 @@ function CornerMenu({ account, syncState, syncNote, onSyncNow, onCourses, onSett
             <span className="at-cico">
               <span className={`at-cdot ${syncState}`} />
             </span>
-            <span className="at-clinetext">{syncNote || "Up to date"}</span>
+            {(() => {
+              const note = syncNote ? syncNote() : { main: "Up to date", sub: "" };
+              return (
+                <span className="at-clinetext at-csync">
+                  <b>{note.main}</b>
+                  {note.sub ? <i>{note.sub}</i> : null}
+                </span>
+              );
+            })()}
             <button className="at-cact" onClick={onSyncNow}>
               Sync now
             </button>

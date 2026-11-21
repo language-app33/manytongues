@@ -358,17 +358,17 @@ test("the exercise types this file merges are the ones the app has", () => {
   assert.deepEqual(Object.keys(states()).sort(), [...TYPES].sort());
 });
 
-test("syncClips never uploads an object URL and never fetches what is already local", async () => {
+test("syncClips fetches only what is missing, and never sends anything up (0.659)", async () => {
   /** @type {WireDoc} */
   const data = { items: [item("x", { forms: [{ id: "x", ar: "", en: "", lat: "", recs: [{ id: "here" }, { id: "there" }] }] })] };
-  /** @type {[string | null, unknown][]} */
-  const pushed = [];
+  /** @type {(string | null)[]} */
+  const posted = [];
   /** @type {(string | null)[]} */
   const pulled = [];
   stubFetch((url, opts) => {
     const id = new URL(url, "http://x").searchParams.get("audio");
     if (opts.method === "POST") {
-      pushed.push([id, JSON.parse(opts.body || "{}").data]);
+      posted.push(id);
       return { ok: true, status: 200, json: async () => ({ ok: true }) };
     }
     pulled.push(id);
@@ -377,44 +377,15 @@ test("syncClips never uploads an object URL and never fetches what is already lo
   /** @type {[string, string][]} */
   const written = [];
   const res = await syncClips("t".repeat(64), data, {
-    hasLocal: async (id) => id === "here",
-    readLocal: async (id) => (id === "here" ? "blob:https://app/uuid" : null),
+    hasLocal: async (/** @type {string} */ id) => id === "here",
     writeLocal: async (/** @type {string} */ id, /** @type {string} */ url) => {
       written.push([id, url]);
     },
-    uploaded: [],
   });
-  assert.deepEqual(pushed, [], "a blob: URL must not be sent as a recording");
+  assert.deepEqual(posted, [], "a recording on this device is not copied into the learner's store");
   assert.deepEqual(pulled, ["there"], "only the missing clip is fetched");
   assert.deepEqual(written, [["there", "data:audio/webm;base64,AAAA"]]);
   assert.equal(res.pulled, 1);
-  assert.equal(res.pushed, 0);
-});
-
-test("syncClips uploads a real data URL once and remembers it", async () => {
-  /** @type {WireDoc} */
-  const data = { items: [item("x", { forms: [{ id: "x", ar: "", en: "", lat: "", recs: [{ id: "mine" }] }] })] };
-  /** @type {string[]} */
-  const pushed = [];
-  stubFetch((url, opts) => {
-    if (opts.method === "POST") {
-      pushed.push(JSON.parse(opts.body || "{}").data.slice(0, 5));
-      return { ok: true, status: 200, json: async () => ({ ok: true }) };
-    }
-    return { ok: false, status: 404, json: async () => ({}) };
-  });
-  const hooks = {
-    hasLocal: async () => true,
-    readLocal: async () => "data:audio/webm;base64,BBBB",
-    writeLocal: async () => {},
-    uploaded: [],
-  };
-  const first = await syncClips("t".repeat(64), data, hooks);
-  assert.deepEqual(pushed, ["data:"]);
-  assert.deepEqual(first.uploaded, ["mine"]);
-  const second = await syncClips("t".repeat(64), data, { ...hooks, uploaded: first.uploaded });
-  assert.equal(pushed.length, 1, "already-uploaded clips are not sent again");
-  assert.equal(second.pushed, 0);
 });
 
 test("clipIdsIn walks cards and their forms", () => {
