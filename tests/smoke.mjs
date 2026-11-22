@@ -10610,15 +10610,15 @@ const openPronounTables = async () => {
      card, the most overdue, and these walks are about the present. */
   const { TYPES: everyKey } = await import(path.resolve("src/languages.ts"));
   const pastDone = Object.fromEntries(everyKey.map((/** @type {string} */ k) => [k, { ...solid }]));
-  /** @param {Record<string, any>} s */
-  const verbCard = (s) => ({
+  /** @param {Record<string, any>} s @param {Record<string, any>} [shape] what to change on a column's form */
+  const verbCard = (s, shape = {}) => ({
     id: "writex", kind: "word", tags: ["Lesson 1"], created: 1, updated: Date.now(), lang: "ar-PS",
     category: "verb", name: "to write",
     forms: [
       { id: "writex", ar: "كتب", en: "to write", lat: "katab", s: {} },
       ...present.map(([col, label, ar, lat]) => ({
         id: `writex-${col}`, ar, en: `${label.replace(" (m)", "")} write${col === "he" || col === "she" ? "s" : ""}`, lat,
-        row: "present", col, s: { ...s },
+        row: "present", col, s: { ...s }, ...(/** @type {Record<string, any>} */ (shape)[col] || {}),
       })),
       { id: "writex-past-he", ar: "كتب", en: "he wrote", lat: "katab", row: "past", col: "he", s: pastDone },
     ],
@@ -10652,6 +10652,7 @@ const openPronounTables = async () => {
       who: 0, whoRight: 0, whoOptions: /** @type {string[]} */ ([]), row: 0, rowRight: 0, tiles: 0,
       shift: 0, shiftRight: 0, verdicts: /** @type {string[]} */ ([]), patternMore: false,
       readRows: /** @type {string[][]} */ ([]), readSaid: /** @type {string[]} */ ([]),
+      readHeard: 0, readMarks: 0, playToCheck: 0,
     };
     const btn = (/** @type {RegExp} */ re) => [...host.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
     for (let n = 0; n < 30 && host.querySelector(".at-instruction"); n++) {
@@ -10683,6 +10684,7 @@ const openPronounTables = async () => {
           ((li.querySelector('[data-el="verb-row-english"]') || {}).textContent || "").trim(),
           ((li.querySelector('[data-el="verb-row-form"]') || {}).textContent || "").replace(/\s+/g, " ").trim(),
         ]);
+        met.playToCheck = [...table.querySelectorAll('[data-el="verb-reveal"]')].filter((b) => /Play to check/.test(b.textContent || "")).length;
         for (let k = 0; k < 10; k++) {
           const hidden = host.querySelector('[data-el="verb-reveal"]');
           if (!hidden) break;
@@ -10690,6 +10692,8 @@ const openPronounTables = async () => {
           await sleep(30);
         }
         met.readSaid = [...table.querySelectorAll(".at-vlat")].map((el) => (el.textContent || "").trim());
+        met.readHeard = table.querySelectorAll('[data-el="verb-recording"]').length;
+        met.readMarks = host.querySelectorAll('[data-el="verb-read-mark"]').length;
         for (const mark of [...host.querySelectorAll('[data-el="verb-read-mark"]')]) {
           click([...mark.querySelectorAll("button")].find((b) => /Read it right/.test(b.textContent || "")));
           await sleep(20);
@@ -10794,6 +10798,21 @@ const openPronounTables = async () => {
     JSON.stringify(paired.met.readRows));
   check("and what was hidden is how the whole of it is said", paired.met.readSaid.includes("ana baktub") &&
     paired.met.readSaid.includes("hiyye btiktub") && paired.met.readSaid.includes("biktbu"), JSON.stringify(paired.met.readSaid));
+  /* Since 0.653 how a form is said may be its recording: a form with a
+     recording and no transliteration is asked too, uncovered by playing
+     it, and one with neither is shown and not asked. */
+  const rec = (/** @type {string} */ n) => [{ id: n.repeat(64), label: "", speed: "" }];
+  const heardWalk = await walk([verbCard(settled(1, ["vread"]), {
+    i: { recs: rec("c") }, "you-m": { lat: "", recs: rec("d") }, "you-f": { lat: "" },
+  }), ...others]);
+  check("a form with only a recording is asked, by playing it", heardWalk.met.playToCheck === 1 && heardWalk.met.hidden === 5,
+    JSON.stringify(heardWalk.met));
+  check("and once uncovered each recorded form can be played", heardWalk.met.readHeard === 2, JSON.stringify(heardWalk.met));
+  check("and a form with neither is shown and not asked", heardWalk.met.readMarks === 5, JSON.stringify(heardWalk.met));
+  const heardMarks = (heardWalk.verb && heardWalk.verb.forms || []).filter((/** @type {any} */ f) => f.row === "present" && f.s && f.s.vread);
+  check("and the five asked are marked, the recording-only one included",
+    heardMarks.length === 5 && heardMarks.some((/** @type {any} */ f) => f.col === "you-m") && !heardMarks.some((/** @type {any} */ f) => f.col === "you-f"),
+    heardMarks.map((/** @type {any} */ f) => f.col).join(","));
   check("and marked form by form as the learner says", reading.met.readRight > 0, JSON.stringify(reading.met.verdicts));
   const readMarks = (reading.verb && reading.verb.forms || []).filter((/** @type {any} */ f) => f.row === "present" && f.s && f.s.vread);
   check("each form read has a mark of its own", readMarks.length === 6, `${readMarks.length} marked`);

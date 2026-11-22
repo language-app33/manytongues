@@ -8,6 +8,31 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.653 — 22 November 2026
+
+**"Read the forms" checks a reading against the recording too.** Until
+now, how a form is said meant its transliteration only.
+
+- **A form with a recording has a Play button** once you uncover it, next
+  to its transliteration.
+- **A form with a recording and no transliteration is now asked too.**
+  Instead of the blurred text it has "Play to check": tapping it plays the
+  recording, and then you say whether you read it right. Before, such a
+  form was only shown, and a verb recorded but never transliterated did
+  not get this practice at all.
+- A form with neither is shown and not asked, as before.
+
+One thing to know: a form's recording is of the verb alone, unless the
+teacher recorded the pronoun with it. The row now shows the pronoun, so
+the recording may say less than the row does.
+
+Languages that don't practise transliteration still don't get "Read the
+forms".
+
+To check by hand, on an iPhone: tapping "Play to check" should play the
+recording straight away. If the phone holds it back, the Play button is
+there to tap.
+
 ## 0.652 — 20 November 2026
 
 **A verb's tense reads as English on the left and the language on the

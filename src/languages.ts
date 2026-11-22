@@ -921,16 +921,18 @@ export const EX: Record<string, ExerciseSpec> = {
     gentle: true,
     verbDrill: "row",
   },
-  /* The same table with each transliteration hidden: read the form, then
+  /* The same table with how each form is said hidden: read the form, then
      uncover how it is said and say whether you read it right. Marked form
      by form, by the learner, so the forms misread come back on their
-     own. Only the forms that have a transliteration carry it. */
+     own. How it is said is the transliteration, or the form's recording,
+     or both (0.653): a form with either is asked, and one with neither is
+     shown and not asked. */
   vread: {
     level: 1,
     instruction: "Read each form, then check how it is said",
     label: "Read the forms",
     short: "Read",
-    needs: ["ar", "lat"],
+    needs: ["ar", "saidOrHeard"],
     question: "Read each one, then tap to check",
     placeholder: "",
     promptField: "tense",
@@ -2161,6 +2163,8 @@ export function needLabel(need: string, lang: Partial<Lang>) {
     en: "the meaning",
     lat: `the ${translit}`,
     recs: "a recording",
+    /* Read the forms checks a reading against either (0.653). */
+    saidOrHeard: `the ${translit} or a recording`,
     images: "a picture",
     pictured: "a few more cards with a picture",
     heard: "a few more cards with a recording",
