@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.661 — 22 November 2026
+
+**The You menu no longer says hundreds of cards are waiting to sync when
+they are not.** Whenever a teacher changed anything in a course, every
+student's phone counted every card of the course as "to sync" until its
+next sync: a few seconds on the home screen, longer on a slow connection
+or while a sync was failing. One card added by a teacher showed a student
+"301 cards to sync". Nothing was unsaved; only the number was wrong.
+
+The count is now only what you did on this phone since the last sync:
+cards answered, marked, reset or flagged, and your own cards edited,
+added or removed. What a teacher changed comes down from the course and
+is not counted, and neither is a card a teacher withdrew.
+
+To check by hand: with the app open on a phone, change a card of the
+course from Teaching on another device, wait a minute, and open the You
+menu: it still says "Up to date".
+
 ## 0.660 — 20 November 2026
 
 **Recordings come down with everything else, and a listening question

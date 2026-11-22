@@ -112,3 +112,33 @@ test("the bar can say Sync failed, and change its reason in place", () => {
   showReach();
   assert.equal(reachState().shown, true);
 });
+
+/* -------- what a course refresh writes is not this device's to send (0.661) -------- */
+
+test("a course card rebuilt by a teacher's change is not counted; one answered is", async () => {
+  const src = { courseId: "c", deckId: "d", cardId: "k1" };
+  const rebuilt = (/** @type {string} */ id, /** @type {Record<string, unknown>} */ states = {}) =>
+    /** @type {any} */ ({ ...card(id, 900, states), source: src });
+  const doc = /** @type {any} */ ({
+    items: [
+      /* 300 of these is what "301 cards to sync" was: stamped by the refresh. */
+      rebuilt("srvk1"),
+      rebuilt("srvk2", { meaning: { updated: 100 } }),
+      /* Answered since the sync. */
+      rebuilt("srvk3", { meaning: { updated: 950 } }),
+      /* A line of a scene answered, a card marked, one flagged. */
+      { ...rebuilt("srvk4"), lines: [{ id: "l1", s: { say: { updated: 960 } } }] },
+      { ...rebuilt("srvk5"), priorityAt: 970 },
+      { ...rebuilt("srvk6"), flags: [{ kind: "other", at: 980 }] },
+      /* The learner's own card, edited. */
+      card("mine", 990),
+    ],
+    /* A card the teacher withdrew, and one of the learner's own removed. */
+    tombstones: { srvk9: 995, "mine-2": 996 },
+  });
+  assert.equal(cardsToSync(doc, 800), 6, "k3, k4, k5, k6, the learner's own card and the one they removed");
+  /* And the id a course card is given here is still what this reads. */
+  const { readFile } = await import("node:fs/promises");
+  const shared = await readFile(new URL("../src/shared.tsx", import.meta.url), "utf8");
+  assert.match(shared, /localIdFor[^\n]*=> `srv\$\{cardId\}`/);
+});

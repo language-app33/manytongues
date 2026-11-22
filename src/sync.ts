@@ -600,21 +600,37 @@ export async function pushClip(token: string, id: string, dataUrl: string) {
 /* ---------------- what is waiting to go up ---------------- */
 
 /*
- * When a card last changed, by any stamp it carries: its own (an edit, or
- * a graded answer, which stamps the card), each form's exercise states,
- * the learner's mark and a reset. The latest of them is what a sync has
- * or has not yet carried.
+ * When this learner last changed a card: an answer or a lift (each stamps
+ * the exercise state it wrote, on a form or on a line of a scene), the
+ * learner's mark, a reset, a problem flagged — and, on a card of their
+ * own, an edit.
+ *
+ * Not a course card's own stamp (0.661). That one is written by the
+ * course refresh, which rebuilds every course card whenever a teacher
+ * changes anything and stamps each with the moment it did: read as a
+ * change made here, one card added by a teacher showed a student "301
+ * cards to sync". What the teacher changed came down from the course; it
+ * is not this device's to send.
  */
 export function cardChangedAt(it: Item): number {
-  let at = Math.max(Number(it.updated) || 0, Number(it.priorityAt) || 0, Number(it.reset) || 0);
-  for (const f of formsOf(it)) {
-    for (const st of Object.values(f.s || {})) {
+  let at = Math.max(Number(it.priorityAt) || 0, Number(it.reset) || 0, it.source ? 0 : Number(it.updated) || 0);
+  for (const f of [...formsOf(it), ...(it.lines || [])]) {
+    for (const st of Object.values((f && f.s) || {})) {
       const u = Number(st && st.updated) || 0;
       if (u > at) at = u;
     }
   }
+  for (const flag of it.flags || []) {
+    const u = Number(flag && flag.at) || 0;
+    if (u > at) at = u;
+  }
   return at;
 }
+
+/* A course card's id on this device — see localIdFor in shared.tsx, which
+   this module cannot import. Its headstone is written by the course
+   refresh when a teacher withdraws it, not by anything done here. */
+const fromCourse = (id: string) => id.startsWith("srv");
 
 /*
  * The newest stamp anywhere in a document's cards and withdrawals.
@@ -632,14 +648,19 @@ export function latestStamp(doc: Pick<Doc, "items" | "tombstones">): number {
 }
 
 /*
- * How many cards have changed here since the last sync carried them:
- * answered, edited, marked, added or removed. `through` is the moment the
+ * How many cards the learner has changed here since the last sync carried
+ * them: answered, marked, reset, flagged, or — their own — edited, added
+ * or removed. `through` is the moment the
  * last successful sync accounted for; nought, never synced, counts all.
  */
 export function cardsToSync(doc: Pick<Doc, "items" | "tombstones">, through: number): number {
   let n = 0;
   for (const it of doc.items || []) if (cardChangedAt(it) > through) n += 1;
-  for (const t of Object.values(doc.tombstones || {})) if ((Number(t) || 0) > through) n += 1;
+  /* A card of the learner's own that they removed; not one a teacher
+     withdrew, which the course refresh buries (0.661). */
+  for (const [id, t] of Object.entries(doc.tombstones || {})) {
+    if (!fromCourse(id) && (Number(t) || 0) > through) n += 1;
+  }
   return n;
 }
 
