@@ -10599,6 +10599,9 @@ interface VerbAt {
   at: string;
 }
 const NO_VERB_AT: VerbAt = { revealed: [], read: {}, placed: {}, at: "" };
+/* Whether a form has a way it is said to check a reading against: its
+   transliteration or its recording (0.661). */
+const saysHow = (form: Form): boolean => !!String(form.lat || "").trim() || audibleOf(form).length > 0;
 /* No words lent their marks — one array, so the view of them stays put. */
 const NO_KEYS: string[] = [];
 
@@ -10621,7 +10624,13 @@ const NO_KEYS: string[] = [];
    the language, its pronoun included (هي أكلت), with how that is said under
    it. The pronoun is the one the Pronouns screen wrote for that person; a
    person with no pronoun card shows the verb alone. What is hidden in "Read
-   the forms" is how the whole right side is said, pronoun and all. */
+   the forms" is how the whole right side is said, pronoun and all.
+
+   Since 0.661 how a form is said may be heard as well as written: a form
+   with a recording has a play button once it is uncovered, and one with a
+   recording and no transliteration is asked too, uncovered by playing it.
+   The recording is the form's own, so it is the verb without the pronoun
+   unless the teacher recorded both. */
 function VerbTable({ tense, lang, reading, checked, pronouns }: {
   tense: Tense;
   lang: Lang;
@@ -10640,10 +10649,13 @@ function VerbTable({ tense, lang, reading, checked, pronouns }: {
   const script = { fontFamily: lang.fontStack, direction: lang.direction } as React.CSSProperties;
   const said = String(lang.translitLabel || "pronunciation").toLowerCase();
   const persons = tense.places.map((p) => p.person);
+  /* The form just uncovered by playing it, which plays straight away;
+     nothing else in the table starts on its own. */
+  const [justHeard, setJustHeard] = useState("");
   return (
     <ol className="at-vtense" data-el="verb-tense" aria-label={tense.tense.label || "The tense"}>
       {tense.places.map(({ person, form }) => {
-        const asked = !!reading && reading.asked.has(form.id) && !!String(form.lat || "").trim();
+        const asked = !!reading && reading.asked.has(form.id) && saysHow(form);
         const shown = !reading || !asked || checked || reading.revealed.has(form.id);
         const mark = reading ? reading.marks[form.id] : undefined;
         const pronoun = (pronouns && pronouns[person.id]) || null;
@@ -10651,6 +10663,7 @@ function VerbTable({ tense, lang, reading, checked, pronouns }: {
         /* How the whole right side is said: the pronoun's reading with the
            verb's, where both are written; the verb's alone otherwise. */
         const lat = formLat ? [pronoun ? pronoun.lat : "", formLat].filter(Boolean).join(" ") : "";
+        const heard = audibleOf(form);
         return (
           <li key={form.id} className="at-vrow at-vpair">
             <span className="at-vperson" data-el="verb-row-english">
@@ -10665,11 +10678,18 @@ function VerbTable({ tense, lang, reading, checked, pronouns }: {
                 ) : null}
                 <Marked text={String(form.ar || "")} lang={lang} />
               </span>
-              {lat ? (
+              {lat || heard.length ? (
                 <span className="at-vsaid">
                   {shown ? (
-                    <span className="at-vlat">{lat}</span>
-                  ) : (
+                    <>
+                      {lat ? <span className="at-vlat">{lat}</span> : null}
+                      {reading && heard.length ? (
+                        <span className="at-vheard" data-el="verb-recording">
+                          <AudioPrompt recs={heard} compact autoPlay={justHeard === form.id} />
+                        </span>
+                      ) : null}
+                    </>
+                  ) : lat ? (
                     <button
                       type="button"
                       className="at-vhidden"
@@ -10679,6 +10699,17 @@ function VerbTable({ tense, lang, reading, checked, pronouns }: {
                     >
                       <span aria-hidden="true">{lat}</span>
                     </button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      data-el="verb-reveal"
+                      onClick={() => {
+                        setJustHeard(form.id);
+                        if (reading) reading.onReveal(form.id);
+                      }}
+                    >
+                      Play to check
+                    </Button>
                   )}
                 </span>
               ) : null}
@@ -16538,7 +16569,7 @@ export default function ArabicTrainer() {
                                       const read = { ...verbAt.read, [id]: right };
                                       setVerbAt((v) => ({ ...v, read }));
                                       const all = verbTense.places
-                                        .filter((p) => verbAsked.has(p.form.id) && String(p.form.lat || "").trim())
+                                        .filter((p) => verbAsked.has(p.form.id) && saysHow(p.form))
                                         .every((p) => p.form.id in read);
                                       setTyped(all ? "read" : "");
                                     },

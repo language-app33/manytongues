@@ -113,7 +113,7 @@ test("the bar can say Sync failed, and change its reason in place", () => {
   assert.equal(reachState().shown, true);
 });
 
-/* -------- what a course refresh writes is not this device's to send (0.661) -------- */
+/* -------- what a course refresh writes is not this device's to send (0.662) -------- */
 
 test("a course card rebuilt by a teacher's change is not counted; one answered is", async () => {
   const src = { courseId: "c", deckId: "d", cardId: "k1" };

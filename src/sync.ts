@@ -605,7 +605,7 @@ export async function pushClip(token: string, id: string, dataUrl: string) {
  * learner's mark, a reset, a problem flagged — and, on a card of their
  * own, an edit.
  *
- * Not a course card's own stamp (0.661). That one is written by the
+ * Not a course card's own stamp (0.662). That one is written by the
  * course refresh, which rebuilds every course card whenever a teacher
  * changes anything and stamps each with the moment it did: read as a
  * change made here, one card added by a teacher showed a student "301
@@ -657,7 +657,7 @@ export function cardsToSync(doc: Pick<Doc, "items" | "tombstones">, through: num
   let n = 0;
   for (const it of doc.items || []) if (cardChangedAt(it) > through) n += 1;
   /* A card of the learner's own that they removed; not one a teacher
-     withdrew, which the course refresh buries (0.661). */
+     withdrew, which the course refresh buries (0.662). */
   for (const [id, t] of Object.entries(doc.tombstones || {})) {
     if (!fromCourse(id) && (Number(t) || 0) > through) n += 1;
   }

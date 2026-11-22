@@ -156,6 +156,9 @@ export function unmetNeeds(
        second; one with a transliteration and no spelling beside it cannot
        be asked at all. */
     if (f === "lat") return !saidAnswers(unit, answerFields()).length;
+    /* How it is said, written or heard: Read the forms checks a reading
+       against the transliteration, the recording, or both (0.661). */
+    if (f === "saidOrHeard") return !String(unit.lat || "").trim() && !(unit.recs || []).length;
     return !(unit as Record<string, unknown>)[f];
   });
 }
@@ -248,7 +251,7 @@ function drilledBy(spec: ExerciseSpec, lang: Lang, unit?: Form): boolean {
   if (spec.quizAttr && !(attr && (!unit || derivedValue(attr, unit.ar)))) return false;
   /* And not where going to and from the second writing would mean asking
      for the word that is already on screen. */
-  if (lang.translitDrilled === false && spec.needs.includes("lat")) return false;
+  if (lang.translitDrilled === false && (spec.needs.includes("lat") || spec.needs.includes("saidOrHeard"))) return false;
   return true;
 }
 

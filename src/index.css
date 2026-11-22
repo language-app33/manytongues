@@ -3168,6 +3168,7 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
 .at-vpair .at-vperson { text-align:start; justify-self:start; }
 .at-vtarget { display:flex; flex-direction:column; align-items:flex-end; gap:2px; min-width:0; }
 .at-vtarget .at-vform { max-width:100%; overflow-wrap:anywhere; }
+.at-vtarget .at-vsaid { flex-direction:column; align-items:flex-end; }
 /* Who each row is, in English, at reading size: a learner looking at a
    tense asked for the English pronouns, which were there in small grey
    and went unseen (0.586). */
@@ -3178,6 +3179,8 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
 .at-vhidden { border:1px dashed var(--line); border-radius: var(--r-sm); background: var(--well);
   padding:2px 8px; cursor:pointer; color: var(--text-soft); }
 .at-vhidden > span { filter: blur(5px); user-select:none; }
+/* A form's recording beside how it is written, at a button's size (0.661). */
+.at-vheard { display:inline-flex; align-items:center; }
 .at-vreadmark { grid-column: 1 / -1; display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
 .at-vnow { margin-top:10px; }
 
