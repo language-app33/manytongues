@@ -2742,8 +2742,8 @@ if (/Build a session/.test(document.body.textContent)) {
   await sleep(200);
 
   /* ---- prep mode: decks to have cleared or learnt by a date ----
-     Set up from Progress, offered on the home screen as a session of its
-     own, edited, and cleared. */
+     Set up from Focused training (on Progress until 0.669), offered on the
+     home screen as a session of its own, edited, and cleared. */
   {
     const setValue = must(
       Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"),
@@ -2759,14 +2759,30 @@ if (/Build a session/.test(document.body.textContent)) {
     const pad = (/** @type {number} */ n) => String(n).padStart(2, "0");
     const day = `${inMonth.getFullYear()}-${pad(inMonth.getMonth() + 1)}-${pad(inMonth.getDate())}`;
 
-    const prepHead = [...document.querySelectorAll("h3.at-sectionhead")].find((h) => /^Prep mode$/.test(h.textContent || ""));
-    check("Progress has Prep mode under a heading of its own, styled as the Courses tab's",
-      !!prepHead && !!prepHead.closest(".at-section")?.querySelector(".at-sectionlede"),
+    check("Progress no longer has Prep mode, which moved to Focused training",
+      ![...document.querySelectorAll("h3.at-sectionhead")].some((h) => /^Prep mode$/.test(h.textContent || "")) &&
+        !buttonNamed(/prep mode$/i),
       [...document.querySelectorAll(".at-sectionhead")].map((h) => h.textContent).join(" | "));
-    check("and its button starts one while there is none", !!buttonNamed(/^Start prep mode$/));
-    click(buttonNamed(/^Start prep mode$/));
+    const prepChoice = () => /** @type {HTMLButtonElement | null} */ (
+      document.querySelector('.at-screen.training .at-trainchoice[aria-label="Prep mode"]'));
+    const status = () => ((document.querySelector(".at-screen.training .at-trainchoicestatus") || {}).textContent || "");
+    /* Into Focused training from Home, and Prep mode from there. */
+    const openPrep = async () => {
+      click(buttonNamed(/^Home$/));
+      await sleep(300);
+      await toTraining();
+      click(prepChoice());
+      await sleep(250);
+    };
+    click(buttonNamed(/^Home$/));
+    await sleep(300);
+    await toTraining();
+    check("Focused training offers Prep mode, saying what it is, with nothing set yet",
+      !!prepChoice() && /ready by a date/.test(prepChoice()?.textContent || "") && !status(),
+      (prepChoice() || {}).textContent || "(no Prep mode)");
+    click(prepChoice());
     await sleep(250);
-    check("Progress opens Prep mode on a screen of its own",
+    check("and opens Prep mode on a screen of its own",
       /Prep mode/.test(((top() || {}).textContent || "")), ((top() || {}).textContent || "").slice(0, 60));
     const nameBox = document.getElementById("at-prep-name");
     const dateBox = document.getElementById("at-prep-date");
@@ -2802,11 +2818,12 @@ if (/Build a session/.test(document.body.textContent)) {
       readyText().slice(0, 160));
     click(buttonNamed(/^Start prepping$/));
     await sleep(300);
-    const note = () => ((document.querySelector(".at-prepnote") || {}).textContent || "");
-    check("once started, Progress says what is being prepped for and how long is left",
+    const note = status;
+    check("once started, back on Focused training, Prep mode says what is being prepped for and how long is left",
       /Prepping for Start of class · (\d+ days|1 day) left/.test(note()) || /Ready for Start of class/.test(note()),
       note() || "(no note)");
 
+    await leaveTraining();
     click(buttonNamed(/^Home$/));
     await sleep(300);
     const prepButton = () => buttonNamed(/^Prep for /);
@@ -2847,10 +2864,7 @@ if (/Build a session/.test(document.body.textContent)) {
     await sleep(250);
 
     /* Edited: the same screen, holding what was set. */
-    click(buttonNamed(/^Progress$/));
-    await sleep(300);
-    click(buttonNamed(/^Edit prep mode$/));
-    await sleep(250);
+    await openPrep();
     const again = /** @type {any} */ (document.getElementById("at-prep-name"));
     check("opening it again holds the prep as it was set",
       !!again && again.value === "Start of class" && !!buttonNamed(/^Save changes$/),
@@ -2860,6 +2874,7 @@ if (/Build a session/.test(document.body.textContent)) {
     click(buttonNamed(/^Save changes$/));
     await sleep(300);
     check("and a change is saved", /Exam/.test(note()), note() || "(no note)");
+    await leaveTraining();
     click(buttonNamed(/^Home$/));
     await sleep(300);
     check("and reaches the home screen's button",
@@ -2869,25 +2884,20 @@ if (/Build a session/.test(document.body.textContent)) {
       (prepTile()?.querySelector(".at-climbsay") || {}).textContent || "(no ring)");
 
     /* Aimed at Cleared instead: the tile counts cleared cards. */
-    click(buttonNamed(/^Progress$/));
-    await sleep(300);
-    click(buttonNamed(/^Edit prep mode$/));
-    await sleep(250);
+    await openPrep();
     click(levelPick(/^Cleared$/));
     await sleep(80);
     click(buttonNamed(/^Save changes$/));
     await sleep(300);
+    await leaveTraining();
     click(buttonNamed(/^Home$/));
     await sleep(300);
     const said = () => (prepTile()?.querySelector(".at-climbsay") || {}).textContent || "";
     check("aimed at Cleared, the tile counts cleared cards, and still offers the prep",
-      / cards? cleared$/.test(said()) || (!prepTile() && !!document.querySelector(".at-prepnote")), said() || "(no tile)");
+      / cards? cleared$/.test(said()) || !prepTile(), said() || "(no tile)");
 
     /* Cleared. */
-    click(buttonNamed(/^Progress$/));
-    await sleep(300);
-    click(buttonNamed(/^Edit prep mode$/));
-    await sleep(250);
+    await openPrep();
     const del = () => [...((foot() || document).querySelectorAll("button"))].find((b) => b.getAttribute("aria-label") === "Delete this prep");
     check("the way to delete it is an icon in the same bar, before Save",
       !!del() && !(del()?.textContent || "").trim() &&
@@ -2895,8 +2905,9 @@ if (/Build a session/.test(document.body.textContent)) {
       (foot() || {}).innerHTML?.slice(0, 160) || "(no foot)");
     click(del());
     await sleep(300);
-    check("deleting clears it from Progress, whose button starts one again",
-      !document.querySelector(".at-prepnote") && !!buttonNamed(/^Start prep mode$/), note());
+    check("deleting clears it from Prep mode's button on Focused training",
+      !!prepChoice() && !note(), note());
+    await leaveTraining();
     click(buttonNamed(/^Home$/));
     await sleep(300);
     check("and from the home screen, which has its climb back",
@@ -3036,13 +3047,25 @@ const beforeAnswer = schedules();
   await toTraining();
   check("the dumbbell opens Focused training",
     !!document.querySelector('.at-screen.training[aria-label="Focused training"]'), "no Focused training screen");
-  const weakBtn = buttonNamed(/^Weak spots$/);
+  const weakBtn = /** @type {HTMLButtonElement | null} */ (
+    document.querySelector('.at-screen.training .at-trainchoice[aria-label="Weak spots"]'));
   check("which offers a weak-spots session", !!weakBtn,
     (document.body.textContent || "").slice(0, 120).replace(/\s+/g, " "));
-  const row = weakBtn && weakBtn.closest(".at-row");
-  check("and nothing is written beside it either way",
-    !!row && !/slipping/.test(row.textContent || ""),
-    row ? (row.textContent || "").replace(/\s+/g, " ") : "no row");
+  check("saying what it is under its name, and nothing about how much is slipping",
+    !!weakBtn && /got wrong lately/.test(weakBtn.textContent || "") && !/slipping/.test(weakBtn.textContent || ""),
+    weakBtn ? (weakBtn.textContent || "").replace(/\s+/g, " ") : "no button");
+  /* The four choices (0.669): two side by side, then two full width, each
+     with its line. */
+  const choices = [...document.querySelectorAll(".at-screen.training .at-trainchoice")];
+  check("Weak spots and Not seen lately side by side, then Build a session and Prep mode",
+    choices.map((b) => b.getAttribute("aria-label")).join("|") === "Weak spots|Not seen lately|Build a session|Prep mode" &&
+      !!weakBtn?.parentElement?.classList.contains("at-trainpair") &&
+      choices.every((b) => !!b.querySelector(".at-trainchoicenote")?.textContent),
+    choices.map((b) => b.getAttribute("aria-label")).join("|"));
+  const unseenBtn = /** @type {HTMLButtonElement | undefined} */ (choices[1]);
+  check("and Not seen lately is lit for a learner with cards they have not met in days",
+    !!unseenBtn && unseenBtn.getAttribute("aria-disabled") !== "true",
+    unseenBtn ? `aria-disabled=${unseenBtn.getAttribute("aria-disabled")}` : "no button");
   /* Dimmed here — this learner has nothing going wrong — and dimmed is not
      dead: the press arrives and comes back with the reason. */
   const dimmed = !!weakBtn && weakBtn.getAttribute("aria-disabled") === "true";
@@ -9519,16 +9542,15 @@ const openPronounTables = async () => {
   await sleep(1500);
 
   await toTraining(host3);
-  const weakBtn = [...document.querySelectorAll(".at-screen.training button")]
-    .find((b) => /^Weak spots$/.test((b.textContent || "").trim()));
+  const weakBtn = /** @type {HTMLButtonElement | null} */ (
+    document.querySelector('.at-screen.training .at-trainchoice[aria-label="Weak spots"]'));
   check("a card missed twice running lights the weak-spots button",
     !!weakBtn && weakBtn.getAttribute("aria-disabled") !== "true",
     weakBtn ? "the button is there but dimmed"
       : (host3.textContent || "").slice(0, 90).replace(/\s+/g, " ") || "nothing rendered");
-  const row = weakBtn && weakBtn.closest(".at-row");
-  check("and says nothing beside it, now that there is something to fix",
-    !!row && !/slipping/.test((row.textContent || "").replace(/\s+/g, " ")),
-    row ? (row.textContent || "").replace(/\s+/g, " ") : "no row");
+  check("and says nothing about how much is slipping, now that there is something to fix",
+    !!weakBtn && !/slipping/.test((weakBtn.textContent || "").replace(/\s+/g, " ")),
+    weakBtn ? (weakBtn.textContent || "").replace(/\s+/g, " ") : "no button");
 
   click(weakBtn);
   await sleep(600);

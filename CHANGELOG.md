@@ -8,6 +8,36 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.669 — 26 November 2026
+
+**Weak spots replaces Fix mistakes in Build a session.** Choosing Weak spots
+there now asks only the questions you've got wrong lately among the cards
+you picked, worst first. If a card keeps going wrong when you write it
+from the English, that's all it asks about that card. Before, Fix mistakes
+took the same cards and asked them every kind of question, including ones
+you never got wrong. Sessions you saved with Fix mistakes now open as Weak
+spots.
+
+**Focused training has four choices, each saying what it is:**
+
+- **Weak spots** and **Not seen lately**, side by side. Not seen lately is
+  new here: it brings back cards you haven't practised in the last few
+  days, across all your cards. Like Weak spots, it's dimmed when there's
+  nothing for it, and says why if pressed.
+- **Build a session**, full width, as before.
+- **Prep mode**, full width. It has moved here from Progress. Once you've
+  set a goal, its button also says what you're prepping for and how many
+  days are left.
+
+The line at the top is now just "Practise with a goal in mind."
+
+**Trade-off:** cards last practised long ago, before the app kept a record
+of each attempt, used to count as mistakes if they had ever gone wrong.
+Weak spots doesn't count them, as the Weak spots button never has.
+
+Still to check by hand: the four buttons on a real phone in light and dark,
+and setting up, editing and deleting a goal from Prep mode's new place.
+
 ## 0.668 — 25 November 2026
 
 **Focused training says what it is for.** The screen behind the dumbbell on

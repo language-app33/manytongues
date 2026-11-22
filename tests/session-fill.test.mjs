@@ -122,7 +122,7 @@ const SESSIONS = {
   regular: (items, length) => buildManualSession({ items, settings, ids: items.map((i) => i.id), mode: "regular", count: length, systems: SETS }),
   "get started": (items, length) => buildManualSession({ items, settings, ids: items.map((i) => i.id), mode: "started", count: length, systems: SETS }),
   "not seen lately": (items, length) => buildManualSession({ items, settings, ids: items.map((i) => i.id), mode: "unseen", count: length, systems: SETS }),
-  "fix mistakes": (items, length) => buildManualSession({ items, settings, ids: items.map((i) => i.id), mode: "mistakes", count: length, systems: SETS }),
+  "weak spots": (items, length) => buildManualSession({ items, settings, ids: items.map((i) => i.id), mode: "weak", count: length, systems: SETS }),
   /* What is going wrong. */
   "weak skills": (items, length) => buildWeakSession({ items, settings, inDeck: () => true, budget: length, systems: SETS }),
 };
@@ -169,12 +169,12 @@ const AGREED = [
     why: "three words never seen, each asked four times" },
   { session: "not seen lately", material: "3 words", learner: "halfway", size: 1 * 4,
     why: "one word of the three not seen lately (the new one; the other two were practised five days ago), asked four times" },
-  ...["fix mistakes", "weak skills"].map((session) => ({
+  ...["weak spots", "weak skills"].map((session) => ({
     session, material: "3 words", learner: "struggling", size: 1 * 4,
     why: "one word of the three going wrong, asked four times",
   })),
   /* Nothing qualifies at all. */
-  ...["fix mistakes", "weak skills"].flatMap((session) =>
+  ...["weak spots", "weak skills"].flatMap((session) =>
     ["beginner", "halfway", "all due", "nothing due"].flatMap((learner) =>
       Object.keys(MATERIAL).map((material) => ({
         session, material, learner, size: 0, why: "nothing is going wrong, and this session is only what is going wrong",
@@ -231,13 +231,13 @@ test("everything agreed to be short is still a case that happens", () => {
   assert.deepEqual(stale, []);
 });
 
-test("a struggling learner's mistakes session is never empty", () => {
+test("a struggling learner's weak-spots sessions are never empty", () => {
   /* The other half of the agreed empties: "nothing is going wrong" must
      not be what a session says when something is. */
   for (const material of Object.keys(MATERIAL)) {
     const items = LEARNERS.struggling(MATERIAL[material]());
     installIndexes(items, settings, SETS);
-    assert.ok(questions(SESSIONS["fix mistakes"](items, 10)) > 0, material);
+    assert.ok(questions(SESSIONS["weak spots"](items, 10)) > 0, material);
     assert.ok(questions(SESSIONS["weak skills"](items, 10)) > 0, material);
   }
 });

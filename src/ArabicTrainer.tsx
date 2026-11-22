@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, useContext, useId } from "react";
 import type { OnboardingPlace } from "./spaces.tsx";
 import type {
   Course, DayMoves, Deck, Doc, ExerciseSpec, ExerciseState, FlagKind, FlagVerdict, Form, Item,
@@ -2034,6 +2034,7 @@ export function standInSets(views: HeldSet[]): HeldSet[] {
 type SetStart =
   | { kind: "begin"; practice?: boolean; only?: (it: Item) => boolean; pathUnit?: string }
   | { kind: "weak" }
+  | { kind: "unseen" }
   | { kind: "saved"; saved: SavedSession };
 
 /*
@@ -5866,9 +5867,9 @@ const MODES = {
     label: "Get started",
     blurb: "Recognition only — reading the script and hearing it, never producing it. The gentle way in.",
   },
-  mistakes: {
-    label: "Fix mistakes",
-    blurb: "Only the cards you've slipped on in the last couple of attempts.",
+  weak: {
+    label: "Weak spots",
+    blurb: "Only the questions you've got wrong lately, worst first — just the way each card went wrong, not every kind of question it has.",
   },
   unseen: {
     label: "Not seen lately",
@@ -5898,31 +5899,16 @@ function notSeenLately(unit: Form, settings: Settings) {
 }
 
 
-/* Did this form go wrong in either of its last two outings? Read in the
-   card's own language, and through stateOf, which answers for a key that
-   has never been written.
+/** Has this card a form Not seen lately would ask about? */
+export function isUnseen(it: Item, settings: Settings): boolean {
+  return drillableUnits(it, settings).some(({ unit }) => notSeenLately(unit, settings));
+}
 
-   Over the questions a session can put to the form, as Weak spots reads
-   it (isWeak) — not over everything the card supports. A form at the top
-   of its ladder is asked its top alone, so a slip on a reading question
-   before the climb stayed in that question's last two answers for good:
-   the card was in every Fix mistakes session, dealt the one question it
-   had never got wrong, and answering that right changed nothing (0.598). */
-function hasRecentMistake(unit: Form, settings: Settings) {
-  const types = askableTypes(unit, settings);
-  let sawHistory = false;
-  for (const t of types) {
-    const h = stateOf(unit, t).hist || [];
-    if (h.length) {
-      sawHistory = true;
-      if (h.slice(-2).some((x) => !x)) return true;
-    }
-  }
-  // Nothing recorded yet — fall back to whether it has ever gone wrong.
-  if (!sawHistory) {
-    return types.some((t) => (stateOf(unit, t).wrong || 0) > 0 || (stateOf(unit, t).lapses || 0) > 0);
-  }
-  return false;
+/* A session kept with Fix mistakes, which Weak spots replaced in Build a
+   session (0.669): the same cards are asked for, now through Weak spots.
+   Read wherever a kept session's mode is. */
+export function modeOfSaved(mode: string): string {
+  return mode === "mistakes" ? "weak" : mode;
 }
 
 /*
@@ -6275,11 +6261,12 @@ function drawRange(
  * the same rule over a different pool, or the same rule asking a different
  * set of questions:
  *
- * - **Fix mistakes:** the pool is cards gone wrong in their last outings.
  * - **Not seen lately:** cards not practised for a few days, new ones
  *   included — which come in through the learning share like anywhere else.
  * - **Weak spots:** cards with something going wrong now, asked the
- *   questions that went wrong.
+ *   questions that went wrong — from Focused training over every card, or
+ *   from the Build screen over the cards picked (0.669, in place of Fix
+ *   mistakes, which took the same cards and asked them everything).
  * - **Get started:** recognition questions only.
  * - **Ultimate:** every question each card has open.
  * - **Catch up:** the pool is Cleared and Learnt cards with a question due
@@ -6288,7 +6275,7 @@ function drawRange(
  *   cards, no cards still climbing, no shares, nothing brought forward to
  *   fill a place.
  */
-export type SessionMode = "regular" | "ultimate" | "started" | "mistakes" | "unseen" | "weak" | "catchup";
+export type SessionMode = "regular" | "ultimate" | "started" | "unseen" | "weak" | "catchup";
 
 /*
  * A question Catch up asks: one already met whose time has come round.
@@ -6408,10 +6395,8 @@ export function buildSession({
   /* The mode's own pool, narrowed from the cards chosen. */
   const units = (it: Item) => drillableUnits(it, settings);
   const pool = drillable.filter((it) =>
-    mode === "mistakes"
-      ? units(it).some(({ unit }) => hasRecentMistake(unit, settings))
-      : mode === "unseen"
-      ? units(it).some(({ unit }) => notSeenLately(unit, settings))
+    mode === "unseen"
+      ? isUnseen(it, settings)
       : mode === "weak"
       ? isWeak(it, settings)
       : mode === "catchup"
@@ -6421,7 +6406,7 @@ export function buildSession({
   if (!pool.length) {
     return {
       exercises: [],
-      reason: mode === "weak" ? "nothing-weak" : mode === "mistakes" ? "no-mistakes" : mode === "unseen" ? "no-unseen" : mode === "catchup" ? "caught-up" : "none-drillable",
+      reason: mode === "weak" ? "nothing-weak" : mode === "unseen" ? "no-unseen" : mode === "catchup" ? "caught-up" : "none-drillable",
     };
   }
 
@@ -7147,7 +7132,7 @@ export function buildManualSession({ items, settings, ids, mode, count, minutes,
  * `hist` is the last six outings, 1 right and 0 wrong, and it is the only
  * record with an order to it. A card from before it existed carries an
  * empty one and reads as 0 rather than as never having been right, which
- * is the same guard `missedTwice` and `hasRecentMistake` both make.
+ * is the same guard `missedTwice` makes.
  */
 export function weakness(s: ExerciseState | null | undefined): number {
   if (!s) return 0;
@@ -7938,6 +7923,19 @@ export function buildWeakSession({ items, settings, inDeck, budget, systems, per
   /* `manual`: not a dealt session. "Keep going" at the end starts another
      of these, not a dealt one — see Again (0.656). */
   return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "weak" }), manual: true, mode: "weak" };
+}
+
+/* Not seen lately over every card, from Focused training (0.669). Under
+   the session mix like the rest — see SessionMode. */
+export function buildUnseenSession({ items, settings, inDeck, budget, systems, perDay }: {
+  items: Item[];
+  settings: Settings;
+  inDeck: (it: Item) => boolean;
+  budget?: number;
+  systems?: SystemSet[];
+  perDay?: number;
+}) {
+  return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "unseen" }), manual: true, mode: "unseen" };
 }
 
 /*
@@ -11833,6 +11831,9 @@ export default function ArabicTrainer() {
   const [building, setBuilding] = useState(false);
   /* Focused training (0.650): the screen behind the dumbbell on Home. */
   const [training, setTraining] = useState(false);
+  /* Prep mode's screen, opened from Focused training (0.669) — it was on
+     Progress until then. */
+  const [prepOpen, setPrepOpen] = useState(false);
   const [showingSaved, setShowingSaved] = useState(false);
   const [editingSaved, setEditingSaved] = useState<SavedSession | null>(null);
   /* Which language the session on screen is drawn from: a language id, ""
@@ -13408,11 +13409,31 @@ export default function ArabicTrainer() {
     () => drillable.filter((it) => isWeak(it, settings)).length,
     [drillable, settings]
   );
+  /* The decks a prep can be aimed at, for Prep mode: the deck tags, with
+     how many cards of each can be asked (towardsLearnt, as Progress counts
+     them). Only while the screen is open — it is a walk of every card. */
+  const prepDecks = useMemo(() => {
+    if (!prepOpen) return [];
+    const counted = asCounted(shown).filter((it) => towardsLearnt(it, settings, shown));
+    return deckTags
+      .map((name) => ({ name, n: counted.filter((it) => (it.tags || []).includes(name)).length, learnt: 0 }))
+      .filter((d) => d.n > 0)
+      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+  }, [prepOpen, shown, settings, deckTags]);
+  /* And how much has not been met lately, for the Not seen lately button
+     beside it (0.669) — the test its session picks with, as above. */
+  const unseenCount = useMemo(
+    () => drillable.filter((it) => isUnseen(it, settings)).length,
+    [drillable, settings]
+  );
   /* A session started from Focused training — weak spots, a built one, a
      kept one — closes it, so the session's end comes back to Home rather
      than to the screen it was started from (0.650). */
   useEffect(() => {
-    if (session) setTraining(false);
+    if (session) {
+      setTraining(false);
+      setPrepOpen(false);
+    }
   }, [session]);
 
   /* ---------------- session ---------------- */
@@ -13554,6 +13575,7 @@ export default function ArabicTrainer() {
     passSets.current = true;
     if (st.kind === "begin") begin(st.practice, st.only, st.pathUnit);
     else if (st.kind === "weak") beginWeak();
+    else if (st.kind === "unseen") beginUnseen();
     else startSaved(st.saved);
     passSets.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -13592,7 +13614,7 @@ export default function ArabicTrainer() {
 
   function manualOfSaved(s: SavedSession) {
     const ids = new Set([...s.ids, ...cardsOfSaved(s, shown).map((it) => it.id)]);
-    return { ids, mode: s.mode, count: s.count, minutes: s.minutes };
+    return { ids, mode: modeOfSaved(s.mode), count: s.count, minutes: s.minutes };
   }
 
   /* What a session started this way would be dealt now — the one place
@@ -13606,6 +13628,7 @@ export default function ArabicTrainer() {
       });
     }
     if (a.kind === "weak") return buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
+    if (a.kind === "unseen") return buildUnseenSession({ items: shown, settings, inDeck, systems, perDay });
     const m = a.kind === "saved" ? manualOfSaved(a.saved) : a;
     /* Regular is dealt as the home screen deals, so it reads the cards the
        home screen does: the language switch has its say over which words
@@ -13618,6 +13641,7 @@ export default function ArabicTrainer() {
   function startAgain(a: Again) {
     if (a.kind === "begin") begin(a.practice, a.only, a.pathUnit);
     else if (a.kind === "weak") beginWeak();
+    else if (a.kind === "unseen") beginUnseen();
     else if (a.kind === "saved") startSaved(a.saved);
     else beginManual(a);
   }
@@ -13634,7 +13658,7 @@ export default function ArabicTrainer() {
     setBuilding(false);
     if (!built.exercises.length) {
       flash(
-        built.reason === "no-mistakes"
+        built.reason === "nothing-weak"
           ? "Nothing to fix — none of those have gone wrong recently"
           : built.reason === "caught-up"
           ? "You're all caught up — no cleared or learnt card in those is due yet"
@@ -13971,6 +13995,29 @@ export default function ArabicTrainer() {
     }
     warmSession(built);
     setSession({ ...built, practice: false, startedAt: now(), endsAt: 0, again: { kind: "weak" } });
+    setQi(0);
+    setTally(NO_SCORE);
+    setMoved([]);
+    resetExercise();
+    setTab("home");
+  }
+
+  /* Not seen lately over every card, from Focused training (0.669): the
+     Build screen's mode of the same name, over the cards a dealt session
+     comes from rather than the ones picked. */
+  function beginUnseen() {
+    if (askFirst({ kind: "unseen" })) return;
+    const built = buildAgain({ kind: "unseen" });
+    if (!built.exercises.length) {
+      flash(
+        built.reason === "no-unseen"
+          ? "You've practised everything in the last few days — nothing has been left behind"
+          : "No card here has enough on it to be practised yet"
+      );
+      return;
+    }
+    warmSession(built);
+    setSession({ ...built, practice: false, startedAt: now(), endsAt: 0, again: { kind: "unseen" } });
     setQi(0);
     setTally(NO_SCORE);
     setMoved([]);
@@ -17737,8 +17784,6 @@ export default function ArabicTrainer() {
             settings={settings}
             moves={data.moves}
             perDay={perDay}
-            prep={prepOf(settings)}
-            onPrep={savePrep}
           />
         )}
 
@@ -17785,14 +17830,36 @@ export default function ArabicTrainer() {
             onWeak={() =>
               weakCount ? beginWeak() : flash("There is no weak spot to fix right now")
             }
+            unseenCount={unseenCount}
+            onUnseen={() =>
+              unseenCount ? beginUnseen() : flash("Nothing left behind — you've practised everything in the last few days")
+            }
             canBuild={drillable.length > 0}
             onBuild={() => setBuilding(true)}
+            prep={prepOf(settings)}
+            onPrep={() => setPrepOpen(true)}
             saved={savedHere}
             items={shown}
             settings={settings}
             onSavedList={() => setShowingSaved(true)}
             onStartSaved={startSaved}
             onClose={() => setTraining(false)}
+          />
+        )}
+
+        {/* Over Focused training, and back to it on Save or Back. */}
+        {training && prepOpen && !session && (
+          <PrepScreen
+            prep={prepOf(settings)}
+            decks={prepDecks}
+            collection={shown}
+            settings={settings}
+            perDay={perDay}
+            onSave={(p) => {
+              savePrep(p);
+              setPrepOpen(false);
+            }}
+            onBack={() => setPrepOpen(false)}
           />
         )}
 
@@ -18905,12 +18972,16 @@ const TIME_CHOICES = [2, 5, 10, 15, 30];
    ------------------------------------------------------------------ */
 
 function FocusedTrainingSheet({
-  weakCount, onWeak, canBuild, onBuild, saved, items, settings, onSavedList, onStartSaved, onClose,
+  weakCount, onWeak, unseenCount, onUnseen, canBuild, onBuild, prep, onPrep, saved, items, settings, onSavedList, onStartSaved, onClose,
 }: {
   weakCount: number;
   onWeak: () => void;
+  unseenCount: number;
+  onUnseen: () => void;
   canBuild: boolean;
   onBuild: () => void;
+  prep: Prep | null;
+  onPrep: () => void;
   saved: SavedSession[];
   items: Item[];
   settings: Settings;
@@ -18924,28 +18995,55 @@ function FocusedTrainingSheet({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  /* Where the prep stands, under its button — the line that sat beside
+     it on Progress until Prep mode moved here (0.669). */
+  const prepNow = prep ? prepStatus(prep, items, settings) : null;
+  const prepLine = !prep
+    ? ""
+    : prepNow === "past"
+    ? `${prep.name} has come — edit the prep or delete it.`
+    : prepNow === "done"
+    ? `Ready for ${prep.name}: every card is ${prep.target === "cleared" ? "cleared" : "learnt"}.`
+    : `Prepping for ${prep.name} · ${prepDaysLeft(prep.date) === 1 ? "1 day left" : `${prepDaysLeft(prep.date)} days left`}`;
+
   return (
     <Screen title="Focused training" onBack={onClose} className="training">
       <div className="at-training">
-        {/* What the screen is for, under a dumbbell (0.668): it had only
-            its buttons, which said what each does but not why come here. */}
+        {/* What the screen is for, under a dumbbell (0.668). Each button
+            says what it does itself (0.669), so the line is short. */}
         <div className="at-trainingintro" data-el="training-intro">
           <TrainingArt />
-          <p>
-            Practise with a goal in mind. Fix what keeps slipping, or build a
-            session from the cards you choose{saved.length > 0 ? ", or go back to one you saved" : ""}.
-          </p>
+          <p>Practise with a goal in mind.</p>
         </div>
-        <div className="at-row">
-          <Button variant="ghost" off={!weakCount} onClick={onWeak}>
-            Weak spots
-          </Button>
+        {/* Two sessions over every card, side by side, then the two ways
+            of aiming one yourself, full width (0.669). */}
+        <div className="at-trainpair">
+          <TrainingChoice
+            title="Weak spots"
+            note="Only the questions you've got wrong lately, worst first."
+            off={!weakCount}
+            onClick={onWeak}
+          />
+          <TrainingChoice
+            title="Not seen lately"
+            note="Cards you haven't practised in the last few days."
+            off={!unseenCount}
+            onClick={onUnseen}
+          />
         </div>
-        <div className="at-row">
-          <Button variant="ghost" onClick={onBuild} disabled={!canBuild}>
-            Build a session
-          </Button>
-        </div>
+        <TrainingChoice
+          title="Build a session"
+          note="Pick the cards, the kind of practice and how long it lasts."
+          disabled={!canBuild}
+          onClick={onBuild}
+        />
+        <TrainingChoice
+          title="Prep mode"
+          note="Get decks ready by a date, like an exam, a trip or the start of a class."
+          status={prepLine}
+          onClick={onPrep}
+          dialog
+        />
         {saved.length > 0 && (
           <>
             <div className="at-row">
@@ -18958,6 +19056,40 @@ function FocusedTrainingSheet({
         )}
       </div>
     </Screen>
+  );
+}
+
+/* One of Focused training's choices (0.669): its name, and a line under
+   it saying what it is. `off` is dimmed but still pressed, so the press
+   can say why there is nothing in it, as Weak spots always has; `status`
+   is a second line for where it stands, in the accent colour. */
+function TrainingChoice({ title, note, status, off, disabled, dialog, onClick }: {
+  title: string;
+  note: string;
+  status?: string;
+  off?: boolean;
+  disabled?: boolean;
+  dialog?: boolean;
+  onClick: () => void;
+}) {
+  /* Named by its title alone, and described by the rest, so it is
+     "Weak spots" to a screen reader as it was before it had a line. */
+  const id = useId();
+  return (
+    <button
+      type="button"
+      className={`at-trainchoice${off ? " off" : ""}`}
+      disabled={disabled}
+      aria-disabled={off ? true : undefined}
+      aria-label={title}
+      aria-describedby={`${id}-note${status ? ` ${id}-status` : ""}`}
+      aria-haspopup={dialog ? "dialog" : undefined}
+      onClick={onClick}
+    >
+      <span className="at-trainchoicename">{title}</span>
+      <span className="at-trainchoicenote" id={`${id}-note`}>{note}</span>
+      {status ? <span className="at-trainchoicestatus" id={`${id}-status`}>{status}</span> : null}
+    </button>
   );
 }
 
@@ -19003,7 +19135,7 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
              the difference between a short session and a broken one. */
           const alive = cardsOfSaved(s, items).length;
           const gone = missingFromSaved(s, items).length;
-          const mode = (MODES as Record<string, { label: string } | undefined>)[s.mode];
+          const mode = (MODES as Record<string, { label: string } | undefined>)[modeOfSaved(s.mode)];
           const length = s.minutes
             ? `${s.minutes} min`
             : s.count && s.count < 999
@@ -19085,7 +19217,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
      already given, so the Mode section gets read as "confirm this" rather
      than "pick one" — and Ultimate, which is the longest session on offer,
      is the last one to hand somebody by default. */
-  const [mode, pickMode] = useState(editing ? editing.mode : "");
+  const [mode, pickMode] = useState(editing ? modeOfSaved(editing.mode) : "");
   /*
    * What is picked, two ways, as the two pickers show it: whole decks, and
    * single cards. A kept session is read back into the same two — what it
@@ -19180,10 +19312,12 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   /* Matches the minimum buildManualSession uses, or Start would be offered
      for a session that then refuses to build — and refused for one that
      would have been fine. */
-  const needTypes = mode === "started" ? 1 : 2;
+  const needTypes = mode === "started" || mode === "weak" ? 1 : 2;
   const typesShort =
     mode && typeCount < needTypes
-      ? mode === "started"
+      ? mode === "weak"
+        ? "Weak spots needs at least one exercise type switched on in Settings"
+        : mode === "started"
         ? "Get started needs one of the gentle exercise types switched on"
         : "At least two exercise types must be switched on in Settings"
       : "";
@@ -20721,8 +20855,6 @@ function ProgressTab({
   settings,
   moves,
   perDay = 0,
-  prep = null,
-  onPrep,
   spaceOf,
   spaceNames,
 }: {
@@ -20743,14 +20875,8 @@ function ProgressTab({
   moves?: Record<string, DayMoves>;
   /** Questions answered on a typical recent day — see `typicalDay`. */
   perDay?: number;
-  /** The learner's prep, if they have one — see Prep. */
-  prep?: Prep | null;
-  /** Sets, changes or clears it. */
-  onPrep?: (prep: Prep | null) => void;
 }) {
   const [viewing, setViewing] = useState<any | null>(null);
-  /* Whether Prep mode is open. */
-  const [prepOpen, setPrepOpen] = useState(false);
   /* The deck open on its own screen, or none. */
   const [deckOpen, setDeckOpen] = useState<string>("");
 
@@ -20907,8 +21033,6 @@ function ProgressTab({
   }, [counted, progress, spaceOf, spaceNames, unitTitles]);
   const deckOpenRow = deckRows.find((d) => d.key === deckOpen) || null;
 
-  /* Where the prep stands, for the line beside the button. */
-  const prepNow = prep ? prepStatus(prep, items, settings) : null;
   return (
     /* One sheet, ruled into parts, the way the card editor is laid out —
        see .at-ruled. */
@@ -21124,47 +21248,8 @@ function ProgressTab({
           </div>
         </Section>
       )}
-      {/* Prep mode: getting a set of decks ready by a date, under a heading
-          of its own like the other parts of the screen, last, after the
-          decks it is about. The button starts
-          one, or opens the one there is; the line beside it says what is
-          being prepped for. */}
-      <Section head title="Prep mode" lede="Get some decks ready by a set date, like an exam, an upcoming trip, or the start of a class.">
-        <div className="at-prepbar">
-          <Button variant="ghost" onClick={() => setPrepOpen(true)} aria-haspopup="dialog">
-            {prep ? "Edit prep mode" : "Start prep mode"}
-          </Button>
-          {prep && (
-            <Help className="at-prepnote">
-              {prepNow === "past"
-                ? `${prep.name} has come — edit the prep or delete it.`
-                : prepNow === "done"
-                ? `Ready for ${prep.name}: every card is ${prep.target === "cleared" ? "cleared" : "learnt"}.`
-                : `Prepping for ${prep.name} · ${
-                    prepDaysLeft(prep.date) === 1 ? "1 day left" : `${prepDaysLeft(prep.date)} days left`
-                  }`}
-            </Help>
-          )}
-        </div>
-      </Section>
-
       {items.length === 0 && (
         <Empty title="Nothing to show yet">{noCardsYet(myCourses.length)}</Empty>
-      )}
-
-      {prepOpen && (
-        <PrepScreen
-          prep={prep}
-          decks={deckRows}
-          collection={items}
-          settings={settings}
-          perDay={perDay}
-          onSave={(p) => {
-            if (onPrep) onPrep(p);
-            setPrepOpen(false);
-          }}
-          onBack={() => setPrepOpen(false)}
-        />
       )}
 
       {deckOpenRow && (

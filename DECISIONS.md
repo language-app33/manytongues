@@ -9001,3 +9001,38 @@ day as the facts, the second day of practice (the owner's 1a), so Home
 opens up once rather than in stages. Before then there is little behind
 it: Weak spots needs a card missed twice running and there are no saved
 sessions. No note announces it (the owner's 2a).
+
+## Weak spots replaces Fix mistakes on the Build screen, and Focused training holds four choices (0.669)
+
+**Fix mistakes is gone; Build a session has Weak spots in its place.** The
+two picked the same cards — something wrong in the last two outings —
+and differed in what they then asked. Fix mistakes gave each card an
+ordinary mix of its questions, including the ones it had never missed,
+and needed two exercise types to build at all. Weak spots asks only the
+questions that went wrong, worst first. The owner asked for the second
+rule on the Build screen too, over the cards picked. `hasRecentMistake`
+went with it, and so did its fallback for cards answered before the
+outing record existed (any lapse ever counted): such cards now read as
+nothing to fix, as they always have for the Weak spots button. A session
+kept with Fix mistakes opens as Weak spots (`modeOfSaved`), so nobody's
+saved session breaks.
+
+**Focused training: Weak spots and Not seen lately side by side, then
+Build a session and Prep mode full width,** each with a line saying what
+it is (the owner's brief). Not seen lately is new as a button: the Build
+screen's mode of the same name over the cards a dealt session reads, as
+Weak spots is (`buildUnseenSession`), dimmed and saying why when there is
+nothing to bring back. The Build screen keeps its own Not seen lately for
+the cards picked (the owner's 5a).
+
+**Prep mode moved from Progress to Focused training (the owner's 1b).**
+Where a prep stands ("Prepping for Exam · 12 days left") is a second
+line under its button. The decks it offers are counted in the trainer
+now rather than off Progress's deck tiles: the deck tags that are not
+path units, with the cards of each that can be asked.
+
+**The choices are their own button (`TrainingChoice`),** not `Button`:
+`Button` sets one line in capitals, and these need a name and a sentence
+under it. It borrows the ghost button's outline, dimmed state and focus
+ring. Its accessible name is the title alone, with the line as its
+description, so it is still "Weak spots" to a screen reader.

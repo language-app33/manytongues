@@ -2533,9 +2533,6 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
   button.at-deckstat { transition: border-color 140ms ease; }
   button.at-deckstat:hover { border-color: var(--ink); }
 }
-/* Prep mode, above the ladder: the button, and what is being prepped for. */
-.at-prepbar { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; }
-.at-prepbar .at-prepnote { margin:0; }
 /* The deck's own screen: how far it has got, then the two dates. */
 .at-deckhead { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
 .at-forecast { border:2px solid var(--line); border-radius: var(--r); background: var(--surface);
@@ -3586,6 +3583,24 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-trainingintro { max-width:420px; margin:0 auto 24px; }
 .at-trainingart { display:block; width:128px; height:auto; margin:4px auto 12px; color: var(--muted); }
 .at-trainingintro p { margin:0; padding:0 8px; font-size:15px; line-height:1.4; color: var(--text-soft); text-wrap: balance; }
+/* Its choices (0.669): the name in the buttons' own lettering, and a line
+   under it saying what it is. Two side by side, then two full width. The
+   outline and the dimmed state are .at-btn.ghost's. */
+.at-trainpair { display:grid; grid-template-columns:1fr 1fr; gap:12px; max-width:420px; margin:0 auto 12px; }
+.at-training > .at-trainchoice { width:100%; max-width:420px; margin:0 auto 12px; }
+.at-trainchoice { display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:6px;
+  min-width:0; padding:14px 14px 16px; background:transparent; color: var(--text);
+  border:2px solid var(--line); border-radius: var(--r); cursor:pointer; font-family: var(--ui); text-align:center;
+  transition: transform 60ms, background 120ms; }
+.at-trainchoicename { font-size:16px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; line-height:1.2; }
+.at-trainchoicenote { font-size:13.5px; font-weight:500; line-height:1.35; color: var(--muted); text-wrap: pretty; }
+.at-trainchoicestatus { font-size:13.5px; font-weight:700; line-height:1.35; color: var(--jade); }
+.at-trainchoice:active:not(:disabled):not(.off) { transform: translateY(1px); }
+.at-trainchoice:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+@media (hover: hover) { .at-trainchoice:hover:not(:disabled):not(.off) { background: var(--raised-hover); } }
+.at-trainchoice:disabled, .at-trainchoice.off { cursor:default; }
+.at-trainchoice:disabled .at-trainchoicename, .at-trainchoice.off .at-trainchoicename { color: var(--faint); }
+.at-trainchoice:disabled .at-trainchoicenote, .at-trainchoice.off .at-trainchoicenote { opacity:.75; }
 
 /* --- the floating button ---------------------------------------------
    Edit on a card or deck being read, Save on one being written: in the

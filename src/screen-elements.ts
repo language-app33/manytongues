@@ -142,7 +142,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
   ]],
   [END, [
     ["what-moved", "The cards this sitting moved up a level, cleared, or learnt — left out altogether when none did.", "airport — learnt · key — up to writing it from a cue"],
-    ["keep-going-button", "Starts another session the way this one was started — the same deck, unit or prep, practice or weak spots, or the same cards, kind and length built by hand — dealt afresh. Above Done, and only when that session would have something to ask.", "Keep going"],
+    ["keep-going-button", "Starts another session the way this one was started — the same deck, unit or prep, practice, weak spots or not seen lately, or the same cards, kind and length built by hand — dealt afresh. Above Done, and only when that session would have something to ask.", "Keep going"],
     ["done-button", "Back to the home screen.", "Done"],
   ]],
   [SPACES, [
@@ -152,8 +152,8 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["path-home", "On Home, above the card and Practice (0.617): one line per course with a path — the course, its current unit and that unit's stages. It opens the unit.", "Arabic 101 · Unit 3 of 8 · Family · Words 4/6 · Sentences 1/5"],
     ["progress-path", "On Progress, above the deck tiles: each course's units in order, each Finished, Current, Locked or Opened by your teacher.", "1. Greetings · Finished"],
     ["set-waiting", "On Home, above the card and Practice (0.630): how many pictures of a personal set still wait for the learner's answer, with Answer to give them.", "3 pictures in Our family are waiting for your answer."],
-    ["focused-training", "On Home, at the right of Practice (0.650): the dumbbell, which opens Focused training — Weak spots, Build a session and the sessions you kept. From the student's second day of practice (0.667).", ""],
-    ["training-intro", "At the top of Focused training (0.668): a dumbbell drawing and one line saying what the screen is for. It names saved sessions only once there is one.", "Practise with a goal in mind. Fix what keeps slipping, or build a session from the cards you choose."],
+    ["focused-training", "On Home, at the right of Practice (0.650): the dumbbell, which opens Focused training — Weak spots, Not seen lately, Build a session, Prep mode (0.669) and the sessions you kept. From the student's second day of practice (0.667).", ""],
+    ["training-intro", "At the top of Focused training (0.668): a dumbbell drawing and one short line saying what the screen is for. Under it since 0.669, Weak spots and Not seen lately side by side and Build a session and Prep mode full width, each with a line saying what it is.", "Practise with a goal in mind."],
     ["home-fact", "On Home, under the progress ring (0.664): the card with a shape in the logo's style and a fact about a dialect or regional language, ending in an icon that opens the fact's source. It turns after every finished session. It had a small title until 0.665. Until the student's second day of practice it holds the logo's loops and a welcome instead (0.666).", "By one estimate, only 2.5% of Italians spoke standard Italian when Italy unified in 1861."],
     ["practice", "On Home, under the card (0.664): the main button, Practice, with a play symbol and a short line inside it saying what it will deal. It was Start session.", "Practice · 6 to review · 3 in progress"],
     ["unit-page", "The top of a unit's page: where it stands, its stages, and Practise this unit where it is open.", "Current · Words 4/6 · Sentences 1/5"],
