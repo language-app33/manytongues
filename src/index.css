@@ -3565,7 +3565,9 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    either theme. */
 .at-home .at-homecard { max-width: 420px; margin: 16px auto 0; padding: 14px 0 16px; border-radius: 22px;
   background: var(--raised); text-align: center; }
-.at-homeart { display: block; width: 78%; max-width: 300px; height: auto; margin: 0 auto 14px; color: var(--text); }
+/* 80% of what it was in 0.664 (the owner, 0.665): 78% of the card, at
+   most 300px, became these. */
+.at-homeart { display: block; width: 62.4%; max-width: 240px; height: auto; margin: 0 auto 14px; color: var(--text); }
 .at-homecardfact { margin: 0; padding: 0 12px; font-size: 14px; font-weight: 700;
   line-height: 1.35; color: var(--text-soft); text-wrap: balance; }
 .at-homecardsrc { display: inline-flex; vertical-align: -2px; padding: 1px; border-radius: 4px; color: var(--jade); }

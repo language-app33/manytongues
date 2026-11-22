@@ -15,6 +15,8 @@ button.**
 
 - **No title on the card.** The small label above the shape ("Italy" and
   so on) is gone, so the card is just the shape and the fact.
+- **A smaller shape.** The shape is a fifth smaller, so the card takes
+  less of the screen.
 - **The fact runs wider.** It uses nearly the card's full width, so most
   facts now take two lines instead of three.
 - **Practice matches the app's other main buttons:** the same corners,
