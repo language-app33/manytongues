@@ -3551,7 +3551,11 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
   row-gap: 4px; text-align: left; width: auto; }
 .at-practicebtn > .at-btnlabel > b { font-weight: inherit; line-height: 1; }
 .at-practicebtn > .at-btnlabel > small { font-size: 12.5px; font-weight: 700; line-height: 1.15; letter-spacing: 0;
-  text-transform: none; opacity: .88; }
+  text-transform: none; opacity: .88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* On the narrowest phones the line stays on one line (0.666): the button
+   may shrink, and the line ends in "…" before it would wrap. */
+.at-row > .at-btn.at-practicebtn { min-width: 0; }
+.at-row > .at-btn.at-practicebtn > .at-btnlabel { min-width: 0; overflow: hidden; }
 /* The dumbbell is the app's secondary (ghost) button, as every secondary
    action is (0.665): its own is only a square-ish width rather than a
    share of the row. */

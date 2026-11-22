@@ -8,6 +8,28 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.666 — 24 November 2026
+
+**A welcome before the facts.** The card on Home now shows its facts from
+the second day a student practises. Until then it shows the logo's loops
+and a welcome instead:
+
+- **Before any practice:** "Welcome! Your first session takes just a few
+  minutes."
+- **On the first day, after practising:** "Great start! Come back
+  tomorrow and your cards will begin to stick."
+
+A student who practised yesterday sees a fact as soon as they open the
+app today. The days are counted from the student's own practice, so this
+follows them across their devices.
+
+**Practice's second line stays on one line.** On the narrowest phones, a
+long line such as "6 to review · 3 in progress" no longer wraps onto two
+lines. It ends in "…" if it can't fit.
+
+Still to check by hand: a brand-new student account sees the first
+welcome, the second after its first session, and a fact the next day.
+
 ## 0.665 — 23 November 2026
 
 **The card on Home is simpler, and Practice looks like every other main

@@ -70,3 +70,22 @@ test("the Practice button says what it will deal, in a few words", () => {
   /* There is always a session to start: caught up is said, not hidden. */
   assert.equal(practiceLine({ review: 0, climbing: 0, fresh: 0, behind: false }), "All caught up");
 });
+
+test("the facts start on the second day of practice, after a welcome (0.666)", async () => {
+  const { homeStage, HOME_WELCOME } = await import("../src/home-card.ts");
+  const today = "2026-11-24";
+  /* Nothing practised yet, or only days with nothing answered. */
+  assert.equal(homeStage(undefined, today), "new");
+  assert.equal(homeStage({}, today), "new");
+  assert.equal(homeStage({ "2026-11-20": 0 }, today), "new");
+  /* Practised today, and never before. */
+  assert.equal(homeStage({ [today]: 12 }, today), "first");
+  /* Any other day of practice: the facts. A student back this morning
+     sees them before practising again. */
+  assert.equal(homeStage({ "2026-11-23": 20 }, today), "learning");
+  assert.equal(homeStage({ "2026-11-23": 20, [today]: 4 }, today), "learning");
+  /* The owner's wording, and never "words". */
+  for (const line of Object.values(HOME_WELCOME)) assert.doesNotMatch(line, /\bwords?\b/i);
+  assert.match(HOME_WELCOME.new, /^Welcome!/);
+  assert.match(HOME_WELCOME.first, /cards/);
+});

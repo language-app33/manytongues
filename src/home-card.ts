@@ -305,3 +305,31 @@ export function practiceLine({ review, climbing, fresh, behind }: {
   else if (behind && (review || climbing)) parts.push("new cards wait");
   return parts.length ? parts.join(" · ") : "All caught up";
 }
+
+/* ------------------------------------------------------------------
+   Before the facts (0.666). A student who has not started, or is on
+   their first day, gets a welcome on the card instead of a fact, under
+   the logo's own loops. The facts arrive from the second day they
+   practise (the owner's 1b): coming back is the clearest sign someone
+   has really started, and the facts are a small reward for it.
+
+   Read off the practice log, which counts questions answered by day and
+   syncs, so it follows the student across their devices. "Learning" is
+   any day of practice other than today: a student who practised
+   yesterday sees facts this morning before practising again, since
+   "come back tomorrow" would be wrong by then.
+   ------------------------------------------------------------------ */
+
+export type HomeStage = "new" | "first" | "learning";
+
+export function homeStage(log: Record<string, unknown> | undefined, today: string): HomeStage {
+  const days = Object.entries(log || {}).filter(([, n]) => Number(n) > 0).map(([d]) => d);
+  if (!days.length) return "new";
+  return days.some((d) => d !== today) ? "learning" : "first";
+}
+
+/* The owner's wording (3a), with "cards", never "words". */
+export const HOME_WELCOME: Record<Exclude<HomeStage, "learning">, string> = {
+  new: "Welcome! Your first session takes just a few minutes.",
+  first: "Great start! Come back tomorrow and your cards will begin to stick.",
+};

@@ -856,7 +856,7 @@ export function mergeMoves(
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
 import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
 import { homeEmptyHint, homeEmptySays, listOf as listOfNames, whyHomeIsEmpty } from "./home-empty.ts";
-import { homeCardAt, practiceLine, type HomeShape, type HomeFact, type ShapeColour } from "./home-card.ts";
+import { homeCardAt, homeStage, practiceLine, HOME_SHAPES, HOME_WELCOME, type HomeShape, type HomeFact, type HomeStage, type ShapeColour } from "./home-card.ts";
 import { rememberedTheme, rememberTheme } from "./theme-memory.ts";
 import type { Filler, Mark } from "./grade.ts";
 
@@ -16403,7 +16403,7 @@ export default function ArabicTrainer() {
                   {/* A shape in the logo's style and a fact about how
                       language varies, turned after every finished session
                       (0.664). See home-card.ts. */}
-                  <HomeCard turn={homeTurn} />
+                  <HomeCard turn={homeTurn} stage={homeStage(data.log, dayKey())} />
 
                   {/* Practice, and beside it on the right the way to
                       Focused training (0.650): weak spots, a session built
@@ -18268,10 +18268,20 @@ function HomeShapeArt({ shape }: { shape: HomeShape }) {
     </svg>
   );
 }
-function HomeCard({ turn }: { turn: number }) {
+function HomeCard({ turn, stage }: { turn: number; stage: HomeStage }) {
   const { shape, fact }: { shape: HomeShape; fact: HomeFact } = homeCardAt(turn);
+  /* Until the second day of practice, a welcome under the logo's loops
+     instead of a fact (0.666): see homeStage. Nothing to source. */
+  if (stage !== "learning") {
+    return (
+      <div className="at-homecard" data-el="home-fact" data-stage={stage}>
+        <HomeShapeArt shape={HOME_SHAPES[0]} />
+        <p className="at-homecardfact">{HOME_WELCOME[stage]}</p>
+      </div>
+    );
+  }
   return (
-    <div className="at-homecard" data-el="home-fact" data-fact={fact.id}>
+    <div className="at-homecard" data-el="home-fact" data-stage={stage} data-fact={fact.id}>
       <HomeShapeArt shape={shape} />
       <p className="at-homecardfact">
         {fact.text}{"\u00a0"}

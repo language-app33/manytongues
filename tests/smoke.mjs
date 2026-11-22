@@ -1047,16 +1047,27 @@ check("every card with something due counts, and a value is never one", homeCard
     !!m && Number(m[1] || 0) + Number(m[2] || 0) + Number(m[3] || 0) === 6 &&
       /^Practice/.test((practice?.textContent || "").trim()) && !homeCard()?.querySelector(".at-homeline"),
     line || "no line");
-  /* The card above it: a title, a shape and a fact whose source opens in
-     the browser, not in the app. */
+  /* The card above it. Until the second day of practice (0.666) it is the
+     logo's loops and a welcome, with nothing to source; from then on a
+     shape and a fact whose source opens in the browser, not in the app.
+     Which one is read off this walk's own practice log, so the check holds
+     whichever day of the walk it lands on. */
   const card = homeCard()?.querySelector('[data-el="home-fact"]');
   const src = card?.querySelector("a.at-homecardsrc");
-  check("Home shows a fact card above Practice, with a shape and a source that opens outside the app, and no title (0.665)",
-    !!card && !card.querySelector(".at-homecardtitle") && !!(card.querySelector(".at-homecardfact")?.textContent || "").trim() &&
+  const doc = JSON.parse(localStorage.getItem("arabic-trainer:arabic-trainer-v3") || "null");
+  const days = Object.entries((doc && doc.log) || {}).filter(([, n]) => Number(n) > 0).map(([d]) => d);
+  const today = new Date();
+  const todayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(today.getDate()).padStart(2, "0")}`;
+  const want = !days.length ? "new" : days.some((d) => d !== todayKey) ? "learning" : "first";
+  const fact = (card?.querySelector(".at-homecardfact")?.textContent || "").trim();
+  check(`Home's card above Practice is the ${want === "learning" ? "fact, with its source opening outside the app" : "welcome, with nothing to source"}, and no title`,
+    !!card && card.getAttribute("data-stage") === want && !card.querySelector(".at-homecardtitle") && !!fact &&
       !!card.querySelector("svg.at-homeart path") &&
-      !!src && src.getAttribute("target") === "_blank" && /^https:\/\//.test(src.getAttribute("href") || "") &&
+      (want === "learning"
+        ? !!src && src.getAttribute("target") === "_blank" && /^https:\/\//.test(src.getAttribute("href") || "")
+        : !src && (want === "new" ? /^Welcome!/.test(fact) : /^Great start!/.test(fact))) &&
       !!((card.compareDocumentPosition(/** @type {Node} */ (practice)) || 0) & 4),
-    card ? (card.textContent || "").slice(0, 120) : "no card");
+    card ? `${card.getAttribute("data-stage")} · ${fact.slice(0, 100)} (log days: ${days.join(",") || "none"})` : "no card");
 }
 const wire = remoteDocs.get(realToken)?.data;
 /* Sparse means one thing: no state written out for an exercise type that was
