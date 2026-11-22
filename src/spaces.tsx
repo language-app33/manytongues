@@ -109,12 +109,12 @@ import { rangeChecks } from "./numbers/range.ts";
 import { personsOf } from "./verbs.ts";
 import { countedNouns, withNouns } from "./numbers/nouns.ts";
 import { isOffline, watchNet } from "./net.ts";
-import { drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { CARD_OUTBOX, drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { mediaIn, sendHeld, withoutMedia } from "./held-media.ts";
 
-/* What a card that could not be sent is filed under while it waits. See
-   outbox.ts: one queue for every kind of waiting work, and the kind is
-   what keeps a teacher's cards and a learner's reports apart. */
-const CARD_OUTBOX = "card";
+/* A card as a teacher would name it, in a message about it. */
+const cardLabel = (c: Partial<Card>) =>
+  (c && (leadOf(c as Card).ar || c.name || leadOf(c as Card).en)) || "A card";
 import { buildDialogIndex } from "./dialogs.ts";
 import { feedbackToText, flagsToText } from "./flag-export.ts";
 import { IMPORTED_STATUS, matchImport, mediaOf, mentions, readImportFile, remapIds, tickedAtFirst, toSave } from "./imports.ts";
@@ -421,7 +421,7 @@ export function Onboarding({ onDone, place = {} }: {
               value={name}
               autoFocus
               onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && name.trim() && create()}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (name.trim()) create(); } }}
             />
             <Help className="at-mt3 at-mb2">
               Your invitation code, or a course code from your teacher.
@@ -434,7 +434,7 @@ export function Onboarding({ onDone, place = {} }: {
                 setSignupCode(e.target.value);
                 setError("");
               }}
-              onKeyDown={(e) => e.key === "Enter" && name.trim() && create()}
+              onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (name.trim()) create(); } }}
             />
             <Notice kind="error">{error}</Notice>
             <Button variant="primary" wide
@@ -2272,6 +2272,7 @@ function CourseSettings({
                   onChange={(e) => setRenaming(e.target.value)}
                   onKeyDown={(e) => {
                     if (e.key === "Escape") setRenaming(null);
+                    if (e.key === "Enter") e.preventDefault();
                     if (e.key === "Enter" && renaming.trim() && renaming.trim() !== c.title) {
                       onRename(renaming.trim());
                       setRenaming(null);
@@ -7722,21 +7723,56 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     if ([...(was.decks || [])].sort().join() !== [...decks].sort().join()) out.push("decks");
     return out;
   };
+  /*
+   * The pictures and recordings a card names that were added offline and
+   * are still on this device go up before the card does (0.659), so no
+   * student is ever handed a card whose picture or recording the server
+   * has not got. `waiting`: some could not go yet, and the card waits with
+   * them. One the server refuses is taken off the card, which goes without
+   * it, and the teacher is told.
+   */
+  const sendCardMedia = async (card: Partial<Card>): Promise<{ card: Partial<Card>; waiting: boolean }> => {
+    const named = mediaIn(card);
+    if (!named.length) return { card, waiting: false };
+    const r = await sendHeld(API.putMedia, named);
+    if (r.refused.length) {
+      const pics = r.refused.filter((x) => x.kind === "image").length;
+      const recs = r.refused.length - pics;
+      const what = [pics ? plural(pics, "picture") : "", recs ? plural(recs, "recording") : ""].filter(Boolean).join(" and ");
+      snack(
+        `${what} on "${cardLabel(card)}" couldn't be sent and ${r.refused.length === 1 ? "was" : "were"} left off: ${API.explain(new Error(r.refused[0].msg))}`,
+        "warn",
+      );
+    }
+    return {
+      card: r.refused.length ? withoutMedia(card, r.refused.map((x) => x.hash)) : card,
+      waiting: r.waiting.length > 0,
+    };
+  };
   /* A save straight to the server, naming what it changed — for the
      screens that do not keep a save for later. */
   /* With the decks this screen believed the card was in, so the server
      applies only what was added or taken away (0.580). */
-  const saveNamed = (card: Partial<Card>, decks: string[]) =>
-    API.saveCard(card, decks, card.id
+  const saveNamed = async (named: Partial<Card>, decks: string[]) => {
+    const { card, waiting } = await sendCardMedia(named);
+    /* Its media could not go, so neither can it: said as the connection. */
+    if (waiting) throw new Error("offline");
+    return API.saveCard(card, decks, card.id
       ? { touched: touchedBy(card, decks), decksWere: card.decks || [] }
       : { personal: mineSide });
-  const sendOrKeep = useCallback(async (card: Partial<Card>, decks: string[], given: API.SaveExtra = {}) => {
+  };
+  const sendOrKeep = useCallback(async (given0: Partial<Card>, decks: string[], given: API.SaveExtra = {}) => {
+    /* Its offline pictures and recordings first; if they cannot go, the
+       card is kept with them (0.659). */
+    const media = await sendCardMedia(given0);
+    const card = media.card;
     /* A new card made on the My space side is personal, for good (0.545). */
     const withSide = !card.id && mineSide ? { ...given, personal: true } : given;
     const extra: API.SaveExtra = withSide.touched || withSide.walk || withSide.into || !card.id
       ? withSide
       : { ...withSide, touched: touchedBy(card, decks) };
     try {
+      if (media.waiting) throw new Error("offline");
       return await API.saveCard(card, decks, extra);
     } catch (e) {
       if (String((e && (e as Error).message) || e) !== "offline") throw e;
@@ -7752,7 +7788,9 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       setKept(waitingToSend(CARD_OUTBOX));
       return { kept: true };
     }
-  /* touchedBy reads the cards through a ref, so this is made once. */
+  /* touchedBy reads the cards through a ref, so this is made once; and
+     sendCardMedia only forwards to the snackbar, which is memoised. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mineSide]);
 
   /* And send them when there is something to send them down. One at a
@@ -7761,12 +7799,14 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   const sendKeptCards = useCallback(async () => {
     if (isOffline()) return;
     const dropped: { name: string; msg: string }[] = [];
-    const cardName = (c: Partial<Card>) =>
-      (c && (leadOf(c as Card).ar || c.name || leadOf(c as Card).en)) || "A card";
+    const cardName = cardLabel;
     const { sent } = await drainOutbox(CARD_OUTBOX, async (body) => {
       const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra; org?: string };
       try {
-        absorbSaved(await API.saveCard(held.card, held.decks, held.extra || {}, held.org));
+        /* Its pictures and recordings kept offline go first (0.659). */
+        const media = await sendCardMedia(held.card);
+        if (media.waiting) return "keep";
+        absorbSaved(await API.saveCard(media.card, held.decks, held.extra || {}, held.org));
         return "sent";
       } catch (e) {
         /* Waited through anything that is not the server's own refusal; a
@@ -7778,6 +7818,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       }
     });
     setKept(waitingToSend(CARD_OUTBOX));
+    /* And with no card left waiting, whatever else was kept offline goes
+       too: a picture or recording added to a card that was then closed
+       without saving, say. Nothing names it, so a refusal is not said. */
+    if (!waitingToSend(CARD_OUTBOX) && !isOffline()) await sendHeld(API.putMedia);
     if (dropped.length) {
       const n = dropped.length;
       snack(
@@ -8814,7 +8858,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   aria-label="Name a new tag"
                   value={newTagName}
                   onChange={(e) => setNewTagName(e.target.value.toLowerCase().replace(/[^a-z0-9_-]/g, "").slice(0, 24))}
-                  onKeyDown={(e) => e.key === "Enter" && makeTag()}
+                  onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); makeTag(); } }}
                 />
                 <Button variant="ghost" size="sm" icon="add" disabled={!typed || !!typedTrouble} onClick={makeTag}>
                   Create

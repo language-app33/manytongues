@@ -925,7 +925,7 @@ export const EX: Record<string, ExerciseSpec> = {
      uncover how it is said and say whether you read it right. Marked form
      by form, by the learner, so the forms misread come back on their
      own. How it is said is the transliteration, or the form's recording,
-     or both (0.653): a form with either is asked, and one with neither is
+     or both (0.661): a form with either is asked, and one with neither is
      shown and not asked. */
   vread: {
     level: 1,
@@ -2163,7 +2163,7 @@ export function needLabel(need: string, lang: Partial<Lang>) {
     en: "the meaning",
     lat: `the ${translit}`,
     recs: "a recording",
-    /* Read the forms checks a reading against either (0.653). */
+    /* Read the forms checks a reading against either (0.661). */
     saidOrHeard: `the ${translit} or a recording`,
     images: "a picture",
     pictured: "a few more cards with a picture",

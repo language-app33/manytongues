@@ -31,11 +31,11 @@ const TOMBSTONE_DAYS = 180;
 export function loadSyncConfig() {
   try {
     const raw = localStorage.getItem(CFG_KEY);
-    if (raw) return { token: "", phrase: "", lastSync: 0, uploaded: [], ...JSON.parse(raw) };
+    if (raw) return { token: "", phrase: "", lastSync: 0, ...JSON.parse(raw) };
   } catch (e) {
     /* nothing saved */
   }
-  return { token: "", phrase: "", lastSync: 0, uploaded: [] };
+  return { token: "", phrase: "", lastSync: 0 };
 }
 
 export function saveSyncConfig(cfg: Record<string, any>) {
@@ -566,10 +566,15 @@ export function syncAfterChange(answering: boolean): { wait: number; keep: boole
 /* ------------------------------------------------------------------
    Clip transport
 
-   Clips are immutable and addressed by id, so reconciling is simple:
-   fetch anything the document references that isn't on this device, and
-   upload anything on this device the server hasn't seen. A local ledger
-   of uploaded ids keeps this from re-checking every clip every sync.
+   Clips are immutable and addressed by id. A sync fetches anything the
+   document references that isn't on this device from the learner's own
+   store, where recordings made by builds before the teaching space were
+   kept.
+
+   It no longer sends anything there (0.659). Every recording a card can
+   name is on the server with the course or the personal card it belongs
+   to, the same as a picture, so copying each one into every learner's own
+   store again protected nothing and cost every learner the upload.
    ------------------------------------------------------------------ */
 
 export async function pullClip(token: string, id: string) {
@@ -592,6 +597,137 @@ export async function pushClip(token: string, id: string, dataUrl: string) {
   return true;
 }
 
+/* ---------------- what is waiting to go up ---------------- */
+
+/*
+ * When a card last changed, by any stamp it carries: its own (an edit, or
+ * a graded answer, which stamps the card), each form's exercise states,
+ * the learner's mark and a reset. The latest of them is what a sync has
+ * or has not yet carried.
+ */
+export function cardChangedAt(it: Item): number {
+  let at = Math.max(Number(it.updated) || 0, Number(it.priorityAt) || 0, Number(it.reset) || 0);
+  for (const f of formsOf(it)) {
+    for (const st of Object.values(f.s || {})) {
+      const u = Number(st && st.updated) || 0;
+      if (u > at) at = u;
+    }
+  }
+  return at;
+}
+
+/*
+ * The newest stamp anywhere in a document's cards and withdrawals.
+ *
+ * What a sync has carried is everything up to the moment it set out — and
+ * also anything it brought down, whose stamps are another device's clock
+ * and may be ahead of this one's. Taking the later of the two keeps a card
+ * just pulled from a fast-clocked phone from reading as still to send.
+ */
+export function latestStamp(doc: Pick<Doc, "items" | "tombstones">): number {
+  let at = 0;
+  for (const it of doc.items || []) at = Math.max(at, cardChangedAt(it));
+  for (const t of Object.values(doc.tombstones || {})) at = Math.max(at, Number(t) || 0);
+  return at;
+}
+
+/*
+ * How many cards have changed here since the last sync carried them:
+ * answered, edited, marked, added or removed. `through` is the moment the
+ * last successful sync accounted for; nought, never synced, counts all.
+ */
+export function cardsToSync(doc: Pick<Doc, "items" | "tombstones">, through: number): number {
+  let n = 0;
+  for (const it of doc.items || []) if (cardChangedAt(it) > through) n += 1;
+  for (const t of Object.values(doc.tombstones || {})) if ((Number(t) || 0) > through) n += 1;
+  return n;
+}
+
+/*
+ * When a sync happened, the way you would say it: "today at 14:32",
+ * "yesterday at 09:10", then "3 Nov at 09:10", with the year only when it
+ * is not this one.
+ */
+export function syncedWhen(ms: number, at: number = Date.now()): string {
+  if (!ms) return "";
+  const d = new Date(ms);
+  if (Number.isNaN(d.getTime())) return "";
+  const time = d.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const day = new Date(at);
+  day.setHours(0, 0, 0, 0);
+  if (ms >= day.getTime()) return `today at ${time}`;
+  day.setDate(day.getDate() - 1);
+  if (ms >= day.getTime()) return `yesterday at ${time}`;
+  const date = d.toLocaleDateString(undefined, {
+    day: "numeric",
+    month: "short",
+    ...(d.getFullYear() === new Date(at).getFullYear() ? null : { year: "numeric" }),
+  });
+  return `${date} at ${time}`;
+}
+
+const count = (n: number, one: string) => (n ? `${n} ${n === 1 ? one : `${one}s`}` : "");
+const joined = (parts: string[]) =>
+  parts.length < 2 ? parts.join("") : `${parts.slice(0, -1).join(", ")} and ${parts[parts.length - 1]}`;
+
+/*
+ * What the You menu says about sync (0.655): where it has got to, and
+ * under that when the last one was and what is waiting for the next.
+ *
+ * It used to name what went wrong instead — "Sync failed", for most things
+ * — which said there was trouble and nothing about what was at stake. The
+ * trouble is now the bar at the foot of the app, with Retry; this answers
+ * "am I losing anything, and since when?".
+ *
+ * Offline comes first because it explains everything under it, and it
+ * says where the work is rather than only what is missing.
+ */
+export function syncLine({
+  trying = false,
+  offline = false,
+  busy = false,
+  failed = false,
+  lastSync = 0,
+  reports = 0,
+  cards = 0,
+  pictures = 0,
+  clips = 0,
+  at = Date.now(),
+}: {
+  trying?: boolean;
+  offline?: boolean;
+  /** A sync, or anything Sync now started, is under way. */
+  busy?: boolean;
+  /** The last one failed. */
+  failed?: boolean;
+  lastSync?: number;
+  reports?: number;
+  cards?: number;
+  /** Pictures and recordings added offline in the card editor (0.659). */
+  pictures?: number;
+  clips?: number;
+  at?: number;
+}): { main: string; sub: string } {
+  if (trying) return { main: "Practice here stays on this device", sub: "" };
+  const waiting = joined(
+    [count(reports, "report"), count(cards, "card"), count(pictures, "picture"), count(clips, "recording")].filter(Boolean),
+  );
+  const toSync = waiting ? `${waiting} to sync` : "";
+  const when = lastSync ? `last synced ${syncedWhen(lastSync, at)}` : "";
+  /* Parts joined with a dot, the first of them capitalised. */
+  const line = (...parts: string[]) => {
+    const t = parts.filter(Boolean).join(" · ");
+    return t.charAt(0).toUpperCase() + t.slice(1);
+  };
+  if (offline) return { main: "Offline — your work is saved on this device", sub: line(toSync, when) };
+  if (busy) return { main: "Syncing now", sub: line(when) };
+  if (!lastSync) return { main: "Not synced yet", sub: line(toSync) };
+  if (toSync) return { main: line(toSync), sub: line(when) };
+  /* A sync that failed with nothing of this device's waiting has still not
+     brought down what the other devices did, so not "up to date". */
+  return { main: failed ? "Nothing waiting to sync" : "Up to date", sub: line(when) };
+}
+
 /* Every recording id the document refers to, across items, their forms and
    the lines of a dialog. A line's recording is a recording like any other:
    left out of here it would be dropped from the device it was made on. */
@@ -610,7 +746,7 @@ export function clipIdsIn(data: WireDoc) {
 }
 
 /*
- * This device's recordings, as the three things syncing them needs to ask.
+ * This device's recordings, as the two things fetching them needs to ask.
  * Passed in rather than imported: what a clip is stored in differs between
  * the app (IndexedDB) and a test (a Map), and this module has no business
  * knowing which.
@@ -619,13 +755,7 @@ export interface ClipStore {
   /** Must only look at this device's store: no network, and nothing
       created as a side effect. */
   hasLocal: (id: string) => boolean | Promise<boolean>;
-  /** A data URL (data:audio/...;base64,...), or null. An object URL is not
-      a recording — sending one stored a "blob:" string on the server and an
-      empty clip on every other device. */
-  readLocal: (id: string) => Promise<string | null>;
   writeLocal: (id: string, url: string) => void | Promise<void>;
-  /** Clips this device has already sent up, so they are not offered again. */
-  uploaded?: Iterable<string>;
 }
 
 /* Clips the server said it doesn't have. Remembered for this session only,
@@ -641,12 +771,10 @@ const KNOWN_MISSING = new Set();
 export async function syncClips(
   token: string,
   data: WireDoc,
-  { hasLocal, readLocal, writeLocal, uploaded }: ClipStore,
+  { hasLocal, writeLocal }: ClipStore,
 ) {
   const ids = clipIdsIn(data);
   let pulled = 0;
-  let pushed = 0;
-  const known = new Set(uploaded || []);
 
   /* Clips are small and independent, so a fresh device fetching a course's
      worth of recordings shouldn't queue them one behind another. A few at a
@@ -664,18 +792,9 @@ export async function syncClips(
           if (url) {
             await writeLocal(id, url);
             pulled += 1;
-            known.add(id);
             KNOWN_MISSING.delete(id);
           } else {
             KNOWN_MISSING.add(id);
-          }
-        } else if (!known.has(id)) {
-          const url = await readLocal(id);
-          if (url && /^data:/.test(url)) {
-            await pushClip(token, id, url);
-            pushed += 1;
-            known.add(id);
-            KNOWN_MISSING.delete(id);
           }
         }
       } catch (e) {
@@ -684,7 +803,7 @@ export async function syncClips(
     }
   };
   await Promise.all(Array.from({ length: Math.min(5, ids.length || 1) }, worker));
-  return { pulled, pushed, uploaded: [...known] };
+  return { pulled };
 }
 
 /**

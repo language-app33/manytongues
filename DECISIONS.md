@@ -11,6 +11,35 @@ anything that was never really a choice.
 
 ---
 
+## Pictures and recordings travel the same way (0.659)
+
+The owner's rule: a picture and a recording never behave differently,
+for learners or for teachers. Three gaps were closed to get there.
+
+- **Added offline, held and sent first.** `held-media.ts` keeps a
+  picture or recording added in the card editor while offline (its own
+  IndexedDB database, because the trainer's media store is a cache that
+  "Clear device media" and the sweep empty). `courses-api`'s `getClip`
+  and `getImage` answer from it first, so the editor and this device's
+  practice show it at once. `spaces.tsx` sends a card's held media before
+  the card, keeps the card in the outbox while any cannot go, and strips
+  a refused one from the card and says so. With no card left waiting,
+  anything else held (added to a card closed unsaved) goes up too.
+- **No per-learner copy.** `syncClips` pulls only. Every recording a card
+  names is on the server with its course or personal card, like a
+  picture; copying each into every learner's sync store cost every
+  learner the upload and protected nothing.
+- **No text-store fallback.** Recordings are kept in IndexedDB or not at
+  all, like pictures. Old text-store copies are moved across where there
+  is IndexedDB and let go of where there is not.
+- **Fetched ahead, asked when here (0.660).** 0.658 made pictures come
+  down in the background with the sync and a picture question wait for
+  its picture, online too. Recordings now do the same: `clipHere` mirrors
+  `pictureHere`, `recsHere` mirrors `pictureTurn`, `CLIPS_READY` mirrors
+  `IMAGES_READY`, and an effect beside `allClipIds` mirrors the one beside
+  `allImageIds`. One `mediaKept` flag stands for both, since they share a
+  database.
+
 ## Grammar belongs to an accepted answer, not to the form
 
 **11 September 2026** · `src/answers.ts`, `src/languages.ts` (`answerFields`)
@@ -8795,3 +8824,95 @@ there, which is still how a learner learns what it is for.
 
 **A session started from the screen closes it**, so the end of a session
 comes back to Home, not to the screen it was started from.
+
+## Enter presses the one primary button, by one rule for the whole app (0.654)
+
+**20 November 2026** · `src/enter-key.ts`
+
+On a computer, Enter presses the screen's primary button. It is one
+listener on the document, not a handler beside each button, because there
+are over a hundred primary buttons and a rule each screen had to remember
+would be forgotten on the next one. The primary variant was already the
+app's way of saying "this is the main action here" (Home's "one primary
+button on the screen"), so the rule reads that rather than a new marker.
+
+It asks the uppermost open dialog first, else the page, and presses only
+when that layer shows exactly one primary: two is ambiguous, and choosing
+by position is how the wrong thing gets done. Toggles (`aria-pressed`)
+are passed over — a choice drawn primary because it is chosen is a state,
+not an action — and `danger` is never primary, so Enter cannot confirm a
+delete. A disabled button is left dead; an `off` one takes the press,
+because that is how it says why.
+
+It does nothing on a phone or tablet — `(hover: hover) and (pointer: fine)`
+is the test. A phone keyboard's Go is the same key, and the answer box
+gave it up there (a thumb on the bottom row marked half-typed answers).
+The answer box no longer cancels Enter itself; the pointer test is what
+keeps the phone as it was.
+
+A field that does its own thing on Enter cancels the key
+(`preventDefault`), and a cancelled key is read as taken. That is the
+contract for any new field with an Enter of its own: without it, Enter
+would do the field's thing *and* press the screen's button.
+
+## Keep going repeats how a session was started (0.656)
+
+**20 November 2026** · `src/ArabicTrainer.tsx` (`Again`, `buildAgain`, `startAgain`)
+
+The end of a session offered "Keep going", which always started a dealt
+session on the home screen's deck, and was left off after anything built
+by hand or Weak spots, because those were a change of subject. The owner
+asked for it to start "the exact same session" instead, and chose (1a, 2a,
+3a, 4a): every kind of session repeats, built and saved ones included; the
+settings repeat, not the questions; the button is left off when the same
+settings would deal nothing; and it sits above Done, full width.
+
+So a session carries `again`, the recipe it was started from, and every
+start goes through `buildAgain`, which is the one place each kind is
+built. The end screen builds that recipe once when it opens to decide
+whether to show the button; pressing it builds again for real, through
+the same start functions as the buttons on Home, so a personal set's
+questions are still asked first. A saved session is kept as itself rather
+than as its cards, so a card added to its decks since is in the repeat.
+A teacher's one-question trial has no recipe and no button.
+
+Given up: one extra build of a session each time the end screen opens.
+
+
+## A picture question waits for its picture; pictures sync with the cards (0.658)
+
+**20 November 2026** · `pictureHere`, `canSeeHere`, `pictureTurn`, the
+picture-sync effect beside `allImageIds`, in `src/ArabicTrainer.tsx`
+
+`canSeeHere` used to hold back picture questions only offline. Online a
+picture question was dealt whether or not its picture was here, and
+`CardPicture` then waited on `getImage`, whose 20-second call timeout is
+what the learner sat through before "The picture isn't on this device
+yet". `warmSession` only fetched `images[0]` of each card, but since
+0.631 a card with several pictures shows `images[turn % count]`, so the
+other pictures were often never fetched in advance. Reproduced in the
+built app with image requests held open: 8 picture questions, 8 "isn't on
+this device yet"; after the change, none asked, and with pictures served
+normally 10 asked and drawn in both builds.
+
+Now a picture counts as showable once it is in IndexedDB or was fetched
+this session (`IMAGES_READY`), online or offline, and `countPictured`
+counts only those, so "choose the picture" is not dealt short of tiles.
+`imageAt` and the choice tiles take turns only among pictures that are
+here. Before the first look at the device (`visibleImages` null) every
+picture is assumed reachable, as before.
+
+Every card's pictures are fetched in the background, three at a time,
+whenever the cards, the device listing or the connection change. This
+departs from the earlier decision to fetch media per session rather than
+on sync, which was about not making the first sync wait on every
+recording: this does not block anything, and covers pictures only, not
+recordings. A picture whose fetch failed is not asked for again for five
+minutes (`MISSING_FOR_MS`), so a server that is down is not asked in a
+loop.
+
+Where IndexedDB is missing (`setPicturesKept(false)`), the sync does not
+run — the pictures would be held in memory and fetched again every launch
+— and online a picture question is dealt as before, its picture fetched
+when asked. The smoke walk runs without IndexedDB, so it still exercises
+that path; `tests/offline.test.mjs` covers the stricter one.

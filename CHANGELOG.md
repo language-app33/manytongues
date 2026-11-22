@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.653 — 22 November 2026
+## 0.661 — 22 November 2026
 
 **"Read the forms" checks a reading against the recording too.** Until
 now, how a form is said meant its transliteration only.
@@ -32,6 +32,216 @@ forms".
 To check by hand, on an iPhone: tapping "Play to check" should play the
 recording straight away. If the phone holds it back, the Play button is
 there to tap.
+## 0.660 — 20 November 2026
+
+**Recordings come down with everything else, and a listening question
+waits for its recording**, exactly as pictures have since 0.658.
+
+- **Recordings download in the background** whenever the cards sync, a
+  course is refreshed, or the connection comes back. They used to come
+  down only when a session was about to start.
+- **A listening question is asked only once its recording is on the
+  phone**, online as well as offline. Until then the card is asked in its
+  other ways. Before, online, it could be asked while the recording was
+  still on its way, and Play gave silence.
+- **A card with an ordinary and a slow recording** plays whichever has
+  arrived, rather than waiting on the other.
+
+The cost: recordings now download on sync rather than when needed, so
+the first time a course is opened uses more data than before. Recordings
+are small (a few kilobytes each) and are only ever downloaded once. In the
+rare browser that cannot store files, nothing changes: there, a
+recording is fetched when its question comes up.
+
+To check by hand: on a phone, join a course with recorded cards, wait a
+moment on the home screen without starting a session, then turn on
+airplane mode and start one: the listening questions are there.
+
+## 0.659 — 20 November 2026
+
+**Pictures and recordings can be added to a card while offline, and the
+two now work the same way everywhere.**
+
+For teachers (and anyone making their own cards in My space):
+
+- **Offline, adding a picture or a recording just works.** It is kept on
+  the device, shown or played in the editor straight away, and goes up
+  when the connection comes back. It used to fail with "Can't reach the
+  server", even though the card itself could be saved offline.
+- **The picture or recording goes first, then the card.** A student is
+  never sent a card whose picture or recording the server has not got.
+  If it cannot go yet, the card waits on the device with it.
+- **If the server refuses one** (too big, say), the card is still sent
+  without it, and a message says which card lost which picture or
+  recording.
+- **The offline note in the editor** now says that what you write,
+  record and add is all kept until you're back online.
+
+For everyone:
+
+- **The You menu counts what the editor is holding**: "3 cards,
+  2 pictures and 1 recording to sync".
+- **Recordings are no longer copied into each learner's own backup.**
+  Like pictures, they already live on the server with the course or card
+  they belong to, so the copy protected nothing and cost every learner
+  data. Recordings already in someone's backup still come back to their
+  devices. A recording no longer counts as "to sync" on a learner's
+  device.
+- **In the rare browser that cannot store files** (some private windows),
+  recordings are now treated like pictures: fetched while online, and the
+  questions that need one are not asked offline. They used to be squeezed
+  into the small store the practice itself is saved in, where enough of
+  them could leave no room to save progress.
+
+To check by hand: on a phone in Teaching, turn on airplane mode, make a
+card with a picture and a recording, save it, and look at the You menu;
+then go back online and check the card, its picture and its recording
+reach a student's device.
+
+## 0.658 — 20 November 2026
+
+**A picture question is asked only when its picture is ready.** A question
+that shows a picture could come up before the picture had reached the
+phone; the learner then looked at empty frames for about twenty seconds
+before being told "The picture isn't on this device yet", and had to skip
+a question they could never answer. Now a picture question is asked only
+once its picture is on the device, online as well as offline. Until then
+the card is asked in its other ways.
+
+**Pictures come down with everything else.** They used to be fetched only
+when a session was about to start, and only each card's first picture — a
+card with several pictures shows the next on each turn, so the others were
+often missing. Now every card's pictures are brought down in the
+background whenever the cards sync, a course is refreshed, or the
+connection comes back, so picture questions are ready by the time a
+session starts. A card with several pictures takes turns only among those
+that have arrived.
+
+The cost: pictures now download on sync rather than when needed, which
+uses more data the first time a course with many pictures is opened (each
+picture is a few hundred kilobytes, and only ever downloaded once). In the
+rare browser that cannot store pictures (some private windows), nothing
+changes: there, a picture is still fetched when its question comes up.
+
+To check by hand: on a phone, open a course whose cards have pictures,
+start a session, and see the picture questions show their pictures at
+once.
+
+## 0.657 — 20 November 2026
+
+**Every question with options in the script now has its harakat behind
+the hint button**, as the matching grids got in 0.653. The "Show the
+harakat" button above the options is gone from:
+
+- Choose the word (from the English, and from a picture)
+- Which word is missing? (in a phrase, and in a sentence)
+- Choose the number
+- Put each form beside its person
+- Choose what you say next
+- Which sentence means this?
+- Put the scene back in order
+
+The question-mark button in the bar at the foot puts the harakat back on
+every option, stays lit while they show, and a second tap puts them away.
+Using it still makes a right answer a near miss.
+
+To check by hand: on a phone, a word whose meaning is known on "Choose the
+word", and a conversation on "Choose what you say next".
+
+## 0.656 — 20 November 2026
+
+**"Keep going" at the end of a session starts the same session again.**
+It sits above "Done" as the main button, both full width. It used to be a
+small button beside "Done" that always started an ordinary session, and
+was missing after a session built by hand or a weak-spots session.
+
+- **The same settings, dealt afresh:** the same deck, unit or prep, the
+  same practice or weak-spots choice, or, for a session built by hand or a
+  saved one, the same cards, the same kind and the same length or number
+  of minutes. The questions are chosen again, so it is what is due now,
+  not a replay of the ones just answered.
+- **Only shown when it has something to ask.** If the same session would
+  come up empty (every weak spot fixed, nothing left in that unit), the
+  button is left off rather than leading to "nothing to do".
+
+To check by hand: on a phone, finish an ordinary session, a weak-spots
+session and a timed session built by hand, and press "Keep going" on each.
+## 0.655 — 20 November 2026
+
+**The You menu says when you last synced and what is waiting, and a
+failed sync is said in the bar at the foot of the screen, with Retry.**
+
+- **The sync line at the bottom of the You menu** now has two parts. The
+  first says where things stand: "Up to date", "Syncing now", "Offline —
+  your work is saved on this device", or what is waiting, such as
+  "2 reports, 23 cards and 1 recording to sync". The second says when the
+  last sync was: "Last synced today at 14:32", "yesterday at 09:10", or a
+  date for anything older. A device that has never synced says "Not synced
+  yet" and what it would send.
+- **A card counts as waiting** once it has been answered, edited, marked,
+  added or removed since the last sync. A recording counts if it was made
+  or downloaded on this device and has not been sent yet (until 0.659:
+  see there).
+- **"Sync failed" now appears in the large bar at the foot of the screen,
+  with Retry**, the same bar as "Can't reach the server". Underneath it
+  says why when the app knows ("Passphrase rejected", "Your cards are too
+  big to sync…"), and otherwise that your work is saved on this device.
+  It shows the first time a sync fails, and again whenever you press Sync
+  now or Retry and it still fails. A background sync failing again does
+  not bring it back after you've closed it. It goes away by itself once a
+  sync works.
+- **Offline is not a failure**: no bar. The menu says your work is safe
+  and what is waiting, and the sync goes again on its own when the
+  connection comes back.
+- While the bar is up, the You menu opens above it rather than under it.
+
+To check by hand: on a phone, put it in airplane mode, answer a few cards
+and open the You menu; then, back online, check the time updates after
+Sync now.
+
+## 0.654 — 20 November 2026
+
+**On a computer, Enter presses the screen's main button.** Wherever a
+screen has one main button — the filled one — Enter now presses it, from
+anywhere on the screen, including from the box being typed in. So a
+session can be done from the keyboard alone: type the answer, Enter to
+check, Enter to go on, and the cursor is back in the box for the next
+question. Setting up, signing in, joining a course, saving and the rest
+work the same way. When a sheet or dialog is open, Enter is its button,
+not the screen's behind it.
+
+Where Enter still does nothing, on purpose:
+
+- **On a phone or tablet.** Its keyboard's Go is the same key, and the
+  answer box stopped checking on it because a thumb reaching for the
+  bottom row sent half-typed answers. That stays.
+- **Where a screen has two main buttons, or none.** Enter will not guess
+  between two.
+- **On a red button.** Delete and remove are never pressed by Enter.
+- **While a greyed-out button is waiting** for something to be filled in
+  or ticked first.
+- **In a box that already uses Enter for itself** — a search box, a
+  longer text, naming a tag — and on a button or link that has the
+  cursor, which Enter presses as it always has.
+
+To check by hand: on a laptop, a whole session from the keyboard; on a
+phone, that the keyboard's Go/Done in an answer box still does nothing.
+
+## 0.653 — 20 November 2026
+
+**On "Match each word to its meaning", the harakat are behind the hint
+button.** The "Show the harakat" button above the tiles is gone; the
+question-mark button in the bar at the foot, beside "I don't know", now
+puts the harakat back on every tile. Like the hint on other questions, it
+stays lit while they are showing and a second tap puts them away again.
+Using it still makes a right answer a near miss, even if they are put
+away before checking.
+
+"Match each recording to its word", the same grid heard, does the same.
+Other questions with options keep their "Show the harakat" button.
+
+To check by hand: a matching grid with words whose meaning is already
+known, on a phone.
 
 ## 0.652 — 20 November 2026
 

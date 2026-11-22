@@ -157,7 +157,7 @@ export function unmetNeeds(
        be asked at all. */
     if (f === "lat") return !saidAnswers(unit, answerFields()).length;
     /* How it is said, written or heard: Read the forms checks a reading
-       against the transliteration, the recording, or both (0.653). */
+       against the transliteration, the recording, or both (0.661). */
     if (f === "saidOrHeard") return !String(unit.lat || "").trim() && !(unit.recs || []).length;
     return !(unit as Record<string, unknown>)[f];
   });

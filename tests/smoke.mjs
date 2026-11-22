@@ -3951,6 +3951,27 @@ check("no console errors during the session", errors.length === 0, errors.slice(
   /* A scene of three exercises runs out inside the loop above, so what is
      on screen is the end of the session rather than the middle of one —
      and a finished session is a screen over the tabs, not a tab. */
+
+  /* Keep going (0.656): above Done, the primary button, and it starts this
+     session over the way it was built — the same one scene, the same ten
+     questions — dealt afresh. */
+  {
+    const keep = document.querySelector('[data-el="keep-going-button"]');
+    const done = document.querySelector('[data-el="done-button"]');
+    check("the end of a built session offers Keep going above Done, as the primary button",
+      !!keep && !!done && keep.parentElement === done.parentElement &&
+        !!(keep.compareDocumentPosition(done) & 4) && /primary/.test(keep.className) && !/primary/.test(done.className),
+      `keep:${!!keep} done:${!!done} ${keep ? keep.className : ""}`);
+    if (keep) {
+      click(keep);
+      await sleep(300);
+      const again = instruction();
+      check("and Keep going starts the same session again, on the scene",
+        !!document.querySelector('[data-el="leave-session"]') && /scene|lines|follow|read|missing/i.test(again), again);
+      click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Leave session") || null);
+      await sleep(300);
+    }
+  }
   if (buttonNamed(/^Done$/)) {
     click(buttonNamed(/^Done$/));
     await sleep(250);
@@ -10798,7 +10819,7 @@ const openPronounTables = async () => {
     JSON.stringify(paired.met.readRows));
   check("and what was hidden is how the whole of it is said", paired.met.readSaid.includes("ana baktub") &&
     paired.met.readSaid.includes("hiyye btiktub") && paired.met.readSaid.includes("biktbu"), JSON.stringify(paired.met.readSaid));
-  /* Since 0.653 how a form is said may be its recording: a form with a
+  /* Since 0.661 how a form is said may be its recording: a form with a
      recording and no transliteration is asked too, uncovered by playing
      it, and one with neither is shown and not asked. */
   const rec = (/** @type {string} */ n) => [{ id: n.repeat(64), label: "", speed: "" }];
@@ -12540,6 +12561,7 @@ const openPronounTables = async () => {
       promptsInScript: 0, promptsMarked: 0, promptsBare: 0, tip: false, tapped: false, tappedShows: false,
       choiceSets: 0, choicesBare: 0, revealButton: false, revealed: false, nearMiss: false, nearVerdict: "",
       afterMarked: false, tilesBare: false, asked: /** @type {string[]} */ ([]),
+      gridHintTried: false, gridNoReveal: false, gridHintShows: false, gridHintHides: false,
     };
     for (let n = 0; n < 30 && host.querySelector(".at-instruction"); n++) {
       const promptEl = host.querySelector('[data-el="question-prompt-text"]');
@@ -12565,7 +12587,9 @@ const openPronounTables = async () => {
       if (choices && /[؀-ۿ]/.test(text(choices))) {
         met.choiceSets += 1;
         if (!HARAKA.test(text(choices))) met.choicesBare += 1;
-        const reveal = host.querySelector('[data-el="reveal-marks"]');
+        /* From the hint button in the bar at the foot (0.654), with no
+           button over the options any more. */
+        const reveal = host.querySelector('[data-el="reveal-marks"]') ? null : host.querySelector('[data-el="hint-button"]');
         met.revealButton = met.revealButton || !!reveal;
         /* The meaning asked, which the prompt may say with more round it. */
         const ask = text(promptEl).toLowerCase();
@@ -12587,6 +12611,22 @@ const openPronounTables = async () => {
           click(choices.querySelector("button"));
         }
       } else if (host.querySelector('[data-el="answer-match"]')) {
+        /* A grid read bare has its harakat behind the hint button in the
+           bar at the foot, not a button over the tiles (0.653). */
+        const wordsText = () => [...host.querySelectorAll('[data-el="match-word"]')].map(text).join(" ");
+        if (!met.gridHintTried && !HARAKA.test(wordsText())) {
+          met.gridHintTried = true;
+          const hint = host.querySelector('[data-el="hint-button"]');
+          met.gridNoReveal = !host.querySelector('[data-el="reveal-marks"]');
+          if (hint) {
+            click(hint);
+            await sleep(60);
+            met.gridHintShows = HARAKA.test(wordsText()) && hint.getAttribute("aria-pressed") === "true";
+            click(hint);
+            await sleep(60);
+            met.gridHintHides = !HARAKA.test(wordsText()) && hint.getAttribute("aria-pressed") === "false";
+          }
+        }
         await playGrid();
       } else {
         const dunno = [...host.querySelectorAll("button")].find((b) => /^I don't know$/.test((b.textContent || "").trim()));
@@ -12633,10 +12673,12 @@ const openPronounTables = async () => {
      marks back. */
   check("once its meaning is known, its options are shown without them",
     known.choiceSets > 0 && known.choicesBare > 0, JSON.stringify(known));
-  check("with a button that puts them back on every option",
+  check("with the hint button, which puts them back on every option",
     known.revealButton && known.revealed, JSON.stringify(known));
   check("which makes a right answer a near miss, and says so",
     known.nearMiss && /near miss/.test(known.nearVerdict), JSON.stringify(known));
+  check("a bare matching grid puts its harakat back from the hint button, and away again",
+    known.gridHintTried && known.gridNoReveal && known.gridHintShows && known.gridHintHides, JSON.stringify(known));
   if (known.promptsBare > 0) {
     check("a bare word on the prompt says it can be tapped, and a tap puts its harakat back",
       known.tip && known.tappedShows, JSON.stringify(known));
