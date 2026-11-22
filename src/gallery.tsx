@@ -150,6 +150,7 @@ const PLACES: Record<string, [string, string]> = {
   SavedTiles: [LEARN, "Focused training · the sessions you kept, with how much of each is learnt, or for a Catch up how much is due"],
   HomeCard: [LEARN, "Home · the card under the progress ring: a shape in the logo's style and a fact about how language varies, with its source"],
   BrandMark: [LEARN, "The app's logo: on its tile in light mode, its loops alone in dark mode"],
+  TabTitle: [LEARN, "The title at the top of each tab, with the app's logo beside it"],
   ItemsTab: [LEARN, "The Cards tab"],
   ItemSheet: [LEARN, "The Cards tab · one card's details"],
   CardScreen: [LEARN, "Opening a card from a tile"],
