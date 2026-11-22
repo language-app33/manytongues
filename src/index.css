@@ -1459,7 +1459,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-cdot { width:9px; height:9px; border-radius:50%; background: var(--jade); flex-shrink:0; }
 .at-cdot.syncing { background: var(--brass); }
 .at-cdot.error { background: var(--rose); }
-/* Offline is not a failure (0.667): grey, not red. */
+/* Offline is not a failure (0.668): grey, not red. */
 .at-cdot.off { background: var(--faint); }
 /* You, in the bar: your initial in a small round of its own, where the
    sections have their icons, with the sync dot on its shoulder. */

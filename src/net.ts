@@ -21,12 +21,12 @@
  */
 
 /** What the app says, in one set of words everywhere, about work it kept
-    on this device because it could not be sent yet (0.667). */
+    on this device because it could not be sent yet (0.668). */
 export const SAVED_FOR_LATER = "Saved on this device. It will be sent when you're back online.";
 
 /**
  * Whether a failure means "no connection", the one rule the whole app uses
- * for it (0.667).
+ * for it (0.668).
  *
  * From the person's side these are all the same thing, and trying again
  * later is the fix for every one of them: a request that could not be made
@@ -51,7 +51,7 @@ export function noConnection(err: unknown): boolean {
 }
 
 /*
- * Something got through (0.667). Told by the app's requests whenever one
+ * Something got through (0.668). Told by the app's requests whenever one
  * is answered, so work that waited for the connection can go the moment
  * there is one — including when the device was online all along and it
  * was the server that was away, which the browser never announces.

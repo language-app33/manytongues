@@ -25,7 +25,7 @@ const {
 
 beforeEach(() => resetReach());
 
-test("one rule for no connection, not the app's own answer (0.667)", () => {
+test("one rule for no connection, not the app's own answer (0.668)", () => {
   /* No connection or a timeout, a server restarting behind a gateway, an
      answer that isn't the app's (a wifi login page), the sync's own names
      for a gateway's answer, and a fetch that never went. */

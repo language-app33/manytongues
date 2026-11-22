@@ -255,7 +255,7 @@ async function call(
     throw new Error(res.ok ? "bad-response" : `http-${res.status}`);
   }
   /* An answer in the app's own words, refusal or not: the connection is
-     there, and anything waiting for it can go (0.667). */
+     there, and anything waiting for it can go (0.668). */
   noteReached();
   /* With the whole answer attached: some errors say more than their code —
      "other-space" names the space the key belongs to (0.543). */
@@ -530,7 +530,7 @@ export async function putOrHold(kind: HeldKind, hash: string, data: string): Pro
     await putMedia(kind, hash, data);
     return { kept: false };
   } catch (e) {
-    /* No connection, by the app's one rule (0.667). */
+    /* No connection, by the app's one rule (0.668). */
     if (!noConnection(e)) throw e;
     if (!(await holdMedia(kind, hash, data))) throw new Error("media-full");
     return { kept: true };
@@ -701,7 +701,7 @@ export function explain(err: unknown): string {
   const m = String(
     (err && typeof err === "object" && "message" in err && err.message) || err
   );
-  /* Never the word "server" (0.667): most people do not know what it is.
+  /* Never the word "server" (0.668): most people do not know what it is.
      No connection — by the app's one rule — is said in the bar at the foot
      of the screen, with Retry; this is the same words, for the rare place
      that shows it some other way. */

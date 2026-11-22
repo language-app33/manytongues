@@ -166,7 +166,7 @@ function wire() {
   watchNet((offline) => {
     if (!offline) void retryReach({ auto: true });
   });
-  /* And when anything else gets through (0.667): the device may have been
+  /* And when anything else gets through (0.668): the device may have been
      online all along with the server away, which the browser never says.
      At most every half a minute, so a request that keeps failing while
      others succeed cannot turn this into a loop. */

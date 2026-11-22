@@ -1,6 +1,6 @@
 // @ts-check
 /*
- * A teacher's waiting cards, sent from anywhere in the app (0.667).
+ * A teacher's waiting cards, sent from anywhere in the app (0.668).
  *
  * The trainer and the Teaching screen both ask for them to be sent, and a
  * second ask while one is going must share it, not start another: two

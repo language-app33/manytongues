@@ -101,7 +101,7 @@ export type Verdict = "sent" | "keep" | "drop";
  *
  * Only a refusal the server made on purpose — an answer in its own words —
  * is a reason to drop queued work. No connection (net.ts's one rule for
- * it, 0.667) or any fault on the server's side is the server not having
+ * it, 0.668) or any fault on the server's side is the server not having
  * answered yet, and the work waits for it.
  */
 export const isTransient = (msg: string) => noConnection(msg) || /^http-5\d\d$/.test(msg);
@@ -160,7 +160,7 @@ export function saveOutbox(list: Pending[]): boolean {
 }
 
 /* Told whenever the queue is written, so the You menu's dot and count
-   follow what is waiting without asking for it on a timer (0.667). */
+   follow what is waiting without asking for it on a timer (0.668). */
 const outboxWatchers: Set<() => void> = new Set();
 export function watchOutbox(fn: () => void): () => void {
   outboxWatchers.add(fn);
