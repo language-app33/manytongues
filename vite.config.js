@@ -51,7 +51,7 @@ export default defineConfig({
     emitVersion(),
     VitePWA({
       registerType: "autoUpdate",
-      includeAssets: ["icon-512.png", "favicon.svg", "logo.svg", "apple-touch-icon.png"],
+      includeAssets: ["icon-512.png", "favicon.svg", "logo.svg", "logo-loops.svg", "apple-touch-icon.png"],
       manifest: {
         name: "ManyTongues",
         short_name: "ManyTongues",

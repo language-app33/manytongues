@@ -8,6 +8,34 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.664 — 23 November 2026
+
+**Home has a card with a fact about how language varies.** Under the
+progress ring there is now a card with a small title, a shape drawn in the
+logo's style, and a short fact about a dialect or regional language, such
+as how Palestinian towns and villages say the letter qaf, or why "tea" and
+"chai" are the same word. There are 53 facts, each approved and checked
+against the source it names, and 20 shapes. The card turns after every
+finished session, and the shapes and facts turn separately, so a fact
+meets a different shape each time round. A small icon at the end of each
+fact opens its source in the browser.
+
+**Start session is now Practice, and it is bigger.** The main button is
+taller, with a play symbol, and carries inside it the line that used to
+sit above it, shorter: "6 to review · 3 in progress". The dumbbell for
+Focused training beside it is the same height, in a soft green. Both sit
+just under the card. On a unit's page, "Practise this unit" is now
+"Practice this unit", matching. The end of a session still says "Session
+complete".
+
+**In dark mode the logo is its loops alone.** At the top of Home, beside
+each screen's title, and on the sign-in page, the logo no longer sits on
+its dark teal square in dark mode. A space's own logo is unchanged, and so
+are the browser-tab icon and the installed app's icon.
+
+Still to check by hand: the card and the bigger buttons on a short phone,
+where the card is what gives way.
+
 ## 0.663 — 22 November 2026
 
 **A teacher's change no longer makes every student's phone sync, and the

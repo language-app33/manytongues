@@ -172,6 +172,10 @@ const ALLOWED_SCRIPT = {
   "screen-elements": ["كِتاب", "كتاب", "الكتاب كبير", "كُتُب", "السَّلامُ عَلَيْكُم", "٤٧", "٠١٢٣٤٥٦٧٨٩", "أنا بالشغل"],
   /* Specimens of each text style, on the admin screen that lists them. */
   "text-styles": ["كِتَاب", "الكِتَاب كَبِير", "اسْمِي لَيْلَى وَأَنَا مِن فِلَسْطِين"],
+  /* The facts on Home's card (0.664), which are something to read: the two
+     letters Arabizi writes as 3 and 7, and the word a fact's source is
+     named after. */
+  "home-card": ["ع", "ح", "بد"],
 };
 
 /*
@@ -184,6 +188,8 @@ const ALLOWED_SCRIPT = {
 const ALLOWED_VIETNAMESE = {
   /* The gallery's specimen of the language switch names the language. */
   gallery: [],
+  /* A city named in a fact on Home's card (0.664). */
+  "home-card": ["Huế"],
 };
 
 for (const file of APP_FILES) {

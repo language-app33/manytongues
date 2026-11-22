@@ -186,6 +186,7 @@ import {
   DeckSwitch,
   DeckPickScreen,
   PickSheet,
+  BrandMark,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
 export { LanguageTag, languageName } from "./shared.tsx";
@@ -367,7 +368,9 @@ export function Onboarding({ onDone, place = {} }: {
         ) : null}
         {!elsewhere && step === "link" && (
           <>
-            <img className="ob-logo" src={org && org.logoData ? org.logoData : "/logo.svg"} alt="" width={72} height={72} />
+            {org && org.logoData
+              ? <img className="ob-logo" src={org.logoData} alt="" width={72} height={72} />
+              : <BrandMark size={72} className="ob-logo" />}
             <h1>{org ? org.name : "ManyTongues"}</h1>
             <Lede>Signing you in…</Lede>
             <Button variant="ghost" wide className="at-mt3" onClick={() => setStep("existing")}>
@@ -378,7 +381,9 @@ export function Onboarding({ onDone, place = {} }: {
 
         {!elsewhere && step === "choose" && (
           <>
-            <img className="ob-logo" src={org && org.logoData ? org.logoData : "/logo.svg"} alt="" width={72} height={72} />
+            {org && org.logoData
+              ? <img className="ob-logo" src={org.logoData} alt="" width={72} height={72} />
+              : <BrandMark size={72} className="ob-logo" />}
             <h1>{org ? org.name : "ManyTongues"}</h1>
             {place.unknown ? (
               <Notice kind="warn">

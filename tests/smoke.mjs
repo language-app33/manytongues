@@ -1036,17 +1036,26 @@ check("untouched states are not stored",
    text: the number came off the screen when the climb went on it, and what
    is being tested here is the counting, not the wording. */
 check("every card with something due counts, and a value is never one", homeCard()?.getAttribute("data-ready") === "6", homeCard()?.getAttribute("data-ready") ?? "no home card");
-/* And said in one line above Start session: the reviews and the new cards
-   beside them add up to the same count the attribute carries. */
+/* And said inside the Practice button (0.664), under its name: the reviews,
+   the cards in progress and the new ones add up to the same count the
+   attribute carries. It was a line of its own above Start session. */
 {
-  const line = (homeCard()?.querySelector(".at-homeline")?.textContent || "").replace(/\s+/g, " ");
-  /* Ready to review is Cleared and Learnt cards alone (0.603); cards still
-     climbing are "in progress" beside it, or in its place. */
-  const m = /^(?:(\d+) cards? ready to review|Nothing to review —)(?:(?: ·)? (\d+) cards? in progress)?(?: · (\d+) new cards? waiting)?/.exec(line);
-  check("the home screen says how many cards are ready to review, above Start session",
+  const practice = homeCard()?.querySelector('[data-el="practice"]');
+  const line = ((practice?.querySelector("small") || {}).textContent || "").replace(/\s+/g, " ");
+  const m = /^(?:(\d+) to review)?(?:(?: · )?(\d+) in progress)?(?:(?: · )?(\d+) new)?$/.exec(line);
+  check("the Practice button says what it will deal, inside it",
     !!m && Number(m[1] || 0) + Number(m[2] || 0) + Number(m[3] || 0) === 6 &&
-      !!homeCard()?.querySelector(".at-homeline + .at-row"),
+      /^Practice/.test((practice?.textContent || "").trim()) && !homeCard()?.querySelector(".at-homeline"),
     line || "no line");
+  /* The card above it: a title, a shape and a fact whose source opens in
+     the browser, not in the app. */
+  const card = homeCard()?.querySelector('[data-el="home-fact"]');
+  const src = card?.querySelector("a.at-homecardsrc");
+  check("Home shows a fact card above Practice, with a title, a shape and a source that opens outside the app",
+    !!card && !!(card.querySelector(".at-homecardtitle")?.textContent || "").trim() && !!card.querySelector("svg.at-homeart path") &&
+      !!src && src.getAttribute("target") === "_blank" && /^https:\/\//.test(src.getAttribute("href") || "") &&
+      !!((card.compareDocumentPosition(/** @type {Node} */ (practice)) || 0) & 4),
+    card ? (card.textContent || "").slice(0, 120) : "no card");
 }
 const wire = remoteDocs.get(realToken)?.data;
 /* Sparse means one thing: no state written out for an exercise type that was
@@ -2795,7 +2804,7 @@ if (/Build a session/.test(document.body.textContent)) {
       prepTile() ? (prepTile()?.textContent || "").replace(/\s+/g, " ").slice(0, 120) : "(no prep tile)");
     check("the climb over everything is left off, and the sessions tile below has no primary button",
       !homeCard()?.querySelector(".at-climb") && !homeCard()?.querySelector(".at-btn.primary") &&
-        !!buttonNamed(/^Start session$/) && !!homeCard()?.querySelector('[data-el="focused-training"]'),
+        !!buttonNamed(/^Practice(?! this)/) && !!homeCard()?.querySelector('[data-el="focused-training"]'),
       (homeCard()?.textContent || "").replace(/\s+/g, " ").slice(0, 120));
     const counter = () => ((document.querySelector(".at-preptoday") || {}).textContent || "");
     check("under it, today's sessions against what today needs, as a count and a row of dots",
@@ -2999,9 +3008,9 @@ const beforeAnswer = schedules();
    nothing to fix it is dimmed and says so on being pressed rather than
    swallowing the press. */
 {
-  const startRow = buttonNamed(/^Start session$/)?.closest(".at-row");
+  const startRow = buttonNamed(/^Practice(?! this)/)?.closest(".at-row");
   const dumbbell = document.querySelector('[data-el="focused-training"]');
-  check("the dumbbell sits at the right of Start session, an icon with a name",
+  check("the dumbbell sits at the right of Practice, an icon with a name",
     !!startRow && startRow.lastElementChild === dumbbell && dumbbell?.getAttribute("aria-label") === "Focused training" &&
       !(dumbbell?.textContent || "").trim(),
     startRow ? (startRow.textContent || "").replace(/\s+/g, " ") : "no row");
@@ -3040,7 +3049,7 @@ const beforeAnswer = schedules();
   check("and Focused training's Back goes home", (await leaveTraining()) && !document.querySelector(".at-screen.training"),
     "still open");
 }
-click(buttonNamed(/^Start session$/));
+click(buttonNamed(/^Practice(?! this)/));
 await sleep(400);
 const instruction = document.querySelector(".at-instruction");
 check("a session started and shows an exercise", !!instruction, (instruction && instruction.textContent) || "");
@@ -4018,7 +4027,7 @@ check("no console errors during the session", errors.length === 0, errors.slice(
 
   const openings = [];
   for (let n = 0; n < 6; n++) {
-    click(buttonNamed(/^Start session$/));
+    click(buttonNamed(/^Practice(?! this)/));
     await sleep(450);
     if (!document.querySelector(".at-instruction")) {
       check("a session starts from the home screen", false,
@@ -4048,7 +4057,7 @@ check("no console errors during the session", errors.length === 0, errors.slice(
    picks up with the same time left. A counted session has nothing to
    pause, so it offers nothing. */
 {
-  click(buttonNamed(/^Start session$/));
+  click(buttonNamed(/^Practice(?! this)/));
   await sleep(400);
   check("a counted session has no pause, because nothing is running out",
     !!document.querySelector(".at-instruction") && !document.querySelector('[data-el="session-pause"]'));
@@ -4603,7 +4612,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
      card opens the session, so the first question is about it. */
   click(buttonNamed(/^Home$/));
   await sleep(400);
-  click(buttonNamed(/^Start session$/));
+  click(buttonNamed(/^Practice(?! this)/));
   await sleep(500);
   const asked = (document.querySelector('[data-el="question-prompt"]') || {}).textContent || "";
   const answers = (document.querySelector(".at-answerbox") || {}).textContent || "";
@@ -9430,7 +9439,7 @@ const openPronounTables = async () => {
   await sleep(1500);
 
   const startBtn = [...host2.querySelectorAll("button")]
-    .find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    .find((b) => /^Practice(?! this)/.test((b.textContent || "").trim()));
   check("a deck of two-spelling cards offers a session to start", !!startBtn && !startBtn.disabled,
     startBtn ? "the button is there but dimmed"
       : (host2.textContent || "").slice(0, 90).replace(/\s+/g, " ") || "nothing rendered");
@@ -10066,7 +10075,7 @@ const openPronounTables = async () => {
   await sleep(1500);
 
   const startNum = [...host4.querySelectorAll("button")]
-    .find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    .find((b) => /^Practice(?! this)/.test((b.textContent || "").trim()));
   check("a teacher's number document is on its own enough to practise from", !!startNum && !startNum.disabled,
     !startNum ? ((host4.textContent || "").slice(0, 120).replace(/\s+/g, " ") || "nothing rendered")
       : startNum.disabled ? "the button is there but dimmed" : "live");
@@ -10239,7 +10248,7 @@ const openPronounTables = async () => {
      question and moves the session on exactly as a learner would. */
   const here = (/** @type {RegExp} */ re) =>
     [...host7.querySelectorAll("button")].find((b) => re.test((b.textContent || "").trim()));
-  click(here(/^Start session$/));
+  click(here(/^Practice(?! this)/));
   await sleep(500);
   let order = host7.querySelector('[data-el="answer-order"]');
   for (let asked = 0; asked < 10 && !order; asked += 1) {
@@ -10510,7 +10519,7 @@ const openPronounTables = async () => {
     document.body.appendChild(host);
     const r = createRoot(host);
     r.render(React.createElement(App));
-    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Practice(?! this)/.test((b.textContent || "").trim()));
     for (let t = 0; t < 100 && !startBtn(); t++) await sleep(100);
     click(startBtn());
     for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
@@ -10664,7 +10673,7 @@ const openPronounTables = async () => {
     document.body.appendChild(host);
     const r = createRoot(host);
     r.render(React.createElement(App));
-    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Practice(?! this)/.test((b.textContent || "").trim()));
     for (let t = 0; t < 100 && !startBtn(); t++) await sleep(100);
     click(startBtn());
     for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
@@ -10899,7 +10908,7 @@ const openPronounTables = async () => {
        busy machine it was not up after a fixed second and a half: the
        button was not there to press, no session ran, and all three
        checks on it failed with nothing counted — one CI run in three. */
-    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Practice(?! this)/.test((b.textContent || "").trim()));
     for (let t = 0; t < 100 && !startBtn(); t++) await sleep(100);
     click(startBtn());
     for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
@@ -11106,7 +11115,7 @@ const openPronounTables = async () => {
     document.body.appendChild(host);
     const r = createRoot(host);
     r.render(React.createElement(App));
-    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Practice(?! this)/.test((b.textContent || "").trim()));
     for (let t = 0; t < 100 && !startBtn(); t++) await sleep(100);
     click(startBtn());
     for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
@@ -11633,7 +11642,7 @@ const openPronounTables = async () => {
   const root5 = createRoot(host5);
   root5.render(React.createElement(App));
   await sleep(1500);
-  click([...host5.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim())));
+  click([...host5.querySelectorAll("button")].find((b) => /^Practice(?! this)/.test((b.textContent || "").trim())));
   await sleep(700);
 
   /** @type {string[]} */
@@ -11758,7 +11767,7 @@ const openPronounTables = async () => {
   const root6 = createRoot(host6);
   root6.render(React.createElement(App));
   await sleep(1500);
-  click([...host6.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim())));
+  click([...host6.querySelectorAll("button")].find((b) => /^Practice(?! this)/.test((b.textContent || "").trim())));
   await sleep(700);
 
   const own = packs["ar-PS"].numerals;
@@ -11927,7 +11936,7 @@ const openPronounTables = async () => {
       (it.forms || []).some((/** @type {any} */ f) => Object.keys(f.s || {}).length > 0)).length;
   };
 
-  click(named(/^Start session$/));
+  click(named(/^Practice(?! this)/));
   await sleep(700);
   const atStart = sent.length;
   await giveUp();
@@ -12553,7 +12562,7 @@ const openPronounTables = async () => {
     document.body.appendChild(host);
     const r = createRoot(host);
     r.render(React.createElement(App));
-    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Start session$/.test((b.textContent || "").trim()));
+    const startBtn = () => [...host.querySelectorAll("button")].find((b) => /^Practice(?! this)/.test((b.textContent || "").trim()));
     for (let t = 0; t < 100 && !startBtn(); t++) await sleep(100);
     click(startBtn());
     for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
@@ -12731,7 +12740,7 @@ const openPronounTables = async () => {
   await sleep(500);
   const openPage = document.querySelector('[data-el="unit-page"]');
   check("the Home line opens its unit, which offers Practise this unit",
-    !!openPage && /Practise this unit/.test(openPage.textContent || ""), openPage ? openPage.textContent || "" : "no page");
+    !!openPage && /Practice this unit/.test(openPage.textContent || ""), openPage ? openPage.textContent || "" : "no page");
   check("and, being open, offers Mark as cleared", !!openPage && /Mark as cleared/.test(openPage.textContent || ""),
     openPage ? openPage.textContent || "" : "no page");
   backOut();
@@ -12752,7 +12761,7 @@ const openPronounTables = async () => {
   const page = document.querySelector('[data-el="unit-page"]');
   const pageText = page ? (page.closest(".at-screen") || page).textContent || "" : "";
   check("a locked unit opens read-only, says what opens it, and offers no practice",
-    /Finish unit 1 to open this one/.test(pageText) && !/Practise this unit|Mark as cleared/.test(pageText), pageText.replace(/\s+/g, " ").slice(0, 200));
+    /Finish unit 1 to open this one/.test(pageText) && !/Practice this unit|Mark as cleared/.test(pageText), pageText.replace(/\s+/g, " ").slice(0, 200));
   backOut();
   studentPath = false;
   r.unmount();
@@ -12783,7 +12792,7 @@ const openPronounTables = async () => {
     return el ? (el.textContent || "").replace(/\s+/g, " ") : "";
   };
   check("Home says how many pictures of the set are waiting", /3 pictures in Our family are waiting for your answer/.test(waiting()), waiting() || "no line");
-  click(buttonNamed(/^Start session$/));
+  click(buttonNamed(/^Practice(?! this)/));
   await sleep(500);
   const top = () => [...document.querySelectorAll(".at-screen")].pop();
   const text = () => ((top() || {}).textContent || "").replace(/\s+/g, " ");

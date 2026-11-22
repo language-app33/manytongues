@@ -493,6 +493,16 @@ button {
    a language actually spreads. It carries its own dark tile, so it reads
    the same in the light and dark themes. */
 .at-brandmark { display:block; width:24px; height:24px; flex:none; }
+/* The logo is its loops alone in dark mode, and on its teal tile in light
+   (0.664): see BrandMark. Dark is the default theme here, so the tiled one
+   is hidden unless the page is light. */
+.at-mark-tiled { display:none !important; }
+.at.light .at-mark-tiled { display:block !important; }
+.at.light .at-mark-loops { display:none !important; }
+@media (prefers-color-scheme: light) {
+  .at.auto .at-mark-tiled { display:block !important; }
+  .at.auto .at-mark-loops { display:none !important; }
+}
 
 .at-modebtn { display:inline-flex; align-items:center; gap:7px; cursor:pointer; border:2px solid var(--line); border-radius:999px; padding:9px 14px; background: var(--nav-bg); backdrop-filter:blur(12px); color: var(--text); font-family: var(--ui); font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; box-shadow: var(--nav-shadow); justify-content:center; }
 .at-modecaret { color: var(--brass); display:inline-flex; transition: transform 150ms; }
@@ -2547,7 +2557,6 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-climb { display:flex; align-items:center; gap:16px; }
 /* What Start session will deal, in one line between the climb and the
    button. The row below still carries the gap underneath. */
-.at-homeline { margin:16px 0 0; font-size: var(--fs-sm); font-weight:700; color: var(--text-soft); }
 /* ---- the prep tile's glance, under its button ----
    Today and the days left side by side in two wells, each a small label, a
    big number and a word under it. Today's dots fill as sessions are done;
@@ -3525,15 +3534,40 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-home + .at-home { margin-top:28px; padding-top:28px; border-top:1px solid var(--line); }
 .at-home .at-row { max-width:420px; margin-inline:auto; }
 .at.kb-open .at-home { padding:0; }
-/* Start session and, at its right, the dumbbell to Focused training
-   (0.650). The row counts as one column, so Start session's type is sized
-   as it was alone; the dumbbell is a square as tall as the button beside
-   it, in the button's own corner and outline, not a share of the row. */
-.at-row.at-startrow { --cols: 1; flex-wrap: nowrap; }
-.at-row > .at-trainbtn { flex:0 0 auto; width:52px; min-height:52px; padding:0;
-  border-radius: var(--r); color: var(--text); }
+/* Practice and, at its right, the dumbbell to Focused training (0.650,
+   made larger in 0.664: they are the most important things on the screen
+   and were the smallest). Practice is tall, with a play symbol and the
+   line saying what it will deal inside it, left-aligned beside the symbol;
+   the dumbbell is a square as tall, in a soft green fill, so the two read
+   as one row with Practice the main one. The row counts as one column, so
+   Practice's type is sized as it would be alone. */
+.at-row.at-startrow { --cols: 1; flex-wrap: nowrap; margin-top: 14px; }
+.at-row > .at-btn.at-practicebtn { min-height: 64px; border-radius: 18px; gap: 12px; padding: 10px 16px; }
+.at-row > .at-btn.at-practicebtn.primary { box-shadow: 0 6px 16px var(--jade-soft); }
+.at-row > .at-btn.at-practicebtn > .at-btnlabel { flex-direction: column; flex-wrap: nowrap; align-items: flex-start;
+  row-gap: 4px; text-align: left; width: auto; }
+.at-practicebtn > .at-btnlabel > b { font-size: 17px; font-weight: 900; line-height: 1; letter-spacing: .03em; }
+.at-practicebtn > .at-btnlabel > small { font-size: 12.5px; font-weight: 700; line-height: 1.15; letter-spacing: 0;
+  text-transform: none; opacity: .88; }
+.at-row > .at-trainbtn { flex:0 0 auto; width:64px; min-height:64px; padding:0; border: 0;
+  border-radius: 18px; background: var(--jade-bg); color: var(--jade); }
+.at-row > .at-trainbtn:hover { background: var(--jade-soft); }
 /* A size up from the usual icon: a dumbbell is all bar at 20px. */
-.at-trainbtn .at-ic { width:26px; height:26px; }
+.at-trainbtn .at-ic { width:28px; height:28px; }
+/* The card on Home (0.664): a small title, a shape in the logo's style and
+   a fact, on one panel in the app's raised colour, close under the
+   progress ring with Practice close under it. The logo's pale lavender is
+   deepened in the drawing itself and its dot takes the text colour, so
+   both show on the panel in either theme. */
+.at-home .at-homecard { max-width: 420px; margin: 16px auto 0; padding: 6px 0 16px; border-radius: 22px;
+  background: var(--raised); text-align: center; }
+.at-homecardtitle { margin: 10px 18px 0; font-size: 14px; font-weight: 900; line-height: 1.2; color: var(--text-soft); }
+.at-homeart { display: block; width: 78%; max-width: 300px; height: auto; margin: 0 auto 14px; color: var(--text); }
+.at-homecardfact { margin: 0 auto; padding: 0 18px; max-width: 300px; font-size: 14px; font-weight: 700;
+  line-height: 1.35; color: var(--text-soft); text-wrap: balance; }
+.at-homecardsrc { display: inline-flex; vertical-align: -2px; padding: 1px; border-radius: 4px; color: var(--jade); }
+.at-homecardsrc:hover { color: var(--text); }
+.at-homecardsrc:focus-visible { outline: 2px solid var(--jade); outline-offset: 1px; }
 /* Focused training: its buttons stacked as they stood on Home. */
 .at-training { text-align:center; }
 .at-training .at-row { max-width:420px; margin-inline:auto; }

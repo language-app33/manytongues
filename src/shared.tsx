@@ -1130,6 +1130,22 @@ export function Field({ label, lede, hint, optional, htmlFor, children, classNam
 /* --- TabTitle -----------------------------------------------------
    The name of the tab a page is, at its top (0.553): the heading size
    used inside Progress, held in place as the page scrolls (0.555). */
+/* --- BrandMark -----------------------------------------------------
+   The app's logo (0.664). In dark mode it is the four loops alone, with
+   no tile behind them: on a dark page the tile only reads as a box (the
+   owner's 1a). Both are in the page and the theme picks one, so a change
+   of theme needs no reload and the mark never flashes the wrong one. The
+   browser-tab icon and the installed app's icon keep the tile, since a
+   phone always sets an app icon on a square of its own. */
+export function BrandMark({ size, className = "at-brandmark" }: { size: number; className?: string }) {
+  return (
+    <>
+      <img className={`${className} at-mark-tiled`} src="/logo.svg" alt="" width={size} height={size} />
+      <img className={`${className} at-mark-loops`} src="/logo-loops.svg" alt="" width={size} height={size} />
+    </>
+  );
+}
+
 export function TabTitle({ children }: { children?: Node }) {
   /* Held at the top while the page scrolls under it (0.555), with the
      app's mark beside it and a rule beneath. Where you are sits at its
@@ -1137,7 +1153,7 @@ export function TabTitle({ children }: { children?: Node }) {
   const place = useContext(PlaceContext);
   return (
     <div className="at-pagetitle">
-      <img className="at-brandmark" src="/logo.svg" alt="" width={28} height={28} />
+      <BrandMark size={28} />
       <h2 className="at-sectionhead">{children}</h2>
       {place}
     </div>

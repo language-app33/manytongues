@@ -8940,3 +8940,48 @@ run — the pictures would be held in memory and fetched again every launch
 — and online a picture question is dealt as before, its picture fetched
 when asked. The smoke walk runs without IndexedDB, so it still exercises
 that path; `tests/offline.test.mjs` covers the stricter one.
+
+## A fact card on Home, and Practice in place of Start session (0.664)
+
+**23 November 2026** · `src/home-card.ts`, `HomeCard` in `src/ArabicTrainer.tsx`
+
+Once Weak spots and Build a session moved to Focused training (0.650), Home
+had a lot of open space. The owner wanted it more engaging without simply
+showing more of the learner's own numbers. After trying illustrations of
+everyday scenes, then geometric shapes, the owner chose abstract shapes in
+the logo's own style paired with short facts about dialects and regional
+languages.
+
+**The facts.** Written in batches, each checked against a published source,
+then approved, rejected or edited by the owner on a review page, and the
+approved ones checked again against their sources. They live in the code as
+plain data with their sources. Adding facts later means the same review,
+not an edit straight into the list. The facts are the same for every
+learner, whatever language they study (the owner's 1b): about a third touch
+Arabic, Hebrew or Vietnamese.
+
+**The shapes.** Twenty variations on the logo: its hand-drawn loops at one
+line weight, its small dot, and the speech bubble from the empty home
+screen. They are generated from a handful of numbers rather than drawn by
+hand, so they are drawn the same every time and stay small. The logo's
+pale lavender would not show on the light panel, so it is deepened, and its
+cream dot takes the text colour. The owner tried the logo's teal behind
+them in dark mode and preferred the app's own panel colour.
+
+**Turning.** One count per device, moved on when a session reaches its end
+screen. Shapes and facts are read off it separately (the owner's 2a). It is
+kept on the device and not synced: which card a screen last showed is not
+something worth a write to the server.
+
+**Practice.** Start session became Practice (the owner's call; "practice"
+had meant a schedule-free session, but only a teacher's one-question trial
+starts one now, so learners never see the two meanings). It is taller and
+carries the old line above it, shortened, so the most important thing on
+the screen is also the largest. The spelling is "practice" throughout
+(owner's 1a), so the unit page's button changed too.
+
+**The logo in dark mode.** Two images, the theme showing one, rather than an
+inline drawing: the logo is a file the server also serves as an icon, and
+two small files cost less than keeping a copy of its drawing in the code.
+Only the pages change. The installed app's icon keeps its square, because a
+phone always draws an app icon on one.

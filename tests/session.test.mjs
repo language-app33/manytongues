@@ -24,7 +24,7 @@ const here = path.dirname(new URL(import.meta.url).pathname);
 const built = await buildOnce(["ArabicTrainer.tsx"]);
 const { lentTags, varyTypes, requeueMissed, isUrgent, buildSession, buildManualSession, installIndexes,
   fillersIn, buildWeakSession, weakness, isWeak, movesAmong, mergeMoves,
-  saidMoves, sumMoves, laddered, castQuestion, mixCardsOf, sessionCount, scoreAnswer, NO_SCORE, homeLine } = await import(path.join(built, "ArabicTrainer.js"));
+  saidMoves, sumMoves, laddered, castQuestion, mixCardsOf, sessionCount, scoreAnswer, NO_SCORE } = await import(path.join(built, "ArabicTrainer.js"));
 const langs = await import(path.join(here, "..", "src", "languages.ts"));
 const { TYPES } = langs;
 const { MAX_IN_LEARNING, inLearningOf } = await import(path.join(here, "..", "src", "session-mix.ts"));
@@ -1965,22 +1965,3 @@ test("a sentence met already and waiting for its words holds no place in learnin
   assert.equal(inLearningOf(pool()), 1, "and the sentence, once it can be asked");
 });
 
-test("the home screen's line says what Start session will deal", () => {
-  /* Reviews first, with any new words the session brings in beside them. */
-  assert.equal(homeLine({ review: 12, climbing: 0, fresh: 3, behind: false }), "12 cards ready to review · 3 new cards waiting");
-  assert.equal(homeLine({ review: 1, climbing: 0, fresh: 0, behind: false }), "1 card ready to review");
-  /* A pile of reviews keeping the new words out says so, rather than
-     leaving the learner to wonder where they went. */
-  assert.equal(homeLine({ review: 40, climbing: 0, fresh: 0, behind: true }), "40 cards ready to review · new cards wait until you've caught up");
-  /* Nothing due: new words if the session would bring them in, and a
-     nudge to practise anyway if not — never a time to come back. */
-  assert.equal(homeLine({ review: 0, climbing: 0, fresh: 3, behind: false }), "Nothing to review — ready to learn 3 new cards");
-  assert.equal(homeLine({ review: 0, climbing: 0, fresh: 1, behind: false }), "Nothing to review — ready to learn a new card");
-  assert.match(homeLine({ review: 0, climbing: 0, fresh: 0, behind: false }), /^All caught up — a practice session/);
-  /* Cards still climbing are not reviews (0.603): beside them, or in
-     place of them when nothing is due for review. */
-  assert.equal(homeLine({ review: 12, climbing: 5, fresh: 0, behind: false }), "12 cards ready to review · 5 in progress");
-  assert.equal(homeLine({ review: 12, climbing: 5, fresh: 3, behind: false }), "12 cards ready to review · 5 in progress · 3 new cards waiting");
-  assert.equal(homeLine({ review: 0, climbing: 5, fresh: 0, behind: false }), "Nothing to review — 5 cards in progress");
-  assert.equal(homeLine({ review: 0, climbing: 1, fresh: 3, behind: false }), "Nothing to review — 1 card in progress · 3 new cards waiting");
-});

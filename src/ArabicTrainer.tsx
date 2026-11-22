@@ -30,6 +30,7 @@ import {
   type FeedbackKind,
   FLAG_NOTE_MAX,
   BannerHost,
+  BrandMark,
   Help,
   Icon,
   IconButton,
@@ -855,6 +856,7 @@ export function mergeMoves(
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
 import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
 import { homeEmptyHint, homeEmptySays, listOf as listOfNames, whyHomeIsEmpty } from "./home-empty.ts";
+import { homeCardAt, practiceLine, type HomeShape, type HomeFact, type ShapeColour } from "./home-card.ts";
 import { rememberedTheme, rememberTheme } from "./theme-memory.ts";
 import type { Filler, Mark } from "./grade.ts";
 
@@ -14082,6 +14084,17 @@ export default function ArabicTrainer() {
   }
 
   const exercise = session && qi < session.exercises.length ? session.exercises[qi] : null;
+  /* The card on Home turns once per finished session (0.664): the end
+     screen is the moment a session is finished, whether it ran its course,
+     ran out of time or was all answered. A trial is a teacher's look at one
+     question, not a session, so it turns nothing. Counted per device. */
+  const [homeTurn, setHomeTurn] = useState(readHomeTurn);
+  const turnedFor = useRef<unknown>(null);
+  useEffect(() => {
+    if (!session || exercise || session.trial || turnedFor.current === session) return;
+    turnedFor.current = session;
+    setHomeTurn((t: number) => writeHomeTurn(t + 1));
+  }, [session, exercise]);
   /* At the end of a session, whether starting it again the same way would
      ask anything: worked out once, when the end screen opens, and the
      button that offers it left off when it would not. */
@@ -16369,13 +16382,6 @@ export default function ArabicTrainer() {
                       takes them further — unless a prep has the top tile. */}
                   {!homePrep && <Climb items={shown} settings={settings} />}
 
-                  {/* What the button below will deal, in one line, just
-                      before the learner decides to press it. Left off under
-                      a prep, which has the top of the screen to itself. */}
-                  {!homePrep && drillable.length > 0 && (
-                    <p className="at-homeline">{homeLine(homeWaiting)}</p>
-                  )}
-
                   {/* A personal set's pictures still waiting for an answer
                       (0.630): one line, naming the first set, and the way
                       to answer them. */}
@@ -16394,10 +16400,17 @@ export default function ArabicTrainer() {
                       onOpen={(deckId) => setUnitOpen({ courseId: p.courseId, deckId })} />
                   ))}
 
-                  {/* Start session, and beside it on the right the way to
+                  {/* A shape in the logo's style and a fact about how
+                      language varies, turned after every finished session
+                      (0.664). See home-card.ts. */}
+                  <HomeCard turn={homeTurn} />
+
+                  {/* Practice, and beside it on the right the way to
                       Focused training (0.650): weak spots, a session built
                       by hand and the ones kept, on a screen of their own,
-                      so the home screen has one thing to do. */}
+                      so the home screen has one thing to do. Practice was
+                      Start session until 0.664, and carries inside it the
+                      line that used to sit above it: what it will deal. */}
                   <div className="at-row at-startrow">
                     {/* Always live while there is anything to drill. Being
                         due decides what a session leads with, not whether
@@ -16408,10 +16421,13 @@ export default function ArabicTrainer() {
                     {/* One primary button on the screen: under a prep it is
                         the prep's, and this is the next thing along. */}
                     <Button variant={homePrep ? undefined : "primary"}
+                      className="at-practicebtn" data-el="practice"
+                      icon="play" iconSize={26}
                       onClick={() => begin(false)}
                       disabled={!drillable.length}
                     >
-                      Start session
+                      <b>Practice</b>
+                      <small>{practiceLine(homeWaiting)}</small>
                     </Button>
                     {/* An icon alone, as the owner asked: its name is what a
                         screen reader says, and the screen's title. No dot
@@ -18062,7 +18078,7 @@ export default function ArabicTrainer() {
           for (0.642): one space, one language, nothing to switch. */}
       {!inExercise && space === "learn" && tab === "home" && (
         <div className={`at-brand at-brand-home${placeButton ? "" : " centred"}`}>
-          <img className="at-brandmark" src="/logo.svg" alt="" width={48} height={48} />
+          <BrandMark size={48} />
           ManyTongues
         </div>
       )}
@@ -18222,6 +18238,59 @@ export function climbOf(cards: Item[], settings: Settings, all: Item[], target: 
     } else spread[toward.at.level - 1]++;
   }
   return { n, learnt, pct: deckPercent({ n, learnt, got }), spread };
+}
+
+/*
+ * The card on Home (0.664): a small title naming what the fact is about, a
+ * shape drawn in the logo's style, and the fact, ending in a small icon
+ * that opens its source in the browser. Which shape and which fact is read
+ * off one count per device, moved on by each finished session; see
+ * home-card.ts for the shapes, the facts and why.
+ *
+ * The panel is the app's raised colour in both themes. On it the logo's
+ * pale lavender is deepened and its cream dot takes the text colour, so
+ * both show in light and dark alike.
+ */
+const SHAPE_STROKE: Record<ShapeColour, string> = {
+  yellow: "#F7C548", coral: "#FF7A59", mint: "#7FD1C7", lavender: "#A99BE0",
+};
+function HomeShapeArt({ shape }: { shape: HomeShape }) {
+  return (
+    <svg className="at-homeart" viewBox="0 0 240 150" aria-hidden="true" focusable="false">
+      {shape.marks.map((m, i) => m.kind === "dot"
+        ? <circle key={i} cx={m.x} cy={m.y} r={m.r} transform={m.transform} fill="currentColor" />
+        : <path key={i} d={m.d} transform={m.transform} fill="none" stroke={SHAPE_STROKE[m.colour]}
+            strokeWidth={m.width} strokeLinecap="round" strokeLinejoin="round" />)}
+    </svg>
+  );
+}
+function HomeCard({ turn }: { turn: number }) {
+  const { shape, fact }: { shape: HomeShape; fact: HomeFact } = homeCardAt(turn);
+  return (
+    <div className="at-homecard" data-el="home-fact" data-fact={fact.id}>
+      <p className="at-homecardtitle">{fact.about}</p>
+      <HomeShapeArt shape={shape} />
+      <p className="at-homecardfact">
+        {fact.text}{"\u00a0"}
+        <a className="at-homecardsrc" href={fact.source} target="_blank" rel="noopener noreferrer"
+          aria-label={`Source: ${fact.sourceName} (opens in your browser)`} title={`Source: ${fact.sourceName}`}>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false">
+            <path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+          </svg>
+        </a>
+      </p>
+    </div>
+  );
+}
+/* The card's count, on this device only: which card is showing is a
+   matter of what this screen last showed, not something to sync. */
+const HOME_TURN_KEY = "arabic-trainer:home-card";
+function readHomeTurn(): number {
+  try { return Math.max(0, parseInt(localStorage.getItem(HOME_TURN_KEY) || "0", 10) || 0); } catch { return 0; }
+}
+function writeHomeTurn(turn: number): number {
+  try { localStorage.setItem(HOME_TURN_KEY, String(turn)); } catch { /* private window: the card still turns for this visit */ }
+  return turn;
 }
 
 function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings: Settings; target?: PrepTarget }) {
@@ -20586,7 +20655,7 @@ function UnitScreen({ line, row, items, settings, perDay, onBack, onPractise, on
             {row.state === "locked" && before ? <Help>{`Finish unit ${before.number} to open this one`}</Help> : null}
             {open ? (
               <div className="at-row">
-                <Button variant="primary" onClick={onPractise}>Practise this unit</Button>
+                <Button variant="primary" onClick={onPractise}>Practice this unit</Button>
                 {markable ? <Button variant="ghost" onClick={() => setMarking(true)}>Mark as cleared</Button> : null}
               </div>
             ) : null}
@@ -22085,7 +22154,7 @@ function SetQuestions({ sets, steps, openSet, onAnswer, onList, onSkipRest, onCl
         {`You can change any of these in Settings, under ${names.join(", ")}.`}
       </Help>
       <div className="at-row at-mt4">
-        <Button variant="primary" onClick={onStart || onClose}>{onStart ? "Start session" : "Done"}</Button>
+        <Button variant="primary" onClick={onStart || onClose}>{onStart ? "Practice" : "Done"}</Button>
       </div>
     </Screen>
   );
@@ -22613,22 +22682,8 @@ function AppPreferences({ settings, setSetting }: {
     cards are being held back for a pile of overdue reviews. */
 export type Ready = { review: number; climbing: number; fresh: number; behind: boolean };
 
-/*
- * The one line above Start session. Every case ends somewhere the button
- * answers: there is always a session to start, so a learner who is caught
- * up is asked to practise rather than told when to come back.
- */
-export function homeLine({ review, climbing, fresh, behind }: Ready): string {
-  const news = fresh
-    ? ` · ${plural(fresh, "new card")} waiting`
-    : behind
-    ? " · new cards wait until you've caught up"
-    : "";
-  if (review) return `${plural(review, "card")} ready to review${climbing ? ` · ${climbing} in progress` : ""}${news}`;
-  if (climbing) return `Nothing to review — ${plural(climbing, "card")} in progress${news}`;
-  if (fresh) return `Nothing to review — ready to learn ${fresh === 1 ? "a new card" : `${fresh} new cards`}`;
-  return "All caught up — a practice session now still helps them stick";
-}
+/* The line that sat above Start session (homeLine) went inside the
+   Practice button in 0.664, shorter: see practiceLine in home-card.ts. */
 
 /*
  * The space you are in, at the top of the You menu (0.543, 28a): its logo
