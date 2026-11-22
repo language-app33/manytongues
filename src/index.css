@@ -1459,7 +1459,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-cdot { width:9px; height:9px; border-radius:50%; background: var(--jade); flex-shrink:0; }
 .at-cdot.syncing { background: var(--brass); }
 .at-cdot.error { background: var(--rose); }
-/* Offline is not a failure (0.668): grey, not red. */
+/* Offline is not a failure (0.669): grey, not red. */
 .at-cdot.off { background: var(--faint); }
 /* You, in the bar: your initial in a small round of its own, where the
    sections have their icons, with the sync dot on its shoulder. */
@@ -3584,6 +3584,10 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-training .at-row { max-width:420px; margin-inline:auto; }
 .at-training > :first-child { margin-top:0; }
 .at-training .at-row + .at-row { margin-top:12px; }
+/* Its drawing and the line under it (0.668). */
+.at-trainingintro { max-width:420px; margin:0 auto 24px; }
+.at-trainingart { display:block; width:128px; height:auto; margin:4px auto 12px; color: var(--muted); }
+.at-trainingintro p { margin:0; padding:0 8px; font-size:15px; line-height:1.4; color: var(--text-soft); text-wrap: balance; }
 
 /* --- the floating button ---------------------------------------------
    Edit on a card or deck being read, Save on one being written: in the

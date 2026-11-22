@@ -24,6 +24,7 @@ import {
   ConfirmModal,
   Empty,
   ChatArt,
+  TrainingArt,
   Field as FormField,
   FLAG_KINDS,
   FEEDBACK_KINDS,
@@ -11644,7 +11645,7 @@ export default function ArabicTrainer() {
      person: nothing to do. Someone else: ask before switching. */
   const [linkAsk, setLinkAsk] = useState<{ name: string } | null>(null);
   const linkPeeked = useRef(false);
-  /* No connection is the bar's to say, with Retry (0.668). */
+  /* No connection is the bar's to say, with Retry (0.669). */
   const linkReach = useReach({ detail: "Opening a sign-in link needs a connection." });
   useEffect(() => {
     if (!ready || !account || !linkKey || linkPeeked.current) return;
@@ -12144,7 +12145,7 @@ export default function ArabicTrainer() {
         syncFailHeld.current = 0;
       };
       /* Said in the bar with Retry (0.655). "No connection" is the bar's
-         own headline (0.668); anything else is "Sync failed". */
+         own headline (0.669); anything else is "Sync failed". */
       const holdFail = (title: string, detail: string) => {
         if (syncFailHeld.current) {
           updateReach(syncFailHeld.current, { title, detail });
@@ -12171,7 +12172,7 @@ export default function ArabicTrainer() {
         /* Offline is not a failure: the menu says the work is safe and
            the sync goes again when the connection comes back. Unless Sync
            now was pressed, which is answered the way anything pressed
-           without a connection is: the bar (0.668). */
+           without a connection is: the bar (0.669). */
         if (byHand) holdFail("", "Your work is saved on this device.");
         else letGo();
         return;
@@ -12520,7 +12521,7 @@ export default function ArabicTrainer() {
 
   /* What is waiting, as the app opens — before any connection has been
      tried, so the corner menu is right from the first paint — and every
-     time the queue changes, so the dot and the count follow it (0.668). */
+     time the queue changes, so the dot and the count follow it (0.669). */
   const [, setOutboxSeen] = useState(0);
   useEffect(() => {
     setToSend(waitingToSend(FLAG_OUTBOX));
@@ -12531,7 +12532,7 @@ export default function ArabicTrainer() {
   }, []);
 
   /*
-   * Everything this device is keeping until it can be sent (0.668): the
+   * Everything this device is keeping until it can be sent (0.669): the
    * problems reported about cards, and a teacher's cards with their
    * pictures and recordings — from anywhere in the app, not only from
    * Teaching. Sync now sends it, and so do the connection coming back,
@@ -12576,7 +12577,7 @@ export default function ArabicTrainer() {
 
   /* Anything getting through means the connection is there, which the
      browser never says when it was the server that was away rather than
-     the network (0.668). At most once a minute, and only with something
+     the network (0.669). At most once a minute, and only with something
      waiting: a refusal is an answer too, and must not start a loop. And a
      look every three minutes while something waits, for the case where
      nothing else is asking at all. */
@@ -13745,7 +13746,7 @@ export default function ArabicTrainer() {
       /* Nothing to ask and nothing to be learnt from asking. What this
          device was last told is already on screen. Unless Refresh was
          pressed, which is answered the way anything pressed without a
-         connection is: the bar, with Retry, on the Courses screen (0.668).
+         connection is: the bar, with Retry, on the Courses screen (0.669).
          It used to do nothing at all. */
       if (isOffline()) {
         if (announce === true) {
@@ -13924,7 +13925,7 @@ export default function ArabicTrainer() {
     try {
       /* Only whether each one settled matters here, not what it returned. */
       /* And everything kept on this device until it could be sent: the
-         reports, and a teacher's cards (0.668). */
+         reports, and a teacher's cards (0.669). */
       const jobs: Promise<unknown>[] = [runSync("", true), sendAllWaiting()];
       if (account) jobs.push(refreshCourses("changes"));
       if (account && (teaches || account.admin))
@@ -18193,7 +18194,7 @@ export default function ArabicTrainer() {
               /* Grey offline, and while trying a space (0.574), where
                  nothing syncs: offline is not a failure. Red only when
                  something failed. Amber while syncing, and while anything
-                 waits to be sent (0.668). */
+                 waits to be sent (0.669). */
               TRYING || offline
                 ? "off"
                 : syncState === "error"
@@ -19002,6 +19003,15 @@ function FocusedTrainingSheet({
   return (
     <Screen title="Focused training" onBack={onClose} className="training">
       <div className="at-training">
+        {/* What the screen is for, under a dumbbell (0.668): it had only
+            its buttons, which said what each does but not why come here. */}
+        <div className="at-trainingintro" data-el="training-intro">
+          <TrainingArt />
+          <p>
+            Practise with a goal in mind. Fix what keeps slipping, or build a
+            session from the cards you choose{saved.length > 0 ? ", or go back to one you saved" : ""}.
+          </p>
+        </div>
         <div className="at-row">
           <Button variant="ghost" off={!weakCount} onClick={onWeak}>
             Weak spots
@@ -22853,7 +22863,7 @@ function JoinSheet({ onJoin, onJoined, onClose }: {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   /* No connection is the bar's to say, with Retry, like everywhere else —
-     offline included (0.668). */
+     offline included (0.669). */
   const reach = useReach({ detail: JOIN_NEEDS });
   const input = useRef<HTMLInputElement | null>(null);
   useEffect(() => {

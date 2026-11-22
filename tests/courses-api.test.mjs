@@ -43,7 +43,7 @@ test("a platform 500 whose body isn't JSON reports the status, not bad-response"
   answer(500, "Internal Server Error", "text/plain");
   await assert.rejects(API.whoAmI("k"), { message: "http-500" });
   /* Said as our fault, with the status in brackets for whoever runs the
-     site — never the word "server" (0.668). */
+     site — never the word "server" (0.669). */
   assert.equal(API.explain(new Error("http-500")), "Something went wrong on our side. Try again in a moment. (500)");
 });
 

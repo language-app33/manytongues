@@ -9001,7 +9001,7 @@ day as the facts, the second day of practice (the owner's 1a), so Home
 opens up once rather than in stages. Before then there is little behind
 it: Weak spots needs a card missed twice running and there are no saved
 sessions. No note announces it (the owner's 2a).
-## One rule for "no connection", and three kinds of notice (0.668)
+## One rule for "no connection", and three kinds of notice (0.669)
 
 **24 November 2026** · `src/net.ts` (`noConnection`), `src/send-waiting.ts`, `src/reach.ts`
 

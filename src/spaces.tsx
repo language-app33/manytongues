@@ -6520,7 +6520,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
 
   /* Saves the server refused when they were sent from the queue, named
      until the teacher dismisses them (0.580, audit finding 5) — whichever
-     part of the app sent them (0.668). How many cards are waiting is the
+     part of the app sent them (0.669). How many cards are waiting is the
      You menu's to say now, with everything else waiting to sync. */
   const [lastDropped, setLastDropped] = useState(droppedCards);
   useEffect(() => watchDropped(setLastDropped), []);
@@ -7743,7 +7743,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       return await API.saveCard(card, decks, extra);
     } catch (e) {
       /* No connection, by the app's one rule — a deploy restarting the
-         server included — keeps the card, as offline does (0.668). */
+         server included — keeps the card, as offline does (0.669). */
       if (!noConnection(e)) throw e;
       /* A space only being tried is never written to, later or now
          (README, "Trying a space"). */
@@ -7762,7 +7762,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   }, [mineSide]);
 
   /* And send them when there is something to send them down: the shared
-     sender in send-waiting.ts, which the rest of the app uses too (0.668).
+     sender in send-waiting.ts, which the rest of the app uses too (0.669).
      A locked deck is said by it, so it is not said again here. */
   const sendKeptCards = useCallback(async () => {
     await sendWaitingCards({ say: snack, onSaved: absorbSaved });
@@ -10059,7 +10059,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
           {/* Saved cards that were refused once they could be sent, and so
               discarded. Work waiting to be sent is no longer said here: the
               dot on the You button turns amber, and the You menu counts it
-              with everything else waiting to sync (0.668). */}
+              with everything else waiting to sync (0.669). */}
           {lastDropped && lastDropped.length > 0 && (
             <TopBanner
               kind="error"

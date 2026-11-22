@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.668 — 24 November 2026
+## 0.669 — 25 November 2026
 
 **One way of saying "no connection", everywhere in the app, and never the
 word "server".** There used to be six kinds of notice and about 25
@@ -69,6 +69,17 @@ back on and see the bar go by itself. Check the dot is grey while offline.
 As a teacher, save a card offline, go to Learning, turn the connection
 back on and press Sync now: "1 card sent". Open the Join a course sheet
 offline and press Join.
+
+## 0.668 — 25 November 2026
+
+**Focused training says what it is for.** The screen behind the dumbbell on
+Home now opens with a small drawing of a dumbbell and one line under it:
+"Practise with a goal in mind. Fix what keeps slipping, or build a session
+from the cards you choose." Once a student has saved a session, the line
+ends "…or go back to one you saved." The buttons below are unchanged.
+
+Still to check by hand: the drawing and the line on a real phone, in light
+and dark.
 
 ## 0.667 — 24 November 2026
 

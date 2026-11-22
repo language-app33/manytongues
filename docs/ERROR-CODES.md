@@ -1,6 +1,6 @@
 # Error codes in brackets
 
-Since 0.668 the app never says "server" to the people using it. A fault on
+Since 0.669 the app never says "server" to the people using it. A fault on
 our side reads:
 
 > Something went wrong on our side. Try again in a moment. (500)

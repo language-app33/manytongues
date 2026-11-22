@@ -1,5 +1,5 @@
 /*
- * A teacher's cards saved without a connection, sent from anywhere (0.668).
+ * A teacher's cards saved without a connection, sent from anywhere (0.669).
  *
  * They used to be sent only by the Teaching screen, on opening it and when
  * the connection came back while it was open: a teacher who saved cards on
