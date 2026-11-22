@@ -16422,7 +16422,7 @@ export default function ArabicTrainer() {
                         the prep's, and this is the next thing along. */}
                     <Button variant={homePrep ? undefined : "primary"}
                       className="at-practicebtn" data-el="practice"
-                      icon="play" iconSize={26}
+                      icon="play" iconSize={34}
                       onClick={() => begin(false)}
                       disabled={!drillable.length}
                     >
@@ -18241,8 +18241,8 @@ export function climbOf(cards: Item[], settings: Settings, all: Item[], target: 
 }
 
 /*
- * The card on Home (0.664): a small title naming what the fact is about, a
- * shape drawn in the logo's style, and the fact, ending in a small icon
+ * The card on Home (0.664): a shape drawn in the logo's style, and the
+ * fact, ending in a small icon
  * that opens its source in the browser. Which shape and which fact is read
  * off one count per device, moved on by each finished session; see
  * home-card.ts for the shapes, the facts and why.
@@ -18268,7 +18268,6 @@ function HomeCard({ turn }: { turn: number }) {
   const { shape, fact }: { shape: HomeShape; fact: HomeFact } = homeCardAt(turn);
   return (
     <div className="at-homecard" data-el="home-fact" data-fact={fact.id}>
-      <p className="at-homecardtitle">{fact.about}</p>
       <HomeShapeArt shape={shape} />
       <p className="at-homecardfact">
         {fact.text}{"\u00a0"}

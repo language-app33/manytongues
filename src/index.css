@@ -3542,28 +3542,32 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    as one row with Practice the main one. The row counts as one column, so
    Practice's type is sized as it would be alone. */
 .at-row.at-startrow { --cols: 1; flex-wrap: nowrap; margin-top: 14px; }
-.at-row > .at-btn.at-practicebtn { min-height: 64px; border-radius: 18px; gap: 12px; padding: 10px 16px; }
-.at-row > .at-btn.at-practicebtn.primary { box-shadow: 0 6px 16px var(--jade-soft); }
+/* Practice is the app's primary button as it is everywhere else (0.665):
+   the same corners, type and fill, no glow. What it adds is a larger play
+   symbol and a second, smaller line inside it saying what it will deal,
+   left-aligned beside the symbol. The dumbbell takes Practice's height. */
+.at-row > .at-btn.at-practicebtn { gap: 12px; padding-block: 10px; }
 .at-row > .at-btn.at-practicebtn > .at-btnlabel { flex-direction: column; flex-wrap: nowrap; align-items: flex-start;
   row-gap: 4px; text-align: left; width: auto; }
-.at-practicebtn > .at-btnlabel > b { font-size: 17px; font-weight: 900; line-height: 1; letter-spacing: .03em; }
+.at-practicebtn > .at-btnlabel > b { font-weight: inherit; line-height: 1; }
 .at-practicebtn > .at-btnlabel > small { font-size: 12.5px; font-weight: 700; line-height: 1.15; letter-spacing: 0;
   text-transform: none; opacity: .88; }
-.at-row > .at-trainbtn { flex:0 0 auto; width:64px; min-height:64px; padding:0; border: 0;
-  border-radius: 18px; background: var(--jade-bg); color: var(--jade); }
+.at-row > .at-trainbtn { flex:0 0 auto; width:64px; min-height:52px; padding:0; border: 0;
+  border-radius: var(--r); background: var(--jade-bg); color: var(--jade); }
 .at-row > .at-trainbtn:hover { background: var(--jade-soft); }
 /* A size up from the usual icon: a dumbbell is all bar at 20px. */
 .at-trainbtn .at-ic { width:28px; height:28px; }
-/* The card on Home (0.664): a small title, a shape in the logo's style and
-   a fact, on one panel in the app's raised colour, close under the
-   progress ring with Practice close under it. The logo's pale lavender is
-   deepened in the drawing itself and its dot takes the text colour, so
-   both show on the panel in either theme. */
-.at-home .at-homecard { max-width: 420px; margin: 16px auto 0; padding: 6px 0 16px; border-radius: 22px;
+/* The card on Home (0.664): a shape in the logo's style and a fact, on one
+   panel in the app's raised colour, close under the progress ring with
+   Practice close under it. No title above the shape since 0.665, and the
+   fact runs nearly the card's full width, so it often takes two lines
+   rather than three. The logo's pale lavender is deepened in the drawing
+   itself and its dot takes the text colour, so both show on the panel in
+   either theme. */
+.at-home .at-homecard { max-width: 420px; margin: 16px auto 0; padding: 14px 0 16px; border-radius: 22px;
   background: var(--raised); text-align: center; }
-.at-homecardtitle { margin: 10px 18px 0; font-size: 14px; font-weight: 900; line-height: 1.2; color: var(--text-soft); }
 .at-homeart { display: block; width: 78%; max-width: 300px; height: auto; margin: 0 auto 14px; color: var(--text); }
-.at-homecardfact { margin: 0 auto; padding: 0 18px; max-width: 300px; font-size: 14px; font-weight: 700;
+.at-homecardfact { margin: 0; padding: 0 12px; font-size: 14px; font-weight: 700;
   line-height: 1.35; color: var(--text-soft); text-wrap: balance; }
 .at-homecardsrc { display: inline-flex; vertical-align: -2px; padding: 1px; border-radius: 4px; color: var(--jade); }
 .at-homecardsrc:hover { color: var(--text); }

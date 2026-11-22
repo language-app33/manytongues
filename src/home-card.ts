@@ -24,7 +24,8 @@
 export type HomeFact = {
   /** Stable, so the card can be pointed at in a report. */
   id: string;
-  /** What the fact is about, as the card's small title: "Italy". */
+  /** What the fact is about: "Italy". Not shown since 0.665 (the card's
+      title came off), kept so a fact can be found and named in a report. */
   about: string;
   /** The fact itself: one or two sentences, about 110 characters at most. */
   text: string;

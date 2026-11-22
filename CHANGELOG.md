@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.665 — 23 November 2026
+
+**The card on Home is simpler, and Practice looks like every other main
+button.**
+
+- **No title on the card.** The small label above the shape ("Italy" and
+  so on) is gone, so the card is just the shape and the fact.
+- **The fact runs wider.** It uses nearly the card's full width, so most
+  facts now take two lines instead of three.
+- **Practice matches the app's other main buttons:** the same corners,
+  lettering and colour, and no glow around it. Its play symbol is larger.
+  The dumbbell beside it takes the same height.
+
 ## 0.664 — 23 November 2026
 
 **Home has a card with a fact about how language varies.** Under the

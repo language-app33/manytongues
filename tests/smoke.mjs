@@ -1051,8 +1051,9 @@ check("every card with something due counts, and a value is never one", homeCard
      the browser, not in the app. */
   const card = homeCard()?.querySelector('[data-el="home-fact"]');
   const src = card?.querySelector("a.at-homecardsrc");
-  check("Home shows a fact card above Practice, with a title, a shape and a source that opens outside the app",
-    !!card && !!(card.querySelector(".at-homecardtitle")?.textContent || "").trim() && !!card.querySelector("svg.at-homeart path") &&
+  check("Home shows a fact card above Practice, with a shape and a source that opens outside the app, and no title (0.665)",
+    !!card && !card.querySelector(".at-homecardtitle") && !!(card.querySelector(".at-homecardfact")?.textContent || "").trim() &&
+      !!card.querySelector("svg.at-homeart path") &&
       !!src && src.getAttribute("target") === "_blank" && /^https:\/\//.test(src.getAttribute("href") || "") &&
       !!((card.compareDocumentPosition(/** @type {Node} */ (practice)) || 0) & 4),
     card ? (card.textContent || "").slice(0, 120) : "no card");
