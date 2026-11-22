@@ -12,7 +12,7 @@ anything that was never really a choice.
 ---
 
 
-## Home's name is a heading in the page, not chrome (0.665)
+## Home's name is a heading in the page, not chrome (0.668)
 
 The app's name on Home was positioned absolutely over the page's top
 padding, with where-you-are on a line of its own underneath. Putting the
@@ -9003,3 +9003,19 @@ inline drawing: the logo is a file the server also serves as an icon, and
 two small files cost less than keeping a copy of its drawing in the code.
 Only the pages change. The installed app's icon keeps its square, because a
 phone always draws an app icon on one.
+
+**A welcome before the facts (0.666).** The owner asked for the facts to
+wait until a student has really started. "Started" is the second day of
+practice (the owner's 1b), read off the synced practice log rather than
+the per-device card count, so it is the same on every device. Before
+then the card keeps its place and shape (2a), holding the logo's own
+loops and one of two welcomes (3a): one for a student who has not
+practised, one for the first day. Any practised day other than today
+counts, so a student returning the next morning sees a fact before
+practising again rather than being told to "come back tomorrow".
+
+**The dumbbell waits too (0.667).** Focused training appears on the same
+day as the facts, the second day of practice (the owner's 1a), so Home
+opens up once rather than in stages. Before then there is little behind
+it: Weak spots needs a card missed twice running and there are no saved
+sessions. No note announces it (the owner's 2a).

@@ -856,7 +856,7 @@ export function mergeMoves(
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
 import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
 import { homeEmptyHint, homeEmptySays, listOf as listOfNames, whyHomeIsEmpty } from "./home-empty.ts";
-import { homeCardAt, practiceLine, type HomeShape, type HomeFact, type ShapeColour } from "./home-card.ts";
+import { homeCardAt, homeStage, practiceLine, HOME_SHAPES, HOME_WELCOME, type HomeShape, type HomeFact, type HomeStage, type ShapeColour } from "./home-card.ts";
 import { rememberedTheme, rememberTheme } from "./theme-memory.ts";
 import type { Filler, Mark } from "./grade.ts";
 
@@ -14089,6 +14089,10 @@ export default function ArabicTrainer() {
      ran out of time or was all answered. A trial is a teacher's look at one
      question, not a session, so it turns nothing. Counted per device. */
   const [homeTurn, setHomeTurn] = useState(readHomeTurn);
+  /* How far the student has come: before practice, the first day, or
+     from the second day of practice (0.666). The card's welcome and the
+     dumbbell (0.667) both wait on it. */
+  const stage: HomeStage = homeStage(data.log, dayKey());
   const turnedFor = useRef<unknown>(null);
   useEffect(() => {
     if (!session || exercise || session.trial || turnedFor.current === session) return;
@@ -16225,7 +16229,7 @@ export default function ArabicTrainer() {
               }}
             />
           )}
-          {/* Home's top line (0.665): the app's name at the left, as the
+          {/* Home's top line (0.668): the app's name at the left, as the
               page's title, and where you are at the right of the same
               line, as every tab's title carries it (0.601). It scrolls
               away with the page. Centred where there is no place button
@@ -16412,7 +16416,7 @@ export default function ArabicTrainer() {
                   {/* A shape in the logo's style and a fact about how
                       language varies, turned after every finished session
                       (0.664). See home-card.ts. */}
-                  <HomeCard turn={homeTurn} />
+                  <HomeCard turn={homeTurn} stage={stage} />
 
                   {/* Practice, and beside it on the right the way to
                       Focused training (0.650): weak spots, a session built
@@ -16431,7 +16435,7 @@ export default function ArabicTrainer() {
                         the prep's, and this is the next thing along. */}
                     <Button variant={homePrep ? undefined : "primary"}
                       className="at-practicebtn" data-el="practice"
-                      icon="play" iconSize={26}
+                      icon="play" iconSize={34}
                       onClick={() => begin(false)}
                       disabled={!drillable.length}
                     >
@@ -16441,9 +16445,18 @@ export default function ArabicTrainer() {
                     {/* An icon alone, as the owner asked: its name is what a
                         screen reader says, and the screen's title. No dot
                         for weak spots waiting (the owner's 3b). */}
-                    <IconButton icon="dumbbell" label="Focused training" ghost
-                      className="at-trainbtn" data-el="focused-training"
-                      onClick={() => setTraining(true)} />
+                    {/* The app's secondary button, outlined and unfilled, as
+                        every secondary action is (0.665): only its width is
+                        its own. Not there until the second day of practice
+                        (0.667), when the facts arrive too: before then
+                        there is little behind it for a beginner, and
+                        Practice has the row to itself. */}
+                    {stage === "learning" && (
+                      <Button variant="ghost" icon="dumbbell" iconSize={28}
+                        aria-label="Focused training" title="Focused training"
+                        className="at-trainbtn" data-el="focused-training"
+                        onClick={() => setTraining(true)} />
+                    )}
                   </div>
                   {/* The warning that sat here — "No card here has two
                       usable exercise types" — was written for a teacher and
@@ -18236,8 +18249,8 @@ export function climbOf(cards: Item[], settings: Settings, all: Item[], target: 
 }
 
 /*
- * The card on Home (0.664): a small title naming what the fact is about, a
- * shape drawn in the logo's style, and the fact, ending in a small icon
+ * The card on Home (0.664): a shape drawn in the logo's style, and the
+ * fact, ending in a small icon
  * that opens its source in the browser. Which shape and which fact is read
  * off one count per device, moved on by each finished session; see
  * home-card.ts for the shapes, the facts and why.
@@ -18259,11 +18272,20 @@ function HomeShapeArt({ shape }: { shape: HomeShape }) {
     </svg>
   );
 }
-function HomeCard({ turn }: { turn: number }) {
+function HomeCard({ turn, stage }: { turn: number; stage: HomeStage }) {
   const { shape, fact }: { shape: HomeShape; fact: HomeFact } = homeCardAt(turn);
+  /* Until the second day of practice, a welcome under the logo's loops
+     instead of a fact (0.666): see homeStage. Nothing to source. */
+  if (stage !== "learning") {
+    return (
+      <div className="at-homecard" data-el="home-fact" data-stage={stage}>
+        <HomeShapeArt shape={HOME_SHAPES[0]} />
+        <p className="at-homecardfact">{HOME_WELCOME[stage]}</p>
+      </div>
+    );
+  }
   return (
-    <div className="at-homecard" data-el="home-fact" data-fact={fact.id}>
-      <p className="at-homecardtitle">{fact.about}</p>
+    <div className="at-homecard" data-el="home-fact" data-stage={stage} data-fact={fact.id}>
       <HomeShapeArt shape={shape} />
       <p className="at-homecardfact">
         {fact.text}{"\u00a0"}

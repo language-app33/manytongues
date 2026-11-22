@@ -1522,11 +1522,11 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-placename, .at-placelangs { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 /* The place gives way long before the mode does; on the narrowest phones
    the mode is cut too, with an ellipsis, rather than running over the
-   arrow (0.665). */
+   arrow (0.668). */
 .at-placename { flex:0 100 auto; }
 .at-placemode { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .at-placelangs { color: var(--muted); font-weight:700; }
-/* On a phone the line is too short for the languages as well (0.665, the
+/* On a phone the line is too short for the languages as well (0.668, the
    owner's 2): the button keeps the place and the mode, and the sheet it
    opens still says which languages are on. */
 @media (max-width: 599px) { .at-placelangs { display:none; } }
@@ -3496,7 +3496,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    other tabs carry their own name in the same place. The content under it
    sits on the page itself rather than in a card: one centred column, its
    parts set apart by space alone. */
-/* Its top line (0.665): the app's name at the left and where you are at
+/* Its top line (0.668): the app's name at the left and where you are at
    the right of the same line, as every tab's title carries it. The name
    is at a tab title's scale rather than the 32px it had alone, so the
    button beside it keeps enough of the line to be read on a phone; the
@@ -3531,28 +3531,37 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    as one row with Practice the main one. The row counts as one column, so
    Practice's type is sized as it would be alone. */
 .at-row.at-startrow { --cols: 1; flex-wrap: nowrap; margin-top: 14px; }
-.at-row > .at-btn.at-practicebtn { min-height: 64px; border-radius: 18px; gap: 12px; padding: 10px 16px; }
-.at-row > .at-btn.at-practicebtn.primary { box-shadow: 0 6px 16px var(--jade-soft); }
+/* Practice is the app's primary button as it is everywhere else (0.665):
+   the same corners, type and fill, no glow. What it adds is a larger play
+   symbol and a second, smaller line inside it saying what it will deal,
+   left-aligned beside the symbol. The dumbbell beside it takes its height. */
+.at-row > .at-btn.at-practicebtn { gap: 12px; padding-block: 10px; }
 .at-row > .at-btn.at-practicebtn > .at-btnlabel { flex-direction: column; flex-wrap: nowrap; align-items: flex-start;
   row-gap: 4px; text-align: left; width: auto; }
-.at-practicebtn > .at-btnlabel > b { font-size: 17px; font-weight: 900; line-height: 1; letter-spacing: .03em; }
+.at-practicebtn > .at-btnlabel > b { font-weight: inherit; line-height: 1; }
 .at-practicebtn > .at-btnlabel > small { font-size: 12.5px; font-weight: 700; line-height: 1.15; letter-spacing: 0;
-  text-transform: none; opacity: .88; }
-.at-row > .at-trainbtn { flex:0 0 auto; width:64px; min-height:64px; padding:0; border: 0;
-  border-radius: 18px; background: var(--jade-bg); color: var(--jade); }
-.at-row > .at-trainbtn:hover { background: var(--jade-soft); }
-/* A size up from the usual icon: a dumbbell is all bar at 20px. */
-.at-trainbtn .at-ic { width:28px; height:28px; }
-/* The card on Home (0.664): a small title, a shape in the logo's style and
-   a fact, on one panel in the app's raised colour, close under the
-   progress ring with Practice close under it. The logo's pale lavender is
-   deepened in the drawing itself and its dot takes the text colour, so
-   both show on the panel in either theme. */
-.at-home .at-homecard { max-width: 420px; margin: 16px auto 0; padding: 6px 0 16px; border-radius: 22px;
+  text-transform: none; opacity: .88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* On the narrowest phones the line stays on one line (0.666): the button
+   may shrink, and the line ends in "…" before it would wrap. */
+.at-row > .at-btn.at-practicebtn { min-width: 0; }
+.at-row > .at-btn.at-practicebtn > .at-btnlabel { min-width: 0; overflow: hidden; }
+/* The dumbbell is the app's secondary (ghost) button, as every secondary
+   action is (0.665): its own is only a square-ish width rather than a
+   share of the row. */
+.at-row > .at-btn.at-trainbtn { flex:0 0 auto; width:64px; padding:0; }
+/* The card on Home (0.664): a shape in the logo's style and a fact, on one
+   panel in the app's raised colour, close under the progress ring with
+   Practice close under it. No title above the shape since 0.665, and the
+   fact runs nearly the card's full width, so it often takes two lines
+   rather than three. The logo's pale lavender is deepened in the drawing
+   itself and its dot takes the text colour, so both show on the panel in
+   either theme. */
+.at-home .at-homecard { max-width: 420px; margin: 16px auto 0; padding: 14px 0 16px; border-radius: 22px;
   background: var(--raised); text-align: center; }
-.at-homecardtitle { margin: 10px 18px 0; font-size: 14px; font-weight: 900; line-height: 1.2; color: var(--text-soft); }
-.at-homeart { display: block; width: 78%; max-width: 300px; height: auto; margin: 0 auto 14px; color: var(--text); }
-.at-homecardfact { margin: 0 auto; padding: 0 18px; max-width: 300px; font-size: 14px; font-weight: 700;
+/* 80% of what it was in 0.664 (the owner, 0.665): 78% of the card, at
+   most 300px, became these. */
+.at-homeart { display: block; width: 62.4%; max-width: 240px; height: auto; margin: 0 auto 14px; color: var(--text); }
+.at-homecardfact { margin: 0; padding: 0 12px; font-size: 14px; font-weight: 700;
   line-height: 1.35; color: var(--text-soft); text-wrap: balance; }
 .at-homecardsrc { display: inline-flex; vertical-align: -2px; padding: 1px; border-radius: 4px; color: var(--jade); }
 .at-homecardsrc:hover { color: var(--text); }

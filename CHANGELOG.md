@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.665 — 23 November 2026
+## 0.668 — 24 November 2026
 
 **On Home, the button for your space and languages is on the top line.**
 It sits at the right of the app's name, on the same line, where every
@@ -28,6 +28,56 @@ arrow.
 Still to check by hand: the top line on your own phone, above all for
 someone in more than one space, where the space's name is cut to a letter
 or two on a typical phone.
+## 0.667 — 24 November 2026
+
+**The Focused training button waits until a student has started.** The
+dumbbell beside Practice now appears on the second day a student
+practises, the same day the facts replace the welcome. Before then there
+is little behind it for a beginner (no weak spots yet, no saved sessions),
+so Practice has the row to itself. A student who wants to practise a
+particular unit early can still do it from the unit's own page.
+
+Still to check by hand: with a brand-new student account, no dumbbell on
+the first day, and the dumbbell beside Practice the next day.
+
+## 0.666 — 24 November 2026
+
+**A welcome before the facts.** The card on Home now shows its facts from
+the second day a student practises. Until then it shows the logo's loops
+and a welcome instead:
+
+- **Before any practice:** "Welcome! Your first session takes just a few
+  minutes."
+- **On the first day, after practising:** "Great start! Come back
+  tomorrow and your cards will begin to stick."
+
+A student who practised yesterday sees a fact as soon as they open the
+app today. The days are counted from the student's own practice, so this
+follows them across their devices.
+
+**Practice's second line stays on one line.** On the narrowest phones, a
+long line such as "6 to review · 3 in progress" no longer wraps onto two
+lines. It ends in "…" if it can't fit.
+
+Still to check by hand: a brand-new student account sees the first
+welcome, the second after its first session, and a fact the next day.
+
+## 0.665 — 23 November 2026
+
+**The card on Home is simpler, and Practice looks like every other main
+button.**
+
+- **No title on the card.** The small label above the shape ("Italy" and
+  so on) is gone, so the card is just the shape and the fact.
+- **A smaller shape.** The shape is a fifth smaller, so the card takes
+  less of the screen.
+- **The fact runs wider.** It uses nearly the card's full width, so most
+  facts now take two lines instead of three.
+- **Practice matches the app's other main buttons:** the same corners,
+  lettering and colour, and no glow around it. Its play symbol is larger.
+- **The dumbbell for Focused training matches the app's other secondary
+  buttons:** outlined and unfilled, instead of the soft green square. It
+  takes Practice's height.
 
 ## 0.664 — 23 November 2026
 
