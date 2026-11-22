@@ -19,7 +19,9 @@ button.**
   facts now take two lines instead of three.
 - **Practice matches the app's other main buttons:** the same corners,
   lettering and colour, and no glow around it. Its play symbol is larger.
-  The dumbbell beside it takes the same height.
+- **The dumbbell for Focused training matches the app's other secondary
+  buttons:** outlined and unfilled, instead of the soft green square. It
+  takes Practice's height.
 
 ## 0.664 — 23 November 2026
 

@@ -3545,18 +3545,17 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 /* Practice is the app's primary button as it is everywhere else (0.665):
    the same corners, type and fill, no glow. What it adds is a larger play
    symbol and a second, smaller line inside it saying what it will deal,
-   left-aligned beside the symbol. The dumbbell takes Practice's height. */
+   left-aligned beside the symbol. The dumbbell beside it takes its height. */
 .at-row > .at-btn.at-practicebtn { gap: 12px; padding-block: 10px; }
 .at-row > .at-btn.at-practicebtn > .at-btnlabel { flex-direction: column; flex-wrap: nowrap; align-items: flex-start;
   row-gap: 4px; text-align: left; width: auto; }
 .at-practicebtn > .at-btnlabel > b { font-weight: inherit; line-height: 1; }
 .at-practicebtn > .at-btnlabel > small { font-size: 12.5px; font-weight: 700; line-height: 1.15; letter-spacing: 0;
   text-transform: none; opacity: .88; }
-.at-row > .at-trainbtn { flex:0 0 auto; width:64px; min-height:52px; padding:0; border: 0;
-  border-radius: var(--r); background: var(--jade-bg); color: var(--jade); }
-.at-row > .at-trainbtn:hover { background: var(--jade-soft); }
-/* A size up from the usual icon: a dumbbell is all bar at 20px. */
-.at-trainbtn .at-ic { width:28px; height:28px; }
+/* The dumbbell is the app's secondary (ghost) button, as every secondary
+   action is (0.665): its own is only a square-ish width rather than a
+   share of the row. */
+.at-row > .at-btn.at-trainbtn { flex:0 0 auto; width:64px; padding:0; }
 /* The card on Home (0.664): a shape in the logo's style and a fact, on one
    panel in the app's raised colour, close under the progress ring with
    Practice close under it. No title above the shape since 0.665, and the

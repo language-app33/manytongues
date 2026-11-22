@@ -16432,7 +16432,11 @@ export default function ArabicTrainer() {
                     {/* An icon alone, as the owner asked: its name is what a
                         screen reader says, and the screen's title. No dot
                         for weak spots waiting (the owner's 3b). */}
-                    <IconButton icon="dumbbell" label="Focused training" ghost
+                    {/* The app's secondary button, outlined and unfilled, as
+                        every secondary action is (0.665): only its width is
+                        its own. */}
+                    <Button variant="ghost" icon="dumbbell" iconSize={28}
+                      aria-label="Focused training" title="Focused training"
                       className="at-trainbtn" data-el="focused-training"
                       onClick={() => setTraining(true)} />
                   </div>
