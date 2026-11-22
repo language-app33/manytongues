@@ -108,13 +108,10 @@ import { fillerCards } from "./numbers/generate.ts";
 import { rangeChecks } from "./numbers/range.ts";
 import { personsOf } from "./verbs.ts";
 import { countedNouns, withNouns } from "./numbers/nouns.ts";
-import { isOffline, watchNet } from "./net.ts";
-import { CARD_OUTBOX, drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
-import { mediaIn, sendHeld, withoutMedia } from "./held-media.ts";
+import { noConnection, SAVED_FOR_LATER, watchNet } from "./net.ts";
+import { CARD_OUTBOX, keep as keepPending } from "./outbox.ts";
 
-/* A card as a teacher would name it, in a message about it. */
-const cardLabel = (c: Partial<Card>) =>
-  (c && (leadOf(c as Card).ar || c.name || leadOf(c as Card).en)) || "A card";
+import { dismissDropped, droppedCards, lockedNote, sendCardMedia as sendWaitingMedia, sendWaitingCards, watchDropped } from "./send-waiting.ts";
 import { buildDialogIndex } from "./dialogs.ts";
 import { feedbackToText, flagsToText } from "./flag-export.ts";
 import { IMPORTED_STATUS, matchImport, mediaOf, mentions, readImportFile, remapIds, tickedAtFirst, toSave } from "./imports.ts";
@@ -176,7 +173,6 @@ import {
   recallSpace,
   rememberSpace,
   useFreshSpace,
-  useOffline,
   useLiveRefresh,
   useSnackbar,
   useRun,
@@ -194,7 +190,7 @@ export { LanguageTag, languageName } from "./shared.tsx";
 /* What a screen says in place of what it could not load when the server
    was out of reach. The snackbar says why and offers Retry (0.636); this
    only keeps the screen from looking empty for no reason. */
-const LOAD_UNREACHED = "Couldn't load the latest from the server.";
+const LOAD_UNREACHED = "Couldn't load the latest.";
 export { ConfirmModal, useLiveRefresh, cardToItem, localIdFor };
 
 /*
@@ -3871,8 +3867,8 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
         </Button>
       </div>
       <Help>
-        The long string set on the server when the site was deployed. Needed once, to make this
-        account the administrator.
+        The long key chosen when the site was set up. Needed once, to make this account the
+        administrator.
       </Help>
     </Field>
   );
@@ -4967,13 +4963,6 @@ function lockedDeleteNote(titles: string[]): string {
     : `${names} are locked. Unlock them in deck settings to delete them.`;
 }
 
-/* What to say when a save left locked decks as they were. */
-function lockedNote(titles: Set<string>): string {
-  const names = [...titles].map((t) => `"${t}"`).join(", ");
-  return titles.size === 1
-    ? `${names} is locked, so its cards were not changed.`
-    : `${names} are locked, so their cards were not changed.`;
-}
 
 /* ------------------------------------------------------------------
    Naming a deck
@@ -6529,12 +6518,12 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     if (m) setEditing({ card: null, decks: m.decks, lang: m.lang, making: "word", opened: Date.now() });
   };
 
-  /* How many cards are waiting for a connection, so the space can say so
-     rather than leaving a teacher to wonder where their work went. */
-  const [kept, setKept] = useState(() => waitingToSend(CARD_OUTBOX));
   /* Saves the server refused when they were sent from the queue, named
-     until the teacher dismisses them (0.580, audit finding 5). */
-  const [lastDropped, setLastDropped] = useState<{ name: string; msg: string }[] | null>(null);
+     until the teacher dismisses them (0.580, audit finding 5) — whichever
+     part of the app sent them (0.669). How many cards are waiting is the
+     You menu's to say now, with everything else waiting to sync. */
+  const [lastDropped, setLastDropped] = useState(droppedCards);
+  useEffect(() => watchDropped(setLastDropped), []);
   /* The teacher's own number systems, one per language they teach. Read
      when the screen that edits them is opened rather than on every visit
      to the card list: it is one request and most visits never want it. */
@@ -6544,9 +6533,6 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     /* Which version of each a teacher signed off — see sign-system. */
     signed?: Record<string, number | null>;
   } | null>(null);
-  /* Whether there is a connection, so the editor can say so before the
-     typing rather than after it. */
-  const offline = useOffline();
   const [naming, setNaming] = useState<"new" | null>(null);
   /* What kind of deck "New deck" makes: chosen on a sheet first, outside
      My space, where only a regular deck can be made (0.633). */
@@ -7423,7 +7409,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         { value: "any", label: "Any" },
         { value: "with", label: "With" },
         { value: "without", label: "Without" },
-        { value: "lost", label: "Missing from the server" },
+        { value: "lost", label: "Missing" },
       ],
     },
     {
@@ -7728,32 +7714,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     if ([...(was.decks || [])].sort().join() !== [...decks].sort().join()) out.push("decks");
     return out;
   };
-  /*
-   * The pictures and recordings a card names that were added offline and
-   * are still on this device go up before the card does (0.659), so no
-   * student is ever handed a card whose picture or recording the server
-   * has not got. `waiting`: some could not go yet, and the card waits with
-   * them. One the server refuses is taken off the card, which goes without
-   * it, and the teacher is told.
-   */
-  const sendCardMedia = async (card: Partial<Card>): Promise<{ card: Partial<Card>; waiting: boolean }> => {
-    const named = mediaIn(card);
-    if (!named.length) return { card, waiting: false };
-    const r = await sendHeld(API.putMedia, named);
-    if (r.refused.length) {
-      const pics = r.refused.filter((x) => x.kind === "image").length;
-      const recs = r.refused.length - pics;
-      const what = [pics ? plural(pics, "picture") : "", recs ? plural(recs, "recording") : ""].filter(Boolean).join(" and ");
-      snack(
-        `${what} on "${cardLabel(card)}" couldn't be sent and ${r.refused.length === 1 ? "was" : "were"} left off: ${API.explain(new Error(r.refused[0].msg))}`,
-        "warn",
-      );
-    }
-    return {
-      card: r.refused.length ? withoutMedia(card, r.refused.map((x) => x.hash)) : card,
-      waiting: r.waiting.length > 0,
-    };
-  };
+  /* Its offline pictures and recordings first (0.659): send-waiting.ts. */
+  const sendCardMedia = (card: Partial<Card>) => sendWaitingMedia(card, snack);
   /* A save straight to the server, naming what it changed — for the
      screens that do not keep a save for later. */
   /* With the decks this screen believed the card was in, so the server
@@ -7780,7 +7742,9 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       if (media.waiting) throw new Error("offline");
       return await API.saveCard(card, decks, extra);
     } catch (e) {
-      if (String((e && (e as Error).message) || e) !== "offline") throw e;
+      /* No connection, by the app's one rule — a deploy restarting the
+         server included — keeps the card, as offline does (0.669). */
+      if (!noConnection(e)) throw e;
       /* A space only being tried is never written to, later or now
          (README, "Trying a space"). */
       if (API.tryingSpace()) throw new Error("trying-space-save");
@@ -7790,7 +7754,6 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       /* Nowhere to keep it: said, and the editor stays open with what was
          typed (0.580, audit finding 6). */
       if (!kept) throw new Error("device-full");
-      setKept(waitingToSend(CARD_OUTBOX));
       return { kept: true };
     }
   /* touchedBy reads the cards through a ref, so this is made once; and
@@ -7798,47 +7761,12 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mineSide]);
 
-  /* And send them when there is something to send them down. One at a
-     time, oldest first; a card the server refuses outright is dropped,
-     because it will be refused again for the same reason. */
+  /* And send them when there is something to send them down: the shared
+     sender in send-waiting.ts, which the rest of the app uses too (0.669).
+     A locked deck is said by it, so it is not said again here. */
   const sendKeptCards = useCallback(async () => {
-    if (isOffline()) return;
-    const dropped: { name: string; msg: string }[] = [];
-    const cardName = cardLabel;
-    const { sent } = await drainOutbox(CARD_OUTBOX, async (body) => {
-      const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra; org?: string };
-      try {
-        /* Its pictures and recordings kept offline go first (0.659). */
-        const media = await sendCardMedia(held.card);
-        if (media.waiting) return "keep";
-        absorbSaved(await API.saveCard(media.card, held.decks, held.extra || {}, held.org));
-        return "sent";
-      } catch (e) {
-        /* Waited through anything that is not the server's own refusal; a
-           refusal drops it, and the teacher is told (0.580, audit finding 5). */
-        const msg = String((e && (e as Error).message) || e);
-        if (isTransient(msg)) return "keep";
-        dropped.push({ name: cardName(held.card), msg });
-        return "drop";
-      }
-    });
-    setKept(waitingToSend(CARD_OUTBOX));
-    /* And with no card left waiting, whatever else was kept offline goes
-       too: a picture or recording added to a card that was then closed
-       without saving, say. Nothing names it, so a refusal is not said. */
-    if (!waitingToSend(CARD_OUTBOX) && !isOffline()) await sendHeld(API.putMedia);
-    if (dropped.length) {
-      const n = dropped.length;
-      snack(
-        `${n} saved card${n === 1 ? "" : "s"} could not be sent and ${n === 1 ? "was" : "were"} discarded: ${API.explain(new Error(dropped[0].msg))}`,
-        "warn",
-      );
-      setLastDropped((was) => (was || []).concat(dropped));
-    }
-    if (lockedHits.current.size) {
-      snack(lockedNote(lockedHits.current), "warn");
-      lockedHits.current.clear();
-    } else if (sent) snack(`${plural(sent, "card")} sent`, "good");
+    await sendWaitingCards({ say: snack, onSaved: absorbSaved });
+    lockedHits.current.clear();
   /* absorbSaved and snack are stable for this purpose: the first writes
      through a state setter, the second forwards to a memoised snackbar. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -8416,8 +8344,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
             (done: { name: string, kept: boolean, published: boolean, waiting: number, trimmed: string[], moved: number, waits: string }) =>
               done.kept
                 ? done.published
-                  ? `${done.name} saved on this device — it's published when you're back online`
-                  : `${done.name} saved on this device — it goes up when you're back online`
+                  ? `${done.name} saved on this device. It will be sent and published when you're back online.`
+                  : `${done.name} ${SAVED_FOR_LATER.charAt(0).toLowerCase()}${SAVED_FOR_LATER.slice(1)}`
                 : done.published && !done.moved && !done.trimmed.length && !done.waiting
                 ? `${done.name} saved and published — students get it now`
                 : done.moved
@@ -10128,23 +10056,16 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       error={error}
       busy={busy}
     >
-          {/* Work that is safe but not yet shared. Said in the band across
-              the top of the window rather than in the space, because it is
-              true of the space rather than of whichever list is on screen —
-              and a teacher who has just written a card on a train should
-              see that it is still coming however far down a list they are. */}
+          {/* Saved cards that were refused once they could be sent, and so
+              discarded. Work waiting to be sent is no longer said here: the
+              dot on the You button turns amber, and the You menu counts it
+              with everything else waiting to sync (0.669). */}
           {lastDropped && lastDropped.length > 0 && (
             <TopBanner
               kind="error"
-              actions={<Button size="sm" variant="ghost" onClick={() => setLastDropped(null)}>Dismiss</Button>}
+              actions={<Button size="sm" variant="ghost" onClick={dismissDropped}>Dismiss</Button>}
             >
               {`Not sent, and discarded: ${lastDropped.map((d) => `${d.name} (${API.explain(new Error(d.msg))})`).join("; ")}`}
-            </TopBanner>
-          )}
-          {kept > 0 && (
-            <TopBanner>
-              {`${plural(kept, "card")} saved on this device, waiting for a connection. `}
-              {offline ? "They go up as soon as you're back online." : "Sending…"}
             </TopBanner>
           )}
           {/* Recordings the server does not hold, on cards students have:
@@ -10167,7 +10088,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 </Button>
               }
             >
-              Some recordings didn't reach the server. Record them again so students can hear them.
+              Some recordings are missing. Record them again so students can hear them.
             </TopBanner>
           )}
 
@@ -10848,7 +10769,7 @@ export function StudentCourses({
 }) {
   const [note, setNote] = useState("");
   useReachHold(onRetry, { detail: "Your own cards still work." });
-  const joinReach = useReach();
+  const joinReach = useReach({ detail: "Joining needs a connection." });
   const joinRef = useRef<(code: string) => Promise<void>>(async () => {});
   const groups = spaces && spaces.length > 1
     ? spaces.map((o) => ({ key: o.id, title: o.name, courses: courses.filter((c) => (c as any).org === o.id) }))

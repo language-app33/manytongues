@@ -121,7 +121,7 @@ const PARTS = "Inside another component";
 const PLACES: Record<string, [string, string]> = {
   /* The learner's app */
   ArabicTrainer: [LEARN, "The app around everything else"],
-  host: [LEARN, "Every screen · the bar saying the server can't be reached"],
+  host: [LEARN, "Every screen · the bar saying there's no connection"],
   AccountPanel: [LEARN, "Account settings"],
   AccountSettings: [LEARN, "Account settings"],
   DeviceMedia: [LEARN, "Account settings · Recordings and pictures on this device"],
@@ -328,8 +328,8 @@ const PLACES: Record<string, [string, string]> = {
   SpaceFrame: [PARTS, "The Teaching and Admin frame"],
   Snackbar: [PARTS, "The message that appears and goes"],
   useSnackbarState: [PARTS, "The message that appears and goes"],
-  ReachBar: [PARTS, "Can't reach the server, with Retry"],
-  ReachSnackbar: [PARTS, "Can't reach the server, with Retry"],
+  ReachBar: [PARTS, "No connection, with Retry"],
+  ReachSnackbar: [PARTS, "No connection, with Retry"],
 };
 
 /* Not in the table: say something readable rather than nothing, and put
@@ -1193,7 +1193,7 @@ export function ComponentGallery() {
 
       <Row
         name="ReachBar"
-        what="Can't reach the server, with Retry. Large, and it stays until Retry works, the connection comes back, or it is closed."
+        what="No connection, with Retry. Large, and it stays until Retry works, the connection comes back, or it is closed."
         note="Never drawn by hand: ReachSnackbar, beside the app in main.tsx, draws the one bar. A screen takes part with useReach() — caught(error, retry) on a failure, ok() when it works — or useReachHold(retry) for a failure found elsewhere. Shown here still, in the page."
       >
         <V label="first" wide><ReachBar still onRetry={() => {}} onDismiss={() => {}} /></V>

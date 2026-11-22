@@ -25,11 +25,21 @@ const {
 
 beforeEach(() => resetReach());
 
-test("only a server out of reach is taken, not the server's own answer", () => {
+test("one rule for no connection, not the app's own answer (0.669)", () => {
+  /* No connection or a timeout, a server restarting behind a gateway, an
+     answer that isn't the app's (a wifi login page), the sync's own names
+     for a gateway's answer, and a fetch that never went. */
   assert.equal(isUnreachable(new Error("offline")), true);
   for (const s of ["502", "503", "504"]) assert.equal(isUnreachable(new Error(`http-${s}`)), true, s);
+  assert.equal(isUnreachable(new Error("bad-response")), true);
+  assert.equal(isUnreachable(new Error("pull-failed-503")), true);
+  assert.equal(isUnreachable(new TypeError("Failed to fetch")), true);
+  assert.equal(isUnreachable(new TypeError("Load failed")), true);
+  /* A bug is not a connection problem. */
+  assert.equal(isUnreachable(new TypeError("Cannot read properties of undefined (reading 'id')")), false);
   assert.equal(isUnreachable("offline"), true);
-  for (const m of ["bad-code", "http-500", "http-404", "bad-key", "bad-response", "device-full"]) {
+  /* An answer in the app's own words, or a fault on our side, is not. */
+  for (const m of ["bad-code", "http-500", "http-404", "bad-key", "device-full", "too-large"]) {
     assert.equal(isUnreachable(new Error(m)), false, m);
   }
   assert.equal(isUnreachable(null), false);

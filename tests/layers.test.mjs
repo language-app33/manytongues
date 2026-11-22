@@ -54,7 +54,7 @@ for (const [, selectors, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
    space and language switch, and the corner menu, which each used to be
    pinned to a corner of their own. The bar is what is positioned now, so
    the bar is what carries the layer. */
-/* The app's name was a third piece, pinned at the top; since 0.669 it is
+/* The app's name was a third piece, pinned at the top; since 0.670 it is
    Home's top line, in the page, and scrolls with it like any heading. */
 const CHROME = [".at-mode", ".at-dock"];
 
@@ -411,7 +411,7 @@ test("no rule falls back to one particular language", () => {
 test("the app's name is not dressed as a button", () => {
   /* It shares Home's top line with where you are, which is a button, and
      once wore the same pill, stroke and shadow — so the one thing up there
-     that does nothing looked like a second control. Since 0.669 it is in
+     that does nothing looked like a second control. Since 0.670 it is in
      the page rather than floating over it, so it needs no wash behind it
      either: none of the things that say "tap me". */
   const name = rule(".at-homename");

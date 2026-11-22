@@ -1434,7 +1434,9 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-place .at-hint { margin:-4px 0 12px; }
 .at-cdot { width:9px; height:9px; border-radius:50%; background: var(--jade); flex-shrink:0; }
 .at-cdot.syncing { background: var(--brass); }
-.at-cdot.error, .at-cdot.off { background: var(--rose); }
+.at-cdot.error { background: var(--rose); }
+/* Offline is not a failure (0.669): grey, not red. */
+.at-cdot.off { background: var(--faint); }
 /* You, in the bar: your initial in a small round of its own, where the
    sections have their icons, with the sync dot on its shoulder. */
 .at-cornerav { position:relative; width:26px; height:26px; border-radius:999px; flex:none;
@@ -1522,11 +1524,11 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-placename, .at-placelangs { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 /* The place gives way long before the mode does; on the narrowest phones
    the mode is cut too, with an ellipsis, rather than running over the
-   arrow (0.669). */
+   arrow (0.670). */
 .at-placename { flex:0 100 auto; }
 .at-placemode { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .at-placelangs { color: var(--muted); font-weight:700; }
-/* On a phone the line is too short for the languages as well (0.669, the
+/* On a phone the line is too short for the languages as well (0.670, the
    owner's 2): the button keeps the place and the mode, and the sheet it
    opens still says which languages are on. */
 @media (max-width: 599px) { .at-placelangs { display:none; } }
@@ -3496,7 +3498,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    other tabs carry their own name in the same place. The content under it
    sits on the page itself rather than in a card: one centred column, its
    parts set apart by space alone. */
-/* Its top line (0.669): the app's name at the left and where you are at
+/* Its top line (0.670): the app's name at the left and where you are at
    the right of the same line, as every tab's title carries it. The name
    is at a tab title's scale rather than the 32px it had alone, so the
    button beside it keeps enough of the line to be read on a phone; the
