@@ -780,7 +780,10 @@ remoteDocs.set(legacyToken, { etag: "old", data: { version: 3, items: [], tombst
 remoteDocs.set(realToken, {
   etag: "e0",
   data: {
-    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, settingsUpdated: 1,
+    /* A day of practice before today (0.667): this student has started,
+       so Home shows the facts and the dumbbell to Focused training that
+       the walks below rely on. */
+    version: 3, tombstones: {}, log: { "2026-01-05": 4 }, settings: { language: "ar-PS" }, settingsUpdated: 1,
     items: [
       { id: "oldclient1", ar: "بيت", en: "house", lat: "beit", kind: "word", tags: ["Lesson 1"],
         created: 1, updated: 5, s: { ar2en: { phase: "review", reps: 3, interval: 2, due: 0, updated: 5 } } },
@@ -1066,7 +1069,9 @@ check("every card with something due counts, and a value is never one", homeCard
       (want === "learning"
         ? !!src && src.getAttribute("target") === "_blank" && /^https:\/\//.test(src.getAttribute("href") || "")
         : !src && (want === "new" ? /^Welcome!/.test(fact) : /^Great start!/.test(fact))) &&
-      !!((card.compareDocumentPosition(/** @type {Node} */ (practice)) || 0) & 4),
+      !!((card.compareDocumentPosition(/** @type {Node} */ (practice)) || 0) & 4) &&
+      /* The dumbbell arrives with the facts, on the second day (0.667). */
+      !!homeCard()?.querySelector('[data-el="focused-training"]') === (want === "learning"),
     card ? `${card.getAttribute("data-stage")} · ${fact.slice(0, 100)} (log days: ${days.join(",") || "none"})` : "no card");
 }
 const wire = remoteDocs.get(realToken)?.data;
@@ -9490,7 +9495,7 @@ const openPronounTables = async () => {
   const plain = (/** @type {string} */ id, /** @type {string} */ ar, /** @type {string} */ en, /** @type {string} */ lat, /** @type {any} */ s) =>
     ({ id, ar, en, lat, kind: "word", tags: ["Lesson 1"], created: 1, updated: Date.now(), ...(s ? { s } : null) });
   localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
-    version: 3, tombstones: {}, log: {},
+    version: 3, tombstones: {}, log: { "2026-01-05": 4 }, /* a day of practice before today: the dumbbell is there (0.667) */
     settings: { language: "ar-PS" },
     account,
     items: [

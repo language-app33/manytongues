@@ -14089,6 +14089,10 @@ export default function ArabicTrainer() {
      ran out of time or was all answered. A trial is a teacher's look at one
      question, not a session, so it turns nothing. Counted per device. */
   const [homeTurn, setHomeTurn] = useState(readHomeTurn);
+  /* How far the student has come: before practice, the first day, or
+     from the second day of practice (0.666). The card's welcome and the
+     dumbbell (0.667) both wait on it. */
+  const stage: HomeStage = homeStage(data.log, dayKey());
   const turnedFor = useRef<unknown>(null);
   useEffect(() => {
     if (!session || exercise || session.trial || turnedFor.current === session) return;
@@ -16403,7 +16407,7 @@ export default function ArabicTrainer() {
                   {/* A shape in the logo's style and a fact about how
                       language varies, turned after every finished session
                       (0.664). See home-card.ts. */}
-                  <HomeCard turn={homeTurn} stage={homeStage(data.log, dayKey())} />
+                  <HomeCard turn={homeTurn} stage={stage} />
 
                   {/* Practice, and beside it on the right the way to
                       Focused training (0.650): weak spots, a session built
@@ -16434,11 +16438,16 @@ export default function ArabicTrainer() {
                         for weak spots waiting (the owner's 3b). */}
                     {/* The app's secondary button, outlined and unfilled, as
                         every secondary action is (0.665): only its width is
-                        its own. */}
-                    <Button variant="ghost" icon="dumbbell" iconSize={28}
-                      aria-label="Focused training" title="Focused training"
-                      className="at-trainbtn" data-el="focused-training"
-                      onClick={() => setTraining(true)} />
+                        its own. Not there until the second day of practice
+                        (0.667), when the facts arrive too: before then
+                        there is little behind it for a beginner, and
+                        Practice has the row to itself. */}
+                    {stage === "learning" && (
+                      <Button variant="ghost" icon="dumbbell" iconSize={28}
+                        aria-label="Focused training" title="Focused training"
+                        className="at-trainbtn" data-el="focused-training"
+                        onClick={() => setTraining(true)} />
+                    )}
                   </div>
                   {/* The warning that sat here — "No card here has two
                       usable exercise types" — was written for a teacher and

@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.667 — 24 November 2026
+
+**The Focused training button waits until a student has started.** The
+dumbbell beside Practice now appears on the second day a student
+practises, the same day the facts replace the welcome. Before then there
+is little behind it for a beginner (no weak spots yet, no saved sessions),
+so Practice has the row to itself. A student who wants to practise a
+particular unit early can still do it from the unit's own page.
+
+Still to check by hand: with a brand-new student account, no dumbbell on
+the first day, and the dumbbell beside Practice the next day.
+
 ## 0.666 — 24 November 2026
 
 **A welcome before the facts.** The card on Home now shows its facts from

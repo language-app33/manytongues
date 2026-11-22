@@ -8995,3 +8995,9 @@ loops and one of two welcomes (3a): one for a student who has not
 practised, one for the first day. Any practised day other than today
 counts, so a student returning the next morning sees a fact before
 practising again rather than being told to "come back tomorrow".
+
+**The dumbbell waits too (0.667).** Focused training appears on the same
+day as the facts, the second day of practice (the owner's 1a), so Home
+opens up once rather than in stages. Before then there is little behind
+it: Weak spots needs a card missed twice running and there are no saved
+sessions. No note announces it (the owner's 2a).
