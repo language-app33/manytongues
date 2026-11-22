@@ -54,7 +54,9 @@ for (const [, selectors, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
    space and language switch, and the corner menu, which each used to be
    pinned to a corner of their own. The bar is what is positioned now, so
    the bar is what carries the layer. */
-const CHROME = [".at-brand", ".at-mode", ".at-dock"];
+/* The app's name was a third piece, pinned at the top; since 0.670 it is
+   Home's top line, in the page, and scrolls with it like any heading. */
+const CHROME = [".at-mode", ".at-dock"];
 
 test("every layer token resolves to a number", () => {
   for (const [name, value] of Object.entries(tokens)) {
@@ -407,40 +409,22 @@ test("no rule falls back to one particular language", () => {
 });
 
 test("the app's name is not dressed as a button", () => {
-  /* It sits in a row with the space selector and the corner menu, both of
-     which are buttons, and it wore the same pill, the same 2px stroke and
-     the same drop shadow — so the one thing up there that does nothing
-     looked like the third control. It keeps a wash behind it, because a
-     fixed wordmark over a scrolling page is unreadable without one, and
-     none of the four things that say "tap me". */
-  const brand = rule(".at-brand");
-  assert.ok(brand, "the app's name has no rule of its own");
+  /* It shares Home's top line with where you are, which is a button, and
+     once wore the same pill, stroke and shadow — so the one thing up there
+     that does nothing looked like a second control. Since 0.670 it is in
+     the page rather than floating over it, so it needs no wash behind it
+     either: none of the things that say "tap me". */
+  const name = rule(".at-homename");
+  assert.ok(name, "the app's name has no rule of its own");
   for (const [prop, why] of [
     ["border", "a stroke"],
     ["box-shadow", "a shadow"],
     ["cursor", "a pointer"],
+    ["background", "a ground"],
   ]) {
     assert.ok(
-      !new RegExp(`(^|;|\\s)${prop}\\s*:`).test(brand),
+      !new RegExp(`(^|;|\\s)${prop}\\s*:`).test(name),
       `the app's name carries ${why}, which is what a button here looks like`,
-    );
-  }
-  const radius = /border-radius:\s*([^;]+)/.exec(brand);
-  assert.ok(radius, "the app's name should say its own radius rather than inherit a pill");
-  assert.ok(
-    !/999px|50%/.test(radius[1]),
-    `the app's name is a pill, which is this app's button shape: ${radius[1]}`,
-  );
-  /* And it stays unreachable, so nothing behind it is harder to tap. */
-  assert.match(brand, /pointer-events:\s*none/);
-  /* The wash is the page's own ground. The raised one reads as a chip
-     sitting on the page rather than as part of it. */
-  assert.match(brand, /background:\s*var\(--wash\)/);
-  for (const block of ["--wash:"]) {
-    assert.equal(
-      (css.match(new RegExp(block, "g")) || []).length,
-      3,
-      "every theme needs its own wash, or the wordmark loses its ground in one of them",
     );
   }
 });

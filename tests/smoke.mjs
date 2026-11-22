@@ -2742,7 +2742,7 @@ if (/Build a session/.test(document.body.textContent)) {
   await sleep(200);
 
   /* ---- prep mode: decks to have cleared or learnt by a date ----
-     Set up from Focused training (on Progress until 0.669), offered on the
+     Set up from Focused training (on Progress until 0.671), offered on the
      home screen as a session of its own, edited, and cleared. */
   {
     const setValue = must(
@@ -3054,7 +3054,7 @@ const beforeAnswer = schedules();
   check("saying what it is under its name, and nothing about how much is slipping",
     !!weakBtn && /got wrong lately/.test(weakBtn.textContent || "") && !/slipping/.test(weakBtn.textContent || ""),
     weakBtn ? (weakBtn.textContent || "").replace(/\s+/g, " ") : "no button");
-  /* The four choices (0.669): two side by side, then two full width, each
+  /* The four choices (0.671): two side by side, then two full width, each
      with its line. */
   const choices = [...document.querySelectorAll(".at-screen.training .at-trainchoice")];
   check("Weak spots and Not seen lately side by side, then Build a session and Prep mode",

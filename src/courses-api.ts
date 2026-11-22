@@ -10,6 +10,7 @@ import type { Card, Feedback, Flag, LangId, User } from "./types.ts";
 import type { SetConfig } from "./sets.ts";
 import { renameLangIds } from "./lang-ids.ts";
 import { heldData, holdMedia, type HeldKind } from "./held-media.ts";
+import { noConnection, noteReached } from "./net.ts";
 
 const ENDPOINT = "/api/courses";
 const KEY_STORE = "arabic-account";
@@ -239,7 +240,10 @@ async function call(
      redirect serving index.html, a platform error page — has a body that
      isn't JSON, and res.json() throwing on it would lose the status code
      along with every clue about what actually happened. */
-  if (res.status === 304 && tag) return { unchanged: true };
+  if (res.status === 304 && tag) {
+    noteReached();
+    return { unchanged: true };
+  }
   const text = await res.text();
   let data = null;
   try {
@@ -250,6 +254,9 @@ async function call(
   if (data === null || typeof data !== "object") {
     throw new Error(res.ok ? "bad-response" : `http-${res.status}`);
   }
+  /* An answer in the app's own words, refusal or not: the connection is
+     there, and anything waiting for it can go (0.669). */
+  noteReached();
   /* With the whole answer attached: some errors say more than their code —
      "other-space" names the space the key belongs to (0.543). */
   if (!res.ok) throw Object.assign(new Error(data.error || `http-${res.status}`), { data });
@@ -523,7 +530,8 @@ export async function putOrHold(kind: HeldKind, hash: string, data: string): Pro
     await putMedia(kind, hash, data);
     return { kept: false };
   } catch (e) {
-    if (String((e && (e as Error).message) || e) !== "offline") throw e;
+    /* No connection, by the app's one rule (0.669). */
+    if (!noConnection(e)) throw e;
     if (!(await holdMedia(kind, hash, data))) throw new Error("media-full");
     return { kept: true };
   }
@@ -693,30 +701,19 @@ export function explain(err: unknown): string {
   const m = String(
     (err && typeof err === "object" && "message" in err && err.message) || err
   );
-  if (m === "unknown-action")
-    return (
-      "This part of the app is newer than the server. Deploy the current " +
-      "server/api/courses.js and restart it."
-    );
-
-  /* An answer that wasn't the function's own. The status is the only clue
-     the app has, and each of these points at a different thing to check,
-     so they are worth spelling out rather than showing a bare number. */
-  if (m.startsWith("http-")) {
-    const status = m.slice("http-".length);
-    if (status === "404")
-      return (
-        "The server has no /api/courses endpoint. Either it isn't running " +
-        "the app's own server, or something else is answering for it."
-      );
-    if (status === "502" || status === "503" || status === "504")
-      return "The server didn't answer. Give it a moment and try again.";
-    return `The server answered ${status}. Check the site's function log.`;
-  }
+  /* Never the word "server" (0.669): most people do not know what it is.
+     No connection — by the app's one rule — is said in the bar at the foot
+     of the screen, with Retry; this is the same words, for the rare place
+     that shows it some other way. */
+  if (noConnection(err)) return "No connection.";
+  /* A fault on our side. The code in brackets is for whoever runs the
+     site, who can look it up in docs/ERROR-CODES.md. */
+  const ours = (code: string) => `Something went wrong on our side. Try again in a moment. (${code})`;
+  if (m === "unknown-action") return "The app has just been updated and this part isn't ready yet. Try again in a few minutes.";
+  if (m.startsWith("http-")) return ours(m.slice("http-".length));
 
   return (
     {
-      offline: "Can't reach the server. Your own cards still work.",
       "bad-key": "That sign-in key isn't recognised.",
       "key-only": "Sign-in links are for students. Type your sign-in key instead.",
       "bad-code": "Nothing has that code. Check it with whoever gave it to you.",
@@ -774,11 +771,8 @@ export function explain(err: unknown): string {
       "use-delete-account": "Delete your own account from Settings instead.",
       "not-found": "That no longer exists.",
       "signup-code-required": "This site needs an invitation code to make an account.",
-      "storage-unconfigured":
-        "The server can't reach its storage. Check that DATA_DIR points at " +
-        "a writable directory.",
-      server: "The server hit an error. Check the site's function log.",
-      "bad-response": "The server's answer wasn't in a form this app understands.",
+      "storage-unconfigured": ours("storage"),
+      server: ours("error"),
     }[m] || `Something went wrong (${m}). Try again in a moment.`
   );
 }

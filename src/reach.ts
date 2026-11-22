@@ -17,24 +17,11 @@
  * while its screen is open, and the snackbar itself — is in shared.tsx.
  */
 
-import { watchNet } from "./net.ts";
+import { noConnection, watchNet, watchReached } from "./net.ts";
 
-/**
- * Whether a failure is the server being out of reach, as against the
- * server's own answer.
- *
- * `offline` is what a request that could not be made at all is called
- * (courses-api's `call`); 502, 503 and 504 are a gateway answering for a
- * server that is restarting or down. From the person's side these are the
- * same thing, and trying again later is the fix for all four. Anything
- * else is the server having decided, and asking again is told the same.
- */
-export function isUnreachable(err: unknown): boolean {
-  const m = String(
-    (err && typeof err === "object" && "message" in err && (err as Error).message) || err,
-  );
-  return m === "offline" || m === "http-502" || m === "http-503" || m === "http-504";
-}
+/** Whether a failure is "no connection": see `noConnection` in net.ts,
+    which is the rule; this is its name where the bar is concerned. */
+export const isUnreachable = (err: unknown): boolean => noConnection(err);
 
 /** One thing that failed, and how to do it again. */
 export interface Held {
@@ -178,6 +165,17 @@ function wire() {
   wired = true;
   watchNet((offline) => {
     if (!offline) void retryReach({ auto: true });
+  });
+  /* And when anything else gets through (0.669): the device may have been
+     online all along with the server away, which the browser never says.
+     At most every half a minute, so a request that keeps failing while
+     others succeed cannot turn this into a loop. */
+  let last = 0;
+  watchReached(() => {
+    const t = Date.now();
+    if (retrying || !held.size || t - last < 30000) return;
+    last = t;
+    void retryReach({ auto: true });
   });
 }
 

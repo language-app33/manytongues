@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.669 — 26 November 2026
+## 0.671 — 26 November 2026
 
 **Weak spots replaces Fix mistakes in Build a session.** Choosing Weak spots
 there now asks only the questions you've got wrong lately among the cards
@@ -37,6 +37,88 @@ Weak spots doesn't count them, as the Weak spots button never has.
 
 Still to check by hand: the four buttons on a real phone in light and dark,
 and setting up, editing and deleting a goal from Prep mode's new place.
+## 0.670 — 25 November 2026
+
+**On Home, the button for your space and languages is on the top line.**
+It sits at the right of the app's name, on the same line, where every
+other tab already has it beside its title, and in the same spot on the
+screen. To make room, the name and logo on Home are smaller than before,
+on a phone the same size as the other tabs' titles. The line scrolls away
+with the page, and the cards below it start higher up. For someone with
+nothing to switch there is still no button, and the name stays centred.
+
+**On a phone the button no longer lists your languages.** When some
+languages are switched off, the button used to say so ("Arabic only");
+on a phone that is now left to the sheet the button opens. A wider screen
+still shows it. If the line is still too short, the space's name is cut
+first and the mode last, each with "…", rather than running over the
+arrow.
+
+Still to check by hand: the top line on your own phone, above all for
+someone in more than one space, where the space's name is cut to a letter
+or two on a typical phone.
+
+## 0.669 — 25 November 2026
+
+**One way of saying "no connection", everywhere in the app, and never the
+word "server".** There used to be six kinds of notice and about 25
+sentences for the same few things. Now there are three, and only one of
+them is an error.
+
+- **No connection.** Whenever something you asked for couldn't get
+  through — signing in, joining, loading a list, saving, uploading,
+  syncing — the bar at the foot of the screen says **No connection**, with
+  Retry, and **Still no connection** if Retry fails too. A line under it
+  says what needed the connection where that helps ("Joining needs a
+  connection."). It goes by itself when the connection comes back, or as
+  soon as anything else gets through.
+  - It now also appears where pressing something offline used to give its
+    own sentence or nothing at all: the Join a course sheet, opening a
+    sign-in link, Check for new material on the Courses screen, and Sync
+    now.
+  - It counts as no connection when the device is offline, when the
+    connection is too slow to answer, while the app is being updated and
+    restarts, and when a wifi login page answers instead of the app. These
+    used to be told apart in four different ways, so one screen said
+    "Can't reach the server" where another said something technical.
+- **Saved for later.** Anything kept on the device because it couldn't be
+  sent yet — a report about a card, a teacher's card, its pictures and
+  recordings — says **Saved on this device. It will be sent when you're
+  back online.** A teacher's card saved while the app is being updated is
+  now kept and sent later too, the same as offline; it used to fail.
+- **Where things stand.** The dot on the **You** button is **grey** when
+  you're offline (it used to be red, though nothing was wrong), **amber**
+  while syncing or while anything is waiting to be sent, and **red** only
+  when something failed. The You menu says what is waiting, such as "1
+  card to sync".
+  - The two "waiting for a connection" bands across the top of the screen
+    are gone; the menu says it instead. **Sync now** now sends everything
+    waiting, including a teacher's cards from anywhere in the app — they
+    used to go only while Teaching was open. Waiting work also goes when
+    the app opens, when anything gets through, and every few minutes.
+
+The word "server" is gone from everything the app says. Faults on our side
+read "Something went wrong on our side. Try again in a moment." with a
+short code in brackets for whoever runs the site; `docs/ERROR-CODES.md`
+says what each means. Other wording that changed:
+
+- "Some recordings didn't reach the server" (the red band in Teaching) is
+  now "Some recordings are missing", and the filter "Missing from the
+  server" is "Missing".
+- Reporting a card the app refused now says "This report couldn't be sent.
+  It's noted on this device only." It used to blame the connection.
+- The card editor's offline note ends "…and will be sent when you're back
+  online."
+
+Settings' "Download all recordings and pictures" keeps its own message and
+Try again button, as decided.
+
+To check by hand, on a phone: turn the connection off, press Sync now,
+then Retry, and see "No connection" then "Still no connection"; turn it
+back on and see the bar go by itself. Check the dot is grey while offline.
+As a teacher, save a card offline, go to Learning, turn the connection
+back on and press Sync now: "1 card sent". Open the Join a course sheet
+offline and press Join.
 
 ## 0.668 — 25 November 2026
 

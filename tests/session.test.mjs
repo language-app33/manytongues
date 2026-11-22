@@ -738,7 +738,7 @@ test("and a resting card is still dealt when there is nothing else", () => {
    One button, and what it opens: everything going wrong and nothing else,
    worst first. The rule it turns on is per *exercise* rather than per
    card, which is what it was always for, and what Fix mistakes on the
-   Build screen never did until Weak spots replaced it there (0.669) — so what is asserted here is that a card
+   Build screen never did until Weak spots replaced it there (0.671) — so what is asserted here is that a card
    failing one way is drilled that way and not on the readings it has
    always got right.
    ------------------------------------------------------------------ */
@@ -1457,7 +1457,7 @@ test("a week is the sum of its days, and a missing day is nought rather than a c
 /* ------------------------------------------------------------------
    Weak spots, by hand
 
-   The Build screen's Weak spots mode (0.669, in place of Fix mistakes):
+   The Build screen's Weak spots mode (0.671, in place of Fix mistakes):
    the Focused training button's own rule — isWeak to pick a card, and the
    questions that went wrong to ask it — over the cards picked rather than
    every card.

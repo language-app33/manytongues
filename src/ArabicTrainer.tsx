@@ -316,10 +316,11 @@ import type { Sibling, SiblingIndex } from "./meanings.ts";
 import { buildContextIndex } from "./context-index.ts";
 import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
-import { isOffline } from "./net.ts";
+import { isOffline, noConnection, SAVED_FOR_LATER, watchReached } from "./net.ts";
 import { holdReach, isUnreachable, releaseReach, showReach, updateReach } from "./reach.ts";
 import { knownMissing as knownMissingAt, MISSING_CLIPS, MISSING_FOR_MS, pictureData } from "./pictures.ts";
-import { CARD_OUTBOX, drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { CARD_OUTBOX, drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend, watchOutbox } from "./outbox.ts";
+import { sendWaitingCards } from "./send-waiting.ts";
 import { heldCounts, watchHeld } from "./held-media.ts";
 import {
   ORDER_SEP,
@@ -5905,7 +5906,7 @@ export function isUnseen(it: Item, settings: Settings): boolean {
 }
 
 /* A session kept with Fix mistakes, which Weak spots replaced in Build a
-   session (0.669): the same cards are asked for, now through Weak spots.
+   session (0.671): the same cards are asked for, now through Weak spots.
    Read wherever a kept session's mode is. */
 export function modeOfSaved(mode: string): string {
   return mode === "mistakes" ? "weak" : mode;
@@ -6265,7 +6266,7 @@ function drawRange(
  *   included — which come in through the learning share like anywhere else.
  * - **Weak spots:** cards with something going wrong now, asked the
  *   questions that went wrong — from Focused training over every card, or
- *   from the Build screen over the cards picked (0.669, in place of Fix
+ *   from the Build screen over the cards picked (0.671, in place of Fix
  *   mistakes, which took the same cards and asked them everything).
  * - **Get started:** recognition questions only.
  * - **Ultimate:** every question each card has open.
@@ -7925,7 +7926,7 @@ export function buildWeakSession({ items, settings, inDeck, budget, systems, per
   return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "weak" }), manual: true, mode: "weak" };
 }
 
-/* Not seen lately over every card, from Focused training (0.669). Under
+/* Not seen lately over every card, from Focused training (0.671). Under
    the session mix like the rest — see SessionMode. */
 export function buildUnseenSession({ items, settings, inDeck, budget, systems, perDay }: {
   items: Item[];
@@ -9048,7 +9049,7 @@ async function clipBlobFrom(id: string) {
     /* Being unable to reach the server is not the same as the server not
        having it. Only the second is remembered; the first is worth retrying
        when the connection comes back. */
-    if (!(typeof e === "object" && e && "message" in e && e.message === "offline")) {
+    if (!isUnreachable(e)) {
       MISSING_CLIPS.set(id, now());
       /* A "not here" from the server, as against a fault, is kept past
          this launch — see serverLacks. */
@@ -11642,6 +11643,8 @@ export default function ArabicTrainer() {
      person: nothing to do. Someone else: ask before switching. */
   const [linkAsk, setLinkAsk] = useState<{ name: string } | null>(null);
   const linkPeeked = useRef(false);
+  /* No connection is the bar's to say, with Retry (0.669). */
+  const linkReach = useReach({ detail: "Opening a sign-in link needs a connection." });
   useEffect(() => {
     if (!ready || !account || !linkKey || linkPeeked.current) return;
     if (linkKey === account.key || linkKey === account.linkKey) {
@@ -11649,18 +11652,25 @@ export default function ArabicTrainer() {
       return;
     }
     linkPeeked.current = true;
-    API.whoAmI(linkKey, "", "", true).then(
-      (r) => {
-        /* Their own link, holding its own code (0.640): nothing to do. */
-        if (r.user.handle === account.handle) setLinkKey("");
-        else setLinkAsk({ name: r.user.displayName || r.user.handle });
-      },
-      (e) => {
-        setLinkKey("");
-        const why = String(e && (e as Error).message);
-        flash(why === "bad-key" ? "That sign-in link no longer works." : API.explain(e), "warn");
-      },
-    );
+    const peek = (key: string): Promise<void> =>
+      API.whoAmI(key, "", "", true).then(
+        (r) => {
+          linkReach.ok();
+          /* Their own link, holding its own code (0.640): nothing to do. */
+          if (r.user.handle === account.handle) setLinkKey("");
+          else {
+            setLinkKey(key);
+            setLinkAsk({ name: r.user.displayName || r.user.handle });
+          }
+        },
+        (e) => {
+          setLinkKey("");
+          if (linkReach.caught(e, () => peek(key))) return;
+          const why = String(e && (e as Error).message);
+          flash(why === "bad-key" ? "That sign-in link no longer works." : API.explain(e), "warn");
+        },
+      );
+    void peek(linkKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, accountKey, linkKey]);
   /* Like the handle: a value rather than the object, so a re-fetch that
@@ -11726,6 +11736,8 @@ export default function ArabicTrainer() {
   /* And the pictures and recordings added offline in the card editor,
      waiting to go up before their cards (0.659). */
   const [heldMedia, setHeldMedia] = useState({ clips: 0, images: 0 });
+  const heldMediaRef = useRef(heldMedia);
+  heldMediaRef.current = heldMedia;
   useEffect(() => {
     let live = true;
     const look = () => {
@@ -11831,7 +11843,7 @@ export default function ArabicTrainer() {
   const [building, setBuilding] = useState(false);
   /* Focused training (0.650): the screen behind the dumbbell on Home. */
   const [training, setTraining] = useState(false);
-  /* Prep mode's screen, opened from Focused training (0.669) — it was on
+  /* Prep mode's screen, opened from Focused training (0.671) — it was on
      Progress until then. */
   const [prepOpen, setPrepOpen] = useState(false);
   const [showingSaved, setShowingSaved] = useState(false);
@@ -12027,7 +12039,7 @@ export default function ArabicTrainer() {
   /* Can't reach the server, with Retry (0.636): feedback sent from the
      menu, and joining a space from its invitation. */
   const feedbackReach = useReach();
-  const inviteReach = useReach();
+  const inviteReach = useReach({ detail: JOIN_NEEDS });
   const kb = useSoftKeyboard();
 
   /* ---- sync ---- */
@@ -12133,6 +12145,23 @@ export default function ArabicTrainer() {
         if (syncFailHeld.current) releaseReach(syncFailHeld.current);
         syncFailHeld.current = 0;
       };
+      /* Said in the bar with Retry (0.655). "No connection" is the bar's
+         own headline (0.669); anything else is "Sync failed". */
+      const holdFail = (title: string, detail: string) => {
+        if (syncFailHeld.current) {
+          updateReach(syncFailHeld.current, { title, detail });
+          if (byHand) showReach();
+        } else {
+          syncFailHeld.current = holdReach({
+            title,
+            detail,
+            /* The connection coming back already syncs; Retry is the
+               only other thing that should. */
+            auto: false,
+            retry: () => runSyncRef.current("", true),
+          });
+        }
+      };
       /*
        * Offline, the round trip can only fail, and failing at it says
        * nothing the connection has not already said. What is on this
@@ -12142,8 +12171,11 @@ export default function ArabicTrainer() {
       if (isOffline()) {
         setSyncState("off");
         /* Offline is not a failure: the menu says the work is safe and
-           the sync goes again when the connection comes back. */
-        letGo();
+           the sync goes again when the connection comes back. Unless Sync
+           now was pressed, which is answered the way anything pressed
+           without a connection is: the bar (0.669). */
+        if (byHand) holdFail("", "Your work is saved on this device.");
+        else letGo();
         return;
       }
       syncing.current = true;
@@ -12290,42 +12322,21 @@ export default function ArabicTrainer() {
             : msg === "too-large"
             ? "Your cards are too big to sync. Remove some recordings or cards."
             : msg === "would-empty"
-            ? "Sync refused: this device had nothing to send. Your cards on the server are untouched."
-            : isOffline()
-            ? "Offline — your work is saved on this device"
-            : "Sync failed";
+            ? "Sync stopped: this device had nothing to send. The cards in your account are untouched."
+            : "Your work is saved on this device.";
         setSyncState("error");
         /*
-         * Said in the bar with Retry (0.655), not in the menu. Its
-         * headline is "Sync failed" and the line under it why, where the
-         * app knows. Not when the connection went: the menu says that, and
-         * the sync goes again on its own when it comes back.
+         * Said in the bar with Retry (0.655), not in the menu. No
+         * connection — by the app's one rule, offline included when Sync
+         * now was pressed — is the bar's own "No connection"; anything
+         * else is "Sync failed", with why under it where the app knows.
+         * A background sync that finds the device offline says nothing:
+         * the menu says the work is safe, and the sync goes again on its
+         * own when the connection comes back.
          */
-        if (isOffline()) letGo();
-        else {
-          const detail =
-            said === "Sync failed"
-              ? /* The sync's own requests say a gateway's answer as
-                   pull-failed-502 and a request that never went as a
-                   TypeError, not reach.ts's words for them. */
-                isUnreachable(err) || err instanceof TypeError || /-50[234]$/.test(msg)
-                ? "Couldn't reach the server. Your work is saved on this device."
-                : "Your work is saved on this device."
-              : said;
-          if (syncFailHeld.current) {
-            updateReach(syncFailHeld.current, { detail });
-            if (byHand) showReach();
-          } else {
-            syncFailHeld.current = holdReach({
-              title: "Sync failed",
-              detail,
-              /* The connection coming back already syncs; Retry is the
-                 only other thing that should. */
-              auto: false,
-              retry: () => runSyncRef.current("", true),
-            });
-          }
-        }
+        const away = isOffline() || noConnection(err);
+        if (isOffline() && !byHand) letGo();
+        else holdFail(away ? "" : "Sync failed", away ? "Your work is saved on this device." : said);
         /* Nothing went up, so everything this trip carried is still owed. */
         if (!sent) {
           owed.current = true;
@@ -12510,28 +12521,82 @@ export default function ArabicTrainer() {
   }, [accountKey]);
 
   /* What is waiting, as the app opens — before any connection has been
-     tried, so the corner menu is right from the first paint. */
+     tried, so the corner menu is right from the first paint — and every
+     time the queue changes, so the dot and the count follow it (0.669). */
+  const [, setOutboxSeen] = useState(0);
   useEffect(() => {
     setToSend(waitingToSend(FLAG_OUTBOX));
+    return watchOutbox(() => {
+      setToSend(waitingToSend(FLAG_OUTBOX));
+      setOutboxSeen((n) => n + 1);
+    });
   }, []);
+
+  /*
+   * Everything this device is keeping until it can be sent (0.669): the
+   * problems reported about cards, and a teacher's cards with their
+   * pictures and recordings — from anywhere in the app, not only from
+   * Teaching. Sync now sends it, and so do the connection coming back,
+   * anything getting through, the app opening and a check every few
+   * minutes while something waits. Said in the You menu, not in a band
+   * across the top: its dot turns amber while anything is waiting.
+   */
+  const sendAllWaiting = useCallback(async () => {
+    if (!account || isOffline()) return;
+    API.setKey(account.key);
+    await Promise.allSettled([
+      sendWaiting(),
+      /* Trying a space (0.574): nothing is written to it. */
+      TRYING ? Promise.resolve(0) : sendWaitingCards({ say: flash }),
+    ]);
+  /* The key, not the account object; flash forwards to a memoised snackbar. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountKey, sendWaiting]);
+  const sendAllRef = useRef(sendAllWaiting);
+  sendAllRef.current = sendAllWaiting;
+  /* Whether anything is waiting, read when it is time to decide. */
+  const anyWaiting = () =>
+    waitingToSend(FLAG_OUTBOX) + waitingToSend(CARD_OUTBOX) + heldMediaRef.current.clips + heldMediaRef.current.images > 0;
 
   // Retry when the connection comes back.
   useEffect(() => {
     const onOnline = () => {
       if (loadSyncConfig().token) runSync();
-      void sendWaiting();
+      void sendAllWaiting();
     };
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
-  }, [runSync, sendWaiting]);
+  }, [runSync, sendAllWaiting]);
 
-  /* And on launch, for a report kept during a session that ended before
-     the connection came back. */
+  /* And on launch, for work kept during a visit that ended before the
+     connection came back. */
   useEffect(() => {
-    if (ready && account) void sendWaiting();
+    if (ready && account) void sendAllWaiting();
   /* The handle, not the account object, for the same reason. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, accountHandle, sendWaiting]);
+  }, [ready, accountHandle, sendAllWaiting]);
+
+  /* Anything getting through means the connection is there, which the
+     browser never says when it was the server that was away rather than
+     the network (0.669). At most once a minute, and only with something
+     waiting: a refusal is an answer too, and must not start a loop. And a
+     look every three minutes while something waits, for the case where
+     nothing else is asking at all. */
+  useEffect(() => {
+    let last = 0;
+    const go = () => {
+      const t = Date.now();
+      if (t - last < 60000 || !anyWaiting()) return;
+      last = t;
+      void sendAllRef.current();
+    };
+    const stop = watchReached(go);
+    const every = setInterval(go, 3 * 60000);
+    return () => {
+      stop();
+      clearInterval(every);
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -13421,7 +13486,7 @@ export default function ArabicTrainer() {
       .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
   }, [prepOpen, shown, settings, deckTags]);
   /* And how much has not been met lately, for the Not seen lately button
-     beside it (0.669) — the test its session picks with, as above. */
+     beside it (0.671) — the test its session picks with, as above. */
   const unseenCount = useMemo(
     () => drillable.filter((it) => isUnseen(it, settings)).length,
     [drillable, settings]
@@ -13703,8 +13768,17 @@ export default function ArabicTrainer() {
          back; one refresh at a time is enough. */
       if (refreshing.current) return true;
       /* Nothing to ask and nothing to be learnt from asking. What this
-         device was last told is already on screen. */
-      if (isOffline()) return false;
+         device was last told is already on screen. Unless Refresh was
+         pressed, which is answered the way anything pressed without a
+         connection is: the bar, with Retry, on the Courses screen (0.669).
+         It used to do nothing at all. */
+      if (isOffline()) {
+        if (announce === true) {
+          setCourseUnreached(true);
+          setCourseError("Couldn't check your courses for anything new.");
+        }
+        return false;
+      }
       refreshing.current = true;
       setCourseBusy(true);
       /* Whether this actually got an answer, which two callers read: the
@@ -13874,7 +13948,9 @@ export default function ArabicTrainer() {
     setSpacesBusy(true);
     try {
       /* Only whether each one settled matters here, not what it returned. */
-      const jobs: Promise<unknown>[] = [runSync("", true)];
+      /* And everything kept on this device until it could be sent: the
+         reports, and a teacher's cards (0.669). */
+      const jobs: Promise<unknown>[] = [runSync("", true), sendAllWaiting()];
       if (account) jobs.push(refreshCourses("changes"));
       if (account && (teaches || account.admin))
         jobs.push(
@@ -13892,7 +13968,7 @@ export default function ArabicTrainer() {
     }
   /* The handle, not the account object, for the same reason. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runSync, refreshCourses, accountHandle, teaches, accountAdmin]);
+  }, [runSync, refreshCourses, accountHandle, teaches, accountAdmin, sendAllWaiting]);
 
   /* A course can be deleted, or its decks changed, by a teacher on another
      device. Without this the home screen keeps showing a course that is gone
@@ -14002,7 +14078,7 @@ export default function ArabicTrainer() {
     setTab("home");
   }
 
-  /* Not seen lately over every card, from Focused training (0.669): the
+  /* Not seen lately over every card, from Focused training (0.671): the
      Build screen's mode of the same name, over the cards a dealt session
      comes from rather than the ones picked. */
   function beginUnseen() {
@@ -15532,7 +15608,7 @@ export default function ArabicTrainer() {
         return;
       }
       setToSend(waitingToSend(FLAG_OUTBOX));
-      flash("Saved — it will be sent when you're back online", "good");
+      flash(SAVED_FOR_LATER, "good");
     };
     if (isOffline()) {
       keepReport();
@@ -15546,7 +15622,7 @@ export default function ArabicTrainer() {
            waits. `offline` is what the client calls a request that could
            not be made at all. */
         if (!isTransient(String((e && (e as Error).message) || e))) {
-          flash("Noted on this device. We couldn't reach the server.", "warn");
+          flash("This report couldn't be sent. It's noted on this device only.", "warn");
           return;
         }
         keepReport();
@@ -16232,12 +16308,6 @@ export default function ArabicTrainer() {
           {`You're in ${addressSpace.name}.`}
         </TopBanner>
       )}
-      {toSend > 0 && (
-        <TopBanner>
-          {`${plural(toSend, "report")} saved on this device, waiting for a connection. `}
-          {offline ? "They go up as soon as you're back online." : "Sending…"}
-        </TopBanner>
-      )}
       <div className="at-wrap">
           {/* No space to use (0.578): what happened, and the way back in.
               Everything else on the page is hidden; the You menu stays, for
@@ -16277,10 +16347,19 @@ export default function ArabicTrainer() {
               }}
             />
           )}
-          {/* Where you are (0.601), in Home's top right corner, where the
-              space button was: the other tabs carry it in their title. */}
-          {!inExercise && space === "learn" && tab === "home" && !session && placeButton && (
-            <div className="at-placecorner">{placeButton}</div>
+          {/* Home's top line (0.670): the app's name at the left, as the
+              page's title, and where you are at the right of the same
+              line, as every tab's title carries it (0.601). It scrolls
+              away with the page. Centred where there is no place button
+              to make room for (0.642): one space, one language. */}
+          {!inExercise && space === "learn" && tab === "home" && (
+            <div className={`at-homehead${placeButton && !session ? "" : " centred"}`}>
+              <h1 className="at-homename">
+                <BrandMark size={32} />
+                ManyTongues
+              </h1>
+              {!session && placeButton}
+            </div>
           )}
 
         {/* ============ STUDY ============ */}
@@ -18102,7 +18181,7 @@ export default function ArabicTrainer() {
           <p className="at-toast">
             Couldn't save to this device —{" "}
             {account
-              ? "still trying. Your answers are going to the server as you give them."
+              ? "still trying. Your answers are being saved to your account as you give them."
               : "still trying. Sign in so your answers are kept somewhere other than this device."}
           </p>
         )}
@@ -18150,20 +18229,6 @@ export default function ArabicTrainer() {
         </TopBanner>
       )}
 
-      {/* The app's name heads the learning page and scrolls away with it;
-          a space frame carries its own. */}
-      {/* Home has it large, at the left (0.576), as the page's title. Progress and
-          Cards are headed with their name, as every tab is (0.553);
-          Courses, reached from the menu, is headed with its own. */}
-      {/* Centred where there is no place button beside it to make room
-          for (0.642): one space, one language, nothing to switch. */}
-      {!inExercise && space === "learn" && tab === "home" && (
-        <div className={`at-brand at-brand-home${placeButton ? "" : " centred"}`}>
-          <BrandMark size={48} />
-          ManyTongues
-        </div>
-      )}
-
       {/* The bar at the foot of the window. Always mounted, so the slot the
           sections portal into stays the same element; hidden rather than
           taken down during an exercise. Two halves: the space's own
@@ -18188,10 +18253,16 @@ export default function ArabicTrainer() {
                every part of it is done — this device's cards, the courses,
                and the spaces this person belongs to. */
             syncState={
-              /* Trying a space (0.574): nothing syncs. */
+              /* Grey offline, and while trying a space (0.574), where
+                 nothing syncs: offline is not a failure. Red only when
+                 something failed. Amber while syncing, and while anything
+                 waits to be sent (0.669). */
               TRYING || offline
                 ? "off"
-                : spacesBusy || (syncState === "idle" && courseBusy)
+                : syncState === "error"
+                ? "error"
+                : spacesBusy || syncState === "syncing" || (syncState === "idle" && courseBusy) ||
+                  toSend + waitingToSend(CARD_OUTBOX) + heldMedia.clips + heldMedia.images > 0
                 ? "syncing"
                 : syncState
             }
@@ -18996,7 +19067,7 @@ function FocusedTrainingSheet({
   }, [onClose]);
 
   /* Where the prep stands, under its button — the line that sat beside
-     it on Progress until Prep mode moved here (0.669). */
+     it on Progress until Prep mode moved here (0.671). */
   const prepNow = prep ? prepStatus(prep, items, settings) : null;
   const prepLine = !prep
     ? ""
@@ -19010,13 +19081,13 @@ function FocusedTrainingSheet({
     <Screen title="Focused training" onBack={onClose} className="training">
       <div className="at-training">
         {/* What the screen is for, under a dumbbell (0.668). Each button
-            says what it does itself (0.669), so the line is short. */}
+            says what it does itself (0.671), so the line is short. */}
         <div className="at-trainingintro" data-el="training-intro">
           <TrainingArt />
           <p>Practise with a goal in mind.</p>
         </div>
         {/* Two sessions over every card, side by side, then the two ways
-            of aiming one yourself, full width (0.669). */}
+            of aiming one yourself, full width (0.671). */}
         <div className="at-trainpair">
           <TrainingChoice
             title="Weak spots"
@@ -19059,7 +19130,7 @@ function FocusedTrainingSheet({
   );
 }
 
-/* One of Focused training's choices (0.669): its name, and a line under
+/* One of Focused training's choices (0.671): its name, and a line under
    it saying what it is. `off` is dimmed but still pressed, so the press
    can say why there is nothing in it, as Weak spots always has; `status`
    is a second line for where it stands, in the accent colour. */
@@ -22685,7 +22756,7 @@ function AccountSettings({
 
             <FormField
               label="Delete your account"
-              lede="Deletes your account, your My space and your practice history from the server, and takes you off every course. Decks and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
+              lede="Deletes your account, your My space and your practice history, and takes you off every course. Decks and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
             >
               <CloseAccount onClosed={onCloseAccount} handle={account.handle} />
             </FormField>
@@ -22859,6 +22930,9 @@ function SpaceBadge({ space, icon }: { space?: { name: string; logoData?: string
  * shows what the course holds. A pasted invitation link is read for its
  * code, as the stranded panel reads one.
  */
+/* The line under "No connection" wherever joining is what failed. */
+const JOIN_NEEDS = "Joining needs a connection.";
+
 function JoinSheet({ onJoin, onJoined, onClose }: {
   onJoin: (code: string) => Promise<any>;
   /** Joined: what to say about it. */
@@ -22868,11 +22942,27 @@ function JoinSheet({ onJoin, onJoined, onClose }: {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  /* No connection is the bar's to say, with Retry, like everywhere else —
+     offline included (0.669). */
+  const reach = useReach({ detail: JOIN_NEEDS });
   const input = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     const t = setTimeout(() => input.current && input.current.focus(), 200);
     return () => clearTimeout(t);
   }, []);
+  const attempt = async (given: string): Promise<void> => {
+    setBusy(true);
+    setError("");
+    try {
+      if (isOffline()) throw new Error("offline");
+      const r = await onJoin(given);
+      reach.ok();
+      onJoined(r && r.course ? `Joined ${r.course.title}.` : r && r.space ? `Joined ${r.space.name}.` : "Joined.");
+    } catch (e) {
+      if (!reach.caught(e, () => attempt(given))) setError(API.explain(e));
+      setBusy(false);
+    }
+  };
   const join = async () => {
     let given = code.trim();
     if (!given || busy) return;
@@ -22881,19 +22971,7 @@ function JoinSheet({ onJoin, onJoined, onClose }: {
     } catch (e) {
       /* not a link: a code */
     }
-    if (isOffline()) {
-      setError("Joining needs a connection. Try again when you're back online.");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const r = await onJoin(given);
-      onJoined(r && r.course ? `Joined ${r.course.title}.` : r && r.space ? `Joined ${r.space.name}.` : "Joined.");
-    } catch (e) {
-      setError(API.explain(e));
-      setBusy(false);
-    }
+    await attempt(given);
   };
   return (
     <PickSheet title="Join a course" lede="Enter the course code your teacher gave you, or paste their invitation link." onClose={onClose}>
@@ -22934,7 +23012,7 @@ function StrandedPanel({ stranded, onJoined }: {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const reach = useReach();
+  const reach = useReach({ detail: JOIN_NEEDS });
   const said = (why: string, name: string) =>
     why === "removed" ? `You were removed from ${name}.` : why === "left" ? `You left ${name}.` : `You're suspended in ${name}.`;
   return (
