@@ -8,6 +8,17 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.667 — 25 November 2026
+
+**Focused training says what it is for.** The screen behind the dumbbell on
+Home now opens with a small drawing of a dumbbell and one line under it:
+"Practise with a goal in mind. Fix what keeps slipping, or build a session
+from the cards you choose." Once a student has saved a session, the line
+ends "…or go back to one you saved." The buttons below are unchanged.
+
+Still to check by hand: the drawing and the line on a real phone, in light
+and dark.
+
 ## 0.666 — 24 November 2026
 
 **A welcome before the facts.** The card on Home now shows its facts from

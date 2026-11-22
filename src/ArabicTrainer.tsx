@@ -24,6 +24,7 @@ import {
   ConfirmModal,
   Empty,
   ChatArt,
+  TrainingArt,
   Field as FormField,
   FLAG_KINDS,
   FEEDBACK_KINDS,
@@ -18917,6 +18918,15 @@ function FocusedTrainingSheet({
   return (
     <Screen title="Focused training" onBack={onClose} className="training">
       <div className="at-training">
+        {/* What the screen is for, under a dumbbell (0.667): it had only
+            its buttons, which said what each does but not why come here. */}
+        <div className="at-trainingintro" data-el="training-intro">
+          <TrainingArt />
+          <p>
+            Practise with a goal in mind. Fix what keeps slipping, or build a
+            session from the cards you choose{saved.length > 0 ? ", or go back to one you saved" : ""}.
+          </p>
+        </div>
         <div className="at-row">
           <Button variant="ghost" off={!weakCount} onClick={onWeak}>
             Weak spots

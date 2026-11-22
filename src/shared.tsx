@@ -817,6 +817,33 @@ export function ChatArt() {
   );
 }
 
+/* --- TrainingArt ---------------------------------------------------
+   A dumbbell, the mark that opens Focused training, at the top of that
+   screen (0.667). Drawn like ChatArt: coral plates and a mint bar that
+   carry their own colours in either theme, a yellow sparkle, and faint
+   dots that follow the page. */
+export function TrainingArt() {
+  return (
+    <svg className="at-trainingart" viewBox="0 0 160 110" width="160" height="110" aria-hidden="true" focusable="false">
+      <g transform="rotate(-14 80 58)">
+        <rect x="46" y="52" width="68" height="12" rx="6" fill="#7FD1C7" />
+        <rect x="34" y="30" width="15" height="56" rx="7.5" fill="#FF7A59" />
+        <rect x="22" y="40" width="13" height="36" rx="6.5" fill="#FF7A59" />
+        <rect x="111" y="30" width="15" height="56" rx="7.5" fill="#FF7A59" />
+        <rect x="125" y="40" width="13" height="36" rx="6.5" fill="#FF7A59" />
+        <path d="M39 38v14M116 38v14" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round" opacity=".5" />
+      </g>
+      <path d="M132 6l3.2 7.3 7.3 3.2-7.3 3.2-3.2 7.3-3.2-7.3-7.3-3.2 7.3-3.2z" fill="#F7C548" />
+      <path d="M22 88l2 4.5 4.5 2-4.5 2-2 4.5-2-4.5-4.5-2 4.5-2z" fill="#A99BE0" />
+      <g fill="currentColor" opacity=".35">
+        <circle cx="14" cy="24" r="2.5" />
+        <circle cx="148" cy="80" r="3" />
+        <circle cx="96" cy="104" r="2" />
+      </g>
+    </svg>
+  );
+}
+
 /* --- Nudge ---------------------------------------------------------
    "Nothing here yet", said inside an open deck or course where the
    section would otherwise be one grey line. An icon, one warm sentence,
