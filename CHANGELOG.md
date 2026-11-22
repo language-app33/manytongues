@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.667 — 25 November 2026
+## 0.668 — 25 November 2026
 
 **Focused training says what it is for.** The screen behind the dumbbell on
 Home now opens with a small drawing of a dumbbell and one line under it:
@@ -18,6 +18,18 @@ ends "…or go back to one you saved." The buttons below are unchanged.
 
 Still to check by hand: the drawing and the line on a real phone, in light
 and dark.
+
+## 0.667 — 24 November 2026
+
+**The Focused training button waits until a student has started.** The
+dumbbell beside Practice now appears on the second day a student
+practises, the same day the facts replace the welcome. Before then there
+is little behind it for a beginner (no weak spots yet, no saved sessions),
+so Practice has the row to itself. A student who wants to practise a
+particular unit early can still do it from the unit's own page.
+
+Still to check by hand: with a brand-new student account, no dumbbell on
+the first day, and the dumbbell beside Practice the next day.
 
 ## 0.666 — 24 November 2026
 

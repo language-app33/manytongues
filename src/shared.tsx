@@ -819,7 +819,7 @@ export function ChatArt() {
 
 /* --- TrainingArt ---------------------------------------------------
    A dumbbell, the mark that opens Focused training, at the top of that
-   screen (0.667). Drawn like ChatArt: coral plates and a mint bar that
+   screen (0.668). Drawn like ChatArt: coral plates and a mint bar that
    carry their own colours in either theme, a yellow sparkle, and faint
    dots that follow the page. */
 export function TrainingArt() {
