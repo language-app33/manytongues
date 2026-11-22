@@ -465,30 +465,6 @@ button {
 .at-tab2.on { background: var(--raised); color: var(--text); border-color: var(--tab-stroke); }
 
 .at-mode { position:fixed; top:calc(12px + var(--banner-h, 0px)); left:12px; }
-/* The app's name, where the space selector used to sit.
-
-   It is fixed, so a screen that scrolls passes underneath it — and with
-   nothing behind the letters the wordmark read as printed over the page,
-   worst in the component gallery, where it landed on the specimens. The
-   room reserved for it below (.at-screen.bare .at-screenbody) only clears
-   it at the top of a scroll; the wash behind it is what makes it legible
-   for the rest.
-
-   A wash, though, and not a chip. It used to carry the pill, the 2px
-   stroke and the drop shadow the space selector and the corner menu wear
-   — which is the app's shape for a button, so the one thing in that row
-   that does nothing looked like the third control in it. What is left is
-   the blur and a soft ground: enough to read against a moving page, and
-   none of the four things that say "tap me".
-
-   Still pointer-events:none: it is the app's name, not a button, and
-   nothing should be harder to tap for its being behind it. */
-.at-brand { position:absolute; top:calc(12px + var(--banner-h, 0px)); left:12px; height:40px;
-  display:flex; align-items:center; padding:0 6px; border-radius:10px;
-  background: var(--wash);
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-  font-family: var(--ui); font-size:16px;
-  font-weight:800; letter-spacing:.01em; color: var(--text-soft); pointer-events:none; gap:7px; }
 /* The dialect-map mark: overlapping zones with no hard borders, the way
    a language actually spreads. It carries its own dark tile, so it reads
    the same in the light and dark themes. */
@@ -1542,16 +1518,22 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   font-family: var(--ui); font-size:14px; font-weight:800; }
 .at-placebtn:hover { border-color: var(--jade); }
 .at-placebtn > svg { flex:none; color: var(--brass); }
-.at-placetext { display:flex; min-width:0; white-space:pre; }
+.at-placetext { display:flex; min-width:0; white-space:pre; overflow:hidden; }
 .at-placename, .at-placelangs { min-width:0; overflow:hidden; text-overflow:ellipsis; }
-.at-placemode { flex:none; }
+/* The place gives way long before the mode does; on the narrowest phones
+   the mode is cut too, with an ellipsis, rather than running over the
+   arrow (0.665). */
+.at-placename { flex:0 100 auto; }
+.at-placemode { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .at-placelangs { color: var(--muted); font-weight:700; }
+/* On a phone the line is too short for the languages as well (0.665, the
+   owner's 2): the button keeps the place and the mode, and the sheet it
+   opens still says which languages are on. */
+@media (max-width: 599px) { .at-placelangs { display:none; } }
 /* Tab names are short and stay whole; the button gives way, cutting its
    place short before the name beside it. */
 .at-pagetitle .at-sectionhead { flex:none; white-space:nowrap; }
 .at-pagetitle .at-placebtn { margin-left:auto; flex:0 1 auto; }
-/* Home has no tab title: the button sits under the app's name, at its left. */
-.at-placecorner { display:flex; margin:-8px 0 18px; }
 /* The sheet: a place per row, with what you can do there on the same line
    as its name (0.610): each mode a small square, its icon over its word. */
 .at-where { display:flex; flex-direction:column; gap:8px; margin:4px 0 16px; }
@@ -1571,8 +1553,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-wheremode.on { background: var(--jade); border-color: var(--jade); color: var(--onjade); }
 /* No space to open (0.578): only the panel and the You menu are left. */
 .at.stranded .at-wrap > :not(.at-strandedbox),
-.at.stranded .at-dockmain,
-.at.stranded .at-brand { display:none !important; }
+.at.stranded .at-dockmain { display:none !important; }
 .at.stranded { padding-top:24px; }
 .at-strandedbox { padding:24px 4px; }
 .at-strandedbox h2 { margin:0 0 12px; font-family: var(--ui); font-size:24px; font-weight:800; color: var(--text); }
@@ -1667,7 +1648,6 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 
 .at-screen.bare .at-screenbody { padding-top:0;
   padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
-.at-screen.bare .at-brand { position:static; width:max-content; margin:0 0 14px -6px; }
 
 .at-guide { border:2px solid var(--line); border-radius: var(--r); margin-bottom:10px;
   background: var(--surface); overflow:hidden; }
@@ -2935,14 +2915,13 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
    the wordmark behind — with no way back to the learning space but a
    reload. A screen opened on top (--z-over) is still above them, and
    .at-screening hides them there anyway. */
-.at-brand, .at-mode, .at-dock { z-index: var(--z-chrome); }
+.at-mode, .at-dock { z-index: var(--z-chrome); }
 .at-modalback { z-index: var(--z-modal); }
 /* Everything the chrome hides while a screen is open, in one rule
    rather than one per overlay. */
 /* Everything that floats above the app hides behind a screen, in one rule.
    It used to be three rules in three places, so a fourth overlay was always
    going to be forgotten. */
-body.at-screening .at-brand,
 body.at-screening .at-mode,
 body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { display:none; }
 /* Ticking cards for a bulk change brings up a tray of its own across the
@@ -3517,15 +3496,25 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    other tabs carry their own name in the same place. The content under it
    sits on the page itself rather than in a card: one centred column, its
    parts set apart by space alone. */
-/* Left-aligned since 0.576, so the space button can have the top right
-   corner to itself. */
-.at-brand.at-brand-home { left:12px; right:auto; margin:0; width:max-content; height:64px;
-  padding:0 12px 0 6px; gap:12px; font-size:32px; color: var(--text); }
-.at-brand.at-brand-home .at-brandmark { width:48px; height:48px; }
-/* With no place button in the top right, nothing needs the room it was
-   moved left to make (0.642): centred again. */
-.at-brand.at-brand-home.centred { left:0; right:0; margin-inline:auto; }
-.at.on-home { padding-top:104px; }
+/* Its top line (0.665): the app's name at the left and where you are at
+   the right of the same line, as every tab's title carries it. The name
+   is at a tab title's scale rather than the 32px it had alone, so the
+   button beside it keeps enough of the line to be read on a phone; the
+   button is what gives way, its place cut short first. It is in the
+   page, not pinned, and scrolls away with it. */
+.at-homehead { display:flex; align-items:center; gap:10px; margin:0 0 18px; min-height:44px; }
+.at-homehead.centred { justify-content:center; }
+.at-homename { display:flex; align-items:center; gap:10px; flex:none; margin:0;
+  font-family: var(--ui); font-size:24px; font-weight:800; letter-spacing:-.01em;
+  line-height:1; color: var(--text); white-space:nowrap; }
+.at-homename .at-brandmark { width:32px; height:32px; }
+.at-homehead .at-placebtn { margin-left:auto; flex:0 1 auto; }
+.at.on-home { padding-top:12px; }
+/* On a phone, exactly a tab title's size, to leave the button its room. */
+@media (max-width: 420px) {
+  .at-homename { font-size:20px; gap:8px; }
+  .at-homename .at-brandmark { width:28px; height:28px; }
+}
 /* Progress and Cards are headed by their tab title (0.553), which is held
    at the very top as a space's is (0.557): nothing above it to scroll. */
 .at.untitled { padding-top:0; }

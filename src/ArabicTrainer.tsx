@@ -16225,10 +16225,19 @@ export default function ArabicTrainer() {
               }}
             />
           )}
-          {/* Where you are (0.601), in Home's top right corner, where the
-              space button was: the other tabs carry it in their title. */}
-          {!inExercise && space === "learn" && tab === "home" && !session && placeButton && (
-            <div className="at-placecorner">{placeButton}</div>
+          {/* Home's top line (0.665): the app's name at the left, as the
+              page's title, and where you are at the right of the same
+              line, as every tab's title carries it (0.601). It scrolls
+              away with the page. Centred where there is no place button
+              to make room for (0.642): one space, one language. */}
+          {!inExercise && space === "learn" && tab === "home" && (
+            <div className={`at-homehead${placeButton && !session ? "" : " centred"}`}>
+              <h1 className="at-homename">
+                <BrandMark size={32} />
+                ManyTongues
+              </h1>
+              {!session && placeButton}
+            </div>
           )}
 
         {/* ============ STUDY ============ */}
@@ -18067,20 +18076,6 @@ export default function ArabicTrainer() {
         >
           A new version is ready. Save your work, then reload.
         </TopBanner>
-      )}
-
-      {/* The app's name heads the learning page and scrolls away with it;
-          a space frame carries its own. */}
-      {/* Home has it large, at the left (0.576), as the page's title. Progress and
-          Cards are headed with their name, as every tab is (0.553);
-          Courses, reached from the menu, is headed with its own. */}
-      {/* Centred where there is no place button beside it to make room
-          for (0.642): one space, one language, nothing to switch. */}
-      {!inExercise && space === "learn" && tab === "home" && (
-        <div className={`at-brand at-brand-home${placeButton ? "" : " centred"}`}>
-          <BrandMark size={48} />
-          ManyTongues
-        </div>
       )}
 
       {/* The bar at the foot of the window. Always mounted, so the slot the

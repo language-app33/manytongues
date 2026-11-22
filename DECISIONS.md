@@ -12,6 +12,24 @@ anything that was never really a choice.
 ---
 
 
+## Home's name is a heading in the page, not chrome (0.665)
+
+The app's name on Home was positioned absolutely over the page's top
+padding, with where-you-are on a line of its own underneath. Putting the
+two on one line, as every tab's title already has them, meant one row in
+the page's own flow (`.at-homehead`), so the button lands where it does on
+Progress and Cards and the row cannot overlap what follows. It scrolls
+away, as the floating name did, rather than sticking like a tab title.
+
+The cost is the name's size: 48px mark and 32px type leave a phone about
+75px for the button, so Home's name is 32/24 on wide screens and a tab
+title's 28/20 at 420px and under. Below 600px the languages leave the
+button (the owner's 2); the place gives way before the mode
+(`flex-shrink` 100 against 1), and both clip with an ellipsis rather than
+run over the arrow. `.at-brand` and its wash are gone, and layers.test no
+longer counts the name as chrome.
+
+
 ## What waits to sync is noted, not inferred (0.663)
 
 The You menu's count used to compare each card's stamps with the moment

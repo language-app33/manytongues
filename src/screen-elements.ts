@@ -146,7 +146,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["done-button", "Back to the home screen.", "Done"],
   ]],
   [SPACES, [
-    ["where-you-are", "The button at the right of every tab's title, and under the app's name on Home (0.601): the place, the mode and the languages once some are off. It opens the sheet that changes them. Not there for someone with nothing to choose.", "Lingua · Teaching · Arabic only"],
+    ["where-you-are", "The button at the right of every tab's title, and of the app's name on Home (0.601, 0.665): the place, the mode and the languages once some are off; on a phone the languages are left to the sheet. It opens the sheet that changes them. Not there for someone with nothing to choose.", "Lingua · Teaching · Arabic only"],
     ["where-place", "A row of the sheet behind where you are: Super admin, All your spaces, or one of your spaces. Beside each space's name, Learn, Teach and Admin, as far as you can do each there; a space where you only learn has none, and its name takes you to learn there.", "Main · Learn Teach"],
     ["stranded", "The page someone sees when they have no space to open: suspended in, removed from or gone from each of theirs, with a box for an invitation link or a course code.", "You're suspended in Lingua."],
     ["path-home", "On Home, above the card and Practice (0.617): one line per course with a path — the course, its current unit and that unit's stages. It opens the unit.", "Arabic 101 · Unit 3 of 8 · Family · Words 4/6 · Sentences 1/5"],

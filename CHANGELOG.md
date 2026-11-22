@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.665 — 23 November 2026
+
+**On Home, the button for your space and languages is on the top line.**
+It sits at the right of the app's name, on the same line, where every
+other tab already has it beside its title, and in the same spot on the
+screen. To make room, the name and logo on Home are smaller than before,
+on a phone the same size as the other tabs' titles. The line scrolls away
+with the page, and the cards below it start higher up. For someone with
+nothing to switch there is still no button, and the name stays centred.
+
+**On a phone the button no longer lists your languages.** When some
+languages are switched off, the button used to say so ("Arabic only");
+on a phone that is now left to the sheet the button opens. A wider screen
+still shows it. If the line is still too short, the space's name is cut
+first and the mode last, each with "…", rather than running over the
+arrow.
+
+Still to check by hand: the top line on your own phone, above all for
+someone in more than one space, where the space's name is cut to a letter
+or two on a typical phone.
+
 ## 0.664 — 23 November 2026
 
 **Home has a card with a fact about how language varies.** Under the
