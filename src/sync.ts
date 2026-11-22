@@ -600,68 +600,123 @@ export async function pushClip(token: string, id: string, dataUrl: string) {
 /* ---------------- what is waiting to go up ---------------- */
 
 /*
- * When this learner last changed a card: an answer or a lift (each stamps
- * the exercise state it wrote, on a form or on a line of a scene), the
- * learner's mark, a reset, a problem flagged — and, on a card of their
- * own, an edit.
+ * What the learner has changed here that no sync has carried yet (0.663).
  *
- * Not a course card's own stamp (0.662). That one is written by the
- * course refresh, which rebuilds every course card whenever a teacher
- * changes anything and stamps each with the moment it did: read as a
- * change made here, one card added by a teacher showed a student "301
- * cards to sync". What the teacher changed came down from the course; it
- * is not this device's to send.
+ * Kept as a list rather than worked out from timestamps. The count used to
+ * compare each card's stamps with the moment of the last sync, which read
+ * a course refresh — it rebuilds and stamps every course card — as a
+ * change made here ("301 cards to sync" after a teacher added one), and
+ * could miss changes after a sync with a device whose clock was ahead.
+ *
+ * Now the one place the learner's changes go through (persist, in the
+ * trainer) notes which cards it changed; a sync or a course refresh never
+ * goes through it. `other` is a change that is not a card — a setting —
+ * which the You menu says as "Changes to sync" when nothing else waits.
+ *
+ * `sending` is what a trip in flight carries: let go when it lands, put
+ * back if it fails. Kept beside the sync config, so a change made and not
+ * yet sent is still counted after a reload.
  */
-export function cardChangedAt(it: Item): number {
-  let at = Math.max(Number(it.priorityAt) || 0, Number(it.reset) || 0, it.source ? 0 : Number(it.updated) || 0);
-  for (const f of [...formsOf(it), ...(it.lines || [])]) {
-    for (const st of Object.values((f && f.s) || {})) {
-      const u = Number(st && st.updated) || 0;
-      if (u > at) at = u;
+export interface Pending {
+  cards: string[];
+  other: boolean;
+  sending: string[];
+  otherSending: boolean;
+}
+
+const PENDING_KEY = "arabic-trainer:sync-pending";
+export const NO_PENDING: Pending = { cards: [], other: false, sending: [], otherSending: false };
+
+export function loadPending(): Pending {
+  try {
+    const raw = JSON.parse(localStorage.getItem(PENDING_KEY) || "null");
+    if (!raw || typeof raw !== "object") return NO_PENDING;
+    /* A trip that was in flight when the app went away did not land. */
+    return pendingFailed({
+      cards: Array.isArray(raw.cards) ? raw.cards.map(String) : [],
+      other: !!raw.other,
+      sending: Array.isArray(raw.sending) ? raw.sending.map(String) : [],
+      otherSending: !!raw.otherSending,
+    });
+  } catch (e) {
+    return NO_PENDING;
+  }
+}
+
+export function savePending(p: Pending) {
+  try {
+    localStorage.setItem(PENDING_KEY, JSON.stringify(p));
+  } catch (e) {
+    /* storage full or blocked: counted for this launch only */
+  }
+}
+
+/** The cards a change made here altered, added or removed: compared by
+    content where a card was replaced, so one handed back unchanged is not
+    counted. And whether anything besides the cards changed. */
+export function changesBetween(prev: Pick<Doc, "items">, next: Pick<Doc, "items">): { cards: string[]; other: boolean } {
+  const before = new Map((prev.items || []).map((it) => [it.id, it]));
+  const after = new Set<string>();
+  const cards: string[] = [];
+  for (const it of next.items || []) {
+    after.add(it.id);
+    const was = before.get(it.id);
+    if (was === it) continue;
+    if (!was || JSON.stringify(was) !== JSON.stringify(it)) cards.push(it.id);
+  }
+  for (const id of before.keys()) if (!after.has(id)) cards.push(id);
+  let other = false;
+  const keys = new Set([...Object.keys(prev), ...Object.keys(next)]);
+  for (const k of keys) {
+    if (k === "items") continue;
+    const a = (prev as Record<string, unknown>)[k];
+    const b = (next as Record<string, unknown>)[k];
+    if (a !== b && JSON.stringify(a) !== JSON.stringify(b)) {
+      other = true;
+      break;
     }
   }
-  for (const flag of it.flags || []) {
-    const u = Number(flag && flag.at) || 0;
-    if (u > at) at = u;
-  }
-  return at;
+  return { cards, other };
 }
 
-/* A course card's id on this device — see localIdFor in shared.tsx, which
-   this module cannot import. Its headstone is written by the course
-   refresh when a teacher withdraws it, not by anything done here. */
-const fromCourse = (id: string) => id.startsWith("srv");
-
-/*
- * The newest stamp anywhere in a document's cards and withdrawals.
- *
- * What a sync has carried is everything up to the moment it set out — and
- * also anything it brought down, whose stamps are another device's clock
- * and may be ahead of this one's. Taking the later of the two keeps a card
- * just pulled from a fast-clocked phone from reading as still to send.
- */
-export function latestStamp(doc: Pick<Doc, "items" | "tombstones">): number {
-  let at = 0;
-  for (const it of doc.items || []) at = Math.max(at, cardChangedAt(it));
-  for (const t of Object.values(doc.tombstones || {})) at = Math.max(at, Number(t) || 0);
-  return at;
+/** A change made here, added to what waits. */
+export function pendingAdd(p: Pending, change: { cards: string[]; other: boolean }): Pending {
+  if (!change.cards.length && !change.other) return p;
+  return {
+    ...p,
+    cards: [...new Set([...p.cards, ...change.cards])],
+    other: p.other || change.other,
+  };
 }
 
-/*
- * How many cards the learner has changed here since the last sync carried
- * them: answered, marked, reset, flagged, or — their own — edited, added
- * or removed. `through` is the moment the
- * last successful sync accounted for; nought, never synced, counts all.
- */
-export function cardsToSync(doc: Pick<Doc, "items" | "tombstones">, through: number): number {
-  let n = 0;
-  for (const it of doc.items || []) if (cardChangedAt(it) > through) n += 1;
-  /* A card of the learner's own that they removed; not one a teacher
-     withdrew, which the course refresh buries (0.662). */
-  for (const [id, t] of Object.entries(doc.tombstones || {})) {
-    if (!fromCourse(id) && (Number(t) || 0) > through) n += 1;
-  }
-  return n;
+/** A trip sets out with everything waiting. */
+export function pendingSetOut(p: Pending): Pending {
+  return {
+    cards: [],
+    other: false,
+    sending: [...new Set([...p.sending, ...p.cards])],
+    otherSending: p.otherSending || p.other,
+  };
+}
+
+/** It landed: what it carried is sent. */
+export function pendingSent(p: Pending): Pending {
+  return { ...p, sending: [], otherSending: false };
+}
+
+/** It did not: what it carried waits again. */
+export function pendingFailed(p: Pending): Pending {
+  return {
+    cards: [...new Set([...p.sending, ...p.cards])],
+    other: p.other || p.otherSending,
+    sending: [],
+    otherSending: false,
+  };
+}
+
+/** How many cards wait, and whether anything else does. */
+export function pendingCount(p: Pending): { cards: number; other: boolean } {
+  return { cards: new Set([...p.cards, ...p.sending]).size, other: p.other || p.otherSending };
 }
 
 /*
@@ -713,6 +768,7 @@ export function syncLine({
   cards = 0,
   pictures = 0,
   clips = 0,
+  other = false,
   at = Date.now(),
 }: {
   trying?: boolean;
@@ -727,13 +783,17 @@ export function syncLine({
   /** Pictures and recordings added offline in the card editor (0.659). */
   pictures?: number;
   clips?: number;
+  /** Something besides these waits — a setting changed (0.663). */
+  other?: boolean;
   at?: number;
 }): { main: string; sub: string } {
   if (trying) return { main: "Practice here stays on this device", sub: "" };
   const waiting = joined(
     [count(reports, "report"), count(cards, "card"), count(pictures, "picture"), count(clips, "recording")].filter(Boolean),
   );
-  const toSync = waiting ? `${waiting} to sync` : "";
+  /* Said only when nothing countable waits, so "Up to date" is never
+     said while something does (0.663). */
+  const toSync = waiting ? `${waiting} to sync` : other ? "changes to sync" : "";
   const when = lastSync ? `last synced ${syncedWhen(lastSync, at)}` : "";
   /* Parts joined with a dot, the first of them capitalised. */
   const line = (...parts: string[]) => {

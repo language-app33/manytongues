@@ -872,8 +872,16 @@ import {
   mergeData,
   syncAfterChange,
   SESSION_END_SYNC_MS,
-  cardsToSync,
-  latestStamp,
+  changesBetween,
+  loadPending,
+  savePending,
+  pendingAdd,
+  pendingSetOut,
+  pendingSent,
+  pendingFailed,
+  pendingCount,
+  NO_PENDING,
+  type Pending,
   syncLine,
 } from "./sync.ts";
 
@@ -12019,7 +12027,7 @@ export default function ArabicTrainer() {
   const kb = useSoftKeyboard();
 
   /* ---- sync ---- */
-  const [syncCfg, setSyncCfg] = useState<{ token: string; lastSync: number; syncedThrough?: number }>(
+  const [syncCfg, setSyncCfg] = useState<{ token: string; lastSync: number }>(
     () => ({ token: "", lastSync: 0 }),
   );
   const [syncState, setSyncState] = useState("idle"); // idle|syncing|ok|error|off
@@ -12054,6 +12062,20 @@ export default function ArabicTrainer() {
    * written down, counted as sent, and left for the next answer.
    */
   const owed = useRef(false);
+  /*
+   * And which cards, for the You menu's count (0.663): noted by persist,
+   * the one place the learner's own changes go through, and let go of as a
+   * trip carries them. See Pending in sync.ts.
+   */
+  const pending = useRef<Pending>(NO_PENDING);
+  const setPending = useCallback((p: Pending) => {
+    if (p === pending.current) return;
+    pending.current = p;
+    savePending(p);
+  }, []);
+  useEffect(() => {
+    setPending(loadPending());
+  }, [setPending]);
   /*
    * Whether a question is being put. The sync's cadence turns on it — see
    * syncAfterChange in sync.ts — and a session that stops putting them,
@@ -12126,10 +12148,8 @@ export default function ArabicTrainer() {
          as it stands now. Anything written while it is in flight sets this
          again, and is owed a trip of its own — see the end. */
       owed.current = false;
+      setPending(pendingSetOut(pending.current));
       let sent = false;
-      /* What this trip carries is everything up to now, so a change from
-         here on is still to send — see syncedThrough below. */
-      const setOut = now();
       try {
         const { merged, changed, lost, serverNow } = await syncOnce(dataRef.current, key);
         sent = true;
@@ -12194,14 +12214,13 @@ export default function ArabicTrainer() {
           /* the document is synced; clips can catch up next time */
         }
 
-        /* How far this sync accounted for the cards, which is what the You
-           menu counts "to sync" from (0.655): the moment it set out, or the
-           newest change it brought down if another device's clock is ahead. */
-        const syncedThrough = Math.max(setOut, latestStamp(merged as Doc));
-        /* The ledger of recordings sent up is gone with the sending (0.659). */
-        const { uploaded: _sent, ...kept } = prevCfg;
+        /* The ledger of recordings sent up is gone with the sending (0.659),
+           and the count no longer reads a time from here (0.663). */
+        const { uploaded: _sent, syncedThrough: _through, ...kept } = prevCfg;
         void _sent;
-        const cfg = { ...kept, token: key, lastSync: now(), syncedThrough };
+        void _through;
+        setPending(pendingSent(pending.current));
+        const cfg = { ...kept, token: key, lastSync: now() };
         saveSyncConfig(cfg);
         setSyncCfg(cfg);
         setSyncState("ok");
@@ -12304,7 +12323,10 @@ export default function ArabicTrainer() {
           }
         }
         /* Nothing went up, so everything this trip carried is still owed. */
-        if (!sent) owed.current = true;
+        if (!sent) {
+          owed.current = true;
+          setPending(pendingFailed(pending.current));
+        } else setPending(pendingSent(pending.current));
       } finally {
         syncing.current = false;
         /* Written to while this was in flight, so it is owed a trip of its
@@ -12388,7 +12410,15 @@ export default function ArabicTrainer() {
       fromSync.current = false;
       return;
     }
-    owed.current = true;
+    /*
+     * Only for what the learner did, which persist marks as owed (0.663).
+     * A course refresh writes the cards too — every course card, whenever
+     * a teacher changes anything — and used to send this device's whole
+     * document up a few seconds later each time, though nothing of the
+     * learner's had changed. What it brought rides with the next trip:
+     * every device folds the course in for itself, so nothing waits on it.
+     */
+    if (!owed.current) return;
     const { wait, keep } = syncAfterChange(answeringRef.current);
     armSync(wait, keep);
   }, [data, ready, syncCfg.token, armSync]);
@@ -12633,6 +12663,7 @@ export default function ArabicTrainer() {
       syncTimer.current = null;
     }
     owed.current = false;
+    setPending(NO_PENDING);
     saveSyncConfig({ ...loadSyncConfig(), token: "" });
     setSyncCfg((c) => ({ ...c, token: "" }));
     fromSync.current = true;
@@ -12665,6 +12696,8 @@ export default function ArabicTrainer() {
     (nextOrFn: Doc | ((cur: Doc) => Doc | null)) => {
       const next = typeof nextOrFn === "function" ? nextOrFn(dataRef.current) : nextOrFn;
       if (!next || next === dataRef.current) return;
+      /* Which cards this changed, for the You menu's count (0.663). */
+      setPending(pendingAdd(pending.current, changesBetween(dataRef.current, next)));
       commit(next);
       /* Something is now in memory that is not on the disk. Read by the
          flush below. */
@@ -12679,7 +12712,7 @@ export default function ArabicTrainer() {
         void writeNow();
       }, 600);
     },
-    [commit, writeNow]
+    [commit, writeNow, setPending]
   );
 
   /*
@@ -15949,6 +15982,7 @@ export default function ArabicTrainer() {
    */
   const syncNote = () => {
     const last = syncCfg.lastSync || 0;
+    const waitingCards = pendingCount(pending.current);
     return syncLine({
       trying: !!TRYING,
       offline,
@@ -15956,9 +15990,10 @@ export default function ArabicTrainer() {
       failed: syncState === "error",
       lastSync: last,
       reports: toSend,
-      /* This device's practice, and the cards the card editor saved
-         offline and keeps until they can go (0.659). */
-      cards: cardsToSync(data, syncCfg.syncedThrough || last) + waitingToSend(CARD_OUTBOX),
+      /* What the learner changed here and no trip has carried (0.663),
+         and the cards the card editor saved offline (0.659). */
+      cards: waitingCards.cards + waitingToSend(CARD_OUTBOX),
+      other: waitingCards.other,
       pictures: heldMedia.images,
       clips: heldMedia.clips,
     });

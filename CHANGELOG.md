@@ -8,6 +8,30 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.663 — 22 November 2026
+
+**A teacher's change no longer makes every student's phone sync, and the
+You menu's count is exact.** Follow-ups to 0.662.
+
+- **No sync for a course change.** Whenever a teacher changed anything in
+  a course, every student's phone sent its whole practice record up a few
+  seconds later, though the student had changed nothing. Now a sync is
+  started only by something the learner did; what the course brought
+  rides along with the next one. Each phone still gets the course itself
+  straight away, as before.
+- **The count is what you changed, card by card.** It used to be worked
+  out by comparing times, which went wrong after a sync with a device
+  whose clock was ahead. Now each card you change is noted as you change
+  it, and let go of once a sync has carried it. A count still waiting
+  when the app is closed is there when it opens again.
+- **"Changes to sync" instead of "Up to date"** when what is waiting is
+  not a card (a setting you changed, say), so the menu never says "Up to
+  date" while something has not been sent.
+
+To check by hand: with the app open on a phone, change a course card from
+Teaching on another device: the You menu stays "Up to date". Then, in
+airplane mode, change the theme: it says "Changes to sync".
+
 ## 0.662 — 22 November 2026
 
 **The You menu no longer says hundreds of cards are waiting to sync when

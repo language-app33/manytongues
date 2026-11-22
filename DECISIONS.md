@@ -11,6 +11,30 @@ anything that was never really a choice.
 
 ---
 
+
+## What waits to sync is noted, not inferred (0.663)
+
+The You menu's count used to compare each card's stamps with the moment
+of the last sync. Two things broke that. A course refresh rebuilds every
+course card and stamps each with its own time, so one teacher change
+read as the whole course changed here (0.662 patched the count by
+ignoring a course card's own stamp). And a sync with a device whose clock
+was ahead moved the mark past changes made here.
+
+So `persist`, the one door the learner's changes go through, now notes
+the cards each change alters (`changesBetween`, by content), and a trip
+moves them to `sending`, lets go of them when it lands and puts them back
+when it fails (`Pending` in sync.ts, kept in localStorage). Syncs and
+course refreshes write with `commit` and are never counted.
+
+The same door now decides whether a sync is owed: the data effect arms
+the trip only when `persist` has marked one. A course refresh used to arm
+it too, so every teacher change sent every student's whole document up.
+What a refresh brings — new course cards, the headstones of withdrawn ones
+— goes with the next trip; every device folds the course in for itself.
+The stamps themselves are unchanged: a course card's `updated` is what
+lets a card that comes back outlive its old headstone in the merge.
+
 ## Pictures and recordings travel the same way (0.659)
 
 The owner's rule: a picture and a recording never behave differently,
