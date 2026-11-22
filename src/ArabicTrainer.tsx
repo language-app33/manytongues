@@ -24,6 +24,7 @@ import {
   ConfirmModal,
   Empty,
   ChatArt,
+  TrainingArt,
   Field as FormField,
   FLAG_KINDS,
   FEEDBACK_KINDS,
@@ -16229,7 +16230,7 @@ export default function ArabicTrainer() {
               }}
             />
           )}
-          {/* Home's top line (0.668): the app's name at the left, as the
+          {/* Home's top line (0.669): the app's name at the left, as the
               page's title, and where you are at the right of the same
               line, as every tab's title carries it (0.601). It scrolls
               away with the page. Centred where there is no place button
@@ -18921,6 +18922,15 @@ function FocusedTrainingSheet({
   return (
     <Screen title="Focused training" onBack={onClose} className="training">
       <div className="at-training">
+        {/* What the screen is for, under a dumbbell (0.668): it had only
+            its buttons, which said what each does but not why come here. */}
+        <div className="at-trainingintro" data-el="training-intro">
+          <TrainingArt />
+          <p>
+            Practise with a goal in mind. Fix what keeps slipping, or build a
+            session from the cards you choose{saved.length > 0 ? ", or go back to one you saved" : ""}.
+          </p>
+        </div>
         <div className="at-row">
           <Button variant="ghost" off={!weakCount} onClick={onWeak}>
             Weak spots

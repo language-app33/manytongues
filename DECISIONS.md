@@ -12,7 +12,7 @@ anything that was never really a choice.
 ---
 
 
-## Home's name is a heading in the page, not chrome (0.668)
+## Home's name is a heading in the page, not chrome (0.669)
 
 The app's name on Home was positioned absolutely over the page's top
 padding, with where-you-are on a line of its own underneath. Putting the

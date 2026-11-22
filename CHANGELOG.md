@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.668 — 24 November 2026
+## 0.669 — 25 November 2026
 
 **On Home, the button for your space and languages is on the top line.**
 It sits at the right of the app's name, on the same line, where every
@@ -28,6 +28,17 @@ arrow.
 Still to check by hand: the top line on your own phone, above all for
 someone in more than one space, where the space's name is cut to a letter
 or two on a typical phone.
+## 0.668 — 25 November 2026
+
+**Focused training says what it is for.** The screen behind the dumbbell on
+Home now opens with a small drawing of a dumbbell and one line under it:
+"Practise with a goal in mind. Fix what keeps slipping, or build a session
+from the cards you choose." Once a student has saved a session, the line
+ends "…or go back to one you saved." The buttons below are unchanged.
+
+Still to check by hand: the drawing and the line on a real phone, in light
+and dark.
+
 ## 0.667 — 24 November 2026
 
 **The Focused training button waits until a student has started.** The

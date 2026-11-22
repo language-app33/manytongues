@@ -1522,11 +1522,11 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-placename, .at-placelangs { min-width:0; overflow:hidden; text-overflow:ellipsis; }
 /* The place gives way long before the mode does; on the narrowest phones
    the mode is cut too, with an ellipsis, rather than running over the
-   arrow (0.668). */
+   arrow (0.669). */
 .at-placename { flex:0 100 auto; }
 .at-placemode { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .at-placelangs { color: var(--muted); font-weight:700; }
-/* On a phone the line is too short for the languages as well (0.668, the
+/* On a phone the line is too short for the languages as well (0.669, the
    owner's 2): the button keeps the place and the mode, and the sheet it
    opens still says which languages are on. */
 @media (max-width: 599px) { .at-placelangs { display:none; } }
@@ -3496,7 +3496,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    other tabs carry their own name in the same place. The content under it
    sits on the page itself rather than in a card: one centred column, its
    parts set apart by space alone. */
-/* Its top line (0.668): the app's name at the left and where you are at
+/* Its top line (0.669): the app's name at the left and where you are at
    the right of the same line, as every tab's title carries it. The name
    is at a tab title's scale rather than the 32px it had alone, so the
    button beside it keeps enough of the line to be read on a phone; the
@@ -3571,6 +3571,10 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-training .at-row { max-width:420px; margin-inline:auto; }
 .at-training > :first-child { margin-top:0; }
 .at-training .at-row + .at-row { margin-top:12px; }
+/* Its drawing and the line under it (0.668). */
+.at-trainingintro { max-width:420px; margin:0 auto 24px; }
+.at-trainingart { display:block; width:128px; height:auto; margin:4px auto 12px; color: var(--muted); }
+.at-trainingintro p { margin:0; padding:0 8px; font-size:15px; line-height:1.4; color: var(--text-soft); text-wrap: balance; }
 
 /* --- the floating button ---------------------------------------------
    Edit on a card or deck being read, Save on one being written: in the
