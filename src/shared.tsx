@@ -1964,7 +1964,7 @@ export function ClipList({ clips, onChange, load }: {
             {/* Said beside the recording itself, in the editor and on the
                 card's own screen alike — see setLostRecordings. */}
             {isLostRecording(id) && (
-              <p className="at-hint at-lostclip">This recording didn't reach the server. Record it again.</p>
+              <p className="at-hint at-lostclip">This recording is missing. Record it again.</p>
             )}
           </React.Fragment>
         );
@@ -4173,7 +4173,7 @@ export function ReachBar({ again = false, retrying = false, detail = "", title =
     <div className={`at-reachbar${still ? " still" : ""}`} role="alert">
       <Icon name="cloud-off" size={22} />
       <span className="msg">
-        <strong>{title || (again ? "Still can't reach the server" : "Can't reach the server")}</strong>
+        <strong>{title || (again ? "Still no connection" : "No connection")}</strong>
         {detail ? <span className="detail">{detail}</span> : null}
       </span>
       <button className="at-reachretry" onClick={onRetry} disabled={retrying}>

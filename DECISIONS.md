@@ -8995,3 +8995,45 @@ loops and one of two welcomes (3a): one for a student who has not
 practised, one for the first day. Any practised day other than today
 counts, so a student returning the next morning sees a fact before
 practising again rather than being told to "come back tomorrow".
+
+## One rule for "no connection", and three kinds of notice
+
+**24 November 2026** · `src/net.ts` (`noConnection`), `src/send-waiting.ts`, `src/reach.ts`
+
+An audit after 0.666 found six kinds of notice about the connection and
+about 25 sentences, decided by four different rules for what counts as a
+connection problem. On the owner's word there are now three kinds, and
+only one is an error:
+
+- **The bar** ("No connection", with Retry) for anything asked for that
+  could not get through.
+- **"Saved on this device. It will be sent when you're back online."** for
+  work kept until it can go.
+- **The dot and the You menu's line** for where things stand: grey
+  offline, amber while anything waits or syncs, red only for a failure.
+
+**One rule.** `noConnection` decides, for the bar, the queues and the
+picture store alike: a request that could not be made or timed out, a
+gateway's 502, 503 or 504, and an answer that is not the app's (a wifi
+login page). A teacher's card saved during a deploy is therefore kept
+like an offline one rather than refused. A 500 is not no connection: it is
+the server's own fault, said as such, though queued work still waits
+through it.
+
+**Waiting work is said in the menu, not a band.** The two "waiting for a
+connection" bands went. That made the menu responsible, so Sync now sends
+everything waiting, and a teacher's cards are sent by a module the whole
+app reaches rather than by the Teaching screen alone. One send at a time,
+whoever asks, so no card goes up twice. Because the browser never says when
+the server comes back while the device stayed online, any answer from the
+server is announced (`noteReached`), and waiting work and the bar both
+retry on it, throttled so a refusal cannot start a loop.
+
+**Never "server".** Most people do not know the word. Faults on our side
+carry a short code in brackets instead of instructions for whoever runs
+the site; `docs/ERROR-CODES.md` keeps those instructions.
+
+**What it costs.** "No connection" is also said when the device is online
+and the fault is ours during a restart — one message, at the price of
+being slightly wrong for a few seconds of a deploy. Settings' download
+section keeps its own message and button, on the owner's word.

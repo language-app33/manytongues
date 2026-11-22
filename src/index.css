@@ -1458,7 +1458,9 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-place .at-hint { margin:-4px 0 12px; }
 .at-cdot { width:9px; height:9px; border-radius:50%; background: var(--jade); flex-shrink:0; }
 .at-cdot.syncing { background: var(--brass); }
-.at-cdot.error, .at-cdot.off { background: var(--rose); }
+.at-cdot.error { background: var(--rose); }
+/* Offline is not a failure (0.667): grey, not red. */
+.at-cdot.off { background: var(--faint); }
 /* You, in the bar: your initial in a small round of its own, where the
    sections have their icons, with the sync dot on its shoulder. */
 .at-cornerav { position:relative; width:26px; height:26px; border-radius:999px; flex:none;

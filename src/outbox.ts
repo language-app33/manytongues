@@ -23,6 +23,8 @@
  * functions at the foot are the only ones that touch storage.
  */
 
+import { noConnection } from "./net.ts";
+
 export interface Pending {
   /** This device's own name for the item, never sent anywhere. */
   id: string;
@@ -98,13 +100,11 @@ export type Verdict = "sent" | "keep" | "drop";
  * Whether a failure is worth waiting through (0.580, audit finding 5).
  *
  * Only a refusal the server made on purpose — an answer in its own words —
- * is a reason to drop queued work. No connection, a call that timed out
- * (which reads as "offline"), a gateway's 502 page during a deploy, or a
- * body that is not the server's JSON are all the server not having
+ * is a reason to drop queued work. No connection (net.ts's one rule for
+ * it, 0.667) or any fault on the server's side is the server not having
  * answered yet, and the work waits for it.
  */
-export const isTransient = (msg: string) =>
-  msg === "offline" || msg === "bad-response" || /^http-5\d\d$/.test(msg);
+export const isTransient = (msg: string) => noConnection(msg) || /^http-5\d\d$/.test(msg);
 
 /* What a teacher's card that could not be sent is filed under while it
    waits: here rather than in the teaching screens, so the You menu can
@@ -146,10 +146,27 @@ export function saveOutbox(list: Pending[]): boolean {
     const s = store();
     if (!s) return false;
     s.setItem(OUTBOX_KEY, JSON.stringify(list || []));
+    for (const fn of [...outboxWatchers]) {
+      try {
+        fn();
+      } catch (e) {
+        /* one listener failing must not keep the rest from hearing */
+      }
+    }
     return true;
   } catch (e) {
     return false;
   }
+}
+
+/* Told whenever the queue is written, so the You menu's dot and count
+   follow what is waiting without asking for it on a timer (0.667). */
+const outboxWatchers: Set<() => void> = new Set();
+export function watchOutbox(fn: () => void): () => void {
+  outboxWatchers.add(fn);
+  return () => {
+    outboxWatchers.delete(fn);
+  };
 }
 
 /**

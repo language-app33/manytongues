@@ -42,19 +42,21 @@ test("a JSON error keeps the server's own error string", async () => {
 test("a platform 500 whose body isn't JSON reports the status, not bad-response", async () => {
   answer(500, "Internal Server Error", "text/plain");
   await assert.rejects(API.whoAmI("k"), { message: "http-500" });
-  assert.match(API.explain(new Error("http-500")), /answered 500/);
+  /* Said as our fault, with the status in brackets for whoever runs the
+     site — never the word "server" (0.667). */
+  assert.equal(API.explain(new Error("http-500")), "Something went wrong on our side. Try again in a moment. (500)");
 });
 
 test("the SPA's index.html served in place of the function names the missing endpoint", async () => {
   answer(404, "<!doctype html><html><body>app</body></html>", "text/html");
   await assert.rejects(API.whoAmI("k"), { message: "http-404" });
-  assert.match(API.explain(new Error("http-404")), /no \/api\/courses endpoint/);
+  assert.match(API.explain(new Error("http-404")), /on our side.*\(404\)$/);
 });
 
 test("a server that cannot write is explained as storage, not as a bad key", async () => {
   answer(500, JSON.stringify({ error: "storage-unconfigured", detail: "..." }));
   await assert.rejects(API.whoAmI("k"), { message: "storage-unconfigured" });
-  assert.match(API.explain(new Error("storage-unconfigured")), /DATA_DIR/);
+  assert.match(API.explain(new Error("storage-unconfigured")), /on our side.*\(storage\)$/);
 });
 
 test("only a 2xx that isn't JSON is a bad response", async () => {

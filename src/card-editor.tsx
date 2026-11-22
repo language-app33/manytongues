@@ -11067,7 +11067,7 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
           {offline && (
             <Notice kind="warn">
               You&apos;re offline. What you write, record and add here is saved on this device
-              and goes up when you&apos;re back online.
+              and will be sent when you&apos;re back online.
             </Notice>
           )}
           {/* Outside the lock: a card being read is moved round as freely
