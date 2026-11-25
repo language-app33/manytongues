@@ -288,7 +288,12 @@ test("a pair is a number a language may count", () => {
   /* Arabic and Hebrew both do, and the app could not say it: a noun's
      dual had nowhere to live, which is why a counting question draws its
      nouns from a list written by hand rather than off the cards. */
-  assert.deepEqual(GRAMMAR.number.options.map(([v]) => v), ["singular", "dual", "plural", "na"]);
+  assert.deepEqual(GRAMMAR.number.options.map(([v]) => v), ["singular", "dual", "plural", "uncountable", "na"]);
+  /* A noun with no plural (0.672), as an import's number column may say it. */
+  for (const given of ["uncountable", "Uncountable", "uncount.", "un"]) {
+    assert.equal(normDimValue(GRAMMAR.number, given), "uncountable", given);
+  }
+  assert.equal(normDimValue(GRAMMAR.number, "n/a"), "na");
   assert.equal(dimValues({ number: "dual" }).number, "dual");
   assert.equal(normDimValue(GRAMMAR.number, "dual"), "dual");
   assert.equal(normDimValue(GRAMMAR.number, "du"), "dual");
@@ -1363,8 +1368,8 @@ test("each pack offers only the grammar its language has", () => {
   }
   /* Arabic has a plural a few nouns take only after three to ten — days,
      months — and Hebrew has none. */
-  assert.deepEqual(values("ar-PS", "number"), ["singular", "dual", "plural", "counted", "na"]);
-  assert.deepEqual(values("he-IL", "number"), ["singular", "dual", "plural", "na"]);
+  assert.deepEqual(values("ar-PS", "number"), ["singular", "dual", "plural", "counted", "uncountable", "na"]);
+  assert.deepEqual(values("he-IL", "number"), ["singular", "dual", "plural", "uncountable", "na"]);
   /* It is a noun's, and offered on nothing else that is asked its number. */
   const offered = (/** @type {string} */ kind) =>
     must(dimsFor(LANGUAGES["ar-PS"], kind).find((d) => d.field === "number"), kind).options.map(([v]) => v);

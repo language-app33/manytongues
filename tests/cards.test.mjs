@@ -32,7 +32,8 @@ const { shapeOf, shapeChoices, shapeLabel, categoryChoices, categoryOffers, tabl
   initialForms, initialCells, initialCategory, initialFrames, storedFormsOf, asideOf, tableCellsOf,
   canSaveWord, canSaveVerb, canSaveScene, writtenCard, writtenLines, ownerLabel, askParts, partAsked,
   partLends, setPartFlags, keptNotAsked,
-  nounLayoutOf, nounBoxes, placeNounForms, stampNounForms, leadFirst, formSays, blankLabel } =
+  nounLayoutOf, nounBoxes, placeNounForms, stampNounForms, leadFirst, formSays, blankLabel,
+  nounUncountable, tickUncountable } =
   await import(path.join(built2, "card-editor.js"));
 
 /* The two halves of card identity live in shared.tsx, so it is bundled the
@@ -51,7 +52,7 @@ const { leadSpeed, deckPercent, levelPercent, nextReviewAt, reviewLine, nextPass
   drillableUnits, askedUnits, agreeTook, laddered, liftStates, merge,
   setValueIndex, valueKey, setMateCounts } =
   await import(path.join(built4, "ArabicTrainer.js"));
-const { TYPES, LANGUAGES, verbOf, attachedOf, specOf, levelOf, askLabel } = await import(path.join(here, "..", "src", "languages.ts"));
+const { TYPES, LANGUAGES, dimsFor, verbOf, attachedOf, specOf, levelOf, askLabel } = await import(path.join(here, "..", "src", "languages.ts"));
 const { leadsOf } = await import(path.join(here, "..", "src", "review.ts"));
 const { fillText } = await import(path.join(here, "..", "src", "variables.ts"));
 
@@ -3095,4 +3096,48 @@ test("a picture question names the form only with what the picture cannot show",
   const female = formTagsAt({ label: "feminine", ambiguous: false, kin: 4, lent: false, promptField: "image", pictured: "female" });
   assert.equal(female.question, true);
   assert.equal(female.answer, false, "never both");
+});
+
+/* ---- an uncountable noun (0.672) ---- */
+
+test("ticking Uncountable leaves a noun one box, and takes the plural and the pair away", () => {
+  const lang = LANGUAGES["ar-PS"];
+  const forms = [
+    { ar: "خبز", en: "bread", number: "singular", gender: "masculine", answers: [{ text: "خبز", number: "singular", gender: "masculine" }] },
+    { id: "f2", ar: "خبزات", en: "breads", number: "plural", gender: "masculine" },
+    { id: "f3", ar: "خبزين", en: "two breads", number: "dual", gender: "masculine" },
+  ];
+  const cells = [{ of: "f2", row: "possessed", col: "my", ar: "خبزاتي" }, { of: "", row: "possessed", col: "my", ar: "خبزي" }];
+  assert.equal(nounUncountable(forms), false);
+  const ticked = tickUncountable(true, forms, cells, nounBoxes(lang, "single"), "single");
+  assert.deepEqual(ticked.forms.map((/** @type {any} */ f) => [f.ar, f.number]), [["خبز", "uncountable"]]);
+  /* Off the answer too, where a stale "singular" would win over the form. */
+  assert.equal("number" in ticked.forms[0].answers[0], false);
+  assert.equal(ticked.forms[0].answers[0].gender, "masculine");
+  assert.equal(nounUncountable(ticked.forms), true);
+  /* The plural's own pronoun goes with it; the word's own stays. */
+  assert.deepEqual(ticked.cells.map((/** @type {any} */ c) => c.ar), ["خبزي"]);
+  /* One box, which holds the word and is saved as what it is. */
+  const boxes = nounBoxes(lang, "single", true);
+  assert.deepEqual(boxes.map((/** @type {any} */ b) => [b.title, b.number]), [["Word", "uncountable"]]);
+  assert.deepEqual(placeNounForms(ticked.forms, boxes, "single"), { at: { uncountable: 0 }, extras: [] });
+  assert.equal(stampNounForms(ticked.forms, boxes, "single", "masculine")[0].number, "uncountable");
+  /* Unticked before saving, everything is back as it was. */
+  const back = tickUncountable(false, ticked.forms, ticked.cells, boxes, "single", ticked.shelved);
+  assert.deepEqual(back.forms.map((/** @type {any} */ f) => [f.ar, f.number]), [["خبز", "singular"], ["خبزات", "plural"], ["خبزين", "dual"]]);
+  assert.equal(back.cells.length, 2);
+  assert.deepEqual(back.shelved, { forms: [], cells: [] });
+});
+
+test("Uncountable is never a box beside the others, and is offered on a noun only", () => {
+  for (const id of ["ar-PS", "he-IL"]) {
+    const lang = LANGUAGES[id];
+    assert.equal(nounBoxes(lang, "single").some((/** @type {any} */ b) => b.number === "uncountable"), false, id);
+    /** @param {string | null} kind */
+    const offered = (kind) => dimsFor(lang, kind).some((/** @type {any} */ d) => d.options.some((/** @type {any} */ o) => o[0] === "uncountable"));
+    assert.equal(offered("noun"), true, id);
+    assert.equal(offered("phrase") || offered(null), false, id);
+  }
+  /* A person or an animal keeps a side for each gender. */
+  assert.deepEqual(nounBoxes(LANGUAGES["ar-PS"], "paired", true).map((/** @type {any} */ b) => b.title), ["Masculine word", "Feminine word"]);
 });

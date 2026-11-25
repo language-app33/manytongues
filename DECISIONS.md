@@ -9095,3 +9095,50 @@ path units, with the cards of each that can be asked.
 under it. It borrows the ghost button's outline, dimmed state and focus
 ring. Its accessible name is the title alone, with the line as its
 description, so it is still "Weak spots" to a screen reader.
+
+---
+
+## Uncountable is a value of number, and a tick over a noun's boxes (0.672)
+
+**26 November 2026** · `UNCOUNTABLE` and `agreesAs` in `src/answers.ts`; `GRAMMAR.number` in `src/languages.ts`; `personFor` in `src/verbs.ts`; `readNounCard` in `src/numbers/nouns.ts`; `nounBoxes`, `nounUncountable`, `tickUncountable` and `NounEditor` in `src/card-editor.tsx`
+
+A noun's card had a box for every number the language counts in, and no way
+to say the word has none of them but the first: مي with an empty Plural box
+was indistinguishable from a noun whose plural nobody had written yet, and
+the number screen listed it as "no plural".
+
+**Stored as a number, not as a fact of its own.** `number: "uncountable"`
+on the card's own word. A separate per-card field (as person-or-thing is)
+would have left agreement untouched, but it would also have let a card say
+"uncountable" and "plural" at once, and needed its own column in an import
+and its own tag. As a value of the axis it is said wherever number is said.
+
+**Nothing agrees with it.** The agreement tables match a noun's number by
+equality, so the one reader of them, `personFor`, takes an uncountable word
+as a singular (`agreesAs`). No column of any table names the value, and
+none should.
+
+**Counting leaves it out silently.** `readNounCard` answers null, as for a
+card that is not a noun, so it is neither counted nor listed as unfinished.
+
+**On the card it is a tick, never a box.** `nounBoxes` leaves the value out
+of the boxes and, where the card's own word says it, draws one box (one a
+side for a person or an animal). Ticking marks the word in each singular
+box and takes the forms in the other boxes out of the draft, with the
+pronoun cells on the end of them; they are held until the editor closes, so
+unticking puts them back, and a save while ticked drops them — which is
+what the owner asked the tick to do. A form in no box is left alone.
+
+**Offered on a noun only** (`optionRules.uncountable.onlyOn`), in Arabic
+and Hebrew. Vietnamese declares no number.
+
+**Group words got a line of help and no value.** ناس is a plural of people
+and عيلة a feminine singular; marked that way the agreement rules already
+read them right, so the card says which box to use rather than offering a
+choice most teachers would never need.
+
+**Still open:** a collective beside its unit noun (تفاح, تفاحة) — see "A
+noun is laid out in boxes", which keeps them as two cards.
+
+**Revisit if** teachers want uncountables counted with a measure word
+("two cups of water"), which needs measure words as cards of their own.

@@ -8,6 +8,34 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.672 — 26 November 2026
+
+**A noun can be marked uncountable.** On a noun's card in Arabic or Hebrew,
+Advanced › Forms now starts with an **Uncountable** tick, for a word with no
+plural, like water or bread. Ticking it takes the Dual, Plural and special
+plural boxes away and leaves the word itself.
+
+- The words beside it treat it as a singular, so an adjective or a verb
+  agrees with it as before.
+- Counting questions leave it out, and the number screen no longer lists it
+  as a noun with "no plural" still to write.
+- The card list tags it "uncount."; an import can say "uncountable" in its
+  number column.
+- Vietnamese is unchanged: it has no plurals to leave out.
+
+**Trade-off:** ticking it on a card that already has a plural or a pair
+written removes them when the card is saved, and students' progress on those
+forms goes with them. The tick says so before you save, and unticking before
+saving brings them back.
+
+**A line of help for group words.** Above the boxes, the card now says where
+a word for a group goes: in the box the words beside it agree with —
+"family" in Singular, "people" in Plural.
+
+Still to check by hand: the tick on a real phone, on a card for a person or
+an animal (which keeps a masculine and a feminine side), and a session that
+puts an uncountable noun beside an adjective.
+
 ## 0.671 — 26 November 2026
 
 **Weak spots replaces Fix mistakes in Build a session.** Choosing Weak spots

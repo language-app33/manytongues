@@ -31,7 +31,7 @@ import type {
    holds the shape of a scene, which marking a part and an ordering both
    have to read. */
 import { DIALOG_KIND, SELF_ALL, isDialog, linesOf, orderIsRight, partAnswers, yourLines } from "./dialogs.ts";
-import { ALT_SEP, answersOf, meaningsOf, splitAlternatives } from "./answers.ts";
+import { ALT_SEP, UNCOUNTABLE, answersOf, meaningsOf, splitAlternatives } from "./answers.ts";
 import { leadOf, subFormsOf, wordOf } from "./cards.ts";
 /* And what a row is, for the one rule below that reads one: verbs.ts
    knows what a table is made of and no language at all, which is the
@@ -2400,6 +2400,20 @@ export function checkViet(given: string, expected: string, settings: Settings) {
   return worst;
 }
 
+/*
+ * A noun with no plural to write: water, bread, rice.
+ *
+ * A value of the number axis rather than a fact of its own, so that it is
+ * said where number is said — on the word, in the card list's tag, in an
+ * import's number column — and so that a word cannot be both this and a
+ * plural. What it is not is a fourth thing for the words beside it to
+ * agree with: an adjective or a verb takes it as the singular it is
+ * (agreesAs in answers.ts, which personFor reads), and a counting question
+ * leaves it alone (readNounCard). On a noun's card it is a tick over the
+ * boxes, which takes the plural and the pair away — see NounEditor.
+ */
+export { UNCOUNTABLE };
+
 export const GRAMMAR: Record<string, GrammarDim> = {
   number: {
     label: "Number",
@@ -2424,6 +2438,10 @@ export const GRAMMAR: Record<string, GrammarDim> = {
          whatever the order. */
       ["dual", "dual"],
       ["plural", "plural"],
+      /* A word with no plural to write — water, bread. A noun's, and said
+         with a tick over its boxes rather than as one of them; see
+         UNCOUNTABLE. */
+      [UNCOUNTABLE, "uncountable"],
       ["na", "N/A"],
     ],
     /* Most words a teacher writes are not usefully singular or plural, and
@@ -2437,7 +2455,7 @@ export const GRAMMAR: Record<string, GrammarDim> = {
        take after three to ten: beside a plain "pl." it reads as the
        plural for three to ten, leaving "pl." to be the one above ten —
        which is the singular. */
-    brief: { singular: "sg.", plural: "pl.", dual: "du.", counted: "special pl.", na: "N/A" },
+    brief: { singular: "sg.", plural: "pl.", dual: "du.", counted: "special pl.", [UNCOUNTABLE]: "uncount.", na: "N/A" },
     /* And on a tag, a number that does not apply names nothing — not the
        letters "N/A". */
     short: { na: "" },
@@ -2460,6 +2478,7 @@ export const GRAMMAR: Record<string, GrammarDim> = {
         box: "special plural after 3–10 (days, months)",
         unasked: true,
       },
+      [UNCOUNTABLE]: { onlyOn: ["noun"] },
     },
   },
   gender: {
@@ -3824,6 +3843,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
         ["dual", "dual"],
         ["plural", "plural"],
         ["counted", "special plural after 3–10"],
+        [UNCOUNTABLE, "uncountable"],
         ["na", "N/A"],
       ],
       gender: [["masculine", "masculine"], ["feminine", "feminine"]],
@@ -4163,7 +4183,7 @@ export const LANGUAGES: Record<LangId, Lang> = {
     grammar: ["number", "gender", "human"],
     /* Two genders, and a dual for the nouns that have one — שעתיים. */
     grammarOptions: {
-      number: [["singular", "singular"], ["dual", "dual"], ["plural", "plural"], ["na", "N/A"]],
+      number: [["singular", "singular"], ["dual", "dual"], ["plural", "plural"], [UNCOUNTABLE, "uncountable"], ["na", "N/A"]],
       gender: [["masculine", "masculine"], ["feminine", "feminine"]],
       human: [["thing", "a thing"], ["person", "a person"], ["animal", "an animal"]],
     },
