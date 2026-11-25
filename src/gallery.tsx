@@ -183,6 +183,7 @@ const PLACES: Record<string, [string, string]> = {
   CardEditor: [TEACH, "Editing a card"],
   WordEditor: [TEACH, "Editing a card · a word or phrase"],
   VerbEditor: [TEACH, "Editing a card · a verb"],
+  NounEditor: [TEACH, "Editing a card · a noun"],
   AttachedEditor: [TEACH, "Editing a card · a word with attached pronouns"],
   TableEditor: [TEACH, "Editing a card · a word with a table of its forms beside it"],
   SceneEditor: [TEACH, "Editing a card · a conversation"],
