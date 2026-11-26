@@ -8,6 +8,29 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.673 — 26 November 2026
+
+**Focused training, tidied.** The dumbbell drawing at the top of the screen
+is gone, so the choices start higher up.
+
+- **Every button has a picture.** Weak spots a target, Not seen lately a clock
+  turning back, Build a session sliders, Prep mode a ticked calendar and Saved
+  sessions a bookmark — drawn like the app's other icons, in green on a round
+  tint, and greyed out when the button is.
+- **A saved session's tile says what it is**, the same line its row on Saved
+  sessions has: the kind of practice, how long it runs and how many cards it
+  holds (or how many are still there, if some have been withdrawn).
+- **Three dots in the tile's corner open a menu** to Start, Edit or Delete
+  the session without going to Saved sessions. The dots still work when
+  every card in the session has gone, so it can be changed or deleted.
+
+**Trade-off:** Delete from the menu asks first, because it sits a finger's
+width from Edit and cannot be undone; the delete button on Saved sessions
+still deletes at once, as before. The tiles are a line or two taller.
+
+Still to check by hand: the menu on a real phone, opened from a tile near
+the foot of the screen.
+
 ## 0.672 — 26 November 2026
 
 **A noun can be marked uncountable.** On a noun's card in Arabic or Hebrew,

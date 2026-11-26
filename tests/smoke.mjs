@@ -2005,6 +2005,28 @@ if (/Build a session/.test(document.body.textContent)) {
   check("and the tile says how much of its cards is learnt",
     !!tile && /^\d{1,3}%$/.test(((tile.querySelector(".pc") || {}).textContent || "").trim()),
     tile ? (tile.textContent || "").trim() : "(no tile)");
+  /* And what its row on Saved sessions says, and the dots in its corner
+     that start, change or delete it from here (0.673). */
+  const tileLine = ((tile && tile.querySelector(".ln")) || {}).textContent || "";
+  check("and the tile says what kind of session it is, as its row on Saved sessions does",
+    / · .*\bcards?\b/.test(tileLine), tileLine || "(no line)");
+  const more = tile && tile.querySelector('button[aria-label="More for Thursday\'s verbs"]');
+  click(more);
+  await sleep(150);
+  const menuSays = () => [...document.querySelectorAll('.at-savedpick [role="menuitem"]')]
+    .map((b) => (b.textContent || "").trim()).join("|");
+  check("its dots open a menu to start, edit or delete it", menuSays() === "Start|Edit|Delete",
+    more ? menuSays() || "no menu" : "no dots on the tile");
+  click([...document.querySelectorAll('.at-savedpick [role="menuitem"]')].find((b) => /Delete/.test(b.textContent || "")));
+  await sleep(150);
+  check("and Delete asks before it forgets the session",
+    !document.querySelector(".at-savedpick") && /Delete Thursday's verbs\?/.test(document.body.textContent || ""),
+    (document.body.textContent || "").slice(0, 120));
+  clickNamed(/^Cancel$/);
+  await sleep(150);
+  check("and cancelling keeps it",
+    [...document.querySelectorAll(".at-savedtile")].some((b) => /Thursday's verbs/.test(b.textContent || "")),
+    "the tile went");
   if (buttonNamed(/^Saved sessions$/)) {
     clickNamed(/^Saved sessions$/);
     await sleep(250);

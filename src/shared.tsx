@@ -203,6 +203,22 @@ const ICONS: Record<string, string> = {
      session — weak spots, a session built by hand, the ones kept (0.650). */
   dumbbell:
     "M4 11h16v2H4zM5 6.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1zM16 6.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1zM2 9.5a1 1 0 0 1 1-1h1v7H3a1 1 0 0 1-1-1zM20 8.5h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1z",
+  /* Focused training's choices (0.673), each a picture of what it does:
+     a target for the weak spots, the clock running back for what has not
+     been seen lately, the sliders a session is built with, a calendar
+     ticked off for a date being prepped for, and a bookmark for the
+     sessions kept. Material's glyphs, like every other icon here. */
+  target:
+    "M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10 10-4.49 10-10S17.51 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3-8c0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3 3 1.34 3 3z",
+  history:
+    "M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z",
+  event:
+    "M16.53 11.06 15.47 10l-4.88 4.88-2.12-2.12-1.06 1.06L10.59 17l5.94-5.94zM19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z",
+  bookmark: "M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z",
+  /* Three dots stood on end: more you can do with the thing it sits on,
+     in a menu (0.673). */
+  more:
+    "M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z",
   /* The number sign, for the screen a language's numbers are written on. */
   hash: "M20 10V8h-4V4h-2v4h-4V4H8v4H4v2h4v4H4v2h4v4h2v-4h4v4h2v-4h4v-2h-4v-4h4zm-6 4h-4v-4h4v4z",
   /* A cloud struck through: the server out of reach (0.636). */
@@ -812,33 +828,6 @@ export function ChatArt() {
         <circle cx="12" cy="88" r="3" />
         <circle cx="150" cy="52" r="2.5" />
         <circle cx="58" cy="104" r="2" />
-      </g>
-    </svg>
-  );
-}
-
-/* --- TrainingArt ---------------------------------------------------
-   A dumbbell, the mark that opens Focused training, at the top of that
-   screen (0.668). Drawn like ChatArt: coral plates and a mint bar that
-   carry their own colours in either theme, a yellow sparkle, and faint
-   dots that follow the page. */
-export function TrainingArt() {
-  return (
-    <svg className="at-trainingart" viewBox="0 0 160 110" width="160" height="110" aria-hidden="true" focusable="false">
-      <g transform="rotate(-14 80 58)">
-        <rect x="46" y="52" width="68" height="12" rx="6" fill="#7FD1C7" />
-        <rect x="34" y="30" width="15" height="56" rx="7.5" fill="#FF7A59" />
-        <rect x="22" y="40" width="13" height="36" rx="6.5" fill="#FF7A59" />
-        <rect x="111" y="30" width="15" height="56" rx="7.5" fill="#FF7A59" />
-        <rect x="125" y="40" width="13" height="36" rx="6.5" fill="#FF7A59" />
-        <path d="M39 38v14M116 38v14" stroke="#FFFFFF" strokeWidth="3.5" strokeLinecap="round" opacity=".5" />
-      </g>
-      <path d="M132 6l3.2 7.3 7.3 3.2-7.3 3.2-3.2 7.3-3.2-7.3-7.3-3.2 7.3-3.2z" fill="#F7C548" />
-      <path d="M22 88l2 4.5 4.5 2-4.5 2-2 4.5-2-4.5-4.5-2 4.5-2z" fill="#A99BE0" />
-      <g fill="currentColor" opacity=".35">
-        <circle cx="14" cy="24" r="2.5" />
-        <circle cx="148" cy="80" r="3" />
-        <circle cx="96" cy="104" r="2" />
       </g>
     </svg>
   );
