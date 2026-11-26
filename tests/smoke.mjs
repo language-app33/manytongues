@@ -11399,7 +11399,18 @@ const openPronounTables = async () => {
     { id: "p-rights", tags: ["Phrases"], created: 1, updated: Date.now(), uses: ["w-rights"],
       forms: [{ id: "p-rights", ar: "جمعية لحقوق الإنسان", en: "human rights organization", lat: "", s: doneBut("") }] },
   ], async (host) => {
-    const out = { reached: await reach(host, /Which word is missing/), seen: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), filled: "", after: "" };
+    /* The phrase card is asked about too; given up on until the gap comes. */
+    const steps = [];
+    for (let n = 0; n < 20 && !/Which word is missing/.test(text(host.querySelector(".at-instruction"))); n++) {
+      const giveUp = host.querySelector('[data-el="dont-know-button"]');
+      if (giveUp) click(giveUp);
+      else if (!(await reach(host, /Which word is missing/))) break;
+      await sleep(250);
+      const onward = [...host.querySelectorAll("button")].find((b) => /^(Continue|Next)$/.test(text(b)));
+      steps.push(`${text(host.querySelector(".at-instruction"))} / ${[...host.querySelectorAll("button")].map((b) => text(b)).join("|")}`);
+      if (onward) { click(onward); await sleep(300); }
+    }
+    const out = { steps, reached: await reach(host, /Which word is missing/), seen: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), filled: "", after: "" };
     const choices = host.querySelector('[data-el="answer-choices"]');
     if (!choices) return out;
     const buttons = [...choices.querySelectorAll("button")];
