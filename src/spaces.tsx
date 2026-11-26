@@ -798,7 +798,7 @@ export function ReportList({ flags, languages, busy, copying = false, copyingSay
 }) {
   return (
     <ItemList
-      noun="flag"
+      noun="report"
       items={flags}
       /* In the toolbar rather than at the head of the tab: it
          acts on the list, and the list is what the toolbar is
@@ -2901,7 +2901,8 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
             ["courses", "Courses", "school"],
             ["people", "People", "group"],
             ["decks", "Decks", "folder"],
-            ["flags", "Flags", "flag"],
+            /* Reports, the name Super admin's has too (0.685, the owner's 4a). */
+            ["flags", "Reports", "flag"],
           ]}
       tab={tab}
       onTab={setTab}
@@ -6375,6 +6376,35 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
 /* Whether Teaching offers its In context section. Off for now; turning it
    back on is this line. */
 const SHOW_IN_CONTEXT = false;
+
+/**
+ * Decks or Cards, inside Material and My space (0.550): their tab row, and
+ * which of the two sides you are in, in one line (0.551). One piece for
+ * both since 0.685 (the owner's 5a), where each side had its own copy.
+ */
+function DecksOrCards({ tab, onTab, mine, spaceName }: {
+  tab: string;
+  onTab: (key: string) => void;
+  /** My space, the teacher's own, rather than Material, the space's. */
+  mine: boolean;
+  spaceName: string;
+}) {
+  return (
+    <>
+      <Tabs
+        tabs={[["decks", "Decks", "folder"], ["cards", "Cards", "cards"]]}
+        value={tab}
+        onChange={onTab}
+        label="Decks or cards"
+      />
+      <Help className="at-mb3">
+        {mine
+          ? "Only you see these. Copy or move them to the space when they're ready."
+          : `${spaceName}'s decks and cards, shared with its teachers.`}
+      </Help>
+    </>
+  );
+}
 
 export function TeachSpace({ account, spaceName: shownName, setsOn = false, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose, personalOnly = false }: {
   account: User;
@@ -10254,20 +10284,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
           {tab === "cards" && (
             <>
-              {/* Decks or Cards, inside Material and My space (0.550): the card
-                  screen's own tab row. */}
-              <Tabs
-                tabs={[["decks", "Decks", "folder"], ["cards", "Cards", "cards"]]}
-                value={tab}
-                onChange={setTab}
-                label="Decks or cards"
-              />
-              {/* Which of the two you are in, in one line (0.551). */}
-              <Help className="at-mb3">
-                {mineSide
-                  ? "Only you see these. Copy or move them to the space when they're ready."
-                  : `${spaceName}'s decks and cards, shared with its teachers.`}
-              </Help>
+              <DecksOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} />
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
                   <LanguageRadio
@@ -10560,20 +10577,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   }
                 />
               )}
-              {/* Decks or Cards, inside Material and My space (0.550): the card
-                  screen's own tab row. */}
-              <Tabs
-                tabs={[["decks", "Decks", "folder"], ["cards", "Cards", "cards"]]}
-                value={tab}
-                onChange={setTab}
-                label="Decks or cards"
-              />
-              {/* Which of the two you are in, in one line (0.551). */}
-              <Help className="at-mb3">
-                {mineSide
-                  ? "Only you see these. Copy or move them to the space when they're ready."
-                  : `${spaceName}'s decks and cards, shared with its teachers.`}
-              </Help>
+              <DecksOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} />
               {deckAction && (
                 <Screen
                   title={
@@ -12012,7 +12016,7 @@ function EveryonePeople({ me }: { me: string }) {
  * inside its space.
  */
 function EveryReport({ languages }: { languages: Record<string, any> }) {
-  /* Ticked reports, per space (0.580: the same list Admin's Flags tab is). */
+  /* Ticked reports, per space (0.580: the same list Admin's Reports tab is). */
   const [picked, setPicked] = useState<Record<string, Set<string>>>({});
   const [clearing, setClearing] = useState<{ ids: string[]; org: string } | null>(null);
   /* Ticked feedback, and feedback waiting on "Clear?" (0.646). */
@@ -12075,15 +12079,12 @@ function EveryReport({ languages }: { languages: Record<string, any> }) {
   };
   return (
     <>
-      <Segmented
+      {/* Tabs, like People's All and By space one tab over (0.685, 2a). */}
+      <Tabs
         label="Which reports"
-        style={{ marginBottom: 14 }}
-        options={[
-          { value: "cards" as const, label: "Card reports" },
-          { value: "feedback" as const, label: "Feedback" },
-        ]}
+        tabs={[["cards", "Card reports", "flag"], ["feedback", "Feedback", "feedback"]]}
         value={kind}
-        onChange={setKind}
+        onChange={(k) => setKind(k === "feedback" ? "feedback" : "cards")}
       />
       <Notice kind="error">{error}</Notice>
       {kind === "cards" ? (

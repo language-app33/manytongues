@@ -12,6 +12,24 @@ anything that was never really a choice.
 ---
 
 
+## Tabs in a page are one track, and views switch by tabs (0.685)
+
+An inventory found ten sets of tabs in three looks. The bar at the foot was
+already one piece. Inside pages, switching what a page lists was done two
+ways: `Tabs` as outlined pills (Decks / Cards, All / By space) and
+`Segmented` (the sentence review, Narrow a blank, Super admin's reports),
+which a screen reader announces as pressed buttons. The card screen dressed
+`Tabs` as a track of its own.
+
+The owner chose the card screen's track for every set of tabs in a page
+(1a), and `Tabs` wherever a page's view changes (2a). So `.at-nav2` is that
+track and `.at-cardtabs` only pins it; `Tabs` gained `counts`, kept to the
+sentence review where the number helps choose (3a). The cost: in-page tabs
+now look like the settings tracks around them, where the pills set them
+apart; the raised tab with its outline, and the icons, are what tell them
+apart now. Admin's Flags tab is named Reports, as Super admin's is (4a),
+and Material and My space share one Decks / Cards piece (5a).
+
 ## A picture says its count again (0.677)
 
 0.651 stopped picture questions saying "dual" or "plural", after a learner

@@ -11600,13 +11600,17 @@ const openPronounTables = async () => {
   /* The screen opens on the sentences still waiting, and one marked there
      stays in its place until the tab is changed — then each tab holds only
      its own. */
+  /* Real tabs since 0.685, each its name with its count under it. */
   const tabOf = (/** @type {string} */ name) =>
-    [...up().querySelectorAll(".at-reviewtabs .at-seg")].find((b) =>
+    [...up().querySelectorAll('.at-reviewtabs [role="tablist"][aria-label="Which sentences"] [role="tab"]')].find((b) =>
       (b.firstChild?.textContent || "") === name);
   const listed = () => up().querySelectorAll(".at-reviewlist .at-askedline").length;
   check("the review screen opens on Waiting",
-    tabOf("Waiting")?.getAttribute("aria-pressed") === "true",
-    [...up().querySelectorAll(".at-reviewtabs .at-seg")].map((b) => b.textContent).join(" "));
+    tabOf("Waiting")?.getAttribute("aria-selected") === "true",
+    [...up().querySelectorAll(".at-reviewtabs [role=tab]")].map((b) => b.textContent).join(" "));
+  check("with how many are on each tab, under its name",
+    ["Waiting", "Struck", "Approved", "All"].map((t) => tabOf(t)?.querySelector(".at-tabcount")?.textContent).join(" ") === "1 1 1 3",
+    [...up().querySelectorAll(".at-reviewtabs [role=tab]")].map((b) => b.textContent).join(" "));
   check("and a sentence marked there stays where it was", listed() === 3, `${listed()} rows`);
   /** @type {[string, number][]} */
   const tabs = [["Waiting", 1], ["Struck", 1], ["Approved", 1], ["All", 3]];

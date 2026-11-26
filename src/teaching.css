@@ -897,7 +897,7 @@
 /* Waiting, struck, approved, all — the tabs over a card's sentences, where
    the tally of the four used to sit. */
 .at-reviewtabs { margin:14px 0 4px; }
-.at-reviewtabn { font-size:1.15em; letter-spacing:0; }
+.at-reviewtabs > [role="tablist"] { margin:0; }
 .at-reviewmarks { display:flex; gap:6px; flex:0 0 auto; margin-left:auto; }
 /* The tick that selects a sentence, beside its number. */
 .at-reviewpick { width:20px; height:20px; flex:0 0 auto; margin:0; align-self:center; cursor:pointer;

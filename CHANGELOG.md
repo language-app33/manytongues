@@ -8,6 +8,30 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.685 — 26 November 2026
+
+**Every set of tabs inside a page now looks and works the same.** They all
+take the look the card screen's tabs had: one full-width bar shared
+equally, the current tab raised. That covers Decks / Cards in Material and
+My space, All / By space in Super admin's People, the sentence review on a
+card, choosing a blank in Narrow a blank, and Card reports / Feedback in
+Super admin's Reports. The last three are now real tabs, so a screen
+reader calls them tabs rather than switches. The sentence review keeps the
+count under each tab's name; no other tabs gained one.
+
+**Admin's Flags tab is now called Reports,** the same name Super admin uses,
+and the search box on the reports list says "Search reports".
+
+**Trade-off:** tabs in a page now look closer to the settings switches
+around them; the raised tab, its outline and the icons are what set them
+apart.
+
+On the narrowest phones the tab names get a little smaller rather than
+breaking in the middle of a word.
+
+Still to check by hand: on a real phone, the sentence review's four tabs
+and the card screen's tabs, in light and dark.
+
 ## 0.684 — 26 November 2026
 
 **Switching personal sets off now hides the ones already made.** While

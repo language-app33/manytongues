@@ -1034,7 +1034,14 @@ export function Segmented<T extends string | number | boolean | null>({
 
 /* --- Tabs ---------------------------------------------------------
    The trainer, the teaching space and the admin space each had their
-   own copy of this, and only one of them said which tab was current. */
+   own copy of this, and only one of them said which tab was current.
+
+   Inside a page, every set of tabs is the one full-width track the card
+   screen had (0.685, the owner's 1a): the parts share it equally, the
+   current one raised. Anything that changes what a page lists is these
+   tabs, not a Segmented — that is a setting, and a screen reader says so;
+   the sentence review, Narrow a blank and Super admin's reports were
+   Segmented until then (2a). */
 /**
  * The main half of the bar that floats at the foot of the window, for a
  * space's own sections to be shown in. The app owns the bar, because the
@@ -1056,7 +1063,7 @@ export const PlaceContext = createContext<Node>(null);
 /**
  * @param props  Each tab is [key, label, iconName].
  */
-export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock = false }: {
+export function Tabs({ tabs, value, onChange, label = "Section", dots = [], counts, dock = false }: {
   tabs: [string, string, string?][];
   value?: string;
   onChange: (key: string) => void;
@@ -1064,6 +1071,10 @@ export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock
   /** Tabs with something on them worth looking at — the card screen's
       unsaved changes, say — marked with a dot and said out loud. */
   dots?: string[];
+  /** How many are on each tab, under its name, where the number helps
+      choose between them — the sentences waiting, struck and approved on
+      a card's review (0.685). Most tabs have none. */
+  counts?: Record<string, number>;
   /** A space's own sections, shown in the bar at the foot of the window
       rather than at the top of the page. Where there is no bar — the
       component gallery — they stay where they are. */
@@ -1071,7 +1082,7 @@ export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock
 }) {
   const slot = useContext(DockContext);
   const strip = (
-    <div className={dock && slot ? "at-docktabs" : "at-nav2"} role="tablist" aria-label={label}>
+    <div className={dock && slot ? "at-docktabs" : "at-nav2"} data-n={tabs.length} role="tablist" aria-label={label}>
       {tabs.map(([k, text, icon]) => (
         <button
           key={k}
@@ -1084,6 +1095,7 @@ export function Tabs({ tabs, value, onChange, label = "Section", dots = [], dock
         >
           {icon ? <Icon name={icon} size={18} /> : null}
           {text}
+          {counts && k in counts ? <span className="at-tabcount">{counts[k]}</span> : null}
           {dots.includes(k) ? <span className="at-tabdot" aria-label="needs a look" /> : null}
         </button>
       ))}

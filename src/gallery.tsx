@@ -276,6 +276,7 @@ const PLACES: Record<string, [string, string]> = {
   WrittenOutScreen: [TEACH, "A language's number system · one number written out by hand"],
   TryItScreen: [TEACH, "A language's number system · checking a number"],
   InContext: [TEACH, "The In context tab"],
+  DecksOrCards: [TEACH, "Material and My space · Decks or Cards, and which side you are in"],
   MeaningSplits: [TEACH, "The Cards tab · cards with more than one meaning, to split or keep"],
   TryExercises: [TEACH, "A card · trying an exercise on it"],
   CodeBox: [TEACH, "A code to hand out"],

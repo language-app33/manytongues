@@ -33,7 +33,7 @@ import {
 import type { PartSentences, ReviewState, Sentence } from "./review.ts";
 import { fillNames, refClash, refOf, slotName, slotsOf, WORD_SLOT } from "./variables.ts";
 import { ownSlot } from "./verbs.ts";
-import { AskedMeanings, AskedScript, Button, CheckList, Field, Help, Notice, Screen, Section, Segmented, plural } from "./shared.tsx";
+import { AskedMeanings, AskedScript, Button, CheckList, Field, Help, Notice, Screen, Section, Tabs, plural } from "./shared.tsx";
 
 type Mark = "ok" | "no" | null;
 
@@ -245,25 +245,15 @@ export function ReviewScreen({
         <>
           {/* The counts are on the tabs, so the tally that used to sit
               here would be saying everything twice. */}
+          {/* The counts are under each name, so four fit across a phone
+              (0.685: tabs, where they were a Segmented — 2a). */}
           <div className="at-reviewtabs">
-            {/* Full width, and each count under its label rather than beside
-                it: four labels with their counts in a line are more than a
-                phone has room for, and the fourth went down to a row of its
-                own. */}
-            <Segmented
-              size={null}
+            <Tabs
               label="Which sentences"
               value={tab}
-              onChange={pick}
-              options={TABS.map((t) => ({
-                value: t.value,
-                label: (
-                  <>
-                    <span>{t.label}</span>{" "}
-                    <span className="at-reviewtabn">{count(t.value)}</span>
-                  </>
-                ),
-              }))}
+              onChange={(k) => pick(k as Tab)}
+              tabs={TABS.map((t) => [t.value, t.label] as [string, string])}
+              counts={Object.fromEntries(TABS.map((t) => [t.value, count(t.value)]))}
             />
           </div>
           {!all.length ? (
@@ -482,9 +472,9 @@ export function NarrowBlank({
       lede="Tick the words that belong in it and give them a group name. The blank then takes only those words."
     >
       {blanks.length > 1 && (
-        <Segmented
+        <Tabs
           label="Which blank"
-          options={blanks.map((b) => ({ value: b, label: `{{${b}}}` }))}
+          tabs={blanks.map((b) => [b, `{{${b}}}`] as [string, string])}
           value={slot}
           onChange={(v: string) => {
             setSlot(v);
