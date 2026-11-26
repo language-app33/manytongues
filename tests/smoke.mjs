@@ -11380,10 +11380,15 @@ const openPronounTables = async () => {
   /* A word of two tokens with a letter glued to its front, as reported
      (0.660): جمعية لحقوق الإنسان showed as "جمعية ____", the ل gone from
      the sentence and from every tile. */
+  /* Everything a word is asked but the one wanted here already solid, so
+     the session's one question about it is the gap. */
+  const doneBut = (/** @type {string} */ open) => Object.fromEntries(
+    ["ar2pick", "ar2en", "match", "en2pick", "tr2ar", "en2ar", "ctx2pick", "ctx2ar", "dlgwhole"]
+      .filter((t) => t !== open).map((t) => [t, { ...solid }]));
   /** @param {string} id @param {string} ar @param {string} en @param {Record<string, any>} [extra] */
   const wordCard = (id, ar, en, extra = {}) => ({
     id, category: "noun", tags: ["Words"], created: 1, updated: Date.now(), uses: [],
-    forms: [{ id, ar, en, lat: "", s: { ar2pick: { ...solid }, ar2en: { ...solid }, match: { ...solid }, en2pick: { ...solid } } }],
+    forms: [{ id, ar, en, lat: "", s: doneBut("ctx2pick") }],
     ...extra,
   });
   const glued = await walk([
@@ -11392,9 +11397,9 @@ const openPronounTables = async () => {
     wordCard("w-sister", "أختي", "my sister"),
     wordCard("w-house", "بيت", "house"),
     { id: "p-rights", tags: ["Phrases"], created: 1, updated: Date.now(), uses: ["w-rights"],
-      forms: [{ id: "p-rights", ar: "جمعية لحقوق الإنسان", en: "human rights organization", lat: "", s: {} }] },
+      forms: [{ id: "p-rights", ar: "جمعية لحقوق الإنسان", en: "human rights organization", lat: "", s: doneBut("") }] },
   ], async (host) => {
-    const out = { reached: await reach(host, /Which word is missing/), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), filled: "", after: "" };
+    const out = { reached: await reach(host, /Which word is missing/), seen: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), filled: "", after: "" };
     const choices = host.querySelector('[data-el="answer-choices"]');
     if (!choices) return out;
     const buttons = [...choices.querySelectorAll("button")];
