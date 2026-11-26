@@ -11398,24 +11398,25 @@ const openPronounTables = async () => {
     wordCard("w-house", "بيت", "house"),
     { id: "p-rights", tags: ["Phrases"], created: 1, updated: Date.now(), uses: ["w-rights"],
       forms: [{ id: "p-rights", ar: "جمعية لحقوق الإنسان", en: "human rights organization", lat: "", s: doneBut("") }] },
-  ], async (host) => {
-    /* The phrase card is asked about too; given up on until the gap comes. */
-    const steps = [];
-    for (let n = 0; n < 20 && !/Which word is missing/.test(text(host.querySelector(".at-instruction"))); n++) {
+  ], async (host, typeIn) => {
+    /* The phrase card is asked about too; given up on until the gap comes,
+       chosen or typed — both show the same gapped phrase. */
+    const GAP = /Which word is missing|Fill the gap/;
+    for (let n = 0; n < 20 && !GAP.test(text(host.querySelector(".at-instruction"))); n++) {
       const giveUp = host.querySelector('[data-el="dont-know-button"]');
-      if (giveUp) click(giveUp);
-      else if (!(await reach(host, /Which word is missing/))) break;
+      if (!giveUp) break;
+      click(giveUp);
       await sleep(250);
-      const onward = [...host.querySelectorAll("button")].find((b) => /^(Continue|Next)$/.test(text(b)));
-      steps.push(`${text(host.querySelector(".at-instruction"))} / ${[...host.querySelectorAll("button")].map((b) => text(b)).join("|")}`);
-      if (onward) { click(onward); await sleep(300); }
+      click([...host.querySelectorAll("button")].find((b) => /^(Continue|Next)$/.test(text(b))) || null);
+      await sleep(300);
     }
-    const out = { steps, reached: await reach(host, /Which word is missing/), seen: text(host.querySelector(".at-instruction")), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), filled: "", after: "" };
+    const out = { reached: GAP.test(text(host.querySelector(".at-instruction"))), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), filled: "", after: "" };
     const choices = host.querySelector('[data-el="answer-choices"]');
-    if (!choices) return out;
-    const buttons = [...choices.querySelectorAll("button")];
-    out.tiles = buttons.map((b) => text(b));
-    click(buttons.find((b) => text(b) === "حقوق الإنسان") || null);
+    if (choices) {
+      const buttons = [...choices.querySelectorAll("button")];
+      out.tiles = buttons.map((b) => text(b));
+      click(buttons.find((b) => text(b) === "حقوق الإنسان") || null);
+    } else typeIn("حقوق الإنسان");
     await sleep(60);
     click(host.querySelector('[data-el="check-button"]'));
     await sleep(250);
@@ -11424,7 +11425,7 @@ const openPronounTables = async () => {
     return out;
   });
   check("a word of two tokens keeps the letter glued to its front outside the gap",
-    glued.reached && glued.prompt === "جمعية ل____" && glued.tiles.includes("حقوق الإنسان"), JSON.stringify(glued));
+    glued.reached && glued.prompt === "جمعية ل____" && (!glued.tiles.length || glued.tiles.includes("حقوق الإنسان")), JSON.stringify(glued));
   check("and put back, the sentence is whole and only the word is marked",
     glued.filled === "حقوق الإنسان" && glued.after.replace(/\s+/g, " ").includes("جمعية لحقوق الإنسان"), JSON.stringify(glued));
   materialQuiet = false;
