@@ -6193,7 +6193,7 @@ export const NO_CARD_FILTER = {
   sceneKinds: [] as string[],
 };
 
-/** Whether a card has anything students don't have yet (0.678): a draft, a
+/** Whether a card has anything students don't have yet (0.679): a draft, a
     card ready for review, or a published card with changes on it. */
 export const waitingToPublish = (c: { status?: string; changes?: unknown }): boolean =>
   (!!c.status && c.status !== "published") || !!c.changes;
@@ -6254,7 +6254,7 @@ export function filterCards(
     kinds?: string[];
     subtypes?: string[];
     sceneKinds?: string[];
-    /* Whether students have the card as it is (0.678): "waiting" keeps
+    /* Whether students have the card as it is (0.679): "waiting" keeps
        the drafts, the cards ready for review and the published cards with
        changes not yet published — everything Publish would send — and
        "published" keeps the cards students have, with nothing waiting. */
@@ -6860,7 +6860,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   const [sortKey, setSortKey] = useState("changed");
   const [newestFirst, setNewestFirst] = useState(true);
   const [cardFilter, setCardFilter] = useState(NO_CARD_FILTER);
-  /* The cards the last import brought in (0.678). They come in Ready for
+  /* The cards the last import brought in (0.679). They come in Ready for
      review, which students do not get, and the import itself said nothing
      about that: a teacher could import a course's material, add its decks
      to the course, and leave every student with empty decks. Held for as
@@ -9852,7 +9852,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     const mine = decks.filter((d) => !isPathUnit(d) && (d.courses || []).some((l) => l.courseId === c.id));
     const plainDecks = decks.filter((d) => !isPathUnit(d));
     /* What of this course's decks — its units with them — students don't
-       get yet (0.678), said here as the deck says it of itself: the course
+       get yet (0.679), said here as the deck says it of itself: the course
        is where a teacher looks to see what their students have. */
     const courseDecks = decks.filter((d) => (d.courses || []).some((l) => l.courseId === c.id));
     const courseCards = [...new Set(courseDecks.flatMap((d) => d.cardIds || []))]
@@ -10169,7 +10169,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               Some recordings are missing. Record them again so students can hear them.
             </TopBanner>
           )}
-          {/* What an import brought in and students don't have yet (0.678):
+          {/* What an import brought in and students don't have yet (0.679):
               on until every card of it is published, or the teacher puts
               it away. */}
           {importedWaiting > 0 && (
