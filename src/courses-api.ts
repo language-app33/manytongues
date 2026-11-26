@@ -30,6 +30,9 @@ export interface OrgCard {
   name: string;
   logo: string;
   colour: string;
+  /** Whether its teachers may make personal sets (0.683): the App admin's
+      choice, off unless switched on. Absent from an older server: off. */
+  sets?: boolean;
   /** Whether this account runs it (0.610). Only on whoami's list of yours. */
   runs?: boolean;
 }
@@ -562,7 +565,7 @@ export const adminOrgs = (): Promise<{ ok: true; orgs: OrgRow[] }> => call("admi
 export const createOrg = (name: string, slug: string, adminName: string, logo = "", colour = "", selfAdmin = false):
   Promise<{ ok: true; org: OrgRow; admin: User; key: string }> =>
   call("admin-create-org", { body: { name, slug, adminName, logo, colour, selfAdmin } });
-export const updateOrg = (id: string, change: { name?: string; slug?: string; logo?: string; colour?: string }) =>
+export const updateOrg = (id: string, change: { name?: string; slug?: string; logo?: string; colour?: string; sets?: boolean }) =>
   call("admin-update-org", { body: { id, ...change } });
 export const orgAdmins = (id: string, change: { add?: string; remove?: string }) =>
   call("admin-org-admins", { body: { id, ...change } });
@@ -740,6 +743,7 @@ export function explain(err: unknown): string {
       "not-reportable": "That's your own card. You can change it in My space.",
       "personal-deck": "A deck in My space can't go on a course. Copy it to the space first.",
       "personal-set": "A deck in My space can't be a personal set. Copy it to the space first.",
+      "sets-off": "Personal sets aren't switched on in this space.",
       "personal-card": "A card in My space can't go in a module of the space. Copy its deck to the space first.",
       "confirm-name": "Type the space's name exactly to confirm.",
       "admin-only": "Only the administrator can do that.",

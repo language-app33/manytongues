@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.672 — 26 November 2026
+## 0.686 — 26 November 2026
 
 **Decks, units and personal sets are now called modules.** A module is
 anything a teacher gives a course to learn from: a deck of cards, a unit on
@@ -17,8 +17,9 @@ any of the three:
 
 - **Teaching:** the Decks tab under Material and under My space is now
   **Modules**, and so is the one in Admin. The button is **New module**,
-  and it asks "What kind of module?" with three choices: **Deck** (which
-  used to be called "Regular deck"), **Unit** and **Personal set**. A
+  and it asks "What kind of module?": **Deck** (which used to be called
+  "Regular deck"), **Unit**, and **Personal set** where personal sets are
+  switched on for the space. A
   course's screen lists its **Modules** beside its Path. A card says which
   modules it is in, and the card filter and card list use the same word.
   Importing, exporting, backups, handing over a space and the warnings
@@ -28,7 +29,7 @@ any of the three:
   "This personal set" and "Personal set name". A deck's screen still says
   "Deck". The quality score is "Deck quality", "Unit quality" or
   "Personal set quality" to match, and just "Quality" in a list.
-- **Students:** Progress shows **Modules**, Prep mode asks for **Modules to
+- **Students:** Progress shows **Modules**, Set a goal asks for **Modules to
   target**, Build a session offers **Choose modules**, and the help text
   explains what a module is.
 
@@ -38,6 +39,284 @@ sets, in the same courses, with the same cards and progress.
 To check by hand: on a phone, the search box under Material › Modules is
 narrower than its words, so it reads "Search module" with the last letter
 cut off, as it would for any longer word.
+
+## 0.685 — 26 November 2026
+
+**Every set of tabs inside a page now looks and works the same.** They all
+take the look the card screen's tabs had: one full-width bar shared
+equally, the current tab raised. That covers Decks / Cards in Material and
+My space, All / By space in Super admin's People, the sentence review on a
+card, choosing a blank in Narrow a blank, and Card reports / Feedback in
+Super admin's Reports. The last three are now real tabs, so a screen
+reader calls them tabs rather than switches. The sentence review keeps the
+count under each tab's name; no other tabs gained one.
+
+**Admin's Flags tab is now called Reports,** the same name Super admin uses,
+and the search box on the reports list says "Search reports".
+
+**Trade-off:** tabs in a page now look closer to the settings switches
+around them; the raised tab, its outline and the icons are what set them
+apart.
+
+On the narrowest phones the tab names get a little smaller rather than
+breaking in the middle of a word.
+
+Still to check by hand: on a real phone, the sentence review's four tabs
+and the card screen's tabs, in light and dark.
+
+## 0.684 — 26 November 2026
+
+**Switching personal sets off now hides the ones already made.** While
+Personal sets is off for a space, its existing sets disappear for teachers
+and students: they're not in the teacher's decks, and students aren't sent
+them or asked about them. The word lists a set uses are ordinary decks and
+stay. Nothing is deleted. Switch it back on and the sets return as they
+were, with each student's answers and practice.
+
+**Trade-off:** every space started with Personal sets off in 0.683, so any
+space that already had sets has them hidden now, until you switch it on.
+And a student's practice on a hidden set is kept for 180 days, as it is for
+any card taken out of a course; a set left off for longer comes back
+without it.
+
+Still to check by hand: in a space that has a personal set, switch it off
+and on and see it go and come back, for a teacher and a student.
+
+## 0.683 — 26 November 2026
+
+**Personal sets are off in every space until you switch them on.** In
+Super admin → Spaces, each space now has a Features section with Personal
+sets, Off or On. Only the super admin can change it. While it's off,
+teachers in that space aren't offered Personal set when they make a new
+deck; they see Regular deck and Unit only.
+
+**Trade-off:** this starts off everywhere, including spaces where teachers
+have already made personal sets. Those sets keep working for students, and
+teachers can still edit them or turn them back into ordinary decks; only
+making a new one needs the switch on.
+
+**The New deck sheet is spaced properly.** Regular deck, Unit and Personal
+set had no gap between them; they're now spaced like every other list of
+tiles.
+
+Still to check by hand: the new switch in Super admin → Spaces on a real
+phone, and that a teacher sees Personal set appear after it's switched on
+(they may need to reload the app).
+
+## 0.682 — 26 November 2026
+
+**Import sits in the empty box.** In Teaching › Material, when there are no
+decks yet, Import is now an icon-only button beside New deck, in the "No
+decks yet" box, instead of standing alone above it. The same goes for
+Cards with no cards yet, beside New card, and for a deck with no cards on
+Manage cards, beside New card and Add existing cards. Once there is
+something in the list, Import goes back to its usual place beside search.
+
+Still to check by hand: the three empty screens on a real phone, in light
+and dark.
+
+## 0.681 — 26 November 2026
+
+**Prep mode is now Set a goal, and Focused training's buttons are two pairs.**
+
+- **Set a goal** replaces Prep mode on Focused training, and on its own
+  screen. Once a goal is set, both say **Your goal** instead, with where it
+  stands under the button as before.
+- The wording follows: the screen asks "What are you working towards?",
+  saves with **Start working towards it**, and deletes with "Delete this
+  goal". The line under the button says "Working towards Paris trip · 12
+  days left", or "Paris trip has come — edit the goal or delete it." The
+  notes after saving or deleting say "Goal set: Paris trip" and "Goal
+  cleared".
+- **On Home, the button while a goal is set says "Practice for Paris
+  trip"** (it was "Prep for …").
+- **Build a session and Set a goal sit side by side**, like Weak spots and
+  Not seen lately above them, rather than each taking the full width.
+- **Each button's icon is on the same line as its name**, before it, a
+  little smaller than it was above it. A name too long for a half-width
+  button wraps beside the icon.
+
+**Trade-off:** the half-width buttons are taller where a name or its line
+wraps, so the four buttons take about the same room as before.
+
+Still to check by hand: the four buttons on a real phone, above all the
+narrowest.
+
+## 0.680 — 26 November 2026
+
+**Saved sessions live on Focused training, and two can be pinned to Home.**
+
+- **No more Saved sessions screen.** The Saved sessions button on Focused
+  training is gone, and so is the screen it opened. In its place is a line
+  across the screen and a **Saved sessions** heading, with the tiles under
+  it. As before, the section shows only once something has been saved.
+- **The dots on a tile open a panel from the bottom of the screen** (in the
+  middle on a wide one), the same kind of panel as "Where you are". It is
+  headed with the session's name and what it is, and offers Start, Edit,
+  Pin to Home and Delete, each with its icon.
+- **Pin to Home** puts the session's tile on Home, just under Practice. It
+  looks the same, without the dots: pressing it starts the session. On
+  Focused training a pinned tile has a small pin by its name, and the panel
+  offers **Unpin from Home** instead.
+- **Up to two can be pinned**, one row on a phone. With two on Home, Pin to
+  Home is greyed out and says to unpin one first.
+- Pinned tiles stay on Home while a Prep mode goal is set, and pinning
+  follows you to your other devices.
+- Deleting a session always asks first now, and takes it off Home too.
+
+**Trade-off:** reaching a saved session's Edit or Delete takes a tap on its
+dots, where the old screen had them on every row.
+
+Still to check by hand: the panel and the pinned tiles on a real phone.
+
+## 0.679 — 26 November 2026
+
+**Imported cards say they haven't reached students yet.** Cards brought in
+from a backup arrive as Ready for review, which students don't get, so a
+course filled from a backup showed its decks to students with nothing in
+them, and they were told there was nothing to practise. Nothing said so to
+the teacher. Now:
+
+- The message after an import ends "Students won't see them until you
+  publish them", and a band across the top of Teaching stays, counting the
+  imported cards still waiting, with **Show the cards** to list them. It
+  goes once they're all published, or with Dismiss.
+- A course's screen says, above its decks, how many cards in the course
+  don't reach students yet and why (drafts, waiting for review, number
+  words to write), with **Show the cards** — the line a deck already had.
+- The card list's Filter has a **Status** choice: Waiting to publish, or
+  Published. Waiting to publish holds drafts, cards ready for review, and
+  published cards with changes not yet published.
+
+**Still to check by hand:** the band is remembered while Teaching is open;
+after the app is reopened, the course's line and the deck's own line are
+what say it.
+
+## 0.678 — 26 November 2026
+
+**"Learn more" under an answer is folded again.** Everything else worth
+knowing about a card (how it sounds and is written, related words, the
+phrase it turned up in) sits behind a small "Learn more" with an arrow
+beside it. A tap opens it, a second tap folds it, and it starts closed on
+every new question. This puts back how it worked before 0.372.
+
+**Trade-off:** what is in the box takes a tap to see, so most answers will
+go by without it being read; in return Continue sits right under the answer.
+
+Still to check by hand: on a phone, that the arrow and the tap feel right
+and Continue is close under the answer.
+
+
+## 0.677 — 26 November 2026
+
+**A phrase question no longer drops a letter.** When the missing word is
+two words and the phrase joins a letter to its front — ل in
+"جمعية لحقوق الإنسان" — the gap used to swallow the letter, so the
+learner saw "جمعية ____" and no choice fitted it. Now the letter stays
+outside the gap, "جمعية ل____", as it already did for one-word answers,
+and the phrase is whole again once answered.
+
+**Writing a word from its picture says singular, dual or plural.** A
+picture of one lemon didn't say whether ليمونة or ليمون was wanted. Where a
+card has more than one of these forms, the picture question now says
+which it wants under the picture, alongside "female" or "male" where that
+was already said ("singular, female"). A word with one form, or one
+marked uncountable, says nothing, as before.
+
+**Trade-off:** 0.651 took "dual" and "plural" away from under pictures,
+because a learner said they only repeated what a picture of two things
+showed. They are back, so a label will sometimes repeat the picture.
+
+Still to check by hand: the phrase card "جمعية لحقوق الإنسان" and the lemon
+card on a real phone. The orange card (برتقال) reported for its spelling or
+transliteration couldn't be checked from here and needs a look in the card
+editor.
+
+## 0.676 — 26 November 2026
+
+**The fact on Home also changes when you come back after a while.** A
+phone often keeps the app in the background rather than closing it, so
+0.674's new card on opening didn't always happen. Now, coming back to the
+app after it has been away for half an hour or more also brings the next
+picture and fact. A quicker look away, such as tapping a fact's source and
+coming straight back, keeps the fact you were reading.
+
+Still to check by hand: leaving the installed app in the background on a
+real phone for over half an hour, then coming back to it.
+
+## 0.675 — 26 November 2026
+
+**Focused training, tidied.** The dumbbell drawing at the top of the screen
+is gone, so the choices start higher up.
+
+- **Every button has a picture.** Weak spots a target, Not seen lately a clock
+  turning back, Build a session sliders, Prep mode a ticked calendar and Saved
+  sessions a bookmark — drawn like the app's other icons, in green on a round
+  tint, and greyed out when the button is.
+- **A saved session's tile says what it is**, the same line its row on Saved
+  sessions has: the kind of practice, how long it runs and how many cards it
+  holds (or how many are still there, if some have been withdrawn).
+- **Three dots in the tile's corner open a menu** to Start, Edit or Delete
+  the session without going to Saved sessions. The dots still work when
+  every card in the session has gone, so it can be changed or deleted.
+
+**Trade-off:** Delete from the menu asks first, because it sits a finger's
+width from Edit and cannot be undone; the delete button on Saved sessions
+still deletes at once, as before. The tiles are a line or two taller.
+
+Still to check by hand: the menu on a real phone, opened from a tile near
+the foot of the screen.
+
+## 0.674 — 26 November 2026
+
+**The fact on Home changes each time you open the app.** The picture and
+the fact under the progress ring used to move on only after a finished
+session, so opening the app again showed the same one. Now reloading the
+page, or closing the app and opening it again, brings the next picture and
+fact too. Finishing a session still moves it on as before; going to You and
+back does not.
+
+Still to check by hand: closing and reopening the app installed on a real
+phone. A phone that only sends the app to the background, rather than
+closing it, shows the same card when you come back.
+
+## 0.673 — 26 November 2026
+
+**Home is less crowded while you're prepping.** With a Prep mode goal set,
+the card on Home (the drawing and the fact under it) is left off. The
+prep's own tile already fills the top of the screen, and on a phone the
+card pushed Practice off the bottom. Clear the goal and the card comes
+back.
+
+Still to check by hand: Home on a real phone with a goal set.
+
+## 0.672 — 26 November 2026
+
+**A noun can be marked uncountable.** On a noun's card in Arabic or Hebrew,
+Advanced › Forms now starts with an **Uncountable** tick, for a word with no
+plural, like water or bread. Ticking it takes the Dual, Plural and special
+plural boxes away and leaves the word itself.
+
+- The words beside it treat it as a singular, so an adjective or a verb
+  agrees with it as before.
+- Counting questions leave it out, and the number screen no longer lists it
+  as a noun with "no plural" still to write.
+- The card list tags it "uncount."; an import can say "uncountable" in its
+  number column.
+- Vietnamese is unchanged: it has no plurals to leave out.
+
+**Trade-off:** ticking it on a card that already has a plural or a pair
+written removes them when the card is saved, and students' progress on those
+forms goes with them. The tick says so before you save, and unticking before
+saving brings them back.
+
+**A line of help for group words.** Above the boxes, the card now says where
+a word for a group goes: in the box the words beside it agree with —
+"family" in Singular, "people" in Plural.
+
+Still to check by hand: the tick on a real phone, on a card for a person or
+an animal (which keeps a masculine and a feminine side), and a session that
+puts an uncountable noun beside an adjective.
 
 ## 0.671 — 26 November 2026
 

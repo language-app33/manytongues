@@ -62,11 +62,18 @@ A titled block. Replaces the hand-built eyebrow-plus-lede opener.
 
 `title, count, lede, action, children, className`
 
-### `Tabs` — 1 use (inside `SpaceFrame`; the trainer uses it directly too)
+### `Tabs`
 `tabs` is an array of `[key, label, iconName]`. Handles `role="tab"`,
 `aria-selected` and `aria-current` so you don't have to.
 
-`tabs, value, onChange, label="Section"`
+`tabs, value, onChange, label="Section", dots, counts, dock`
+
+With `dock` the strip goes to the bar at the foot of the window (a space's
+sections). Without it, it is the one full-width track every page's tabs
+share (0.685): equal parts, an icon over each name, the current one raised.
+`counts` puts a number under a tab's name, only where it helps choose
+(the sentence review). Anything that changes what a page lists is `Tabs`;
+`Segmented` is for a setting.
 
 ---
 
@@ -123,8 +130,9 @@ browser's own clear button is hidden so there is only ever one cross.
 `value, onChange(next), className` (on the input), `boxClassName` (on the
 wrapper), `style`, plus anything an `<input>` takes.
 
-### `Segmented` — 17 uses
-Pick one from a few. Reports `aria-pressed`.
+### `Segmented`
+Pick one from a few: a setting, or a filter. Reports `aria-pressed`. Not for
+switching between views of a page — that is `Tabs`.
 
 ```jsx
 <Segmented
@@ -274,7 +282,7 @@ offers goes in as children.
 
 ### `ReportList` — spaces.tsx
 Learners' reports about cards (0.580): `ItemList` with search, Copy and Clear
-for what is ticked, and Open card, Copy and Clear on each. Admin's Flags tab
+for what is ticked, and Open card, Copy and Clear on each. Admin's Reports tab
 and Super admin's Reports, a list per space.
 
 ### `usePicture(hash)` — the hook
@@ -369,7 +377,7 @@ its play buttons resolve to "missing" rather than fetching.
 - **`FLAG_KINDS` / `flagTitle(kind)` / `FLAG_NOTE_MAX`** — the four things a
   learner can say about a question — three complaints, and "too easy",
   which moves the form up its ladder on the device and is never sent —
-  each with a `title` and the `what` line under it. The trainer renders the list; Admin → Flags names
+  each with a `title` and the `what` line under it. The trainer renders the list; Admin → Reports names
   what came back with `flagTitle`. Not components, but they live here for
   the same reason: two copies would be two vocabularies for one thing.
 - **`languageName(languages, id)`** / **`LanguageTag`** — one place that knows

@@ -2,7 +2,7 @@
  * What a module is called on screen.
  *
  * A module is anything a teacher hands a course to learn from: a deck, a
- * unit on the course's path, or a personal set (0.672). "Module" is the
+ * unit on the course's path, or a personal set (0.686). "Module" is the
  * word for any of them — a tab, a list, a card's "which modules is it in".
  * Where the screen is about one module, it says which kind it is, so a
  * teacher looking at a unit reads "Delete unit", not "Delete module".

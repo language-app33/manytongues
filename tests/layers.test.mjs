@@ -551,14 +551,32 @@ test("the selected tab has a stroke, in a colour that exists in both themes", ()
   assert.match(rule(".at-tab2"), /border:\s*2px solid/, "the tab has no border for the stroke to take");
 });
 
-test("what is not the answer is headed, not hidden behind a tap", () => {
-  /* The blocks are shown open under a plain "Learn more" heading. It is
-     text, not a control: no pointer, no hover, nothing to fold the box. */
+test("tabs inside a page are one full-width track, and views are switched by tabs", () => {
+  /* 0.685 (the owner's 1a): every set of tabs in a page is the track the
+     card screen had, its parts sharing the width equally; the card screen
+     only pins it. */
+  assert.match(rule(".at-nav2"), /display:\s*grid/);
+  assert.match(rule(".at-nav2"), /grid-auto-columns:\s*minmax\(0,\s*1fr\)/);
+  assert.doesNotMatch(rule(".at-tab2"), /border-radius:\s*999px/, "a tab in a page is still a pill");
+  assert.doesNotMatch(css, /\.at-cardtabs \.at-tab2/, "the card screen draws its tabs its own way again");
+  /* (2a) What changes what a page lists is tabs, not a Segmented. */
+  const src = (/** @type {string} */ f) => readFileSync(new URL(`../src/${f}`, import.meta.url), "utf8");
+  for (const [f, label] of [["review-sheet.tsx", "Which sentences"], ["review-sheet.tsx", "Which blank"], ["spaces.tsx", "Which reports"]]) {
+    const at = src(f).indexOf(`label="${label}"`);
+    assert.ok(at > 0, `${label} is gone from ${f}`);
+    const opener = src(f).lastIndexOf("<", at);
+    assert.match(src(f).slice(opener, at), /^<Tabs\b/, `${label} is not drawn as tabs`);
+  }
+});
+
+test("what is not the answer opens on a tap", () => {
+  /* Back to a toggle (0.678): "Learn more" is a quiet, centred control with
+     a pointer, and the box stays folded until it is tapped. */
   const more = rule(".at-alsomore");
-  assert.ok(more, "there is no rule for the heading");
+  assert.ok(more, "there is no rule for the toggle");
   assert.match(more, /text-align:\s*center/);
-  assert.doesNotMatch(more, /cursor:\s*pointer/, "the heading still looks pressable");
-  assert.equal(rule(".at-alsomore:hover"), "", "the heading still changes colour under the pointer");
+  assert.match(more, /cursor:\s*pointer/, "the toggle does not look pressable");
+  assert.match(more, /border:\s*0/, "the toggle is drawn as a boxed button");
 });
 
 test("the foot is not cut in two by a rule between its parts", () => {
