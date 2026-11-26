@@ -8,6 +8,33 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.677 — 26 November 2026
+
+**Saved sessions live on Focused training, and two can be pinned to Home.**
+
+- **No more Saved sessions screen.** The Saved sessions button on Focused
+  training is gone, and so is the screen it opened. In its place is a line
+  across the screen and a **Saved sessions** heading, with the tiles under
+  it. As before, the section shows only once something has been saved.
+- **The dots on a tile open a panel from the bottom of the screen** (in the
+  middle on a wide one), the same kind of panel as "Where you are". It is
+  headed with the session's name and what it is, and offers Start, Edit,
+  Pin to Home and Delete, each with its icon.
+- **Pin to Home** puts the session's tile on Home, just under Practice. It
+  looks the same, without the dots: pressing it starts the session. On
+  Focused training a pinned tile has a small pin by its name, and the panel
+  offers **Unpin from Home** instead.
+- **Up to two can be pinned**, one row on a phone. With two on Home, Pin to
+  Home is greyed out and says to unpin one first.
+- Pinned tiles stay on Home while a Prep mode goal is set, and pinning
+  follows you to your other devices.
+- Deleting a session always asks first now, and takes it off Home too.
+
+**Trade-off:** reaching a saved session's Edit or Delete takes a tap on its
+dots, where the old screen had them on every row.
+
+Still to check by hand: the panel and the pinned tiles on a real phone.
+
 ## 0.676 — 26 November 2026
 
 **The fact on Home also changes when you come back after a while.** A

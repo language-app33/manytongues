@@ -1993,90 +1993,123 @@ if (/Build a session/.test(document.body.textContent)) {
 
   /* And the session kept a few steps ago, which is only worth keeping if
      there is a way back to it. */
-  check("a kept session puts a way back to it in Focused training",
-    (await toTraining()) && !!buttonNamed(/^Saved sessions$/),
-    [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(0, 120));
-  /* And as a tile under that button, with how much of it is learnt —
-     a glance at each without opening the list. */
-  const tile = [...document.querySelectorAll(".at-savedtile")]
-    .find((b) => /Thursday's verbs/.test(b.textContent || ""));
-  check("a kept session is a tile in Focused training too", !!tile,
+  /* Under a heading of its own on Focused training (0.677), where a
+     button used to open a screen listing them. */
+  const savedHead = () => ((document.querySelector(".at-screen.training .at-trainsaved .at-sectionhead") || {}).textContent || "").trim();
+  check("a kept session puts a way back to it in Focused training, under a heading",
+    (await toTraining()) && savedHead() === "Saved sessions" && !buttonNamed(/^Saved sessions$/),
+    savedHead() || [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(0, 120));
+  /* As a tile, with how much of it is learnt — a glance at each. */
+  const tileNamed = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-screen.training .at-savedtile")]
+    .find((b) => re.test(((b.querySelector(".nmtext") || {}).textContent || "")));
+  const tile = tileNamed(/^Thursday's verbs$/);
+  check("a kept session is a tile in Focused training", !!tile,
     [...document.querySelectorAll(".at-savedtile")].map((b) => b.textContent).join("|") || "no tiles");
   check("and the tile says how much of its cards is learnt",
     !!tile && /^\d{1,3}%$/.test(((tile.querySelector(".pc") || {}).textContent || "").trim()),
     tile ? (tile.textContent || "").trim() : "(no tile)");
-  /* And what its row on Saved sessions says, and the dots in its corner
-     that start, change or delete it from here (0.675). */
+  /* What the session is, and the dots in its corner that do the rest
+     from here (0.675), in a panel from the foot of the screen (0.677). */
   const tileLine = ((tile && tile.querySelector(".ln")) || {}).textContent || "";
-  check("and the tile says what kind of session it is, as its row on Saved sessions does",
+  check("and the tile says what kind of session it is",
     / · .*\bcards?\b/.test(tileLine), tileLine || "(no line)");
-  const more = tile && tile.querySelector('button[aria-label="More for Thursday\'s verbs"]');
-  click(more);
-  await sleep(150);
-  const menuSays = () => [...document.querySelectorAll('.at-savedpick [role="menuitem"]')]
-    .map((b) => (b.textContent || "").trim()).join("|");
-  check("its dots open a menu to start, edit or delete it", menuSays() === "Start|Edit|Delete",
-    more ? menuSays() || "no menu" : "no dots on the tile");
-  click([...document.querySelectorAll('.at-savedpick [role="menuitem"]')].find((b) => /Delete/.test(b.textContent || "")));
+  const panelFor = async (/** @type {string} */ name) => {
+    const t = tileNamed(new RegExp(`^${name}$`));
+    click(t && t.querySelector(`button[aria-label="More for ${name}"]`));
+    await sleep(150);
+    return [...document.querySelectorAll(".at-savedsheet .at-sheetact")];
+  };
+  const actNamed = (/** @type {Element[]} */ acts, /** @type {RegExp} */ re) => acts.find((b) => re.test(((b.querySelector("b") || {}).textContent || "")));
+  let acts = await panelFor("Thursday's verbs");
+  check("its dots open a panel, named for it, to start, edit, pin or delete it",
+    acts.map((b) => (b.querySelector("b") || {}).textContent).join("|") === "Start|Edit|Pin to Home|Delete" &&
+      ((document.querySelector(".at-savedsheet .at-modaltitle") || {}).textContent || "") === "Thursday's verbs",
+    acts.map((b) => b.textContent).join("|") || "no panel");
+  click(actNamed(acts, /^Delete$/));
   await sleep(150);
   check("and Delete asks before it forgets the session",
-    !document.querySelector(".at-savedpick") && /Delete Thursday's verbs\?/.test(document.body.textContent || ""),
+    !document.querySelector(".at-savedsheet") && /Delete Thursday's verbs\?/.test(document.body.textContent || ""),
     (document.body.textContent || "").slice(0, 120));
   clickNamed(/^Cancel$/);
   await sleep(150);
-  check("and cancelling keeps it",
-    [...document.querySelectorAll(".at-savedtile")].some((b) => /Thursday's verbs/.test(b.textContent || "")),
-    "the tile went");
-  if (buttonNamed(/^Saved sessions$/)) {
-    clickNamed(/^Saved sessions$/);
-    await sleep(250);
-    check("and it is there under the name it was given",
-      /Thursday's verbs/.test(document.body.textContent || ""),
-      (document.body.textContent || "").slice(0, 120));
-    /* Built from the cards it named rather than replayed: the point of
-       keeping a description instead of a snapshot. */
-    clickNamed(/^Start$/);
-    await sleep(500);
-    check("and starting it builds the session again",
-      !!document.querySelector(".at-instruction"),
-      (document.body.textContent || "").slice(0, 100));
-    click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Leave session"));
-    await sleep(120);
-    clickNamed(/^Leave$/);
-    await sleep(250);
+  check("and cancelling keeps it", !!tileNamed(/^Thursday's verbs$/), "the tile went");
 
-    /* Changed rather than built again: the Build screen opens on what was
-       kept, and saving puts the change back under the same session. */
-    check("starting a kept session closed Focused training behind it",
-      !document.querySelector(".at-screen.training"), "Focused training still open");
-    await toTraining();
-    clickNamed(/^Saved sessions$/);
-    await sleep(250);
-    click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Edit Thursday's verbs"));
-    await sleep(250);
-    check("a kept session opens on the Build screen to be changed",
-      /Regular/.test(sessionModeSaid()), sessionModeSaid() || (document.body.textContent || "").slice(0, 120));
-    check("with its deck already picked, as a deck", sessionPills().some((p) => /Introductions/.test(p)),
-      sessionPills().join("|"));
-    const renameBox = [...document.querySelectorAll(".at-formblock")]
-      .find((d) => d.querySelector(".at-formnum")?.textContent === "Name")?.querySelector("input");
-    if (renameBox) {
-      must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value")?.set, "the input's value setter")
-        .call(renameBox, "Friday's verbs");
-      renameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
-      await sleep(60);
-    }
-    check("and its button saves rather than starts",
-      !!buttonNamed(/^Save$/)?.closest(".at-screenhead") && !buttonNamed(/^Start$/),
-      [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-120));
-    clickNamed(/^Save$/);
-    await sleep(250);
-    const listed = document.querySelector(".at-list")?.textContent || "";
-    check("and the change is kept under the same session",
-      /Friday's verbs/.test(listed) && !/Thursday's verbs/.test(listed), listed.slice(0, 120));
-    click([...document.querySelectorAll('[aria-label="Back"]')].pop());
-    await sleep(250);
+  /* Pinned to Home: a pin on its tile here, and the tile on Home under
+     Practice, without its dots. */
+  acts = await panelFor("Thursday's verbs");
+  click(actNamed(acts, /^Pin to Home$/));
+  await sleep(200);
+  check("pinning it puts a pin on its tile",
+    !document.querySelector(".at-savedsheet") && !!tileNamed(/^Thursday's verbs$/)?.querySelector(".at-savedpin"),
+    (tileNamed(/^Thursday's verbs$/)?.outerHTML || "no tile").slice(0, 160));
+  await leaveTraining();
+  const homePin = () => [...document.querySelectorAll(".at-homepins .at-savedtile")];
+  check("and the tile is on Home, under Practice, without its dots",
+    homePin().length === 1 && /Thursday's verbs/.test(homePin()[0].textContent || "") &&
+      !homePin()[0].querySelector(".at-savedtilemore") &&
+      !!document.querySelector(".at-startrow + .at-homepins"),
+    homePin().map((t) => t.textContent).join("|") || "no pinned tile on Home");
+  /* Built from the cards it named rather than replayed: the point of
+     keeping a description instead of a snapshot. */
+  click(homePin()[0]?.querySelector(".at-savedtilego"));
+  await sleep(500);
+  check("and pressing it there builds the session again",
+    !!document.querySelector(".at-instruction"),
+    (document.body.textContent || "").slice(0, 100));
+  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Leave session"));
+  await sleep(120);
+  clickNamed(/^Leave$/);
+  await sleep(250);
+
+  /* Start from the panel closes Focused training behind it. */
+  await toTraining();
+  acts = await panelFor("Thursday's verbs");
+  click(actNamed(acts, /^Start$/));
+  await sleep(500);
+  check("Start in the panel starts it, and closes Focused training behind it",
+    !!document.querySelector(".at-instruction") && !document.querySelector(".at-screen.training"),
+    (document.body.textContent || "").slice(0, 100));
+  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Leave session"));
+  await sleep(120);
+  clickNamed(/^Leave$/);
+  await sleep(250);
+
+  /* Changed rather than built again: the Build screen opens on what was
+     kept, and saving puts the change back under the same session. */
+  await toTraining();
+  acts = await panelFor("Thursday's verbs");
+  click(actNamed(acts, /^Edit$/));
+  await sleep(250);
+  check("a kept session opens on the Build screen to be changed",
+    /Regular/.test(sessionModeSaid()), sessionModeSaid() || (document.body.textContent || "").slice(0, 120));
+  check("with its deck already picked, as a deck", sessionPills().some((p) => /Introductions/.test(p)),
+    sessionPills().join("|"));
+  const renameBox = [...document.querySelectorAll(".at-formblock")]
+    .find((d) => d.querySelector(".at-formnum")?.textContent === "Name")?.querySelector("input");
+  if (renameBox) {
+    must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value")?.set, "the input's value setter")
+      .call(renameBox, "Friday's verbs");
+    renameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(60);
   }
+  check("and its button saves rather than starts",
+    !!buttonNamed(/^Save$/)?.closest(".at-screenhead") && !buttonNamed(/^Start$/),
+    [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-120));
+  clickNamed(/^Save$/);
+  await sleep(250);
+  check("and the change is kept under the same session, still pinned",
+    !!tileNamed(/^Friday's verbs$/)?.querySelector(".at-savedpin") && !tileNamed(/^Thursday's verbs$/),
+    [...document.querySelectorAll(".at-screen.training .at-savedtile")].map((t) => t.textContent).join("|") || "no tiles");
+
+  /* And off Home again. */
+  acts = await panelFor("Friday's verbs");
+  click(actNamed(acts, /^Unpin from Home$/));
+  await sleep(200);
+  check("unpinning takes its pin away", !!tileNamed(/^Friday's verbs$/) && !tileNamed(/^Friday's verbs$/)?.querySelector(".at-savedpin"),
+    acts.map((b) => b.textContent).join("|") || "no panel");
+  await leaveTraining();
+  check("and its tile off Home", homePin().length === 0, homePin().map((t) => t.textContent).join("|"));
+  await toTraining();
   await leaveTraining();
 
   /* Kept for the browser check, which needs cards to have a session at

@@ -811,6 +811,11 @@ export interface SavedSession {
   /** Minutes to run for, or 0 where the length is a number of questions. */
   minutes: number;
   created: Millis;
+  /**
+   * On Home as a tile, under Practice (0.677). At most PIN_LIMIT are; it
+   * rides in settings with the rest of the session, so it syncs.
+   */
+  pinned?: boolean;
 }
 
 /* ---- people ---- */

@@ -11845,7 +11845,6 @@ export default function ArabicTrainer() {
   /* Prep mode's screen, opened from Focused training (0.671) — it was on
      Progress until then. */
   const [prepOpen, setPrepOpen] = useState(false);
-  const [showingSaved, setShowingSaved] = useState(false);
   const [editingSaved, setEditingSaved] = useState<SavedSession | null>(null);
   /* Which language the session on screen is drawn from: a language id, ""
      for all of them at once, or null for never asked — which is what keeps
@@ -13581,6 +13580,7 @@ export default function ArabicTrainer() {
         count: Number(x.count) || 0,
         minutes: Number(x.minutes) || 0,
         created: Number(x.created) || 0,
+        pinned: x.pinned === true,
       }));
   }, [settings.savedSessions]);
 
@@ -13592,6 +13592,9 @@ export default function ArabicTrainer() {
     [savedSessions, drillable]
   );
 
+  /* The ones pinned to Home (0.677) that can run here. */
+  const pinnedHere = useMemo(() => savedHere.filter((s) => s.pinned), [savedHere]);
+
   function keepSession(session: Omit<SavedSession, "id" | "created">) {
     const kept: SavedSession = {
       ...session,
@@ -13599,11 +13602,20 @@ export default function ArabicTrainer() {
       created: now(),
     };
     setSetting("savedSessions", savedSessions.concat([kept]));
-    flash(`Saved — it is under Saved sessions`);
+    flash(`Saved — it is under Saved sessions in Focused training`);
   }
 
   function dropSession(id: string) {
     setSetting("savedSessions", savedSessions.filter((x) => x.id !== id));
+  }
+
+  /* On Home or off it (0.677). The limit is the menu's to keep: it greys
+     the line out once PIN_LIMIT are pinned, rather than this quietly
+     unpinning another. */
+  function pinSession(id: string, on: boolean) {
+    setSetting("savedSessions", savedSessions.map((x) => (x.id === id ? { ...x, pinned: on } : x)));
+    const s = savedSessions.find((x) => x.id === id);
+    flash(on ? `${s ? s.name : "It"} is pinned to Home` : `${s ? s.name : "It"} is no longer on Home`);
   }
 
   /* Kept under the same id and date, so it stays where it was in the list
@@ -16597,6 +16609,20 @@ export default function ArabicTrainer() {
                         onClick={() => setTraining(true)} />
                     )}
                   </div>
+                  {/* The saved sessions pinned to Home (0.677), under
+                      Practice: the tiles of Focused training without their
+                      dots, so pressing one starts it and that is all. Shown
+                      whatever else Home leaves off, a prep's included (the
+                      owner's 6a): they were put here on purpose. */}
+                  {pinnedHere.length > 0 && (
+                    <SavedTiles
+                      className="at-homepins"
+                      sessions={pinnedHere}
+                      items={shown}
+                      settings={settings}
+                      onStart={startSaved}
+                    />
+                  )}
                   {/* The warning that sat here — "No card here has two
                       usable exercise types" — was written for a teacher and
                       shown to learners. With nothing to practise the home
@@ -17921,7 +17947,7 @@ export default function ArabicTrainer() {
 
         {/* ============ SETTINGS ============ */}
 
-        {/* Under the Build and Saved sessions screens, which open over it
+        {/* Under the Build and Prep screens, which open over it
             and come back to it; a session started from any of them closes
             it (see the effect on `session`). */}
         {training && !session && (
@@ -17941,10 +17967,10 @@ export default function ArabicTrainer() {
             saved={savedHere}
             items={shown}
             settings={settings}
-            onSavedList={() => setShowingSaved(true)}
             onStartSaved={startSaved}
             onEditSaved={setEditingSaved}
             onDeleteSaved={dropSession}
+            onPinSaved={pinSession}
             onClose={() => setTraining(false)}
           />
         )}
@@ -17976,25 +18002,9 @@ export default function ArabicTrainer() {
           />
         )}
 
-        {showingSaved && !editingSaved && (
-          <SavedSessionsSheet
-            /* The ones that can run here, as the home screen offers
-               them (0.639). */
-            sessions={savedHere}
-            items={shown}
-            onStart={(s) => {
-              setShowingSaved(false);
-              startSaved(s);
-            }}
-            onEdit={setEditingSaved}
-            onDelete={dropSession}
-            onClose={() => setShowingSaved(false)}
-          />
-        )}
-
-        {/* The Build screen again, opened on what was kept. Saving goes
-            back to where it was opened from: the list, or a tile's menu on
-            Focused training (0.675). */}
+        {/* The Build screen again, opened on what was kept, from a tile's
+            menu on Focused training (0.675; the list it was opened from
+            before went in 0.677). Saving goes back there. */}
         {editingSaved && (
           <ManualSessionSheet
             items={shown}
@@ -18550,20 +18560,30 @@ function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings
   );
 }
 
+/* How many saved sessions can be on Home at once (0.677, the owner's 3b):
+   two fill one row of tiles on a phone, and Home was cleared of clutter
+   not long before. */
+const PIN_LIMIT = 2;
+
 /*
- * The sessions somebody kept, as tiles under the button that lists them.
+ * The sessions somebody kept, as tiles: under "Saved sessions" on Focused
+ * training, and the pinned ones on Home under Practice (0.677).
  *
- * A tile and not a row: these sit on the home screen's own card, between
- * buttons, and a full-width row each would push Start session's neighbours
- * off the screen after three or four of them. Small enough to sit two or
- * three abreast, which is a glance at all of them.
+ * A tile and not a row: small enough to sit two or three abreast, which is
+ * a glance at all of them.
  *
  * Each carries how much of its own cards is learnt, worked out the way the
- * ring above it is, so "Thursday's verbs · 40%" and the ring cannot be
- * counting different things. Pressing one starts it, which is what Start
- * does on the list. Since 0.675 it also says what the list's row says —
- * its kind, its length, its cards — and the dots in its corner start,
- * change or delete it from here.
+ * ring on Home is, so "Thursday's verbs · 40%" and the ring cannot be
+ * counting different things, and since 0.675 what the session is — its
+ * kind, its length, its cards (savedSummary). Pressing one starts it.
+ *
+ * On Focused training the dots in its corner open a panel to start, edit,
+ * pin or unpin, and delete it (0.675; a panel from the foot of the screen
+ * since 0.677, the owner's 9c, where it was a menu hanging from the dots:
+ * a phone's thumb reaches it, and a tile at the foot of the screen cannot
+ * cut it off). A pinned one has a pin by its name there. On Home the same
+ * tile has no dots (`onEdit` and the rest left out): changing what is on
+ * Home is Focused training's to do.
  *
  * Except a Catch up, which carries how many of its cards are due instead
  * (0.604, the owner's 1a). Catch up only asks Cleared and Learnt cards, so
@@ -18573,16 +18593,20 @@ function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings
  * screen's "ready to review" counts by, so all three agree. With nothing
  * due the tile is dimmed but still pressable, and says so when pressed.
  */
-function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete }: {
+function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete, onPin, className = "" }: {
   sessions: SavedSession[];
   items: Item[];
   settings: Settings;
   onStart: (session: SavedSession) => void;
-  onEdit: (session: SavedSession) => void;
-  onDelete: (id: string) => void;
+  /** With these three, each tile has its dots and its panel; without
+      them it is Home's: the tile alone. */
+  onEdit?: (session: SavedSession) => void;
+  onDelete?: (id: string) => void;
+  onPin?: (id: string, on: boolean) => void;
+  className?: string;
 }) {
   const tiles = useMemo(() => {
-    /* Newest first, as the list has them. */
+    /* Newest first. */
     return [...sessions]
       .sort((a, b) => (b.created || 0) - (a.created || 0))
       .map((s) => {
@@ -18594,25 +18618,26 @@ function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete }: {
         return { s, line, alive: cards.length, due: null, pct: climbOf(cards, settings, items).pct };
       });
   }, [sessions, items, settings]);
-  /* The tile whose menu is open, and the one being asked about before it
-     is deleted. */
-  const [menuFor, setMenuFor] = useState<string | null>(null);
+  /* The session whose panel is open, and the one being asked about
+     before it is deleted. */
+  const [panelFor, setPanelFor] = useState<SavedSession | null>(null);
   const [asking, setAsking] = useState<SavedSession | null>(null);
+  const menus = !!(onEdit && onDelete && onPin);
+  const pinnedCount = sessions.filter((x) => x.pinned).length;
 
   if (!tiles.length) return null;
+  const open = panelFor ? tiles.find((t) => t.s.id === panelFor.id) : undefined;
+  const close = () => setPanelFor(null);
   return (
-    <div className="at-savedtiles">
+    <div className={`at-savedtiles${className ? " " + className : ""}`}>
       {tiles.map(({ s, line, alive, due, pct }) => (
-        /* The tile is two buttons, side by side rather than one inside the
-           other: the tile itself, which starts the session as it always
-           has, and the dots in its corner, which open a menu to start,
-           change or delete it (0.675) — what the row on Saved sessions
-           offers, without going there. The dots stay pressable when every
-           card in it has gone, which is when changing or deleting it is
-           the thing to do. */
+        /* Two buttons side by side rather than one inside the other: the
+           tile itself, which starts the session, and the dots in its
+           corner. The dots stay pressable when every card in it has gone,
+           which is when changing or deleting it is the thing to do. */
         <div
           key={s.id}
-          className={`at-savedtile${due === 0 ? " quiet" : ""}${alive ? "" : " gone"}`}
+          className={`at-savedtile${due === 0 ? " quiet" : ""}${alive ? "" : " gone"}${menus ? "" : " bare"}`}
         >
           <button
             type="button"
@@ -18620,14 +18645,20 @@ function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete }: {
             disabled={!alive}
             aria-label={
               due !== null
-                ? `Start ${s.name}, ${due ? `${due} ${due === 1 ? "card" : "cards"} due` : "nothing due"}`
-                : `Start ${s.name}, ${pct}% learnt`
+                ? `Start ${s.name}, ${due ? `${due} ${due === 1 ? "card" : "cards"} due` : "nothing due"}${menus && s.pinned ? ", pinned to Home" : ""}`
+                : `Start ${s.name}, ${pct}% learnt${menus && s.pinned ? ", pinned to Home" : ""}`
             }
             aria-describedby={`saved-${s.id}-line`}
             onClick={() => onStart(s)}
           >
-            <span className="nm">{s.name}</span>
-            {/* The same line the session's row on Saved sessions has. */}
+            <span className="nm">
+              {menus && s.pinned ? (
+                <span className="at-savedpin" title="Pinned to Home">
+                  <Icon name="pin" size={14} />
+                </span>
+              ) : null}
+              <span className="nmtext">{s.name}</span>
+            </span>
             <span className="ln" id={`saved-${s.id}-line`}>
               {/* A number kept on the line with its word, so a narrow
                   tile breaks "30 questions · 1 card" between the parts
@@ -18655,80 +18686,85 @@ function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete }: {
               </>
             )}
           </button>
-          {/* Clicks stop here so that the one opening the menu does not
-              reach the window and close it again — see Popover — and
-              Escape closes the menu rather than the screen under it. */}
-          <span
-            className="at-savedtilemenu"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === "Escape" && menuFor === s.id) {
-                e.stopPropagation();
-                setMenuFor(null);
-              }
-            }}
-          >
+          {menus && (
             <button
               type="button"
               className="at-savedtilemore"
               aria-label={`More for ${s.name}`}
               title="More"
-              aria-haspopup="menu"
-              aria-expanded={menuFor === s.id}
-              onClick={() => setMenuFor((cur) => (cur === s.id ? null : s.id))}
+              aria-haspopup="dialog"
+              onClick={() => setPanelFor(s)}
             >
               <Icon name="more" size={20} />
             </button>
-            {menuFor === s.id && (
-              <Popover className="at-pickmenu at-savedpick" role="menu" onClose={() => setMenuFor(null)}>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="at-pickline"
-                  disabled={!alive}
-                  onClick={() => {
-                    setMenuFor(null);
-                    onStart(s);
-                  }}
-                >
-                  <span className="at-pickmark"><Icon name="play" size={18} /></span>
-                  <span className="at-picktext">Start</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="at-pickline"
-                  onClick={() => {
-                    setMenuFor(null);
-                    onEdit(s);
-                  }}
-                >
-                  <span className="at-pickmark"><Icon name="edit" size={18} /></span>
-                  <span className="at-picktext">Edit</span>
-                </button>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="at-pickline danger"
-                  onClick={() => {
-                    setMenuFor(null);
-                    setAsking(s);
-                  }}
-                >
-                  <span className="at-pickmark"><Icon name="delete" size={18} /></span>
-                  <span className="at-picktext">Delete</span>
-                </button>
-              </Popover>
-            )}
-          </span>
+          )}
         </div>
       ))}
-      {/* Asked first, here and not on the list's own delete button: a menu
-          item sits a finger's width from Edit, and there is no undo. */}
-      {asking && (
+      {/* The panel, from the foot of the screen on a phone and in the
+          middle of a wide one: the sheet "Where you are" and "Join a
+          course" open in, named for the session it acts on. */}
+      {menus && panelFor && open && (
+        <PickSheet title={panelFor.name} lede={open.line} className="at-savedsheet" onClose={close}>
+          <div className="at-sheetacts">
+            <SheetAction
+              icon="play"
+              label="Start"
+              disabled={!open.alive}
+              note={open.alive ? undefined : "None of its cards are here any more"}
+              onClick={() => {
+                close();
+                onStart(panelFor);
+              }}
+            />
+            <SheetAction
+              icon="edit"
+              label="Edit"
+              onClick={() => {
+                close();
+                onEdit!(panelFor);
+              }}
+            />
+            {panelFor.pinned ? (
+              <SheetAction
+                icon="pinOff"
+                label="Unpin from Home"
+                onClick={() => {
+                  close();
+                  onPin!(panelFor.id, false);
+                }}
+              />
+            ) : (
+              /* Greyed out once Home has its two, with the reason under
+                 it, rather than unpinning another behind the learner's
+                 back (the owner's 8a). */
+              <SheetAction
+                icon="pin"
+                label="Pin to Home"
+                disabled={pinnedCount >= PIN_LIMIT}
+                note={pinnedCount >= PIN_LIMIT ? `Home has ${PIN_LIMIT} already. Unpin one first.` : undefined}
+                onClick={() => {
+                  close();
+                  onPin!(panelFor.id, true);
+                }}
+              />
+            )}
+            <SheetAction
+              icon="delete"
+              label="Delete"
+              danger
+              onClick={() => {
+                close();
+                setAsking(panelFor);
+              }}
+            />
+          </div>
+        </PickSheet>
+      )}
+      {/* Asked first: there is no undo (the owner's 1a). */}
+      {asking && onDelete && (
         <ConfirmModal
           title={`Delete ${asking.name}?`}
-          body={<p>The session is forgotten. Its cards and what you have learnt of them stay as they are.</p>}
+          body={<p>The session is forgotten{asking.pinned ? ", and comes off Home" : ""}. Its cards and what you have learnt of them stay as they are.</p>}
           confirmLabel="Delete"
           onCancel={() => setAsking(null)}
           onConfirm={() => {
@@ -18739,6 +18775,35 @@ function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete }: {
         />
       )}
     </div>
+  );
+}
+
+/* One thing to do in a panel of them (0.677): its icon in a round well,
+   and its name, with a line under it where it cannot be done and why.
+   Drawn like a row of "Where you are", the other panel of places to go. */
+function SheetAction({ icon, label, note, danger, disabled, onClick }: {
+  icon: string;
+  label: string;
+  note?: string;
+  danger?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`at-sheetact${danger ? " danger" : ""}`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="at-sheetactico" aria-hidden="true">
+        <Icon name={icon} size={22} />
+      </span>
+      <span className="at-sheetacttext">
+        <b>{label}</b>
+        {note ? <i>{note}</i> : null}
+      </span>
+    </button>
   );
 }
 
@@ -19190,8 +19255,8 @@ const TIME_CHOICES = [2, 5, 10, 15, 30];
    ------------------------------------------------------------------ */
 
 function FocusedTrainingSheet({
-  weakCount, onWeak, unseenCount, onUnseen, canBuild, onBuild, prep, onPrep, saved, items, settings, onSavedList, onStartSaved,
-  onEditSaved, onDeleteSaved, onClose,
+  weakCount, onWeak, unseenCount, onUnseen, canBuild, onBuild, prep, onPrep, saved, items, settings, onStartSaved,
+  onEditSaved, onDeleteSaved, onPinSaved, onClose,
 }: {
   weakCount: number;
   onWeak: () => void;
@@ -19204,10 +19269,10 @@ function FocusedTrainingSheet({
   saved: SavedSession[];
   items: Item[];
   settings: Settings;
-  onSavedList: () => void;
   onStartSaved: (session: SavedSession) => void;
   onEditSaved: (session: SavedSession) => void;
   onDeleteSaved: (id: string) => void;
+  onPinSaved: (id: string, on: boolean) => void;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -19269,13 +19334,14 @@ function FocusedTrainingSheet({
           onClick={onPrep}
           dialog
         />
+        {/* The sessions kept, under a rule and a heading of their own
+            (0.677). There was a Saved sessions button here, opening a
+            screen that listed them with Start, Edit and Delete; once each
+            tile's menu did all three the screen said nothing the tiles
+            did not, and it went. Not here until there is one, as the
+            button was not (the owner's 1a). */}
         {saved.length > 0 && (
-          <>
-            <div className="at-row">
-              <Button variant="ghost" icon="bookmark" onClick={onSavedList}>
-                Saved sessions
-              </Button>
-            </div>
+          <Section title="Saved sessions" head className="at-trainsaved">
             <SavedTiles
               sessions={saved}
               items={items}
@@ -19283,8 +19349,9 @@ function FocusedTrainingSheet({
               onStart={onStartSaved}
               onEdit={onEditSaved}
               onDelete={onDeleteSaved}
+              onPin={onPinSaved}
             />
-          </>
+          </Section>
         )}
       </div>
     </Screen>
@@ -19333,9 +19400,13 @@ function TrainingChoice({ title, icon, note, status, off, disabled, dialog, onCl
 /*
  * What a kept session is, in one line: its kind of practice, how long it
  * runs and how many of its cards are still here — "Regular · 20 questions
- * · 34 cards". The row on Saved sessions and the tile on Focused training
- * both say it (0.675), from here, so they cannot come to say different
- * things.
+ * · 34 cards". On its tile since 0.675, as the Saved sessions screen's row
+ * had it until that screen went (0.677).
+ *
+ * A saved session is a description, not a snapshot — which cards, which
+ * mode, how long — so what it opens is built from the cards as they are
+ * now. That is what makes "Thursday's verbs" worth keeping: the same
+ * ground, practised again, with everything edited since included.
  *
  * How much of it is still here matters: a card withdrawn since is simply
  * gone from the session, and saying so before it is started is the
@@ -19356,79 +19427,6 @@ function savedSummary(s: SavedSession, items: Item[]): { alive: number; line: st
     !gone ? plural(alive, "card") : `${alive} of ${alive + gone} cards still here`,
   ].join(" · ");
   return { alive, line };
-}
-
-/* ------------------------------------------------------------------
-   Full-screen: the sessions somebody kept
-
-   A saved session is a description, not a snapshot — which cards, which
-   mode, how long — so what it opens is built from the cards as they are
-   now. That is what makes "Thursday's verbs" worth keeping: the same
-   ground, practised again, with everything edited since included.
-   ------------------------------------------------------------------ */
-
-function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClose }: {
-  sessions: SavedSession[];
-  items: Item[];
-  onStart: (session: SavedSession) => void;
-  onEdit: (session: SavedSession) => void;
-  onDelete: (id: string) => void;
-  onClose: () => void;
-}) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  /* Newest first: the one somebody just made is the one they are looking
-     for. */
-  const list = [...sessions].sort((a, b) => (b.created || 0) - (a.created || 0));
-
-  return (
-    <Screen title="Saved sessions" onBack={onClose}>
-      {!list.length && (
-        <Empty title="Nothing saved yet">
-          Build a session, and the screen offers to keep it.
-        </Empty>
-      )}
-
-      <div className="at-list">
-        {list.map((s) => {
-          /* What it is, and how much of it is still here: savedSummary. */
-          const { alive, line } = savedSummary(s, items);
-          return (
-            <div className="at-item at-sessionrow" key={s.id}>
-              <div className="grow">
-                <div className="en">{s.name}</div>
-                <div className="lat">{line}</div>
-              </div>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={!alive}
-                onClick={() => onStart(s)}
-              >
-                Start
-              </Button>
-              <IconButton
-                icon="edit"
-                label={`Edit ${s.name}`}
-                onClick={() => onEdit(s)}
-              />
-              <IconButton
-                icon="delete"
-                label={`Forget ${s.name}`}
-                danger
-                onClick={() => onDelete(s.id)}
-              />
-            </div>
-          );
-        })}
-      </div>
-
-    </Screen>
-  );
 }
 
 /*
