@@ -9190,8 +9190,12 @@ Teaching reads it off the space on screen (`shownSpace`), which for the
 App admin is the one at the address.
 
 Off hides Personal set from the New deck sheet and makes `save-set` refuse
-a *new* set (`sets-off`). A deck that is already a set is left alone: its
-students keep it, and it can still be edited or made ordinary again
-(`set: null`). Switching a feature off was not to take material away from
-students mid-course; the cost is that "off" does not mean "none in this
-space".
+any set but `null` (`sets-off`). Since 0.684 (the owner's 1b) it also hides
+every deck that is already a set, in that space, from `my-decks` and
+`my-material` — `setsOffAmong` and `hidesSet`. Nothing is deleted on the
+server. On a device the set's cards leave the material as any withdrawn
+card does, so their progress, set answers included (`s[SET_KEY]` carries
+`updated`), goes into the drawer `foldCourses` keeps and comes back when the
+cards do. The cost is the drawer's own: it is pruned with the headstones,
+so a set switched off for longer than that comes back without its
+students' practice. A set's word lists are ordinary decks and stay.

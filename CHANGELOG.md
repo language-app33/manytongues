@@ -8,6 +8,24 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.684 — 26 November 2026
+
+**Switching personal sets off now hides the ones already made.** While
+Personal sets is off for a space, its existing sets disappear for teachers
+and students: they're not in the teacher's decks, and students aren't sent
+them or asked about them. The word lists a set uses are ordinary decks and
+stay. Nothing is deleted. Switch it back on and the sets return as they
+were, with each student's answers and practice.
+
+**Trade-off:** every space started with Personal sets off in 0.683, so any
+space that already had sets has them hidden now, until you switch it on.
+And a student's practice on a hidden set is kept for 180 days, as it is for
+any card taken out of a course; a set left off for longer comes back
+without it.
+
+Still to check by hand: in a space that has a personal set, switch it off
+and on and see it go and come back, for a teacher and a student.
+
 ## 0.683 — 26 November 2026
 
 **Personal sets are off in every space until you switch them on.** In

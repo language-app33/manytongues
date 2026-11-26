@@ -11404,10 +11404,10 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
         </fieldset>
       </div>
       {/* What the space's teachers may make (0.683): personal sets are off
-          until the App admin switches them on here. Sets already made keep
-          working either way. */}
+          until the App admin switches them on here, and hidden while off
+          (0.684). */}
       <Section title="Features">
-        <Field label="Personal sets" lede="Pictures each student answers a question about once, then practises with their own word. When off, teachers here aren't offered them; sets already made keep working.">
+        <Field label="Personal sets" lede="Pictures each student answers a question about once, then practises with their own word. While off, they're hidden from this space's teachers and students; switched back on, they return as they were, with every student's answers.">
           <RadioGroup
             name={`space-sets-${org.id}`}
             label="Personal sets"

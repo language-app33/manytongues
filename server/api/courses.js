@@ -1607,6 +1607,22 @@ const orgCard = (org) => ({
   sets: !!org.sets,
 });
 
+/**
+ * Which of the spaces named have personal sets switched off (0.684): every
+ * space, until the App admin switches them on. A deck that is a set, in a
+ * space where they are off, is hidden from its teachers and its students
+ * alike; nothing of it is deleted, so switching them back on brings it back
+ * as it was, with every student's answers. See hidesSet.
+ * @param {Store} store @param {string[]} ids
+ */
+async function setsOffAmong(store, ids) {
+  const uniq = [...new Set(ids)];
+  const docs = await readManyJson(store, uniq.map((id) => K.org(id)), EVENTUAL);
+  return new Set(uniq.filter((_, i) => !(docs[i] && docs[i].sets)));
+}
+/** Whether a deck is a set hidden by its space (0.684). @param {Set<string>} off @param {any} deck */
+const hidesSet = (off, deck) => !!(deck && deck.set && off.has(orgOf(deck)));
+
 /*
  * Making sure Main exists (0.542). Everything written before orgs is in it
  * already, by `orgOf`; this is only its document, address and invite code,
@@ -4638,7 +4654,9 @@ async function handle(req) {
       /* With the courses that hold each one read off those courses, which
          is what the course screen, Manage decks and a deck's settings all
          show — see linksOf. */
-      const shown = rows.filter((d) => d.owner === mine || teaching.has(d.id) || (iManage && !d.personal));
+      /* Less a personal set in a space where they are switched off (0.684). */
+      const off = await setsOffAmong(store, rows.filter((d) => d.set).map((d) => orgOf(d)));
+      const shown = rows.filter((d) => !hidesSet(off, d) && (d.owner === mine || teaching.has(d.id) || (iManage && !d.personal)));
       /* And which of its number parts reach nobody yet — see partsWaiting. */
       const waiting = await partsWaiting(shown, courses);
       const decks = shown.map((d) => ({
@@ -4741,9 +4759,10 @@ async function handle(req) {
         return json({ error: "not-yours" }, 403);
       if (deck.personal) return json({ error: "personal-set" }, 400);
       if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
-      /* A new personal set only where the App admin allows them (0.683);
-         one made before keeps working, and can still be changed or undone. */
-      if (body.set !== null && !(/** @type {any} */ (deck).set)) {
+      /* A personal set only where the App admin allows them (0.683): while
+         they are off, none is made or changed (0.684); one can still be
+         made an ordinary deck again. */
+      if (body.set !== null) {
         const space = await readJson(store, K.org(orgOf(deck)));
         if (!space || !space.sets) return json({ error: "sets-off" }, 403);
       }
@@ -5524,6 +5543,10 @@ async function handle(req) {
         else deckToCourse.delete(d.id);
       }
       deckRows = deckRows.filter((d) => deckToCourse.has(d.id));
+      /* A personal set reaches nobody while its space has them switched
+         off (0.684); its students' answers wait on their devices and here. */
+      const setsOff = await setsOffAmong(store, deckRows.filter((d) => d.set).map((d) => orgOf(d)));
+      deckRows = deckRows.filter((d) => !hidesSet(setsOff, d));
 
       /* Whose values can reach this person: whoever owns a deck they hold,
          and whoever teaches a course they are in — the same two lists the

@@ -162,13 +162,18 @@ test("a name is cut at forty characters, and a form with no names carries none",
   assert.equal("voices" in card.forms[1], false);
 });
 
-test("switched off again, a set already made keeps working and can still be changed", async () => {
+test("switched off, a set is hidden from its teacher and its students, and comes back as it was", async () => {
   await post("save-set", teacher.key, { deckId: family.id, set: SET });
+  const decksOf = async (/** @type {string} */ key) => (await raw("/api/courses?action=my-decks", { key })).json.decks.map((/** @type {any} */ d) => d.id);
   await post("admin-update-org", owner.key, { id: "main", sets: false });
-  assert.ok((await sentDeck(family.id)).set, "still sent to students");
+  assert.equal(await sentDeck(family.id), undefined, "a student is not sent it");
+  assert.ok(await sentDeck(hanoi.id), "its word list is an ordinary deck, and still sent");
+  assert.ok(!(await decksOf(teacher.key)).includes(family.id), "its teacher does not see it");
+  assert.ok((await decksOf(teacher.key)).includes(hanoi.id));
   const changed = await post("save-set", teacher.key, { deckId: family.id, set: { ...SET, order: "before" } });
-  assert.equal(changed.status, 200, changed.text);
-  const fresh = (await post("create-deck", teacher.key, { title: "Friends", lang: "ar-PS" })).json.deck;
-  const refused = await post("save-set", teacher.key, { deckId: fresh.id, set: SET });
-  assert.equal(refused.status, 403, "but no new one is made");
+  assert.equal(changed.status, 403, "nor can it be changed");
+  await post("admin-update-org", owner.key, { id: "main", sets: true });
+  assert.ok((await decksOf(teacher.key)).includes(family.id), "back for its teacher");
+  const back = await sentDeck(family.id);
+  assert.deepEqual(back && back.set.lists, [hanoi.id], "and for its students, as it was");
 });
