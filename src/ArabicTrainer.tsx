@@ -171,7 +171,7 @@ import {
   EASY_TYPES,
   exOf,
   findWordSpan,
-  gluedTo,
+  gluedToSpan,
   guessKind,
   kindOf,
   isListening,
@@ -4493,7 +4493,7 @@ function blankedPhrase(context: any, lang: Lang, blank: string = "____") {
   const tokens = contextTokens(context.ar, lang);
   const span = Math.max(1, context.span || 1);
   if (context.slot < 0 || context.slot >= tokens.length) return context.ar;
-  const glued = span === 1 && context.word ? gluedTo(tokens[context.slot], context.word, lang) : null;
+  const glued = context.word ? gluedToSpan(tokens.slice(context.slot, context.slot + span), context.word, lang) : null;
   const gap = glued ? `${glued.before}${blank}${glued.after}` : blank;
   return tokens
     .map((t, i) => (i === context.slot ? gap : i > context.slot && i < context.slot + span ? null : t))
@@ -4511,11 +4511,11 @@ function filledPhrase(context: any, lang: Lang): { before: string; word: string;
   if (context.slot < 0 || context.slot >= tokens.length) return null;
   const SPLIT = "\u0000";
   const [before, after = ""] = blankedPhrase(context, lang, SPLIT).split(SPLIT);
-  const token = tokens[context.slot];
-  const glued = span === 1 && context.word ? gluedTo(token, context.word, lang) : null;
+  const covered = tokens.slice(context.slot, context.slot + span).join(" ");
+  const glued = context.word ? gluedToSpan(tokens.slice(context.slot, context.slot + span), context.word, lang) : null;
   const word = glued
-    ? Array.from(token).slice(Array.from(glued.before).length, Array.from(token).length - Array.from(glued.after).length).join("")
-    : tokens.slice(context.slot, context.slot + span).join(" ");
+    ? Array.from(covered).slice(Array.from(glued.before).length, Array.from(covered).length - Array.from(glued.after).length).join("")
+    : covered;
   return word ? { before, word, after } : null;
 }
 
@@ -19805,9 +19805,9 @@ function readAlike(
 export function formTagsAt({ label, ambiguous, kin, lent, promptField, pictured = "" }: {
   /** What the form is called, from askLabel. Empty where nothing tells it apart. */
   label: string;
-  /** On a picture, what it says instead — pictureLabel: "female" or
-      "male" where the picture cannot show it, and never the count, which
-      it does. Under the picture whenever it says anything. */
+  /** On a picture, what it says instead — pictureLabel: the count where
+      the card has another, and "female" or "male" where the picture
+      cannot show it. Under the picture whenever it says anything. */
   pictured?: string;
   /** Whether the prompt leaves which form open — formIsAmbiguous. */
   ambiguous: boolean;
