@@ -8,6 +8,29 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.673 — 26 November 2026
+
+**Imported cards say they haven't reached students yet.** Cards brought in
+from a backup arrive as Ready for review, which students don't get, so a
+course filled from a backup showed its decks to students with nothing in
+them, and they were told there was nothing to practise. Nothing said so to
+the teacher. Now:
+
+- The message after an import ends "Students won't see them until you
+  publish them", and a band across the top of Teaching stays, counting the
+  imported cards still waiting, with **Show the cards** to list them. It
+  goes once they're all published, or with Dismiss.
+- A course's screen says, above its decks, how many cards in the course
+  don't reach students yet and why (drafts, waiting for review, number
+  words to write), with **Show the cards** — the line a deck already had.
+- The card list's Filter has a **Status** choice: Waiting to publish, or
+  Published. Waiting to publish holds drafts, cards ready for review, and
+  published cards with changes not yet published.
+
+**Still to check by hand:** the band is remembered while Teaching is open;
+after the app is reopened, the course's line and the deck's own line are
+what say it.
+
 ## 0.672 — 26 November 2026
 
 **A noun can be marked uncountable.** On a noun's card in Arabic or Hebrew,

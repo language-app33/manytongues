@@ -9142,3 +9142,30 @@ noun is laid out in boxes", which keeps them as two cards.
 
 **Revisit if** teachers want uncountables counted with a measure word
 ("two cups of water"), which needs measure words as cards of their own.
+
+## Imported cards say they don't reach students yet (0.673)
+
+**Problem.** A learner reported "no material" in a course whose decks they
+could see. The course had been filled from a backup, and an import saves
+every card as Ready for review (the owner's rule, so nothing a file brings
+in reaches students unread). Students are sent published cards only, so
+they got the decks and none of their cards, and Home said there was nothing
+to practise. The teacher was told "Imported N cards" and nothing more.
+
+**Decided (owner, 1a 2a 3c).** Keep the rule. Say it to the teacher instead:
+
+- The import's own message adds that students won't see the cards until
+  they are published.
+- A band across Teaching counts the cards that import brought in which are
+  still waiting (`waitingToPublish`: a draft, ready for review, or changes
+  not yet published), with Show the cards, which opens the card list on the
+  new **Status** filter. Held in the screen's state, not saved: it is a
+  reminder about the import just made, and the deck and course lines below
+  carry the same fact for good.
+- A course's screen says what of its decks (units included) doesn't reach
+  students, with `notReaching` as a deck already says it of itself.
+- The student's side is unchanged (3c): a course whose decks are still empty
+  keeps its Practice button.
+
+**Revisit if** teachers import material they have already checked and the
+band reads as nagging: a "Publish them all" on it is the next step.
