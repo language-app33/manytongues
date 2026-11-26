@@ -8,6 +8,15 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.673 — 26 November 2026
+
+**Home is less crowded while you're prepping.** With a Prep mode goal set,
+the card on Home keeps its fact but drops its drawing. The prep's own tile
+already fills the top of the screen, and on a phone the drawing pushed
+Practice off the bottom. Clear the goal and the drawing comes back.
+
+Still to check by hand: Home on a real phone with a goal set.
+
 ## 0.672 — 26 November 2026
 
 **A noun can be marked uncountable.** On a noun's card in Arabic or Hebrew,

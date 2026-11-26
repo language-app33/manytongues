@@ -16533,8 +16533,10 @@ export default function ArabicTrainer() {
 
                   {/* A shape in the logo's style and a fact about how
                       language varies, turned after every finished session
-                      (0.664). See home-card.ts. */}
-                  <HomeCard turn={homeTurn} stage={stage} />
+                      (0.664). See home-card.ts. Under a prep, the fact
+                      alone (0.673): the prep's tile is the top of the
+                      screen, and the shape pushed Practice off a phone. */}
+                  <HomeCard turn={homeTurn} stage={stage} art={!homePrep} />
 
                   {/* Practice, and beside it on the right the way to
                       Focused training (0.650): weak spots, a session built
@@ -18416,21 +18418,23 @@ function HomeShapeArt({ shape }: { shape: HomeShape }) {
     </svg>
   );
 }
-function HomeCard({ turn, stage }: { turn: number; stage: HomeStage }) {
+/* `art` false leaves the shape off and keeps the words (0.673): under a
+   prep, whose tile already fills the top of Home. */
+function HomeCard({ turn, stage, art = true }: { turn: number; stage: HomeStage; art?: boolean }) {
   const { shape, fact }: { shape: HomeShape; fact: HomeFact } = homeCardAt(turn);
   /* Until the second day of practice, a welcome under the logo's loops
      instead of a fact (0.666): see homeStage. Nothing to source. */
   if (stage !== "learning") {
     return (
       <div className="at-homecard" data-el="home-fact" data-stage={stage}>
-        <HomeShapeArt shape={HOME_SHAPES[0]} />
+        {art && <HomeShapeArt shape={HOME_SHAPES[0]} />}
         <p className="at-homecardfact">{HOME_WELCOME[stage]}</p>
       </div>
     );
   }
   return (
     <div className="at-homecard" data-el="home-fact" data-stage={stage} data-fact={fact.id}>
-      <HomeShapeArt shape={shape} />
+      {art && <HomeShapeArt shape={shape} />}
       <p className="at-homecardfact">
         {fact.text}{"\u00a0"}
         <a className="at-homecardsrc" href={fact.source} target="_blank" rel="noopener noreferrer"
