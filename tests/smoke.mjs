@@ -13111,13 +13111,13 @@ const openPronounTables = async () => {
     .filter((b) => re.test((b.textContent || "").trim())).pop();
   click(tab(/^Material$/) || null);
   await sleep(400);
-  click(tab(/^Decks$/) || null);
+  click(tab(/^Modules$/) || null);
   await sleep(500);
-  click(buttonNamed(/^New deck$/));
+  click(buttonNamed(/^New module$/));
   await sleep(300);
   const rows = [...document.querySelectorAll(".at-sheet .at-openrow")];
   const titles = rows.map((b) => (b.querySelector(".at-decktitle") || b).textContent || "").join(" | ");
-  check("with personal sets off in the space, New deck offers a regular deck and a unit only", titles === "Regular deck | Unit", titles || "no sheet");
+  check("with personal sets off in the space, New module offers a deck and a unit only", titles === "Deck | Unit", titles || "no sheet");
   check("and the kinds sit in the spaced list of tiles", rows.length > 0 && rows.every((b) => !!b.parentElement && b.parentElement.classList.contains("at-decklist2")),
     rows.map((b) => (b.parentElement && b.parentElement.className) || "").join(", ") || "no rows");
   click(document.querySelector('.at-sheet button[aria-label="Close"]'));
