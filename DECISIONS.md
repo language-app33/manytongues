@@ -11,6 +11,59 @@ anything that was never really a choice.
 
 ---
 
+
+## A picture says its count again (0.677)
+
+0.651 stopped picture questions saying "dual" or "plural", after a learner
+said the label only repeated what a picture of two plants showed. In 0.660
+a learner reported, twice, that a picture of one lemon did not say whether
+ليمونة or ليمون was wanted. The owner chose the label back: `pictureLabel`
+names the count wherever another form of the card has another count
+(singular, dual, plural), and the gender as before. A label that repeats
+the picture costs a word; one that is missing costs a guess. A word with
+one form, and an uncountable one, still says nothing.
+
+## Home's name is a heading in the page, not chrome (0.670)
+
+The app's name on Home was positioned absolutely over the page's top
+padding, with where-you-are on a line of its own underneath. Putting the
+two on one line, as every tab's title already has them, meant one row in
+the page's own flow (`.at-homehead`), so the button lands where it does on
+Progress and Cards and the row cannot overlap what follows. It scrolls
+away, as the floating name did, rather than sticking like a tab title.
+
+The cost is the name's size: 48px mark and 32px type leave a phone about
+75px for the button, so Home's name is 32/24 on wide screens and a tab
+title's 28/20 at 420px and under. Below 600px the languages leave the
+button (the owner's 2); the place gives way before the mode
+(`flex-shrink` 100 against 1), and both clip with an ellipsis rather than
+run over the arrow. `.at-brand` and its wash are gone, and layers.test no
+longer counts the name as chrome.
+
+
+## What waits to sync is noted, not inferred (0.663)
+
+The You menu's count used to compare each card's stamps with the moment
+of the last sync. Two things broke that. A course refresh rebuilds every
+course card and stamps each with its own time, so one teacher change
+read as the whole course changed here (0.662 patched the count by
+ignoring a course card's own stamp). And a sync with a device whose clock
+was ahead moved the mark past changes made here.
+
+So `persist`, the one door the learner's changes go through, now notes
+the cards each change alters (`changesBetween`, by content), and a trip
+moves them to `sending`, lets go of them when it lands and puts them back
+when it fails (`Pending` in sync.ts, kept in localStorage). Syncs and
+course refreshes write with `commit` and are never counted.
+
+The same door now decides whether a sync is owed: the data effect arms
+the trip only when `persist` has marked one. A course refresh used to arm
+it too, so every teacher change sent every student's whole document up.
+What a refresh brings — new course cards, the headstones of withdrawn ones
+— goes with the next trip; every device folds the course in for itself.
+The stamps themselves are unchanged: a course card's `updated` is what
+lets a card that comes back outlive its old headstone in the merge.
+
 ## Pictures and recordings travel the same way (0.659)
 
 The owner's rule: a picture and a recording never behave differently,
@@ -8916,3 +8969,214 @@ run — the pictures would be held in memory and fetched again every launch
 — and online a picture question is dealt as before, its picture fetched
 when asked. The smoke walk runs without IndexedDB, so it still exercises
 that path; `tests/offline.test.mjs` covers the stricter one.
+
+## A fact card on Home, and Practice in place of Start session (0.664)
+
+**23 November 2026** · `src/home-card.ts`, `HomeCard` in `src/ArabicTrainer.tsx`
+
+Once Weak spots and Build a session moved to Focused training (0.650), Home
+had a lot of open space. The owner wanted it more engaging without simply
+showing more of the learner's own numbers. After trying illustrations of
+everyday scenes, then geometric shapes, the owner chose abstract shapes in
+the logo's own style paired with short facts about dialects and regional
+languages.
+
+**The facts.** Written in batches, each checked against a published source,
+then approved, rejected or edited by the owner on a review page, and the
+approved ones checked again against their sources. They live in the code as
+plain data with their sources. Adding facts later means the same review,
+not an edit straight into the list. The facts are the same for every
+learner, whatever language they study (the owner's 1b): about a third touch
+Arabic, Hebrew or Vietnamese.
+
+**The shapes.** Twenty variations on the logo: its hand-drawn loops at one
+line weight, its small dot, and the speech bubble from the empty home
+screen. They are generated from a handful of numbers rather than drawn by
+hand, so they are drawn the same every time and stay small. The logo's
+pale lavender would not show on the light panel, so it is deepened, and its
+cream dot takes the text colour. The owner tried the logo's teal behind
+them in dark mode and preferred the app's own panel colour.
+
+**Turning.** One count per device, moved on when a session reaches its end
+screen. Shapes and facts are read off it separately (the owner's 2a). It is
+kept on the device and not synced: which card a screen last showed is not
+something worth a write to the server.
+
+**Practice.** Start session became Practice (the owner's call; "practice"
+had meant a schedule-free session, but only a teacher's one-question trial
+starts one now, so learners never see the two meanings). It is taller and
+carries the old line above it, shortened, so the most important thing on
+the screen is also the largest. The spelling is "practice" throughout
+(owner's 1a), so the unit page's button changed too.
+
+**The logo in dark mode.** Two images, the theme showing one, rather than an
+inline drawing: the logo is a file the server also serves as an icon, and
+two small files cost less than keeping a copy of its drawing in the code.
+Only the pages change. The installed app's icon keeps its square, because a
+phone always draws an app icon on one.
+
+**A welcome before the facts (0.666).** The owner asked for the facts to
+wait until a student has really started. "Started" is the second day of
+practice (the owner's 1b), read off the synced practice log rather than
+the per-device card count, so it is the same on every device. Before
+then the card keeps its place and shape (2a), holding the logo's own
+loops and one of two welcomes (3a): one for a student who has not
+practised, one for the first day. Any practised day other than today
+counts, so a student returning the next morning sees a fact before
+practising again rather than being told to "come back tomorrow".
+
+**The dumbbell waits too (0.667).** Focused training appears on the same
+day as the facts, the second day of practice (the owner's 1a), so Home
+opens up once rather than in stages. Before then there is little behind
+it: Weak spots needs a card missed twice running and there are no saved
+sessions. No note announces it (the owner's 2a).
+## One rule for "no connection", and three kinds of notice (0.669)
+
+**24 November 2026** · `src/net.ts` (`noConnection`), `src/send-waiting.ts`, `src/reach.ts`
+
+An audit after 0.666 found six kinds of notice about the connection and
+about 25 sentences, decided by four different rules for what counts as a
+connection problem. On the owner's word there are now three kinds, and
+only one is an error:
+
+- **The bar** ("No connection", with Retry) for anything asked for that
+  could not get through.
+- **"Saved on this device. It will be sent when you're back online."** for
+  work kept until it can go.
+- **The dot and the You menu's line** for where things stand: grey
+  offline, amber while anything waits or syncs, red only for a failure.
+
+**One rule.** `noConnection` decides, for the bar, the queues and the
+picture store alike: a request that could not be made or timed out, a
+gateway's 502, 503 or 504, and an answer that is not the app's (a wifi
+login page). A teacher's card saved during a deploy is therefore kept
+like an offline one rather than refused. A 500 is not no connection: it is
+the server's own fault, said as such, though queued work still waits
+through it.
+
+**Waiting work is said in the menu, not a band.** The two "waiting for a
+connection" bands went. That made the menu responsible, so Sync now sends
+everything waiting, and a teacher's cards are sent by a module the whole
+app reaches rather than by the Teaching screen alone. One send at a time,
+whoever asks, so no card goes up twice. Because the browser never says when
+the server comes back while the device stayed online, any answer from the
+server is announced (`noteReached`), and waiting work and the bar both
+retry on it, throttled so a refusal cannot start a loop.
+
+**Never "server".** Most people do not know the word. Faults on our side
+carry a short code in brackets instead of instructions for whoever runs
+the site; `docs/ERROR-CODES.md` keeps those instructions.
+
+**What it costs.** "No connection" is also said when the device is online
+and the fault is ours during a restart — one message, at the price of
+being slightly wrong for a few seconds of a deploy. Settings' download
+section keeps its own message and button, on the owner's word.
+
+## Weak spots replaces Fix mistakes on the Build screen, and Focused training holds four choices (0.671)
+
+**Fix mistakes is gone; Build a session has Weak spots in its place.** The
+two picked the same cards — something wrong in the last two outings —
+and differed in what they then asked. Fix mistakes gave each card an
+ordinary mix of its questions, including the ones it had never missed,
+and needed two exercise types to build at all. Weak spots asks only the
+questions that went wrong, worst first. The owner asked for the second
+rule on the Build screen too, over the cards picked. `hasRecentMistake`
+went with it, and so did its fallback for cards answered before the
+outing record existed (any lapse ever counted): such cards now read as
+nothing to fix, as they always have for the Weak spots button. A session
+kept with Fix mistakes opens as Weak spots (`modeOfSaved`), so nobody's
+saved session breaks.
+
+**Focused training: Weak spots and Not seen lately side by side, then
+Build a session and Prep mode full width,** each with a line saying what
+it is (the owner's brief). Not seen lately is new as a button: the Build
+screen's mode of the same name over the cards a dealt session reads, as
+Weak spots is (`buildUnseenSession`), dimmed and saying why when there is
+nothing to bring back. The Build screen keeps its own Not seen lately for
+the cards picked (the owner's 5a).
+
+**Prep mode moved from Progress to Focused training (the owner's 1b).**
+Where a prep stands ("Prepping for Exam · 12 days left") is a second
+line under its button. The decks it offers are counted in the trainer
+now rather than off Progress's deck tiles: the deck tags that are not
+path units, with the cards of each that can be asked.
+
+**The choices are their own button (`TrainingChoice`),** not `Button`:
+`Button` sets one line in capitals, and these need a name and a sentence
+under it. It borrows the ghost button's outline, dimmed state and focus
+ring. Its accessible name is the title alone, with the line as its
+description, so it is still "Weak spots" to a screen reader.
+
+---
+
+## Uncountable is a value of number, and a tick over a noun's boxes (0.672)
+
+**26 November 2026** · `UNCOUNTABLE` and `agreesAs` in `src/answers.ts`; `GRAMMAR.number` in `src/languages.ts`; `personFor` in `src/verbs.ts`; `readNounCard` in `src/numbers/nouns.ts`; `nounBoxes`, `nounUncountable`, `tickUncountable` and `NounEditor` in `src/card-editor.tsx`
+
+A noun's card had a box for every number the language counts in, and no way
+to say the word has none of them but the first: مي with an empty Plural box
+was indistinguishable from a noun whose plural nobody had written yet, and
+the number screen listed it as "no plural".
+
+**Stored as a number, not as a fact of its own.** `number: "uncountable"`
+on the card's own word. A separate per-card field (as person-or-thing is)
+would have left agreement untouched, but it would also have let a card say
+"uncountable" and "plural" at once, and needed its own column in an import
+and its own tag. As a value of the axis it is said wherever number is said.
+
+**Nothing agrees with it.** The agreement tables match a noun's number by
+equality, so the one reader of them, `personFor`, takes an uncountable word
+as a singular (`agreesAs`). No column of any table names the value, and
+none should.
+
+**Counting leaves it out silently.** `readNounCard` answers null, as for a
+card that is not a noun, so it is neither counted nor listed as unfinished.
+
+**On the card it is a tick, never a box.** `nounBoxes` leaves the value out
+of the boxes and, where the card's own word says it, draws one box (one a
+side for a person or an animal). Ticking marks the word in each singular
+box and takes the forms in the other boxes out of the draft, with the
+pronoun cells on the end of them; they are held until the editor closes, so
+unticking puts them back, and a save while ticked drops them — which is
+what the owner asked the tick to do. A form in no box is left alone.
+
+**Offered on a noun only** (`optionRules.uncountable.onlyOn`), in Arabic
+and Hebrew. Vietnamese declares no number.
+
+**Group words got a line of help and no value.** ناس is a plural of people
+and عيلة a feminine singular; marked that way the agreement rules already
+read them right, so the card says which box to use rather than offering a
+choice most teachers would never need.
+
+**Still open:** a collective beside its unit noun (تفاح, تفاحة) — see "A
+noun is laid out in boxes", which keeps them as two cards.
+
+**Revisit if** teachers want uncountables counted with a measure word
+("two cups of water"), which needs measure words as cards of their own.
+
+## Imported cards say they don't reach students yet (0.679)
+
+**Problem.** A learner reported "no material" in a course whose decks they
+could see. The course had been filled from a backup, and an import saves
+every card as Ready for review (the owner's rule, so nothing a file brings
+in reaches students unread). Students are sent published cards only, so
+they got the decks and none of their cards, and Home said there was nothing
+to practise. The teacher was told "Imported N cards" and nothing more.
+
+**Decided (owner, 1a 2a 3c).** Keep the rule. Say it to the teacher instead:
+
+- The import's own message adds that students won't see the cards until
+  they are published.
+- A band across Teaching counts the cards that import brought in which are
+  still waiting (`waitingToPublish`: a draft, ready for review, or changes
+  not yet published), with Show the cards, which opens the card list on the
+  new **Status** filter. Held in the screen's state, not saved: it is a
+  reminder about the import just made, and the deck and course lines below
+  carry the same fact for good.
+- A course's screen says what of its decks (units included) doesn't reach
+  students, with `notReaching` as a deck already says it of itself.
+- The student's side is unchanged (3c): a course whose decks are still empty
+  keeps its Practice button.
+
+**Revisit if** teachers import material they have already checked and the
+band reads as nagging: a "Publish them all" on it is the next step.

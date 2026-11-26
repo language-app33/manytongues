@@ -23,8 +23,8 @@ const here = path.dirname(new URL(import.meta.url).pathname);
    relative to the file doing the importing. */
 const built = await buildOnce(["ArabicTrainer.tsx"]);
 const { lentTags, varyTypes, requeueMissed, isUrgent, buildSession, buildManualSession, installIndexes,
-  fillersIn, buildWeakSession, weakness, isWeak, movesAmong, mergeMoves,
-  saidMoves, sumMoves, laddered, castQuestion, mixCardsOf, sessionCount, scoreAnswer, NO_SCORE, homeLine } = await import(path.join(built, "ArabicTrainer.js"));
+  fillersIn, buildWeakSession, weakness, isWeak, modeOfSaved, movesAmong, mergeMoves,
+  saidMoves, sumMoves, laddered, castQuestion, mixCardsOf, sessionCount, scoreAnswer, NO_SCORE } = await import(path.join(built, "ArabicTrainer.js"));
 const langs = await import(path.join(here, "..", "src", "languages.ts"));
 const { TYPES } = langs;
 const { MAX_IN_LEARNING, inLearningOf } = await import(path.join(here, "..", "src", "session-mix.ts"));
@@ -737,8 +737,8 @@ test("and a resting card is still dealt when there is nothing else", () => {
 
    One button, and what it opens: everything going wrong and nothing else,
    worst first. The rule it turns on is per *exercise* rather than per
-   card, which is the whole difference between this and the Fix mistakes
-   mode on the Build screen — so what is asserted here is that a card
+   card, which is what it was always for, and what Fix mistakes on the
+   Build screen never did until Weak spots replaced it there (0.671) — so what is asserted here is that a card
    failing one way is drilled that way and not on the readings it has
    always got right.
    ------------------------------------------------------------------ */
@@ -1455,85 +1455,74 @@ test("a week is the sum of its days, and a missing day is nought rather than a c
 });
 
 /* ------------------------------------------------------------------
-   Practising what went wrong, by hand
+   Weak spots, by hand
 
-   The hand-built session's *mistakes* mode picks per exercise through
-   `hasRecentMistake`, which is a different question from the one the Weak
-   skills button asks and was reached by no test. The difference matters:
-   this one falls back to "has it ever gone wrong" only where there is no
-   record of outings to read, and a card with a clean record has to come
-   out the other side as nothing to fix.
+   The Build screen's Weak spots mode (0.671, in place of Fix mistakes):
+   the Focused training button's own rule — isWeak to pick a card, and the
+   questions that went wrong to ask it — over the cards picked rather than
+   every card.
    ------------------------------------------------------------------ */
 
-test("asked for the mistakes, a card whose record is clean is not among them", () => {
+const byHand = (/** @type {any[]} */ items, /** @type {any[]} */ picked = items) =>
+  buildManualSession({ items, settings, ids: picked.map((i) => i.id), mode: "weak", count: 20 });
+
+test("built by hand, Weak spots takes a card whose record is clean as nothing to fix", () => {
   const clean = slipping("clean", [1, 1]);
   const missed = slipping("missed", [1, 0]);
   const items = [clean, missed].concat(deckOf(4));
   installIndexes(items, settings);
-  const got = buildManualSession({
-    items, settings, ids: items.map((i) => i.id), mode: "mistakes", count: 20,
-  });
+  const got = byHand(items);
   assert.equal(got.reason, null, got.reason || "");
   assert.deepEqual([...new Set(got.exercises.map((/** @type {any} */ e) => e.id))], ["missed"],
-    "a card answered right twice running was offered as a mistake");
+    "a card answered right twice running was offered as a weak spot");
 });
 
-test("and where nothing has been recorded, whether it ever went wrong is what is asked", () => {
-  /*
-   * The fallback, for cards answered before the record of outings existed.
-   * A card with a lapse behind it and no history is a mistake; a card with
-   * neither is not.
-   */
-  const noHist = (/** @type {string} */ id, /** @type {Record<string, any>} */ s) =>
-    word(id, `كلمة-${id}`, `word ${id}`, {
-      forms: [{ id, ar: `كلمة-${id}`, en: `word ${id}`, lat: `k-${id}`, lang: "ar-PS", s }],
-    });
-  const bad = { ...withHist([]), wrong: 2, right: 4, reps: 6 };
-  const fine = { ...withHist([]), wrong: 0, right: 4, reps: 4 };
-  const items = [noHist("aged-bad", { ar2en: bad }), noHist("aged-fine", { ar2en: fine })]
-    .concat(deckOf(4));
+test("and asks only the question that went wrong, not everything the card has", () => {
+  /* Its other questions have never gone wrong; Fix mistakes, which this
+     replaced, asked those too. */
+  const items = [slipping("missed", [0, 0])].concat(deckOf(4));
   installIndexes(items, settings);
-  const got = buildManualSession({
-    items, settings, ids: items.map((i) => i.id), mode: "mistakes", count: 20,
-  });
-  assert.deepEqual([...new Set(got.exercises.map((/** @type {any} */ e) => e.id))], ["aged-bad"]);
+  const got = byHand(items);
+  assert.ok(got.exercises.length > 0);
+  assert.deepEqual([...new Set(got.exercises.map((/** @type {any} */ e) => e.type))], ["ar2en"]);
 });
 
-test("a slip on a question the card has climbed past is not a mistake to fix", () => {
+test("and keeps to the cards picked", () => {
+  const a = slipping("a", [0, 0]);
+  const b = slipping("b", [0, 0]);
+  const items = [a, b].concat(deckOf(4));
+  installIndexes(items, settings);
+  const got = byHand(items, [b]);
+  assert.deepEqual([...new Set(got.exercises.map((/** @type {any} */ e) => e.id))], ["b"]);
+});
+
+test("a slip on a question the card has climbed past is not a weak spot by hand either", () => {
   /*
    * A card at the top of its ladder is asked its top alone (atItsTop), so
-   * a reading question's record is frozen where the climb left it. With a
-   * miss as its last answer — right, right, wrong is still solid — the
-   * card was in every Fix mistakes session for good, dealt the one
-   * question it had never got wrong (0.598). Weak spots already left it
-   * out; the two now read the same questions.
+   * a reading question's record is frozen where the climb left it — right,
+   * right, wrong is still solid (0.598).
    */
   const climbed = word("climbed", "كلمة-c", "word c");
   const items = [climbed, slipping("missed", [1, 0])].concat(deckOf(4));
   installIndexes(items, settings);
-  /* Every question on its ladder solid, the reading one with the slip in
-     its record — read off the ladder the deck gives it, since the grids
-     and the pickings open only once there are cards to fill them. */
   const keys = laddered(climbed.forms[0], settings);
   assert.ok(keys.includes("ar2en") && keys.includes("en2ar"));
   climbed.forms[0].s = Object.fromEntries(
     keys.map((/** @type {string} */ k) => [k, { ...withHist(k === "ar2en" ? [1, 1, 0] : [1, 1, 1, 1]), interval: 6 }]),
   );
-  assert.equal(isWeak(climbed, settings), false, "Weak spots does not count it");
-  const got = buildManualSession({
-    items, settings, ids: items.map((i) => i.id), mode: "mistakes", count: 20,
-  });
-  assert.deepEqual([...new Set(got.exercises.map((/** @type {any} */ e) => e.id))], ["missed"],
-    "and neither does Fix mistakes");
+  assert.equal(isWeak(climbed, settings), false);
+  assert.deepEqual([...new Set(byHand(items).exercises.map((/** @type {any} */ e) => e.id))], ["missed"]);
 });
 
-test("nothing going wrong at all is said rather than built into a session", () => {
+test("nothing going wrong among the cards picked is said rather than built into a session", () => {
   const items = [slipping("clean", [1, 1])].concat(deckOf(4));
   installIndexes(items, settings);
-  const got = buildManualSession({
-    items, settings, ids: items.map((i) => i.id), mode: "mistakes", count: 20,
-  });
-  assert.equal(got.reason, "no-mistakes");
+  assert.equal(byHand(items).reason, "nothing-weak");
+});
+
+test("a session kept with Fix mistakes opens as Weak spots", () => {
+  assert.equal(modeOfSaved("mistakes"), "weak");
+  assert.equal(modeOfSaved("unseen"), "unseen");
 });
 
 /* ------------------------------------------------------------------
@@ -1965,22 +1954,3 @@ test("a sentence met already and waiting for its words holds no place in learnin
   assert.equal(inLearningOf(pool()), 1, "and the sentence, once it can be asked");
 });
 
-test("the home screen's line says what Start session will deal", () => {
-  /* Reviews first, with any new words the session brings in beside them. */
-  assert.equal(homeLine({ review: 12, climbing: 0, fresh: 3, behind: false }), "12 cards ready to review · 3 new cards waiting");
-  assert.equal(homeLine({ review: 1, climbing: 0, fresh: 0, behind: false }), "1 card ready to review");
-  /* A pile of reviews keeping the new words out says so, rather than
-     leaving the learner to wonder where they went. */
-  assert.equal(homeLine({ review: 40, climbing: 0, fresh: 0, behind: true }), "40 cards ready to review · new cards wait until you've caught up");
-  /* Nothing due: new words if the session would bring them in, and a
-     nudge to practise anyway if not — never a time to come back. */
-  assert.equal(homeLine({ review: 0, climbing: 0, fresh: 3, behind: false }), "Nothing to review — ready to learn 3 new cards");
-  assert.equal(homeLine({ review: 0, climbing: 0, fresh: 1, behind: false }), "Nothing to review — ready to learn a new card");
-  assert.match(homeLine({ review: 0, climbing: 0, fresh: 0, behind: false }), /^All caught up — a practice session/);
-  /* Cards still climbing are not reviews (0.603): beside them, or in
-     place of them when nothing is due for review. */
-  assert.equal(homeLine({ review: 12, climbing: 5, fresh: 0, behind: false }), "12 cards ready to review · 5 in progress");
-  assert.equal(homeLine({ review: 12, climbing: 5, fresh: 3, behind: false }), "12 cards ready to review · 5 in progress · 3 new cards waiting");
-  assert.equal(homeLine({ review: 0, climbing: 5, fresh: 0, behind: false }), "Nothing to review — 5 cards in progress");
-  assert.equal(homeLine({ review: 0, climbing: 1, fresh: 3, behind: false }), "Nothing to review — 1 card in progress · 3 new cards waiting");
-});

@@ -8,6 +8,478 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.681 — 26 November 2026
+
+**Prep mode is now Set a goal, and Focused training's buttons are two pairs.**
+
+- **Set a goal** replaces Prep mode on Focused training, and on its own
+  screen. Once a goal is set, both say **Your goal** instead, with where it
+  stands under the button as before.
+- The wording follows: the screen asks "What are you working towards?",
+  saves with **Start working towards it**, and deletes with "Delete this
+  goal". The line under the button says "Working towards Paris trip · 12
+  days left", or "Paris trip has come — edit the goal or delete it." The
+  notes after saving or deleting say "Goal set: Paris trip" and "Goal
+  cleared".
+- **On Home, the button while a goal is set says "Practice for Paris
+  trip"** (it was "Prep for …").
+- **Build a session and Set a goal sit side by side**, like Weak spots and
+  Not seen lately above them, rather than each taking the full width.
+- **Each button's icon is on the same line as its name**, before it, a
+  little smaller than it was above it. A name too long for a half-width
+  button wraps beside the icon.
+
+**Trade-off:** the half-width buttons are taller where a name or its line
+wraps, so the four buttons take about the same room as before.
+
+Still to check by hand: the four buttons on a real phone, above all the
+narrowest.
+
+## 0.680 — 26 November 2026
+
+**Saved sessions live on Focused training, and two can be pinned to Home.**
+
+- **No more Saved sessions screen.** The Saved sessions button on Focused
+  training is gone, and so is the screen it opened. In its place is a line
+  across the screen and a **Saved sessions** heading, with the tiles under
+  it. As before, the section shows only once something has been saved.
+- **The dots on a tile open a panel from the bottom of the screen** (in the
+  middle on a wide one), the same kind of panel as "Where you are". It is
+  headed with the session's name and what it is, and offers Start, Edit,
+  Pin to Home and Delete, each with its icon.
+- **Pin to Home** puts the session's tile on Home, just under Practice. It
+  looks the same, without the dots: pressing it starts the session. On
+  Focused training a pinned tile has a small pin by its name, and the panel
+  offers **Unpin from Home** instead.
+- **Up to two can be pinned**, one row on a phone. With two on Home, Pin to
+  Home is greyed out and says to unpin one first.
+- Pinned tiles stay on Home while a Prep mode goal is set, and pinning
+  follows you to your other devices.
+- Deleting a session always asks first now, and takes it off Home too.
+
+**Trade-off:** reaching a saved session's Edit or Delete takes a tap on its
+dots, where the old screen had them on every row.
+
+Still to check by hand: the panel and the pinned tiles on a real phone.
+
+## 0.679 — 26 November 2026
+
+**Imported cards say they haven't reached students yet.** Cards brought in
+from a backup arrive as Ready for review, which students don't get, so a
+course filled from a backup showed its decks to students with nothing in
+them, and they were told there was nothing to practise. Nothing said so to
+the teacher. Now:
+
+- The message after an import ends "Students won't see them until you
+  publish them", and a band across the top of Teaching stays, counting the
+  imported cards still waiting, with **Show the cards** to list them. It
+  goes once they're all published, or with Dismiss.
+- A course's screen says, above its decks, how many cards in the course
+  don't reach students yet and why (drafts, waiting for review, number
+  words to write), with **Show the cards** — the line a deck already had.
+- The card list's Filter has a **Status** choice: Waiting to publish, or
+  Published. Waiting to publish holds drafts, cards ready for review, and
+  published cards with changes not yet published.
+
+**Still to check by hand:** the band is remembered while Teaching is open;
+after the app is reopened, the course's line and the deck's own line are
+what say it.
+
+## 0.678 — 26 November 2026
+
+**"Learn more" under an answer is folded again.** Everything else worth
+knowing about a card (how it sounds and is written, related words, the
+phrase it turned up in) sits behind a small "Learn more" with an arrow
+beside it. A tap opens it, a second tap folds it, and it starts closed on
+every new question. This puts back how it worked before 0.372.
+
+**Trade-off:** what is in the box takes a tap to see, so most answers will
+go by without it being read; in return Continue sits right under the answer.
+
+Still to check by hand: on a phone, that the arrow and the tap feel right
+and Continue is close under the answer.
+
+
+## 0.677 — 26 November 2026
+
+**A phrase question no longer drops a letter.** When the missing word is
+two words and the phrase joins a letter to its front — ل in
+"جمعية لحقوق الإنسان" — the gap used to swallow the letter, so the
+learner saw "جمعية ____" and no choice fitted it. Now the letter stays
+outside the gap, "جمعية ل____", as it already did for one-word answers,
+and the phrase is whole again once answered.
+
+**Writing a word from its picture says singular, dual or plural.** A
+picture of one lemon didn't say whether ليمونة or ليمون was wanted. Where a
+card has more than one of these forms, the picture question now says
+which it wants under the picture, alongside "female" or "male" where that
+was already said ("singular, female"). A word with one form, or one
+marked uncountable, says nothing, as before.
+
+**Trade-off:** 0.651 took "dual" and "plural" away from under pictures,
+because a learner said they only repeated what a picture of two things
+showed. They are back, so a label will sometimes repeat the picture.
+
+Still to check by hand: the phrase card "جمعية لحقوق الإنسان" and the lemon
+card on a real phone. The orange card (برتقال) reported for its spelling or
+transliteration couldn't be checked from here and needs a look in the card
+editor.
+
+## 0.676 — 26 November 2026
+
+**The fact on Home also changes when you come back after a while.** A
+phone often keeps the app in the background rather than closing it, so
+0.674's new card on opening didn't always happen. Now, coming back to the
+app after it has been away for half an hour or more also brings the next
+picture and fact. A quicker look away, such as tapping a fact's source and
+coming straight back, keeps the fact you were reading.
+
+Still to check by hand: leaving the installed app in the background on a
+real phone for over half an hour, then coming back to it.
+
+## 0.675 — 26 November 2026
+
+**Focused training, tidied.** The dumbbell drawing at the top of the screen
+is gone, so the choices start higher up.
+
+- **Every button has a picture.** Weak spots a target, Not seen lately a clock
+  turning back, Build a session sliders, Prep mode a ticked calendar and Saved
+  sessions a bookmark — drawn like the app's other icons, in green on a round
+  tint, and greyed out when the button is.
+- **A saved session's tile says what it is**, the same line its row on Saved
+  sessions has: the kind of practice, how long it runs and how many cards it
+  holds (or how many are still there, if some have been withdrawn).
+- **Three dots in the tile's corner open a menu** to Start, Edit or Delete
+  the session without going to Saved sessions. The dots still work when
+  every card in the session has gone, so it can be changed or deleted.
+
+**Trade-off:** Delete from the menu asks first, because it sits a finger's
+width from Edit and cannot be undone; the delete button on Saved sessions
+still deletes at once, as before. The tiles are a line or two taller.
+
+Still to check by hand: the menu on a real phone, opened from a tile near
+the foot of the screen.
+
+## 0.674 — 26 November 2026
+
+**The fact on Home changes each time you open the app.** The picture and
+the fact under the progress ring used to move on only after a finished
+session, so opening the app again showed the same one. Now reloading the
+page, or closing the app and opening it again, brings the next picture and
+fact too. Finishing a session still moves it on as before; going to You and
+back does not.
+
+Still to check by hand: closing and reopening the app installed on a real
+phone. A phone that only sends the app to the background, rather than
+closing it, shows the same card when you come back.
+
+## 0.673 — 26 November 2026
+
+**Home is less crowded while you're prepping.** With a Prep mode goal set,
+the card on Home (the drawing and the fact under it) is left off. The
+prep's own tile already fills the top of the screen, and on a phone the
+card pushed Practice off the bottom. Clear the goal and the card comes
+back.
+
+Still to check by hand: Home on a real phone with a goal set.
+
+## 0.672 — 26 November 2026
+
+**A noun can be marked uncountable.** On a noun's card in Arabic or Hebrew,
+Advanced › Forms now starts with an **Uncountable** tick, for a word with no
+plural, like water or bread. Ticking it takes the Dual, Plural and special
+plural boxes away and leaves the word itself.
+
+- The words beside it treat it as a singular, so an adjective or a verb
+  agrees with it as before.
+- Counting questions leave it out, and the number screen no longer lists it
+  as a noun with "no plural" still to write.
+- The card list tags it "uncount."; an import can say "uncountable" in its
+  number column.
+- Vietnamese is unchanged: it has no plurals to leave out.
+
+**Trade-off:** ticking it on a card that already has a plural or a pair
+written removes them when the card is saved, and students' progress on those
+forms goes with them. The tick says so before you save, and unticking before
+saving brings them back.
+
+**A line of help for group words.** Above the boxes, the card now says where
+a word for a group goes: in the box the words beside it agree with —
+"family" in Singular, "people" in Plural.
+
+Still to check by hand: the tick on a real phone, on a card for a person or
+an animal (which keeps a masculine and a feminine side), and a session that
+puts an uncountable noun beside an adjective.
+
+## 0.671 — 26 November 2026
+
+**Weak spots replaces Fix mistakes in Build a session.** Choosing Weak spots
+there now asks only the questions you've got wrong lately among the cards
+you picked, worst first. If a card keeps going wrong when you write it
+from the English, that's all it asks about that card. Before, Fix mistakes
+took the same cards and asked them every kind of question, including ones
+you never got wrong. Sessions you saved with Fix mistakes now open as Weak
+spots.
+
+**Focused training has four choices, each saying what it is:**
+
+- **Weak spots** and **Not seen lately**, side by side. Not seen lately is
+  new here: it brings back cards you haven't practised in the last few
+  days, across all your cards. Like Weak spots, it's dimmed when there's
+  nothing for it, and says why if pressed.
+- **Build a session**, full width, as before.
+- **Prep mode**, full width. It has moved here from Progress. Once you've
+  set a goal, its button also says what you're prepping for and how many
+  days are left.
+
+The line at the top is now just "Practise with a goal in mind."
+
+**Trade-off:** cards last practised long ago, before the app kept a record
+of each attempt, used to count as mistakes if they had ever gone wrong.
+Weak spots doesn't count them, as the Weak spots button never has.
+
+Still to check by hand: the four buttons on a real phone in light and dark,
+and setting up, editing and deleting a goal from Prep mode's new place.
+## 0.670 — 25 November 2026
+
+**On Home, the button for your space and languages is on the top line.**
+It sits at the right of the app's name, on the same line, where every
+other tab already has it beside its title, and in the same spot on the
+screen. To make room, the name and logo on Home are smaller than before,
+on a phone the same size as the other tabs' titles. The line scrolls away
+with the page, and the cards below it start higher up. For someone with
+nothing to switch there is still no button, and the name stays centred.
+
+**On a phone the button no longer lists your languages.** When some
+languages are switched off, the button used to say so ("Arabic only");
+on a phone that is now left to the sheet the button opens. A wider screen
+still shows it. If the line is still too short, the space's name is cut
+first and the mode last, each with "…", rather than running over the
+arrow.
+
+Still to check by hand: the top line on your own phone, above all for
+someone in more than one space, where the space's name is cut to a letter
+or two on a typical phone.
+
+## 0.669 — 25 November 2026
+
+**One way of saying "no connection", everywhere in the app, and never the
+word "server".** There used to be six kinds of notice and about 25
+sentences for the same few things. Now there are three, and only one of
+them is an error.
+
+- **No connection.** Whenever something you asked for couldn't get
+  through — signing in, joining, loading a list, saving, uploading,
+  syncing — the bar at the foot of the screen says **No connection**, with
+  Retry, and **Still no connection** if Retry fails too. A line under it
+  says what needed the connection where that helps ("Joining needs a
+  connection."). It goes by itself when the connection comes back, or as
+  soon as anything else gets through.
+  - It now also appears where pressing something offline used to give its
+    own sentence or nothing at all: the Join a course sheet, opening a
+    sign-in link, Check for new material on the Courses screen, and Sync
+    now.
+  - It counts as no connection when the device is offline, when the
+    connection is too slow to answer, while the app is being updated and
+    restarts, and when a wifi login page answers instead of the app. These
+    used to be told apart in four different ways, so one screen said
+    "Can't reach the server" where another said something technical.
+- **Saved for later.** Anything kept on the device because it couldn't be
+  sent yet — a report about a card, a teacher's card, its pictures and
+  recordings — says **Saved on this device. It will be sent when you're
+  back online.** A teacher's card saved while the app is being updated is
+  now kept and sent later too, the same as offline; it used to fail.
+- **Where things stand.** The dot on the **You** button is **grey** when
+  you're offline (it used to be red, though nothing was wrong), **amber**
+  while syncing or while anything is waiting to be sent, and **red** only
+  when something failed. The You menu says what is waiting, such as "1
+  card to sync".
+  - The two "waiting for a connection" bands across the top of the screen
+    are gone; the menu says it instead. **Sync now** now sends everything
+    waiting, including a teacher's cards from anywhere in the app — they
+    used to go only while Teaching was open. Waiting work also goes when
+    the app opens, when anything gets through, and every few minutes.
+
+The word "server" is gone from everything the app says. Faults on our side
+read "Something went wrong on our side. Try again in a moment." with a
+short code in brackets for whoever runs the site; `docs/ERROR-CODES.md`
+says what each means. Other wording that changed:
+
+- "Some recordings didn't reach the server" (the red band in Teaching) is
+  now "Some recordings are missing", and the filter "Missing from the
+  server" is "Missing".
+- Reporting a card the app refused now says "This report couldn't be sent.
+  It's noted on this device only." It used to blame the connection.
+- The card editor's offline note ends "…and will be sent when you're back
+  online."
+
+Settings' "Download all recordings and pictures" keeps its own message and
+Try again button, as decided.
+
+To check by hand, on a phone: turn the connection off, press Sync now,
+then Retry, and see "No connection" then "Still no connection"; turn it
+back on and see the bar go by itself. Check the dot is grey while offline.
+As a teacher, save a card offline, go to Learning, turn the connection
+back on and press Sync now: "1 card sent". Open the Join a course sheet
+offline and press Join.
+
+## 0.668 — 25 November 2026
+
+**Focused training says what it is for.** The screen behind the dumbbell on
+Home now opens with a small drawing of a dumbbell and one line under it:
+"Practise with a goal in mind. Fix what keeps slipping, or build a session
+from the cards you choose." Once a student has saved a session, the line
+ends "…or go back to one you saved." The buttons below are unchanged.
+
+Still to check by hand: the drawing and the line on a real phone, in light
+and dark.
+
+## 0.667 — 24 November 2026
+
+**The Focused training button waits until a student has started.** The
+dumbbell beside Practice now appears on the second day a student
+practises, the same day the facts replace the welcome. Before then there
+is little behind it for a beginner (no weak spots yet, no saved sessions),
+so Practice has the row to itself. A student who wants to practise a
+particular unit early can still do it from the unit's own page.
+
+Still to check by hand: with a brand-new student account, no dumbbell on
+the first day, and the dumbbell beside Practice the next day.
+
+## 0.666 — 24 November 2026
+
+**A welcome before the facts.** The card on Home now shows its facts from
+the second day a student practises. Until then it shows the logo's loops
+and a welcome instead:
+
+- **Before any practice:** "Welcome! Your first session takes just a few
+  minutes."
+- **On the first day, after practising:** "Great start! Come back
+  tomorrow and your cards will begin to stick."
+
+A student who practised yesterday sees a fact as soon as they open the
+app today. The days are counted from the student's own practice, so this
+follows them across their devices.
+
+**Practice's second line stays on one line.** On the narrowest phones, a
+long line such as "6 to review · 3 in progress" no longer wraps onto two
+lines. It ends in "…" if it can't fit.
+
+Still to check by hand: a brand-new student account sees the first
+welcome, the second after its first session, and a fact the next day.
+
+## 0.665 — 23 November 2026
+
+**The card on Home is simpler, and Practice looks like every other main
+button.**
+
+- **No title on the card.** The small label above the shape ("Italy" and
+  so on) is gone, so the card is just the shape and the fact.
+- **A smaller shape.** The shape is a fifth smaller, so the card takes
+  less of the screen.
+- **The fact runs wider.** It uses nearly the card's full width, so most
+  facts now take two lines instead of three.
+- **Practice matches the app's other main buttons:** the same corners,
+  lettering and colour, and no glow around it. Its play symbol is larger.
+- **The dumbbell for Focused training matches the app's other secondary
+  buttons:** outlined and unfilled, instead of the soft green square. It
+  takes Practice's height.
+
+## 0.664 — 23 November 2026
+
+**Home has a card with a fact about how language varies.** Under the
+progress ring there is now a card with a small title, a shape drawn in the
+logo's style, and a short fact about a dialect or regional language, such
+as how Palestinian towns and villages say the letter qaf, or why "tea" and
+"chai" are the same word. There are 53 facts, each approved and checked
+against the source it names, and 20 shapes. The card turns after every
+finished session, and the shapes and facts turn separately, so a fact
+meets a different shape each time round. A small icon at the end of each
+fact opens its source in the browser.
+
+**Start session is now Practice, and it is bigger.** The main button is
+taller, with a play symbol, and carries inside it the line that used to
+sit above it, shorter: "6 to review · 3 in progress". The dumbbell for
+Focused training beside it is the same height, in a soft green. Both sit
+just under the card. On a unit's page, "Practise this unit" is now
+"Practice this unit", matching. The end of a session still says "Session
+complete".
+
+**In dark mode the logo is its loops alone.** At the top of Home, beside
+each screen's title, and on the sign-in page, the logo no longer sits on
+its dark teal square in dark mode. A space's own logo is unchanged, and so
+are the browser-tab icon and the installed app's icon.
+
+Still to check by hand: the card and the bigger buttons on a short phone,
+where the card is what gives way.
+
+## 0.663 — 22 November 2026
+
+**A teacher's change no longer makes every student's phone sync, and the
+You menu's count is exact.** Follow-ups to 0.662.
+
+- **No sync for a course change.** Whenever a teacher changed anything in
+  a course, every student's phone sent its whole practice record up a few
+  seconds later, though the student had changed nothing. Now a sync is
+  started only by something the learner did; what the course brought
+  rides along with the next one. Each phone still gets the course itself
+  straight away, as before.
+- **The count is what you changed, card by card.** It used to be worked
+  out by comparing times, which went wrong after a sync with a device
+  whose clock was ahead. Now each card you change is noted as you change
+  it, and let go of once a sync has carried it. A count still waiting
+  when the app is closed is there when it opens again.
+- **"Changes to sync" instead of "Up to date"** when what is waiting is
+  not a card (a setting you changed, say), so the menu never says "Up to
+  date" while something has not been sent.
+
+To check by hand: with the app open on a phone, change a course card from
+Teaching on another device: the You menu stays "Up to date". Then, in
+airplane mode, change the theme: it says "Changes to sync".
+
+## 0.662 — 22 November 2026
+
+**The You menu no longer says hundreds of cards are waiting to sync when
+they are not.** Whenever a teacher changed anything in a course, every
+student's phone counted every card of the course as "to sync" until its
+next sync: a few seconds on the home screen, longer on a slow connection
+or while a sync was failing. One card added by a teacher showed a student
+"301 cards to sync". Nothing was unsaved; only the number was wrong.
+
+The count is now only what you did on this phone since the last sync:
+cards answered, marked, reset or flagged, and your own cards edited,
+added or removed. What a teacher changed comes down from the course and
+is not counted, and neither is a card a teacher withdrew.
+
+To check by hand: with the app open on a phone, change a card of the
+course from Teaching on another device, wait a minute, and open the You
+menu: it still says "Up to date".
+
+## 0.661 — 22 November 2026
+
+**"Read the forms" checks a reading against the recording too.** Until
+now, how a form is said meant its transliteration only.
+
+- **A form with a recording has a Play button** once you uncover it, next
+  to its transliteration.
+- **A form with a recording and no transliteration is now asked too.**
+  Instead of the blurred text it has "Play to check": tapping it plays the
+  recording, and then you say whether you read it right. Before, such a
+  form was only shown, and a verb recorded but never transliterated did
+  not get this practice at all.
+- A form with neither is shown and not asked, as before.
+
+One thing to know: a form's recording is of the verb alone, unless the
+teacher recorded the pronoun with it. The row now shows the pronoun, so
+the recording may say less than the row does.
+
+Languages that don't practise transliteration still don't get "Read the
+forms".
+
+To check by hand, on an iPhone: tapping "Play to check" should play the
+recording straight away. If the phone holds it back, the Play button is
+there to tap.
+
 ## 0.660 — 20 November 2026
 
 **Recordings come down with everything else, and a listening question

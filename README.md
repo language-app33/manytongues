@@ -269,8 +269,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   arrives.
 
   The custom modes on the Build screen are the same rule over a narrower
-  pool or a narrower set of questions: Fix mistakes and Not seen lately
-  narrow the pool, Weak spots narrows it to what is going wrong and asks
+  pool or a narrower set of questions: Not seen lately narrows the pool,
+  Weak spots (in place of Fix mistakes since 0.671) narrows it to what is going wrong and asks
   the questions that went wrong, Get started asks recognition alone, and
   Ultimate asks every question each card has — every card the mix lets in,
   since it has no length of its own. It lets in every new card, without the
@@ -317,7 +317,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   stay. See DECISIONS.md, "Students learn to read without harakat".
 
 - **What keeps going wrong can be practised on its own.** *Weak spots*,
-  under Start session on the home screen, deals nothing but the exercises
+  on Focused training behind the dumbbell on Home, and a mode of the Build
+  screen over the cards picked (0.671), deals nothing but the exercises
   that have been missed — wrong twice running, which is the app's own
   definition of a gap rather than a slip and what shuts a level
   (`missedTwice`), and anything missed once in its last two outings, worst
@@ -360,14 +361,15 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   another device while it keeps its stamp — see `priorityAt` in
   `src/types.ts`.
 
-- **A learner can prepare for a date.** Prep mode, under Progress, takes
+- **A learner can prepare for a date.** Set a goal (Your goal once one is
+  set; Prep mode until 0.681), on Focused training (under Progress until 0.671), takes
   a name ("Start of class"), a day and the decks to have learnt by then,
   and keeps the one prep in the settings (`prep`, read through `prepOf`),
   so it syncs as they do and the learner can change or clear it. Being
   ready means every card in those decks learnt before the day starts. As
   it is set, `readyFor` says what that takes: the work spread over the
   days left, or the earliest they could be finished if there are fewer
-  days than the cards can take. The home screen offers "Prep for …" while
+  days than the cards can take. The home screen offers "Practice for …" while
   the prep is still to come and not yet learnt; it is `begin` with the
   prep's decks in place of the chosen deck, so every rule of an ordinary
   session holds. Under it, today's sessions against the day's goal

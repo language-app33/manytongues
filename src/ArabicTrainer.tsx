@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo, useContext } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo, useContext, useId } from "react";
 import type { OnboardingPlace } from "./spaces.tsx";
 import type {
   Course, DayMoves, Deck, Doc, ExerciseSpec, ExerciseState, FlagKind, FlagVerdict, Form, Item,
@@ -30,6 +30,7 @@ import {
   type FeedbackKind,
   FLAG_NOTE_MAX,
   BannerHost,
+  BrandMark,
   Help,
   Icon,
   IconButton,
@@ -169,7 +170,7 @@ import {
   EASY_TYPES,
   exOf,
   findWordSpan,
-  gluedTo,
+  gluedToSpan,
   guessKind,
   kindOf,
   isListening,
@@ -314,10 +315,11 @@ import type { Sibling, SiblingIndex } from "./meanings.ts";
 import { buildContextIndex } from "./context-index.ts";
 import { sentenceWords } from "./sentence-words.ts";
 import { canAsk, isFigureForm } from "./offers.ts";
-import { isOffline } from "./net.ts";
+import { isOffline, noConnection, SAVED_FOR_LATER, watchReached } from "./net.ts";
 import { holdReach, isUnreachable, releaseReach, showReach, updateReach } from "./reach.ts";
 import { knownMissing as knownMissingAt, MISSING_CLIPS, MISSING_FOR_MS, pictureData } from "./pictures.ts";
-import { CARD_OUTBOX, drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
+import { CARD_OUTBOX, drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend, watchOutbox } from "./outbox.ts";
+import { sendWaitingCards } from "./send-waiting.ts";
 import { heldCounts, watchHeld } from "./held-media.ts";
 import {
   ORDER_SEP,
@@ -855,6 +857,7 @@ export function mergeMoves(
 import { fillerMarks, gradeInto, verdictOf } from "./grade.ts";
 import { cardsOfSaved, describeSaved, missingFromSaved } from "./saved-sessions.ts";
 import { homeEmptyHint, homeEmptySays, listOf as listOfNames, whyHomeIsEmpty } from "./home-empty.ts";
+import { homeCardAt, homeStage, practiceLine, HOME_SHAPES, HOME_WELCOME, type HomeShape, type HomeFact, type HomeStage, type ShapeColour } from "./home-card.ts";
 import { rememberedTheme, rememberTheme } from "./theme-memory.ts";
 import type { Filler, Mark } from "./grade.ts";
 
@@ -872,8 +875,16 @@ import {
   mergeData,
   syncAfterChange,
   SESSION_END_SYNC_MS,
-  cardsToSync,
-  latestStamp,
+  changesBetween,
+  loadPending,
+  savePending,
+  pendingAdd,
+  pendingSetOut,
+  pendingSent,
+  pendingFailed,
+  pendingCount,
+  NO_PENDING,
+  type Pending,
   syncLine,
 } from "./sync.ts";
 
@@ -2023,6 +2034,7 @@ export function standInSets(views: HeldSet[]): HeldSet[] {
 type SetStart =
   | { kind: "begin"; practice?: boolean; only?: (it: Item) => boolean; pathUnit?: string }
   | { kind: "weak" }
+  | { kind: "unseen" }
   | { kind: "saved"; saved: SavedSession };
 
 /*
@@ -4480,7 +4492,7 @@ function blankedPhrase(context: any, lang: Lang, blank: string = "____") {
   const tokens = contextTokens(context.ar, lang);
   const span = Math.max(1, context.span || 1);
   if (context.slot < 0 || context.slot >= tokens.length) return context.ar;
-  const glued = span === 1 && context.word ? gluedTo(tokens[context.slot], context.word, lang) : null;
+  const glued = context.word ? gluedToSpan(tokens.slice(context.slot, context.slot + span), context.word, lang) : null;
   const gap = glued ? `${glued.before}${blank}${glued.after}` : blank;
   return tokens
     .map((t, i) => (i === context.slot ? gap : i > context.slot && i < context.slot + span ? null : t))
@@ -4498,11 +4510,11 @@ function filledPhrase(context: any, lang: Lang): { before: string; word: string;
   if (context.slot < 0 || context.slot >= tokens.length) return null;
   const SPLIT = "\u0000";
   const [before, after = ""] = blankedPhrase(context, lang, SPLIT).split(SPLIT);
-  const token = tokens[context.slot];
-  const glued = span === 1 && context.word ? gluedTo(token, context.word, lang) : null;
+  const covered = tokens.slice(context.slot, context.slot + span).join(" ");
+  const glued = context.word ? gluedToSpan(tokens.slice(context.slot, context.slot + span), context.word, lang) : null;
   const word = glued
-    ? Array.from(token).slice(Array.from(glued.before).length, Array.from(token).length - Array.from(glued.after).length).join("")
-    : tokens.slice(context.slot, context.slot + span).join(" ");
+    ? Array.from(covered).slice(Array.from(glued.before).length, Array.from(covered).length - Array.from(glued.after).length).join("")
+    : covered;
   return word ? { before, word, after } : null;
 }
 
@@ -5855,9 +5867,9 @@ const MODES = {
     label: "Get started",
     blurb: "Recognition only — reading the script and hearing it, never producing it. The gentle way in.",
   },
-  mistakes: {
-    label: "Fix mistakes",
-    blurb: "Only the cards you've slipped on in the last couple of attempts.",
+  weak: {
+    label: "Weak spots",
+    blurb: "Only the questions you've got wrong lately, worst first — just the way each card went wrong, not every kind of question it has.",
   },
   unseen: {
     label: "Not seen lately",
@@ -5887,31 +5899,16 @@ function notSeenLately(unit: Form, settings: Settings) {
 }
 
 
-/* Did this form go wrong in either of its last two outings? Read in the
-   card's own language, and through stateOf, which answers for a key that
-   has never been written.
+/** Has this card a form Not seen lately would ask about? */
+export function isUnseen(it: Item, settings: Settings): boolean {
+  return drillableUnits(it, settings).some(({ unit }) => notSeenLately(unit, settings));
+}
 
-   Over the questions a session can put to the form, as Weak spots reads
-   it (isWeak) — not over everything the card supports. A form at the top
-   of its ladder is asked its top alone, so a slip on a reading question
-   before the climb stayed in that question's last two answers for good:
-   the card was in every Fix mistakes session, dealt the one question it
-   had never got wrong, and answering that right changed nothing (0.598). */
-function hasRecentMistake(unit: Form, settings: Settings) {
-  const types = askableTypes(unit, settings);
-  let sawHistory = false;
-  for (const t of types) {
-    const h = stateOf(unit, t).hist || [];
-    if (h.length) {
-      sawHistory = true;
-      if (h.slice(-2).some((x) => !x)) return true;
-    }
-  }
-  // Nothing recorded yet — fall back to whether it has ever gone wrong.
-  if (!sawHistory) {
-    return types.some((t) => (stateOf(unit, t).wrong || 0) > 0 || (stateOf(unit, t).lapses || 0) > 0);
-  }
-  return false;
+/* A session kept with Fix mistakes, which Weak spots replaced in Build a
+   session (0.671): the same cards are asked for, now through Weak spots.
+   Read wherever a kept session's mode is. */
+export function modeOfSaved(mode: string): string {
+  return mode === "mistakes" ? "weak" : mode;
 }
 
 /*
@@ -6264,11 +6261,12 @@ function drawRange(
  * the same rule over a different pool, or the same rule asking a different
  * set of questions:
  *
- * - **Fix mistakes:** the pool is cards gone wrong in their last outings.
  * - **Not seen lately:** cards not practised for a few days, new ones
  *   included — which come in through the learning share like anywhere else.
  * - **Weak spots:** cards with something going wrong now, asked the
- *   questions that went wrong.
+ *   questions that went wrong — from Focused training over every card, or
+ *   from the Build screen over the cards picked (0.671, in place of Fix
+ *   mistakes, which took the same cards and asked them everything).
  * - **Get started:** recognition questions only.
  * - **Ultimate:** every question each card has open.
  * - **Catch up:** the pool is Cleared and Learnt cards with a question due
@@ -6277,7 +6275,7 @@ function drawRange(
  *   cards, no cards still climbing, no shares, nothing brought forward to
  *   fill a place.
  */
-export type SessionMode = "regular" | "ultimate" | "started" | "mistakes" | "unseen" | "weak" | "catchup";
+export type SessionMode = "regular" | "ultimate" | "started" | "unseen" | "weak" | "catchup";
 
 /*
  * A question Catch up asks: one already met whose time has come round.
@@ -6397,10 +6395,8 @@ export function buildSession({
   /* The mode's own pool, narrowed from the cards chosen. */
   const units = (it: Item) => drillableUnits(it, settings);
   const pool = drillable.filter((it) =>
-    mode === "mistakes"
-      ? units(it).some(({ unit }) => hasRecentMistake(unit, settings))
-      : mode === "unseen"
-      ? units(it).some(({ unit }) => notSeenLately(unit, settings))
+    mode === "unseen"
+      ? isUnseen(it, settings)
       : mode === "weak"
       ? isWeak(it, settings)
       : mode === "catchup"
@@ -6410,7 +6406,7 @@ export function buildSession({
   if (!pool.length) {
     return {
       exercises: [],
-      reason: mode === "weak" ? "nothing-weak" : mode === "mistakes" ? "no-mistakes" : mode === "unseen" ? "no-unseen" : mode === "catchup" ? "caught-up" : "none-drillable",
+      reason: mode === "weak" ? "nothing-weak" : mode === "unseen" ? "no-unseen" : mode === "catchup" ? "caught-up" : "none-drillable",
     };
   }
 
@@ -7136,7 +7132,7 @@ export function buildManualSession({ items, settings, ids, mode, count, minutes,
  * `hist` is the last six outings, 1 right and 0 wrong, and it is the only
  * record with an order to it. A card from before it existed carries an
  * empty one and reads as 0 rather than as never having been right, which
- * is the same guard `missedTwice` and `hasRecentMistake` both make.
+ * is the same guard `missedTwice` makes.
  */
 export function weakness(s: ExerciseState | null | undefined): number {
   if (!s) return 0;
@@ -7929,6 +7925,19 @@ export function buildWeakSession({ items, settings, inDeck, budget, systems, per
   return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "weak" }), manual: true, mode: "weak" };
 }
 
+/* Not seen lately over every card, from Focused training (0.671). Under
+   the session mix like the rest — see SessionMode. */
+export function buildUnseenSession({ items, settings, inDeck, budget, systems, perDay }: {
+  items: Item[];
+  settings: Settings;
+  inDeck: (it: Item) => boolean;
+  budget?: number;
+  systems?: SystemSet[];
+  perDay?: number;
+}) {
+  return { ...buildSession({ items, settings, inDeck, budget, systems, perDay, mode: "unseen" }), manual: true, mode: "unseen" };
+}
+
 /*
  * A tense held as a skill, cast as the person its question is about.
  *
@@ -8113,9 +8122,12 @@ export function praiseFor(n: number) {
 }
 
 /* --- AlsoBox --------------------------------------------------------
-   What is worth knowing beyond the answer, under a "Learn more" heading.
-   It is shown open, with nothing to fold it away: the blocks are there to
-   be read, and a tap to reach them was a tap most answers never got.
+   What is worth knowing beyond the answer, behind a "Learn more" toggle.
+   It starts closed (0.678, back to how it was before 0.372): open, it put
+   several blocks between the answer and Continue on every card. A tap
+   opens it, with a chevron saying which way it will go. It is closed again
+   on every new question, because the answer, and this with it, unmounts
+   between questions.
 
    Renders nothing — not even the heading — when there is nothing to put
    in it, so "Learn more" is never a promise the box cannot keep.
@@ -8135,6 +8147,7 @@ function alsoName(el: any): string {
   return el.type === RelatedWords ? "related-words" : el.props["data-el"] || "";
 }
 function AlsoBox({ children }: { children?: Node }) {
+  const [open, setOpen] = useState(false);
   const shown = React.Children.toArray(children).filter(Boolean) as any[];
   if (!shown.length) return null;
   const row = (cells: any[]) => (
@@ -8156,12 +8169,21 @@ function AlsoBox({ children }: { children?: Node }) {
   rows.push(...shown.filter(wide));
   return (
     <>
-      <p className="at-alsomore" data-el="also-heading">
+      <button
+        type="button"
+        className="at-alsomore"
+        data-el="also-heading"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
         Learn more
-      </p>
-      <div className="at-alsobox" data-el="also">
-        {rows}
-      </div>
+        <Icon name={open ? "chevronUp" : "chevronDown"} size={18} />
+      </button>
+      {open && (
+        <div className="at-alsobox" data-el="also">
+          {rows}
+        </div>
+      )}
     </>
   );
 }
@@ -9039,7 +9061,7 @@ async function clipBlobFrom(id: string) {
     /* Being unable to reach the server is not the same as the server not
        having it. Only the second is remembered; the first is worth retrying
        when the connection comes back. */
-    if (!(typeof e === "object" && e && "message" in e && e.message === "offline")) {
+    if (!isUnreachable(e)) {
       MISSING_CLIPS.set(id, now());
       /* A "not here" from the server, as against a fault, is kept past
          this launch — see serverLacks. */
@@ -10599,6 +10621,9 @@ interface VerbAt {
   at: string;
 }
 const NO_VERB_AT: VerbAt = { revealed: [], read: {}, placed: {}, at: "" };
+/* Whether a form has a way it is said to check a reading against: its
+   transliteration or its recording (0.661). */
+const saysHow = (form: Form): boolean => !!String(form.lat || "").trim() || audibleOf(form).length > 0;
 /* No words lent their marks — one array, so the view of them stays put. */
 const NO_KEYS: string[] = [];
 
@@ -10621,7 +10646,13 @@ const NO_KEYS: string[] = [];
    the language, its pronoun included (هي أكلت), with how that is said under
    it. The pronoun is the one the Pronouns screen wrote for that person; a
    person with no pronoun card shows the verb alone. What is hidden in "Read
-   the forms" is how the whole right side is said, pronoun and all. */
+   the forms" is how the whole right side is said, pronoun and all.
+
+   Since 0.661 how a form is said may be heard as well as written: a form
+   with a recording has a play button once it is uncovered, and one with a
+   recording and no transliteration is asked too, uncovered by playing it.
+   The recording is the form's own, so it is the verb without the pronoun
+   unless the teacher recorded both. */
 function VerbTable({ tense, lang, reading, checked, pronouns }: {
   tense: Tense;
   lang: Lang;
@@ -10640,10 +10671,13 @@ function VerbTable({ tense, lang, reading, checked, pronouns }: {
   const script = { fontFamily: lang.fontStack, direction: lang.direction } as React.CSSProperties;
   const said = String(lang.translitLabel || "pronunciation").toLowerCase();
   const persons = tense.places.map((p) => p.person);
+  /* The form just uncovered by playing it, which plays straight away;
+     nothing else in the table starts on its own. */
+  const [justHeard, setJustHeard] = useState("");
   return (
     <ol className="at-vtense" data-el="verb-tense" aria-label={tense.tense.label || "The tense"}>
       {tense.places.map(({ person, form }) => {
-        const asked = !!reading && reading.asked.has(form.id) && !!String(form.lat || "").trim();
+        const asked = !!reading && reading.asked.has(form.id) && saysHow(form);
         const shown = !reading || !asked || checked || reading.revealed.has(form.id);
         const mark = reading ? reading.marks[form.id] : undefined;
         const pronoun = (pronouns && pronouns[person.id]) || null;
@@ -10651,6 +10685,7 @@ function VerbTable({ tense, lang, reading, checked, pronouns }: {
         /* How the whole right side is said: the pronoun's reading with the
            verb's, where both are written; the verb's alone otherwise. */
         const lat = formLat ? [pronoun ? pronoun.lat : "", formLat].filter(Boolean).join(" ") : "";
+        const heard = audibleOf(form);
         return (
           <li key={form.id} className="at-vrow at-vpair">
             <span className="at-vperson" data-el="verb-row-english">
@@ -10665,11 +10700,18 @@ function VerbTable({ tense, lang, reading, checked, pronouns }: {
                 ) : null}
                 <Marked text={String(form.ar || "")} lang={lang} />
               </span>
-              {lat ? (
+              {lat || heard.length ? (
                 <span className="at-vsaid">
                   {shown ? (
-                    <span className="at-vlat">{lat}</span>
-                  ) : (
+                    <>
+                      {lat ? <span className="at-vlat">{lat}</span> : null}
+                      {reading && heard.length ? (
+                        <span className="at-vheard" data-el="verb-recording">
+                          <AudioPrompt recs={heard} compact autoPlay={justHeard === form.id} />
+                        </span>
+                      ) : null}
+                    </>
+                  ) : lat ? (
                     <button
                       type="button"
                       className="at-vhidden"
@@ -10679,6 +10721,17 @@ function VerbTable({ tense, lang, reading, checked, pronouns }: {
                     >
                       <span aria-hidden="true">{lat}</span>
                     </button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      data-el="verb-reveal"
+                      onClick={() => {
+                        setJustHeard(form.id);
+                        if (reading) reading.onReveal(form.id);
+                      }}
+                    >
+                      Play to check
+                    </Button>
                   )}
                 </span>
               ) : null}
@@ -11602,6 +11655,8 @@ export default function ArabicTrainer() {
      person: nothing to do. Someone else: ask before switching. */
   const [linkAsk, setLinkAsk] = useState<{ name: string } | null>(null);
   const linkPeeked = useRef(false);
+  /* No connection is the bar's to say, with Retry (0.669). */
+  const linkReach = useReach({ detail: "Opening a sign-in link needs a connection." });
   useEffect(() => {
     if (!ready || !account || !linkKey || linkPeeked.current) return;
     if (linkKey === account.key || linkKey === account.linkKey) {
@@ -11609,18 +11664,25 @@ export default function ArabicTrainer() {
       return;
     }
     linkPeeked.current = true;
-    API.whoAmI(linkKey, "", "", true).then(
-      (r) => {
-        /* Their own link, holding its own code (0.640): nothing to do. */
-        if (r.user.handle === account.handle) setLinkKey("");
-        else setLinkAsk({ name: r.user.displayName || r.user.handle });
-      },
-      (e) => {
-        setLinkKey("");
-        const why = String(e && (e as Error).message);
-        flash(why === "bad-key" ? "That sign-in link no longer works." : API.explain(e), "warn");
-      },
-    );
+    const peek = (key: string): Promise<void> =>
+      API.whoAmI(key, "", "", true).then(
+        (r) => {
+          linkReach.ok();
+          /* Their own link, holding its own code (0.640): nothing to do. */
+          if (r.user.handle === account.handle) setLinkKey("");
+          else {
+            setLinkKey(key);
+            setLinkAsk({ name: r.user.displayName || r.user.handle });
+          }
+        },
+        (e) => {
+          setLinkKey("");
+          if (linkReach.caught(e, () => peek(key))) return;
+          const why = String(e && (e as Error).message);
+          flash(why === "bad-key" ? "That sign-in link no longer works." : API.explain(e), "warn");
+        },
+      );
+    void peek(linkKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ready, accountKey, linkKey]);
   /* Like the handle: a value rather than the object, so a re-fetch that
@@ -11686,6 +11748,8 @@ export default function ArabicTrainer() {
   /* And the pictures and recordings added offline in the card editor,
      waiting to go up before their cards (0.659). */
   const [heldMedia, setHeldMedia] = useState({ clips: 0, images: 0 });
+  const heldMediaRef = useRef(heldMedia);
+  heldMediaRef.current = heldMedia;
   useEffect(() => {
     let live = true;
     const look = () => {
@@ -11791,7 +11855,9 @@ export default function ArabicTrainer() {
   const [building, setBuilding] = useState(false);
   /* Focused training (0.650): the screen behind the dumbbell on Home. */
   const [training, setTraining] = useState(false);
-  const [showingSaved, setShowingSaved] = useState(false);
+  /* Prep mode's screen, opened from Focused training (0.671) — it was on
+     Progress until then. */
+  const [prepOpen, setPrepOpen] = useState(false);
   const [editingSaved, setEditingSaved] = useState<SavedSession | null>(null);
   /* Which language the session on screen is drawn from: a language id, ""
      for all of them at once, or null for never asked — which is what keeps
@@ -11984,11 +12050,11 @@ export default function ArabicTrainer() {
   /* Can't reach the server, with Retry (0.636): feedback sent from the
      menu, and joining a space from its invitation. */
   const feedbackReach = useReach();
-  const inviteReach = useReach();
+  const inviteReach = useReach({ detail: JOIN_NEEDS });
   const kb = useSoftKeyboard();
 
   /* ---- sync ---- */
-  const [syncCfg, setSyncCfg] = useState<{ token: string; lastSync: number; syncedThrough?: number }>(
+  const [syncCfg, setSyncCfg] = useState<{ token: string; lastSync: number }>(
     () => ({ token: "", lastSync: 0 }),
   );
   const [syncState, setSyncState] = useState("idle"); // idle|syncing|ok|error|off
@@ -12023,6 +12089,20 @@ export default function ArabicTrainer() {
    * written down, counted as sent, and left for the next answer.
    */
   const owed = useRef(false);
+  /*
+   * And which cards, for the You menu's count (0.663): noted by persist,
+   * the one place the learner's own changes go through, and let go of as a
+   * trip carries them. See Pending in sync.ts.
+   */
+  const pending = useRef<Pending>(NO_PENDING);
+  const setPending = useCallback((p: Pending) => {
+    if (p === pending.current) return;
+    pending.current = p;
+    savePending(p);
+  }, []);
+  useEffect(() => {
+    setPending(loadPending());
+  }, [setPending]);
   /*
    * Whether a question is being put. The sync's cadence turns on it — see
    * syncAfterChange in sync.ts — and a session that stops putting them,
@@ -12076,6 +12156,23 @@ export default function ArabicTrainer() {
         if (syncFailHeld.current) releaseReach(syncFailHeld.current);
         syncFailHeld.current = 0;
       };
+      /* Said in the bar with Retry (0.655). "No connection" is the bar's
+         own headline (0.669); anything else is "Sync failed". */
+      const holdFail = (title: string, detail: string) => {
+        if (syncFailHeld.current) {
+          updateReach(syncFailHeld.current, { title, detail });
+          if (byHand) showReach();
+        } else {
+          syncFailHeld.current = holdReach({
+            title,
+            detail,
+            /* The connection coming back already syncs; Retry is the
+               only other thing that should. */
+            auto: false,
+            retry: () => runSyncRef.current("", true),
+          });
+        }
+      };
       /*
        * Offline, the round trip can only fail, and failing at it says
        * nothing the connection has not already said. What is on this
@@ -12085,8 +12182,11 @@ export default function ArabicTrainer() {
       if (isOffline()) {
         setSyncState("off");
         /* Offline is not a failure: the menu says the work is safe and
-           the sync goes again when the connection comes back. */
-        letGo();
+           the sync goes again when the connection comes back. Unless Sync
+           now was pressed, which is answered the way anything pressed
+           without a connection is: the bar (0.669). */
+        if (byHand) holdFail("", "Your work is saved on this device.");
+        else letGo();
         return;
       }
       syncing.current = true;
@@ -12095,10 +12195,8 @@ export default function ArabicTrainer() {
          as it stands now. Anything written while it is in flight sets this
          again, and is owed a trip of its own — see the end. */
       owed.current = false;
+      setPending(pendingSetOut(pending.current));
       let sent = false;
-      /* What this trip carries is everything up to now, so a change from
-         here on is still to send — see syncedThrough below. */
-      const setOut = now();
       try {
         const { merged, changed, lost, serverNow } = await syncOnce(dataRef.current, key);
         sent = true;
@@ -12163,14 +12261,13 @@ export default function ArabicTrainer() {
           /* the document is synced; clips can catch up next time */
         }
 
-        /* How far this sync accounted for the cards, which is what the You
-           menu counts "to sync" from (0.655): the moment it set out, or the
-           newest change it brought down if another device's clock is ahead. */
-        const syncedThrough = Math.max(setOut, latestStamp(merged as Doc));
-        /* The ledger of recordings sent up is gone with the sending (0.659). */
-        const { uploaded: _sent, ...kept } = prevCfg;
+        /* The ledger of recordings sent up is gone with the sending (0.659),
+           and the count no longer reads a time from here (0.663). */
+        const { uploaded: _sent, syncedThrough: _through, ...kept } = prevCfg;
         void _sent;
-        const cfg = { ...kept, token: key, lastSync: now(), syncedThrough };
+        void _through;
+        setPending(pendingSent(pending.current));
+        const cfg = { ...kept, token: key, lastSync: now() };
         saveSyncConfig(cfg);
         setSyncCfg(cfg);
         setSyncState("ok");
@@ -12236,44 +12333,26 @@ export default function ArabicTrainer() {
             : msg === "too-large"
             ? "Your cards are too big to sync. Remove some recordings or cards."
             : msg === "would-empty"
-            ? "Sync refused: this device had nothing to send. Your cards on the server are untouched."
-            : isOffline()
-            ? "Offline — your work is saved on this device"
-            : "Sync failed";
+            ? "Sync stopped: this device had nothing to send. The cards in your account are untouched."
+            : "Your work is saved on this device.";
         setSyncState("error");
         /*
-         * Said in the bar with Retry (0.655), not in the menu. Its
-         * headline is "Sync failed" and the line under it why, where the
-         * app knows. Not when the connection went: the menu says that, and
-         * the sync goes again on its own when it comes back.
+         * Said in the bar with Retry (0.655), not in the menu. No
+         * connection — by the app's one rule, offline included when Sync
+         * now was pressed — is the bar's own "No connection"; anything
+         * else is "Sync failed", with why under it where the app knows.
+         * A background sync that finds the device offline says nothing:
+         * the menu says the work is safe, and the sync goes again on its
+         * own when the connection comes back.
          */
-        if (isOffline()) letGo();
-        else {
-          const detail =
-            said === "Sync failed"
-              ? /* The sync's own requests say a gateway's answer as
-                   pull-failed-502 and a request that never went as a
-                   TypeError, not reach.ts's words for them. */
-                isUnreachable(err) || err instanceof TypeError || /-50[234]$/.test(msg)
-                ? "Couldn't reach the server. Your work is saved on this device."
-                : "Your work is saved on this device."
-              : said;
-          if (syncFailHeld.current) {
-            updateReach(syncFailHeld.current, { detail });
-            if (byHand) showReach();
-          } else {
-            syncFailHeld.current = holdReach({
-              title: "Sync failed",
-              detail,
-              /* The connection coming back already syncs; Retry is the
-                 only other thing that should. */
-              auto: false,
-              retry: () => runSyncRef.current("", true),
-            });
-          }
-        }
+        const away = isOffline() || noConnection(err);
+        if (isOffline() && !byHand) letGo();
+        else holdFail(away ? "" : "Sync failed", away ? "Your work is saved on this device." : said);
         /* Nothing went up, so everything this trip carried is still owed. */
-        if (!sent) owed.current = true;
+        if (!sent) {
+          owed.current = true;
+          setPending(pendingFailed(pending.current));
+        } else setPending(pendingSent(pending.current));
       } finally {
         syncing.current = false;
         /* Written to while this was in flight, so it is owed a trip of its
@@ -12357,7 +12436,15 @@ export default function ArabicTrainer() {
       fromSync.current = false;
       return;
     }
-    owed.current = true;
+    /*
+     * Only for what the learner did, which persist marks as owed (0.663).
+     * A course refresh writes the cards too — every course card, whenever
+     * a teacher changes anything — and used to send this device's whole
+     * document up a few seconds later each time, though nothing of the
+     * learner's had changed. What it brought rides with the next trip:
+     * every device folds the course in for itself, so nothing waits on it.
+     */
+    if (!owed.current) return;
     const { wait, keep } = syncAfterChange(answeringRef.current);
     armSync(wait, keep);
   }, [data, ready, syncCfg.token, armSync]);
@@ -12445,28 +12532,82 @@ export default function ArabicTrainer() {
   }, [accountKey]);
 
   /* What is waiting, as the app opens — before any connection has been
-     tried, so the corner menu is right from the first paint. */
+     tried, so the corner menu is right from the first paint — and every
+     time the queue changes, so the dot and the count follow it (0.669). */
+  const [, setOutboxSeen] = useState(0);
   useEffect(() => {
     setToSend(waitingToSend(FLAG_OUTBOX));
+    return watchOutbox(() => {
+      setToSend(waitingToSend(FLAG_OUTBOX));
+      setOutboxSeen((n) => n + 1);
+    });
   }, []);
+
+  /*
+   * Everything this device is keeping until it can be sent (0.669): the
+   * problems reported about cards, and a teacher's cards with their
+   * pictures and recordings — from anywhere in the app, not only from
+   * Teaching. Sync now sends it, and so do the connection coming back,
+   * anything getting through, the app opening and a check every few
+   * minutes while something waits. Said in the You menu, not in a band
+   * across the top: its dot turns amber while anything is waiting.
+   */
+  const sendAllWaiting = useCallback(async () => {
+    if (!account || isOffline()) return;
+    API.setKey(account.key);
+    await Promise.allSettled([
+      sendWaiting(),
+      /* Trying a space (0.574): nothing is written to it. */
+      TRYING ? Promise.resolve(0) : sendWaitingCards({ say: flash }),
+    ]);
+  /* The key, not the account object; flash forwards to a memoised snackbar. */
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [accountKey, sendWaiting]);
+  const sendAllRef = useRef(sendAllWaiting);
+  sendAllRef.current = sendAllWaiting;
+  /* Whether anything is waiting, read when it is time to decide. */
+  const anyWaiting = () =>
+    waitingToSend(FLAG_OUTBOX) + waitingToSend(CARD_OUTBOX) + heldMediaRef.current.clips + heldMediaRef.current.images > 0;
 
   // Retry when the connection comes back.
   useEffect(() => {
     const onOnline = () => {
       if (loadSyncConfig().token) runSync();
-      void sendWaiting();
+      void sendAllWaiting();
     };
     window.addEventListener("online", onOnline);
     return () => window.removeEventListener("online", onOnline);
-  }, [runSync, sendWaiting]);
+  }, [runSync, sendAllWaiting]);
 
-  /* And on launch, for a report kept during a session that ended before
-     the connection came back. */
+  /* And on launch, for work kept during a visit that ended before the
+     connection came back. */
   useEffect(() => {
-    if (ready && account) void sendWaiting();
+    if (ready && account) void sendAllWaiting();
   /* The handle, not the account object, for the same reason. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ready, accountHandle, sendWaiting]);
+  }, [ready, accountHandle, sendAllWaiting]);
+
+  /* Anything getting through means the connection is there, which the
+     browser never says when it was the server that was away rather than
+     the network (0.669). At most once a minute, and only with something
+     waiting: a refusal is an answer too, and must not start a loop. And a
+     look every three minutes while something waits, for the case where
+     nothing else is asking at all. */
+  useEffect(() => {
+    let last = 0;
+    const go = () => {
+      const t = Date.now();
+      if (t - last < 60000 || !anyWaiting()) return;
+      last = t;
+      void sendAllRef.current();
+    };
+    const stop = watchReached(go);
+    const every = setInterval(go, 3 * 60000);
+    return () => {
+      stop();
+      clearInterval(every);
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -12602,6 +12743,7 @@ export default function ArabicTrainer() {
       syncTimer.current = null;
     }
     owed.current = false;
+    setPending(NO_PENDING);
     saveSyncConfig({ ...loadSyncConfig(), token: "" });
     setSyncCfg((c) => ({ ...c, token: "" }));
     fromSync.current = true;
@@ -12634,6 +12776,8 @@ export default function ArabicTrainer() {
     (nextOrFn: Doc | ((cur: Doc) => Doc | null)) => {
       const next = typeof nextOrFn === "function" ? nextOrFn(dataRef.current) : nextOrFn;
       if (!next || next === dataRef.current) return;
+      /* Which cards this changed, for the You menu's count (0.663). */
+      setPending(pendingAdd(pending.current, changesBetween(dataRef.current, next)));
       commit(next);
       /* Something is now in memory that is not on the disk. Read by the
          flush below. */
@@ -12648,7 +12792,7 @@ export default function ArabicTrainer() {
         void writeNow();
       }, 600);
     },
-    [commit, writeNow]
+    [commit, writeNow, setPending]
   );
 
   /*
@@ -13341,11 +13485,31 @@ export default function ArabicTrainer() {
     () => drillable.filter((it) => isWeak(it, settings)).length,
     [drillable, settings]
   );
+  /* The decks a prep can be aimed at, for Prep mode: the deck tags, with
+     how many cards of each can be asked (towardsLearnt, as Progress counts
+     them). Only while the screen is open — it is a walk of every card. */
+  const prepDecks = useMemo(() => {
+    if (!prepOpen) return [];
+    const counted = asCounted(shown).filter((it) => towardsLearnt(it, settings, shown));
+    return deckTags
+      .map((name) => ({ name, n: counted.filter((it) => (it.tags || []).includes(name)).length, learnt: 0 }))
+      .filter((d) => d.n > 0)
+      .sort((a, b) => b.n - a.n || a.name.localeCompare(b.name));
+  }, [prepOpen, shown, settings, deckTags]);
+  /* And how much has not been met lately, for the Not seen lately button
+     beside it (0.671) — the test its session picks with, as above. */
+  const unseenCount = useMemo(
+    () => drillable.filter((it) => isUnseen(it, settings)).length,
+    [drillable, settings]
+  );
   /* A session started from Focused training — weak spots, a built one, a
      kept one — closes it, so the session's end comes back to Home rather
      than to the screen it was started from (0.650). */
   useEffect(() => {
-    if (session) setTraining(false);
+    if (session) {
+      setTraining(false);
+      setPrepOpen(false);
+    }
   }, [session]);
 
   /* ---------------- session ---------------- */
@@ -13429,6 +13593,7 @@ export default function ArabicTrainer() {
         count: Number(x.count) || 0,
         minutes: Number(x.minutes) || 0,
         created: Number(x.created) || 0,
+        pinned: x.pinned === true,
       }));
   }, [settings.savedSessions]);
 
@@ -13440,6 +13605,9 @@ export default function ArabicTrainer() {
     [savedSessions, drillable]
   );
 
+  /* The ones pinned to Home (0.680) that can run here. */
+  const pinnedHere = useMemo(() => savedHere.filter((s) => s.pinned), [savedHere]);
+
   function keepSession(session: Omit<SavedSession, "id" | "created">) {
     const kept: SavedSession = {
       ...session,
@@ -13447,11 +13615,20 @@ export default function ArabicTrainer() {
       created: now(),
     };
     setSetting("savedSessions", savedSessions.concat([kept]));
-    flash(`Saved — it is under Saved sessions`);
+    flash(`Saved — it is under Saved sessions in Focused training`);
   }
 
   function dropSession(id: string) {
     setSetting("savedSessions", savedSessions.filter((x) => x.id !== id));
+  }
+
+  /* On Home or off it (0.680). The limit is the menu's to keep: it greys
+     the line out once PIN_LIMIT are pinned, rather than this quietly
+     unpinning another. */
+  function pinSession(id: string, on: boolean) {
+    setSetting("savedSessions", savedSessions.map((x) => (x.id === id ? { ...x, pinned: on } : x)));
+    const s = savedSessions.find((x) => x.id === id);
+    flash(on ? `${s ? s.name : "It"} is pinned to Home` : `${s ? s.name : "It"} is no longer on Home`);
   }
 
   /* Kept under the same id and date, so it stays where it was in the list
@@ -13487,6 +13664,7 @@ export default function ArabicTrainer() {
     passSets.current = true;
     if (st.kind === "begin") begin(st.practice, st.only, st.pathUnit);
     else if (st.kind === "weak") beginWeak();
+    else if (st.kind === "unseen") beginUnseen();
     else startSaved(st.saved);
     passSets.current = false;
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -13525,7 +13703,7 @@ export default function ArabicTrainer() {
 
   function manualOfSaved(s: SavedSession) {
     const ids = new Set([...s.ids, ...cardsOfSaved(s, shown).map((it) => it.id)]);
-    return { ids, mode: s.mode, count: s.count, minutes: s.minutes };
+    return { ids, mode: modeOfSaved(s.mode), count: s.count, minutes: s.minutes };
   }
 
   /* What a session started this way would be dealt now — the one place
@@ -13539,6 +13717,7 @@ export default function ArabicTrainer() {
       });
     }
     if (a.kind === "weak") return buildWeakSession({ items: shown, settings, inDeck, systems, perDay });
+    if (a.kind === "unseen") return buildUnseenSession({ items: shown, settings, inDeck, systems, perDay });
     const m = a.kind === "saved" ? manualOfSaved(a.saved) : a;
     /* Regular is dealt as the home screen deals, so it reads the cards the
        home screen does: the language switch has its say over which words
@@ -13551,6 +13730,7 @@ export default function ArabicTrainer() {
   function startAgain(a: Again) {
     if (a.kind === "begin") begin(a.practice, a.only, a.pathUnit);
     else if (a.kind === "weak") beginWeak();
+    else if (a.kind === "unseen") beginUnseen();
     else if (a.kind === "saved") startSaved(a.saved);
     else beginManual(a);
   }
@@ -13567,7 +13747,7 @@ export default function ArabicTrainer() {
     setBuilding(false);
     if (!built.exercises.length) {
       flash(
-        built.reason === "no-mistakes"
+        built.reason === "nothing-weak"
           ? "Nothing to fix — none of those have gone wrong recently"
           : built.reason === "caught-up"
           ? "You're all caught up — no cleared or learnt card in those is due yet"
@@ -13612,8 +13792,17 @@ export default function ArabicTrainer() {
          back; one refresh at a time is enough. */
       if (refreshing.current) return true;
       /* Nothing to ask and nothing to be learnt from asking. What this
-         device was last told is already on screen. */
-      if (isOffline()) return false;
+         device was last told is already on screen. Unless Refresh was
+         pressed, which is answered the way anything pressed without a
+         connection is: the bar, with Retry, on the Courses screen (0.669).
+         It used to do nothing at all. */
+      if (isOffline()) {
+        if (announce === true) {
+          setCourseUnreached(true);
+          setCourseError("Couldn't check your courses for anything new.");
+        }
+        return false;
+      }
       refreshing.current = true;
       setCourseBusy(true);
       /* Whether this actually got an answer, which two callers read: the
@@ -13783,7 +13972,9 @@ export default function ArabicTrainer() {
     setSpacesBusy(true);
     try {
       /* Only whether each one settled matters here, not what it returned. */
-      const jobs: Promise<unknown>[] = [runSync("", true)];
+      /* And everything kept on this device until it could be sent: the
+         reports, and a teacher's cards (0.669). */
+      const jobs: Promise<unknown>[] = [runSync("", true), sendAllWaiting()];
       if (account) jobs.push(refreshCourses("changes"));
       if (account && (teaches || account.admin))
         jobs.push(
@@ -13801,7 +13992,7 @@ export default function ArabicTrainer() {
     }
   /* The handle, not the account object, for the same reason. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [runSync, refreshCourses, accountHandle, teaches, accountAdmin]);
+  }, [runSync, refreshCourses, accountHandle, teaches, accountAdmin, sendAllWaiting]);
 
   /* A course can be deleted, or its decks changed, by a teacher on another
      device. Without this the home screen keeps showing a course that is gone
@@ -13904,6 +14095,29 @@ export default function ArabicTrainer() {
     }
     warmSession(built);
     setSession({ ...built, practice: false, startedAt: now(), endsAt: 0, again: { kind: "weak" } });
+    setQi(0);
+    setTally(NO_SCORE);
+    setMoved([]);
+    resetExercise();
+    setTab("home");
+  }
+
+  /* Not seen lately over every card, from Focused training (0.671): the
+     Build screen's mode of the same name, over the cards a dealt session
+     comes from rather than the ones picked. */
+  function beginUnseen() {
+    if (askFirst({ kind: "unseen" })) return;
+    const built = buildAgain({ kind: "unseen" });
+    if (!built.exercises.length) {
+      flash(
+        built.reason === "no-unseen"
+          ? "You've practised everything in the last few days — nothing has been left behind"
+          : "No card here has enough on it to be practised yet"
+      );
+      return;
+    }
+    warmSession(built);
+    setSession({ ...built, practice: false, startedAt: now(), endsAt: 0, again: { kind: "unseen" } });
     setQi(0);
     setTally(NO_SCORE);
     setMoved([]);
@@ -14018,6 +14232,41 @@ export default function ArabicTrainer() {
   }
 
   const exercise = session && qi < session.exercises.length ? session.exercises[qi] : null;
+  /* The card on Home turns once per finished session (0.664): the end
+     screen is the moment a session is finished, whether it ran its course,
+     ran out of time or was all answered. A trial is a teacher's look at one
+     question, not a session, so it turns nothing. Counted per device.
+     Opening the app turns it too (0.674): see readHomeTurn. */
+  const [homeTurn, setHomeTurn] = useState(readHomeTurn);
+  /* How far the student has come: before practice, the first day, or
+     from the second day of practice (0.666). The card's welcome and the
+     dumbbell (0.667) both wait on it. */
+  const stage: HomeStage = homeStage(data.log, dayKey());
+  const turnedFor = useRef<unknown>(null);
+  useEffect(() => {
+    if (!session || exercise || session.trial || turnedFor.current === session) return;
+    turnedFor.current = session;
+    setHomeTurn((t: number) => writeHomeTurn(t + 1));
+  }, [session, exercise]);
+  /* Coming back to the app after it has been in the background for a
+     while turns the card too (0.676), as a phone often keeps the app
+     there rather than closing it, so it never reopens. Not after a quick
+     look away (HOME_AWAY_TURN): tapping a fact's source and coming
+     straight back finds the same fact, not a new one. */
+  useEffect(() => {
+    let hiddenAt = document.visibilityState === "hidden" ? Date.now() : 0;
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        if (!hiddenAt) hiddenAt = Date.now();
+        return;
+      }
+      const away = hiddenAt ? Date.now() - hiddenAt : 0;
+      hiddenAt = 0;
+      if (away >= HOME_AWAY_TURN) setHomeTurn((t: number) => writeHomeTurn(t + 1));
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
   /* At the end of a session, whether starting it again the same way would
      ask anything: worked out once, when the end screen opens, and the
      button that offers it left off when it would not. */
@@ -15403,7 +15652,7 @@ export default function ArabicTrainer() {
         return;
       }
       setToSend(waitingToSend(FLAG_OUTBOX));
-      flash("Saved — it will be sent when you're back online", "good");
+      flash(SAVED_FOR_LATER, "good");
     };
     if (isOffline()) {
       keepReport();
@@ -15417,7 +15666,7 @@ export default function ArabicTrainer() {
            waits. `offline` is what the client calls a request that could
            not be made at all. */
         if (!isTransient(String((e && (e as Error).message) || e))) {
-          flash("Noted on this device. We couldn't reach the server.", "warn");
+          flash("This report couldn't be sent. It's noted on this device only.", "warn");
           return;
         }
         keepReport();
@@ -15735,10 +15984,13 @@ export default function ArabicTrainer() {
   }
 
 
-  /* The one prep, set, changed or cleared from Prep mode — see Prep. */
+  /* The one prep, set, changed or cleared from its screen — see Prep.
+     Called a goal wherever the learner reads it (0.681, the owner's 1b);
+     still a prep in the code, where renaming it would touch the stored
+     setting and every device's copy of it. */
   const savePrep = (p: Prep | null) => {
     setSetting("prep", p);
-    flash(p ? `Prepping for ${p.name}` : "Prep cleared");
+    flash(p ? `Goal set: ${p.name}` : "Goal cleared");
   };
 
   const setSetting: (k: string, v: any) => void = (k, v) =>
@@ -15918,6 +16170,7 @@ export default function ArabicTrainer() {
    */
   const syncNote = () => {
     const last = syncCfg.lastSync || 0;
+    const waitingCards = pendingCount(pending.current);
     return syncLine({
       trying: !!TRYING,
       offline,
@@ -15925,9 +16178,10 @@ export default function ArabicTrainer() {
       failed: syncState === "error",
       lastSync: last,
       reports: toSend,
-      /* This device's practice, and the cards the card editor saved
-         offline and keeps until they can go (0.659). */
-      cards: cardsToSync(data, syncCfg.syncedThrough || last) + waitingToSend(CARD_OUTBOX),
+      /* What the learner changed here and no trip has carried (0.663),
+         and the cards the card editor saved offline (0.659). */
+      cards: waitingCards.cards + waitingToSend(CARD_OUTBOX),
+      other: waitingCards.other,
       pictures: heldMedia.images,
       clips: heldMedia.clips,
     });
@@ -16101,12 +16355,6 @@ export default function ArabicTrainer() {
           {`You're in ${addressSpace.name}.`}
         </TopBanner>
       )}
-      {toSend > 0 && (
-        <TopBanner>
-          {`${plural(toSend, "report")} saved on this device, waiting for a connection. `}
-          {offline ? "They go up as soon as you're back online." : "Sending…"}
-        </TopBanner>
-      )}
       <div className="at-wrap">
           {/* No space to use (0.578): what happened, and the way back in.
               Everything else on the page is hidden; the You menu stays, for
@@ -16146,10 +16394,19 @@ export default function ArabicTrainer() {
               }}
             />
           )}
-          {/* Where you are (0.601), in Home's top right corner, where the
-              space button was: the other tabs carry it in their title. */}
-          {!inExercise && space === "learn" && tab === "home" && !session && placeButton && (
-            <div className="at-placecorner">{placeButton}</div>
+          {/* Home's top line (0.670): the app's name at the left, as the
+              page's title, and where you are at the right of the same
+              line, as every tab's title carries it (0.601). It scrolls
+              away with the page. Centred where there is no place button
+              to make room for (0.642): one space, one language. */}
+          {!inExercise && space === "learn" && tab === "home" && (
+            <div className={`at-homehead${placeButton && !session ? "" : " centred"}`}>
+              <h1 className="at-homename">
+                <BrandMark size={32} />
+                ManyTongues
+              </h1>
+              {!session && placeButton}
+            </div>
           )}
 
         {/* ============ STUDY ============ */}
@@ -16286,7 +16543,7 @@ export default function ArabicTrainer() {
                     <Climb items={shown.filter(prepDeckOf(homePrep.decks))} settings={settings} target={homePrep.target} />
                     <div className="at-row">
                       <Button variant="primary" onClick={() => begin(false, prepDeckOf(homePrep.decks))}>
-                        Prep for {homePrep.name}
+                        Practice for {homePrep.name}
                       </Button>
                     </div>
                     <PrepLine
@@ -16302,13 +16559,6 @@ export default function ArabicTrainer() {
                   {/* How far along the learner is, above the button that
                       takes them further — unless a prep has the top tile. */}
                   {!homePrep && <Climb items={shown} settings={settings} />}
-
-                  {/* What the button below will deal, in one line, just
-                      before the learner decides to press it. Left off under
-                      a prep, which has the top of the screen to itself. */}
-                  {!homePrep && drillable.length > 0 && (
-                    <p className="at-homeline">{homeLine(homeWaiting)}</p>
-                  )}
 
                   {/* A personal set's pictures still waiting for an answer
                       (0.630): one line, naming the first set, and the way
@@ -16328,10 +16578,19 @@ export default function ArabicTrainer() {
                       onOpen={(deckId) => setUnitOpen({ courseId: p.courseId, deckId })} />
                   ))}
 
-                  {/* Start session, and beside it on the right the way to
+                  {/* A shape in the logo's style and a fact about how
+                      language varies, turned after every finished session
+                      (0.664). See home-card.ts. Not under a prep (0.673):
+                      the prep's tile is the top of the screen, and the card
+                      pushed Practice off a phone. */}
+                  {!homePrep && <HomeCard turn={homeTurn} stage={stage} />}
+
+                  {/* Practice, and beside it on the right the way to
                       Focused training (0.650): weak spots, a session built
                       by hand and the ones kept, on a screen of their own,
-                      so the home screen has one thing to do. */}
+                      so the home screen has one thing to do. Practice was
+                      Start session until 0.664, and carries inside it the
+                      line that used to sit above it: what it will deal. */}
                   <div className="at-row at-startrow">
                     {/* Always live while there is anything to drill. Being
                         due decides what a session leads with, not whether
@@ -16342,18 +16601,44 @@ export default function ArabicTrainer() {
                     {/* One primary button on the screen: under a prep it is
                         the prep's, and this is the next thing along. */}
                     <Button variant={homePrep ? undefined : "primary"}
+                      className="at-practicebtn" data-el="practice"
+                      icon="play" iconSize={34}
                       onClick={() => begin(false)}
                       disabled={!drillable.length}
                     >
-                      Start session
+                      <b>Practice</b>
+                      <small>{practiceLine(homeWaiting)}</small>
                     </Button>
                     {/* An icon alone, as the owner asked: its name is what a
                         screen reader says, and the screen's title. No dot
                         for weak spots waiting (the owner's 3b). */}
-                    <IconButton icon="dumbbell" label="Focused training" ghost
-                      className="at-trainbtn" data-el="focused-training"
-                      onClick={() => setTraining(true)} />
+                    {/* The app's secondary button, outlined and unfilled, as
+                        every secondary action is (0.665): only its width is
+                        its own. Not there until the second day of practice
+                        (0.667), when the facts arrive too: before then
+                        there is little behind it for a beginner, and
+                        Practice has the row to itself. */}
+                    {stage === "learning" && (
+                      <Button variant="ghost" icon="dumbbell" iconSize={28}
+                        aria-label="Focused training" title="Focused training"
+                        className="at-trainbtn" data-el="focused-training"
+                        onClick={() => setTraining(true)} />
+                    )}
                   </div>
+                  {/* The saved sessions pinned to Home (0.680), under
+                      Practice: the tiles of Focused training without their
+                      dots, so pressing one starts it and that is all. Shown
+                      whatever else Home leaves off, a prep's included (the
+                      owner's 6a): they were put here on purpose. */}
+                  {pinnedHere.length > 0 && (
+                    <SavedTiles
+                      className="at-homepins"
+                      sessions={pinnedHere}
+                      items={shown}
+                      settings={settings}
+                      onStart={startSaved}
+                    />
+                  )}
                   {/* The warning that sat here — "No card here has two
                       usable exercise types" — was written for a teacher and
                       shown to learners. With nothing to practise the home
@@ -16538,7 +16823,7 @@ export default function ArabicTrainer() {
                                       const read = { ...verbAt.read, [id]: right };
                                       setVerbAt((v) => ({ ...v, read }));
                                       const all = verbTense.places
-                                        .filter((p) => verbAsked.has(p.form.id) && String(p.form.lat || "").trim())
+                                        .filter((p) => verbAsked.has(p.form.id) && saysHow(p.form))
                                         .every((p) => p.form.id in read);
                                       setTyped(all ? "read" : "");
                                     },
@@ -17641,8 +17926,6 @@ export default function ArabicTrainer() {
             settings={settings}
             moves={data.moves}
             perDay={perDay}
-            prep={prepOf(settings)}
-            onPrep={savePrep}
           />
         )}
 
@@ -17680,7 +17963,7 @@ export default function ArabicTrainer() {
 
         {/* ============ SETTINGS ============ */}
 
-        {/* Under the Build and Saved sessions screens, which open over it
+        {/* Under the Build and Prep screens, which open over it
             and come back to it; a session started from any of them closes
             it (see the effect on `session`). */}
         {training && !session && (
@@ -17689,14 +17972,38 @@ export default function ArabicTrainer() {
             onWeak={() =>
               weakCount ? beginWeak() : flash("There is no weak spot to fix right now")
             }
+            unseenCount={unseenCount}
+            onUnseen={() =>
+              unseenCount ? beginUnseen() : flash("Nothing left behind — you've practised everything in the last few days")
+            }
             canBuild={drillable.length > 0}
             onBuild={() => setBuilding(true)}
+            prep={prepOf(settings)}
+            onPrep={() => setPrepOpen(true)}
             saved={savedHere}
             items={shown}
             settings={settings}
-            onSavedList={() => setShowingSaved(true)}
             onStartSaved={startSaved}
+            onEditSaved={setEditingSaved}
+            onDeleteSaved={dropSession}
+            onPinSaved={pinSession}
             onClose={() => setTraining(false)}
+          />
+        )}
+
+        {/* Over Focused training, and back to it on Save or Back. */}
+        {training && prepOpen && !session && (
+          <PrepScreen
+            prep={prepOf(settings)}
+            decks={prepDecks}
+            collection={shown}
+            settings={settings}
+            perDay={perDay}
+            onSave={(p) => {
+              savePrep(p);
+              setPrepOpen(false);
+            }}
+            onBack={() => setPrepOpen(false)}
           />
         )}
 
@@ -17711,24 +18018,9 @@ export default function ArabicTrainer() {
           />
         )}
 
-        {showingSaved && !editingSaved && (
-          <SavedSessionsSheet
-            /* The ones that can run here, as the home screen offers
-               them (0.639). */
-            sessions={savedHere}
-            items={shown}
-            onStart={(s) => {
-              setShowingSaved(false);
-              startSaved(s);
-            }}
-            onEdit={setEditingSaved}
-            onDelete={dropSession}
-            onClose={() => setShowingSaved(false)}
-          />
-        )}
-
-        {/* The Build screen again, opened on what was kept. Saving goes
-            back to the list, which is where it was opened from. */}
+        {/* The Build screen again, opened on what was kept, from a tile's
+            menu on Focused training (0.675; the list it was opened from
+            before went in 0.680). Saving goes back there. */}
         {editingSaved && (
           <ManualSessionSheet
             items={shown}
@@ -17939,7 +18231,7 @@ export default function ArabicTrainer() {
           <p className="at-toast">
             Couldn't save to this device —{" "}
             {account
-              ? "still trying. Your answers are going to the server as you give them."
+              ? "still trying. Your answers are being saved to your account as you give them."
               : "still trying. Sign in so your answers are kept somewhere other than this device."}
           </p>
         )}
@@ -17987,20 +18279,6 @@ export default function ArabicTrainer() {
         </TopBanner>
       )}
 
-      {/* The app's name heads the learning page and scrolls away with it;
-          a space frame carries its own. */}
-      {/* Home has it large, at the left (0.576), as the page's title. Progress and
-          Cards are headed with their name, as every tab is (0.553);
-          Courses, reached from the menu, is headed with its own. */}
-      {/* Centred where there is no place button beside it to make room
-          for (0.642): one space, one language, nothing to switch. */}
-      {!inExercise && space === "learn" && tab === "home" && (
-        <div className={`at-brand at-brand-home${placeButton ? "" : " centred"}`}>
-          <img className="at-brandmark" src="/logo.svg" alt="" width={48} height={48} />
-          ManyTongues
-        </div>
-      )}
-
       {/* The bar at the foot of the window. Always mounted, so the slot the
           sections portal into stays the same element; hidden rather than
           taken down during an exercise. Two halves: the space's own
@@ -18025,10 +18303,16 @@ export default function ArabicTrainer() {
                every part of it is done — this device's cards, the courses,
                and the spaces this person belongs to. */
             syncState={
-              /* Trying a space (0.574): nothing syncs. */
+              /* Grey offline, and while trying a space (0.574), where
+                 nothing syncs: offline is not a failure. Red only when
+                 something failed. Amber while syncing, and while anything
+                 waits to be sent (0.669). */
               TRYING || offline
                 ? "off"
-                : spacesBusy || (syncState === "idle" && courseBusy)
+                : syncState === "error"
+                ? "error"
+                : spacesBusy || syncState === "syncing" || (syncState === "idle" && courseBusy) ||
+                  toSend + waitingToSend(CARD_OUTBOX) + heldMedia.clips + heldMedia.images > 0
                 ? "syncing"
                 : syncState
             }
@@ -18158,6 +18442,84 @@ export function climbOf(cards: Item[], settings: Settings, all: Item[], target: 
   return { n, learnt, pct: deckPercent({ n, learnt, got }), spread };
 }
 
+/*
+ * The card on Home (0.664): a shape drawn in the logo's style, and the
+ * fact, ending in a small icon
+ * that opens its source in the browser. Which shape and which fact is read
+ * off one count per device, moved on by each finished session; see
+ * home-card.ts for the shapes, the facts and why.
+ *
+ * The panel is the app's raised colour in both themes. On it the logo's
+ * pale lavender is deepened and its cream dot takes the text colour, so
+ * both show in light and dark alike.
+ */
+const SHAPE_STROKE: Record<ShapeColour, string> = {
+  yellow: "#F7C548", coral: "#FF7A59", mint: "#7FD1C7", lavender: "#A99BE0",
+};
+function HomeShapeArt({ shape }: { shape: HomeShape }) {
+  return (
+    <svg className="at-homeart" viewBox="0 0 240 150" aria-hidden="true" focusable="false">
+      {shape.marks.map((m, i) => m.kind === "dot"
+        ? <circle key={i} cx={m.x} cy={m.y} r={m.r} transform={m.transform} fill="currentColor" />
+        : <path key={i} d={m.d} transform={m.transform} fill="none" stroke={SHAPE_STROKE[m.colour]}
+            strokeWidth={m.width} strokeLinecap="round" strokeLinejoin="round" />)}
+    </svg>
+  );
+}
+function HomeCard({ turn, stage }: { turn: number; stage: HomeStage }) {
+  const { shape, fact }: { shape: HomeShape; fact: HomeFact } = homeCardAt(turn);
+  /* Until the second day of practice, a welcome under the logo's loops
+     instead of a fact (0.666): see homeStage. Nothing to source. */
+  if (stage !== "learning") {
+    return (
+      <div className="at-homecard" data-el="home-fact" data-stage={stage}>
+        <HomeShapeArt shape={HOME_SHAPES[0]} />
+        <p className="at-homecardfact">{HOME_WELCOME[stage]}</p>
+      </div>
+    );
+  }
+  return (
+    <div className="at-homecard" data-el="home-fact" data-stage={stage} data-fact={fact.id}>
+      <HomeShapeArt shape={shape} />
+      <p className="at-homecardfact">
+        {fact.text}{"\u00a0"}
+        <a className="at-homecardsrc" href={fact.source} target="_blank" rel="noopener noreferrer"
+          aria-label={`Source: ${fact.sourceName} (opens in your browser)`} title={`Source: ${fact.sourceName}`}>
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="currentColor" aria-hidden="true" focusable="false">
+            <path d="M19 19H5V5h7V3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14c1.1 0 2-.9 2-2v-7h-2v7zM14 3v2h3.59l-9.83 9.83 1.41 1.41L19 6.41V10h2V3h-7z" />
+          </svg>
+        </a>
+      </p>
+    </div>
+  );
+}
+/* The card's count, on this device only: which card is showing is a
+   matter of what this screen last showed, not something to sync.
+
+   It also turns once each time the app is opened (0.674): a reload, or
+   closing the app and opening it again, shows the next card, not the one
+   left from last time. Once per page load, not per mount, so going to
+   another screen and back does not turn it, and the end of a session
+   still turns it as before. The very first open, with nothing stored,
+   shows the first card. */
+const HOME_TURN_KEY = "arabic-trainer:home-card";
+/* How long the app must be in the background before coming back turns
+   the card (0.676, the owner's 1b). */
+const HOME_AWAY_TURN = 30 * 60 * 1000;
+let homeTurnedOnOpen = false;
+function readHomeTurn(): number {
+  let stored: string | null = null;
+  try { stored = localStorage.getItem(HOME_TURN_KEY); } catch { /* private window */ }
+  const turn = Math.max(0, parseInt(stored || "0", 10) || 0);
+  if (homeTurnedOnOpen) return turn;
+  homeTurnedOnOpen = true;
+  return writeHomeTurn(stored === null ? turn : turn + 1);
+}
+function writeHomeTurn(turn: number): number {
+  try { localStorage.setItem(HOME_TURN_KEY, String(turn)); } catch { /* private window: the card still turns for this visit */ }
+  return turn;
+}
+
 function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings: Settings; target?: PrepTarget }) {
   const climb = useMemo(() => climbOf(items, settings, items, target), [items, settings, target]);
 
@@ -18214,18 +18576,30 @@ function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings
   );
 }
 
+/* How many saved sessions can be on Home at once (0.680, the owner's 3b):
+   two fill one row of tiles on a phone, and Home was cleared of clutter
+   not long before. */
+const PIN_LIMIT = 2;
+
 /*
- * The sessions somebody kept, as tiles under the button that lists them.
+ * The sessions somebody kept, as tiles: under "Saved sessions" on Focused
+ * training, and the pinned ones on Home under Practice (0.680).
  *
- * A tile and not a row: these sit on the home screen's own card, between
- * buttons, and a full-width row each would push Start session's neighbours
- * off the screen after three or four of them. Small enough to sit two or
- * three abreast, which is a glance at all of them.
+ * A tile and not a row: small enough to sit two or three abreast, which is
+ * a glance at all of them.
  *
  * Each carries how much of its own cards is learnt, worked out the way the
- * ring above it is, so "Thursday's verbs · 40%" and the ring cannot be
- * counting different things. Pressing one starts it, which is what Start
- * does on the list; changing or forgetting one is the list's to do.
+ * ring on Home is, so "Thursday's verbs · 40%" and the ring cannot be
+ * counting different things, and since 0.675 what the session is — its
+ * kind, its length, its cards (savedSummary). Pressing one starts it.
+ *
+ * On Focused training the dots in its corner open a panel to start, edit,
+ * pin or unpin, and delete it (0.675; a panel from the foot of the screen
+ * since 0.680, the owner's 9c, where it was a menu hanging from the dots:
+ * a phone's thumb reaches it, and a tile at the foot of the screen cannot
+ * cut it off). A pinned one has a pin by its name there. On Home the same
+ * tile has no dots (`onEdit` and the rest left out): changing what is on
+ * Home is Focused training's to do.
  *
  * Except a Catch up, which carries how many of its cards are due instead
  * (0.604, the owner's 1a). Catch up only asks Cleared and Learnt cards, so
@@ -18235,67 +18609,217 @@ function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings
  * screen's "ready to review" counts by, so all three agree. With nothing
  * due the tile is dimmed but still pressable, and says so when pressed.
  */
-function SavedTiles({ sessions, items, settings, onStart }: {
+function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete, onPin, className = "" }: {
   sessions: SavedSession[];
   items: Item[];
   settings: Settings;
   onStart: (session: SavedSession) => void;
+  /** With these three, each tile has its dots and its panel; without
+      them it is Home's: the tile alone. */
+  onEdit?: (session: SavedSession) => void;
+  onDelete?: (id: string) => void;
+  onPin?: (id: string, on: boolean) => void;
+  className?: string;
 }) {
   const tiles = useMemo(() => {
-    /* Newest first, as the list has them. */
+    /* Newest first. */
     return [...sessions]
       .sort((a, b) => (b.created || 0) - (a.created || 0))
       .map((s) => {
         const cards = cardsOfSaved(s, items);
+        const { line } = savedSummary(s, items);
         if (s.mode === "catchup") {
-          return { s, alive: cards.length, due: cards.filter((it) => dueForReview(it, settings, items)).length, pct: 0 };
+          return { s, line, alive: cards.length, due: cards.filter((it) => dueForReview(it, settings, items)).length, pct: 0 };
         }
-        return { s, alive: cards.length, due: null, pct: climbOf(cards, settings, items).pct };
+        return { s, line, alive: cards.length, due: null, pct: climbOf(cards, settings, items).pct };
       });
   }, [sessions, items, settings]);
+  /* The session whose panel is open, and the one being asked about
+     before it is deleted. */
+  const [panelFor, setPanelFor] = useState<SavedSession | null>(null);
+  const [asking, setAsking] = useState<SavedSession | null>(null);
+  const menus = !!(onEdit && onDelete && onPin);
+  const pinnedCount = sessions.filter((x) => x.pinned).length;
 
   if (!tiles.length) return null;
+  const open = panelFor ? tiles.find((t) => t.s.id === panelFor.id) : undefined;
+  const close = () => setPanelFor(null);
   return (
-    <div className="at-savedtiles">
-      {tiles.map(({ s, alive, due, pct }) =>
-        due !== null ? (
+    <div className={`at-savedtiles${className ? " " + className : ""}`}>
+      {tiles.map(({ s, line, alive, due, pct }) => (
+        /* Two buttons side by side rather than one inside the other: the
+           tile itself, which starts the session, and the dots in its
+           corner. The dots stay pressable when every card in it has gone,
+           which is when changing or deleting it is the thing to do. */
+        <div
+          key={s.id}
+          className={`at-savedtile${due === 0 ? " quiet" : ""}${alive ? "" : " gone"}${menus ? "" : " bare"}`}
+        >
           <button
-            key={s.id}
-            className={`at-savedtile${due ? "" : " quiet"}`}
+            type="button"
+            className="at-savedtilego"
             disabled={!alive}
-            aria-label={`Start ${s.name}, ${due ? `${due} ${due === 1 ? "card" : "cards"} due` : "nothing due"}`}
+            aria-label={
+              due !== null
+                ? `Start ${s.name}, ${due ? `${due} ${due === 1 ? "card" : "cards"} due` : "nothing due"}${menus && s.pinned ? ", pinned to Home" : ""}`
+                : `Start ${s.name}, ${pct}% learnt${menus && s.pinned ? ", pinned to Home" : ""}`
+            }
+            aria-describedby={`saved-${s.id}-line`}
             onClick={() => onStart(s)}
           >
-            <span className="nm">{s.name}</span>
-            {due ? (
-              <span className="pc" aria-hidden="true">
-                {due}
-                <i className="due">due</i>
-              </span>
+            <span className="nm">
+              {menus && s.pinned ? (
+                <span className="at-savedpin" title="Pinned to Home">
+                  <Icon name="pin" size={14} />
+                </span>
+              ) : null}
+              <span className="nmtext">{s.name}</span>
+            </span>
+            <span className="ln" id={`saved-${s.id}-line`}>
+              {/* A number kept on the line with its word, so a narrow
+                  tile breaks "30 questions · 1 card" between the parts
+                  rather than leaving "card" alone under its 1. */}
+              {line.replace(/(\d) /g, "$1\u00a0")}
+            </span>
+            {due !== null ? (
+              due ? (
+                <span className="pc" aria-hidden="true">
+                  {due}
+                  <i className="due">due</i>
+                </span>
+              ) : (
+                <span className="pc none" aria-hidden="true">Nothing due</span>
+              )
             ) : (
-              <span className="pc none" aria-hidden="true">Nothing due</span>
+              <>
+                <span className="pc" aria-hidden="true">
+                  {pct}
+                  <i>%</i>
+                </span>
+                <span className="bar" aria-hidden="true">
+                  {pct > 0 && <i style={{ width: `${pct}%` }} />}
+                </span>
+              </>
             )}
           </button>
-        ) : (
-          <button
-            key={s.id}
-            className="at-savedtile"
-            disabled={!alive}
-            aria-label={`Start ${s.name}, ${pct}% learnt`}
-            onClick={() => onStart(s)}
-          >
-            <span className="nm">{s.name}</span>
-            <span className="pc" aria-hidden="true">
-              {pct}
-              <i>%</i>
-            </span>
-            <span className="bar" aria-hidden="true">
-              {pct > 0 && <i style={{ width: `${pct}%` }} />}
-            </span>
-          </button>
-        )
+          {menus && (
+            <button
+              type="button"
+              className="at-savedtilemore"
+              aria-label={`More for ${s.name}`}
+              title="More"
+              aria-haspopup="dialog"
+              onClick={() => setPanelFor(s)}
+            >
+              <Icon name="more" size={20} />
+            </button>
+          )}
+        </div>
+      ))}
+      {/* The panel, from the foot of the screen on a phone and in the
+          middle of a wide one: the sheet "Where you are" and "Join a
+          course" open in, named for the session it acts on. */}
+      {menus && panelFor && open && (
+        <PickSheet title={panelFor.name} lede={open.line} className="at-savedsheet" onClose={close}>
+          <div className="at-sheetacts">
+            <SheetAction
+              icon="play"
+              label="Start"
+              disabled={!open.alive}
+              note={open.alive ? undefined : "None of its cards are here any more"}
+              onClick={() => {
+                close();
+                onStart(panelFor);
+              }}
+            />
+            <SheetAction
+              icon="edit"
+              label="Edit"
+              onClick={() => {
+                close();
+                onEdit!(panelFor);
+              }}
+            />
+            {panelFor.pinned ? (
+              <SheetAction
+                icon="pinOff"
+                label="Unpin from Home"
+                onClick={() => {
+                  close();
+                  onPin!(panelFor.id, false);
+                }}
+              />
+            ) : (
+              /* Greyed out once Home has its two, with the reason under
+                 it, rather than unpinning another behind the learner's
+                 back (the owner's 8a). */
+              <SheetAction
+                icon="pin"
+                label="Pin to Home"
+                disabled={pinnedCount >= PIN_LIMIT}
+                note={pinnedCount >= PIN_LIMIT ? `Home has ${PIN_LIMIT} already. Unpin one first.` : undefined}
+                onClick={() => {
+                  close();
+                  onPin!(panelFor.id, true);
+                }}
+              />
+            )}
+            <SheetAction
+              icon="delete"
+              label="Delete"
+              danger
+              onClick={() => {
+                close();
+                setAsking(panelFor);
+              }}
+            />
+          </div>
+        </PickSheet>
+      )}
+      {/* Asked first: there is no undo (the owner's 1a). */}
+      {asking && onDelete && (
+        <ConfirmModal
+          title={`Delete ${asking.name}?`}
+          body={<p>The session is forgotten{asking.pinned ? ", and comes off Home" : ""}. Its cards and what you have learnt of them stay as they are.</p>}
+          confirmLabel="Delete"
+          onCancel={() => setAsking(null)}
+          onConfirm={() => {
+            const id = asking.id;
+            setAsking(null);
+            onDelete(id);
+          }}
+        />
       )}
     </div>
+  );
+}
+
+/* One thing to do in a panel of them (0.680): its icon in a round well,
+   and its name, with a line under it where it cannot be done and why.
+   Drawn like a row of "Where you are", the other panel of places to go. */
+function SheetAction({ icon, label, note, danger, disabled, onClick }: {
+  icon: string;
+  label: string;
+  note?: string;
+  danger?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`at-sheetact${danger ? " danger" : ""}`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="at-sheetactico" aria-hidden="true">
+        <Icon name={icon} size={22} />
+      </span>
+      <span className="at-sheetacttext">
+        <b>{label}</b>
+        {note ? <i>{note}</i> : null}
+      </span>
+    </button>
   );
 }
 
@@ -18747,17 +19271,24 @@ const TIME_CHOICES = [2, 5, 10, 15, 30];
    ------------------------------------------------------------------ */
 
 function FocusedTrainingSheet({
-  weakCount, onWeak, canBuild, onBuild, saved, items, settings, onSavedList, onStartSaved, onClose,
+  weakCount, onWeak, unseenCount, onUnseen, canBuild, onBuild, prep, onPrep, saved, items, settings, onStartSaved,
+  onEditSaved, onDeleteSaved, onPinSaved, onClose,
 }: {
   weakCount: number;
   onWeak: () => void;
+  unseenCount: number;
+  onUnseen: () => void;
   canBuild: boolean;
   onBuild: () => void;
+  prep: Prep | null;
+  onPrep: () => void;
   saved: SavedSession[];
   items: Item[];
   settings: Settings;
-  onSavedList: () => void;
   onStartSaved: (session: SavedSession) => void;
+  onEditSaved: (session: SavedSession) => void;
+  onDeleteSaved: (id: string) => void;
+  onPinSaved: (id: string, on: boolean) => void;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -18766,122 +19297,161 @@ function FocusedTrainingSheet({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
+  /* Where the prep stands, under its button — the line that sat beside
+     it on Progress until Prep mode moved here (0.671). */
+  const prepNow = prep ? prepStatus(prep, items, settings) : null;
+  const prepLine = !prep
+    ? ""
+    : prepNow === "past"
+    ? `${prep.name} has come — edit the goal or delete it.`
+    : prepNow === "done"
+    ? `Ready for ${prep.name}: every card is ${prep.target === "cleared" ? "cleared" : "learnt"}.`
+    : `Working towards ${prep.name} · ${prepDaysLeft(prep.date) === 1 ? "1 day left" : `${prepDaysLeft(prep.date)} days left`}`;
+
   return (
     <Screen title="Focused training" onBack={onClose} className="training">
       <div className="at-training">
-        <div className="at-row">
-          <Button variant="ghost" off={!weakCount} onClick={onWeak}>
-            Weak spots
-          </Button>
+        {/* What the screen is for (0.668). Each button says what it does
+            itself (0.671), so the line is short; the dumbbell drawing over
+            it went in 0.675, when each button got a picture of its own. */}
+        <div className="at-trainingintro" data-el="training-intro">
+          <p>Practise with a goal in mind.</p>
         </div>
-        <div className="at-row">
-          <Button variant="ghost" onClick={onBuild} disabled={!canBuild}>
-            Build a session
-          </Button>
+        {/* Two sessions over every card, side by side, then the two ways
+            of aiming one yourself, side by side too (0.681; full width
+            from 0.671). */}
+        <div className="at-trainpair">
+          <TrainingChoice
+            title="Weak spots"
+            icon="target"
+            note="Only the questions you've got wrong lately, worst first."
+            off={!weakCount}
+            onClick={onWeak}
+          />
+          <TrainingChoice
+            title="Not seen lately"
+            icon="history"
+            note="Cards you haven't practised in the last few days."
+            off={!unseenCount}
+            onClick={onUnseen}
+          />
         </div>
+        <div className="at-trainpair">
+          <TrainingChoice
+            title="Build a session"
+            icon="tune"
+            note="Pick the cards, the kind of practice and how long it lasts."
+            disabled={!canBuild}
+            onClick={onBuild}
+          />
+          {/* Set a goal until one is set, then Your goal, with where it
+              stands under it (0.681, the owner's 2b): it was Prep mode. */}
+          <TrainingChoice
+            title={prep ? "Your goal" : "Set a goal"}
+            icon="event"
+            note="Get decks ready by a date, like an exam, a trip or the start of a class."
+            status={prepLine}
+            onClick={onPrep}
+            dialog
+          />
+        </div>
+        {/* The sessions kept, under a rule and a heading of their own
+            (0.680). There was a Saved sessions button here, opening a
+            screen that listed them with Start, Edit and Delete; once each
+            tile's menu did all three the screen said nothing the tiles
+            did not, and it went. Not here until there is one, as the
+            button was not (the owner's 1a). */}
         {saved.length > 0 && (
-          <>
-            <div className="at-row">
-              <Button variant="ghost" onClick={onSavedList}>
-                Saved sessions
-              </Button>
-            </div>
-            <SavedTiles sessions={saved} items={items} settings={settings} onStart={onStartSaved} />
-          </>
+          <Section title="Saved sessions" head className="at-trainsaved">
+            <SavedTiles
+              sessions={saved}
+              items={items}
+              settings={settings}
+              onStart={onStartSaved}
+              onEdit={onEditSaved}
+              onDelete={onDeleteSaved}
+              onPin={onPinSaved}
+            />
+          </Section>
         )}
       </div>
     </Screen>
   );
 }
 
-/* ------------------------------------------------------------------
-   Full-screen: the sessions somebody kept
-
-   A saved session is a description, not a snapshot — which cards, which
-   mode, how long — so what it opens is built from the cards as they are
-   now. That is what makes "Thursday's verbs" worth keeping: the same
-   ground, practised again, with everything edited since included.
-   ------------------------------------------------------------------ */
-
-function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClose }: {
-  sessions: SavedSession[];
-  items: Item[];
-  onStart: (session: SavedSession) => void;
-  onEdit: (session: SavedSession) => void;
-  onDelete: (id: string) => void;
-  onClose: () => void;
+/* One of Focused training's choices (0.671): its name, and a line under
+   it saying what it is. `off` is dimmed but still pressed, so the press
+   can say why there is nothing in it, as Weak spots always has; `status`
+   is a second line for where it stands, in the accent colour. `icon`
+   is the picture over its name (0.675), in a round well like a Nudge's. */
+function TrainingChoice({ title, icon, note, status, off, disabled, dialog, onClick }: {
+  title: string;
+  icon: string;
+  note: string;
+  status?: string;
+  off?: boolean;
+  disabled?: boolean;
+  dialog?: boolean;
+  onClick: () => void;
 }) {
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
-
-  /* Newest first: the one somebody just made is the one they are looking
-     for. */
-  const list = [...sessions].sort((a, b) => (b.created || 0) - (a.created || 0));
-
+  /* Named by its title alone, and described by the rest, so it is
+     "Weak spots" to a screen reader as it was before it had a line. */
+  const id = useId();
   return (
-    <Screen title="Saved sessions" onBack={onClose}>
-      {!list.length && (
-        <Empty title="Nothing saved yet">
-          Build a session, and the screen offers to keep it.
-        </Empty>
-      )}
-
-      <div className="at-list">
-        {list.map((s) => {
-          /* How much of it is still here. A card withdrawn since is simply
-             gone from the session, and saying so before it is started is
-             the difference between a short session and a broken one. */
-          const alive = cardsOfSaved(s, items).length;
-          const gone = missingFromSaved(s, items).length;
-          const mode = (MODES as Record<string, { label: string } | undefined>)[s.mode];
-          const length = s.minutes
-            ? `${s.minutes} min`
-            : s.count && s.count < 999
-            ? `${s.count} questions`
-            : s.mode === "catchup"
-            ? "everything due"
-            : "everything";
-          return (
-            <div className="at-item at-sessionrow" key={s.id}>
-              <div className="grow">
-                <div className="en">{s.name}</div>
-                <div className="lat">
-                  {[mode ? mode.label : s.mode, length,
-                    !gone
-                      ? plural(alive, "card")
-                      : `${alive} of ${alive + gone} cards still here`,
-                  ].join(" · ")}
-                </div>
-              </div>
-              <Button
-                variant="primary"
-                size="sm"
-                disabled={!alive}
-                onClick={() => onStart(s)}
-              >
-                Start
-              </Button>
-              <IconButton
-                icon="edit"
-                label={`Edit ${s.name}`}
-                onClick={() => onEdit(s)}
-              />
-              <IconButton
-                icon="delete"
-                label={`Forget ${s.name}`}
-                danger
-                onClick={() => onDelete(s.id)}
-              />
-            </div>
-          );
-        })}
-      </div>
-
-    </Screen>
+    <button
+      type="button"
+      className={`at-trainchoice${off ? " off" : ""}`}
+      disabled={disabled}
+      aria-disabled={off ? true : undefined}
+      aria-label={title}
+      aria-describedby={`${id}-note${status ? ` ${id}-status` : ""}`}
+      aria-haspopup={dialog ? "dialog" : undefined}
+      onClick={onClick}
+    >
+      {/* The icon on the name's line, before it (0.681; over it from
+          0.675). A long name wraps beside it rather than shrinking. */}
+      <span className="at-trainchoicehead">
+        <span className="at-trainchoiceico" aria-hidden="true">
+          <Icon name={icon} size={18} />
+        </span>
+        <span className="at-trainchoicename">{title}</span>
+      </span>
+      <span className="at-trainchoicenote" id={`${id}-note`}>{note}</span>
+      {status ? <span className="at-trainchoicestatus" id={`${id}-status`}>{status}</span> : null}
+    </button>
   );
+}
+
+/*
+ * What a kept session is, in one line: its kind of practice, how long it
+ * runs and how many of its cards are still here — "Regular · 20 questions
+ * · 34 cards". On its tile since 0.675, as the Saved sessions screen's row
+ * had it until that screen went (0.680).
+ *
+ * A saved session is a description, not a snapshot — which cards, which
+ * mode, how long — so what it opens is built from the cards as they are
+ * now. That is what makes "Thursday's verbs" worth keeping: the same
+ * ground, practised again, with everything edited since included.
+ *
+ * How much of it is still here matters: a card withdrawn since is simply
+ * gone from the session, and saying so before it is started is the
+ * difference between a short session and a broken one.
+ */
+function savedSummary(s: SavedSession, items: Item[]): { alive: number; line: string } {
+  const alive = cardsOfSaved(s, items).length;
+  const gone = missingFromSaved(s, items).length;
+  const mode = (MODES as Record<string, { label: string } | undefined>)[modeOfSaved(s.mode)];
+  const length = s.minutes
+    ? `${s.minutes} min`
+    : s.count && s.count < 999
+    ? `${s.count} questions`
+    : s.mode === "catchup"
+    ? "everything due"
+    : "everything";
+  const line = [mode ? mode.label : s.mode, length,
+    !gone ? plural(alive, "card") : `${alive} of ${alive + gone} cards still here`,
+  ].join(" · ");
+  return { alive, line };
 }
 
 /*
@@ -18918,7 +19488,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
      already given, so the Mode section gets read as "confirm this" rather
      than "pick one" — and Ultimate, which is the longest session on offer,
      is the last one to hand somebody by default. */
-  const [mode, pickMode] = useState(editing ? editing.mode : "");
+  const [mode, pickMode] = useState(editing ? modeOfSaved(editing.mode) : "");
   /*
    * What is picked, two ways, as the two pickers show it: whole decks, and
    * single cards. A kept session is read back into the same two — what it
@@ -19013,10 +19583,12 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   /* Matches the minimum buildManualSession uses, or Start would be offered
      for a session that then refuses to build — and refused for one that
      would have been fine. */
-  const needTypes = mode === "started" ? 1 : 2;
+  const needTypes = mode === "started" || mode === "weak" ? 1 : 2;
   const typesShort =
     mode && typeCount < needTypes
-      ? mode === "started"
+      ? mode === "weak"
+        ? "Weak spots needs at least one exercise type switched on in Settings"
+        : mode === "started"
         ? "Get started needs one of the gentle exercise types switched on"
         : "At least two exercise types must be switched on in Settings"
       : "";
@@ -19433,9 +20005,9 @@ function readAlike(
 export function formTagsAt({ label, ambiguous, kin, lent, promptField, pictured = "" }: {
   /** What the form is called, from askLabel. Empty where nothing tells it apart. */
   label: string;
-  /** On a picture, what it says instead — pictureLabel: "female" or
-      "male" where the picture cannot show it, and never the count, which
-      it does. Under the picture whenever it says anything. */
+  /** On a picture, what it says instead — pictureLabel: the count where
+      the card has another, and "female" or "male" where the picture
+      cannot show it. Under the picture whenever it says anything. */
   pictured?: string;
   /** Whether the prompt leaves which form open — formIsAmbiguous. */
   ambiguous: boolean;
@@ -20024,7 +20596,7 @@ function PrepScreen({
   );
   return (
     <Screen
-      title="Prep mode"
+      title={prep ? "Your goal" : "Set a goal"}
       onBack={onBack}
       className="cardform"
       /* Save at the foot of the screen, as every other form keeps it, and
@@ -20033,23 +20605,23 @@ function PrepScreen({
       footer={
         <>
           {prep && (
-            <IconButton icon="delete" label="Delete this prep" danger onClick={() => onSave(null)} />
+            <IconButton icon="delete" label="Delete this goal" danger onClick={() => onSave(null)} />
           )}
           <Button
             variant="primary"
             disabled={!ready}
             onClick={() => ready && onSave({ name: name.trim(), date, decks: chosen, target })}
           >
-            {prep ? "Save changes" : "Start prepping"}
+            {prep ? "Save changes" : "Start working towards it"}
           </Button>
         </>
       }
     >
       <Lede>
-        Preparing for something on a set date? Pick the decks you need ready by then. The home screen will offer
+        Working towards something on a set date? Pick the decks you need ready by then. The home screen will offer
         sessions drawn only from those decks, and tell you whether you're on track.
       </Lede>
-      <FormField label="What are you preparing for?" htmlFor="at-prep-name">
+      <FormField label="What are you working towards?" htmlFor="at-prep-name">
         <input
           id="at-prep-name"
           className="at-input"
@@ -20520,7 +21092,7 @@ function UnitScreen({ line, row, items, settings, perDay, onBack, onPractise, on
             {row.state === "locked" && before ? <Help>{`Finish unit ${before.number} to open this one`}</Help> : null}
             {open ? (
               <div className="at-row">
-                <Button variant="primary" onClick={onPractise}>Practise this unit</Button>
+                <Button variant="primary" onClick={onPractise}>Practice this unit</Button>
                 {markable ? <Button variant="ghost" onClick={() => setMarking(true)}>Mark as cleared</Button> : null}
               </div>
             ) : null}
@@ -20554,8 +21126,6 @@ function ProgressTab({
   settings,
   moves,
   perDay = 0,
-  prep = null,
-  onPrep,
   spaceOf,
   spaceNames,
 }: {
@@ -20576,14 +21146,8 @@ function ProgressTab({
   moves?: Record<string, DayMoves>;
   /** Questions answered on a typical recent day — see `typicalDay`. */
   perDay?: number;
-  /** The learner's prep, if they have one — see Prep. */
-  prep?: Prep | null;
-  /** Sets, changes or clears it. */
-  onPrep?: (prep: Prep | null) => void;
 }) {
   const [viewing, setViewing] = useState<any | null>(null);
-  /* Whether Prep mode is open. */
-  const [prepOpen, setPrepOpen] = useState(false);
   /* The deck open on its own screen, or none. */
   const [deckOpen, setDeckOpen] = useState<string>("");
 
@@ -20740,8 +21304,6 @@ function ProgressTab({
   }, [counted, progress, spaceOf, spaceNames, unitTitles]);
   const deckOpenRow = deckRows.find((d) => d.key === deckOpen) || null;
 
-  /* Where the prep stands, for the line beside the button. */
-  const prepNow = prep ? prepStatus(prep, items, settings) : null;
   return (
     /* One sheet, ruled into parts, the way the card editor is laid out —
        see .at-ruled. */
@@ -20957,47 +21519,8 @@ function ProgressTab({
           </div>
         </Section>
       )}
-      {/* Prep mode: getting a set of decks ready by a date, under a heading
-          of its own like the other parts of the screen, last, after the
-          decks it is about. The button starts
-          one, or opens the one there is; the line beside it says what is
-          being prepped for. */}
-      <Section head title="Prep mode" lede="Get some decks ready by a set date, like an exam, an upcoming trip, or the start of a class.">
-        <div className="at-prepbar">
-          <Button variant="ghost" onClick={() => setPrepOpen(true)} aria-haspopup="dialog">
-            {prep ? "Edit prep mode" : "Start prep mode"}
-          </Button>
-          {prep && (
-            <Help className="at-prepnote">
-              {prepNow === "past"
-                ? `${prep.name} has come — edit the prep or delete it.`
-                : prepNow === "done"
-                ? `Ready for ${prep.name}: every card is ${prep.target === "cleared" ? "cleared" : "learnt"}.`
-                : `Prepping for ${prep.name} · ${
-                    prepDaysLeft(prep.date) === 1 ? "1 day left" : `${prepDaysLeft(prep.date)} days left`
-                  }`}
-            </Help>
-          )}
-        </div>
-      </Section>
-
       {items.length === 0 && (
         <Empty title="Nothing to show yet">{noCardsYet(myCourses.length)}</Empty>
-      )}
-
-      {prepOpen && (
-        <PrepScreen
-          prep={prep}
-          decks={deckRows}
-          collection={items}
-          settings={settings}
-          perDay={perDay}
-          onSave={(p) => {
-            if (onPrep) onPrep(p);
-            setPrepOpen(false);
-          }}
-          onBack={() => setPrepOpen(false)}
-        />
       )}
 
       {deckOpenRow && (
@@ -22019,7 +22542,7 @@ function SetQuestions({ sets, steps, openSet, onAnswer, onList, onSkipRest, onCl
         {`You can change any of these in Settings, under ${names.join(", ")}.`}
       </Help>
       <div className="at-row at-mt4">
-        <Button variant="primary" onClick={onStart || onClose}>{onStart ? "Start session" : "Done"}</Button>
+        <Button variant="primary" onClick={onStart || onClose}>{onStart ? "Practice" : "Done"}</Button>
       </div>
     </Screen>
   );
@@ -22433,7 +22956,7 @@ function AccountSettings({
 
             <FormField
               label="Delete your account"
-              lede="Deletes your account, your My space and your practice history from the server, and takes you off every course. Decks and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
+              lede="Deletes your account, your My space and your practice history, and takes you off every course. Decks and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
             >
               <CloseAccount onClosed={onCloseAccount} handle={account.handle} />
             </FormField>
@@ -22547,22 +23070,8 @@ function AppPreferences({ settings, setSetting }: {
     cards are being held back for a pile of overdue reviews. */
 export type Ready = { review: number; climbing: number; fresh: number; behind: boolean };
 
-/*
- * The one line above Start session. Every case ends somewhere the button
- * answers: there is always a session to start, so a learner who is caught
- * up is asked to practise rather than told when to come back.
- */
-export function homeLine({ review, climbing, fresh, behind }: Ready): string {
-  const news = fresh
-    ? ` · ${plural(fresh, "new card")} waiting`
-    : behind
-    ? " · new cards wait until you've caught up"
-    : "";
-  if (review) return `${plural(review, "card")} ready to review${climbing ? ` · ${climbing} in progress` : ""}${news}`;
-  if (climbing) return `Nothing to review — ${plural(climbing, "card")} in progress${news}`;
-  if (fresh) return `Nothing to review — ready to learn ${fresh === 1 ? "a new card" : `${fresh} new cards`}`;
-  return "All caught up — a practice session now still helps them stick";
-}
+/* The line that sat above Start session (homeLine) went inside the
+   Practice button in 0.664, shorter: see practiceLine in home-card.ts. */
 
 /*
  * The space you are in, at the top of the You menu (0.543, 28a): its logo
@@ -22621,6 +23130,9 @@ function SpaceBadge({ space, icon }: { space?: { name: string; logoData?: string
  * shows what the course holds. A pasted invitation link is read for its
  * code, as the stranded panel reads one.
  */
+/* The line under "No connection" wherever joining is what failed. */
+const JOIN_NEEDS = "Joining needs a connection.";
+
 function JoinSheet({ onJoin, onJoined, onClose }: {
   onJoin: (code: string) => Promise<any>;
   /** Joined: what to say about it. */
@@ -22630,11 +23142,27 @@ function JoinSheet({ onJoin, onJoined, onClose }: {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  /* No connection is the bar's to say, with Retry, like everywhere else —
+     offline included (0.669). */
+  const reach = useReach({ detail: JOIN_NEEDS });
   const input = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     const t = setTimeout(() => input.current && input.current.focus(), 200);
     return () => clearTimeout(t);
   }, []);
+  const attempt = async (given: string): Promise<void> => {
+    setBusy(true);
+    setError("");
+    try {
+      if (isOffline()) throw new Error("offline");
+      const r = await onJoin(given);
+      reach.ok();
+      onJoined(r && r.course ? `Joined ${r.course.title}.` : r && r.space ? `Joined ${r.space.name}.` : "Joined.");
+    } catch (e) {
+      if (!reach.caught(e, () => attempt(given))) setError(API.explain(e));
+      setBusy(false);
+    }
+  };
   const join = async () => {
     let given = code.trim();
     if (!given || busy) return;
@@ -22643,19 +23171,7 @@ function JoinSheet({ onJoin, onJoined, onClose }: {
     } catch (e) {
       /* not a link: a code */
     }
-    if (isOffline()) {
-      setError("Joining needs a connection. Try again when you're back online.");
-      return;
-    }
-    setBusy(true);
-    setError("");
-    try {
-      const r = await onJoin(given);
-      onJoined(r && r.course ? `Joined ${r.course.title}.` : r && r.space ? `Joined ${r.space.name}.` : "Joined.");
-    } catch (e) {
-      setError(API.explain(e));
-      setBusy(false);
-    }
+    await attempt(given);
   };
   return (
     <PickSheet title="Join a course" lede="Enter the course code your teacher gave you, or paste their invitation link." onClose={onClose}>
@@ -22696,7 +23212,7 @@ function StrandedPanel({ stranded, onJoined }: {
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const reach = useReach();
+  const reach = useReach({ detail: JOIN_NEEDS });
   const said = (why: string, name: string) =>
     why === "removed" ? `You were removed from ${name}.` : why === "left" ? `You left ${name}.` : `You're suspended in ${name}.`;
   return (

@@ -108,13 +108,10 @@ import { fillerCards } from "./numbers/generate.ts";
 import { rangeChecks } from "./numbers/range.ts";
 import { personsOf } from "./verbs.ts";
 import { countedNouns, withNouns } from "./numbers/nouns.ts";
-import { isOffline, watchNet } from "./net.ts";
-import { CARD_OUTBOX, drainOutbox, isTransient, keep as keepPending, waiting as waitingToSend } from "./outbox.ts";
-import { mediaIn, sendHeld, withoutMedia } from "./held-media.ts";
+import { noConnection, SAVED_FOR_LATER, watchNet } from "./net.ts";
+import { CARD_OUTBOX, keep as keepPending } from "./outbox.ts";
 
-/* A card as a teacher would name it, in a message about it. */
-const cardLabel = (c: Partial<Card>) =>
-  (c && (leadOf(c as Card).ar || c.name || leadOf(c as Card).en)) || "A card";
+import { dismissDropped, droppedCards, lockedNote, sendCardMedia as sendWaitingMedia, sendWaitingCards, watchDropped } from "./send-waiting.ts";
 import { buildDialogIndex } from "./dialogs.ts";
 import { feedbackToText, flagsToText } from "./flag-export.ts";
 import { IMPORTED_STATUS, matchImport, mediaOf, mentions, readImportFile, remapIds, tickedAtFirst, toSave } from "./imports.ts";
@@ -176,7 +173,6 @@ import {
   recallSpace,
   rememberSpace,
   useFreshSpace,
-  useOffline,
   useLiveRefresh,
   useSnackbar,
   useRun,
@@ -186,6 +182,7 @@ import {
   DeckSwitch,
   DeckPickScreen,
   PickSheet,
+  BrandMark,
 } from "./shared.tsx";
 export { Icon, CheckList, Screen, LanguageRadio, ClipList, ItemList, CardReadout };
 export { LanguageTag, languageName } from "./shared.tsx";
@@ -193,7 +190,7 @@ export { LanguageTag, languageName } from "./shared.tsx";
 /* What a screen says in place of what it could not load when the server
    was out of reach. The snackbar says why and offers Retry (0.636); this
    only keeps the screen from looking empty for no reason. */
-const LOAD_UNREACHED = "Couldn't load the latest from the server.";
+const LOAD_UNREACHED = "Couldn't load the latest.";
 export { ConfirmModal, useLiveRefresh, cardToItem, localIdFor };
 
 /*
@@ -367,7 +364,9 @@ export function Onboarding({ onDone, place = {} }: {
         ) : null}
         {!elsewhere && step === "link" && (
           <>
-            <img className="ob-logo" src={org && org.logoData ? org.logoData : "/logo.svg"} alt="" width={72} height={72} />
+            {org && org.logoData
+              ? <img className="ob-logo" src={org.logoData} alt="" width={72} height={72} />
+              : <BrandMark size={72} className="ob-logo" />}
             <h1>{org ? org.name : "ManyTongues"}</h1>
             <Lede>Signing you in…</Lede>
             <Button variant="ghost" wide className="at-mt3" onClick={() => setStep("existing")}>
@@ -378,7 +377,9 @@ export function Onboarding({ onDone, place = {} }: {
 
         {!elsewhere && step === "choose" && (
           <>
-            <img className="ob-logo" src={org && org.logoData ? org.logoData : "/logo.svg"} alt="" width={72} height={72} />
+            {org && org.logoData
+              ? <img className="ob-logo" src={org.logoData} alt="" width={72} height={72} />
+              : <BrandMark size={72} className="ob-logo" />}
             <h1>{org ? org.name : "ManyTongues"}</h1>
             {place.unknown ? (
               <Notice kind="warn">
@@ -3866,8 +3867,8 @@ export function ClaimAdmin({ onDone }: { onDone: (claimed?: boolean) => void }) 
         </Button>
       </div>
       <Help>
-        The long string set on the server when the site was deployed. Needed once, to make this
-        account the administrator.
+        The long key chosen when the site was set up. Needed once, to make this account the
+        administrator.
       </Help>
     </Field>
   );
@@ -4962,13 +4963,6 @@ function lockedDeleteNote(titles: string[]): string {
     : `${names} are locked. Unlock them in deck settings to delete them.`;
 }
 
-/* What to say when a save left locked decks as they were. */
-function lockedNote(titles: Set<string>): string {
-  const names = [...titles].map((t) => `"${t}"`).join(", ");
-  return titles.size === 1
-    ? `${names} is locked, so its cards were not changed.`
-    : `${names} are locked, so their cards were not changed.`;
-}
 
 /* ------------------------------------------------------------------
    Naming a deck
@@ -6191,11 +6185,18 @@ export const NO_CARD_FILTER = {
   blankNames: [] as string[],
   /* And where a card stands with review — see filterCards. */
   review: "any",
+  /* And whether students have it as it is — see filterCards. */
+  status: "any",
   /* What kind of card, and which of its kind: see filterCards. */
   kinds: [] as string[],
   subtypes: [] as string[],
   sceneKinds: [] as string[],
 };
+
+/** Whether a card has anything students don't have yet (0.679): a draft, a
+    card ready for review, or a published card with changes on it. */
+export const waitingToPublish = (c: { status?: string; changes?: unknown }): boolean =>
+  (!!c.status && c.status !== "published") || !!c.changes;
 
 /*
  * What a card list leaves out.
@@ -6238,7 +6239,7 @@ export function filterCards(
   cards: Card[],
   {
     audio = "any", forms = "any", deckMode = "any", deckIds = [], blankMode = "any", blankNames = [], review = "any",
-    kinds = [], subtypes = [], sceneKinds = [],
+    kinds = [], subtypes = [], sceneKinds = [], status = "any",
   }: {
     audio?: string;
     forms?: string;
@@ -6253,6 +6254,11 @@ export function filterCards(
     kinds?: string[];
     subtypes?: string[];
     sceneKinds?: string[];
+    /* Whether students have the card as it is (0.679): "waiting" keeps
+       the drafts, the cards ready for review and the published cards with
+       changes not yet published — everything Publish would send — and
+       "published" keeps the cards students have, with nothing waiting. */
+    status?: string;
   } = {},
   /* The ids of the cards waiting for review, worked out by the caller —
      it takes the whole collection to know what a frame makes. */
@@ -6266,6 +6272,8 @@ export function filterCards(
     if (forms === "one" && cardFormCount(c) !== 1) return false;
     if (review === "waiting" && !waiting.has(c.id)) return false;
     if (review === "sentences" && !needsReview(c)) return false;
+    if (status === "waiting" && !waitingToPublish(c)) return false;
+    if (status === "published" && waitingToPublish(c)) return false;
     if (forms === "several" && cardFormCount(c) < 2) return false;
     if (kinds.length) {
       const kind = cardKindOf(c);
@@ -6524,12 +6532,12 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     if (m) setEditing({ card: null, decks: m.decks, lang: m.lang, making: "word", opened: Date.now() });
   };
 
-  /* How many cards are waiting for a connection, so the space can say so
-     rather than leaving a teacher to wonder where their work went. */
-  const [kept, setKept] = useState(() => waitingToSend(CARD_OUTBOX));
   /* Saves the server refused when they were sent from the queue, named
-     until the teacher dismisses them (0.580, audit finding 5). */
-  const [lastDropped, setLastDropped] = useState<{ name: string; msg: string }[] | null>(null);
+     until the teacher dismisses them (0.580, audit finding 5) — whichever
+     part of the app sent them (0.669). How many cards are waiting is the
+     You menu's to say now, with everything else waiting to sync. */
+  const [lastDropped, setLastDropped] = useState(droppedCards);
+  useEffect(() => watchDropped(setLastDropped), []);
   /* The teacher's own number systems, one per language they teach. Read
      when the screen that edits them is opened rather than on every visit
      to the card list: it is one request and most visits never want it. */
@@ -6539,9 +6547,6 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     /* Which version of each a teacher signed off — see sign-system. */
     signed?: Record<string, number | null>;
   } | null>(null);
-  /* Whether there is a connection, so the editor can say so before the
-     typing rather than after it. */
-  const offline = useOffline();
   const [naming, setNaming] = useState<"new" | null>(null);
   /* What kind of deck "New deck" makes: chosen on a sheet first, outside
      My space, where only a regular deck can be made (0.633). */
@@ -6855,6 +6860,18 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   const [sortKey, setSortKey] = useState("changed");
   const [newestFirst, setNewestFirst] = useState(true);
   const [cardFilter, setCardFilter] = useState(NO_CARD_FILTER);
+  /* The cards the last import brought in (0.679). They come in Ready for
+     review, which students do not get, and the import itself said nothing
+     about that: a teacher could import a course's material, add its decks
+     to the course, and leave every student with empty decks. Held for as
+     long as this is open, so the band below can say so until they are
+     published. */
+  const [importedIds, setImportedIds] = useState<string[]>([]);
+  const importedWaiting = useMemo(() => {
+    if (!importedIds.length) return 0;
+    const ids = new Set(importedIds);
+    return cards.filter((c) => ids.has(c.id) && waitingToPublish(c)).length;
+  }, [cards, importedIds]);
   /*
    * Where every sentence card stands with review, and which are waiting.
    *
@@ -7098,6 +7115,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     }
     setImporting(false);
     await refresh();
+    setImportedIds(saved.map((x) => x.card.id));
     const replaced = going.filter((m) => m.kind === "same").length;
     const said = [
       going.length - replaced ? `imported ${plural(going.length - replaced, "card")}` : "",
@@ -7105,7 +7123,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       madeDecks ? `made ${plural(madeDecks, "deck")}` : "",
       unnamed ? `${unnamed} came in without its ID, which a card of yours already has` : "",
     ].filter(Boolean).join(", ") || "added your cards to the deck";
-    return `${said.charAt(0).toUpperCase()}${said.slice(1)}.`;
+    /* And that students don't have them yet, where any were saved: the
+       band at the top says it again, and stays. */
+    const waiting = saved.length ? " Students won't see them until you publish them." : "";
+    return `${said.charAt(0).toUpperCase()}${said.slice(1)}.${waiting}`;
   }
   const importScreen = importing && (
     <ImportScreen
@@ -7409,6 +7430,18 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       ),
     },
     {
+      key: "status",
+      label: "Status",
+      value: cardFilter.status,
+      onChange: (v) => setCardFilter((f) => ({ ...f, status: v })),
+      quiet: "any",
+      options: [
+        { value: "any", label: "Any" },
+        { value: "waiting", label: "Waiting to publish" },
+        { value: "published", label: "Published" },
+      ],
+    },
+    {
       key: "audio",
       label: "Recordings",
       value: cardFilter.audio,
@@ -7418,7 +7451,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         { value: "any", label: "Any" },
         { value: "with", label: "With" },
         { value: "without", label: "Without" },
-        { value: "lost", label: "Missing from the server" },
+        { value: "lost", label: "Missing" },
       ],
     },
     {
@@ -7723,32 +7756,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     if ([...(was.decks || [])].sort().join() !== [...decks].sort().join()) out.push("decks");
     return out;
   };
-  /*
-   * The pictures and recordings a card names that were added offline and
-   * are still on this device go up before the card does (0.659), so no
-   * student is ever handed a card whose picture or recording the server
-   * has not got. `waiting`: some could not go yet, and the card waits with
-   * them. One the server refuses is taken off the card, which goes without
-   * it, and the teacher is told.
-   */
-  const sendCardMedia = async (card: Partial<Card>): Promise<{ card: Partial<Card>; waiting: boolean }> => {
-    const named = mediaIn(card);
-    if (!named.length) return { card, waiting: false };
-    const r = await sendHeld(API.putMedia, named);
-    if (r.refused.length) {
-      const pics = r.refused.filter((x) => x.kind === "image").length;
-      const recs = r.refused.length - pics;
-      const what = [pics ? plural(pics, "picture") : "", recs ? plural(recs, "recording") : ""].filter(Boolean).join(" and ");
-      snack(
-        `${what} on "${cardLabel(card)}" couldn't be sent and ${r.refused.length === 1 ? "was" : "were"} left off: ${API.explain(new Error(r.refused[0].msg))}`,
-        "warn",
-      );
-    }
-    return {
-      card: r.refused.length ? withoutMedia(card, r.refused.map((x) => x.hash)) : card,
-      waiting: r.waiting.length > 0,
-    };
-  };
+  /* Its offline pictures and recordings first (0.659): send-waiting.ts. */
+  const sendCardMedia = (card: Partial<Card>) => sendWaitingMedia(card, snack);
   /* A save straight to the server, naming what it changed — for the
      screens that do not keep a save for later. */
   /* With the decks this screen believed the card was in, so the server
@@ -7775,7 +7784,9 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       if (media.waiting) throw new Error("offline");
       return await API.saveCard(card, decks, extra);
     } catch (e) {
-      if (String((e && (e as Error).message) || e) !== "offline") throw e;
+      /* No connection, by the app's one rule — a deploy restarting the
+         server included — keeps the card, as offline does (0.669). */
+      if (!noConnection(e)) throw e;
       /* A space only being tried is never written to, later or now
          (README, "Trying a space"). */
       if (API.tryingSpace()) throw new Error("trying-space-save");
@@ -7785,7 +7796,6 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       /* Nowhere to keep it: said, and the editor stays open with what was
          typed (0.580, audit finding 6). */
       if (!kept) throw new Error("device-full");
-      setKept(waitingToSend(CARD_OUTBOX));
       return { kept: true };
     }
   /* touchedBy reads the cards through a ref, so this is made once; and
@@ -7793,47 +7803,12 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mineSide]);
 
-  /* And send them when there is something to send them down. One at a
-     time, oldest first; a card the server refuses outright is dropped,
-     because it will be refused again for the same reason. */
+  /* And send them when there is something to send them down: the shared
+     sender in send-waiting.ts, which the rest of the app uses too (0.669).
+     A locked deck is said by it, so it is not said again here. */
   const sendKeptCards = useCallback(async () => {
-    if (isOffline()) return;
-    const dropped: { name: string; msg: string }[] = [];
-    const cardName = cardLabel;
-    const { sent } = await drainOutbox(CARD_OUTBOX, async (body) => {
-      const held = body as { card: Partial<Card>; decks: string[]; extra?: API.SaveExtra; org?: string };
-      try {
-        /* Its pictures and recordings kept offline go first (0.659). */
-        const media = await sendCardMedia(held.card);
-        if (media.waiting) return "keep";
-        absorbSaved(await API.saveCard(media.card, held.decks, held.extra || {}, held.org));
-        return "sent";
-      } catch (e) {
-        /* Waited through anything that is not the server's own refusal; a
-           refusal drops it, and the teacher is told (0.580, audit finding 5). */
-        const msg = String((e && (e as Error).message) || e);
-        if (isTransient(msg)) return "keep";
-        dropped.push({ name: cardName(held.card), msg });
-        return "drop";
-      }
-    });
-    setKept(waitingToSend(CARD_OUTBOX));
-    /* And with no card left waiting, whatever else was kept offline goes
-       too: a picture or recording added to a card that was then closed
-       without saving, say. Nothing names it, so a refusal is not said. */
-    if (!waitingToSend(CARD_OUTBOX) && !isOffline()) await sendHeld(API.putMedia);
-    if (dropped.length) {
-      const n = dropped.length;
-      snack(
-        `${n} saved card${n === 1 ? "" : "s"} could not be sent and ${n === 1 ? "was" : "were"} discarded: ${API.explain(new Error(dropped[0].msg))}`,
-        "warn",
-      );
-      setLastDropped((was) => (was || []).concat(dropped));
-    }
-    if (lockedHits.current.size) {
-      snack(lockedNote(lockedHits.current), "warn");
-      lockedHits.current.clear();
-    } else if (sent) snack(`${plural(sent, "card")} sent`, "good");
+    await sendWaitingCards({ say: snack, onSaved: absorbSaved });
+    lockedHits.current.clear();
   /* absorbSaved and snack are stable for this purpose: the first writes
      through a state setter, the second forwards to a memoised snackbar. */
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -8411,8 +8386,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
             (done: { name: string, kept: boolean, published: boolean, waiting: number, trimmed: string[], moved: number, waits: string }) =>
               done.kept
                 ? done.published
-                  ? `${done.name} saved on this device — it's published when you're back online`
-                  : `${done.name} saved on this device — it goes up when you're back online`
+                  ? `${done.name} saved on this device. It will be sent and published when you're back online.`
+                  : `${done.name} ${SAVED_FOR_LATER.charAt(0).toLowerCase()}${SAVED_FOR_LATER.slice(1)}`
                 : done.published && !done.moved && !done.trimmed.length && !done.waiting
                 ? `${done.name} saved and published — students get it now`
                 : done.moved
@@ -9876,6 +9851,20 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
        among those that can be added beside it. */
     const mine = decks.filter((d) => !isPathUnit(d) && (d.courses || []).some((l) => l.courseId === c.id));
     const plainDecks = decks.filter((d) => !isPathUnit(d));
+    /* What of this course's decks — its units with them — students don't
+       get yet (0.679), said here as the deck says it of itself: the course
+       is where a teacher looks to see what their students have. */
+    const courseDecks = decks.filter((d) => (d.courses || []).some((l) => l.courseId === c.id));
+    const courseCards = [...new Set(courseDecks.flatMap((d) => d.cardIds || []))]
+      .map((id) => cardById.get(id))
+      .filter(Boolean) as Card[];
+    const courseOff = notReaching(
+      { parts: courseDecks.flatMap((d) => d.parts || []), partsWaiting: courseDecks.flatMap((d) => d.partsWaiting || []) },
+      courseCards,
+    );
+    /* The cards among them, which Show them lists: a number part is
+       written under Numbers, not published. */
+    const courseUnpublished = courseCards.filter((x) => x.status === "draft" || x.status === "review").length;
     const units = pathUnits(c, allDecks) as Deck[];
     /* What the server saved, put on screen as it is — see toggleDeck. */
     const tookCourse = (r: any) => {
@@ -10045,6 +10034,28 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                     : "Students in this course see the decks you add here."}
                 </span>
               </div>
+              {courseOff && (
+                <div className="at-mb3">
+                  <Nudge
+                    icon="view"
+                    tone="attention"
+                    action={courseUnpublished ? (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setCardFilter({ ...NO_CARD_FILTER, status: "waiting", deckMode: "in", deckIds: courseDecks.map((d) => d.id) });
+                          setCourseView(null);
+                          setTab("cards");
+                        }}
+                      >
+                        {courseUnpublished === 1 ? "Show the card" : "Show the cards"}
+                      </Button>
+                    ) : undefined}
+                  >
+                    {`${plural(courseOff.n, "card")} in this course ${courseOff.n === 1 ? "doesn't" : "don't"} reach students yet: ${courseOff.why}.`}
+                  </Nudge>
+                </div>
+              )}
               {mine.length ? (
                 <DeckSwitch
                   decks={plainDecks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
@@ -10123,23 +10134,16 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       error={error}
       busy={busy}
     >
-          {/* Work that is safe but not yet shared. Said in the band across
-              the top of the window rather than in the space, because it is
-              true of the space rather than of whichever list is on screen —
-              and a teacher who has just written a card on a train should
-              see that it is still coming however far down a list they are. */}
+          {/* Saved cards that were refused once they could be sent, and so
+              discarded. Work waiting to be sent is no longer said here: the
+              dot on the You button turns amber, and the You menu counts it
+              with everything else waiting to sync (0.669). */}
           {lastDropped && lastDropped.length > 0 && (
             <TopBanner
               kind="error"
-              actions={<Button size="sm" variant="ghost" onClick={() => setLastDropped(null)}>Dismiss</Button>}
+              actions={<Button size="sm" variant="ghost" onClick={dismissDropped}>Dismiss</Button>}
             >
               {`Not sent, and discarded: ${lastDropped.map((d) => `${d.name} (${API.explain(new Error(d.msg))})`).join("; ")}`}
-            </TopBanner>
-          )}
-          {kept > 0 && (
-            <TopBanner>
-              {`${plural(kept, "card")} saved on this device, waiting for a connection. `}
-              {offline ? "They go up as soon as you're back online." : "Sending…"}
             </TopBanner>
           )}
           {/* Recordings the server does not hold, on cards students have:
@@ -10162,7 +10166,36 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 </Button>
               }
             >
-              Some recordings didn't reach the server. Record them again so students can hear them.
+              Some recordings are missing. Record them again so students can hear them.
+            </TopBanner>
+          )}
+          {/* What an import brought in and students don't have yet (0.679):
+              on until every card of it is published, or the teacher puts
+              it away. */}
+          {importedWaiting > 0 && (
+            <TopBanner
+              actions={
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setCardFilter({ ...NO_CARD_FILTER, status: "waiting" });
+                      setOpenDeck(null);
+                      setCourseView(null);
+                      setTab("cards");
+                    }}
+                  >
+                    {importedWaiting === 1 ? "Show the card" : "Show the cards"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setImportedIds([])}>
+                    Dismiss
+                  </Button>
+                </>
+              }
+            >
+              {importedWaiting === 1
+                ? "1 imported card is waiting for review. Students won't see it until you publish it."
+                : `${importedWaiting} imported cards are waiting for review. Students won't see them until you publish them.`}
             </TopBanner>
           )}
 
@@ -10843,7 +10876,7 @@ export function StudentCourses({
 }) {
   const [note, setNote] = useState("");
   useReachHold(onRetry, { detail: "Your own cards still work." });
-  const joinReach = useReach();
+  const joinReach = useReach({ detail: "Joining needs a connection." });
   const joinRef = useRef<(code: string) => Promise<void>>(async () => {});
   const groups = spaces && spaces.length > 1
     ? spaces.map((o) => ({ key: o.id, title: o.name, courses: courses.filter((c) => (c as any).org === o.id) }))

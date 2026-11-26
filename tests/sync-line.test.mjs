@@ -8,7 +8,8 @@
 import { test, beforeEach } from "node:test";
 import assert from "node:assert/strict";
 
-const { syncLine, syncedWhen, cardsToSync, latestStamp } = await import("../src/sync.ts");
+const { syncLine, syncedWhen, changesBetween, pendingAdd, pendingSetOut, pendingSent, pendingFailed, pendingCount, NO_PENDING } =
+  await import("../src/sync.ts");
 const { holdReach, updateReach, reachState, resetReach, dismissReach, showReach } = await import("../src/reach.ts");
 
 beforeEach(() => resetReach());
@@ -81,21 +82,47 @@ test("syncing, and trying a space", () => {
 const card = (id, updated, states = {}) =>
   /** @type {any} */ ({ id, kind: "word", ar: "x", en: "x", updated, s: states, forms: [] });
 
-test("a card counts once it has changed since the sync, by any of its stamps", () => {
-  const doc = /** @type {any} */ ({
+test("a change counts the cards it altered, added or removed, by content (0.663)", () => {
+  const a = card("a", 100);
+  const b = card("b", 100);
+  const prev = /** @type {any} */ ({ items: [a, b, card("gone", 1)], settings: { x: 1 } });
+  const next = /** @type {any} */ ({
     items: [
-      card("a", 100),
-      card("b", 300),
-      /* Answered after the sync: only the exercise state says so. */
-      card("c", 100, { meaning: { updated: 400 } }),
-      { ...card("d", 100), priorityAt: 350 },
+      a,
+      /* Answered: a new state on it. */
+      card("b", 100, { meaning: { updated: 200 } }),
+      card("new", 300),
     ],
-    tombstones: { gone: 500, old: 50 },
+    settings: { x: 1 },
   });
-  assert.equal(cardsToSync(doc, 200), 4, "b, c, d and the card removed since");
-  assert.equal(cardsToSync(doc, 0), 6, "never synced: everything");
-  assert.equal(cardsToSync(doc, latestStamp(doc)), 0);
-  assert.equal(latestStamp(doc), 500);
+  assert.deepEqual(changesBetween(prev, next).cards.sort(), ["b", "gone", "new"]);
+  assert.equal(changesBetween(prev, next).other, false);
+  /* Every card handed back as a fresh object with nothing changed is no change. */
+  const copied = /** @type {any} */ ({ items: prev.items.map((/** @type {any} */ x) => ({ ...x })), settings: { x: 1 } });
+  assert.deepEqual(changesBetween(prev, copied), { cards: [], other: false });
+  /* A setting alone is a change that is not a card. */
+  assert.deepEqual(changesBetween(prev, { ...prev, settings: { x: 2 } }), { cards: [], other: true });
+});
+
+test("what a trip carries is let go when it lands and waits again when it fails", () => {
+  let p = pendingAdd(NO_PENDING, { cards: ["a", "b"], other: true });
+  assert.deepEqual(pendingCount(p), { cards: 2, other: true });
+  p = pendingSetOut(p);
+  /* Changed again while the trip is out: still waiting after it lands. */
+  p = pendingAdd(p, { cards: ["b", "c"], other: false });
+  assert.deepEqual(pendingCount(p), { cards: 3, other: true }, "in flight still counts");
+  const landed = pendingSent(p);
+  assert.deepEqual(pendingCount(landed), { cards: 2, other: false }, "b and c, changed during the trip");
+  const failed = pendingFailed(p);
+  assert.deepEqual(pendingCount(failed), { cards: 3, other: true }, "nothing went up");
+  assert.deepEqual(pendingCount(pendingSent(pendingSetOut(landed))), { cards: 0, other: false });
+});
+
+test("something waiting that is not a card is said, never Up to date (0.663)", () => {
+  const last = new Date(2026, 10, 20, 14, 32).getTime();
+  assert.equal(syncLine({ lastSync: last, other: true, at }).main, "Changes to sync");
+  assert.equal(syncLine({ lastSync: last, other: true, cards: 2, at }).main, "2 cards to sync", "the count says it already");
+  assert.equal(syncLine({ offline: true, lastSync: last, other: true, at }).sub, `Changes to sync · last synced today at ${hm(14, 32)}`);
 });
 
 /* -------- the bar -------- */

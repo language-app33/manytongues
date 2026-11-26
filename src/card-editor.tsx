@@ -51,7 +51,7 @@ import { CONVERSATION, MAX_SPEAKERS, TEXT, isDialog, isText, namedPart, pickedFr
 import type { SceneKind } from "./dialogs.ts";
 import { castFill, castOf, castReport, filledScene, memberBase, memberLabel, newMember, recast, roleIn } from "./cast.ts";
 import { reviewPool, sentencesOf } from "./review.ts";
-import { answerRows, answersOf, packAnswers, shownAlternatives } from "./answers.ts";
+import { UNCOUNTABLE, answerRows, answersOf, packAnswers, shownAlternatives } from "./answers.ts";
 import { ADJECTIVE_IS_SLOT, asMeaning, ADJECTIVE_SLOT, cardRef, DEMONSTRATIVE_READING_SLOTS, DEMONSTRATIVE_SLOT, dropRail, fillNames, fillsOf, isLent, isSentence, MAX_FILLS, movedSlot, NOUN_READING_SLOTS, NOUN_SLOT, nounNumberOf, PRONOUN_SLOT, readingBase, readingNames, READING_SLOTS, refClash, renameSlot, RESERVED_READINGS, slotName, slotsIn, slotsOf, slotTrouble, SPEAKER_COLUMNS, splitSlots, withoutSlot, withSlotAt, WORD_SLOT, wordsDir } from "./variables.ts";
 import { agreeingBlanks, combosOf, mainFormOnly, EXAMPLES_CEILING, examplesOf, fillersFor, rowsLine, tensedBlanks, whyStarved } from "./card-facts.ts";
 import type { Value } from "./variables.ts";
@@ -3981,13 +3981,19 @@ const sidesOf = (dims: GrammarDim[]): [string, string][] =>
 
 /**
  * The boxes, in the order they are drawn: every number the language offers
- * but "doesn't apply" — on each side, where there are two.
+ * but "doesn't apply" — on each side, where there are two. One box, the
+ * word's own, where the card says it is uncountable.
  */
-export function nounBoxes(lang: Lang | null | undefined, layout: NounLayout): NounBox[] {
+export function nounBoxes(lang: Lang | null | undefined, layout: NounLayout, uncountable = false): NounBox[] {
   if (!layout) return [];
   const dims = answerDims(lang, "noun");
   const dim = dims.find((d) => d.field === "number");
-  const numbers = ((dim || { options: [] }).options as [string, string][]).filter(([v]) => v !== "na");
+  /* An uncountable word has one shape, so one box — on each side, where
+     there are two — and is never itself a box beside the others: it is
+     the tick over them. See nounUncountable. */
+  const numbers = uncountable
+    ? ([[UNCOUNTABLE, "word"]] as [string, string][])
+    : ((dim || { options: [] }).options as [string, string][]).filter(([v]) => v !== "na" && v !== UNCOUNTABLE);
   /* What a value says about its box — Arabic's plural after three to ten
      has a name longer than its radio's, a line under it, and is not asked
      on its own. */
@@ -4129,6 +4135,77 @@ export const nounGenderOf = (forms: Record<string, any>[]): string => {
   const lead = forms[0] || {};
   return (formSays(lead) || leadFirstAnswer(lead)).gender;
 };
+
+/**
+ * Whether a noun's card says it has no plural: its own word is marked
+ * uncountable. Asked of the card's own word alone, as its gender is —
+ * it is the form that cannot be removed.
+ */
+export const nounUncountable = (forms: Record<string, any>[]): boolean => {
+  const lead = forms[0] || {};
+  return (formSays(lead) || leadFirstAnswer(lead)).number === UNCOUNTABLE;
+};
+
+const withoutNumber = (answer: Record<string, any>) => {
+  const { number: _n, ...rest } = answer || {};
+  return rest;
+};
+
+/**
+ * A noun's forms with the tick put on or taken off.
+ *
+ * On: the word in each singular box becomes the uncountable word, and the
+ * forms in every other box — the pair, the plural, the plural after three
+ * to ten — are taken out and handed back as `shelved`, with the pronoun
+ * cells on the end of them, so that unticking before the card is saved
+ * puts them back as they were. A form in no box is left alone: nothing
+ * said it was a plural.
+ *
+ * Off: the uncountable words are singulars again, and whatever was
+ * shelved comes back after them.
+ */
+export function tickUncountable(
+  on: boolean,
+  forms: Record<string, any>[],
+  cells: Record<string, any>[],
+  boxes: NounBox[],
+  layout: NounLayout,
+  shelved: { forms: Record<string, any>[]; cells: Record<string, any>[] } = { forms: [], cells: [] },
+): { forms: Record<string, any>[]; cells: Record<string, any>[]; shelved: { forms: Record<string, any>[]; cells: Record<string, any>[] } } {
+  const marked = (form: Record<string, any>, number: string) => ({
+    ...form,
+    number,
+    ...(Array.isArray(form.answers) ? { answers: form.answers.map(withoutNumber) } : null),
+  });
+  if (!on) {
+    return {
+      forms: forms
+        .map((f, i) => (((formSays(f) || (i === 0 ? leadFirstAnswer(f) : { number: "" })).number === UNCOUNTABLE) ? marked(f, "singular") : f))
+        .concat(shelved.forms),
+      cells: cells.concat(shelved.cells),
+      shelved: { forms: [], cells: [] },
+    };
+  }
+  const { at } = placeNounForms(forms, boxes, layout);
+  const kept = new Set<number>([0]);
+  const gone = new Set<number>();
+  for (const box of boxes) {
+    const i = at[box.key];
+    if (i === undefined) continue;
+    if (box.number === "singular" || i === 0) kept.add(i);
+    else gone.add(i);
+  }
+  const goneIds = new Set([...gone].map((i) => String(forms[i].id || "")).filter(Boolean));
+  const isGone = (c: Record<string, any>) => goneIds.has(String(c.of || ""));
+  return {
+    forms: forms.flatMap((f, i) => (gone.has(i) ? [] : [kept.has(i) ? marked(f, UNCOUNTABLE) : f])),
+    cells: cells.filter((c) => !isGone(c)),
+    shelved: {
+      forms: forms.filter((f, i) => gone.has(i) && hasWords(f)),
+      cells: cells.filter(isGone),
+    },
+  };
+}
 
 /**
  * The card's own word, kept on a box with something in it.
@@ -4683,8 +4760,14 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
   const nounLayout: NounLayout = worded
     ? nounLayoutOf(lang, category, String((forms[0] || {}).human || ""))
     : "";
-  const nounBoxList = useMemo(() => nounBoxes(lang, nounLayout), [lang, nounLayout]);
+  /* Whether the card says the word has no plural, which leaves it one box
+     — see nounUncountable. */
+  const uncountable = !!nounLayout && nounUncountable(forms);
+  const nounBoxList = useMemo(() => nounBoxes(lang, nounLayout, uncountable), [lang, nounLayout, uncountable]);
   const nounPlaced = placeNounForms(forms, nounBoxList, nounLayout);
+  /* What the tick took out of the draft, kept until the card is saved or
+     closed so that unticking puts it back. Never saved. */
+  const [shelved, setShelved] = useState<{ forms: Record<string, any>[]; cells: Record<string, any>[] }>({ forms: [], cells: [] });
   /* What the stored card already carries, which is what the radio may no
      longer take away — see storedFormsOf. */
   const storedForms: CardForms = storedFormsOf(card, lang);
@@ -5825,6 +5908,15 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
   };
   const fillBox = (box: NounBox, next: Record<string, any>) =>
     settle(forms.concat([{ ...emptyBox(box), ...next, id: formName(forms) }]));
+  /* The tick over a noun's boxes: the word has no plural, so the boxes for
+     one go, and what was in them with them — see tickUncountable. */
+  const setUncountable = (on: boolean) => {
+    if (!nounLayout || on === uncountable) return;
+    const next = tickUncountable(on, forms, cells, nounBoxList, nounLayout, shelved);
+    setForms(next.forms);
+    setCells(next.cells);
+    setShelved(next.shelved);
+  };
   /* A thing's gender, which is the card's: on every form in a box, and off
      their answers, where an older card may have said it one answer at a
      time. */
@@ -6083,6 +6175,10 @@ export function useWordDraft({ card: given, lang, allCards, draft, shape }: {
     nounPlaced,
     nounGender: nounGenderOf(forms),
     setNounGender,
+    uncountable,
+    setUncountable,
+    /* How many written forms the tick is holding back. */
+    shelvedForms: shelved.forms.length,
     emptyBox,
     fillBox,
     drillsTranslit,
@@ -9900,7 +9996,7 @@ function NounEditor({ word, lang, allCards, selfId }: {
   allCards: Card[];
   selfId: string;
 }) {
-  const { forms, nounBoxList, nounPlaced, emptyBox, fillBox } = word;
+  const { forms, nounBoxList, nounPlaced, emptyBox, fillBox, uncountable, setUncountable, shelvedForms } = word;
   /* A person has every box twice, a side for each gender, and opened
      wherever something was written it was a screen of fields and pronoun
      tables before anything else the card says. So every box starts under
@@ -9909,6 +10005,25 @@ function NounEditor({ word, lang, allCards, selfId }: {
   return (
     <>
       <FormsSection lang={lang} folded={person}>
+        {/* Over the boxes, because it decides which there are: a word with
+            no plural has no use for a plural's box, or a pair's. */}
+        <CheckList
+          options={[{
+            id: "uncountable",
+            title: "Uncountable",
+            note: uncountable && shelvedForms
+              ? `No plural, like water or bread. Saving removes the ${shelvedForms === 1 ? "other form" : `${shelvedForms} other forms`} written here; untick to bring ${shelvedForms === 1 ? "it" : "them"} back.`
+              : "No plural, like water or bread. Only the word itself is kept, and it is left out of counting questions.",
+          }]}
+          chosen={uncountable ? ["uncountable"] : []}
+          onToggle={(_, wasOn) => setUncountable(!wasOn)}
+        />
+        {uncountable ? null : (
+          <Help>
+            A word for a group goes in the box the words beside it agree with:
+            &ldquo;family&rdquo; in Singular, &ldquo;people&rdquo; in Plural.
+          </Help>
+        )}
         {nounBoxList.map((box) => {
           const i = box.key in nounPlaced.at ? nounPlaced.at[box.key] : -1;
           const f = i >= 0 ? forms[i] : emptyBox(box);
@@ -11067,7 +11182,7 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
           {offline && (
             <Notice kind="warn">
               You&apos;re offline. What you write, record and add here is saved on this device
-              and goes up when you&apos;re back online.
+              and will be sent when you&apos;re back online.
             </Notice>
           )}
           {/* Outside the lock: a card being read is moved round as freely

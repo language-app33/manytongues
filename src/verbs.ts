@@ -35,6 +35,7 @@
  */
 import type { Form, VerbPerson, VerbSpec, VerbTense } from "./types.ts";
 import { subFormsOf } from "./cards.ts";
+import { agreesAs } from "./answers.ts";
 
 /*
  * Everything below takes `unknown` and narrows it here.
@@ -514,7 +515,9 @@ export function personFor(
     for (const picks of picksOf(person)) {
       const keys = Object.keys(picks);
       if (!keys.length) continue;
-      if (!keys.every((key) => str(had[key]) === str(picks[key]))) continue;
+      /* An uncountable noun is agreed with as the singular it is. */
+      const said = (key: string) => (key === "number" ? agreesAs(had[key]) : str(had[key]));
+      if (!keys.every((key) => said(key) === str(picks[key]))) continue;
       if (keys.length > bestAt) {
         best = person;
         bestAt = keys.length;

@@ -437,8 +437,7 @@ export function graduated(s: ExerciseState): boolean {
  * The length guard is load bearing rather than defensive. A document
  * written before `hist` existed carries an empty one, and `[].every()` is
  * true, so without it every old card would read as having just failed
- * twice. `hasRecentMistake` in the trainer meets the same case and answers
- * it the same way.
+ * twice.
  *
  * A near miss counts as wrong here, as it does in every other count the
  * app keeps: it is scheduled gently and it is still not knowing the word.

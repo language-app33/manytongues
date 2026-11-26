@@ -305,9 +305,11 @@ button {
    it is an offer, not the next thing to do — the next thing to do is
    Continue, at the foot of the screen. It carries the chevron so the tap
    target says which way the box will go. */
-.at-alsomore { margin: 14px 0 0; text-align:center;
+.at-alsomore { display:flex; align-items:center; justify-content:center; gap:4px;
+  margin: 14px auto 0; text-align:center; background:none; border:0; cursor:pointer;
   font-family: var(--ui); font-size:15px; font-weight:700; color: var(--muted);
   padding:6px 10px; }
+.at-alsomore:hover { color: var(--text); }
 .at-alsobox { margin-top:10px; padding:14px; background: var(--well);
   border:2px solid var(--line); border-radius: var(--r); }
 /* The dividers belong to the box, not to its members: the related words
@@ -465,34 +467,20 @@ button {
 .at-tab2.on { background: var(--raised); color: var(--text); border-color: var(--tab-stroke); }
 
 .at-mode { position:fixed; top:calc(12px + var(--banner-h, 0px)); left:12px; }
-/* The app's name, where the space selector used to sit.
-
-   It is fixed, so a screen that scrolls passes underneath it — and with
-   nothing behind the letters the wordmark read as printed over the page,
-   worst in the component gallery, where it landed on the specimens. The
-   room reserved for it below (.at-screen.bare .at-screenbody) only clears
-   it at the top of a scroll; the wash behind it is what makes it legible
-   for the rest.
-
-   A wash, though, and not a chip. It used to carry the pill, the 2px
-   stroke and the drop shadow the space selector and the corner menu wear
-   — which is the app's shape for a button, so the one thing in that row
-   that does nothing looked like the third control in it. What is left is
-   the blur and a soft ground: enough to read against a moving page, and
-   none of the four things that say "tap me".
-
-   Still pointer-events:none: it is the app's name, not a button, and
-   nothing should be harder to tap for its being behind it. */
-.at-brand { position:absolute; top:calc(12px + var(--banner-h, 0px)); left:12px; height:40px;
-  display:flex; align-items:center; padding:0 6px; border-radius:10px;
-  background: var(--wash);
-  -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
-  font-family: var(--ui); font-size:16px;
-  font-weight:800; letter-spacing:.01em; color: var(--text-soft); pointer-events:none; gap:7px; }
 /* The dialect-map mark: overlapping zones with no hard borders, the way
    a language actually spreads. It carries its own dark tile, so it reads
    the same in the light and dark themes. */
 .at-brandmark { display:block; width:24px; height:24px; flex:none; }
+/* The logo is its loops alone in dark mode, and on its teal tile in light
+   (0.664): see BrandMark. Dark is the default theme here, so the tiled one
+   is hidden unless the page is light. */
+.at-mark-tiled { display:none !important; }
+.at.light .at-mark-tiled { display:block !important; }
+.at.light .at-mark-loops { display:none !important; }
+@media (prefers-color-scheme: light) {
+  .at.auto .at-mark-tiled { display:block !important; }
+  .at.auto .at-mark-loops { display:none !important; }
+}
 
 .at-modebtn { display:inline-flex; align-items:center; gap:7px; cursor:pointer; border:2px solid var(--line); border-radius:999px; padding:9px 14px; background: var(--nav-bg); backdrop-filter:blur(12px); color: var(--text); font-family: var(--ui); font-size:11px; font-weight:800; letter-spacing:.07em; text-transform:uppercase; box-shadow: var(--nav-shadow); justify-content:center; }
 .at-modecaret { color: var(--brass); display:inline-flex; transition: transform 150ms; }
@@ -1448,7 +1436,9 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-place .at-hint { margin:-4px 0 12px; }
 .at-cdot { width:9px; height:9px; border-radius:50%; background: var(--jade); flex-shrink:0; }
 .at-cdot.syncing { background: var(--brass); }
-.at-cdot.error, .at-cdot.off { background: var(--rose); }
+.at-cdot.error { background: var(--rose); }
+/* Offline is not a failure (0.669): grey, not red. */
+.at-cdot.off { background: var(--faint); }
 /* You, in the bar: your initial in a small round of its own, where the
    sections have their icons, with the sync dot on its shoulder. */
 .at-cornerav { position:relative; width:26px; height:26px; border-radius:999px; flex:none;
@@ -1532,16 +1522,22 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   font-family: var(--ui); font-size:14px; font-weight:800; }
 .at-placebtn:hover { border-color: var(--jade); }
 .at-placebtn > svg { flex:none; color: var(--brass); }
-.at-placetext { display:flex; min-width:0; white-space:pre; }
+.at-placetext { display:flex; min-width:0; white-space:pre; overflow:hidden; }
 .at-placename, .at-placelangs { min-width:0; overflow:hidden; text-overflow:ellipsis; }
-.at-placemode { flex:none; }
+/* The place gives way long before the mode does; on the narrowest phones
+   the mode is cut too, with an ellipsis, rather than running over the
+   arrow (0.670). */
+.at-placename { flex:0 100 auto; }
+.at-placemode { flex:0 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; }
 .at-placelangs { color: var(--muted); font-weight:700; }
+/* On a phone the line is too short for the languages as well (0.670, the
+   owner's 2): the button keeps the place and the mode, and the sheet it
+   opens still says which languages are on. */
+@media (max-width: 599px) { .at-placelangs { display:none; } }
 /* Tab names are short and stay whole; the button gives way, cutting its
    place short before the name beside it. */
 .at-pagetitle .at-sectionhead { flex:none; white-space:nowrap; }
 .at-pagetitle .at-placebtn { margin-left:auto; flex:0 1 auto; }
-/* Home has no tab title: the button sits under the app's name, at its left. */
-.at-placecorner { display:flex; margin:-8px 0 18px; }
 /* The sheet: a place per row, with what you can do there on the same line
    as its name (0.610): each mode a small square, its icon over its word. */
 .at-where { display:flex; flex-direction:column; gap:8px; margin:4px 0 16px; }
@@ -1561,8 +1557,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 .at-wheremode.on { background: var(--jade); border-color: var(--jade); color: var(--onjade); }
 /* No space to open (0.578): only the panel and the You menu are left. */
 .at.stranded .at-wrap > :not(.at-strandedbox),
-.at.stranded .at-dockmain,
-.at.stranded .at-brand { display:none !important; }
+.at.stranded .at-dockmain { display:none !important; }
 .at.stranded { padding-top:24px; }
 .at-strandedbox { padding:24px 4px; }
 .at-strandedbox h2 { margin:0 0 12px; font-family: var(--ui); font-size:24px; font-weight:800; color: var(--text); }
@@ -1657,7 +1652,6 @@ html.at-pagelocked, html.at-pagelocked body { overflow:hidden; }
 
 .at-screen.bare .at-screenbody { padding-top:0;
   padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
-.at-screen.bare .at-brand { position:static; width:max-content; margin:0 0 14px -6px; }
 
 .at-guide { border:2px solid var(--line); border-radius: var(--r); margin-bottom:10px;
   background: var(--surface); overflow:hidden; }
@@ -2390,14 +2384,6 @@ textarea.at-input { font-size:15px; font-weight:500; line-height:1.7; resize:ver
    The row wraps: a name, a handle and two pills is more than 320px holds,
    and the toggles dropping to a second line is better than a name cut
    short. */
-/* One kept session: a name, what it is, and the two things you can do with
-   it. Wraps like the roster row rather than squeezing the name into a
-   column — what these are called is the whole reason for keeping them —
-   and the icon button is told not to grow, because .at-icon is built to
-   fill a toolbar and would otherwise take a third of the row. */
-.at-sessionrow { flex-wrap:wrap; row-gap:8px; }
-.at-sessionrow > .grow { min-width:11rem; }
-.at-sessionrow > .at-icon { flex:0 0 auto; width:44px; }
 
 .at-flag { cursor:default; font-family: var(--ui); font-size:10px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; border:2px solid var(--line); border-radius:999px; padding:2px 7px; color: var(--muted); white-space:nowrap; }
 button.at-flag { cursor:pointer; }
@@ -2523,9 +2509,6 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
   button.at-deckstat { transition: border-color 140ms ease; }
   button.at-deckstat:hover { border-color: var(--ink); }
 }
-/* Prep mode, above the ladder: the button, and what is being prepped for. */
-.at-prepbar { display:flex; flex-wrap:wrap; align-items:center; gap:6px 12px; }
-.at-prepbar .at-prepnote { margin:0; }
 /* The deck's own screen: how far it has got, then the two dates. */
 .at-deckhead { display:flex; flex-direction:column; gap:6px; margin-bottom:14px; }
 .at-forecast { border:2px solid var(--line); border-radius: var(--r); background: var(--surface);
@@ -2547,7 +2530,6 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-climb { display:flex; align-items:center; gap:16px; }
 /* What Start session will deal, in one line between the climb and the
    button. The row below still carries the gap underneath. */
-.at-homeline { margin:16px 0 0; font-size: var(--fs-sm); font-weight:700; color: var(--text-soft); }
 /* ---- the prep tile's glance, under its button ----
    Today and the days left side by side in two wells, each a small label, a
    big number and a word under it. Today's dots fill as sessions are done;
@@ -2596,12 +2578,55 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
    ring's colour, so the two read as one measure. */
 .at-savedtiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(128px, 1fr)); gap:8px;
   margin-top: var(--s3); }
-.at-savedtile { display:flex; flex-direction:column; align-items:stretch; gap:6px; min-width:0;
-  padding:10px 12px 12px; text-align:start; cursor:pointer; font:inherit; color: var(--text);
+/* Since 0.675 a tile is a box holding two buttons: the tile's face,
+   which starts it, and the dots in its top corner, which open its menu. */
+.at-savedtile { position:relative; min-width:0; display:flex;
   background: var(--well); border:1px solid transparent; border-radius: var(--r-sm); }
-.at-savedtile:hover:not(:disabled) { border-color: var(--line); }
-.at-savedtile:focus-visible { outline:2px solid var(--jade); outline-offset:2px; }
-.at-savedtile:disabled { opacity:.5; cursor:default; }
+.at-savedtile:hover:has(.at-savedtilego:not(:disabled)) { border-color: var(--line); }
+.at-savedtilego { flex:1; display:flex; flex-direction:column; align-items:stretch; gap:6px; min-width:0;
+  padding:10px 12px 12px; text-align:start; cursor:pointer; font:inherit; color: var(--text);
+  background:none; border:0; border-radius: var(--r-sm); }
+.at-savedtilego:focus-visible { outline:2px solid var(--jade); outline-offset:2px; }
+.at-savedtilego:disabled { cursor:default; }
+.at-savedtile.gone .at-savedtilego { opacity:.5; }
+/* The name leaves room for the dots beside it. */
+.at-savedtile .nm { padding-inline-end:26px; }
+/* What the session is: its kind, its length, its cards. */
+.at-savedtile .ln { font-family: var(--ui); font-size: var(--fs-xs); font-weight:600; line-height:1.3;
+  color: var(--muted); overflow-wrap:anywhere; text-wrap: pretty; }
+.at-savedtilemore { position:absolute; top:4px; inset-inline-end:4px; width:32px; height:32px;
+  display:inline-flex; align-items:center; justify-content:center;
+  padding:0; background:none; border:0; border-radius:50%; cursor:pointer; color: var(--muted); }
+.at-savedtilemore:hover { background: var(--raised); color: var(--text); }
+.at-savedtilemore:focus-visible { outline:2px solid var(--jade); outline-offset:1px; }
+/* Home's tiles have no dots, so the name has the width to itself. */
+.at-savedtile.bare .nm { padding-inline-end:0; }
+/* The name, after a pin where the session is on Home (0.680). */
+.at-savedtile .nm { display:flex; align-items:center; gap:4px; }
+.at-savedtile .nmtext { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.at-savedpin { flex:0 0 auto; display:inline-flex; color: var(--jade); }
+/* On Home, under Practice. */
+.at-homepins { margin-top:12px; }
+/* A panel of things to do (0.680, see SheetAction): one row each, drawn
+   like a row of "Where you are" — a rounded outline, its icon in a round
+   well, its name in bold — with a line under the name where it cannot be
+   done. */
+.at-sheetacts { display:flex; flex-direction:column; gap:8px; margin:4px 0 8px; }
+.at-sheetact { display:flex; align-items:center; gap:12px; width:100%; min-height:56px; padding:8px 12px;
+  background:none; border:2px solid var(--line); border-radius:16px; cursor:pointer;
+  font-family: var(--ui); color: var(--text); text-align:start; }
+@media (hover: hover) { .at-sheetact:hover:not(:disabled) { background: var(--press); } }
+.at-sheetact:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+.at-sheetact:disabled { cursor:default; }
+.at-sheetact:disabled .at-sheetactico, .at-sheetact:disabled b { opacity:.5; }
+.at-sheetactico { flex:0 0 auto; width:40px; height:40px; border-radius:50%; display:inline-flex;
+  align-items:center; justify-content:center; color: var(--jade);
+  background: color-mix(in srgb, var(--jade) 14%, transparent); }
+.at-sheetact.danger { color: var(--rose); }
+.at-sheetact.danger .at-sheetactico { color: var(--rose); background: color-mix(in srgb, var(--rose) 14%, transparent); }
+.at-sheetacttext { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+.at-sheetacttext b { font-size:16px; font-weight:800; }
+.at-sheetacttext i { font-style:normal; font-size:13px; font-weight:600; color: var(--muted); }
 .at-savedtile .nm { font-family: var(--ui); font-size: var(--fs-sm); font-weight:700; line-height:1.25;
   color: var(--text-soft); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .at-savedtile .pc { font-family: var(--ui); font-size:20px; line-height:1; font-weight:800;
@@ -2611,7 +2636,7 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
    learnt, and no bar. Dimmed when nothing is, but still pressable. */
 .at-savedtile .pc i.due { margin-inline-start:4px; font-weight:700; color: var(--text-soft); }
 .at-savedtile .pc.none { font-size: var(--fs-sm); font-weight:700; letter-spacing:0; color: var(--text-soft); }
-.at-savedtile.quiet { opacity:.6; }
+.at-savedtile.quiet .at-savedtilego { opacity:.6; }
 .at-savedtile .bar { display:block; height:5px; border-radius:999px; background: var(--surface); overflow:hidden; }
 .at-savedtile .bar i { display:block; height:100%; border-radius:999px; background: var(--jade); }
 
@@ -2926,14 +2951,13 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
    the wordmark behind — with no way back to the learning space but a
    reload. A screen opened on top (--z-over) is still above them, and
    .at-screening hides them there anyway. */
-.at-brand, .at-mode, .at-dock { z-index: var(--z-chrome); }
+.at-mode, .at-dock { z-index: var(--z-chrome); }
 .at-modalback { z-index: var(--z-modal); }
 /* Everything the chrome hides while a screen is open, in one rule
    rather than one per overlay. */
 /* Everything that floats above the app hides behind a screen, in one rule.
    It used to be three rules in three places, so a fourth overlay was always
    going to be forgotten. */
-body.at-screening .at-brand,
 body.at-screening .at-mode,
 body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { display:none; }
 /* Ticking cards for a bulk change brings up a tray of its own across the
@@ -3168,6 +3192,7 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
 .at-vpair .at-vperson { text-align:start; justify-self:start; }
 .at-vtarget { display:flex; flex-direction:column; align-items:flex-end; gap:2px; min-width:0; }
 .at-vtarget .at-vform { max-width:100%; overflow-wrap:anywhere; }
+.at-vtarget .at-vsaid { flex-direction:column; align-items:flex-end; }
 /* Who each row is, in English, at reading size: a learner looking at a
    tense asked for the English pronouns, which were there in small grey
    and went unseen (0.586). */
@@ -3178,6 +3203,8 @@ body.at-screening .at-dock, body:has(.at-bulkfloat) .at-dock, .at-hidden { displ
 .at-vhidden { border:1px dashed var(--line); border-radius: var(--r-sm); background: var(--well);
   padding:2px 8px; cursor:pointer; color: var(--text-soft); }
 .at-vhidden > span { filter: blur(5px); user-select:none; }
+/* A form's recording beside how it is written, at a button's size (0.661). */
+.at-vheard { display:inline-flex; align-items:center; }
 .at-vreadmark { grid-column: 1 / -1; display:flex; gap:8px; justify-content:flex-end; flex-wrap:wrap; }
 .at-vnow { margin-top:10px; }
 
@@ -3505,15 +3532,25 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
    other tabs carry their own name in the same place. The content under it
    sits on the page itself rather than in a card: one centred column, its
    parts set apart by space alone. */
-/* Left-aligned since 0.576, so the space button can have the top right
-   corner to itself. */
-.at-brand.at-brand-home { left:12px; right:auto; margin:0; width:max-content; height:64px;
-  padding:0 12px 0 6px; gap:12px; font-size:32px; color: var(--text); }
-.at-brand.at-brand-home .at-brandmark { width:48px; height:48px; }
-/* With no place button in the top right, nothing needs the room it was
-   moved left to make (0.642): centred again. */
-.at-brand.at-brand-home.centred { left:0; right:0; margin-inline:auto; }
-.at.on-home { padding-top:104px; }
+/* Its top line (0.670): the app's name at the left and where you are at
+   the right of the same line, as every tab's title carries it. The name
+   is at a tab title's scale rather than the 32px it had alone, so the
+   button beside it keeps enough of the line to be read on a phone; the
+   button is what gives way, its place cut short first. It is in the
+   page, not pinned, and scrolls away with it. */
+.at-homehead { display:flex; align-items:center; gap:10px; margin:0 0 18px; min-height:44px; }
+.at-homehead.centred { justify-content:center; }
+.at-homename { display:flex; align-items:center; gap:10px; flex:none; margin:0;
+  font-family: var(--ui); font-size:24px; font-weight:800; letter-spacing:-.01em;
+  line-height:1; color: var(--text); white-space:nowrap; }
+.at-homename .at-brandmark { width:32px; height:32px; }
+.at-homehead .at-placebtn { margin-left:auto; flex:0 1 auto; }
+.at.on-home { padding-top:12px; }
+/* On a phone, exactly a tab title's size, to leave the button its room. */
+@media (max-width: 420px) {
+  .at-homename { font-size:20px; gap:8px; }
+  .at-homename .at-brandmark { width:28px; height:28px; }
+}
 /* Progress and Cards are headed by their tab title (0.553), which is held
    at the very top as a space's is (0.557): nothing above it to scroll. */
 .at.untitled { padding-top:0; }
@@ -3522,20 +3559,90 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-home + .at-home { margin-top:28px; padding-top:28px; border-top:1px solid var(--line); }
 .at-home .at-row { max-width:420px; margin-inline:auto; }
 .at.kb-open .at-home { padding:0; }
-/* Start session and, at its right, the dumbbell to Focused training
-   (0.650). The row counts as one column, so Start session's type is sized
-   as it was alone; the dumbbell is a square as tall as the button beside
-   it, in the button's own corner and outline, not a share of the row. */
-.at-row.at-startrow { --cols: 1; flex-wrap: nowrap; }
-.at-row > .at-trainbtn { flex:0 0 auto; width:52px; min-height:52px; padding:0;
-  border-radius: var(--r); color: var(--text); }
-/* A size up from the usual icon: a dumbbell is all bar at 20px. */
-.at-trainbtn .at-ic { width:26px; height:26px; }
+/* Practice and, at its right, the dumbbell to Focused training (0.650,
+   made larger in 0.664: they are the most important things on the screen
+   and were the smallest). Practice is tall, with a play symbol and the
+   line saying what it will deal inside it, left-aligned beside the symbol;
+   the dumbbell is a square as tall, in a soft green fill, so the two read
+   as one row with Practice the main one. The row counts as one column, so
+   Practice's type is sized as it would be alone. */
+.at-row.at-startrow { --cols: 1; flex-wrap: nowrap; margin-top: 14px; }
+/* Practice is the app's primary button as it is everywhere else (0.665):
+   the same corners, type and fill, no glow. What it adds is a larger play
+   symbol and a second, smaller line inside it saying what it will deal,
+   left-aligned beside the symbol. The dumbbell beside it takes its height. */
+.at-row > .at-btn.at-practicebtn { gap: 12px; padding-block: 10px; }
+.at-row > .at-btn.at-practicebtn > .at-btnlabel { flex-direction: column; flex-wrap: nowrap; align-items: flex-start;
+  row-gap: 4px; text-align: left; width: auto; }
+.at-practicebtn > .at-btnlabel > b { font-weight: inherit; line-height: 1; }
+.at-practicebtn > .at-btnlabel > small { font-size: 12.5px; font-weight: 700; line-height: 1.15; letter-spacing: 0;
+  text-transform: none; opacity: .88; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
+/* On the narrowest phones the line stays on one line (0.666): the button
+   may shrink, and the line ends in "…" before it would wrap. */
+.at-row > .at-btn.at-practicebtn { min-width: 0; }
+.at-row > .at-btn.at-practicebtn > .at-btnlabel { min-width: 0; overflow: hidden; }
+/* The dumbbell is the app's secondary (ghost) button, as every secondary
+   action is (0.665): its own is only a square-ish width rather than a
+   share of the row. */
+.at-row > .at-btn.at-trainbtn { flex:0 0 auto; width:64px; padding:0; }
+/* The card on Home (0.664): a shape in the logo's style and a fact, on one
+   panel in the app's raised colour, close under the progress ring with
+   Practice close under it. No title above the shape since 0.665, and the
+   fact runs nearly the card's full width, so it often takes two lines
+   rather than three. The logo's pale lavender is deepened in the drawing
+   itself and its dot takes the text colour, so both show on the panel in
+   either theme. */
+.at-home .at-homecard { max-width: 420px; margin: 16px auto 0; padding: 14px 0 16px; border-radius: 22px;
+  background: var(--raised); text-align: center; }
+/* 80% of what it was in 0.664 (the owner, 0.665): 78% of the card, at
+   most 300px, became these. */
+.at-homeart { display: block; width: 62.4%; max-width: 240px; height: auto; margin: 0 auto 14px; color: var(--text); }
+.at-homecardfact { margin: 0; padding: 0 12px; font-size: 14px; font-weight: 700;
+  line-height: 1.35; color: var(--text-soft); text-wrap: balance; }
+.at-homecardsrc { display: inline-flex; vertical-align: -2px; padding: 1px; border-radius: 4px; color: var(--jade); }
+.at-homecardsrc:hover { color: var(--text); }
+.at-homecardsrc:focus-visible { outline: 2px solid var(--jade); outline-offset: 1px; }
 /* Focused training: its buttons stacked as they stood on Home. */
 .at-training { text-align:center; }
 .at-training .at-row { max-width:420px; margin-inline:auto; }
 .at-training > :first-child { margin-top:0; }
 .at-training .at-row + .at-row { margin-top:12px; }
+/* The line at its top (0.668; its drawing went in 0.675). */
+/* The sessions kept (0.680): a rule across, then the heading, then the
+   tiles, all set from the start of the line rather than centred. */
+.at-training .at-trainsaved { max-width:420px; margin:28px auto 0; padding-top:24px;
+  border-top:1px solid var(--line); text-align:start; }
+.at-training .at-trainsaved .at-savedtiles { margin-top:0; }
+.at-trainingintro { max-width:420px; margin:0 auto 20px; }
+.at-trainingintro p { margin:0; padding:0 8px; font-size:15px; line-height:1.4; color: var(--text-soft); text-wrap: balance; }
+/* Its choices (0.671): the name in the buttons' own lettering, and a line
+   under it saying what it is. Two side by side, then two more side by side
+   (0.681; full width before). The
+   outline and the dimmed state are .at-btn.ghost's. */
+.at-trainpair { display:grid; grid-template-columns:1fr 1fr; gap:12px; max-width:420px; margin:0 auto 12px; }
+.at-trainchoice { display:flex; flex-direction:column; align-items:center; justify-content:flex-start; gap:6px;
+  min-width:0; padding:14px 14px 16px; background:transparent; color: var(--text);
+  border:2px solid var(--line); border-radius: var(--r); cursor:pointer; font-family: var(--ui); text-align:center;
+  transition: transform 60ms, background 120ms; }
+/* Its picture (0.675): the choice's icon in a round well, as a Nudge
+   carries one, in the colour the app marks what can be done; on the
+   name's line, before it, since 0.681. */
+.at-trainchoicehead { display:flex; align-items:center; justify-content:center; gap:8px; min-width:0; }
+.at-trainchoicehead .at-trainchoicename { min-width:0; text-align:start; }
+.at-trainchoiceico { flex:0 0 auto; width:32px; height:32px; border-radius:50%; display:inline-flex; align-items:center;
+  justify-content:center; color: var(--jade);
+  background: color-mix(in srgb, var(--jade) 14%, transparent); }
+.at-trainchoice:disabled .at-trainchoiceico, .at-trainchoice.off .at-trainchoiceico { color: var(--faint);
+  background: var(--well); }
+.at-trainchoicename { font-size:16px; font-weight:800; letter-spacing:.03em; text-transform:uppercase; line-height:1.2; }
+.at-trainchoicenote { font-size:13.5px; font-weight:500; line-height:1.35; color: var(--muted); text-wrap: pretty; }
+.at-trainchoicestatus { font-size:13.5px; font-weight:700; line-height:1.35; color: var(--jade); }
+.at-trainchoice:active:not(:disabled):not(.off) { transform: translateY(1px); }
+.at-trainchoice:focus-visible { outline:3px solid var(--brass); outline-offset:2px; }
+@media (hover: hover) { .at-trainchoice:hover:not(:disabled):not(.off) { background: var(--raised-hover); } }
+.at-trainchoice:disabled, .at-trainchoice.off { cursor:default; }
+.at-trainchoice:disabled .at-trainchoicename, .at-trainchoice.off .at-trainchoicename { color: var(--faint); }
+.at-trainchoice:disabled .at-trainchoicenote, .at-trainchoice.off .at-trainchoicenote { opacity:.75; }
 
 /* --- the floating button ---------------------------------------------
    Edit on a card or deck being read, Save on one being written: in the

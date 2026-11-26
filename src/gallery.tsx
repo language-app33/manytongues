@@ -121,7 +121,7 @@ const PARTS = "Inside another component";
 const PLACES: Record<string, [string, string]> = {
   /* The learner's app */
   ArabicTrainer: [LEARN, "The app around everything else"],
-  host: [LEARN, "Every screen · the bar saying the server can't be reached"],
+  host: [LEARN, "Every screen · the bar saying there's no connection"],
   AccountPanel: [LEARN, "Account settings"],
   AccountSettings: [LEARN, "Account settings"],
   DeviceMedia: [LEARN, "Account settings · Recordings and pictures on this device"],
@@ -145,9 +145,13 @@ const PLACES: Record<string, [string, string]> = {
   TextChoices: [LEARN, "A practice session · choosing an answer from a few"],
   MatchGrid: [LEARN, "A practice session · matching pairs"],
   ManualSessionSheet: [LEARN, "Building a session by hand"],
-  SavedSessionsSheet: [LEARN, "The sessions you kept"],
-  FocusedTrainingSheet: [LEARN, "Focused training · behind the dumbbell on Home: weak spots, building a session, and the sessions you kept"],
-  SavedTiles: [LEARN, "Focused training · the sessions you kept, with how much of each is learnt, or for a Catch up how much is due"],
+  FocusedTrainingSheet: [LEARN, "Focused training · behind the dumbbell on Home: weak spots, not seen lately, building a session, prep mode, and the sessions you kept"],
+  TrainingChoice: [LEARN, "Focused training · one of its choices, with its icon, its name and a line saying what it is"],
+  SheetAction: [LEARN, "Focused training · one row of a saved session's panel: Start, Edit, Pin to Home, Delete"],
+  SavedTiles: [LEARN, "Focused training · the sessions you kept, with what each is, how much of it is learnt (or for a Catch up how much is due), and a panel to start, edit, pin to Home or delete it; and on Home, the pinned ones"],
+  HomeCard: [LEARN, "Home · the card under the progress ring: a shape in the logo's style and a fact about how language varies, with its source"],
+  BrandMark: [LEARN, "The app's logo: on its tile in light mode, its loops alone in dark mode"],
+  TabTitle: [LEARN, "The title at the top of each tab, with the app's logo beside it"],
   ItemsTab: [LEARN, "The Cards tab"],
   ItemSheet: [LEARN, "The Cards tab · one card's details"],
   CardScreen: [LEARN, "Opening a card from a tile"],
@@ -158,7 +162,7 @@ const PLACES: Record<string, [string, string]> = {
   DeckScreen: [LEARN, "The Progress tab · one deck, with when it could be learnt"],
   UnitScreen: [LEARN, "A course's path · one unit, its words and sentences"],
   PathHomeLine: [LEARN, "Home · a course's current unit"],
-  PrepScreen: [LEARN, "The Progress tab · Prep mode, getting decks learnt by a date"],
+  PrepScreen: [LEARN, "Focused training · Set a goal (Prep mode until 0.681), getting decks learnt by a date"],
   PrepLine: [LEARN, "The home screen · how long is left to prep, and whether your pace gets you there"],
   ReviewItem: [LEARN, "The Progress tab · one card"],
   StudentCourses: [LEARN, "The Courses tab"],
@@ -180,6 +184,7 @@ const PLACES: Record<string, [string, string]> = {
   CardEditor: [TEACH, "Editing a card"],
   WordEditor: [TEACH, "Editing a card · a word or phrase"],
   VerbEditor: [TEACH, "Editing a card · a verb"],
+  NounEditor: [TEACH, "Editing a card · a noun"],
   AttachedEditor: [TEACH, "Editing a card · a word with attached pronouns"],
   TableEditor: [TEACH, "Editing a card · a word with a table of its forms beside it"],
   SceneEditor: [TEACH, "Editing a card · a conversation"],
@@ -325,8 +330,8 @@ const PLACES: Record<string, [string, string]> = {
   SpaceFrame: [PARTS, "The Teaching and Admin frame"],
   Snackbar: [PARTS, "The message that appears and goes"],
   useSnackbarState: [PARTS, "The message that appears and goes"],
-  ReachBar: [PARTS, "Can't reach the server, with Retry"],
-  ReachSnackbar: [PARTS, "Can't reach the server, with Retry"],
+  ReachBar: [PARTS, "No connection, with Retry"],
+  ReachSnackbar: [PARTS, "No connection, with Retry"],
 };
 
 /* Not in the table: say something readable rather than nothing, and put
@@ -1190,7 +1195,7 @@ export function ComponentGallery() {
 
       <Row
         name="ReachBar"
-        what="Can't reach the server, with Retry. Large, and it stays until Retry works, the connection comes back, or it is closed."
+        what="No connection, with Retry. Large, and it stays until Retry works, the connection comes back, or it is closed."
         note="Never drawn by hand: ReachSnackbar, beside the app in main.tsx, draws the one bar. A screen takes part with useReach() — caught(error, retry) on a failure, ok() when it works — or useReachHold(retry) for a failure found elsewhere. Shown here still, in the page."
       >
         <V label="first" wide><ReachBar still onRetry={() => {}} onDismiss={() => {}} /></V>

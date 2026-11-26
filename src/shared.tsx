@@ -203,6 +203,27 @@ const ICONS: Record<string, string> = {
      session — weak spots, a session built by hand, the ones kept (0.650). */
   dumbbell:
     "M4 11h16v2H4zM5 6.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1zM16 6.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1zM2 9.5a1 1 0 0 1 1-1h1v7H3a1 1 0 0 1-1-1zM20 8.5h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1z",
+  /* Focused training's choices (0.679), each a picture of what it does:
+     a target for the weak spots, the clock running back for what has not
+     been seen lately, the sliders a session is built with, a calendar
+     ticked off for a date being prepped for, and a bookmark for the
+     sessions kept. Material's glyphs, like every other icon here. */
+  target:
+    "M12 2C6.49 2 2 6.49 2 12s4.49 10 10 10 10-4.49 10-10S17.51 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3-8c0 1.66-1.34 3-3 3s-3-1.34-3-3 1.34-3 3-3 3 1.34 3 3z",
+  history:
+    "M13 3c-4.97 0-9 4.03-9 9H1l3.89 3.89.07.14L9 12H6c0-3.87 3.13-7 7-7s7 3.13 7 7-3.13 7-7 7c-1.93 0-3.68-.79-4.94-2.06l-1.42 1.42C8.27 19.99 10.51 21 13 21c4.97 0 9-4.03 9-9s-4.03-9-9-9zm-1 5v5l4.28 2.54.72-1.21-3.5-2.08V8H12z",
+  event:
+    "M16.53 11.06 15.47 10l-4.88 4.88-2.12-2.12-1.06 1.06L10.59 17l5.94-5.94zM19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z",
+  bookmark: "M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z",
+  /* A drawing pin, for a saved session put on Home (0.680), and the same
+     pin outlined and struck through for taking it off again. */
+  pin: "M16 9V4h1c.55 0 1-.45 1-1s-.45-1-1-1H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3z",
+  pinOff:
+    "M14 4v5c0 1.12.37 2.16 1 3H9c.65-.86 1-1.9 1-3V4h4m3-2H7c-.55 0-1 .45-1 1s.45 1 1 1h1v5c0 1.66-1.34 3-3 3v2h5.97v7l1 1 1-1v-7H19v-2c-1.66 0-3-1.34-3-3V4h1c.55 0 1-.45 1-1s-.45-1-1-1zM3.4 2 2 3.4 20.6 22l1.4-1.4z",
+  /* Three dots stood on end: more you can do with the thing it sits on,
+     in a menu (0.679). */
+  more:
+    "M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z",
   /* The number sign, for the screen a language's numbers are written on. */
   hash: "M20 10V8h-4V4h-2v4h-4V4H8v4H4v2h4v4H4v2h4v4h2v-4h4v4h2v-4h4v-2h-4v-4h4zm-6 4h-4v-4h4v4z",
   /* A cloud struck through: the server out of reach (0.636). */
@@ -435,7 +456,7 @@ export function deckSize(d: { cardCount?: number; parts?: string[] }, cards = d.
 export function notReaching(
   d: { parts?: string[]; partsWaiting?: string[] },
   cards: { status?: string }[],
-): { n: number; long: string; short: string } | null {
+): { n: number; long: string; short: string; why: string } | null {
   const drafts = cards.filter((c) => c.status === "draft").length;
   const review = cards.filter((c) => c.status === "review").length;
   const held = d.parts || [];
@@ -451,6 +472,9 @@ export function notReaching(
     n,
     long: `${n} ${n === 1 ? "doesn't" : "don't"} reach students yet: ${why}`,
     short: `${n} not reaching students`,
+    /* The reasons alone, for a sentence that names the cards its own way —
+       a course's (0.679). */
+    why,
   };
 }
 
@@ -1130,6 +1154,22 @@ export function Field({ label, lede, hint, optional, htmlFor, children, classNam
 /* --- TabTitle -----------------------------------------------------
    The name of the tab a page is, at its top (0.553): the heading size
    used inside Progress, held in place as the page scrolls (0.555). */
+/* --- BrandMark -----------------------------------------------------
+   The app's logo (0.664). In dark mode it is the four loops alone, with
+   no tile behind them: on a dark page the tile only reads as a box (the
+   owner's 1a). Both are in the page and the theme picks one, so a change
+   of theme needs no reload and the mark never flashes the wrong one. The
+   browser-tab icon and the installed app's icon keep the tile, since a
+   phone always sets an app icon on a square of its own. */
+export function BrandMark({ size, className = "at-brandmark" }: { size: number; className?: string }) {
+  return (
+    <>
+      <img className={`${className} at-mark-tiled`} src="/logo.svg" alt="" width={size} height={size} />
+      <img className={`${className} at-mark-loops`} src="/logo-loops.svg" alt="" width={size} height={size} />
+    </>
+  );
+}
+
 export function TabTitle({ children }: { children?: Node }) {
   /* Held at the top while the page scrolls under it (0.555), with the
      app's mark beside it and a rule beneath. Where you are sits at its
@@ -1137,7 +1177,7 @@ export function TabTitle({ children }: { children?: Node }) {
   const place = useContext(PlaceContext);
   return (
     <div className="at-pagetitle">
-      <img className="at-brandmark" src="/logo.svg" alt="" width={28} height={28} />
+      <BrandMark size={28} />
       <h2 className="at-sectionhead">{children}</h2>
       {place}
     </div>
@@ -1948,7 +1988,7 @@ export function ClipList({ clips, onChange, load }: {
             {/* Said beside the recording itself, in the editor and on the
                 card's own screen alike — see setLostRecordings. */}
             {isLostRecording(id) && (
-              <p className="at-hint at-lostclip">This recording didn't reach the server. Record it again.</p>
+              <p className="at-hint at-lostclip">This recording is missing. Record it again.</p>
             )}
           </React.Fragment>
         );
@@ -4157,7 +4197,7 @@ export function ReachBar({ again = false, retrying = false, detail = "", title =
     <div className={`at-reachbar${still ? " still" : ""}`} role="alert">
       <Icon name="cloud-off" size={22} />
       <span className="msg">
-        <strong>{title || (again ? "Still can't reach the server" : "Can't reach the server")}</strong>
+        <strong>{title || (again ? "Still no connection" : "No connection")}</strong>
         {detail ? <span className="detail">{detail}</span> : null}
       </span>
       <button className="at-reachretry" onClick={onRetry} disabled={retrying}>
@@ -6385,7 +6425,7 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
       card, or a part of a language's numbers. */
   of?: string;
   /** Its words where decks are being chosen rather than something put in
-      them — Prep mode picks the decks it aims at, and "Add this card to a
+      them — Set a goal picks the decks it aims at, and "Add this card to a
       deck" would be the wrong sentence there. Each one left out is the
       card's. */
   words?: Partial<DeckWords>;
