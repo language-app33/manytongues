@@ -103,7 +103,7 @@ export const SCREEN_ELEMENTS: [string, [string, string, string][]][] = [
     ["answer-meaning", "On a \"which word is missing?\" question once answered: what the whole sentence means, under the verdict. Only where the sentence has its English.", "The book is big"],
     ["answer-value-text", "The right answer itself, in whichever language was asked for.", "كِتاب"],
     ["answer-person", "On Who is it?: every person the form is about, once answered — every one of them is to be ticked, two where two persons are spelt the same.", "you (m) · she"],
-    ["also-heading", "The tap that opens everything else worth knowing, closed on every new answer (0.677).", "Learn more"],
+    ["also-heading", "The tap that opens everything else worth knowing, closed on every new answer (0.678).", "Learn more"],
     ["also", "The box under it: whichever of the blocks below the card has.", ""],
     ["also-row", "Two of the short blocks side by side — how it is pronounced beside how it sounds.", ""],
     ["also-context", "Where the word turned up, with its label and the phrase.", ""],

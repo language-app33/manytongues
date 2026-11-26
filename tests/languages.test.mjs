@@ -30,6 +30,7 @@ import {
   EASY_TYPES,
   findWordSlot,
   gluedTo,
+  gluedToSpan,
   GRAMMAR,
   guessKind,
   kindOf,
@@ -1459,6 +1460,17 @@ test("the gap in a phrase is the word: what is glued to it stays on the screen",
   assert.equal(gluedTo("مش", "بوليس", ar), null);
 });
 
+test("a word of two tokens keeps what is glued to its outer edges (0.660)", () => {
+  const ar = LANGUAGES["ar-PS"];
+  // جمعية لحقوق الإنسان, asked for حقوق الإنسان: the ل stays, جمعية ل____.
+  assert.deepEqual(gluedToSpan(["لحقوق", "الإنسان"], "حقوق الإنسان", ar), { before: "ل", after: "" });
+  assert.deepEqual(gluedToSpan(["حقوق", "الإنسانية؟"], "حقوق الإنسانية", ar), { before: "", after: "؟" });
+  // Nothing glued, nothing kept.
+  assert.equal(gluedToSpan(["حقوق", "الإنسان"], "حقوق الإنسان", ar), null);
+  // One token is gluedTo.
+  assert.deepEqual(gluedToSpan(["البوليس"], "بوليس", ar), { before: "ال", after: "" });
+});
+
 test("Vietnamese is described in its own terms, not in Arabic's", () => {
   const vi = LANGUAGES["vi"];
   const ar = LANGUAGES["ar-PS"];
@@ -1507,21 +1519,31 @@ test("Vietnamese is plain Vietnamese, with all six tones, and its old id is carr
   assert.equal(renameLangIds(already), already);
 });
 
-test("a picture names only the gender it cannot show, and never the count", () => {
-  /* Two reports (0.651): كلبة asked from a picture of a dog with nothing
-     saying female, and "dual" under a picture of two plants. */
+test("a picture names the count and the gender where the card has others", () => {
+  /* كلبة asked from a picture of a dog with nothing saying female (0.651),
+     and ليمونة from a picture of a lemon with nothing saying singular
+     (0.660, twice). */
   const ar = LANGUAGES["ar-PS"];
   const f = (/** @type {string} */ id, /** @type {string} */ word, /** @type {string} */ en, /** @type {string} */ number, /** @type {string} */ gender) =>
     ({ id, ar: word, en, lat: "", number, gender });
   const dog = { ...f("k", "كَلب", "Dog", "singular", "masculine"), category: "noun",
     subs: [f("k-f0", "كَلبة", "Dog", "singular", "feminine"), f("k-f1", "كلبين", "Two dogs", "dual", "masculine"),
       f("k-f2", "كلاب", "Dogs", "plural", "masculine"), f("k-f3", "كَلبتين", "Two dogs", "dual", "feminine")] };
-  assert.equal(pictureLabel(dog.subs[0], dog, ar), "female");
-  assert.equal(pictureLabel(dog, dog, ar), "male");
-  assert.equal(pictureLabel(dog.subs[3], dog, ar), "female", "two female dogs beside two male ones");
-  assert.equal(pictureLabel(dog.subs[2], dog, ar), "", "no female plural beside it: the picture is enough");
+  assert.equal(pictureLabel(dog.subs[0], dog, ar), "singular, female");
+  assert.equal(pictureLabel(dog, dog, ar), "singular, male");
+  assert.equal(pictureLabel(dog.subs[3], dog, ar), "dual, female", "two female dogs beside two male ones");
+  assert.equal(pictureLabel(dog.subs[2], dog, ar), "plural", "no female plural beside it: only the count");
   const plant = { ...f("p", "نَبتِة", "Plant", "singular", "feminine"), category: "noun",
     subs: [f("p-f0", "نباتات", "plants", "plural", "feminine"), f("p-f1", "نَبتِتين", "Two plants", "dual", "feminine")] };
   assert.equal(askLabel(plant.subs[1], plant, ar), "dual", "said beside the answer, as before");
-  assert.equal(pictureLabel(plant.subs[1], plant, ar), "", "but not under the picture");
+  assert.equal(pictureLabel(plant.subs[1], plant, ar), "dual", "and under the picture");
+  const lemon = { ...f("l", "ليمونة", "Lemon", "singular", "feminine"), category: "noun",
+    subs: [f("l-f0", "ليمون", "Lemons", "plural", "masculine")] };
+  assert.equal(pictureLabel(lemon, lemon, ar), "singular");
+  assert.equal(pictureLabel(lemon.subs[0], lemon, ar), "plural");
+  // A word with one form, or an uncountable one, says nothing.
+  const water = { ...f("w", "مَيّ", "Water", "uncountable", "feminine"), category: "noun" };
+  assert.equal(pictureLabel(water, water, ar), "");
+  const alone = { ...f("a", "تفاحة", "Apple", "singular", "feminine"), category: "noun" };
+  assert.equal(pictureLabel(alone, alone, ar), "");
 });

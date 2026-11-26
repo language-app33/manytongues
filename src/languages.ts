@@ -1804,17 +1804,23 @@ export function askLabel(
 }
 
 /**
- * What a picture question says about the form it wants: "female" or
- * "male", and nothing else.
+ * What a picture question says about the form it wants: its count —
+ * "singular", "dual" or "plural" — and "female" or "male", each only
+ * where the card needs it said.
  *
- * A picture shows how many there are, so "dual" or "plural" under it said
- * what the picture already did, and a learner reported it (0.651). It
- * cannot show whether a dog is male or female: asked for كلبة from a
- * picture of a dog, nothing said the female was wanted, and a learner
- * reported that too. So a picture names the gender where another form of
+ * The count is said where another form of the card is another count. It
+ * was left out from 0.651, when a learner reported "dual" under a picture
+ * of two plants as saying what the picture already did; but a picture of
+ * one lemon did not say whether ليمونة or ليمون was wanted, and a learner
+ * reported that twice (0.660). A word said twice costs less than a guess.
+ *
+ * A picture cannot show whether a dog is male or female: asked for كلبة
+ * from a picture of a dog, nothing said the female was wanted, and a
+ * learner reported that too. So it names the gender where another form of
  * the card is the other gender at the same count — كلب beside كلبة, كلبين
- * beside كلبتين — and is silent everywhere else. Never on a table's cell,
- * which no picture asks about by its grammar.
+ * beside كلبتين. Neither is said of a word with one form, nor of an
+ * uncountable one, nor of a table's cell, which no picture asks about by
+ * its grammar.
  */
 export function pictureLabel(
   unit: Record<string, any> | null | undefined,
@@ -1822,21 +1828,21 @@ export function pictureLabel(
   lang: Lang = activeLang(),
 ): string {
   if (!unit || !card || isCell(unit)) return "";
-  const dim = dimsOf(lang).find((d) => d.field === "gender" && !d.retired);
-  if (!dim) return "";
   const mine = valuesOf(unit, lang);
-  const gender = String(mine.gender || "");
-  if (!gender || gender === "na") return "";
+  const others = othersOnCard(unit, card).map((o) => valuesOf(o, lang));
+  const COUNTS = ["singular", "dual", "plural"];
   const count = String(mine.number || "");
-  const told = othersOnCard(unit, card).some((o) => {
-    const theirs = valuesOf(o, lang);
-    return String(theirs.number || "") === count && !!theirs.gender && theirs.gender !== "na" && theirs.gender !== gender;
-  });
-  if (!told) return "";
+  const counted = !!dimsOf(lang).find((d) => d.field === "number" && !d.retired)
+    && COUNTS.includes(count)
+    && others.some((o) => COUNTS.includes(String(o.number || "")) && String(o.number) !== count);
+  const dim = dimsOf(lang).find((d) => d.field === "gender" && !d.retired);
+  const gender = String(mine.gender || "");
+  const told = !!dim && !!gender && gender !== "na" && others.some((o) =>
+    String(o.number || "") === count && !!o.gender && o.gender !== "na" && o.gender !== gender);
   const PICTURED: Record<string, string> = { feminine: "female", masculine: "male" };
-  if (PICTURED[gender]) return PICTURED[gender];
-  const opt = dim.options.find(([v]) => v === gender);
-  return opt ? opt[1] : gender;
+  const opt = dim && dim.options.find(([v]) => v === gender);
+  const sex = told ? PICTURED[gender] || (opt ? opt[1] : gender) : "";
+  return [counted ? count : "", sex].filter(Boolean).join(", ");
 }
 
 /**
@@ -2065,6 +2071,28 @@ export function gluedTo(token: string, word: string, lang: Partial<Lang>): { bef
   let end = best.b;
   while (end < chars.length && /\p{M}/u.test(chars[end])) end++;
   return { before: chars.slice(0, best.a).join(""), after: chars.slice(end).join("") };
+}
+
+/*
+ * The same for a word of several tokens, read off the tokens it covers in
+ * the phrase: what is glued to the front of the first and the end of the
+ * last. One token is gluedTo itself.
+ *
+ * Blanking لحقوق الإنسان whole over a choice of حقوق الإنسان left the ل
+ * out of the sentence and out of every tile, and a learner reported a
+ * letter missing (0.660). Only the two outer edges are kept: whatever
+ * sits between the word's own tokens is the word's.
+ */
+export function gluedToSpan(covered: string[], word: string, lang: Partial<Lang>): { before: string; after: string } | null {
+  if (!supportsContext(lang) || !covered.length || !word) return null;
+  if (covered.length === 1) return gluedTo(covered[0], word, lang);
+  const parts = contextTokens(word, lang);
+  if (parts.length !== covered.length) return null;
+  const head = gluedTo(covered[0], parts[0], lang);
+  const tail = gluedTo(covered[covered.length - 1], parts[parts.length - 1], lang);
+  const before = head && !head.after ? head.before : "";
+  const after = tail && !tail.before ? tail.after : "";
+  return before || after ? { before, after } : null;
 }
 
 /*

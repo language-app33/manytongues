@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.677 — 26 November 2026
+## 0.678 — 26 November 2026
 
 **"Learn more" under an answer is folded again.** Everything else worth
 knowing about a card (how it sounds and is written, related words, the
@@ -22,6 +22,31 @@ go by without it being read; in return Continue sits right under the answer.
 Still to check by hand: on a phone, that the arrow and the tap feel right
 and Continue is close under the answer.
 
+
+## 0.677 — 26 November 2026
+
+**A phrase question no longer drops a letter.** When the missing word is
+two words and the phrase joins a letter to its front — ل in
+"جمعية لحقوق الإنسان" — the gap used to swallow the letter, so the
+learner saw "جمعية ____" and no choice fitted it. Now the letter stays
+outside the gap, "جمعية ل____", as it already did for one-word answers,
+and the phrase is whole again once answered.
+
+**Writing a word from its picture says singular, dual or plural.** A
+picture of one lemon didn't say whether ليمونة or ليمون was wanted. Where a
+card has more than one of these forms, the picture question now says
+which it wants under the picture, alongside "female" or "male" where that
+was already said ("singular, female"). A word with one form, or one
+marked uncountable, says nothing, as before.
+
+**Trade-off:** 0.651 took "dual" and "plural" away from under pictures,
+because a learner said they only repeated what a picture of two things
+showed. They are back, so a label will sometimes repeat the picture.
+
+Still to check by hand: the phrase card "جمعية لحقوق الإنسان" and the lemon
+card on a real phone. The orange card (برتقال) reported for its spelling or
+transliteration couldn't be checked from here and needs a look in the card
+editor.
 
 ## 0.676 — 26 November 2026
 

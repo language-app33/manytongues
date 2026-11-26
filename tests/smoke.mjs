@@ -1643,7 +1643,7 @@ if (/Build a session/.test(document.body.textContent)) {
     const dupes2 = answered.filter((n, i) => n !== "related-word" && answered.indexOf(n) !== i);
     check("and each of those means one thing too", dupes2.length === 0, dupes2.join(", "));
 
-    /* The extras are folded behind a "Learn more" toggle (0.677): closed
+    /* The extras are folded behind a "Learn more" toggle (0.678): closed
        on every new answer, open on a tap, closed again on a second. */
     const moreHead = document.querySelector('[data-el="also-heading"]');
     check("what is not the answer is behind Learn more",
@@ -10993,6 +10993,7 @@ const openPronounTables = async () => {
     for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
     const met = {
       chooseImage: 0, promptPicked: 0, promptWritten: 0, answerPicture: 0, tiles: 0,
+      /** @type {string[]} */ writtenTags: [],
       /* The grid of recordings, where one comes up. */
       soundGrids: 0, soundTiles: 0, wordsInScript: false, noEnglish: false,
       unpairs: false, playPicks: false, playKeepsPair: false, playLeavesMeaning: false, tapPutsDown: false, soundVerdict: "", learnMore: false, marked: false,
@@ -11018,7 +11019,11 @@ const openPronounTables = async () => {
         if (promptPic) met.promptPicked += 1;
         click(choices.querySelector("button"));
       } else if (host.querySelector('[data-el="answer-input"]')) {
-        if (promptPic) met.promptWritten += 1;
+        if (promptPic) {
+          met.promptWritten += 1;
+          const tag = host.querySelector('[data-el="question-form-tag"]');
+          met.writtenTags.push(((tag && tag.textContent) || "").trim());
+        }
         click([...host.querySelectorAll("button")].find((b) => /^I don't know$/.test((b.textContent || "").trim())));
       } else if (host.querySelector('[data-el="answer-match"]')) {
         const sounds = host.querySelectorAll('[data-el="match-sound"]').length;
@@ -11132,6 +11137,19 @@ const openPronounTables = async () => {
   const fourth = await walk([0, 1, 2, 3, 4].map((i) => pictured(i, upTo4)));
   check("and, known further, to write it from the picture",
     fourth.promptWritten > 0, JSON.stringify(fourth));
+  check("a word with one form is written from its picture with nothing under it",
+    fourth.writtenTags.length > 0 && fourth.writtenTags.every((t) => t === ""), JSON.stringify(fourth.writtenTags));
+  /* A picture of one lemon did not say whether ليمونة or ليمون was
+     wanted, and a learner reported it twice (0.660): on a card with
+     another count, the count is said under the picture. */
+  const base = pictured(0, upTo4);
+  const lemon = { ...base, forms: [
+    { ...base.forms[0], ar: "ليمونة", en: "lemon", lat: "laymoone", number: "singular", gender: "feminine" },
+    { ...base.forms[0], id: "pic0-f1", ar: "ليمون", en: "lemons", lat: "laymoon", number: "plural", gender: "masculine", recs: [] },
+  ] };
+  const counted = await walk([lemon]);
+  check("on a card with a singular and a plural, the picture says which is wanted",
+    counted.writtenTags.length > 0 && counted.writtenTags.every((t) => /^(singular|plural)$/.test(t)), JSON.stringify(counted.writtenTags));
   /* Known by ear and every other second-level question passed, the one
      left to ask is the grid of recordings: a play button for each word, the
      words in the script beside them, and no English anywhere. */
@@ -11399,6 +11417,57 @@ const openPronounTables = async () => {
     out.above = text(host.querySelector('[data-el="question-prompt-meaning"]'));
     return out;
   });
+  /* A word of two tokens with a letter glued to its front, as reported
+     (0.660): جمعية لحقوق الإنسان showed as "جمعية ____", the ل gone from
+     the sentence and from every tile. */
+  /* Everything a word is asked but the one wanted here already solid, so
+     the session's one question about it is the gap. */
+  const doneBut = (/** @type {string} */ open) => Object.fromEntries(
+    ["ar2pick", "ar2en", "match", "en2pick", "tr2ar", "en2ar", "ctx2pick", "ctx2ar", "dlgwhole"]
+      .filter((t) => t !== open).map((t) => [t, { ...solid }]));
+  /** @param {string} id @param {string} ar @param {string} en @param {Record<string, any>} [extra] */
+  const wordCard = (id, ar, en, extra = {}) => ({
+    id, category: "noun", tags: ["Words"], created: 1, updated: Date.now(), uses: [],
+    forms: [{ id, ar, en, lat: "", s: doneBut("ctx2pick") }],
+    ...extra,
+  });
+  const glued = await walk([
+    wordCard("w-rights", "حقوق الإنسان", "human rights"),
+    wordCard("w-donkey", "حمار", "donkey"),
+    wordCard("w-sister", "أختي", "my sister"),
+    wordCard("w-house", "بيت", "house"),
+    { id: "p-rights", tags: ["Phrases"], created: 1, updated: Date.now(), uses: ["w-rights"],
+      forms: [{ id: "p-rights", ar: "جمعية لحقوق الإنسان", en: "human rights organization", lat: "", s: doneBut("") }] },
+  ], async (host, typeIn) => {
+    /* The phrase card is asked about too; given up on until the gap comes,
+       chosen or typed — both show the same gapped phrase. */
+    const GAP = /Which word is missing|Fill the gap/;
+    for (let n = 0; n < 20 && !GAP.test(text(host.querySelector(".at-instruction"))); n++) {
+      const giveUp = host.querySelector('[data-el="dont-know-button"]');
+      if (!giveUp) break;
+      click(giveUp);
+      await sleep(250);
+      click([...host.querySelectorAll("button")].find((b) => /^(Continue|Next)$/.test(text(b))) || null);
+      await sleep(300);
+    }
+    const out = { reached: GAP.test(text(host.querySelector(".at-instruction"))), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), filled: "", after: "" };
+    const choices = host.querySelector('[data-el="answer-choices"]');
+    if (choices) {
+      const buttons = [...choices.querySelectorAll("button")];
+      out.tiles = buttons.map((b) => text(b));
+      click(buttons.find((b) => text(b) === "حقوق الإنسان") || null);
+    } else typeIn("حقوق الإنسان");
+    await sleep(60);
+    click(host.querySelector('[data-el="check-button"]'));
+    await sleep(250);
+    out.filled = text(host.querySelector('[data-el="question-prompt-filled"]'));
+    out.after = prompt(host);
+    return out;
+  });
+  check("a word of two tokens keeps the letter glued to its front outside the gap",
+    glued.reached && glued.prompt === "جمعية ل____" && (!glued.tiles.length || glued.tiles.includes("حقوق الإنسان")), JSON.stringify(glued));
+  check("and put back, the sentence is whole and only the word is marked",
+    glued.filled === "حقوق الإنسان" && glued.after.replace(/\s+/g, " ").includes("جمعية لحقوق الإنسان"), JSON.stringify(glued));
   materialQuiet = false;
   check("each sentence of a new text is met on its own before it is asked, with its meaning",
     introduced.length > 0 && introduced.every((m) =>
