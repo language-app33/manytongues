@@ -8,6 +8,33 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.681 — 26 November 2026
+
+**Prep mode is now Set a goal, and Focused training's buttons are two pairs.**
+
+- **Set a goal** replaces Prep mode on Focused training, and on its own
+  screen. Once a goal is set, both say **Your goal** instead, with where it
+  stands under the button as before.
+- The wording follows: the screen asks "What are you working towards?",
+  saves with **Start working towards it**, and deletes with "Delete this
+  goal". The line under the button says "Working towards Paris trip · 12
+  days left", or "Paris trip has come — edit the goal or delete it." The
+  notes after saving or deleting say "Goal set: Paris trip" and "Goal
+  cleared".
+- **On Home, the button while a goal is set says "Practice for Paris
+  trip"** (it was "Prep for …").
+- **Build a session and Set a goal sit side by side**, like Weak spots and
+  Not seen lately above them, rather than each taking the full width.
+- **Each button's icon is on the same line as its name**, before it, a
+  little smaller than it was above it. A name too long for a half-width
+  button wraps beside the icon.
+
+**Trade-off:** the half-width buttons are taller where a name or its line
+wraps, so the four buttons take about the same room as before.
+
+Still to check by hand: the four buttons on a real phone, above all the
+narrowest.
+
 ## 0.680 — 26 November 2026
 
 **Saved sessions live on Focused training, and two can be pinned to Home.**

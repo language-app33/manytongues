@@ -2823,12 +2823,12 @@ if (/Build a session/.test(document.body.textContent)) {
     const pad = (/** @type {number} */ n) => String(n).padStart(2, "0");
     const day = `${inMonth.getFullYear()}-${pad(inMonth.getMonth() + 1)}-${pad(inMonth.getDate())}`;
 
-    check("Progress no longer has Prep mode, which moved to Focused training",
-      ![...document.querySelectorAll("h3.at-sectionhead")].some((h) => /^Prep mode$/.test(h.textContent || "")) &&
-        !buttonNamed(/prep mode$/i),
+    check("Progress no longer has the goal (Prep mode until 0.681), which moved to Focused training",
+      ![...document.querySelectorAll("h3.at-sectionhead")].some((h) => /^(Prep mode|Set a goal|Your goal)$/.test(h.textContent || "")) &&
+        !buttonNamed(/(prep mode|set a goal|your goal)$/i),
       [...document.querySelectorAll(".at-sectionhead")].map((h) => h.textContent).join(" | "));
     const prepChoice = () => /** @type {HTMLButtonElement | null} */ (
-      document.querySelector('.at-screen.training .at-trainchoice[aria-label="Prep mode"]'));
+      document.querySelector('.at-screen.training .at-trainchoice[aria-label="Set a goal"], .at-screen.training .at-trainchoice[aria-label="Your goal"]'));
     const status = () => ((document.querySelector(".at-screen.training .at-trainchoicestatus") || {}).textContent || "");
     /* Into Focused training from Home, and Prep mode from there. */
     const openPrep = async () => {
@@ -2841,13 +2841,15 @@ if (/Build a session/.test(document.body.textContent)) {
     click(buttonNamed(/^Home$/));
     await sleep(300);
     await toTraining();
-    check("Focused training offers Prep mode, saying what it is, with nothing set yet",
-      !!prepChoice() && /ready by a date/.test(prepChoice()?.textContent || "") && !status(),
-      (prepChoice() || {}).textContent || "(no Prep mode)");
+    /* Called Set a goal since 0.681 (Prep mode before), and Your goal once
+       there is one. */
+    check("Focused training offers Set a goal, saying what it is, with nothing set yet",
+      prepChoice()?.getAttribute("aria-label") === "Set a goal" && /ready by a date/.test(prepChoice()?.textContent || "") && !status(),
+      (prepChoice() || {}).textContent || "(no Set a goal)");
     click(prepChoice());
     await sleep(250);
-    check("and opens Prep mode on a screen of its own",
-      /Prep mode/.test(((top() || {}).textContent || "")), ((top() || {}).textContent || "").slice(0, 60));
+    check("and opens Set a goal on a screen of its own",
+      /Set a goal/.test(((top() || {}).textContent || "")), ((top() || {}).textContent || "").slice(0, 60));
     const nameBox = document.getElementById("at-prep-name");
     const dateBox = document.getElementById("at-prep-date");
     check("asking what it is for and when", !!nameBox && !!dateBox);
@@ -2874,25 +2876,26 @@ if (/Build a session/.test(document.body.textContent)) {
       (levelPick(/^Learnt$/) || {}).outerHTML || "(no level picker)");
     const foot = () => (top() || document).querySelector(".at-screenfoot");
     check("Save sits in the bar at the foot of the screen",
-      !!foot()?.contains(buttonNamed(/^Start prepping$/) || null), (foot() || {}).textContent || "(no foot)");
+      !!foot()?.contains(buttonNamed(/^Start working towards it$/) || null), (foot() || {}).textContent || "(no foot)");
     const readyText = () => ((document.querySelector(".at-prepready") || {}).textContent || "");
     for (let i = 0; i < 160 && (!readyText() || /Working out/.test(readyText())); i++) await sleep(250);
     check("saying how much practice being ready takes, or when it could be",
       /sessions? a day will get you ready before|can't be fully ready|already learnt/.test(readyText()),
       readyText().slice(0, 160));
-    click(buttonNamed(/^Start prepping$/));
+    click(buttonNamed(/^Start working towards it$/));
     await sleep(300);
     const note = status;
-    check("once started, back on Focused training, Prep mode says what is being prepped for and how long is left",
-      /Prepping for Start of class · (\d+ days|1 day) left/.test(note()) || /Ready for Start of class/.test(note()),
-      note() || "(no note)");
+    check("once started, back on Focused training, Your goal says what is being worked towards and how long is left",
+      prepChoice()?.getAttribute("aria-label") === "Your goal" &&
+        (/Working towards Start of class · (\d+ days|1 day) left/.test(note()) || /Ready for Start of class/.test(note())),
+      `${prepChoice()?.getAttribute("aria-label")}: ${note() || "(no note)"}`);
 
     await leaveTraining();
     click(buttonNamed(/^Home$/));
     await sleep(300);
-    const prepButton = () => buttonNamed(/^Prep for /);
+    const prepButton = () => buttonNamed(/^Practice for /);
     check("the home screen offers a session for it",
-      !!prepButton() && /^Prep for Start of class$/.test((prepButton() || {}).textContent || ""),
+      !!prepButton() && /^Practice for Start of class$/.test((prepButton() || {}).textContent || ""),
       (prepButton() || {}).textContent || "(no prep button)");
     const prepTile = () => document.querySelector(".at-preptile");
     check("in a tile of its own at the top, with the prep's own climb and its button the primary one",
@@ -2945,7 +2948,7 @@ if (/Build a session/.test(document.body.textContent)) {
     click(buttonNamed(/^Home$/));
     await sleep(300);
     check("and reaches the home screen's button",
-      /^Prep for Exam$/.test((prepButton() || {}).textContent || ""), (prepButton() || {}).textContent || "(none)");
+      /^Practice for Exam$/.test((prepButton() || {}).textContent || ""), (prepButton() || {}).textContent || "(none)");
     check("whose ring counts cards learnt",
       / cards? learnt$/.test((prepTile()?.querySelector(".at-climbsay") || {}).textContent || ""),
       (prepTile()?.querySelector(".at-climbsay") || {}).textContent || "(no ring)");
@@ -2965,15 +2968,15 @@ if (/Build a session/.test(document.body.textContent)) {
 
     /* Cleared. */
     await openPrep();
-    const del = () => [...((foot() || document).querySelectorAll("button"))].find((b) => b.getAttribute("aria-label") === "Delete this prep");
+    const del = () => [...((foot() || document).querySelectorAll("button"))].find((b) => b.getAttribute("aria-label") === "Delete this goal");
     check("the way to delete it is an icon in the same bar, before Save",
       !!del() && !(del()?.textContent || "").trim() &&
         !!((del()?.compareDocumentPosition(/** @type {Node} */ (buttonNamed(/^Save changes$/))) || 0) & 4),
       (foot() || {}).innerHTML?.slice(0, 160) || "(no foot)");
     click(del());
     await sleep(300);
-    check("deleting clears it from Prep mode's button on Focused training",
-      !!prepChoice() && !note(), note());
+    check("deleting clears it from Focused training, whose button is Set a goal again",
+      prepChoice()?.getAttribute("aria-label") === "Set a goal" && !note(), note());
     await leaveTraining();
     click(buttonNamed(/^Home$/));
     await sleep(300);
@@ -3122,14 +3125,18 @@ const beforeAnswer = schedules();
   check("saying what it is under its name, and nothing about how much is slipping",
     !!weakBtn && /got wrong lately/.test(weakBtn.textContent || "") && !/slipping/.test(weakBtn.textContent || ""),
     weakBtn ? (weakBtn.textContent || "").replace(/\s+/g, " ") : "no button");
-  /* The four choices (0.671): two side by side, then two full width, each
-     with its line. */
+  /* The four choices (0.671): two side by side, then two more side by
+     side (0.681), each with its line and its icon on its name's line. */
   const choices = [...document.querySelectorAll(".at-screen.training .at-trainchoice")];
-  check("Weak spots and Not seen lately side by side, then Build a session and Prep mode",
-    choices.map((b) => b.getAttribute("aria-label")).join("|") === "Weak spots|Not seen lately|Build a session|Prep mode" &&
-      !!weakBtn?.parentElement?.classList.contains("at-trainpair") &&
+  check("Weak spots and Not seen lately side by side, then Build a session and Set a goal side by side",
+    choices.map((b) => b.getAttribute("aria-label")).join("|") === "Weak spots|Not seen lately|Build a session|Set a goal" &&
+      choices.every((b) => !!b.parentElement?.classList.contains("at-trainpair")) &&
+      choices[0]?.parentElement !== choices[2]?.parentElement && choices[2]?.parentElement === choices[3]?.parentElement &&
       choices.every((b) => !!b.querySelector(".at-trainchoicenote")?.textContent),
     choices.map((b) => b.getAttribute("aria-label")).join("|"));
+  check("each with its icon on the same line as its name",
+    choices.every((b) => !!b.querySelector(".at-trainchoicehead > .at-trainchoiceico + .at-trainchoicename")),
+    choices.map((b) => b.querySelector(".at-trainchoicehead") ? "ok" : "no head").join("|"));
   const unseenBtn = /** @type {HTMLButtonElement | undefined} */ (choices[1]);
   check("and Not seen lately is lit for a learner with cards they have not met in days",
     !!unseenBtn && unseenBtn.getAttribute("aria-disabled") !== "true",

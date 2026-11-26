@@ -15984,10 +15984,13 @@ export default function ArabicTrainer() {
   }
 
 
-  /* The one prep, set, changed or cleared from Prep mode — see Prep. */
+  /* The one prep, set, changed or cleared from its screen — see Prep.
+     Called a goal wherever the learner reads it (0.681, the owner's 1b);
+     still a prep in the code, where renaming it would touch the stored
+     setting and every device's copy of it. */
   const savePrep = (p: Prep | null) => {
     setSetting("prep", p);
-    flash(p ? `Prepping for ${p.name}` : "Prep cleared");
+    flash(p ? `Goal set: ${p.name}` : "Goal cleared");
   };
 
   const setSetting: (k: string, v: any) => void = (k, v) =>
@@ -16540,7 +16543,7 @@ export default function ArabicTrainer() {
                     <Climb items={shown.filter(prepDeckOf(homePrep.decks))} settings={settings} target={homePrep.target} />
                     <div className="at-row">
                       <Button variant="primary" onClick={() => begin(false, prepDeckOf(homePrep.decks))}>
-                        Prep for {homePrep.name}
+                        Practice for {homePrep.name}
                       </Button>
                     </div>
                     <PrepLine
@@ -19300,10 +19303,10 @@ function FocusedTrainingSheet({
   const prepLine = !prep
     ? ""
     : prepNow === "past"
-    ? `${prep.name} has come — edit the prep or delete it.`
+    ? `${prep.name} has come — edit the goal or delete it.`
     : prepNow === "done"
     ? `Ready for ${prep.name}: every card is ${prep.target === "cleared" ? "cleared" : "learnt"}.`
-    : `Prepping for ${prep.name} · ${prepDaysLeft(prep.date) === 1 ? "1 day left" : `${prepDaysLeft(prep.date)} days left`}`;
+    : `Working towards ${prep.name} · ${prepDaysLeft(prep.date) === 1 ? "1 day left" : `${prepDaysLeft(prep.date)} days left`}`;
 
   return (
     <Screen title="Focused training" onBack={onClose} className="training">
@@ -19315,7 +19318,8 @@ function FocusedTrainingSheet({
           <p>Practise with a goal in mind.</p>
         </div>
         {/* Two sessions over every card, side by side, then the two ways
-            of aiming one yourself, full width (0.671). */}
+            of aiming one yourself, side by side too (0.681; full width
+            from 0.671). */}
         <div className="at-trainpair">
           <TrainingChoice
             title="Weak spots"
@@ -19332,21 +19336,25 @@ function FocusedTrainingSheet({
             onClick={onUnseen}
           />
         </div>
-        <TrainingChoice
-          title="Build a session"
-          icon="tune"
-          note="Pick the cards, the kind of practice and how long it lasts."
-          disabled={!canBuild}
-          onClick={onBuild}
-        />
-        <TrainingChoice
-          title="Prep mode"
-          icon="event"
-          note="Get decks ready by a date, like an exam, a trip or the start of a class."
-          status={prepLine}
-          onClick={onPrep}
-          dialog
-        />
+        <div className="at-trainpair">
+          <TrainingChoice
+            title="Build a session"
+            icon="tune"
+            note="Pick the cards, the kind of practice and how long it lasts."
+            disabled={!canBuild}
+            onClick={onBuild}
+          />
+          {/* Set a goal until one is set, then Your goal, with where it
+              stands under it (0.681, the owner's 2b): it was Prep mode. */}
+          <TrainingChoice
+            title={prep ? "Your goal" : "Set a goal"}
+            icon="event"
+            note="Get decks ready by a date, like an exam, a trip or the start of a class."
+            status={prepLine}
+            onClick={onPrep}
+            dialog
+          />
+        </div>
         {/* The sessions kept, under a rule and a heading of their own
             (0.680). There was a Saved sessions button here, opening a
             screen that listed them with Start, Edit and Delete; once each
@@ -19400,10 +19408,14 @@ function TrainingChoice({ title, icon, note, status, off, disabled, dialog, onCl
       aria-haspopup={dialog ? "dialog" : undefined}
       onClick={onClick}
     >
-      <span className="at-trainchoiceico" aria-hidden="true">
-        <Icon name={icon} size={22} />
+      {/* The icon on the name's line, before it (0.681; over it from
+          0.675). A long name wraps beside it rather than shrinking. */}
+      <span className="at-trainchoicehead">
+        <span className="at-trainchoiceico" aria-hidden="true">
+          <Icon name={icon} size={18} />
+        </span>
+        <span className="at-trainchoicename">{title}</span>
       </span>
-      <span className="at-trainchoicename">{title}</span>
       <span className="at-trainchoicenote" id={`${id}-note`}>{note}</span>
       {status ? <span className="at-trainchoicestatus" id={`${id}-status`}>{status}</span> : null}
     </button>
@@ -20584,7 +20596,7 @@ function PrepScreen({
   );
   return (
     <Screen
-      title="Prep mode"
+      title={prep ? "Your goal" : "Set a goal"}
       onBack={onBack}
       className="cardform"
       /* Save at the foot of the screen, as every other form keeps it, and
@@ -20593,23 +20605,23 @@ function PrepScreen({
       footer={
         <>
           {prep && (
-            <IconButton icon="delete" label="Delete this prep" danger onClick={() => onSave(null)} />
+            <IconButton icon="delete" label="Delete this goal" danger onClick={() => onSave(null)} />
           )}
           <Button
             variant="primary"
             disabled={!ready}
             onClick={() => ready && onSave({ name: name.trim(), date, decks: chosen, target })}
           >
-            {prep ? "Save changes" : "Start prepping"}
+            {prep ? "Save changes" : "Start working towards it"}
           </Button>
         </>
       }
     >
       <Lede>
-        Preparing for something on a set date? Pick the decks you need ready by then. The home screen will offer
+        Working towards something on a set date? Pick the decks you need ready by then. The home screen will offer
         sessions drawn only from those decks, and tell you whether you're on track.
       </Lede>
-      <FormField label="What are you preparing for?" htmlFor="at-prep-name">
+      <FormField label="What are you working towards?" htmlFor="at-prep-name">
         <input
           id="at-prep-name"
           className="at-input"

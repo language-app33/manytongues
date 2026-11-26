@@ -162,7 +162,7 @@ const PLACES: Record<string, [string, string]> = {
   DeckScreen: [LEARN, "The Progress tab · one deck, with when it could be learnt"],
   UnitScreen: [LEARN, "A course's path · one unit, its words and sentences"],
   PathHomeLine: [LEARN, "Home · a course's current unit"],
-  PrepScreen: [LEARN, "Focused training · Prep mode, getting decks learnt by a date"],
+  PrepScreen: [LEARN, "Focused training · Set a goal (Prep mode until 0.681), getting decks learnt by a date"],
   PrepLine: [LEARN, "The home screen · how long is left to prep, and whether your pace gets you there"],
   ReviewItem: [LEARN, "The Progress tab · one card"],
   StudentCourses: [LEARN, "The Courses tab"],

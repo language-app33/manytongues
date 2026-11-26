@@ -6425,7 +6425,7 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
       card, or a part of a language's numbers. */
   of?: string;
   /** Its words where decks are being chosen rather than something put in
-      them — Prep mode picks the decks it aims at, and "Add this card to a
+      them — Set a goal picks the decks it aims at, and "Add this card to a
       deck" would be the wrong sentence there. Each one left out is the
       card's. */
   words?: Partial<DeckWords>;
