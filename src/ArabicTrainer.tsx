@@ -24,7 +24,6 @@ import {
   ConfirmModal,
   Empty,
   ChatArt,
-  TrainingArt,
   Field as FormField,
   FLAG_KINDS,
   FEEDBACK_KINDS,
@@ -14211,7 +14210,8 @@ export default function ArabicTrainer() {
   /* The card on Home turns once per finished session (0.664): the end
      screen is the moment a session is finished, whether it ran its course,
      ran out of time or was all answered. A trial is a teacher's look at one
-     question, not a session, so it turns nothing. Counted per device. */
+     question, not a session, so it turns nothing. Counted per device.
+     Opening the app turns it too (0.674): see readHomeTurn. */
   const [homeTurn, setHomeTurn] = useState(readHomeTurn);
   /* How far the student has come: before practice, the first day, or
      from the second day of practice (0.666). The card's welcome and the
@@ -16533,8 +16533,10 @@ export default function ArabicTrainer() {
 
                   {/* A shape in the logo's style and a fact about how
                       language varies, turned after every finished session
-                      (0.664). See home-card.ts. */}
-                  <HomeCard turn={homeTurn} stage={stage} />
+                      (0.664). See home-card.ts. Not under a prep (0.673):
+                      the prep's tile is the top of the screen, and the card
+                      pushed Practice off a phone. */}
+                  {!homePrep && <HomeCard turn={homeTurn} stage={stage} />}
 
                   {/* Practice, and beside it on the right the way to
                       Focused training (0.650): weak spots, a session built
@@ -17922,6 +17924,8 @@ export default function ArabicTrainer() {
             settings={settings}
             onSavedList={() => setShowingSaved(true)}
             onStartSaved={startSaved}
+            onEditSaved={setEditingSaved}
+            onDeleteSaved={dropSession}
             onClose={() => setTraining(false)}
           />
         )}
@@ -17970,7 +17974,8 @@ export default function ArabicTrainer() {
         )}
 
         {/* The Build screen again, opened on what was kept. Saving goes
-            back to the list, which is where it was opened from. */}
+            back to where it was opened from: the list, or a tile's menu on
+            Focused training (0.675). */}
         {editingSaved && (
           <ManualSessionSheet
             items={shown}
@@ -18444,10 +18449,23 @@ function HomeCard({ turn, stage }: { turn: number; stage: HomeStage }) {
   );
 }
 /* The card's count, on this device only: which card is showing is a
-   matter of what this screen last showed, not something to sync. */
+   matter of what this screen last showed, not something to sync.
+
+   It also turns once each time the app is opened (0.674): a reload, or
+   closing the app and opening it again, shows the next card, not the one
+   left from last time. Once per page load, not per mount, so going to
+   another screen and back does not turn it, and the end of a session
+   still turns it as before. The very first open, with nothing stored,
+   shows the first card. */
 const HOME_TURN_KEY = "arabic-trainer:home-card";
+let homeTurnedOnOpen = false;
 function readHomeTurn(): number {
-  try { return Math.max(0, parseInt(localStorage.getItem(HOME_TURN_KEY) || "0", 10) || 0); } catch { return 0; }
+  let stored: string | null = null;
+  try { stored = localStorage.getItem(HOME_TURN_KEY); } catch { /* private window */ }
+  const turn = Math.max(0, parseInt(stored || "0", 10) || 0);
+  if (homeTurnedOnOpen) return turn;
+  homeTurnedOnOpen = true;
+  return writeHomeTurn(stored === null ? turn : turn + 1);
 }
 function writeHomeTurn(turn: number): number {
   try { localStorage.setItem(HOME_TURN_KEY, String(turn)); } catch { /* private window: the card still turns for this visit */ }
@@ -18521,7 +18539,9 @@ function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings
  * Each carries how much of its own cards is learnt, worked out the way the
  * ring above it is, so "Thursday's verbs · 40%" and the ring cannot be
  * counting different things. Pressing one starts it, which is what Start
- * does on the list; changing or forgetting one is the list's to do.
+ * does on the list. Since 0.675 it also says what the list's row says —
+ * its kind, its length, its cards — and the dots in its corner start,
+ * change or delete it from here.
  *
  * Except a Catch up, which carries how many of its cards are due instead
  * (0.604, the owner's 1a). Catch up only asks Cleared and Learnt cards, so
@@ -18531,11 +18551,13 @@ function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings
  * screen's "ready to review" counts by, so all three agree. With nothing
  * due the tile is dimmed but still pressable, and says so when pressed.
  */
-function SavedTiles({ sessions, items, settings, onStart }: {
+function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete }: {
   sessions: SavedSession[];
   items: Item[];
   settings: Settings;
   onStart: (session: SavedSession) => void;
+  onEdit: (session: SavedSession) => void;
+  onDelete: (id: string) => void;
 }) {
   const tiles = useMemo(() => {
     /* Newest first, as the list has them. */
@@ -18543,53 +18565,156 @@ function SavedTiles({ sessions, items, settings, onStart }: {
       .sort((a, b) => (b.created || 0) - (a.created || 0))
       .map((s) => {
         const cards = cardsOfSaved(s, items);
+        const { line } = savedSummary(s, items);
         if (s.mode === "catchup") {
-          return { s, alive: cards.length, due: cards.filter((it) => dueForReview(it, settings, items)).length, pct: 0 };
+          return { s, line, alive: cards.length, due: cards.filter((it) => dueForReview(it, settings, items)).length, pct: 0 };
         }
-        return { s, alive: cards.length, due: null, pct: climbOf(cards, settings, items).pct };
+        return { s, line, alive: cards.length, due: null, pct: climbOf(cards, settings, items).pct };
       });
   }, [sessions, items, settings]);
+  /* The tile whose menu is open, and the one being asked about before it
+     is deleted. */
+  const [menuFor, setMenuFor] = useState<string | null>(null);
+  const [asking, setAsking] = useState<SavedSession | null>(null);
 
   if (!tiles.length) return null;
   return (
     <div className="at-savedtiles">
-      {tiles.map(({ s, alive, due, pct }) =>
-        due !== null ? (
+      {tiles.map(({ s, line, alive, due, pct }) => (
+        /* The tile is two buttons, side by side rather than one inside the
+           other: the tile itself, which starts the session as it always
+           has, and the dots in its corner, which open a menu to start,
+           change or delete it (0.675) — what the row on Saved sessions
+           offers, without going there. The dots stay pressable when every
+           card in it has gone, which is when changing or deleting it is
+           the thing to do. */
+        <div
+          key={s.id}
+          className={`at-savedtile${due === 0 ? " quiet" : ""}${alive ? "" : " gone"}`}
+        >
           <button
-            key={s.id}
-            className={`at-savedtile${due ? "" : " quiet"}`}
+            type="button"
+            className="at-savedtilego"
             disabled={!alive}
-            aria-label={`Start ${s.name}, ${due ? `${due} ${due === 1 ? "card" : "cards"} due` : "nothing due"}`}
+            aria-label={
+              due !== null
+                ? `Start ${s.name}, ${due ? `${due} ${due === 1 ? "card" : "cards"} due` : "nothing due"}`
+                : `Start ${s.name}, ${pct}% learnt`
+            }
+            aria-describedby={`saved-${s.id}-line`}
             onClick={() => onStart(s)}
           >
             <span className="nm">{s.name}</span>
-            {due ? (
-              <span className="pc" aria-hidden="true">
-                {due}
-                <i className="due">due</i>
-              </span>
+            {/* The same line the session's row on Saved sessions has. */}
+            <span className="ln" id={`saved-${s.id}-line`}>
+              {/* A number kept on the line with its word, so a narrow
+                  tile breaks "30 questions · 1 card" between the parts
+                  rather than leaving "card" alone under its 1. */}
+              {line.replace(/(\d) /g, "$1\u00a0")}
+            </span>
+            {due !== null ? (
+              due ? (
+                <span className="pc" aria-hidden="true">
+                  {due}
+                  <i className="due">due</i>
+                </span>
+              ) : (
+                <span className="pc none" aria-hidden="true">Nothing due</span>
+              )
             ) : (
-              <span className="pc none" aria-hidden="true">Nothing due</span>
+              <>
+                <span className="pc" aria-hidden="true">
+                  {pct}
+                  <i>%</i>
+                </span>
+                <span className="bar" aria-hidden="true">
+                  {pct > 0 && <i style={{ width: `${pct}%` }} />}
+                </span>
+              </>
             )}
           </button>
-        ) : (
-          <button
-            key={s.id}
-            className="at-savedtile"
-            disabled={!alive}
-            aria-label={`Start ${s.name}, ${pct}% learnt`}
-            onClick={() => onStart(s)}
+          {/* Clicks stop here so that the one opening the menu does not
+              reach the window and close it again — see Popover — and
+              Escape closes the menu rather than the screen under it. */}
+          <span
+            className="at-savedtilemenu"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === "Escape" && menuFor === s.id) {
+                e.stopPropagation();
+                setMenuFor(null);
+              }
+            }}
           >
-            <span className="nm">{s.name}</span>
-            <span className="pc" aria-hidden="true">
-              {pct}
-              <i>%</i>
-            </span>
-            <span className="bar" aria-hidden="true">
-              {pct > 0 && <i style={{ width: `${pct}%` }} />}
-            </span>
-          </button>
-        )
+            <button
+              type="button"
+              className="at-savedtilemore"
+              aria-label={`More for ${s.name}`}
+              title="More"
+              aria-haspopup="menu"
+              aria-expanded={menuFor === s.id}
+              onClick={() => setMenuFor((cur) => (cur === s.id ? null : s.id))}
+            >
+              <Icon name="more" size={20} />
+            </button>
+            {menuFor === s.id && (
+              <Popover className="at-pickmenu at-savedpick" role="menu" onClose={() => setMenuFor(null)}>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="at-pickline"
+                  disabled={!alive}
+                  onClick={() => {
+                    setMenuFor(null);
+                    onStart(s);
+                  }}
+                >
+                  <span className="at-pickmark"><Icon name="play" size={18} /></span>
+                  <span className="at-picktext">Start</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="at-pickline"
+                  onClick={() => {
+                    setMenuFor(null);
+                    onEdit(s);
+                  }}
+                >
+                  <span className="at-pickmark"><Icon name="edit" size={18} /></span>
+                  <span className="at-picktext">Edit</span>
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="at-pickline danger"
+                  onClick={() => {
+                    setMenuFor(null);
+                    setAsking(s);
+                  }}
+                >
+                  <span className="at-pickmark"><Icon name="delete" size={18} /></span>
+                  <span className="at-picktext">Delete</span>
+                </button>
+              </Popover>
+            )}
+          </span>
+        </div>
+      ))}
+      {/* Asked first, here and not on the list's own delete button: a menu
+          item sits a finger's width from Edit, and there is no undo. */}
+      {asking && (
+        <ConfirmModal
+          title={`Delete ${asking.name}?`}
+          body={<p>The session is forgotten. Its cards and what you have learnt of them stay as they are.</p>}
+          confirmLabel="Delete"
+          onCancel={() => setAsking(null)}
+          onConfirm={() => {
+            const id = asking.id;
+            setAsking(null);
+            onDelete(id);
+          }}
+        />
       )}
     </div>
   );
@@ -19043,7 +19168,8 @@ const TIME_CHOICES = [2, 5, 10, 15, 30];
    ------------------------------------------------------------------ */
 
 function FocusedTrainingSheet({
-  weakCount, onWeak, unseenCount, onUnseen, canBuild, onBuild, prep, onPrep, saved, items, settings, onSavedList, onStartSaved, onClose,
+  weakCount, onWeak, unseenCount, onUnseen, canBuild, onBuild, prep, onPrep, saved, items, settings, onSavedList, onStartSaved,
+  onEditSaved, onDeleteSaved, onClose,
 }: {
   weakCount: number;
   onWeak: () => void;
@@ -19058,6 +19184,8 @@ function FocusedTrainingSheet({
   settings: Settings;
   onSavedList: () => void;
   onStartSaved: (session: SavedSession) => void;
+  onEditSaved: (session: SavedSession) => void;
+  onDeleteSaved: (id: string) => void;
   onClose: () => void;
 }) {
   useEffect(() => {
@@ -19080,10 +19208,10 @@ function FocusedTrainingSheet({
   return (
     <Screen title="Focused training" onBack={onClose} className="training">
       <div className="at-training">
-        {/* What the screen is for, under a dumbbell (0.668). Each button
-            says what it does itself (0.671), so the line is short. */}
+        {/* What the screen is for (0.668). Each button says what it does
+            itself (0.671), so the line is short; the dumbbell drawing over
+            it went in 0.675, when each button got a picture of its own. */}
         <div className="at-trainingintro" data-el="training-intro">
-          <TrainingArt />
           <p>Practise with a goal in mind.</p>
         </div>
         {/* Two sessions over every card, side by side, then the two ways
@@ -19091,12 +19219,14 @@ function FocusedTrainingSheet({
         <div className="at-trainpair">
           <TrainingChoice
             title="Weak spots"
+            icon="target"
             note="Only the questions you've got wrong lately, worst first."
             off={!weakCount}
             onClick={onWeak}
           />
           <TrainingChoice
             title="Not seen lately"
+            icon="history"
             note="Cards you haven't practised in the last few days."
             off={!unseenCount}
             onClick={onUnseen}
@@ -19104,12 +19234,14 @@ function FocusedTrainingSheet({
         </div>
         <TrainingChoice
           title="Build a session"
+          icon="tune"
           note="Pick the cards, the kind of practice and how long it lasts."
           disabled={!canBuild}
           onClick={onBuild}
         />
         <TrainingChoice
           title="Prep mode"
+          icon="event"
           note="Get decks ready by a date, like an exam, a trip or the start of a class."
           status={prepLine}
           onClick={onPrep}
@@ -19118,11 +19250,18 @@ function FocusedTrainingSheet({
         {saved.length > 0 && (
           <>
             <div className="at-row">
-              <Button variant="ghost" onClick={onSavedList}>
+              <Button variant="ghost" icon="bookmark" onClick={onSavedList}>
                 Saved sessions
               </Button>
             </div>
-            <SavedTiles sessions={saved} items={items} settings={settings} onStart={onStartSaved} />
+            <SavedTiles
+              sessions={saved}
+              items={items}
+              settings={settings}
+              onStart={onStartSaved}
+              onEdit={onEditSaved}
+              onDelete={onDeleteSaved}
+            />
           </>
         )}
       </div>
@@ -19133,9 +19272,11 @@ function FocusedTrainingSheet({
 /* One of Focused training's choices (0.671): its name, and a line under
    it saying what it is. `off` is dimmed but still pressed, so the press
    can say why there is nothing in it, as Weak spots always has; `status`
-   is a second line for where it stands, in the accent colour. */
-function TrainingChoice({ title, note, status, off, disabled, dialog, onClick }: {
+   is a second line for where it stands, in the accent colour. `icon`
+   is the picture over its name (0.675), in a round well like a Nudge's. */
+function TrainingChoice({ title, icon, note, status, off, disabled, dialog, onClick }: {
   title: string;
+  icon: string;
   note: string;
   status?: string;
   off?: boolean;
@@ -19157,11 +19298,42 @@ function TrainingChoice({ title, note, status, off, disabled, dialog, onClick }:
       aria-haspopup={dialog ? "dialog" : undefined}
       onClick={onClick}
     >
+      <span className="at-trainchoiceico" aria-hidden="true">
+        <Icon name={icon} size={22} />
+      </span>
       <span className="at-trainchoicename">{title}</span>
       <span className="at-trainchoicenote" id={`${id}-note`}>{note}</span>
       {status ? <span className="at-trainchoicestatus" id={`${id}-status`}>{status}</span> : null}
     </button>
   );
+}
+
+/*
+ * What a kept session is, in one line: its kind of practice, how long it
+ * runs and how many of its cards are still here — "Regular · 20 questions
+ * · 34 cards". The row on Saved sessions and the tile on Focused training
+ * both say it (0.675), from here, so they cannot come to say different
+ * things.
+ *
+ * How much of it is still here matters: a card withdrawn since is simply
+ * gone from the session, and saying so before it is started is the
+ * difference between a short session and a broken one.
+ */
+function savedSummary(s: SavedSession, items: Item[]): { alive: number; line: string } {
+  const alive = cardsOfSaved(s, items).length;
+  const gone = missingFromSaved(s, items).length;
+  const mode = (MODES as Record<string, { label: string } | undefined>)[modeOfSaved(s.mode)];
+  const length = s.minutes
+    ? `${s.minutes} min`
+    : s.count && s.count < 999
+    ? `${s.count} questions`
+    : s.mode === "catchup"
+    ? "everything due"
+    : "everything";
+  const line = [mode ? mode.label : s.mode, length,
+    !gone ? plural(alive, "card") : `${alive} of ${alive + gone} cards still here`,
+  ].join(" · ");
+  return { alive, line };
 }
 
 /* ------------------------------------------------------------------
@@ -19201,30 +19373,13 @@ function SavedSessionsSheet({ sessions, items, onStart, onEdit, onDelete, onClos
 
       <div className="at-list">
         {list.map((s) => {
-          /* How much of it is still here. A card withdrawn since is simply
-             gone from the session, and saying so before it is started is
-             the difference between a short session and a broken one. */
-          const alive = cardsOfSaved(s, items).length;
-          const gone = missingFromSaved(s, items).length;
-          const mode = (MODES as Record<string, { label: string } | undefined>)[modeOfSaved(s.mode)];
-          const length = s.minutes
-            ? `${s.minutes} min`
-            : s.count && s.count < 999
-            ? `${s.count} questions`
-            : s.mode === "catchup"
-            ? "everything due"
-            : "everything";
+          /* What it is, and how much of it is still here: savedSummary. */
+          const { alive, line } = savedSummary(s, items);
           return (
             <div className="at-item at-sessionrow" key={s.id}>
               <div className="grow">
                 <div className="en">{s.name}</div>
-                <div className="lat">
-                  {[mode ? mode.label : s.mode, length,
-                    !gone
-                      ? plural(alive, "card")
-                      : `${alive} of ${alive + gone} cards still here`,
-                  ].join(" · ")}
-                </div>
+                <div className="lat">{line}</div>
               </div>
               <Button
                 variant="primary"
