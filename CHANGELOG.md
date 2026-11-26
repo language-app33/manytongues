@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.676 — 26 November 2026
+## 0.677 — 26 November 2026
 
 **Imported cards say they haven't reached students yet.** Cards brought in
 from a backup arrive as Ready for review, which students don't get, so a
@@ -30,6 +30,18 @@ the teacher. Now:
 **Still to check by hand:** the band is remembered while Teaching is open;
 after the app is reopened, the course's line and the deck's own line are
 what say it.
+
+## 0.676 — 26 November 2026
+
+**The fact on Home also changes when you come back after a while.** A
+phone often keeps the app in the background rather than closing it, so
+0.674's new card on opening didn't always happen. Now, coming back to the
+app after it has been away for half an hour or more also brings the next
+picture and fact. A quicker look away, such as tapping a fact's source and
+coming straight back, keeps the fact you were reading.
+
+Still to check by hand: leaving the installed app in the background on a
+real phone for over half an hour, then coming back to it.
 
 ## 0.675 — 26 November 2026
 

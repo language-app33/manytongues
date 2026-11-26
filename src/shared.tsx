@@ -203,7 +203,7 @@ const ICONS: Record<string, string> = {
      session — weak spots, a session built by hand, the ones kept (0.650). */
   dumbbell:
     "M4 11h16v2H4zM5 6.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1zM16 6.5a1 1 0 0 1 1-1h1a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1h-1a1 1 0 0 1-1-1zM2 9.5a1 1 0 0 1 1-1h1v7H3a1 1 0 0 1-1-1zM20 8.5h1a1 1 0 0 1 1 1v5a1 1 0 0 1-1 1h-1z",
-  /* Focused training's choices (0.676), each a picture of what it does:
+  /* Focused training's choices (0.677), each a picture of what it does:
      a target for the weak spots, the clock running back for what has not
      been seen lately, the sliders a session is built with, a calendar
      ticked off for a date being prepped for, and a bookmark for the
@@ -216,7 +216,7 @@ const ICONS: Record<string, string> = {
     "M16.53 11.06 15.47 10l-4.88 4.88-2.12-2.12-1.06 1.06L10.59 17l5.94-5.94zM19 3h-1V1h-2v2H8V1H6v2H5c-1.11 0-1.99.9-1.99 2L3 19c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z",
   bookmark: "M17 3H7c-1.1 0-1.99.9-1.99 2L5 21l7-3 7 3V5c0-1.1-.9-2-2-2z",
   /* Three dots stood on end: more you can do with the thing it sits on,
-     in a menu (0.676). */
+     in a menu (0.677). */
   more:
     "M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z",
   /* The number sign, for the screen a language's numbers are written on. */
@@ -468,7 +468,7 @@ export function notReaching(
     long: `${n} ${n === 1 ? "doesn't" : "don't"} reach students yet: ${why}`,
     short: `${n} not reaching students`,
     /* The reasons alone, for a sentence that names the cards its own way —
-       a course's (0.676). */
+       a course's (0.677). */
     why,
   };
 }

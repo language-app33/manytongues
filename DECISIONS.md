@@ -9143,7 +9143,7 @@ noun is laid out in boxes", which keeps them as two cards.
 **Revisit if** teachers want uncountables counted with a measure word
 ("two cups of water"), which needs measure words as cards of their own.
 
-## Imported cards say they don't reach students yet (0.676)
+## Imported cards say they don't reach students yet (0.677)
 
 **Problem.** A learner reported "no material" in a course whose decks they
 could see. The course had been filled from a backup, and an import saves
