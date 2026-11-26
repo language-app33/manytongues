@@ -452,7 +452,7 @@ export function notReaching(
     long: `${n} ${n === 1 ? "doesn't" : "don't"} reach students yet: ${why}`,
     short: `${n} not reaching students`,
     /* The reasons alone, for a sentence that names the cards its own way —
-       a course's (0.673). */
+       a course's (0.675). */
     why,
   };
 }
