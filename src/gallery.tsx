@@ -147,6 +147,7 @@ const PLACES: Record<string, [string, string]> = {
   ManualSessionSheet: [LEARN, "Building a session by hand"],
   SavedSessionsSheet: [LEARN, "The sessions you kept"],
   FocusedTrainingSheet: [LEARN, "Focused training · behind the dumbbell on Home: weak spots, not seen lately, building a session, prep mode, and the sessions you kept"],
+  TrainingChoice: [LEARN, "Focused training · one of its choices, with its icon, its name and a line saying what it is"],
   SavedTiles: [LEARN, "Focused training · the sessions you kept, with what each is, how much of it is learnt (or for a Catch up how much is due), and a menu to start, edit or delete it"],
   HomeCard: [LEARN, "Home · the card under the progress ring: a shape in the logo's style and a fact about how language varies, with its source"],
   BrandMark: [LEARN, "The app's logo: on its tile in light mode, its loops alone in dark mode"],
