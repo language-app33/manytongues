@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.678 — 26 November 2026
+## 0.679 — 26 November 2026
 
 **Saved sessions live on Focused training, and two can be pinned to Home.**
 
@@ -34,6 +34,21 @@ and moves once per batch of work you would notice, not once per commit.
 dots, where the old screen had them on every row.
 
 Still to check by hand: the panel and the pinned tiles on a real phone.
+
+## 0.678 — 26 November 2026
+
+**"Learn more" under an answer is folded again.** Everything else worth
+knowing about a card (how it sounds and is written, related words, the
+phrase it turned up in) sits behind a small "Learn more" with an arrow
+beside it. A tap opens it, a second tap folds it, and it starts closed on
+every new question. This puts back how it worked before 0.372.
+
+**Trade-off:** what is in the box takes a tap to see, so most answers will
+go by without it being read; in return Continue sits right under the answer.
+
+Still to check by hand: on a phone, that the arrow and the tap feel right
+and Continue is close under the answer.
+
 
 ## 0.677 — 26 November 2026
 

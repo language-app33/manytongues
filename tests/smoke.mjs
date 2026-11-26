@@ -1643,16 +1643,25 @@ if (/Build a session/.test(document.body.textContent)) {
     const dupes2 = answered.filter((n, i) => n !== "related-word" && answered.indexOf(n) !== i);
     check("and each of those means one thing too", dupes2.length === 0, dupes2.join(", "));
 
-    /* The extras are shown open, under a plain "Learn more" heading with
-       nothing to fold them away: they are there to be read. */
+    /* The extras are folded behind a "Learn more" toggle (0.678): closed
+       on every new answer, open on a tap, closed again on a second. */
     const moreHead = document.querySelector('[data-el="also-heading"]');
-    check("what is not the answer is headed Learn more",
+    check("what is not the answer is behind Learn more",
       !!moreHead && /^Learn more$/.test(moreHead.textContent.trim()), moreHead ? moreHead.textContent : "no heading");
-    check("and the heading is not a control that folds it away",
-      !!moreHead && moreHead.tagName !== "BUTTON" && !moreHead.querySelector("svg") && !moreHead.hasAttribute("aria-expanded"),
+    check("and Learn more is a button with a chevron, closed to begin with",
+      !!moreHead && moreHead.tagName === "BUTTON" && !!moreHead.querySelector("svg") &&
+        moreHead.getAttribute("aria-expanded") === "false" && !document.querySelector('[data-el="also"]'),
       moreHead ? moreHead.outerHTML : "");
-    check("and the box is open without being asked for",
-      !!document.querySelector('[data-el="also"]'), "the box is closed");
+    click(moreHead);
+    await sleep(40);
+    check("and a tap opens the box",
+      !!document.querySelector('[data-el="also"]') && !!moreHead && moreHead.getAttribute("aria-expanded") === "true",
+      "the box is still closed");
+    click(moreHead);
+    await sleep(40);
+    check("and a second tap folds it away", !document.querySelector('[data-el="also"]'), "the box is still open");
+    click(moreHead);
+    await sleep(40);
 
     /* Everything that is not the answer, in one box. The members are each
        conditional, so what matters is that whichever turned up are inside
@@ -1993,7 +2002,7 @@ if (/Build a session/.test(document.body.textContent)) {
 
   /* And the session kept a few steps ago, which is only worth keeping if
      there is a way back to it. */
-  /* Under a heading of its own on Focused training (0.678), where a
+  /* Under a heading of its own on Focused training (0.679), where a
      button used to open a screen listing them. */
   const savedHead = () => ((document.querySelector(".at-screen.training .at-trainsaved .at-sectionhead") || {}).textContent || "").trim();
   check("a kept session puts a way back to it in Focused training, under a heading",
@@ -2009,7 +2018,7 @@ if (/Build a session/.test(document.body.textContent)) {
     !!tile && /^\d{1,3}%$/.test(((tile.querySelector(".pc") || {}).textContent || "").trim()),
     tile ? (tile.textContent || "").trim() : "(no tile)");
   /* What the session is, and the dots in its corner that do the rest
-     from here (0.675), in a panel from the foot of the screen (0.678). */
+     from here (0.675), in a panel from the foot of the screen (0.679). */
   const tileLine = ((tile && tile.querySelector(".ln")) || {}).textContent || "";
   check("and the tile says what kind of session it is",
     / · .*\bcards?\b/.test(tileLine), tileLine || "(no line)");
@@ -4427,7 +4436,12 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
 
     /* Move two: what the answer screen says about where the word lives.
        Under "Learn more", which is where everything that is not the
-       answer lives, open from the start. */
+       answer lives, opened with a tap. */
+    const moreToggle = document.querySelector('[data-el="also-heading"]');
+    if (moreToggle) {
+      click(moreToggle);
+      await sleep(40);
+    }
     const more = document.querySelector('[data-el="also"]');
     if (/Choose the meaning/.test(asked) && !alsoOnMeaning) {
       alsoOnMeaning = {

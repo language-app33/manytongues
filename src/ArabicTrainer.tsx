@@ -8122,9 +8122,12 @@ export function praiseFor(n: number) {
 }
 
 /* --- AlsoBox --------------------------------------------------------
-   What is worth knowing beyond the answer, under a "Learn more" heading.
-   It is shown open, with nothing to fold it away: the blocks are there to
-   be read, and a tap to reach them was a tap most answers never got.
+   What is worth knowing beyond the answer, behind a "Learn more" toggle.
+   It starts closed (0.678, back to how it was before 0.372): open, it put
+   several blocks between the answer and Continue on every card. A tap
+   opens it, with a chevron saying which way it will go. It is closed again
+   on every new question, because the answer, and this with it, unmounts
+   between questions.
 
    Renders nothing — not even the heading — when there is nothing to put
    in it, so "Learn more" is never a promise the box cannot keep.
@@ -8144,6 +8147,7 @@ function alsoName(el: any): string {
   return el.type === RelatedWords ? "related-words" : el.props["data-el"] || "";
 }
 function AlsoBox({ children }: { children?: Node }) {
+  const [open, setOpen] = useState(false);
   const shown = React.Children.toArray(children).filter(Boolean) as any[];
   if (!shown.length) return null;
   const row = (cells: any[]) => (
@@ -8165,12 +8169,21 @@ function AlsoBox({ children }: { children?: Node }) {
   rows.push(...shown.filter(wide));
   return (
     <>
-      <p className="at-alsomore" data-el="also-heading">
+      <button
+        type="button"
+        className="at-alsomore"
+        data-el="also-heading"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
         Learn more
-      </p>
-      <div className="at-alsobox" data-el="also">
-        {rows}
-      </div>
+        <Icon name={open ? "chevronUp" : "chevronDown"} size={18} />
+      </button>
+      {open && (
+        <div className="at-alsobox" data-el="also">
+          {rows}
+        </div>
+      )}
     </>
   );
 }
@@ -13592,7 +13605,7 @@ export default function ArabicTrainer() {
     [savedSessions, drillable]
   );
 
-  /* The ones pinned to Home (0.678) that can run here. */
+  /* The ones pinned to Home (0.679) that can run here. */
   const pinnedHere = useMemo(() => savedHere.filter((s) => s.pinned), [savedHere]);
 
   function keepSession(session: Omit<SavedSession, "id" | "created">) {
@@ -13609,7 +13622,7 @@ export default function ArabicTrainer() {
     setSetting("savedSessions", savedSessions.filter((x) => x.id !== id));
   }
 
-  /* On Home or off it (0.678). The limit is the menu's to keep: it greys
+  /* On Home or off it (0.679). The limit is the menu's to keep: it greys
      the line out once PIN_LIMIT are pinned, rather than this quietly
      unpinning another. */
   function pinSession(id: string, on: boolean) {
@@ -16609,7 +16622,7 @@ export default function ArabicTrainer() {
                         onClick={() => setTraining(true)} />
                     )}
                   </div>
-                  {/* The saved sessions pinned to Home (0.678), under
+                  {/* The saved sessions pinned to Home (0.679), under
                       Practice: the tiles of Focused training without their
                       dots, so pressing one starts it and that is all. Shown
                       whatever else Home leaves off, a prep's included (the
@@ -18004,7 +18017,7 @@ export default function ArabicTrainer() {
 
         {/* The Build screen again, opened on what was kept, from a tile's
             menu on Focused training (0.675; the list it was opened from
-            before went in 0.678). Saving goes back there. */}
+            before went in 0.679). Saving goes back there. */}
         {editingSaved && (
           <ManualSessionSheet
             items={shown}
@@ -18560,14 +18573,14 @@ function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings
   );
 }
 
-/* How many saved sessions can be on Home at once (0.678, the owner's 3b):
+/* How many saved sessions can be on Home at once (0.679, the owner's 3b):
    two fill one row of tiles on a phone, and Home was cleared of clutter
    not long before. */
 const PIN_LIMIT = 2;
 
 /*
  * The sessions somebody kept, as tiles: under "Saved sessions" on Focused
- * training, and the pinned ones on Home under Practice (0.678).
+ * training, and the pinned ones on Home under Practice (0.679).
  *
  * A tile and not a row: small enough to sit two or three abreast, which is
  * a glance at all of them.
@@ -18579,7 +18592,7 @@ const PIN_LIMIT = 2;
  *
  * On Focused training the dots in its corner open a panel to start, edit,
  * pin or unpin, and delete it (0.675; a panel from the foot of the screen
- * since 0.678, the owner's 9c, where it was a menu hanging from the dots:
+ * since 0.679, the owner's 9c, where it was a menu hanging from the dots:
  * a phone's thumb reaches it, and a tile at the foot of the screen cannot
  * cut it off). A pinned one has a pin by its name there. On Home the same
  * tile has no dots (`onEdit` and the rest left out): changing what is on
@@ -18778,7 +18791,7 @@ function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete, onPi
   );
 }
 
-/* One thing to do in a panel of them (0.678): its icon in a round well,
+/* One thing to do in a panel of them (0.679): its icon in a round well,
    and its name, with a line under it where it cannot be done and why.
    Drawn like a row of "Where you are", the other panel of places to go. */
 function SheetAction({ icon, label, note, danger, disabled, onClick }: {
@@ -19335,7 +19348,7 @@ function FocusedTrainingSheet({
           dialog
         />
         {/* The sessions kept, under a rule and a heading of their own
-            (0.678). There was a Saved sessions button here, opening a
+            (0.679). There was a Saved sessions button here, opening a
             screen that listed them with Start, Edit and Delete; once each
             tile's menu did all three the screen said nothing the tiles
             did not, and it went. Not here until there is one, as the
@@ -19401,7 +19414,7 @@ function TrainingChoice({ title, icon, note, status, off, disabled, dialog, onCl
  * What a kept session is, in one line: its kind of practice, how long it
  * runs and how many of its cards are still here — "Regular · 20 questions
  * · 34 cards". On its tile since 0.675, as the Saved sessions screen's row
- * had it until that screen went (0.678).
+ * had it until that screen went (0.679).
  *
  * A saved session is a description, not a snapshot — which cards, which
  * mode, how long — so what it opens is built from the cards as they are

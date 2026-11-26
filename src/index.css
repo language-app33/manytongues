@@ -305,9 +305,11 @@ button {
    it is an offer, not the next thing to do — the next thing to do is
    Continue, at the foot of the screen. It carries the chevron so the tap
    target says which way the box will go. */
-.at-alsomore { margin: 14px 0 0; text-align:center;
+.at-alsomore { display:flex; align-items:center; justify-content:center; gap:4px;
+  margin: 14px auto 0; text-align:center; background:none; border:0; cursor:pointer;
   font-family: var(--ui); font-size:15px; font-weight:700; color: var(--muted);
   padding:6px 10px; }
+.at-alsomore:hover { color: var(--text); }
 .at-alsobox { margin-top:10px; padding:14px; background: var(--well);
   border:2px solid var(--line); border-radius: var(--r); }
 /* The dividers belong to the box, not to its members: the related words
@@ -2599,13 +2601,13 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-savedtilemore:focus-visible { outline:2px solid var(--jade); outline-offset:1px; }
 /* Home's tiles have no dots, so the name has the width to itself. */
 .at-savedtile.bare .nm { padding-inline-end:0; }
-/* The name, after a pin where the session is on Home (0.678). */
+/* The name, after a pin where the session is on Home (0.679). */
 .at-savedtile .nm { display:flex; align-items:center; gap:4px; }
 .at-savedtile .nmtext { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .at-savedpin { flex:0 0 auto; display:inline-flex; color: var(--jade); }
 /* On Home, under Practice. */
 .at-homepins { margin-top:12px; }
-/* A panel of things to do (0.678, see SheetAction): one row each, drawn
+/* A panel of things to do (0.679, see SheetAction): one row each, drawn
    like a row of "Where you are" — a rounded outline, its icon in a round
    well, its name in bold — with a line under the name where it cannot be
    done. */
@@ -3606,7 +3608,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-training > :first-child { margin-top:0; }
 .at-training .at-row + .at-row { margin-top:12px; }
 /* The line at its top (0.668; its drawing went in 0.675). */
-/* The sessions kept (0.678): a rule across, then the heading, then the
+/* The sessions kept (0.679): a rule across, then the heading, then the
    tiles, all set from the start of the line rather than centred. */
 .at-training .at-trainsaved { max-width:420px; margin:28px auto 0; padding-top:24px;
   border-top:1px solid var(--line); text-align:start; }

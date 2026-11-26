@@ -812,7 +812,7 @@ export interface SavedSession {
   minutes: number;
   created: Millis;
   /**
-   * On Home as a tile, under Practice (0.678). At most PIN_LIMIT are; it
+   * On Home as a tile, under Practice (0.679). At most PIN_LIMIT are; it
    * rides in settings with the rest of the session, so it syncs.
    */
   pinned?: boolean;
