@@ -12,6 +12,17 @@ anything that was never really a choice.
 ---
 
 
+## A picture says its count again (0.677)
+
+0.651 stopped picture questions saying "dual" or "plural", after a learner
+said the label only repeated what a picture of two plants showed. In 0.660
+a learner reported, twice, that a picture of one lemon did not say whether
+ليمونة or ليمون was wanted. The owner chose the label back: `pictureLabel`
+names the count wherever another form of the card has another count
+(singular, dual, plural), and the gender as before. A label that repeats
+the picture costs a word; one that is missing costs a guess. A word with
+one form, and an uncountable one, still says nothing.
+
 ## Home's name is a heading in the page, not chrome (0.670)
 
 The app's name on Home was positioned absolutely over the page's top
@@ -9143,7 +9154,7 @@ noun is laid out in boxes", which keeps them as two cards.
 **Revisit if** teachers want uncountables counted with a measure word
 ("two cups of water"), which needs measure words as cards of their own.
 
-## Imported cards say they don't reach students yet (0.677)
+## Imported cards say they don't reach students yet (0.678)
 
 **Problem.** A learner reported "no material" in a course whose decks they
 could see. The course had been filled from a backup, and an import saves
