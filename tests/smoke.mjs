@@ -11128,11 +11128,11 @@ const openPronounTables = async () => {
   /* A picture of one lemon did not say whether ليمونة or ليمون was
      wanted, and a learner reported it twice (0.660): on a card with
      another count, the count is said under the picture. */
-  const lemon = pictured(0, upTo4);
-  lemon.forms = [
-    { ...lemon.forms[0], ar: "ليمونة", en: "lemon", lat: "laymoone", number: "singular", gender: "feminine" },
-    { ...lemon.forms[0], id: "pic0-f1", ar: "ليمون", en: "lemons", lat: "laymoon", number: "plural", gender: "masculine", recs: [] },
-  ];
+  const base = pictured(0, upTo4);
+  const lemon = { ...base, forms: [
+    { ...base.forms[0], ar: "ليمونة", en: "lemon", lat: "laymoone", number: "singular", gender: "feminine" },
+    { ...base.forms[0], id: "pic0-f1", ar: "ليمون", en: "lemons", lat: "laymoon", number: "plural", gender: "masculine", recs: [] },
+  ] };
   const counted = await walk([lemon]);
   check("on a card with a singular and a plural, the picture says which is wanted",
     counted.writtenTags.length > 0 && counted.writtenTags.every((t) => /^(singular|plural)$/.test(t)), JSON.stringify(counted.writtenTags));
