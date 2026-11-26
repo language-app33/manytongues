@@ -12,7 +12,7 @@ anything that was never really a choice.
 ---
 
 
-## A picture says its count again (0.676)
+## A picture says its count again (0.677)
 
 0.651 stopped picture questions saying "dual" or "plural", after a learner
 said the label only repeated what a picture of two plants showed. In 0.660

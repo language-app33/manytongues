@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.676 — 26 November 2026
+## 0.677 — 26 November 2026
 
 **A phrase question no longer drops a letter.** When the missing word is
 two words and the phrase joins a letter to its front — ل in
@@ -33,6 +33,18 @@ card on a real phone. The orange card (برتقال) reported for its spelling o
 transliteration couldn't be checked from here and needs a look in the card
 editor.
 
+## 0.676 — 26 November 2026
+
+**The fact on Home also changes when you come back after a while.** A
+phone often keeps the app in the background rather than closing it, so
+0.674's new card on opening didn't always happen. Now, coming back to the
+app after it has been away for half an hour or more also brings the next
+picture and fact. A quicker look away, such as tapping a fact's source and
+coming straight back, keeps the fact you were reading.
+
+Still to check by hand: leaving the installed app in the background on a
+real phone for over half an hour, then coming back to it.
+
 ## 0.675 — 26 November 2026
 
 **Focused training, tidied.** The dumbbell drawing at the top of the screen
@@ -55,6 +67,7 @@ still deletes at once, as before. The tiles are a line or two taller.
 
 Still to check by hand: the menu on a real phone, opened from a tile near
 the foot of the screen.
+
 ## 0.674 — 26 November 2026
 
 **The fact on Home changes each time you open the app.** The picture and
