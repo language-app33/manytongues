@@ -9,7 +9,7 @@
  * learner's own numbers. A fact about how language varies is a small
  * reason to look, and it changes after every finished session, each time
  * the app is opened (0.674) and on coming back to it after half an hour
- * or more (0.675), so there is something new each time a learner comes
+ * or more (0.676), so there is something new each time a learner comes
  * back.
  *
  * The facts are the ones the owner approved on the review page, each
@@ -283,7 +283,7 @@ export const HOME_SHAPES: HomeShape[] = [
 /* ------------------------------------------------------------------
    Which card shows. One count per device, moved on by each finished
    session, each time the app is opened (0.674) and on coming back to it
-   after half an hour or more (0.675); the shape and the fact are read off
+   after half an hour or more (0.676); the shape and the fact are read off
    it separately, so the twenty shapes and the facts
    drift past each other.
    ------------------------------------------------------------------ */
