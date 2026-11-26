@@ -8,7 +8,6 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-<<<<<<< HEAD
 ## 0.676 — 26 November 2026
 
 **A phrase question no longer drops a letter.** When the missing word is
@@ -33,7 +32,7 @@ Still to check by hand: the phrase card "جمعية لحقوق الإنسان" a
 card on a real phone. The orange card (برتقال) reported for its spelling or
 transliteration couldn't be checked from here and needs a look in the card
 editor.
-=======
+
 ## 0.675 — 26 November 2026
 
 **Focused training, tidied.** The dumbbell drawing at the top of the screen
@@ -78,7 +77,6 @@ card pushed Practice off the bottom. Clear the goal and the card comes
 back.
 
 Still to check by hand: Home on a real phone with a goal set.
->>>>>>> origin/beta
 
 ## 0.672 — 26 November 2026
 
