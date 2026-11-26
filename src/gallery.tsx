@@ -148,7 +148,7 @@ const PLACES: Record<string, [string, string]> = {
   ManualSessionSheet: [LEARN, "Building a session by hand"],
   FocusedTrainingSheet: [LEARN, "Focused training · behind the dumbbell on Home: weak spots, not seen lately, building a session, prep mode, and the sessions you kept"],
   TrainingChoice: [LEARN, "Focused training · one of its choices, with its icon, its name and a line saying what it is"],
-  SheetAction: [LEARN, "Focused training · one row of a saved session's panel: Start, Edit, Pin to Home, Delete"],
+  SheetAction: [PARTS, "One row of a three-dots panel: a saved session's Start or Delete, a module's Export"],
   SavedTiles: [LEARN, "Focused training · the sessions you kept, with what each is, how much of it is learnt (or for a Catch up how much is due), and a panel to start, edit, pin to Home or delete it; and on Home, the pinned ones"],
   HomeCard: [LEARN, "Home · the card under the progress ring: a shape in the logo's style and a fact about how language varies, with its source"],
   BrandMark: [LEARN, "The app's logo: on its tile in light mode, its loops alone in dark mode"],
@@ -840,12 +840,13 @@ export function ComponentGallery() {
 
       <Row
         name="MoreMenu"
-        what="Three dots that open a short menu of actions."
-        note="For the less used actions on a tile or a list — a module's Export and Delete, a list's Import — out of the way of the one it is for. items is [{ label, icon, danger, onClick }]; anything falsy is left out. Its clicks stop at it, so a tile it sits on does not open too, and opening one shuts any other."
+        what="Three dots that open the app's one context menu: a sheet of actions, named for what it acts on."
+        note="For the less used actions on a tile or a list — a module's Export and Delete, a list's Import — out of the way of the one it is for. The sheet is the one a saved session's dots open: up from the foot of a phone, in the middle of a wide screen, a SheetAction per row. title heads it; items is [{ label, icon, danger, note, disabled, onClick }]; anything falsy is left out. Its clicks stop at it, so a tile it sits on does not open too."
       >
         <V label="press it">
           <MoreMenu
             label="More for this module"
+            title="Lesson 1"
             items={[
               { label: "Export", icon: "download", onClick: () => {} },
               { label: "Delete", icon: "delete", danger: true, onClick: () => {} },

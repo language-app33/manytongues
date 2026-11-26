@@ -2425,91 +2425,99 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
 }
 
 /*
- * Three dots that open a short menu of what can be done with the thing they
- * sit on — a module's Export and Delete, a list's Import (0.689). The less
- * often used actions, out of the way of the ones a tile or a list is for.
+ * Three dots that open the panel of what can be done with the thing they
+ * sit on — a module's Export and Delete, a list's Import (0.689).
  *
- * Its clicks stop at it, so a tile it sits on does not open as well; that is
- * also why the window never hears them, and why one menu opening shuts any
- * other that is open itself rather than leaving it to the window.
+ * The panel is the app's one context menu (0.690, the owner's wish): the
+ * sheet a saved session's dots open on Focused training, up from the foot
+ * of the screen on a phone and in the middle of a wide one, named for what
+ * it acts on, a row per action. A thumb reaches it, and a tile at the foot
+ * of the screen cannot cut it off, which a menu hanging from the dots did.
  *
- * Items are { label, icon, danger, onClick }; anything falsy is left out, so
- * an action that only some things have is written in place with `&&`.
+ * Its clicks stop at it, so a tile it sits on does not open as well.
+ * Items are { label, icon, danger, note, disabled, onClick }; anything
+ * falsy is left out, so an action that only some things have is written in
+ * place with `&&`.
  */
-type MoreItem = { label: string; icon?: string; danger?: boolean; onClick: () => void };
-let shutOpenMore: (() => void) | null = null;
-export function MoreMenu({ label = "More", items, ghost = true }: {
+type MoreItem = { label: string; icon: string; danger?: boolean; note?: string; disabled?: boolean; onClick: () => void };
+export function MoreMenu({ label = "More", title, lede, items, ghost = true }: {
   /** What the button is called, to a screen reader and on hover. */
   label?: string;
+  /** The panel's heading: the thing it acts on. */
+  title: string;
+  /** A line under the heading, where one helps. */
+  lede?: string;
   items: (MoreItem | null | false | undefined)[];
   ghost?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const shut = useCallback(() => setOpen(false), []);
-  const wrap: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
-  useEffect(() => () => {
-    if (shutOpenMore === shut) shutOpenMore = null;
-  }, [shut]);
-  /* Under its button unless that runs it behind the bar at the foot of the
-     window — the last tile on a phone, whose Delete was hidden there — and
-     there is more room above, where it then opens instead. */
-  useLayoutEffect(() => {
-    const box = wrap.current;
-    const menu = box && (box.querySelector(".at-moremenu") as HTMLElement | null);
-    if (!open || !box || !menu || typeof window === "undefined") return;
-    const dock = document.querySelector(".at-dock");
-    const floor = Math.min(window.innerHeight, dock ? dock.getBoundingClientRect().top : Infinity) - 8;
-    const btn = box.getBoundingClientRect();
-    const tall = menu.scrollHeight;
-    if (btn.bottom + 6 + tall > floor && btn.top - 6 - tall > 8) {
-      menu.classList.add("up");
-      menu.style.maxHeight = "";
-      menu.style.overflowY = "";
-    }
-  }, [open]);
   const live = items.filter(Boolean) as MoreItem[];
   if (!live.length) return null;
   return (
-    <div className="at-pickwrap at-morewrap" ref={wrap} onClick={(e) => e.stopPropagation()}>
+    <div className="at-morewrap" onClick={(e) => e.stopPropagation()}>
       <button
         type="button"
         className={`at-icon at-morebtn${ghost ? " ghost" : ""}${open ? " on" : ""}`}
         title={label}
         aria-label={label}
-        aria-haspopup="menu"
+        aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => {
-          if (open) {
-            setOpen(false);
-            return;
-          }
-          if (shutOpenMore && shutOpenMore !== shut) shutOpenMore();
-          shutOpenMore = shut;
-          setOpen(true);
-        }}
+        onClick={() => setOpen(true)}
       >
         <Icon name="more" />
       </button>
       {open && (
-        <Popover className="at-pickmenu at-moremenu" role="menu" onClose={shut}>
-          {live.map((it) => (
-            <button
-              key={it.label}
-              type="button"
-              role="menuitem"
-              className={`at-pickline${it.danger ? " danger" : ""}`}
-              onClick={() => {
-                setOpen(false);
-                it.onClick();
-              }}
-            >
-              <span className="at-pickmark">{it.icon ? <Icon name={it.icon} size={18} /> : null}</span>
-              <span className="at-picktext">{it.label}</span>
-            </button>
-          ))}
-        </Popover>
+        <PickSheet title={title} lede={lede} className="at-moresheet" onClose={shut}>
+          <div className="at-sheetacts">
+            {live.map((it) => (
+              <SheetAction
+                key={it.label}
+                icon={it.icon}
+                label={it.label}
+                note={it.note}
+                danger={it.danger}
+                disabled={it.disabled}
+                onClick={() => {
+                  setOpen(false);
+                  it.onClick();
+                }}
+              />
+            ))}
+          </div>
+        </PickSheet>
       )}
     </div>
+  );
+}
+
+/* One thing to do in a panel of them (0.680): its icon in a round well,
+   and its name, with a line under it where it cannot be done and why.
+   Drawn like a row of "Where you are", the other panel of places to go.
+   In the library since 0.690, where MoreMenu draws its rows with it. */
+export function SheetAction({ icon, label, note, danger, disabled, onClick }: {
+  icon: string;
+  label: string;
+  note?: string;
+  danger?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      className={`at-sheetact${danger ? " danger" : ""}`}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      <span className="at-sheetactico" aria-hidden="true">
+        <Icon name={icon} size={22} />
+      </span>
+      <span className="at-sheetacttext">
+        <b>{label}</b>
+        {note ? <i>{note}</i> : null}
+      </span>
+    </button>
   );
 }
 
@@ -2798,7 +2806,13 @@ export function ItemList<T>({
                 New {noun}
               </button>
             )}
-            {dots ? <MoreMenu label={`More for these ${plural || `${noun}s`}`} items={more || []} /> : null}
+            {dots ? (
+              <MoreMenu
+                label={`More for these ${plural || `${noun}s`}`}
+                title={(plural || `${noun}s`).replace(/^./, (c) => c.toUpperCase())}
+                items={more || []}
+              />
+            ) : null}
             {tools}
             {viewBtn && (
               <button

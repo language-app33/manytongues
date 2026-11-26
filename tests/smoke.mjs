@@ -9183,12 +9183,16 @@ const openPronounTables = async () => {
     top ? (top.textContent || "").replace(/\s+/g, " ").trim() + ` · ${top.querySelectorAll("input, button").length} controls` : "no row");
   click(one(".at-morebtn", top));
   await sleep(150);
-  const moreLines = () => [...document.querySelectorAll(".at-moremenu [role=menuitem]")].map((b) => (b.textContent || "").trim());
-  check("and the three dots hold Import",
-    moreLines().join(" | ") === "Import", moreLines().join(" | ") || "(no menu)");
-  click(one(".at-morebtn", top));
+  /* The app's one context menu (0.690): the sheet a saved session's dots
+     open, named for what it acts on, a row per action. */
+  const moreLines = () => [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+  check("and the three dots open a sheet named Cards, holding Import",
+    moreLines().join(" | ") === "Import" &&
+      ((document.querySelector(".at-moresheet .at-modaltitle") || {}).textContent || "") === "Cards",
+    moreLines().join(" | ") || "(no sheet)");
+  click(document.querySelector('.at-moresheet [aria-label="Close"]'));
   await sleep(150);
-  check("pressed again, they close", !document.querySelector(".at-moremenu"));
+  check("and its cross closes it", !document.querySelector(".at-moresheet"));
   const searchRow = /** @type {any} */ (rows()[1]);
   check("and the search box is on a line of its own under it",
     !!searchRow && searchRow.classList.contains("at-toolbar-search") &&
@@ -13146,11 +13150,12 @@ const openPronounTables = async () => {
       lesson ? `${meta} | ring: ${!!lesson.querySelector(".at-qring")}` : "(no Lesson 1)");
     click(lesson ? lesson.querySelector(".at-morebtn") : null);
     await sleep(150);
-    const lines = [...document.querySelectorAll(".at-moremenu [role=menuitem]")].map((b) => (b.textContent || "").trim());
-    check("and its three dots hold Export and Delete, without opening it",
-      lines.join(" | ") === "Export deck | Delete deck" && !document.querySelector(".at-screen.cardform"),
-      lines.join(" | ") || "(no menu)");
-    click(lesson ? lesson.querySelector(".at-morebtn") : null);
+    const lines = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+    check("and its three dots open its sheet, with Export and Delete, without opening it",
+      lines.join(" | ") === "Export deck | Delete deck" && !document.querySelector(".at-screen.cardform") &&
+        ((document.querySelector(".at-moresheet .at-modaltitle") || {}).textContent || "") === "Lesson 1",
+      lines.join(" | ") || "(no sheet)");
+    click(document.querySelector('.at-moresheet [aria-label="Close"]'));
     await sleep(150);
   }
   withPath = false;

@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.690 — 26 November 2026
+
+**Three dots open the same panel everywhere.** The three dots on a module's
+tile and beside New in a list now open the panel a saved session's dots
+open on Focused training: up from the bottom of the screen on a phone, in
+the middle of a wide one, headed with the module's name (or the list's), and
+a large row for each action. They used to open a small menu hanging from the
+dots, which on a phone could run under the bar at the foot of the screen.
+Tap the cross, tap outside the panel or press Escape to close it.
+
 ## 0.689 — 26 November 2026
 
 **Module tiles are simpler.** In Teaching › Material › Modules and

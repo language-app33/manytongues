@@ -10855,6 +10855,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                               three dots (0.689; the owner's 1a). */}
                           <MoreMenu
                             label={`More for ${d.title}`}
+                            title={d.title}
                             ghost
                             items={[
                               { label: `Export ${moduleKind(d)}`, icon: "download", onClick: () => exportModules([d.id]) },

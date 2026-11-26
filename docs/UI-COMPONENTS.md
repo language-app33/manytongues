@@ -159,15 +159,23 @@ Pick several. `options, chosen, onToggle, empty`
 second argument saves the caller working out which way the tick just went.
 
 ### `MoreMenu` — 3 uses
-Three dots that open a short menu of actions (0.689): the less used things
-done with a tile or a list — a module's Export and Delete, a list's Import —
-out of the way of the one it is for. `label, items, ghost=true`
+Three dots that open the app's one context menu (0.689; a sheet since
+0.690): the less used things done with a tile or a list — a module's Export
+and Delete, a list's Import — out of the way of the one it is for.
+`label, title, lede, items, ghost=true`
 
-`items` is `[{ label, icon, danger, onClick }]`; anything falsy is left out,
-so an action only some things have is written in place with `&&`. Its
-clicks stop at it, so a tile it sits on does not open as well, and opening
-one shuts any other. It opens under its button, or above it where below
-would run behind the bar at the foot of the window.
+The panel is a `PickSheet` of `SheetAction` rows, the same one a saved
+session's dots open on Focused training: up from the foot of a phone, in the
+middle of a wide screen, headed by `title`. **Any new menu of actions on a
+thing is one of these**, not a list hanging from a button. `items` is
+`[{ label, icon, danger, note, disabled, onClick }]`; anything falsy is left
+out, so an action only some things have is written in place with `&&`. Its
+clicks stop at it, so a tile it sits on does not open as well.
+
+### `SheetAction`
+One row of that panel: its icon in a round well, its name, and a line under
+it where it cannot be done and why. `icon, label, note, danger, disabled,
+onClick`
 
 ### `FilterBar` / `narrowing(groups)` — 3 uses
 The panel a list's Sort or Filter button opens onto. `groups, note`

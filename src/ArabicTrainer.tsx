@@ -48,6 +48,7 @@ import {
   DockContext,
   PlaceContext,
   PickSheet,
+  SheetAction,
   Stat,
   StickyFoot,
   Tabs,
@@ -18792,35 +18793,6 @@ function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete, onPi
         />
       )}
     </div>
-  );
-}
-
-/* One thing to do in a panel of them (0.680): its icon in a round well,
-   and its name, with a line under it where it cannot be done and why.
-   Drawn like a row of "Where you are", the other panel of places to go. */
-function SheetAction({ icon, label, note, danger, disabled, onClick }: {
-  icon: string;
-  label: string;
-  note?: string;
-  danger?: boolean;
-  disabled?: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      className={`at-sheetact${danger ? " danger" : ""}`}
-      disabled={disabled}
-      onClick={onClick}
-    >
-      <span className="at-sheetactico" aria-hidden="true">
-        <Icon name={icon} size={22} />
-      </span>
-      <span className="at-sheetacttext">
-        <b>{label}</b>
-        {note ? <i>{note}</i> : null}
-      </span>
-    </button>
   );
 }
 

@@ -1900,24 +1900,12 @@ html.at-reaching .at-cmenu { bottom: calc(100% + 118px);
 .at-pickmark { width:16px; flex:0 0 auto; display:inline-flex; align-items:center;
   justify-content:center; color: var(--brass); }
 .at-picktext { flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-/* The three dots (0.689, see MoreMenu): a menu of actions rather than of
-   choices, so each line has its icon where a choice has its tick, and the
-   one that destroys something is in the colour that says so. */
-.at-moremenu .at-pickmark { width:18px; color: var(--muted); }
-.at-moremenu .at-pickline { font-size:14px; padding:11px 12px; }
-.at-moremenu .at-pickline.danger, .at-moremenu .at-pickline.danger .at-pickmark { color: var(--rose); }
+/* The three dots (0.689, see MoreMenu), sized like the icons beside them
+   in a list's top row and on a tile. Their panel is a PickSheet. */
+.at-morewrap { display:flex; flex:0 0 auto; }
 .at-morebtn.on { border-color: var(--accent); color: var(--accent); }
 .at-toolbar .at-morebtn { flex:0 0 auto; width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
 .at-deckacts .at-morewrap .at-morebtn { width:44px; height:44px; min-height:44px; padding:0; box-sizing:border-box; }
-/* On a tile it opens on the left of its button and under it, over the
-   tiles below. */
-.at-deckacts .at-moremenu { top:50px; }
-/* In the top row the dots sit at the start, beside New, so their menu opens
-   rightward from them. */
-.at-toolbar-top .at-moremenu { right:auto; left:0; }
-/* Opened upward where below would run behind the bar at the foot of the
-   window (see MoreMenu). */
-.at-moremenu.up { top:auto; bottom:50px; }
 .at-picknote { flex:0 0 auto; font-size:11px; font-weight:700; color: var(--muted); }
 .at-eyebrow { font-family: var(--ui); font-size:13px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; color: var(--muted); margin:0 0 12px; }
 .at-hint { font-size:14px; font-weight:500; color: var(--muted); line-height:1.6; margin:10px 0 0; }
