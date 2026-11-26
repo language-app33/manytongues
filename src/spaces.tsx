@@ -6362,11 +6362,14 @@ export function blanksInUse(cards: Card[]): { name: string; leaves: number; fill
    back on is this line. */
 const SHOW_IN_CONTEXT = false;
 
-export function TeachSpace({ account, spaceName: shownName, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose, personalOnly = false }: {
+export function TeachSpace({ account, spaceName: shownName, setsOn = false, languages, settings, langsOff, onLangChoices, onTry, resume, onResend, onClose, personalOnly = false }: {
   account: User;
   /** The name of the space on screen — for an App admin, the one at the
       address rather than their own. */
   spaceName?: string | null;
+  /** Whether this space offers personal sets (0.672): the App admin's
+      choice, off unless they switched it on. */
+  setsOn?: boolean;
   /** A learner's My space (0.545): only their own decks and cards, no courses. */
   personalOnly?: boolean;
   languages: Record<LangId, Lang>;
@@ -10539,13 +10542,17 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
 
               {choosingKind && (
                 <PickSheet title="New deck" lede="What kind of deck? This can't be changed once it is made." onClose={() => setChoosingKind(false)}>
-                  {NEW_KINDS.map((k) => (
-                    <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
-                      setChoosingKind(false);
-                      setNewKind(k.kind);
-                      setNaming("new");
-                    }} />
-                  ))}
+                  {/* Spaced as every list of tiles is (0.672); a personal
+                      set only where the App admin switched them on. */}
+                  <div className="at-decklist2">
+                    {NEW_KINDS.filter((k) => k.kind !== "set" || setsOn).map((k) => (
+                      <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
+                        setChoosingKind(false);
+                        setNewKind(k.kind);
+                        setNaming("new");
+                      }} />
+                    ))}
+                  </div>
                 </PickSheet>
               )}
 
@@ -11273,6 +11280,24 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
           </Field>
         </fieldset>
       </div>
+      {/* What the space's teachers may make (0.672): personal sets are off
+          until the App admin switches them on here. Sets already made keep
+          working either way. */}
+      <Section title="Features">
+        <Field label="Personal sets" lede="Pictures each student answers a question about once, then practises with their own word. When off, teachers here aren't offered them; sets already made keep working.">
+          <RadioGroup
+            name={`space-sets-${org.id}`}
+            label="Personal sets"
+            quiet
+            value={org.sets ? "on" : "off"}
+            options={[{ value: "off", label: "Off" }, { value: "on", label: "On" }]}
+            onChange={(v) => {
+              if (busy || (v === "on") === !!org.sets) return;
+              void run(() => API.updateOrg(org.id, { sets: v === "on" }), v === "on" ? "Personal sets switched on" : "Personal sets switched off");
+            }}
+          />
+        </Field>
+      </Section>
       <Section title="Invite people">
       <CodeBox long label="Invitation link" hint="Anyone with it can make an account in this space."
         code={`${window.location.origin}/${org.slug}?join=${org.inviteCode}`} />

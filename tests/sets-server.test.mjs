@@ -68,6 +68,21 @@ const sentCard = async (/** @type {string} */ id) =>
   (await material()).cards.flatMap((/** @type {any} */ b) => b.cards).find((/** @type {any} */ c) => c.id === id);
 const SET = { wording: { question: "Who is this person to you?" }, lists: [hanoi.id], named: [], order: "after" };
 
+/* Personal sets are off in a space until the App admin switches them on
+   (0.672): only they may, and only a new set is refused while off. */
+test("a space offers no personal sets until the App admin switches them on", async () => {
+  const card = async () => (await raw("/api/courses?action=whoami", { key: teacher.key })).json.user.org;
+  assert.equal((await card()).sets, false, "off by default");
+  const refused = await post("save-set", teacher.key, { deckId: family.id, set: SET });
+  assert.equal(refused.status, 403, refused.text);
+  assert.equal(refused.json.error, "sets-off");
+  const notTheirs = await post("admin-update-org", teacher.key, { id: "main", sets: true });
+  assert.equal(notTheirs.status, 403, "a teacher cannot switch them on");
+  const on = await post("admin-update-org", owner.key, { id: "main", sets: true });
+  assert.equal(on.status, 200, on.text);
+  assert.equal((await card()).sets, true);
+});
+
 test("a teacher saves a set on a deck, and a student of the course receives it", async () => {
   const r = await post("save-set", teacher.key, { deckId: family.id, set: SET });
   assert.equal(r.status, 200, r.text);
@@ -145,4 +160,15 @@ test("a name is cut at forty characters, and a form with no names carries none",
   const card = await sentCard(r.json.card.id);
   assert.equal(card.forms[0].voices[A].length, 40);
   assert.equal("voices" in card.forms[1], false);
+});
+
+test("switched off again, a set already made keeps working and can still be changed", async () => {
+  await post("save-set", teacher.key, { deckId: family.id, set: SET });
+  await post("admin-update-org", owner.key, { id: "main", sets: false });
+  assert.ok((await sentDeck(family.id)).set, "still sent to students");
+  const changed = await post("save-set", teacher.key, { deckId: family.id, set: { ...SET, order: "before" } });
+  assert.equal(changed.status, 200, changed.text);
+  const fresh = (await post("create-deck", teacher.key, { title: "Friends", lang: "ar-PS" })).json.deck;
+  const refused = await post("save-set", teacher.key, { deckId: fresh.id, set: SET });
+  assert.equal(refused.status, 403, "but no new one is made");
 });

@@ -1602,6 +1602,9 @@ async function codeTarget(store, given) {
 /** A space as anyone may be told of it. @param {any} org */
 const orgCard = (org) => ({
   id: org.id, slug: org.slug, name: org.name, logo: org.logo || "", colour: org.colour || "",
+  /* Whether its teachers may make personal sets (0.672): off unless the
+     App admin switched them on for this space. */
+  sets: !!org.sets,
 });
 
 /*
@@ -4738,6 +4741,12 @@ async function handle(req) {
         return json({ error: "not-yours" }, 403);
       if (deck.personal) return json({ error: "personal-set" }, 400);
       if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
+      /* A new personal set only where the App admin allows them (0.672);
+         one made before keeps working, and can still be changed or undone. */
+      if (body.set !== null && !(/** @type {any} */ (deck).set)) {
+        const space = await readJson(store, K.org(orgOf(deck)));
+        if (!space || !space.sets) return json({ error: "sets-off" }, 403);
+      }
       const next = await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
         if (!fresh) return null;
         const { set: _was, ...rest } = /** @type {any} */ (fresh);
@@ -7128,6 +7137,7 @@ async function handle(req) {
             ...(body.name !== undefined && String(body.name).trim() ? { name: String(body.name).trim().slice(0, 60) } : {}),
             ...(body.logo !== undefined ? { logo: /^[a-f0-9]{64}$/.test(String(body.logo || "")) ? String(body.logo) : "" } : {}),
             ...(body.colour !== undefined ? { colour: colourOf(body.colour) } : {}),
+            ...(body.sets !== undefined ? { sets: !!body.sets } : {}),
             ...(moved ? { slug, formerSlugs: [...new Set((o.formerSlugs || []).concat([o.slug]))] } : {}),
           };
         });

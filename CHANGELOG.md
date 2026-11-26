@@ -8,6 +8,27 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.672 — 26 November 2026
+
+**Personal sets are off in every space until you switch them on.** In
+Super admin → Spaces, each space now has a Features section with Personal
+sets, Off or On. Only the super admin can change it. While it's off,
+teachers in that space aren't offered Personal set when they make a new
+deck; they see Regular deck and Unit only.
+
+**Trade-off:** this starts off everywhere, including spaces where teachers
+have already made personal sets. Those sets keep working for students, and
+teachers can still edit them or turn them back into ordinary decks; only
+making a new one needs the switch on.
+
+**The New deck sheet is spaced properly.** Regular deck, Unit and Personal
+set had no gap between them; they're now spaced like every other list of
+tiles.
+
+Still to check by hand: the new switch in Super admin → Spaces on a real
+phone, and that a teacher sees Personal set appear after it's switched on
+(they may need to reload the app).
+
 ## 0.671 — 26 November 2026
 
 **Weak spots replaces Fix mistakes in Build a session.** Choosing Weak spots

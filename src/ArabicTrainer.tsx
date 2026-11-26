@@ -18018,6 +18018,7 @@ export default function ArabicTrainer() {
             <TeachSpace
               account={account}
               spaceName={shownSpace && shownSpace.name}
+              setsOn={!!(shownSpace && typeof shownSpace === "object" && shownSpace.sets)}
               languages={LANGUAGES}
               settings={settings}
               langsOff={teachLangsOff}

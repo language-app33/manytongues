@@ -12931,6 +12931,50 @@ const openPronounTables = async () => {
   check("and nothing threw on the path's screens", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
+/* ---- personal sets are the App admin's to switch on (0.672) ----
+   A space whose card does not say so offers only a regular deck and a
+   unit on New deck; the tiles sit in the spaced list every list of tiles
+   uses, not straight on the sheet. */
+{
+  const before = errors.length;
+  const offOrg = { id: "main", slug: "main", name: "Main", logo: "", colour: "", sets: false };
+  whoamiAs = { ...account, org: offOrg };
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account: { ...account, org: offOrg }, items: [],
+  }));
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(1500);
+  if (!host.querySelector(".at-screen.bare")) {
+    click(host.querySelector('[data-el="where-you-are"]'));
+    await sleep(200);
+    click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+    await sleep(900);
+  }
+  const frame = () => host.querySelector(".at-screen.bare") || host;
+  const tab = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
+    .filter((b) => re.test((b.textContent || "").trim())).pop();
+  click(tab(/^Material$/) || null);
+  await sleep(400);
+  click(tab(/^Decks$/) || null);
+  await sleep(500);
+  click(buttonNamed(/^New deck$/));
+  await sleep(300);
+  const rows = [...document.querySelectorAll(".at-sheet .at-openrow")];
+  const titles = rows.map((b) => (b.querySelector(".at-decktitle") || b).textContent || "").join(" | ");
+  check("with personal sets off in the space, New deck offers a regular deck and a unit only", titles === "Regular deck | Unit", titles || "no sheet");
+  check("and the kinds sit in the spaced list of tiles", rows.length > 0 && rows.every((b) => !!b.parentElement && b.parentElement.classList.contains("at-decklist2")),
+    rows.map((b) => (b.parentElement && b.parentElement.className) || "").join(", ") || "no rows");
+  click(document.querySelector('.at-sheet button[aria-label="Close"]'));
+  await sleep(200);
+  whoamiAs = null;
+  r.unmount();
+  host.remove();
+  check("and nothing threw with personal sets off", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
 /* ---- a new deck's kind, and a personal set's section (0.632, 0.633) ----
    New deck asks first what kind: a regular deck, a unit or a personal
    set. A unit asks for its course; a personal set is made as a deck and
@@ -12939,8 +12983,11 @@ const openPronounTables = async () => {
    ticked, the word after the name, saved. */
 {
   const before = errors.length;
+  /* Personal sets switched on for the space by the App admin (0.672). */
+  const onOrg = { id: "main", slug: "main", name: "Main", logo: "", colour: "", sets: true };
+  whoamiAs = { ...account, org: onOrg };
   localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
-    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account: { ...account, org: onOrg }, items: [],
   }));
   teacherSets = true;
   const host = document.createElement("div");
@@ -13078,6 +13125,7 @@ const openPronounTables = async () => {
   backOut();
   await sleep(300);
   teacherSets = false;
+  whoamiAs = null;
   r.unmount();
   host.remove();
   check("and nothing threw making decks of each kind, or on a set's section", errors.length === before, errors.slice(before, before + 3).join(" | "));

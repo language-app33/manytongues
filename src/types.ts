@@ -830,7 +830,7 @@ export interface User {
    * The space (org) this account belongs to (0.542). Stored as its id;
    * whoami answers with the space's card. Absent on older accounts: Main.
    */
-  org?: string | { id: string; slug: string; name: string; logo: string; colour: string };
+  org?: string | { id: string; slug: string; name: string; logo: string; colour: string; sets?: boolean };
   /** Whether this account runs its space (0.544). Worked out by whoami, never stored. */
   orgAdmin?: boolean;
   /**

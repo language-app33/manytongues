@@ -9095,3 +9095,19 @@ path units, with the cards of each that can be asked.
 under it. It borrows the ghost button's outline, dimmed state and focus
 ring. Its accessible name is the title alone, with the line as its
 description, so it is still "Weak spots" to a screen reader.
+
+## Personal sets are a space's feature, off until the App admin switches it on (0.672)
+
+A space's document carries `sets`, false when absent, so every space —
+those made before this release too — starts with personal sets off. Only
+`admin-update-org`, the App admin's, writes it; it rides on `orgCard`, so
+whoami's `org`/`orgs` and the address's `org-info` both carry it, and
+Teaching reads it off the space on screen (`shownSpace`), which for the
+App admin is the one at the address.
+
+Off hides Personal set from the New deck sheet and makes `save-set` refuse
+a *new* set (`sets-off`). A deck that is already a set is left alone: its
+students keep it, and it can still be edited or made ordinary again
+(`set: null`). Switching a feature off was not to take material away from
+students mid-course; the cost is that "off" does not mean "none in this
+space".
