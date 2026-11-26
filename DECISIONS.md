@@ -12,6 +12,17 @@ anything that was never really a choice.
 ---
 
 
+## A picture says its count again (0.677)
+
+0.651 stopped picture questions saying "dual" or "plural", after a learner
+said the label only repeated what a picture of two plants showed. In 0.660
+a learner reported, twice, that a picture of one lemon did not say whether
+ليمونة or ليمون was wanted. The owner chose the label back: `pictureLabel`
+names the count wherever another form of the card has another count
+(singular, dual, plural), and the gender as before. A label that repeats
+the picture costs a word; one that is missing costs a guess. A word with
+one form, and an uncountable one, still says nothing.
+
 ## Home's name is a heading in the page, not chrome (0.670)
 
 The app's name on Home was positioned absolutely over the page's top

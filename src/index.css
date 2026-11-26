@@ -2599,13 +2599,13 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-savedtilemore:focus-visible { outline:2px solid var(--jade); outline-offset:1px; }
 /* Home's tiles have no dots, so the name has the width to itself. */
 .at-savedtile.bare .nm { padding-inline-end:0; }
-/* The name, after a pin where the session is on Home (0.677). */
+/* The name, after a pin where the session is on Home (0.678). */
 .at-savedtile .nm { display:flex; align-items:center; gap:4px; }
 .at-savedtile .nmtext { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .at-savedpin { flex:0 0 auto; display:inline-flex; color: var(--jade); }
 /* On Home, under Practice. */
 .at-homepins { margin-top:12px; }
-/* A panel of things to do (0.677, see SheetAction): one row each, drawn
+/* A panel of things to do (0.678, see SheetAction): one row each, drawn
    like a row of "Where you are" — a rounded outline, its icon in a round
    well, its name in bold — with a line under the name where it cannot be
    done. */
@@ -3606,7 +3606,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-training > :first-child { margin-top:0; }
 .at-training .at-row + .at-row { margin-top:12px; }
 /* The line at its top (0.668; its drawing went in 0.675). */
-/* The sessions kept (0.677): a rule across, then the heading, then the
+/* The sessions kept (0.678): a rule across, then the heading, then the
    tiles, all set from the start of the line rather than centred. */
 .at-training .at-trainsaved { max-width:420px; margin:28px auto 0; padding-top:24px;
   border-top:1px solid var(--line); text-align:start; }
