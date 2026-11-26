@@ -193,10 +193,9 @@
    if each carried the list and the explanation the forms below get. Square,
    and lit once there is something recorded.
 
-   Written as a child selector, like .at-sessionrow > .at-icon below and for
-   the same reason: .at-icon is built to grow and says `flex:1` further down
-   this file, so a rule of one class up here loses to it wherever it sits in
-   the source. */
+   Written as a child selector because .at-icon is built to grow and says
+   `flex:1` further down this file, so a rule of one class up here loses to
+   it wherever it sits in the source. */
 .at-cellrow > .at-cellmic { flex:0 0 auto; width:44px; min-width:0; padding:0;
   align-self:center; height:44px; }
 .at-cellrow > .at-cellmic.on { border-color: var(--accent); color: var(--accent); }

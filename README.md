@@ -361,14 +361,15 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   another device while it keeps its stamp — see `priorityAt` in
   `src/types.ts`.
 
-- **A learner can prepare for a date.** Prep mode, on Focused training (under Progress until 0.671), takes
+- **A learner can prepare for a date.** Set a goal (Your goal once one is
+  set; Prep mode until 0.681), on Focused training (under Progress until 0.671), takes
   a name ("Start of class"), a day and the decks to have learnt by then,
   and keeps the one prep in the settings (`prep`, read through `prepOf`),
   so it syncs as they do and the learner can change or clear it. Being
   ready means every card in those decks learnt before the day starts. As
   it is set, `readyFor` says what that takes: the work spread over the
   days left, or the earliest they could be finished if there are fewer
-  days than the cards can take. The home screen offers "Prep for …" while
+  days than the cards can take. The home screen offers "Practice for …" while
   the prep is still to come and not yet learnt; it is `begin` with the
   prep's decks in place of the chosen deck, so every rule of an ordinary
   session holds. Under it, today's sessions against the day's goal

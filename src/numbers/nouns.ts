@@ -22,7 +22,7 @@
  * answer is which and copies the words across, and holds none.
  */
 import type { CountedNoun } from "./types.ts";
-import { answersOf, splitAlternatives } from "../answers.ts";
+import { UNCOUNTABLE, answersOf, splitAlternatives } from "../answers.ts";
 import { formsOf } from "../cards.ts";
 
 /* The three things the answers are asked, accepted as the card wrote
@@ -56,7 +56,8 @@ export interface ReadNoun {
 /**
  * One card, as a noun to count — or as what it is missing.
  *
- * Null for a card that is not a noun at all. The first answer of each
+ * Null for a card that is not a noun at all, and for a noun marked
+ * uncountable. The first answer of each
  * kind wins: a card that accepts two plurals is counted with the one the
  * teacher wrote first, which is the same rule a sentence borrowing it
  * follows.
@@ -65,6 +66,12 @@ export function readNounCard(card: Held | null | undefined): ReadNoun | null {
   if (!card || str(card.category).toLowerCase() !== "noun") return null;
   const id = str(card.id);
   if (!id) return null;
+  /* A word the teacher has said cannot be counted is not a noun with its
+     plural still to write: it is left out, and nothing is listed as
+     missing from it. Said by the card's own word. */
+  const own = (formsOf(card)[0] || {}) as Held;
+  const ownNumbers = answersOf(own, FIELDS).map((a) => str(a.number || own.number).toLowerCase());
+  if (str(own.number).toLowerCase() === UNCOUNTABLE || ownNumbers.includes(UNCOUNTABLE)) return null;
   let sg: { text: string; en: string; gender: string; human: string } | null = null;
   const pls: { text: string; en: string; gender: string }[] = [];
   const duals: { text: string; gender: string }[] = [];

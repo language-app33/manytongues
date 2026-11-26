@@ -39,6 +39,26 @@
  */
 
 /*
+ * A noun with no plural to write — water, bread, rice — as the number axis
+ * says it. Here, with no imports, because the three readers that have to
+ * know it are the language table, the verb table and the counting
+ * questions, and this is the one module all of them can reach.
+ */
+export const UNCOUNTABLE = "uncountable";
+
+/**
+ * A number as the words beside it take it.
+ *
+ * Nothing agrees with "uncountable": الميّ باردة is a feminine singular
+ * adjective beside a feminine singular noun. So where a number is matched
+ * against what a column asks for, an uncountable word is the singular.
+ */
+export const agreesAs = (number: unknown): string => {
+  const said = String(number == null ? "" : number).trim();
+  return said === UNCOUNTABLE ? "singular" : said;
+};
+
+/*
  * Which fields an answer may carry, and what each will accept, is the
  * language table's business rather than this module's — so it is passed
  * in, as answerFields() builds it. It travels as an argument rather than

@@ -1643,16 +1643,25 @@ if (/Build a session/.test(document.body.textContent)) {
     const dupes2 = answered.filter((n, i) => n !== "related-word" && answered.indexOf(n) !== i);
     check("and each of those means one thing too", dupes2.length === 0, dupes2.join(", "));
 
-    /* The extras are shown open, under a plain "Learn more" heading with
-       nothing to fold them away: they are there to be read. */
+    /* The extras are folded behind a "Learn more" toggle (0.678): closed
+       on every new answer, open on a tap, closed again on a second. */
     const moreHead = document.querySelector('[data-el="also-heading"]');
-    check("what is not the answer is headed Learn more",
+    check("what is not the answer is behind Learn more",
       !!moreHead && /^Learn more$/.test(moreHead.textContent.trim()), moreHead ? moreHead.textContent : "no heading");
-    check("and the heading is not a control that folds it away",
-      !!moreHead && moreHead.tagName !== "BUTTON" && !moreHead.querySelector("svg") && !moreHead.hasAttribute("aria-expanded"),
+    check("and Learn more is a button with a chevron, closed to begin with",
+      !!moreHead && moreHead.tagName === "BUTTON" && !!moreHead.querySelector("svg") &&
+        moreHead.getAttribute("aria-expanded") === "false" && !document.querySelector('[data-el="also"]'),
       moreHead ? moreHead.outerHTML : "");
-    check("and the box is open without being asked for",
-      !!document.querySelector('[data-el="also"]'), "the box is closed");
+    click(moreHead);
+    await sleep(40);
+    check("and a tap opens the box",
+      !!document.querySelector('[data-el="also"]') && !!moreHead && moreHead.getAttribute("aria-expanded") === "true",
+      "the box is still closed");
+    click(moreHead);
+    await sleep(40);
+    check("and a second tap folds it away", !document.querySelector('[data-el="also"]'), "the box is still open");
+    click(moreHead);
+    await sleep(40);
 
     /* Everything that is not the answer, in one box. The members are each
        conditional, so what matters is that whichever turned up are inside
@@ -1993,68 +2002,123 @@ if (/Build a session/.test(document.body.textContent)) {
 
   /* And the session kept a few steps ago, which is only worth keeping if
      there is a way back to it. */
-  check("a kept session puts a way back to it in Focused training",
-    (await toTraining()) && !!buttonNamed(/^Saved sessions$/),
-    [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(0, 120));
-  /* And as a tile under that button, with how much of it is learnt —
-     a glance at each without opening the list. */
-  const tile = [...document.querySelectorAll(".at-savedtile")]
-    .find((b) => /Thursday's verbs/.test(b.textContent || ""));
-  check("a kept session is a tile in Focused training too", !!tile,
+  /* Under a heading of its own on Focused training (0.680), where a
+     button used to open a screen listing them. */
+  const savedHead = () => ((document.querySelector(".at-screen.training .at-trainsaved .at-sectionhead") || {}).textContent || "").trim();
+  check("a kept session puts a way back to it in Focused training, under a heading",
+    (await toTraining()) && savedHead() === "Saved sessions" && !buttonNamed(/^Saved sessions$/),
+    savedHead() || [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(0, 120));
+  /* As a tile, with how much of it is learnt — a glance at each. */
+  const tileNamed = (/** @type {RegExp} */ re) => [...document.querySelectorAll(".at-screen.training .at-savedtile")]
+    .find((b) => re.test(((b.querySelector(".nmtext") || {}).textContent || "")));
+  const tile = tileNamed(/^Thursday's verbs$/);
+  check("a kept session is a tile in Focused training", !!tile,
     [...document.querySelectorAll(".at-savedtile")].map((b) => b.textContent).join("|") || "no tiles");
   check("and the tile says how much of its cards is learnt",
     !!tile && /^\d{1,3}%$/.test(((tile.querySelector(".pc") || {}).textContent || "").trim()),
     tile ? (tile.textContent || "").trim() : "(no tile)");
-  if (buttonNamed(/^Saved sessions$/)) {
-    clickNamed(/^Saved sessions$/);
-    await sleep(250);
-    check("and it is there under the name it was given",
-      /Thursday's verbs/.test(document.body.textContent || ""),
-      (document.body.textContent || "").slice(0, 120));
-    /* Built from the cards it named rather than replayed: the point of
-       keeping a description instead of a snapshot. */
-    clickNamed(/^Start$/);
-    await sleep(500);
-    check("and starting it builds the session again",
-      !!document.querySelector(".at-instruction"),
-      (document.body.textContent || "").slice(0, 100));
-    click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Leave session"));
-    await sleep(120);
-    clickNamed(/^Leave$/);
-    await sleep(250);
+  /* What the session is, and the dots in its corner that do the rest
+     from here (0.675), in a panel from the foot of the screen (0.680). */
+  const tileLine = ((tile && tile.querySelector(".ln")) || {}).textContent || "";
+  check("and the tile says what kind of session it is",
+    / · .*\bcards?\b/.test(tileLine), tileLine || "(no line)");
+  const panelFor = async (/** @type {string} */ name) => {
+    const t = tileNamed(new RegExp(`^${name}$`));
+    click(t && t.querySelector(`button[aria-label="More for ${name}"]`));
+    await sleep(150);
+    return [...document.querySelectorAll(".at-savedsheet .at-sheetact")];
+  };
+  const actNamed = (/** @type {Element[]} */ acts, /** @type {RegExp} */ re) => acts.find((b) => re.test(((b.querySelector("b") || {}).textContent || "")));
+  let acts = await panelFor("Thursday's verbs");
+  check("its dots open a panel, named for it, to start, edit, pin or delete it",
+    acts.map((b) => (b.querySelector("b") || {}).textContent).join("|") === "Start|Edit|Pin to Home|Delete" &&
+      ((document.querySelector(".at-savedsheet .at-modaltitle") || {}).textContent || "") === "Thursday's verbs",
+    acts.map((b) => b.textContent).join("|") || "no panel");
+  click(actNamed(acts, /^Delete$/));
+  await sleep(150);
+  check("and Delete asks before it forgets the session",
+    !document.querySelector(".at-savedsheet") && /Delete Thursday's verbs\?/.test(document.body.textContent || ""),
+    (document.body.textContent || "").slice(0, 120));
+  clickNamed(/^Cancel$/);
+  await sleep(150);
+  check("and cancelling keeps it", !!tileNamed(/^Thursday's verbs$/), "the tile went");
 
-    /* Changed rather than built again: the Build screen opens on what was
-       kept, and saving puts the change back under the same session. */
-    check("starting a kept session closed Focused training behind it",
-      !document.querySelector(".at-screen.training"), "Focused training still open");
-    await toTraining();
-    clickNamed(/^Saved sessions$/);
-    await sleep(250);
-    click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Edit Thursday's verbs"));
-    await sleep(250);
-    check("a kept session opens on the Build screen to be changed",
-      /Regular/.test(sessionModeSaid()), sessionModeSaid() || (document.body.textContent || "").slice(0, 120));
-    check("with its deck already picked, as a deck", sessionPills().some((p) => /Introductions/.test(p)),
-      sessionPills().join("|"));
-    const renameBox = [...document.querySelectorAll(".at-formblock")]
-      .find((d) => d.querySelector(".at-formnum")?.textContent === "Name")?.querySelector("input");
-    if (renameBox) {
-      must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value")?.set, "the input's value setter")
-        .call(renameBox, "Friday's verbs");
-      renameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
-      await sleep(60);
-    }
-    check("and its button saves rather than starts",
-      !!buttonNamed(/^Save$/)?.closest(".at-screenhead") && !buttonNamed(/^Start$/),
-      [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-120));
-    clickNamed(/^Save$/);
-    await sleep(250);
-    const listed = document.querySelector(".at-list")?.textContent || "";
-    check("and the change is kept under the same session",
-      /Friday's verbs/.test(listed) && !/Thursday's verbs/.test(listed), listed.slice(0, 120));
-    click([...document.querySelectorAll('[aria-label="Back"]')].pop());
-    await sleep(250);
+  /* Pinned to Home: a pin on its tile here, and the tile on Home under
+     Practice, without its dots. */
+  acts = await panelFor("Thursday's verbs");
+  click(actNamed(acts, /^Pin to Home$/));
+  await sleep(200);
+  check("pinning it puts a pin on its tile",
+    !document.querySelector(".at-savedsheet") && !!tileNamed(/^Thursday's verbs$/)?.querySelector(".at-savedpin"),
+    (tileNamed(/^Thursday's verbs$/)?.outerHTML || "no tile").slice(0, 160));
+  await leaveTraining();
+  const homePin = () => [...document.querySelectorAll(".at-homepins .at-savedtile")];
+  check("and the tile is on Home, under Practice, without its dots",
+    homePin().length === 1 && /Thursday's verbs/.test(homePin()[0].textContent || "") &&
+      !homePin()[0].querySelector(".at-savedtilemore") &&
+      !!document.querySelector(".at-startrow + .at-homepins"),
+    homePin().map((t) => t.textContent).join("|") || "no pinned tile on Home");
+  /* Built from the cards it named rather than replayed: the point of
+     keeping a description instead of a snapshot. */
+  click(homePin()[0]?.querySelector(".at-savedtilego"));
+  await sleep(500);
+  check("and pressing it there builds the session again",
+    !!document.querySelector(".at-instruction"),
+    (document.body.textContent || "").slice(0, 100));
+  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Leave session"));
+  await sleep(120);
+  clickNamed(/^Leave$/);
+  await sleep(250);
+
+  /* Start from the panel closes Focused training behind it. */
+  await toTraining();
+  acts = await panelFor("Thursday's verbs");
+  click(actNamed(acts, /^Start$/));
+  await sleep(500);
+  check("Start in the panel starts it, and closes Focused training behind it",
+    !!document.querySelector(".at-instruction") && !document.querySelector(".at-screen.training"),
+    (document.body.textContent || "").slice(0, 100));
+  click([...document.querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Leave session"));
+  await sleep(120);
+  clickNamed(/^Leave$/);
+  await sleep(250);
+
+  /* Changed rather than built again: the Build screen opens on what was
+     kept, and saving puts the change back under the same session. */
+  await toTraining();
+  acts = await panelFor("Thursday's verbs");
+  click(actNamed(acts, /^Edit$/));
+  await sleep(250);
+  check("a kept session opens on the Build screen to be changed",
+    /Regular/.test(sessionModeSaid()), sessionModeSaid() || (document.body.textContent || "").slice(0, 120));
+  check("with its deck already picked, as a deck", sessionPills().some((p) => /Introductions/.test(p)),
+    sessionPills().join("|"));
+  const renameBox = [...document.querySelectorAll(".at-formblock")]
+    .find((d) => d.querySelector(".at-formnum")?.textContent === "Name")?.querySelector("input");
+  if (renameBox) {
+    must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value")?.set, "the input's value setter")
+      .call(renameBox, "Friday's verbs");
+    renameBox.dispatchEvent(new w.Event("input", { bubbles: true }));
+    await sleep(60);
   }
+  check("and its button saves rather than starts",
+    !!buttonNamed(/^Save$/)?.closest(".at-screenhead") && !buttonNamed(/^Start$/),
+    [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-120));
+  clickNamed(/^Save$/);
+  await sleep(250);
+  check("and the change is kept under the same session, still pinned",
+    !!tileNamed(/^Friday's verbs$/)?.querySelector(".at-savedpin") && !tileNamed(/^Thursday's verbs$/),
+    [...document.querySelectorAll(".at-screen.training .at-savedtile")].map((t) => t.textContent).join("|") || "no tiles");
+
+  /* And off Home again. */
+  acts = await panelFor("Friday's verbs");
+  click(actNamed(acts, /^Unpin from Home$/));
+  await sleep(200);
+  check("unpinning takes its pin away", !!tileNamed(/^Friday's verbs$/) && !tileNamed(/^Friday's verbs$/)?.querySelector(".at-savedpin"),
+    acts.map((b) => b.textContent).join("|") || "no panel");
+  await leaveTraining();
+  check("and its tile off Home", homePin().length === 0, homePin().map((t) => t.textContent).join("|"));
+  await toTraining();
   await leaveTraining();
 
   /* Kept for the browser check, which needs cards to have a session at
@@ -2759,12 +2823,12 @@ if (/Build a session/.test(document.body.textContent)) {
     const pad = (/** @type {number} */ n) => String(n).padStart(2, "0");
     const day = `${inMonth.getFullYear()}-${pad(inMonth.getMonth() + 1)}-${pad(inMonth.getDate())}`;
 
-    check("Progress no longer has Prep mode, which moved to Focused training",
-      ![...document.querySelectorAll("h3.at-sectionhead")].some((h) => /^Prep mode$/.test(h.textContent || "")) &&
-        !buttonNamed(/prep mode$/i),
+    check("Progress no longer has the goal (Prep mode until 0.681), which moved to Focused training",
+      ![...document.querySelectorAll("h3.at-sectionhead")].some((h) => /^(Prep mode|Set a goal|Your goal)$/.test(h.textContent || "")) &&
+        !buttonNamed(/(prep mode|set a goal|your goal)$/i),
       [...document.querySelectorAll(".at-sectionhead")].map((h) => h.textContent).join(" | "));
     const prepChoice = () => /** @type {HTMLButtonElement | null} */ (
-      document.querySelector('.at-screen.training .at-trainchoice[aria-label="Prep mode"]'));
+      document.querySelector('.at-screen.training .at-trainchoice[aria-label="Set a goal"], .at-screen.training .at-trainchoice[aria-label="Your goal"]'));
     const status = () => ((document.querySelector(".at-screen.training .at-trainchoicestatus") || {}).textContent || "");
     /* Into Focused training from Home, and Prep mode from there. */
     const openPrep = async () => {
@@ -2777,13 +2841,15 @@ if (/Build a session/.test(document.body.textContent)) {
     click(buttonNamed(/^Home$/));
     await sleep(300);
     await toTraining();
-    check("Focused training offers Prep mode, saying what it is, with nothing set yet",
-      !!prepChoice() && /ready by a date/.test(prepChoice()?.textContent || "") && !status(),
-      (prepChoice() || {}).textContent || "(no Prep mode)");
+    /* Called Set a goal since 0.681 (Prep mode before), and Your goal once
+       there is one. */
+    check("Focused training offers Set a goal, saying what it is, with nothing set yet",
+      prepChoice()?.getAttribute("aria-label") === "Set a goal" && /ready by a date/.test(prepChoice()?.textContent || "") && !status(),
+      (prepChoice() || {}).textContent || "(no Set a goal)");
     click(prepChoice());
     await sleep(250);
-    check("and opens Prep mode on a screen of its own",
-      /Prep mode/.test(((top() || {}).textContent || "")), ((top() || {}).textContent || "").slice(0, 60));
+    check("and opens Set a goal on a screen of its own",
+      /Set a goal/.test(((top() || {}).textContent || "")), ((top() || {}).textContent || "").slice(0, 60));
     const nameBox = document.getElementById("at-prep-name");
     const dateBox = document.getElementById("at-prep-date");
     check("asking what it is for and when", !!nameBox && !!dateBox);
@@ -2810,25 +2876,26 @@ if (/Build a session/.test(document.body.textContent)) {
       (levelPick(/^Learnt$/) || {}).outerHTML || "(no level picker)");
     const foot = () => (top() || document).querySelector(".at-screenfoot");
     check("Save sits in the bar at the foot of the screen",
-      !!foot()?.contains(buttonNamed(/^Start prepping$/) || null), (foot() || {}).textContent || "(no foot)");
+      !!foot()?.contains(buttonNamed(/^Start working towards it$/) || null), (foot() || {}).textContent || "(no foot)");
     const readyText = () => ((document.querySelector(".at-prepready") || {}).textContent || "");
     for (let i = 0; i < 160 && (!readyText() || /Working out/.test(readyText())); i++) await sleep(250);
     check("saying how much practice being ready takes, or when it could be",
       /sessions? a day will get you ready before|can't be fully ready|already learnt/.test(readyText()),
       readyText().slice(0, 160));
-    click(buttonNamed(/^Start prepping$/));
+    click(buttonNamed(/^Start working towards it$/));
     await sleep(300);
     const note = status;
-    check("once started, back on Focused training, Prep mode says what is being prepped for and how long is left",
-      /Prepping for Start of class · (\d+ days|1 day) left/.test(note()) || /Ready for Start of class/.test(note()),
-      note() || "(no note)");
+    check("once started, back on Focused training, Your goal says what is being worked towards and how long is left",
+      prepChoice()?.getAttribute("aria-label") === "Your goal" &&
+        (/Working towards Start of class · (\d+ days|1 day) left/.test(note()) || /Ready for Start of class/.test(note())),
+      `${prepChoice()?.getAttribute("aria-label")}: ${note() || "(no note)"}`);
 
     await leaveTraining();
     click(buttonNamed(/^Home$/));
     await sleep(300);
-    const prepButton = () => buttonNamed(/^Prep for /);
+    const prepButton = () => buttonNamed(/^Practice for /);
     check("the home screen offers a session for it",
-      !!prepButton() && /^Prep for Start of class$/.test((prepButton() || {}).textContent || ""),
+      !!prepButton() && /^Practice for Start of class$/.test((prepButton() || {}).textContent || ""),
       (prepButton() || {}).textContent || "(no prep button)");
     const prepTile = () => document.querySelector(".at-preptile");
     check("in a tile of its own at the top, with the prep's own climb and its button the primary one",
@@ -2840,6 +2907,9 @@ if (/Build a session/.test(document.body.textContent)) {
       !homeCard()?.querySelector(".at-climb") && !homeCard()?.querySelector(".at-btn.primary") &&
         !!buttonNamed(/^Practice(?! this)/) && !!homeCard()?.querySelector('[data-el="focused-training"]'),
       (homeCard()?.textContent || "").replace(/\s+/g, " ").slice(0, 120));
+    check("and the card with the drawing and the fact is left off, so Home is less crowded (0.673)",
+      !document.querySelector('[data-el="home-fact"]'),
+      (document.querySelector('[data-el="home-fact"]') || {}).textContent || "");
     const counter = () => ((document.querySelector(".at-preptoday") || {}).textContent || "");
     check("under it, today's sessions against what today needs, as a count and a row of dots",
       /^Today's sessions\d+(\/\d+)?$/.test(counter()) &&
@@ -2878,7 +2948,7 @@ if (/Build a session/.test(document.body.textContent)) {
     click(buttonNamed(/^Home$/));
     await sleep(300);
     check("and reaches the home screen's button",
-      /^Prep for Exam$/.test((prepButton() || {}).textContent || ""), (prepButton() || {}).textContent || "(none)");
+      /^Practice for Exam$/.test((prepButton() || {}).textContent || ""), (prepButton() || {}).textContent || "(none)");
     check("whose ring counts cards learnt",
       / cards? learnt$/.test((prepTile()?.querySelector(".at-climbsay") || {}).textContent || ""),
       (prepTile()?.querySelector(".at-climbsay") || {}).textContent || "(no ring)");
@@ -2898,20 +2968,21 @@ if (/Build a session/.test(document.body.textContent)) {
 
     /* Cleared. */
     await openPrep();
-    const del = () => [...((foot() || document).querySelectorAll("button"))].find((b) => b.getAttribute("aria-label") === "Delete this prep");
+    const del = () => [...((foot() || document).querySelectorAll("button"))].find((b) => b.getAttribute("aria-label") === "Delete this goal");
     check("the way to delete it is an icon in the same bar, before Save",
       !!del() && !(del()?.textContent || "").trim() &&
         !!((del()?.compareDocumentPosition(/** @type {Node} */ (buttonNamed(/^Save changes$/))) || 0) & 4),
       (foot() || {}).innerHTML?.slice(0, 160) || "(no foot)");
     click(del());
     await sleep(300);
-    check("deleting clears it from Prep mode's button on Focused training",
-      !!prepChoice() && !note(), note());
+    check("deleting clears it from Focused training, whose button is Set a goal again",
+      prepChoice()?.getAttribute("aria-label") === "Set a goal" && !note(), note());
     await leaveTraining();
     click(buttonNamed(/^Home$/));
     await sleep(300);
-    check("and from the home screen, which has its climb back",
-      !prepButton() && !prepTile() && !!homeCard()?.querySelector(".at-climb"),
+    check("and from the home screen, which has its climb back, and the card with its drawing and fact",
+      !prepButton() && !prepTile() && !!homeCard()?.querySelector(".at-climb") &&
+        !!homeCard()?.querySelector('[data-el="home-fact"] .at-homeart') && !!homeCard()?.querySelector(".at-homecardfact"),
       (prepButton() || {}).textContent || "");
     click(buttonNamed(/^Progress$/));
     await sleep(300);
@@ -3054,14 +3125,18 @@ const beforeAnswer = schedules();
   check("saying what it is under its name, and nothing about how much is slipping",
     !!weakBtn && /got wrong lately/.test(weakBtn.textContent || "") && !/slipping/.test(weakBtn.textContent || ""),
     weakBtn ? (weakBtn.textContent || "").replace(/\s+/g, " ") : "no button");
-  /* The four choices (0.671): two side by side, then two full width, each
-     with its line. */
+  /* The four choices (0.671): two side by side, then two more side by
+     side (0.681), each with its line and its icon on its name's line. */
   const choices = [...document.querySelectorAll(".at-screen.training .at-trainchoice")];
-  check("Weak spots and Not seen lately side by side, then Build a session and Prep mode",
-    choices.map((b) => b.getAttribute("aria-label")).join("|") === "Weak spots|Not seen lately|Build a session|Prep mode" &&
-      !!weakBtn?.parentElement?.classList.contains("at-trainpair") &&
+  check("Weak spots and Not seen lately side by side, then Build a session and Set a goal side by side",
+    choices.map((b) => b.getAttribute("aria-label")).join("|") === "Weak spots|Not seen lately|Build a session|Set a goal" &&
+      choices.every((b) => !!b.parentElement?.classList.contains("at-trainpair")) &&
+      choices[0]?.parentElement !== choices[2]?.parentElement && choices[2]?.parentElement === choices[3]?.parentElement &&
       choices.every((b) => !!b.querySelector(".at-trainchoicenote")?.textContent),
     choices.map((b) => b.getAttribute("aria-label")).join("|"));
+  check("each with its icon on the same line as its name",
+    choices.every((b) => !!b.querySelector(".at-trainchoicehead > .at-trainchoiceico + .at-trainchoicename")),
+    choices.map((b) => b.querySelector(".at-trainchoicehead") ? "ok" : "no head").join("|"));
   const unseenBtn = /** @type {HTMLButtonElement | undefined} */ (choices[1]);
   check("and Not seen lately is lit for a learner with cards they have not met in days",
     !!unseenBtn && unseenBtn.getAttribute("aria-disabled") !== "true",
@@ -4368,7 +4443,12 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
 
     /* Move two: what the answer screen says about where the word lives.
        Under "Learn more", which is where everything that is not the
-       answer lives, open from the start. */
+       answer lives, opened with a tap. */
+    const moreToggle = document.querySelector('[data-el="also-heading"]');
+    if (moreToggle) {
+      click(moreToggle);
+      await sleep(40);
+    }
     const more = document.querySelector('[data-el="also"]');
     if (/Choose the meaning/.test(asked) && !alsoOnMeaning) {
       alsoOnMeaning = {
@@ -9119,7 +9199,7 @@ const openPronounTables = async () => {
   await sleep(200);
   check("and Filter replaces it rather than standing beside it",
     frame.querySelectorAll(".at-listmenu").length === 1 &&
-      sortLabels().join(" | ") === "Kind | Recordings | Forms | Decks | Blanks | Review",
+      sortLabels().join(" | ") === "Kind | Status | Recordings | Forms | Decks | Blanks | Review",
     `${frame.querySelectorAll(".at-listmenu").length} panels · ${sortLabels().join(" | ")}`);
 
   /* ---- and by kind, with each kind's subtypes under it ----
@@ -10953,6 +11033,7 @@ const openPronounTables = async () => {
     for (let t = 0; t < 50 && !host.querySelector(".at-instruction"); t++) await sleep(100);
     const met = {
       chooseImage: 0, promptPicked: 0, promptWritten: 0, answerPicture: 0, tiles: 0,
+      /** @type {string[]} */ writtenTags: [],
       /* The grid of recordings, where one comes up. */
       soundGrids: 0, soundTiles: 0, wordsInScript: false, noEnglish: false,
       unpairs: false, playPicks: false, playKeepsPair: false, playLeavesMeaning: false, tapPutsDown: false, soundVerdict: "", learnMore: false, marked: false,
@@ -10978,7 +11059,11 @@ const openPronounTables = async () => {
         if (promptPic) met.promptPicked += 1;
         click(choices.querySelector("button"));
       } else if (host.querySelector('[data-el="answer-input"]')) {
-        if (promptPic) met.promptWritten += 1;
+        if (promptPic) {
+          met.promptWritten += 1;
+          const tag = host.querySelector('[data-el="question-form-tag"]');
+          met.writtenTags.push(((tag && tag.textContent) || "").trim());
+        }
         click([...host.querySelectorAll("button")].find((b) => /^I don't know$/.test((b.textContent || "").trim())));
       } else if (host.querySelector('[data-el="answer-match"]')) {
         const sounds = host.querySelectorAll('[data-el="match-sound"]').length;
@@ -11092,6 +11177,19 @@ const openPronounTables = async () => {
   const fourth = await walk([0, 1, 2, 3, 4].map((i) => pictured(i, upTo4)));
   check("and, known further, to write it from the picture",
     fourth.promptWritten > 0, JSON.stringify(fourth));
+  check("a word with one form is written from its picture with nothing under it",
+    fourth.writtenTags.length > 0 && fourth.writtenTags.every((t) => t === ""), JSON.stringify(fourth.writtenTags));
+  /* A picture of one lemon did not say whether ليمونة or ليمون was
+     wanted, and a learner reported it twice (0.660): on a card with
+     another count, the count is said under the picture. */
+  const base = pictured(0, upTo4);
+  const lemon = { ...base, forms: [
+    { ...base.forms[0], ar: "ليمونة", en: "lemon", lat: "laymoone", number: "singular", gender: "feminine" },
+    { ...base.forms[0], id: "pic0-f1", ar: "ليمون", en: "lemons", lat: "laymoon", number: "plural", gender: "masculine", recs: [] },
+  ] };
+  const counted = await walk([lemon]);
+  check("on a card with a singular and a plural, the picture says which is wanted",
+    counted.writtenTags.length > 0 && counted.writtenTags.every((t) => /^(singular|plural)$/.test(t)), JSON.stringify(counted.writtenTags));
   /* Known by ear and every other second-level question passed, the one
      left to ask is the grid of recordings: a play button for each word, the
      words in the script beside them, and no English anywhere. */
@@ -11359,6 +11457,57 @@ const openPronounTables = async () => {
     out.above = text(host.querySelector('[data-el="question-prompt-meaning"]'));
     return out;
   });
+  /* A word of two tokens with a letter glued to its front, as reported
+     (0.660): جمعية لحقوق الإنسان showed as "جمعية ____", the ل gone from
+     the sentence and from every tile. */
+  /* Everything a word is asked but the one wanted here already solid, so
+     the session's one question about it is the gap. */
+  const doneBut = (/** @type {string} */ open) => Object.fromEntries(
+    ["ar2pick", "ar2en", "match", "en2pick", "tr2ar", "en2ar", "ctx2pick", "ctx2ar", "dlgwhole"]
+      .filter((t) => t !== open).map((t) => [t, { ...solid }]));
+  /** @param {string} id @param {string} ar @param {string} en @param {Record<string, any>} [extra] */
+  const wordCard = (id, ar, en, extra = {}) => ({
+    id, category: "noun", tags: ["Words"], created: 1, updated: Date.now(), uses: [],
+    forms: [{ id, ar, en, lat: "", s: doneBut("ctx2pick") }],
+    ...extra,
+  });
+  const glued = await walk([
+    wordCard("w-rights", "حقوق الإنسان", "human rights"),
+    wordCard("w-donkey", "حمار", "donkey"),
+    wordCard("w-sister", "أختي", "my sister"),
+    wordCard("w-house", "بيت", "house"),
+    { id: "p-rights", tags: ["Phrases"], created: 1, updated: Date.now(), uses: ["w-rights"],
+      forms: [{ id: "p-rights", ar: "جمعية لحقوق الإنسان", en: "human rights organization", lat: "", s: doneBut("") }] },
+  ], async (host, typeIn) => {
+    /* The phrase card is asked about too; given up on until the gap comes,
+       chosen or typed — both show the same gapped phrase. */
+    const GAP = /Which word is missing|Fill the gap/;
+    for (let n = 0; n < 20 && !GAP.test(text(host.querySelector(".at-instruction"))); n++) {
+      const giveUp = host.querySelector('[data-el="dont-know-button"]');
+      if (!giveUp) break;
+      click(giveUp);
+      await sleep(250);
+      click([...host.querySelectorAll("button")].find((b) => /^(Continue|Next)$/.test(text(b))) || null);
+      await sleep(300);
+    }
+    const out = { reached: GAP.test(text(host.querySelector(".at-instruction"))), prompt: prompt(host), tiles: /** @type {string[]} */ ([]), filled: "", after: "" };
+    const choices = host.querySelector('[data-el="answer-choices"]');
+    if (choices) {
+      const buttons = [...choices.querySelectorAll("button")];
+      out.tiles = buttons.map((b) => text(b));
+      click(buttons.find((b) => text(b) === "حقوق الإنسان") || null);
+    } else typeIn("حقوق الإنسان");
+    await sleep(60);
+    click(host.querySelector('[data-el="check-button"]'));
+    await sleep(250);
+    out.filled = text(host.querySelector('[data-el="question-prompt-filled"]'));
+    out.after = prompt(host);
+    return out;
+  });
+  check("a word of two tokens keeps the letter glued to its front outside the gap",
+    glued.reached && glued.prompt === "جمعية ل____" && (!glued.tiles.length || glued.tiles.includes("حقوق الإنسان")), JSON.stringify(glued));
+  check("and put back, the sentence is whole and only the word is marked",
+    glued.filled === "حقوق الإنسان" && glued.after.replace(/\s+/g, " ").includes("جمعية لحقوق الإنسان"), JSON.stringify(glued));
   materialQuiet = false;
   check("each sentence of a new text is met on its own before it is asked, with its meaning",
     introduced.length > 0 && introduced.every((m) =>

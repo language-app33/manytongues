@@ -57,6 +57,15 @@ function nounCard(id, has = {}) {
 
 /* ---- reading a card ---- */
 
+test("an uncountable noun is left out of counting, and nothing is listed as missing from it", () => {
+  const water = { id: "water", lang: "ar-PS", category: "noun", forms: [{ ar: "مي", en: "water", number: "uncountable", gender: "feminine" }] };
+  assert.equal(readNounCard(water), null);
+  assert.deepEqual(readNouns([water, nounCard("book")], "ar-PS").map((r) => r.id), ["book"]);
+  /* Said on the answer, as an older card or an import may say it. */
+  const bread = { id: "bread", lang: "ar-PS", category: "noun", forms: [{ ar: "خبز", en: "bread", answers: [{ text: "خبز", number: "uncountable", gender: "masculine" }] }] };
+  assert.equal(readNounCard(bread), null);
+});
+
 test("a noun card's plural after three to ten is read with the rest", () => {
   const card = nounCard("book");
   /* A made-up word: what is tested is that it is read, not what it is. */
