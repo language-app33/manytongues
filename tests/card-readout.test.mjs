@@ -26,7 +26,7 @@ import { buildOnce } from "./helpers.mjs";
 import path from "node:path";
 import React from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { CORPUS, DECKS, POOL } from "./card-corpus.mjs";
+import { CORPUS, MODULES, POOL } from "./card-corpus.mjs";
 import { blanksOn, combosOf, examplesOf, fieldsOn, fillersFor } from "../src/card-facts.ts";
 import { LANGUAGES } from "../src/languages.ts";
 import { leadOf } from "../src/cards.ts";
@@ -44,7 +44,7 @@ const readOut = (/** @type {Record<string, any>} */ card) => {
     React.createElement(CardReadout, {
       card,
       lang: LANGUAGES[card.lang],
-      decks: DECKS,
+      modules: MODULES,
       cards: POOL,
     }),
   );
@@ -66,7 +66,7 @@ test("every value on a card is somewhere on the screen that shows it", () => {
       /* A list is walked in its own right; a field nobody has described yet
          is drawn raw, which the test below is about. */
       if (!field.rule || field.rule.container || !field.rule.shown) continue;
-      const wanted = field.rule.shown(field.value, { lang, card, cards: POOL, decks: DECKS });
+      const wanted = field.rule.shown(field.value, { lang, card, cards: POOL, decks: MODULES });
       for (const said of wanted) {
         if (said && !screen.includes(said)) {
           lost.push(`${field.where}.${field.key}${field.at ? ` (${field.at})` : ""} — "${said}"`);
@@ -150,7 +150,7 @@ test("a student's card says the card and not the teacher's side of it", () => {
     React.createElement(CardReadout, {
       card,
       lang: LANGUAGES[card.lang],
-      decks: [],
+      modules: [],
       reader: "both",
     }),
   );

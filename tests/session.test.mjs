@@ -273,7 +273,7 @@ test("a marked card with nothing to ask is not urgent", () => {
    ------------------------------------------------------------------ */
 
 /** Every card is in, which is what a session with no deck chosen means. */
-const anyDeck = () => true;
+const anyModule = () => true;
 
 /**
  * A plain word, ready to be dealt: two exercises' worth of material and
@@ -290,17 +290,17 @@ const word = (id, ar, en, over = {}) => ({
 });
 
 /** A deck of them, named so the assertions can read. */
-const deckOf = (/** @type {number} */ n) =>
+const moduleOf = (/** @type {number} */ n) =>
   Array.from({ length: n }, (_, i) => word(`w${i + 1}`, `كلمة${i + 1}`, `word ${i + 1}`));
 
 /** Deal one, with the indexes filled the way a render fills them. */
 const deal = (/** @type {any[]} */ items, /** @type {Record<string, any>} */ over = {}) => {
   installIndexes(items, settings);
-  return buildSession({ items, settings, inDeck: anyDeck, ...over });
+  return buildSession({ items, settings, inModule: anyModule, ...over });
 };
 
 test("a session is dealt from the cards in hand", () => {
-  const got = deal(deckOf(12));
+  const got = deal(moduleOf(12));
   assert.equal(got.reason, null, "there was something to ask");
   assert.ok(got.exercises.length > 1, `${got.exercises.length} questions`);
   /* Every question names a card that is actually in the deck, and an
@@ -317,8 +317,8 @@ const due = () => ({
   reps: 4, lapses: 0, right: 4, wrong: 0, skips: 0, near: 0, hints: 0, hist: [1], updated: 1,
 });
 /** A deck of them: met, due, and waiting. */
-const dueDeck = (/** @type {number} */ n) =>
-  deckOf(n).map((it) => ({
+const dueModule = (/** @type {number} */ n) =>
+  moduleOf(n).map((it) => ({
     ...it,
     forms: [{ ...it.forms[0], s: { ar2en: due(), en2ar: due(), tr2ar: due() } }],
   }));
@@ -330,7 +330,7 @@ test("a course does not arrive all at once, however many words are waiting", () 
    * strangers is not sixty words tonight: it is one session's places, met
    * properly, with the rest waiting.
    */
-  const got = deal(deckOf(60));
+  const got = deal(moduleOf(60));
   const cards = new Set(got.exercises.map((/** @type {any} */ e) => e.id));
   assert.ok(cards.size <= PLACES, `${cards.size} new words opened at once`);
   assert.ok(cards.size >= 1, "and at least one");
@@ -341,7 +341,7 @@ test("a session of due cards is spread over several rather than spent on one", (
      session that was six cards asked three ways each. Nine words, asked
      two ways, is the shape now — what is asserted is that no one card is
      half of it. */
-  const got = deal(dueDeck(14));
+  const got = deal(dueModule(14));
   const perCard = new Map();
   for (const ex of got.exercises) perCard.set(ex.id, (perCard.get(ex.id) || 0) + 1);
   assert.ok(perCard.size >= 5, `${perCard.size} cards in the session`);
@@ -353,7 +353,7 @@ test("a session of due cards is spread over several rather than spent on one", (
 test("a session is dealt backups from the met cards it did not take, none of them listening", () => {
   /* Held back to stand in for a question that has to go mid-session — no
      sound, no connection — so the count at the top keeps its length. */
-  const got = deal(dueDeck(40));
+  const got = deal(dueModule(40));
   const taken = new Set(got.exercises.map((/** @type {any} */ e) => e.id));
   assert.ok(got.backups.length > 0, "there are backups");
   assert.ok(got.backups.length <= got.exercises.length, "no more than one per question");
@@ -365,7 +365,7 @@ test("a session is dealt backups from the met cards it did not take, none of the
 
 test("nor are new cards slipped in as backups", () => {
   /* The mix decides which new cards come in; a backup is not a side door. */
-  const got = deal(deckOf(60));
+  const got = deal(moduleOf(60));
   assert.deepEqual(got.backups, []);
 });
 
@@ -415,7 +415,7 @@ test("nothing new is dealt while a pile of new cards is already in hand", () => 
    * session may open, nothing new is dealt while ten are already being
    * learnt. Without it a first week is forty words met once each.
    */
-  const learning = deckOf(14).map((/** @type {any} */ it) => ({
+  const learning = moduleOf(14).map((/** @type {any} */ it) => ({
     ...it,
     forms: [{ ...it.forms[0], s: { ar2en: { phase: "learning", step: 0, ease: 2.5, interval: 0,
       due: 0, reps: 1, lapses: 0, right: 0, wrong: 1, skips: 0, near: 0, hints: 0, hist: [0], updated: 1 } } }],
@@ -476,9 +476,9 @@ test("a card the learner asked for is dealt however far off it was", () => {
      waiting. */
   const far = { phase: "review", step: 0, ease: 2.5, interval: 60, due: Date.now() + 60 * 86400000,
     reps: 9, lapses: 0, right: 9, wrong: 0, skips: 0, near: 0, hints: 0, hist: [1], updated: 1 };
-  const deck = deckOf(6).map((it) => ({ ...it, forms: [{ ...it.forms[0], s: { ar2en: far, en2ar: far } }] }));
-  const asked = { ...deck[5], priority: true };
-  const got = deal(deck.slice(0, 5).concat([asked]));
+  const module = moduleOf(6).map((it) => ({ ...it, forms: [{ ...it.forms[0], s: { ar2en: far, en2ar: far } }] }));
+  const asked = { ...module[5], priority: true };
+  const got = deal(module.slice(0, 5).concat([asked]));
   assert.ok(got.exercises.some((/** @type {any} */ e) => e.id === asked.id),
     "the card that was asked for is in the session");
 });
@@ -495,7 +495,7 @@ test("a form the teacher keeps without asking about is never dealt", () => {
       { id: "quiet", ar: "كُتُب", en: "books", lat: "kutub", lang: "ar-PS", ask: false, s: {} },
     ],
   });
-  const got = deal([kept].concat(deckOf(6)));
+  const got = deal([kept].concat(moduleOf(6)));
   assert.ok(!got.exercises.some((/** @type {any} */ e) => e.subId === "quiet"),
     "the form switched off is not asked");
 });
@@ -513,7 +513,7 @@ test("a session built by hand climbs the same ladder a dealt one does", () => {
       { id: "quiet", ar: "كُتُب", en: "books", lat: "kutub", lang: "ar-PS", ask: false, s: {} },
     ],
   });
-  const items = [kept].concat(deckOf(4));
+  const items = [kept].concat(moduleOf(4));
   installIndexes(items, settings);
   const got = buildManualSession({
     items, settings, ids: items.map((i) => i.id), mode: "regular", count: 20,
@@ -529,9 +529,9 @@ test("a value is not a question, however it was chosen", () => {
      honoured that; a hand-built one picking the deck a frame lives in used
      to drill the names in it. */
   const value = word("rafa", "رافائيل", "Raphael", { fills: "name", drill: false });
-  const items = [value].concat(deckOf(5));
+  const items = [value].concat(moduleOf(5));
   installIndexes(items, settings);
-  const dealt = buildSession({ items, settings, inDeck: anyDeck });
+  const dealt = buildSession({ items, settings, inModule: anyModule });
   const byHand = buildManualSession({
     items, settings, ids: items.map((i) => i.id), mode: "regular", count: 20,
   });
@@ -551,10 +551,10 @@ test("a sentence is not dealt until there is a word to put in it", () => {
   /* Beside cards that are due rather than new, so the frame is the one new
      card in the deck and the room kept for new ones is not the thing being
      measured. */
-  const rest = dueDeck(3);
+  const rest = dueModule(3);
   const starved = [frame].concat(rest);
   installIndexes(starved, settings);
-  const without = buildSession({ items: starved, settings, inDeck: anyDeck });
+  const without = buildSession({ items: starved, settings, inModule: anyModule });
   assert.ok(!without.exercises.some((/** @type {any} */ e) => e.id === "f1"),
     "nothing fills it, so it is not asked");
 
@@ -563,7 +563,7 @@ test("a sentence is not dealt until there is a word to put in it", () => {
   const value = word("rafa", "رافائيل", "Raphael", { fills: "name", drill: false });
   const fed = [frame, value].concat(rest);
   installIndexes(fed, settings);
-  const with_ = buildSession({ items: fed, settings, inDeck: anyDeck });
+  const with_ = buildSession({ items: fed, settings, inModule: anyModule });
   assert.ok(with_.exercises.some((/** @type {any} */ e) => e.id === "f1"),
     "with a name to put in it, it is");
 });
@@ -593,9 +593,9 @@ test("nor when the only word for it has no form that agrees with the rest", () =
       { id: "a1-f", ar: "", en: "big", lat: "", lang: "ar-PS", s: {}, row: "agreement", col: "feminine" },
     ],
   });
-  const rest = dueDeck(3);
+  const rest = dueModule(3);
   installIndexes([frame, noun, blank].concat(rest), settings);
-  const short = buildSession({ items: [frame, noun, blank].concat(rest), settings, inDeck: anyDeck });
+  const short = buildSession({ items: [frame, noun, blank].concat(rest), settings, inModule: anyModule });
   assert.ok(!short.exercises.some((/** @type {any} */ e) => e.id === "f2"),
     "there is no sentence to make, so none is asked");
 
@@ -608,7 +608,7 @@ test("nor when the only word for it has no form that agrees with the rest", () =
     ],
   });
   installIndexes([frame, noun, whole].concat(rest), settings);
-  const full = buildSession({ items: [frame, noun, whole].concat(rest), settings, inDeck: anyDeck });
+  const full = buildSession({ items: [frame, noun, whole].concat(rest), settings, inModule: anyModule });
   assert.ok(full.exercises.some((/** @type {any} */ e) => e.id === "f2"),
     "with the feminine written down, it is");
 });
@@ -629,9 +629,9 @@ test("a verb's later rows are not dealt before the row above is known", () => {
         row: "past", col: "she", s: {} },
     ],
   });
-  const items = [verb].concat(deckOf(5));
+  const items = [verb].concat(moduleOf(5));
   installIndexes(items, settings);
-  const got = buildSession({ items, settings, inDeck: anyDeck });
+  const got = buildSession({ items, settings, inModule: anyModule });
   assert.ok(!got.exercises.some((/** @type {any} */ e) => e.subId === "c-past-she"),
     "the past is not dealt while the present is unlearnt");
 });
@@ -640,10 +640,10 @@ test("the same deck deals a different session next time", () => {
   /* Everything the ordering calls equal is shuffled, so leaving a session
      half way through and starting another is not the same questions in the
      same order. */
-  const items = dueDeck(14);
+  const items = dueModule(14);
   installIndexes(items, settings);
   const runs = Array.from({ length: 6 }, () =>
-    buildSession({ items, settings, inDeck: anyDeck }).exercises
+    buildSession({ items, settings, inModule: anyModule }).exercises
       .map((/** @type {any} */ e) => `${e.id}:${e.type}`).join(" "));
   assert.ok(new Set(runs).size > 1, "six sessions from one deck were identical");
 });
@@ -696,7 +696,7 @@ test("but anything actually due still comes first", () => {
      it was also practised at breakfast, so the three-hour gap never holds
      back backlog — every one of these is dealt, and cards not yet due only
      fill what places are left. */
-  const dueNow = dueDeck(9).map((it) => ({
+  const dueNow = dueModule(9).map((it) => ({
     ...it,
     forms: [{ ...it.forms[0], s: { ...it.forms[0].s, ar2en: { ...it.forms[0].s.ar2en, updated: Date.now() } } }],
   }));
@@ -760,7 +760,7 @@ const slipping = (/** @type {string} */ id, /** @type {number[]} */ hist, type =
 /** Built the way a render builds it, like `deal` above. */
 const weak = (/** @type {any[]} */ items, /** @type {Record<string, any>} */ over = {}) => {
   installIndexes(items, settings);
-  return buildWeakSession({ items, settings, inDeck: anyDeck, ...over });
+  return buildWeakSession({ items, settings, inModule: anyModule, ...over });
 };
 
 test("how badly one exercise is going, in three answers", () => {
@@ -786,7 +786,7 @@ test("a weak session asks the exercises that went wrong, and nothing else", () =
      the card's own other exercises are fine — so one question is the whole
      of what is going wrong, and padding it out with readings this learner
      has never missed is what the button would be lying about. */
-  const items = [slipping("s1", [0, 0])].concat(deckOf(6));
+  const items = [slipping("s1", [0, 0])].concat(moduleOf(6));
   const got = weak(items);
   assert.equal(got.reason, null, got.reason || "");
   assert.deepEqual([...new Set(got.exercises.map((/** @type {any} */ e) => e.id))], ["s1"],
@@ -801,14 +801,14 @@ test("the one thing you keep failing is a session on its own", () => {
      the right way to fix the thing you keep getting wrong — asked as many
      times as a session asks anything (four), since the session is short
      of its length and there is nothing else it should be about. */
-  const got = weak([slipping("s1", [0, 0])].concat(deckOf(3)));
+  const got = weak([slipping("s1", [0, 0])].concat(moduleOf(3)));
   assert.equal(got.reason, null, got.reason || "");
   assert.equal(got.exercises.length, 4);
   assert.ok(got.exercises.every((/** @type {any} */ e) => e.id === "s1" && e.type === "ar2en"));
 });
 
 test("a gap and a slip are both asked, as often as the session has room", () => {
-  const got = weak([slipping("once", [1, 0]), slipping("twice", [0, 0])].concat(deckOf(4)));
+  const got = weak([slipping("once", [1, 0]), slipping("twice", [0, 0])].concat(moduleOf(4)));
   assert.deepEqual([...new Set(got.exercises.map((/** @type {any} */ e) => e.id))].sort(), ["once", "twice"], "both are in it");
   assert.equal(got.exercises.length, 8, "each asked four times, with nothing else going wrong to fill it");
 });
@@ -816,7 +816,7 @@ test("a gap and a slip are both asked, as often as the session has room", () => 
 test("a deck with nothing going wrong says so rather than building a session", () => {
   /* The reason is a sentence the button can say, which is the difference
      between an empty session and a button that looks broken. */
-  assert.equal(weak(deckOf(6)).reason, "nothing-weak");
+  assert.equal(weak(moduleOf(6)).reason, "nothing-weak");
   assert.equal(weak([]).reason, "none-drillable");
 });
 
@@ -828,7 +828,7 @@ test("an exercise the ladder has not opened is not drilled, however badly it wen
    * the level below being recovered first, which is what this session is
    * for.
    */
-  const got = weak([slipping("s1", [0, 0], "en2ar")].concat(deckOf(4)));
+  const got = weak([slipping("s1", [0, 0], "en2ar")].concat(moduleOf(4)));
   assert.equal(got.reason, "nothing-weak");
 });
 
@@ -846,7 +846,7 @@ test("no one card is the whole of a weak session", () => {
       lang: "ar-PS", s: { ar2en: withHist([0, 0]) },
     })),
   });
-  const got = weak([many].concat(deckOf(4)));
+  const got = weak([many].concat(moduleOf(4)));
   const forms = new Set(got.exercises.map((/** @type {any} */ e) => e.subId || "own"));
   assert.ok(forms.size <= 1, `${forms.size} forms of one card in the session`);
 });
@@ -866,7 +866,7 @@ test("a masculine and its feminine are not both in one session", () => {
      together, the second is answered off the first still in mind. A card
      never met is met by its own form. */
   for (let i = 0; i < 10; i += 1) {
-    const got = deal([gendered({}, {})].concat(deckOf(3)));
+    const got = deal([gendered({}, {})].concat(moduleOf(3)));
     assert.deepEqual([...formsOfG1(got)], ["own"], "the card's own form, alone");
   }
 });
@@ -877,7 +877,7 @@ test("the form a session takes of a card is the one that is due", () => {
      due now. */
   const later = { ...withHist([1, 1]), due: Date.now() + 7 * 86400000 };
   const own = Object.fromEntries(TYPES.map((/** @type {string} */ t) => [t, later]));
-  const got = deal([gendered(own, { ar2en: withHist([1]) })].concat(deckOf(3)));
+  const got = deal([gendered(own, { ar2en: withHist([1]) })].concat(moduleOf(3)));
   assert.deepEqual([...formsOfG1(got)], ["g1-f"], "the feminine, which is due, alone");
 });
 
@@ -899,11 +899,11 @@ test("every form with something wrong on it is asked before any is asked twice",
 test("the count beside the button and the session it opens are the same test", () => {
   /* A number promising cards the session would not include is the fault
      the home screen has had before — see countReady. Both read isWeak. */
-  const items = [slipping("s1", [0, 0]), slipping("s2", [1, 0])].concat(deckOf(4));
+  const items = [slipping("s1", [0, 0]), slipping("s2", [1, 0])].concat(moduleOf(4));
   installIndexes(items, settings);
   const counted = items.filter((it) => isWeak(it, settings)).map((it) => it.id);
   assert.deepEqual(counted, ["s1", "s2"]);
-  const got = buildWeakSession({ items, settings, inDeck: anyDeck });
+  const got = buildWeakSession({ items, settings, inModule: anyModule });
   assert.deepEqual(
     [...new Set(got.exercises.map((/** @type {any} */ e) => e.id))].sort(),
     counted.sort(),
@@ -1153,7 +1153,7 @@ test("with nothing due, the nearest to due is taken and the furthest is not", ()
 test("practising ahead never brings in more new words than there is room for", () => {
   /* More practice means more of what you hold, never more than you can
      take on at once. */
-  const got = deal(deckOf(60));
+  const got = deal(moduleOf(60));
   const dealt = new Set(got.exercises.map((/** @type {any} */ x) => x.id));
   assert.ok(dealt.size <= PLACES, `${dealt.size} new words in one session`);
 });
@@ -1170,13 +1170,13 @@ test("practising ahead never brings in more new words than there is room for", (
  * session grows to hold them instead.
  */
 test("every card the learner asked for is dealt, however many there are", () => {
-  const deck = Array.from({ length: 30 }, (_, i) => settled(`f${i + 1}`, 30 + i));
+  const module = Array.from({ length: 30 }, (_, i) => settled(`f${i + 1}`, 30 + i));
   for (const n of [3, 8, 12]) {
     const asked = Array.from({ length: n }, (_, i) => ({
       ...settled(`a${i + 1}`, 60),
       priority: true,
     }));
-    const dealt = dealtCards(deal(deck.concat(asked)));
+    const dealt = dealtCards(deal(module.concat(asked)));
     const missing = asked.map((it) => it.id).filter((id) => !dealt.has(id));
     assert.equal(missing.length, 0, `${n} marked, and these were left out: ${missing.join(" ")}`);
   }
@@ -1190,9 +1190,9 @@ test("and a card with a second form on it is no harder to ask for", () => {
     const w = settled(id, inDays);
     return { ...w, forms: w.forms.concat([{ ...w.forms[0], id: `${id}-f1`, ar: `${w.forms[0].ar}ات`, en: `${w.forms[0].en}s` }]) };
   };
-  const deck = Array.from({ length: 30 }, (_, i) => pair(`f${i + 1}`, 30 + i));
+  const module = Array.from({ length: 30 }, (_, i) => pair(`f${i + 1}`, 30 + i));
   const asked = Array.from({ length: 8 }, (_, i) => ({ ...pair(`a${i + 1}`, 60), priority: true }));
-  const dealt = dealtCards(deal(deck.concat(asked)));
+  const dealt = dealtCards(deal(module.concat(asked)));
   const missing = asked.map((it) => it.id).filter((id) => !dealt.has(id));
   assert.equal(missing.length, 0, `left out: ${missing.join(" ")}`);
 });
@@ -1200,8 +1200,8 @@ test("and a card with a second form on it is no harder to ask for", () => {
 test("and a session nobody has marked anything in is the size it always was", () => {
   /* The other half of the rule: the reach above is bought by the marks, so
      a learner who has made none is dealt exactly what they were before. */
-  const deck = Array.from({ length: 30 }, (_, i) => settled(`f${i + 1}`, -1));
-  const got = deal(deck);
+  const module = Array.from({ length: 30 }, (_, i) => settled(`f${i + 1}`, -1));
+  const got = deal(module);
   assert.ok(got.exercises.length <= SESSION_SIZE, `${got.exercises.length} questions with nothing marked`);
 });
 
@@ -1221,7 +1221,7 @@ test("twenty cards in learning stop new ones, and do not stop those being practi
      in — and the learner is still given a session of the ones they hold,
      even though every one of them was practised a moment ago. */
   const held = Array.from({ length: MAX_IN_LEARNING }, (_, i) => learningWord(`h${i + 1}`));
-  const waiting = deckOf(20);
+  const waiting = moduleOf(20);
   const got = deal(held.concat(waiting));
   assert.equal(got.reason, null, `refused: ${got.reason}`);
   const dealt = new Set(got.exercises.map((/** @type {any} */ x) => x.id));
@@ -1234,7 +1234,7 @@ test("twenty cards in learning stop new ones, and do not stop those being practi
 
 test("Ultimate takes every new card, past the twenty in learning", () => {
   const held = Array.from({ length: MAX_IN_LEARNING }, (_, i) => learningWord(`h${i + 1}`));
-  const got = deal(held.concat(deckOf(25)), { mode: "ultimate" });
+  const got = deal(held.concat(moduleOf(25)), { mode: "ultimate" });
   assert.equal(got.reason, null, `refused: ${got.reason}`);
   const dealt = new Set(got.exercises.map((/** @type {any} */ x) => x.id));
   const fresh = [...dealt].filter((id) => String(id).startsWith("w"));
@@ -1244,7 +1244,7 @@ test("Ultimate takes every new card, past the twenty in learning", () => {
 test("Ultimate leaves out Cleared and Learnt cards that are not due", () => {
   const waiting = Array.from({ length: 4 }, (_, i) => settled(`d${i + 1}`, -1));
   const ahead = Array.from({ length: 4 }, (_, i) => settled(`a${i + 1}`, 7));
-  const got = deal(waiting.concat(ahead, deckOf(3)), { mode: "ultimate" });
+  const got = deal(waiting.concat(ahead, moduleOf(3)), { mode: "ultimate" });
   assert.equal(got.reason, null, `refused: ${got.reason}`);
   const dealt = new Set(got.exercises.map((/** @type {any} */ x) => x.id));
   assert.ok([...dealt].every((id) => !String(id).startsWith("a")), `dealt ahead of time: ${[...dealt].join(" ")}`);
@@ -1306,7 +1306,7 @@ test("and a card no longer counts as in learning once it is cleared", () => {
      no longer hold a place in learning, even though they have their passes
      still to make — twenty of them, and new cards still come in. */
   const known = Array.from({ length: MAX_IN_LEARNING }, (_, i) => settled(`k${i + 1}`, 1));
-  const got = deal(known.concat(deckOf(20)));
+  const got = deal(known.concat(moduleOf(20)));
   const dealt = new Set(got.exercises.map((/** @type {any} */ x) => x.id));
   assert.ok(
     [...dealt].some((id) => String(id).startsWith("w")),
@@ -1323,13 +1323,13 @@ test("coming back within three hours brings new cards in; once a day does not", 
      the next sitting is for, and nothing new comes in. */
   const isNew = (/** @type {string} */ id) => String(id).startsWith("w");
   const justNow = Array.from({ length: 10 }, (_, i) => learningWord(`h${i + 1}`));
-  const often = dealtCards(deal(justNow.concat(deckOf(22))));
+  const often = dealtCards(deal(justNow.concat(moduleOf(22))));
   assert.ok([...often].some(isNew), `nothing new came in for somebody back within the hour: ${[...often].join(" ")}`);
   const thisMorning = justNow.map((w) => ({
     ...w,
     forms: [{ ...w.forms[0], s: Object.fromEntries(Object.entries(w.forms[0].s).map(([k, st]) => [k, { ...st, updated: Date.now() - 5 * 3600000 }])) }],
   }));
-  const daily = dealtCards(deal(thisMorning.concat(deckOf(22))));
+  const daily = dealtCards(deal(thisMorning.concat(moduleOf(22))));
   assert.ok(![...daily].some(isNew), `new cards came in while ten in learning were waiting: ${[...daily].join(" ")}`);
 });
 
@@ -1469,7 +1469,7 @@ const byHand = (/** @type {any[]} */ items, /** @type {any[]} */ picked = items)
 test("built by hand, Weak spots takes a card whose record is clean as nothing to fix", () => {
   const clean = slipping("clean", [1, 1]);
   const missed = slipping("missed", [1, 0]);
-  const items = [clean, missed].concat(deckOf(4));
+  const items = [clean, missed].concat(moduleOf(4));
   installIndexes(items, settings);
   const got = byHand(items);
   assert.equal(got.reason, null, got.reason || "");
@@ -1480,7 +1480,7 @@ test("built by hand, Weak spots takes a card whose record is clean as nothing to
 test("and asks only the question that went wrong, not everything the card has", () => {
   /* Its other questions have never gone wrong; Fix mistakes, which this
      replaced, asked those too. */
-  const items = [slipping("missed", [0, 0])].concat(deckOf(4));
+  const items = [slipping("missed", [0, 0])].concat(moduleOf(4));
   installIndexes(items, settings);
   const got = byHand(items);
   assert.ok(got.exercises.length > 0);
@@ -1490,7 +1490,7 @@ test("and asks only the question that went wrong, not everything the card has", 
 test("and keeps to the cards picked", () => {
   const a = slipping("a", [0, 0]);
   const b = slipping("b", [0, 0]);
-  const items = [a, b].concat(deckOf(4));
+  const items = [a, b].concat(moduleOf(4));
   installIndexes(items, settings);
   const got = byHand(items, [b]);
   assert.deepEqual([...new Set(got.exercises.map((/** @type {any} */ e) => e.id))], ["b"]);
@@ -1503,7 +1503,7 @@ test("a slip on a question the card has climbed past is not a weak spot by hand 
    * right, wrong is still solid (0.598).
    */
   const climbed = word("climbed", "كلمة-c", "word c");
-  const items = [climbed, slipping("missed", [1, 0])].concat(deckOf(4));
+  const items = [climbed, slipping("missed", [1, 0])].concat(moduleOf(4));
   installIndexes(items, settings);
   const keys = laddered(climbed.forms[0], settings);
   assert.ok(keys.includes("ar2en") && keys.includes("en2ar"));
@@ -1515,7 +1515,7 @@ test("a slip on a question the card has climbed past is not a weak spot by hand 
 });
 
 test("nothing going wrong among the cards picked is said rather than built into a session", () => {
-  const items = [slipping("clean", [1, 1])].concat(deckOf(4));
+  const items = [slipping("clean", [1, 1])].concat(moduleOf(4));
   installIndexes(items, settings);
   assert.equal(byHand(items).reason, "nothing-weak");
 });
@@ -1559,10 +1559,10 @@ test("the session ends on the last card the learner asked for, and not a questio
   /* Thirty of them, which is more than a session's own length can hold
      however the questions fall — grids included — so the reach below is
      always the marks doing the stretching rather than the ordinary budget. */
-  const deck = Array.from({ length: 30 }, (_, i) => settled(`f${i + 1}`, 30 + i));
+  const module = Array.from({ length: 30 }, (_, i) => settled(`f${i + 1}`, 30 + i));
   const asked = Array.from({ length: 30 }, (_, i) => ({ ...settled(`a${i + 1}`, 60), priority: true }));
-  const ordinary = deal(deck).exercises.length;
-  const got = deal(deck.concat(asked));
+  const ordinary = deal(module).exercises.length;
+  const got = deal(module.concat(asked));
   const marked = new Set(asked.map((it) => it.id));
 
   assert.ok(got.exercises.length > ordinary,
@@ -1607,7 +1607,7 @@ test("a card that is both new and asked for is still asked about only as much as
    * four times in one sitting while another card waited.
    */
   const asked = { ...word("both", "كلمة-both", "word both"), priority: true };
-  const items = [asked].concat(deckOf(20));
+  const items = [asked].concat(moduleOf(20));
   const got = deal(items);
   const mine = got.exercises.filter((/** @type {any} */ e) => e.id === "both");
   assert.ok(mine.length > 0, "the marked card was not dealt");
@@ -1626,7 +1626,7 @@ test("a deck with pictures deals the picture exercises, from the first level up"
   /* Five words, each with a recording and a picture: every one of them can
      be heard and its picture chosen among the others' — the gentlest
      question a pictured card has, on the level a new card starts on. */
-  const items = deckOf(5).map((it, i) => ({
+  const items = moduleOf(5).map((it, i) => ({
     ...it,
     forms: [{ ...it.forms[0], recs: [{ id: `rec${i}` }], images: [String(i).repeat(64)] }],
   }));
@@ -1644,7 +1644,7 @@ test("a deck with pictures deals the picture exercises, from the first level up"
 });
 
 test("a card without a picture is never dealt one of the picture exercises", () => {
-  const items = deckOf(8).map((it, i) => ({ ...it, forms: [{ ...it.forms[0], recs: [{ id: `rec${i}` }] }] }));
+  const items = moduleOf(8).map((it, i) => ({ ...it, forms: [{ ...it.forms[0], recs: [{ id: `rec${i}` }] }] }));
   const got = deal(items);
   const types = got.exercises.map((/** @type {any} */ x) => String(x.type).split("@")[0]);
   assert.ok(!types.some((/** @type {string} */ t) => ["rec2img", "img2pick", "img2ar"].includes(t)), types.join(" "));
@@ -1684,12 +1684,12 @@ test("a sentence names the word in its blank where that word's English is shared
 test("built by hand in Regular, new words are let in as a dealt session lets them in", () => {
   /* Sixty strangers picked: the front door admits what it admits, the same
      as when the home screen deals from them. */
-  const items = deckOf(60);
+  const items = moduleOf(60);
   installIndexes(items, settings);
   const byHand = buildManualSession({
     items, settings, ids: items.map((i) => i.id), mode: "regular", count: 50,
   });
-  const dealt = buildSession({ items, settings, inDeck: anyDeck, budget: 50 });
+  const dealt = buildSession({ items, settings, inModule: anyModule, budget: 50 });
   assert.equal(byHand.reason, null, byHand.reason || "");
   assert.ok(dealtCards(byHand).size <= MAX_IN_LEARNING,
     `${dealtCards(byHand).size} new words in one session`);
@@ -1699,7 +1699,7 @@ test("built by hand in Regular, new words are let in as a dealt session lets the
 test("and what is due comes ahead of what is not", () => {
   /* Six due and twelve a week off, all picked. A short session reaches the
      due ones; a shuffle of everything picked would not. */
-  const waiting = dueDeck(6);
+  const waiting = dueModule(6);
   const ahead = Array.from({ length: 12 }, (_, i) => settled(`s${i + 1}`, 7));
   const items = waiting.concat(ahead);
   installIndexes(items, settings);
@@ -1713,7 +1713,7 @@ test("and what is due comes ahead of what is not", () => {
 });
 
 test("and only the cards picked are dealt", () => {
-  const items = deckOf(4).concat(dueDeck(8).map((w) => ({ ...w, id: `d${w.id}` })));
+  const items = moduleOf(4).concat(dueModule(8).map((w) => ({ ...w, id: `d${w.id}` })));
   installIndexes(items, settings);
   const picked = items.slice(0, 4).map((i) => i.id);
   const got = buildManualSession({ items, settings, ids: picked, mode: "regular", count: 20 });
@@ -1727,7 +1727,7 @@ test("built by hand on decks, the cards in learning elsewhere do not count", () 
      nobody has started. The limit is counted in the pool, so the new deck
      starts at once — a session's places of it, and no more. */
   const held = Array.from({ length: 10 }, (_, i) => learningWord(`h${i + 1}`));
-  const fresh = deckOf(20);
+  const fresh = moduleOf(20);
   const items = held.concat(fresh);
   installIndexes(items, settings);
   const got = buildManualSession({
@@ -1743,11 +1743,11 @@ test("and so does a prep: every session counts the cards in learning in its own 
   /* One rule for every session. A prep's decks are its pool, and twenty in
      learning elsewhere do not keep its new cards out. */
   const held = Array.from({ length: MAX_IN_LEARNING }, (_, i) => learningWord(`h${i + 1}`));
-  const fresh = deckOf(20);
+  const fresh = moduleOf(20);
   const items = held.concat(fresh);
   installIndexes(items, settings);
   const onlyFresh = (/** @type {any} */ it) => fresh.some((f) => f.id === it.id);
-  const got = buildSession({ items, settings, inDeck: onlyFresh });
+  const got = buildSession({ items, settings, inModule: onlyFresh });
   assert.equal(got.reason, null, `refused: ${got.reason}`);
   assert.ok(got.exercises.length > 0, "a fresh prep deck came up empty");
 });
@@ -1757,7 +1757,7 @@ test("built by hand, a deck with twenty in learning practises those", () => {
      deck's words in progress are what is asked instead — so the session is
      not empty. */
   const held = Array.from({ length: MAX_IN_LEARNING }, (_, i) => learningWord(`h${i + 1}`));
-  const fresh = deckOf(5);
+  const fresh = moduleOf(5);
   const items = held.concat(fresh);
   installIndexes(items, settings);
   const got = buildManualSession({
@@ -1842,7 +1842,7 @@ const framesShown = (/** @type {any[]} */ items, /** @type {string} */ id = "f1"
   const shown = new Set();
   for (let i = 0; i < 12; i++) {
     installIndexes(items, settings);
-    for (const ex of buildSession({ items, settings, inDeck: anyDeck }).exercises) {
+    for (const ex of buildSession({ items, settings, inModule: anyModule }).exercises) {
       if (ex.id !== id) continue;
       const cast = castQuestion(items, ex);
       if (cast) shown.add(cast.ar);

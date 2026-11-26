@@ -718,9 +718,9 @@ answer carries `space` not in `account.orgs`, call `whoAmI` and
   course's `org`; `item.source.systemId` → the `org` of the first course
   whose deck has `numbersSystemId` or `timeSystemId` equal to it; otherwise
   `null` (the learner's own card: shown under every filter). Memoise a
-  `Map<itemId, org | null>` from `items`, `myCourses`, `courseDecks`.
+  `Map<itemId, org | null>` from `items`, `myCourses`, `courseModules`.
 - `learnItems = spaceFilter ? items.filter((it) => { const o = spaceOf.get(it.id); return o === null || o === spaceFilter; }) : items`,
-  and the same for `learnCourses` (by `c.org`) and `learnDecks` (by their
+  and the same for `learnCourses` (by `c.org`) and `learnModules` (by their
   course). **Use these, and never `items`, wherever Learning reads or
   practises:** `drillable` (feeding `readyOf`, `homeWaiting`, `readyCount`,
   `homePrep` — 11428–11550), `begin` (11998), `beginManual` (11673),
@@ -851,7 +851,7 @@ and "a course code joins the space".
 
 ### Stage 3 — Learning across spaces
 
-- [ ] `spaceFilter` state and storage; `spaceOfItem` map; `learnItems`/`learnCourses`/`learnDecks` in every place B4 lists.
+- [ ] `spaceFilter` state and storage; `spaceOfItem` map; `learnItems`/`learnCourses`/`learnModules` in every place B4 lists.
 - [ ] The `Segmented` row in the Learning frame, only with more than one space.
 - [ ] `StudentCourses` sections per space under All.
 - [ ] `ProgressTab` tiles keyed and labelled by space.

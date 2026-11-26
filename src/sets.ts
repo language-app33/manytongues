@@ -98,7 +98,7 @@ const ids = (raw: unknown, limit: number, not = ""): string[] =>
  * with the default, the deck's own id never one of its lists. Null for
  * anything that is not an object. Never throws.
  */
-export function readSet(raw: unknown, ownDeckId: string): SetConfig | null {
+export function readSet(raw: unknown, ownModuleId: string): SetConfig | null {
   if (!raw || typeof raw !== "object" || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
   const w = r.wording && typeof r.wording === "object" && !Array.isArray(r.wording) ? (r.wording as Record<string, unknown>) : {};
@@ -111,7 +111,7 @@ export function readSet(raw: unknown, ownDeckId: string): SetConfig | null {
   const on = (k: string) => (typeof a[k] === "boolean" ? (a[k] as boolean) : true);
   return {
     wording,
-    lists: ids(r.lists, SET_LIMITS.lists, ownDeckId),
+    lists: ids(r.lists, SET_LIMITS.lists, ownModuleId),
     named: ids(r.named, SET_LIMITS.named),
     asks: { name: on("name"), word: on("word"), both: on("both") },
     order: r.order === "after" ? "after" : "before",
@@ -185,8 +185,8 @@ export type SetStep =
  * among its pictures, if that deck is still one of the set's held lists;
  * otherwise none yet.
  */
-export function chosenList(set: SetConfig, heldDeckIds: string[], answers: (SetAnswer | null | undefined)[]): string | null {
-  const held = set.lists.filter((id) => heldDeckIds.includes(id));
+export function chosenList(set: SetConfig, heldModuleIds: string[], answers: (SetAnswer | null | undefined)[]): string | null {
+  const held = set.lists.filter((id) => heldModuleIds.includes(id));
   if (held.length === 1) return held[0];
   if (!held.length) return null;
   let best: SetAnswer | null = null;

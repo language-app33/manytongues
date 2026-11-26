@@ -54,7 +54,7 @@ import type { RangeCheck } from "./numbers/range.ts";
 import { figureOf, homesOf, partTags } from "./numbers/generate.ts";
 import { readNouns, withNouns } from "./numbers/nouns.ts";
 import type { ReadNoun } from "./numbers/nouns.ts";
-import { Button, ConfirmModal, DeckSwitch, Help, Icon, Meta, Notice, Screen, Section, Segmented, Tile, plural } from "./shared.tsx";
+import { Button, ConfirmModal, ModuleSwitch, Help, Icon, Meta, Notice, Screen, Section, Segmented, Tile, plural } from "./shared.tsx";
 import { dimsFor } from "./languages.ts";
 import { RecordingScreen, ScriptInput } from "./card-editor.tsx";
 
@@ -185,14 +185,14 @@ export interface EditorProps {
   /** The teacher's cards: the noun cards are what counting counts. */
   cards?: Record<string, unknown>[];
   /** The decks in this language, for which hold each part. */
-  decks?: PartDeck[];
+  modules?: PartModule[];
   /** Put a part in a deck or take it out — saved at once, as a deck's own
       screen saves it. */
-  onDeckPart?: (deckId: string, rangeId: string, on: boolean) => unknown;
+  onModulePart?: (moduleId: string, rangeId: string, on: boolean) => unknown;
 }
 
 export function NumberSystemEditor({
-  lang, numbers, times, onSave, onClose, busy, error, cards = [], decks = [], onDeckPart,
+  lang, numbers, times, onSave, onClose, busy, error, cards = [], modules: modules = [], onModulePart: onModulePart,
 }: EditorProps) {
   const composer = composerFor(lang.id);
   const timeComposer = timeComposerFor(lang.id);
@@ -526,12 +526,12 @@ export function NumberSystemEditor({
       countingGaps={
         open.range.counts ? (noun) => countingWarnings(countingOf(open.range), composer, counted, noun) : undefined
       }
-      decks={decks}
+      modules={modules}
       saveButton={saveButton}
       note={note}
       onRecord={(slot, key) => setRecording({ slot, key })}
       onWrite={setWriting}
-      onDeckPart={onDeckPart}
+      onModulePart={onModulePart}
       onClose={leave(() => setPart(null))}
     />
   ) : fixing ? (
@@ -610,7 +610,7 @@ export function NumberSystemEditor({
 
 /** A deck as this screen needs it: what it is called, which parts of the
     numbers it holds, and whether its contents are locked. */
-export interface PartDeck {
+export interface PartModule {
   id: string;
   title: string;
   parts: string[];
@@ -943,8 +943,8 @@ function SampleRows({ lang, draft, values, render, onWrite }: {
  * screen.
  */
 function PartScreen({
-  lang, draft, setDraft, check, checks, homes, slots, render, twoWords, onKeepOne, nouns, countedAt, countingGaps, decks,
-  saveButton, note, onRecord, onWrite, onDeckPart, onClose,
+  lang, draft, setDraft, check, checks, homes, slots, render, twoWords, onKeepOne, nouns, countedAt, countingGaps, modules,
+  saveButton, note, onRecord, onWrite, onModulePart, onClose,
 }: {
   lang: Lang;
   draft: NumberSystem;
@@ -965,14 +965,14 @@ function PartScreen({
   countedAt?: (n: number) => { text: string; en: string } | null;
   /** What counting a noun across the part warns about. */
   countingGaps?: (noun: CountedNoun) => { code: string; slot?: string; detail?: string }[];
-  decks: PartDeck[];
+  modules: PartModule[];
   /** Save, for the top bar. */
   saveButton: React.ReactNode;
   /** What went wrong with the last save, if it did not go through. */
   note?: React.ReactNode;
   onRecord: (slot: string, key: FormKey) => void;
   onWrite: (key: string) => void;
-  onDeckPart?: (deckId: string, rangeId: string, on: boolean) => unknown;
+  onModulePart?: (moduleId: string, rangeId: string, on: boolean) => unknown;
   onClose: () => void;
 }) {
   const range = check.range;
@@ -1006,7 +1006,7 @@ function PartScreen({
       {note}
       {/* First, as a card's editor puts them near the top: where this part
           goes decides whether anybody is ever asked it. */}
-      <PartDecks range={range} decks={decks} onDeckPart={onDeckPart} />
+      <PartModules range={range} modules={modules} onModulePart={onModulePart} />
 
       {twoWords.length ? <TwoWordsBlock lang={lang} questions={twoWords} onKeep={onKeepOne} /> : null}
 
@@ -1377,29 +1377,29 @@ function CountedSection({ lang, range, nouns, render, warningsOf, standing }: {
  * the moment it is ticked, as it is on the deck's screen, and that is why
  * it sits apart from the words above, which wait for Save.
  */
-function PartDecks({ range, decks, onDeckPart }: {
+function PartModules({ range, modules, onModulePart }: {
   range: Range;
-  decks: PartDeck[];
-  onDeckPart?: (deckId: string, rangeId: string, on: boolean) => unknown;
+  modules: PartModule[];
+  onModulePart?: (moduleId: string, rangeId: string, on: boolean) => unknown;
 }) {
   /* The decks still being saved, each saying "Adding…" or "Removing…"
-     until the server answers — see DeckSwitch's saving. */
+     until the server answers — see ModuleSwitch's saving. */
   const [saving, setSaving] = useState<Record<string, "add" | "drop">>({});
-  if (!onDeckPart) return null;
+  if (!onModulePart) return null;
   return (
     <PartBlock
       title="Modules"
       role="The modules this range of numbers is in. The same as ticking it on a module's Add existing cards, and saved straight away."
     >
-      <DeckSwitch
+      <ModuleSwitch
         of="range"
-        decks={decks}
-        chosen={decks.filter((d) => partsNow(d.parts || []).includes(range.id)).map((d) => d.id)}
+        modules={modules}
+        chosen={modules.filter((d) => partsNow(d.parts || []).includes(range.id)).map((d) => d.id)}
         saving={saving}
         onToggle={(id, wasOn) => {
           if (saving[id]) return;
           setSaving((now) => ({ ...now, [id]: wasOn ? "drop" : "add" }));
-          Promise.resolve(onDeckPart(id, range.id, !wasOn)).finally(() =>
+          Promise.resolve(onModulePart(id, range.id, !wasOn)).finally(() =>
             setSaving((now) => {
               const next = { ...now };
               delete next[id];

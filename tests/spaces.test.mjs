@@ -80,14 +80,14 @@ async function furnish(/** @type {string | undefined} */ org, /** @type {string}
   })).json;
   const t = { key: teacher.key, handle: teacher.user.handle };
   const s = { key: student.key, handle: student.user.handle };
-  const deck = (await api("create-deck", { key: t.key, body: { title: `Deck ${tag}`, description: "", lang: "ar-PS" } })).json.deck;
-  assert.equal((await api("attach-deck", { key: t.key, body: { deckId: deck.id, courseId: course.id } })).status, 200);
-  const saved = await api("save-card", { key: t.key, body: { card: card(`word-${tag}`), decks: [deck.id] } });
+  const module = (await api("create-deck", { key: t.key, body: { title: `Deck ${tag}`, description: "", lang: "ar-PS" } })).json.deck;
+  assert.equal((await api("attach-deck", { key: t.key, body: { deckId: module.id, courseId: course.id } })).status, 200);
+  const saved = await api("save-card", { key: t.key, body: { card: card(`word-${tag}`), decks: [module.id] } });
   assert.equal(saved.status, 200, JSON.stringify(saved.json));
   const flag = await api("report-flag", {
-    key: s.key, body: { kind: "other", note: "x", cardId: saved.json.card.id, deckId: deck.id, courseId: course.id },
+    key: s.key, body: { kind: "other", note: "x", cardId: saved.json.card.id, deckId: module.id, courseId: course.id },
   });
-  return { course, teacher: t, student: s, deck, card: saved.json.card, flagId: flag.json.id };
+  return { course, teacher: t, student: s, deck: module, card: saved.json.card, flagId: flag.json.id };
 }
 
 const made = await api("admin-create-org", {
@@ -171,8 +171,8 @@ test("a teacher in Main can't reach anything of B's", async () => {
   }
   /* And B's deck and card are untouched. */
   const store = getStore("arabic-courses");
-  const deck = JSON.parse(String(await store.get(`deck:${b.deck.id}`, { type: "text" })));
-  assert.equal(deck.title, "Deck b");
+  const module = JSON.parse(String(await store.get(`deck:${b.deck.id}`, { type: "text" })));
+  assert.equal(module.title, "Deck b");
   assert.ok(await store.get(`card:${b.card.id}`, { type: "text" }));
 });
 
@@ -193,8 +193,8 @@ test("every list leaves the other space out", async () => {
   const ids = (/** @type {any[]} */ rows) => (rows || []).map((r) => r.id || r.handle);
   const mine = await api("my-courses", { key: main.teacher.key });
   assert.ok(!ids(mine.json.courses).includes(b.course.id));
-  const decks = await api("my-decks", { key: main.teacher.key });
-  assert.ok(!ids(decks.json.decks).includes(b.deck.id));
+  const modules = await api("my-decks", { key: main.teacher.key });
+  assert.ok(!ids(modules.json.decks).includes(b.deck.id));
   const cards = await api("my-cards", { key: main.teacher.key });
   assert.ok(!ids(cards.json.cards).includes(b.card.id));
   const material = await api("my-material", { key: main.student.key });
@@ -424,17 +424,17 @@ async function another(/** @type {string} */ slug) {
   const st = (await api("admin-create-user", { key: lead.key, body: { displayName: `S ${slug}`, courseId: course.id, roles: ["student"] } })).json;
   const teacher = { key: t.key, handle: t.user.handle };
   const student = { key: st.key, handle: st.user.handle };
-  const deck = (await api("create-deck", { key: teacher.key, body: { title: `D ${slug}`, description: "", lang: "ar-PS" } })).json.deck;
-  await api("attach-deck", { key: teacher.key, body: { deckId: deck.id, courseId: course.id } });
-  const saved = (await api("save-card", { key: teacher.key, body: { card: card(`w-${slug}`), decks: [deck.id] } })).json.card;
-  return { id, lead, course, teacher, student, deck, card: saved };
+  const module = (await api("create-deck", { key: teacher.key, body: { title: `D ${slug}`, description: "", lang: "ar-PS" } })).json.deck;
+  await api("attach-deck", { key: teacher.key, body: { deckId: module.id, courseId: course.id } });
+  const saved = (await api("save-card", { key: teacher.key, body: { card: card(`w-${slug}`), decks: [module.id] } })).json.card;
+  return { id, lead, course, teacher, student, deck: module, card: saved };
 }
 
 test("a space admin runs their own space, and nothing more", async () => {
   const c = await another("run-space");
   /* Sees every deck in the space, and may delete a teacher's (94a). */
-  const decks = (await api("my-decks", { key: c.lead.key })).json.decks.map((/** @type {any} */ d) => d.id);
-  assert.ok(decks.includes(c.deck.id));
+  const modules = (await api("my-decks", { key: c.lead.key })).json.decks.map((/** @type {any} */ d) => d.id);
+  assert.ok(modules.includes(c.deck.id));
   const report = await api("report-flag", { key: c.student.key, body: { kind: "other", note: "x", cardId: c.card.id, deckId: c.deck.id } });
   const reports = (await api("my-reports", { key: c.lead.key })).json.flags.map((/** @type {any} */ f) => f.id);
   assert.ok(reports.includes(report.json.id), "reports reach the space admin");
@@ -596,7 +596,7 @@ test("the App admin can be a new space's admin, with no account made (0.552)", a
 test("a teacher who deletes their account leaves their material, and every other space's lists are untouched", async () => {
   const c = await another("delete-space");
   const store = getStore("arabic-courses");
-  const decksBefore = JSON.parse(String(await store.get("index:decks", { type: "text" })));
+  const modulesBefore = JSON.parse(String(await store.get("index:decks", { type: "text" })));
   assert.equal((await api("delete-account", { key: c.teacher.key, body: {} })).status, 200);
   /* The deck and card stay, under the teacher's name, and still reach the student. */
   assert.ok(await store.get(`deck:${c.deck.id}`, { type: "text" }));
@@ -605,8 +605,8 @@ test("a teacher who deletes their account leaves their material, and every other
   const sent = material.decks.find((/** @type {any} */ d) => d.id === c.deck.id);
   assert.equal(sent.ownerName, `T delete-space`);
   /* No other space's deck fell off the site's list (the 0.544 regression). */
-  const decksAfter = JSON.parse(String(await store.get("index:decks", { type: "text" })));
-  for (const id of decksBefore) assert.ok(decksAfter.includes(id), `deck ${id} kept on the list`);
+  const modulesAfter = JSON.parse(String(await store.get("index:decks", { type: "text" })));
+  for (const id of modulesBefore) assert.ok(modulesAfter.includes(id), `deck ${id} kept on the list`);
   /* The record, and a handover. */
   const over = (await api("admin-overview", { key: c.lead.key })).json;
   assert.equal(over.former.find((/** @type {any} */ r) => r.handle === c.teacher.handle).why, "deleted-self");
@@ -638,29 +638,29 @@ test("My space is a teacher's private corner; students have none (0.550)", async
   assert.equal((await api("create-deck", { key: c.student.key, body: { title: "Mine", lang: "ar-PS", personal: true } })).status, 403);
   assert.equal((await api("save-card", { key: c.student.key, body: { card: card("mine"), decks: [], personal: true } })).status, 403);
   /* A teacher's My space deck. */
-  const deck = (await api("create-deck", { key: c.teacher.key, body: { title: "Prep", lang: "ar-PS", personal: true } })).json.deck;
-  assert.equal(deck.personal, true);
-  const own = (await api("save-card", { key: c.teacher.key, body: { card: card("prep"), decks: [deck.id], personal: true } })).json.card;
+  const module = (await api("create-deck", { key: c.teacher.key, body: { title: "Prep", lang: "ar-PS", personal: true } })).json.deck;
+  assert.equal(module.personal, true);
+  const own = (await api("save-card", { key: c.teacher.key, body: { card: card("prep"), decks: [module.id], personal: true } })).json.card;
   assert.equal(own.personal, true);
   /* Never practised in Learning, and nobody else sees it. */
   const material = (await api("my-material", { key: c.teacher.key })).json;
   assert.ok(!material.courses.some((/** @type {any} */ x) => x.id === "my-space"));
-  assert.ok((await api("deck-cards", { key: c.lead.key, params: { deck: deck.id } })).status >= 400);
-  assert.ok(!(await api("my-decks", { key: c.lead.key })).json.decks.some((/** @type {any} */ d) => d.id === deck.id));
-  assert.ok((await api("deck-cards", { key: admin.key, org: c.id, params: { deck: deck.id } })).status >= 400);
+  assert.ok((await api("deck-cards", { key: c.lead.key, params: { deck: module.id } })).status >= 400);
+  assert.ok(!(await api("my-decks", { key: c.lead.key })).json.decks.some((/** @type {any} */ d) => d.id === module.id));
+  assert.ok((await api("deck-cards", { key: admin.key, org: c.id, params: { deck: module.id } })).status >= 400);
   /* Not reportable, and not onto a course except by copying or moving. */
   assert.equal((await api("report-flag", { key: c.student.key, body: { kind: "other", note: "x", cardId: own.id } })).status, 400);
-  assert.ok((await api("attach-deck", { key: c.teacher.key, body: { deckId: deck.id, courseId: c.course.id } })).status >= 400);
+  assert.ok((await api("attach-deck", { key: c.teacher.key, body: { deckId: module.id, courseId: c.course.id } })).status >= 400);
 });
 
 test("a teacher copies a My space deck into the space, as separate cards", async () => {
   const c = await another("copy-space");
-  const deck = (await api("create-deck", { key: c.teacher.key, body: { title: "Draft", lang: "ar-PS", personal: true } })).json.deck;
-  const own = (await api("save-card", { key: c.teacher.key, body: { card: card("prep"), decks: [deck.id], personal: true } })).json.card;
+  const module = (await api("create-deck", { key: c.teacher.key, body: { title: "Draft", lang: "ar-PS", personal: true } })).json.deck;
+  const own = (await api("save-card", { key: c.teacher.key, body: { card: card("prep"), decks: [module.id], personal: true } })).json.card;
   /* A personal card can't be put in the space's deck directly. */
-  const tried = await api("save-card", { key: c.teacher.key, body: { card: own, decks: [deck.id, c.deck.id] } });
+  const tried = await api("save-card", { key: c.teacher.key, body: { card: own, decks: [module.id, c.deck.id] } });
   assert.ok(!(tried.json.card.inDecks || []).includes(c.deck.id));
-  const copied = await api("copy-to-space", { key: c.teacher.key, body: { deckId: deck.id } });
+  const copied = await api("copy-to-space", { key: c.teacher.key, body: { deckId: module.id } });
   assert.equal(copied.status, 200, JSON.stringify(copied.json));
   assert.equal(copied.json.deck.personal, undefined);
   assert.equal(copied.json.deck.cardIds.length, 1);
@@ -668,7 +668,7 @@ test("a teacher copies a My space deck into the space, as separate cards", async
   /* The space can see the copy; the original stays private. */
   const leads = (await api("my-decks", { key: c.lead.key })).json.decks.map((/** @type {any} */ d) => d.id);
   assert.ok(leads.includes(copied.json.deck.id));
-  assert.ok(!leads.includes(deck.id));
+  assert.ok(!leads.includes(module.id));
   /* Moving: the deck itself becomes the space's, onto a course. */
   const second = (await api("create-deck", { key: c.teacher.key, body: { title: "Ready", lang: "ar-PS", personal: true } })).json.deck;
   const moved = await api("copy-to-space", { key: c.teacher.key, body: { deckId: second.id, move: true, courses: [c.course.id] } });
@@ -993,9 +993,9 @@ test("a backup from before spaces goes back into the space, not Main", async () 
     const { org: _gone, ...rest } = rec;
     return rest;
   };
-  const deckKey = `deck:${b.deck.id}`;
+  const moduleKey = `deck:${b.deck.id}`;
   const cardKey = `card:${b.card.id}`;
-  const old = { [deckKey]: unspaced(await read(deckKey)), [cardKey]: unspaced(await read(cardKey)) };
+  const old = { [moduleKey]: unspaced(await read(moduleKey)), [cardKey]: unspaced(await read(cardKey)) };
   const cardsOf = async () =>
     (await api("my-cards", { key: b.teacher.key })).json.cards.map((/** @type {any} */ c) => c.id);
   const bundled = async () =>
@@ -1012,7 +1012,7 @@ test("a backup from before spaces goes back into the space, not Main", async () 
   const put = await api("admin-restore-chunk", { key: admin.key, org: B, body: { records: old } });
   assert.equal(put.status, 200, JSON.stringify(put.json));
   assert.equal((await read(cardKey)).org, B);
-  assert.equal((await read(deckKey)).org, B);
+  assert.equal((await read(moduleKey)).org, B);
   assert.deepEqual(unspaced(await read(cardKey)), old[cardKey], "placed, and nothing else about it changed");
   assert.ok((await cardsOf()).includes(b.card.id), "the teacher has the card again");
   assert.ok((await bundled()).includes(b.card.id), "and the students get it");

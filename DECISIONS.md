@@ -4063,7 +4063,7 @@ than a guess.
 ## A deck's forecast is the rules played forward, and the simulation's clock moves
 
 **30 September 2026** · `src/ArabicTrainer.tsx` (`deckForecast`,
-`earliestForecast`, `DeckScreen`, `buildSession`'s `elsewhere`),
+`earliestForecast`, `ModuleScreen`, `buildSession`'s `elsewhere`),
 `src/scheduler.ts` (`REAL_CLOCK`), `tests/forecast.test.mjs`,
 `tests/pace.test.mjs`
 
@@ -5150,7 +5150,7 @@ it says.
 
 ## Which decks a course holds is the course's say
 
-**4 October 2026** · `server/api/courses.js` (`linksOf`, `withLinks`, `dropFromCourses`, `canEditDeck`, `attach-deck`)
+**4 October 2026** · `server/api/courses.js` (`linksOf`, `withLinks`, `dropFromCourses`, `canEditModule`, `attach-deck`)
 
 A deck being in a course is written twice: the course lists the deck's id,
 and the deck lists the course with the day it was added. Every write to
@@ -5543,7 +5543,7 @@ comma; nothing has been reported there, and it was left as it was.
 ## A prep can aim at Cleared, and the deck picker moved to shared
 
 **6 October 2026** · `src/ArabicTrainer.tsx` (`PrepTarget`, `workloadOf`,
-`climbOf`, `towardsLearnt`'s `reach`), `src/shared.tsx` (`DeckSwitch`,
+`climbOf`, `towardsLearnt`'s `reach`), `src/shared.tsx` (`ModuleSwitch`,
 `PickSheet`)
 
 The owner asked for a prep to aim at Cleared as well as Learnt, with the
@@ -5556,7 +5556,7 @@ floor at `CLEAR_DAYS` (twice that for a card whose words come first)
 rather than `LEARN_DAYS` — the same measured figures, not new ones; the
 estimate is no better checked than the Learnt one was.
 
-The prep's decks are chosen with the card editor's `DeckSwitch`, as
+The prep's decks are chosen with the card editor's `ModuleSwitch`, as
 asked. It and `PickSheet` moved from `card-editor.tsx` to `shared.tsx`
 rather than the trainer importing the card editor, which loads on its own
 and would otherwise be pulled into every student's first load. The
@@ -5565,7 +5565,7 @@ overridable (`words`).
 
 ## Numbers are followed through their decks, waiting ones included
 
-**6 October 2026** · `src/ArabicTrainer.tsx` (`DeckScreen`, `workloadOf`)
+**6 October 2026** · `src/ArabicTrainer.tsx` (`ModuleScreen`, `workloadOf`)
 
 The owner asked for the Numbers section on Progress to go: a deck that
 holds numbers is the place to follow them. Its word-by-word view went with
@@ -6715,7 +6715,7 @@ its claim to the top of the screen. Tests: the `homeLine` case in
 
 ## A deck's quality (0.461)
 
-**22 October 2026** · `src/deck-quality.ts`, `src/spaces.tsx`
+**22 October 2026** · `src/module-quality.ts`, `src/spaces.tsx`
 
 The owner asked for a score on each deck saying how well built and
 pedagogical it is, and settled its rules question by question before any
@@ -6804,7 +6804,7 @@ no untaught word, because a blank stands in for the link a plain sentence
 needs. That let a sentence no student is ever shown earn its share of the
 10 points: one whose blank no card fits, or whose sentences review lets
 none of through. It is now a third flaw, read off the same lists the
-words part already reads (`shown` in `deckQuality`), with a fix of its own,
+words part already reads (`shown` in `moduleQuality`), with a fix of its own,
 "Fill the blank in N sentences", and a joint fix where the sentence also
 uses untaught words. Only a blank that was read is judged: a line picked
 from a sentence card of another deck is reviewed on that card and is left
@@ -6816,7 +6816,7 @@ owner's answer to whether a sentence with a blank counts differently.
 
 ## Words with several answers, in sentences (0.468)
 
-**24 October 2026** · `answerWords`, `phraseAnswers` and `wordsOffered` in `src/context-index.ts`, `castContext` and `pickContext` in `src/ArabicTrainer.tsx`, `src/context-links.ts`, `src/sentence-words.ts`, `contextCoverage` in `src/languages.ts`, `heard` and `spelt` in `src/deck-quality.ts`
+**24 October 2026** · `answerWords`, `phraseAnswers` and `wordsOffered` in `src/context-index.ts`, `castContext` and `pickContext` in `src/ArabicTrainer.tsx`, `src/context-links.ts`, `src/sentence-words.ts`, `contextCoverage` in `src/languages.ts`, `heard` and `spelt` in `src/module-quality.ts`
 
 Found by the audit in `docs/AUDIT-what-teachers-can-make.md` (findings 4
 to 6), and settled by the owner question by question.
@@ -7204,7 +7204,7 @@ raw `<button className="at-btn">` has no such box, so it does not get this.
 
 ## A deck is read and edited on one screen, as a card is
 
-**27 October 2026** · `src/spaces.tsx` (the open deck in `TeachSpace`, `NewDeck`, `DeckDraft`)
+**27 October 2026** · `src/spaces.tsx` (the open deck in `TeachSpace`, `NewModule`, `ModuleDraft`)
 
 Deck settings was its own screen, reached from a pencil on each deck, and
 the deck's own screen could not change anything about the deck. A card had
@@ -7213,7 +7213,7 @@ the edit's own controls held still in a disabled fieldset while it is read.
 The owner asked for the deck to work exactly the same, so the settings
 screen is gone and its title, lock and courses live under "This deck".
 
-What an edit holds is a draft (`DeckDraft`) and nothing reaches the server
+What an edit holds is a draft (`ModuleDraft`) and nothing reaches the server
 until Save — including the deck's built-in cards, which used to save from
 their own sheet. Save writes the lock last when it goes on and first when
 it comes off, so pronoun cards going in or out of the deck in the same save
@@ -7312,7 +7312,7 @@ drafts per screen; only the shown one is saved.
 ## A deck's numbers come from one person
 
 **2 November 2026** · `number-sources`, `set-deck-numbers` and `partsWaiting`
-in `server/api/courses.js`, `src/number-decks.ts`
+in `server/api/courses.js`, `src/number-modules.ts`
 
 A deck holds number *parts* (0 to 10, telling the hour), and the words come
 from a teacher's number system. The device was sent every system of every
@@ -7321,7 +7321,7 @@ its language, so a course with two teachers who had numbers gave each number
 twice. A deck now names one source, `numbersFrom`, defaulting to its owner;
 the server stamps each deck it sends with that person's system and clock ids,
 and the device files a system only into the decks that name it
-(`decksForSystem`).
+(`modulesForSystem`).
 
 Weighed: keeping "everyone's" and de-duplicating on the device. Rejected
 because two teachers' recordings of the same number are different answers,
@@ -7341,13 +7341,13 @@ Part of the spaces plan (`docs/PLAN-spaces.md`, stage 1).
 `server/api/courses.js`
 
 The plan (`docs/PLAN-spaces.md`, B3) asked for an org check in every
-action and a changed signature for `canEditDeck`. There are some sixty
+action and a changed signature for `canEditModule`. There are some sixty
 actions, and every one written by hand is one more place to forget. So
 the org is worked out once, after the caller is known, and kept in an
 `AsyncLocalStorage` for the rest of the request — per request rather than
 per process, because requests interleave. While it is set, `readCourse`,
-`readDeck`, `readCard` and `readUser` answer null for another org's record,
-`everyCourse` and `canEditDeck` see only this org, and the lists read
+`readModule`, `readCard` and `readUser` answer null for another org's record,
+`everyCourse` and `canEditModule` see only this org, and the lists read
 straight off an index are filtered with `inScope`. Another space's record
 looks like no record at all, and every action already knows what to do
 with that.
@@ -7962,7 +7962,7 @@ little padding so both names fit.
 
 ## One screen for putting cards in decks
 
-**9 November 2026** · `src/shared.tsx` (`DeckPickScreen`, `DeckSwitch`'s `onAdd`), `src/card-editor.tsx`, `src/spaces.tsx`
+**9 November 2026** · `src/shared.tsx` (`ModulePickScreen`, `ModuleSwitch`'s `onAdd`), `src/card-editor.tsx`, `src/spaces.tsx`
 
 A card being written chose its decks in a small sheet, which could pick
 only among decks that already existed. Selected cards chose theirs on a
@@ -7970,14 +7970,14 @@ full screen, which had New deck at the top. The owner asked for the card
 to work the same way, so a card written for a deck not yet made need not
 be left to make it.
 
-Both now open `DeckPickScreen`. The card's ticks are a draft, applied by
+Both now open `ModulePickScreen`. The card's ticks are a draft, applied by
 Done and thrown away by Cancel. The old sheet took each tap at once, and
 that immediacy is what this gives up. The draft is needed because a deck
 made on the screen is ticked in it before the card has said yes to
 anything. The deck is made in the card's language, read off the card as
 selected cards' decks read theirs off the selection.
 
-The other callers of `DeckSwitch` keep the sheet: a course's decks, Prep
+The other callers of `ModuleSwitch` keep the sheet: a course's decks, Prep
 mode's and Build a session's. In those places, making a deck isn't
 something being chosen, and a course's deck list saves each tap as it
 goes.
@@ -8648,7 +8648,7 @@ longer always the teacher's first photo.
 
 ## Personal sets, stage 4: the teacher's side, and the choices behind sets (0.632)
 
-**15 November 2026** · `SetSection`, `setDecksForTrial` in
+**15 November 2026** · `SetSection`, `setModulesForTrial` in
 `src/spaces.tsx`; `RecordingScreen` in `src/card-editor.tsx`; `setGaps` in
 `src/sets.ts`; `standInSets` and the trial index in
 `src/ArabicTrainer.tsx`; `tests/sets.test.mjs`, `tests/smoke.mjs`
@@ -8709,7 +8709,7 @@ that list's first word (`standInSets`); with no list, the name alone.
 
 ## A new deck's kind is chosen first, and fixed (0.633)
 
-**15 November 2026** · `NewDeck`, `NEW_KINDS`, `newDeck` and
+**15 November 2026** · `NewModule`, `NEW_KINDS`, `newModule` and
 `SetSection` in `src/spaces.tsx`; `tests/smoke.mjs`
 
 The owner's choice (1a, 2b, 3a, 4a, 5a, 6a): New deck opens a sheet with
@@ -9241,4 +9241,26 @@ kind of deck? Regular deck / Unit / Personal set"). Now:
 **Code and data (the owner's 5b).** The owner asked for the rename to
 reach the code too. That follows as its own change, so that this release
 is wording alone and can be checked as such.
+
+**The code rename, 0.687 (the owner's 1a of the follow-up).** The owner
+was offered three depths — code only, code and saved data, or nothing —
+and chose code only. Every name a programmer declares now says module:
+the type `Module` (and `ModuleDraft`, `PathModule`, …), components
+(`ModuleScreen`, `ModuleSwitch`, `NewModule`, …), functions
+(`createModule`, `attachModule`, `moduleQuality`), variables and
+parameters, and the files `module-quality.ts` and `number-modules.ts`.
+It was done with the TypeScript language service rather than by search
+and replace, so each name followed its own uses and nothing else.
+
+What stays "deck" is everything that leaves the code: the fields of what
+is sent and stored (`decks`, `deckId`, `deckIds`, `inDecks`,
+`decksWere`, `deckTitle`), the server's `deck:` records and its actions
+(`create-deck`, `attach-deck`), error codes (`no-deck`), backup files,
+the card filter's `deckMode` and the class names the stylesheet and the
+smoke harness hold on to (`at-deckpill`). Renaming those would have meant
+converting the live store, accepting both words from every old backup
+and from phones with changes queued offline, for no difference anyone
+using the app could see. Where a renamed variable meets such a field the
+code says so plainly — `{ deckId: moduleId }`. Comments still say "deck"
+where they did; they are prose, and many of them mean the plain kind.
 

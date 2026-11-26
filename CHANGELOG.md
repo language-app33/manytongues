@@ -8,6 +8,14 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.687 — 26 November 2026
+
+**Nothing changes for people using the app.** Inside the code, decks,
+units and personal sets are now called modules too, to match what the
+screens have said since 0.686. Saved work, backups and anything waiting
+to be sent from a phone keep their old names behind the scenes, so
+nothing stored had to be converted and nothing needs checking by hand.
+
 ## 0.686 — 26 November 2026
 
 **Decks, units and personal sets are now called modules.** A module is

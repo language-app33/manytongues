@@ -240,7 +240,7 @@ One card tile for both the learner's and the teacher's lists.
 `card, lang, showLat, meta, actions, onClick, className`
 
 `meta` is the one line of small print, and the caller decides what it says.
-It replaced a `deckTitles` prop, which this file and the gallery both went
+It replaced a `moduleTitles` prop, which this file and the gallery both went
 on advertising for a while afterwards.
 
 A card carrying a `name` is listed under it: the name is the headline, drawn

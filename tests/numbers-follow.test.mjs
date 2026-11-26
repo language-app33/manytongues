@@ -28,7 +28,7 @@ const built = await buildOnce(["ArabicTrainer.tsx"]);
 const { buildSession, cardStandings, creditNumbers, installIndexes, laddered, skillCapsOf, wordsOfDigit } = await import(
   path.join(built, "ArabicTrainer.js")
 );
-const { generate, fileIntoDecks, isRangeSkill, isNumeralCard, numeralId } = await import(
+const { generate, fileIntoModules, isRangeSkill, isNumeralCard, numeralId } = await import(
   path.join(here, "..", "src", "numbers", "generate.ts")
 );
 const { arComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.ts"));
@@ -48,7 +48,7 @@ const settings = { language: "ar-PS" };
 const AR = LANGUAGES["ar-PS"];
 
 const generated = generate({ ...SET, now: 1750000000000, numerals: AR.numerals });
-const filed = fileIntoDecks(generated.items, SET, [
+const filed = fileIntoModules(generated.items, SET, [
   { title: "Numbers", parts: generated.items.filter(isRangeSkill).map((/** @type {any} */ it) => it.range.id) },
 ]);
 const zeroToNine = must(filed.find((/** @type {any} */ it) => it.range && it.range.id === "numbers:0-9"), "0 to 9");
@@ -92,7 +92,7 @@ test("a figure comes in with its word, and not ahead of the words", () => {
   installIndexes(items, settings, SETS);
   const dealtIds = new Set();
   for (let i = 0; i < 6; i++) {
-    const got = buildSession({ items, settings, inDeck: () => true, systems: SETS }).exercises.map((/** @type {any} */ ex) => ex.id);
+    const got = buildSession({ items, settings, inModule: () => true, systems: SETS }).exercises.map((/** @type {any} */ ex) => ex.id);
     for (const id of got) dealtIds.add(id);
   }
   assert.ok(dealtIds.has(numeralId(SYS.id, 3)), "three's figure did not come in with three");

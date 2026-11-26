@@ -827,18 +827,18 @@ test("a card can hold a conversation, and keeps its turns in order", async () =>
   assert.equal(first.json.card.you, 0);
 
   /* A student gets it through the material payload, whole. */
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Scenes", lang: "ar-PS" },
   });
-  const deckId = deck.json.deck.id;
+  const moduleId = module.json.deck.id;
   await api("/api/courses?action=save-card", {
-    method: "POST", key, body: { card: { ...held, id: held.id }, decks: [deckId] },
+    method: "POST", key, body: { card: { ...held, id: held.id }, decks: [moduleId] },
   });
   const course = await api("/api/courses?action=create-course", {
     method: "POST", key, body: { title: "Beginners", language: "ar-PS" },
   });
   await api("/api/courses?action=attach-deck", {
-    method: "POST", key, body: { deckId, courseId: course.json.course.id },
+    method: "POST", key, body: { deckId: moduleId, courseId: course.json.course.id },
   });
   /* Asked for as the student it is for, which is the only way material is
      ever handed out. */
@@ -929,11 +929,11 @@ test("a text keeps its kind, its picked turns read their sentence, and a student
   assert.equal(again.json.card.sceneKind, "text");
 
   /* A student gets the text, the sentence as it is now, and the name. */
-  const deck = await api("/api/courses?action=create-deck", { method: "POST", key, body: { title: "Texts", lang: "ar-PS" } });
-  const deckId = deck.json.deck.id;
-  await api("/api/courses?action=save-card", { method: "POST", key, body: { card: { ...held }, decks: [deckId] } });
+  const module = await api("/api/courses?action=create-deck", { method: "POST", key, body: { title: "Texts", lang: "ar-PS" } });
+  const moduleId = module.json.deck.id;
+  await api("/api/courses?action=save-card", { method: "POST", key, body: { card: { ...held }, decks: [moduleId] } });
   const course = await api("/api/courses?action=create-course", { method: "POST", key, body: { title: "Readers", language: "ar-PS" } });
-  await api("/api/courses?action=attach-deck", { method: "POST", key, body: { deckId, courseId: course.json.course.id } });
+  await api("/api/courses?action=attach-deck", { method: "POST", key, body: { deckId: moduleId, courseId: course.json.course.id } });
   const student = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Nour" } });
   await api("/api/courses?action=assign-student", {
     method: "POST", key, body: { courseId: course.json.course.id, handle: student.json.user.handle },
@@ -977,22 +977,22 @@ test("a deck's phrases are sent with the cards that fill their variables", async
   const key = made.json.key;
   await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
 
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Introductions", lang: "ar-PS" },
   });
-  const deckId = deck.json.deck.id;
+  const moduleId = module.json.deck.id;
   const course = await api("/api/courses?action=create-course", {
     method: "POST", key, body: { title: "Arabic 1", language: "ar-PS" },
   });
   await api("/api/courses?action=attach-deck", {
-    method: "POST", key, body: { deckId, courseId: course.json.course.id },
+    method: "POST", key, body: { deckId: moduleId, courseId: course.json.course.id },
   });
   /* The frame, in the deck. */
   await api("/api/courses?action=save-card", {
     method: "POST", key,
     body: {
       card: carded({ ar: "صاحبي {{friend}}", en: "My friend is {{friend}}", lat: "sa7bi {{friend}}" }),
-      decks: [deckId],
+      decks: [moduleId],
     },
   });
   /* The values, in no deck at all, and not practised in their own right.
@@ -1073,14 +1073,14 @@ test("a deck keeps the parts of the numbers it holds, and its students are told"
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Huda" } });
   const key = made.json.key;
   await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Counting", lang: "ar-PS" },
   });
-  const deckId = deck.json.deck.id;
+  const moduleId = module.json.deck.id;
   const course = await api("/api/courses?action=create-course", {
     method: "POST", key, body: { title: "Arabic numbers", language: "ar-PS" },
   });
-  await api("/api/courses?action=attach-deck", { method: "POST", key, body: { deckId, courseId: course.json.course.id } });
+  await api("/api/courses?action=attach-deck", { method: "POST", key, body: { deckId: moduleId, courseId: course.json.course.id } });
   const student = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rami" } });
   await api("/api/courses?action=assign-student", {
     method: "POST", key, body: { courseId: course.json.course.id, handle: student.json.user.handle },
@@ -1089,34 +1089,34 @@ test("a deck keeps the parts of the numbers it holds, and its students are told"
 
   const set = await api("/api/courses?action=set-deck-parts", {
     method: "POST", key,
-    body: { deckId, parts: ["numbers:0-10", "numbers:count-3-10", "numbers:0-10", "../../etc", 7, "numbers:1000+"] },
+    body: { deckId: moduleId, parts: ["numbers:0-10", "numbers:count-3-10", "numbers:0-10", "../../etc", 7, "numbers:1000+"] },
   });
   assert.equal(set.status, 200, JSON.stringify(set.json));
   assert.deepEqual(set.json.parts, ["numbers:0-10", "numbers:count-3-10", "numbers:1000+"], "kept clean and once each");
 
   const after = await api(`/api/courses?action=my-material&version=${first.json.version}`, { key: student.json.key });
   assert.notEqual(after.json.unchanged, true, "the student's device was never told");
-  const sent = must((after.json.decks || []).find((/** @type {any} */ d) => d.id === deckId), "the deck");
+  const sent = must((after.json.decks || []).find((/** @type {any} */ d) => d.id === moduleId), "the deck");
   assert.deepEqual(sent.parts, ["numbers:0-10", "numbers:count-3-10", "numbers:1000+"]);
 
   /* Emptied, the list goes rather than staying as an empty one. */
-  await api("/api/courses?action=set-deck-parts", { method: "POST", key, body: { deckId, parts: [] } });
+  await api("/api/courses?action=set-deck-parts", { method: "POST", key, body: { deckId: moduleId, parts: [] } });
   const emptied = await api("/api/courses?action=my-material", { key: student.json.key });
-  assert.equal(must((emptied.json.decks || []).find((/** @type {any} */ d) => d.id === deckId), "the deck").parts, undefined);
+  assert.equal(must((emptied.json.decks || []).find((/** @type {any} */ d) => d.id === moduleId), "the deck").parts, undefined);
 
   /* Locks are set aside for now (0.523): a deck marked locked still takes
      a change to its parts. */
-  await api("/api/courses?action=lock-deck", { method: "POST", key, body: { deckId, locked: true } });
+  await api("/api/courses?action=lock-deck", { method: "POST", key, body: { deckId: moduleId, locked: true } });
   const allowed = await api("/api/courses?action=set-deck-parts", {
-    method: "POST", key, body: { deckId, parts: ["numbers:0-10"] },
+    method: "POST", key, body: { deckId: moduleId, parts: ["numbers:0-10"] },
   });
   assert.equal(allowed.status, 200, allowed.text);
 
   /* And somebody else's deck is not theirs to change. */
   const other = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Sami" } });
-  await api("/api/courses?action=lock-deck", { method: "POST", key, body: { deckId, locked: false } });
+  await api("/api/courses?action=lock-deck", { method: "POST", key, body: { deckId: moduleId, locked: false } });
   const theirs = await api("/api/courses?action=set-deck-parts", {
-    method: "POST", key: other.json.key, body: { deckId, parts: ["numbers:0-10"] },
+    method: "POST", key: other.json.key, body: { deckId: moduleId, parts: ["numbers:0-10"] },
   });
   assert.equal(theirs.status, 403);
 });
@@ -1137,21 +1137,21 @@ test("a deck's phrases are also sent the cards a kind of word and an ID fill", a
   const key = made.json.key;
   await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
 
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Things", lang: "ar-PS" },
   });
-  const deckId = deck.json.deck.id;
+  const moduleId = module.json.deck.id;
   const course = await api("/api/courses?action=create-course", {
     method: "POST", key, body: { title: "Arabic 2", language: "ar-PS" },
   });
   await api("/api/courses?action=attach-deck", {
-    method: "POST", key, body: { deckId, courseId: course.json.course.id },
+    method: "POST", key, body: { deckId: moduleId, courseId: course.json.course.id },
   });
   /* Two frames in the deck: one asking for any noun, one for a named card. */
   for (const [ar, en] of [["الـ{{noun}} كبير", "the {{noun}} is big"], ["{{colour-red}} غامق", "{{colour-red}} is dark"]]) {
     await api("/api/courses?action=save-card", {
       method: "POST", key,
-      body: { card: carded({ ar, en, lat: en }, [], { sentence: true }), decks: [deckId] },
+      body: { card: carded({ ar, en, lat: en }, [], { sentence: true }), decks: [moduleId] },
     });
   }
   /* A noun, which says what it is and names no group at all. */
@@ -1231,16 +1231,16 @@ test("cards saved at the same moment all reach the deck and the collection", asy
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Suha" } });
   const key = made.json.key;
   await teaching(made.json.user.handle);
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Lesson 1", lang: "ar-PS" },
   });
-  const deckId = deck.json.deck.id;
+  const moduleId = module.json.deck.id;
 
   /* Eight at once, which is what a paste of a list looks like from here. */
   const saves = Array.from({ length: 8 }, (_, i) =>
     api("/api/courses?action=save-card", {
       method: "POST", key,
-      body: { card: carded({ ar: `كلمة${i}`, en: `word ${i}`, lat: `word${i}` }), decks: [deckId] },
+      body: { card: carded({ ar: `كلمة${i}`, en: `word ${i}`, lat: `word${i}` }), decks: [moduleId] },
     }));
   const done = await Promise.all(saves);
   for (const r of done) assert.equal(r.status, 200, r.text);
@@ -1252,8 +1252,8 @@ test("cards saved at the same moment all reach the deck and the collection", asy
     saveIds,
     "a card was saved into nobody's collection",
   );
-  const decks = await api("/api/courses?action=my-decks", { key });
-  const back = decks.json.decks.find((/** @type {any} */ d) => d.id === deckId);
+  const modules = await api("/api/courses?action=my-decks", { key });
+  const back = modules.json.decks.find((/** @type {any} */ d) => d.id === moduleId);
   assert.equal(back.cardCount, 8, "a card was saved into no deck");
 
   /* And deleting several at once leaves the rest where they were. */
@@ -1316,20 +1316,20 @@ test("a card can say it fills several blanks, and reaches every deck that leaves
   const key = made.json.key;
   await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
 
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Greetings", lang: "ar-PS" },
   });
-  const deckId = deck.json.deck.id;
+  const moduleId = module.json.deck.id;
   const course = await api("/api/courses?action=create-course", {
     method: "POST", key, body: { title: "Arabic 1", language: "ar-PS" },
   });
   await api("/api/courses?action=attach-deck", {
-    method: "POST", key, body: { deckId, courseId: course.json.course.id },
+    method: "POST", key, body: { deckId: moduleId, courseId: course.json.course.id },
   });
   /* One frame leaving each of the two holes. */
   for (const [ar, en] of [["اسمي {{name}}", "My name is {{name}}"], ["{{greeting}}!", "{{greeting}}!"]]) {
     await api("/api/courses?action=save-card", {
-      method: "POST", key, body: { card: carded({ ar, en, lat: "" }), decks: [deckId] },
+      method: "POST", key, body: { card: carded({ ar, en, lat: "" }), decks: [moduleId] },
     });
   }
 
@@ -1356,7 +1356,7 @@ test("a card can say it fills several blanks, and reaches every deck that leaves
   /* And a card that fills none carries the field not at all, which is what
      it has always been on an ordinary card. */
   const plain = await api("/api/courses?action=save-card", {
-    method: "POST", key, body: { card: carded({ ar: "شمس", en: "sun", lat: "" }), decks: [deckId] },
+    method: "POST", key, body: { card: carded({ ar: "شمس", en: "sun", lat: "" }), decks: [moduleId] },
   });
   assert.equal("fills" in plain.json.card, false, "an ordinary card started carrying an empty one");
 
@@ -1528,33 +1528,33 @@ test("signing in, practising and writing a card are recorded apart", async () =>
   /* Making a deck counts too, and later than the card did. */
   await new Promise((r) => setTimeout(r, 5));
   await api("/api/courses?action=create-deck", { method: "POST", key, body: { title: "Lesson 1" } });
-  const deck = await mine();
-  const deckAt = must(deck.lastTaught, "lastTaught after making a deck");
-  assert.ok(deckAt > taughtAt, "making a deck was not recorded");
+  const module = await mine();
+  const moduleAt = must(module.lastTaught, "lastTaught after making a deck");
+  assert.ok(moduleAt > taughtAt, "making a deck was not recorded");
 
   /* Reading is not work: opening the app moves being seen and nothing else. */
   await new Promise((r) => setTimeout(r, 5));
   await api("/api/courses?action=whoami", { key });
   const seen = await mine();
   assert.ok(
-    must(seen.lastSeen, "lastSeen after signing in") > must(deck.lastSeen, "lastSeen before"),
+    must(seen.lastSeen, "lastSeen after signing in") > must(module.lastSeen, "lastSeen before"),
     "signing in did not move being seen"
   );
-  assert.equal(seen.lastTaught, deckAt, "reading is not teaching work");
-  assert.equal(seen.lastLearned, deck.lastLearned, "reading is not practising");
+  assert.equal(seen.lastTaught, moduleAt, "reading is not teaching work");
+  assert.equal(seen.lastLearned, module.lastLearned, "reading is not practising");
 });
 
 test("a teaching action that is refused is not recorded as work done", async () => {
   const owner = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Yara" } });
   const other = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Fadi" } });
   await teaching(owner.json.user.handle);
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key: owner.json.key, body: { title: "Yara's deck" },
   });
-  assert.equal(deck.status, 200, deck.text);
+  assert.equal(module.status, 200, module.text);
 
   const refused = await api("/api/courses?action=rename-deck", {
-    method: "POST", key: other.json.key, body: { deckId: deck.json.deck.id, title: "Mine now" },
+    method: "POST", key: other.json.key, body: { deckId: module.json.deck.id, title: "Mine now" },
   });
   assert.equal(refused.status, 403);
 
@@ -1676,11 +1676,11 @@ test("an admin can rename a course, and nothing else about it moves", async () =
   await api("/api/courses?action=assign-student", {
     method: "POST", key, body: { courseId: before.id, handle: student.json.user.handle },
   });
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Lesson 1", lang: "ar-PS" },
   });
   await api("/api/courses?action=attach-deck", {
-    method: "POST", key, body: { deckId: deck.json.deck.id, courseId: before.id },
+    method: "POST", key, body: { deckId: module.json.deck.id, courseId: before.id },
   });
 
   const renamed = await api("/api/courses?action=admin-rename-course", {
@@ -1697,7 +1697,7 @@ test("an admin can rename a course, and nothing else about it moves", async () =
   assert.equal(after.teacherCode, before.teacherCode, "and so does the teacher code");
   assert.equal(after.language, before.language);
   assert.deepEqual(after.students, [student.json.user.handle], "the roster is untouched");
-  assert.deepEqual(after.decks, before.decks.concat([deck.json.deck.id]), "and the deck is still attached");
+  assert.deepEqual(after.decks, before.decks.concat([module.json.deck.id]), "and the deck is still attached");
 
   /* And the student still reaches it, which is the thing a broken rename
      would quietly take away. */
@@ -2150,11 +2150,11 @@ test("a flag says what became of its card: edited, deleted, or never the site's"
   await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
   const student = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Nour" } });
 
-  const deck = (await api("/api/courses?action=create-deck", {
+  const module = (await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Flagged Lesson", lang: "ar-PS" },
   })).json.deck;
   const make = async (/** @type {string} */ ar, /** @type {string} */ en) => (await api("/api/courses?action=save-card", {
-    method: "POST", key, body: { card: carded({ ar, en }), decks: [deck.id] },
+    method: "POST", key, body: { card: carded({ ar, en }), decks: [module.id] },
   })).json.card;
   const untouched = await make("كِتاب", "book");
   const edited = await make("بيت", "house");
@@ -2179,7 +2179,7 @@ test("a flag says what became of its card: edited, deleted, or never the site's"
 
   await api("/api/courses?action=save-card", {
     method: "POST", key,
-    body: { card: { ...edited, forms: [{ ...lead(edited), en: "home" }] }, decks: [deck.id] },
+    body: { card: { ...edited, forms: [{ ...lead(edited), en: "home" }] }, decks: [module.id] },
   });
   await api("/api/courses?action=delete-card", { method: "POST", key, body: { cardId: deleted.id } });
 
@@ -2200,7 +2200,7 @@ test("a flag says what became of its card: edited, deleted, or never the site's"
   const opened = await api(`/api/courses?action=admin-card&card=${untouched.id}`, { key });
   assert.equal(opened.status, 200, opened.text);
   assert.equal(lead(opened.json.card).ar, "كِتاب");
-  assert.deepEqual(opened.json.card.decks, [deck.id], "with the decks it is in, for the readout");
+  assert.deepEqual(opened.json.card.decks, [module.id], "with the decks it is in, for the readout");
 
   const missing = await api(`/api/courses?action=admin-card&card=${deleted.id}`, { key });
   assert.equal(missing.status, 404);
@@ -2225,17 +2225,17 @@ test("an older report still finds its card, and does not invent an edit", async 
   const key = admin.json.key;
   await api("/api/courses?action=claim-admin", { method: "POST", key, body: { adminKey: ADMIN_KEY } });
 
-  const deck = (await api("/api/courses?action=create-deck", {
+  const module = (await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Older Reports", lang: "ar-PS" },
   })).json.deck;
   let card = (await api("/api/courses?action=save-card", {
-    method: "POST", key, body: { card: carded({ ar: "شمس", en: "sun" }), decks: [deck.id] },
+    method: "POST", key, body: { card: carded({ ar: "شمس", en: "sun" }), decks: [module.id] },
   })).json.card;
   /* Saved again, so it is past rev 1 — the number a missing one would be
      compared against if the code guessed. */
   card = (await api("/api/courses?action=save-card", {
     method: "POST", key,
-    body: { card: { ...card, forms: [{ ...lead(card), lat: "shams" }] }, decks: [deck.id] },
+    body: { card: { ...card, forms: [{ ...lead(card), lat: "shams" }] }, decks: [module.id] },
   })).json.card;
   assert.ok(card.rev > 1, "the card has been saved more than once");
 
@@ -2852,22 +2852,22 @@ test("a class whose teacher never opened the screen still gets their numbers", a
   const teacher = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rania" } });
   const tKey = teacher.json.key;
   await api("/api/courses?action=claim-admin", { method: "POST", key: tKey, body: { adminKey: ADMIN_KEY } });
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key: tKey, body: { title: "Numbers", lang: "ar-PS" },
   });
-  const deckId = deck.json.deck.id;
+  const moduleId = module.json.deck.id;
   const course = await api("/api/courses?action=create-course", {
     method: "POST", key: tKey, body: { title: "Arabic 1", language: "ar-PS" },
   });
   await api("/api/courses?action=attach-deck", {
-    method: "POST", key: tKey, body: { deckId, courseId: course.json.course.id },
+    method: "POST", key: tKey, body: { deckId: moduleId, courseId: course.json.course.id },
   });
   for (const [value, word] of [[1, "wahad"], [2, "tnen"], [20, "ishrin"]]) {
     const saved = await api("/api/courses?action=save-card", {
       method: "POST", key: tKey,
       body: {
         card: { id: "", lang: "ar-PS", forms: [{ ar: word, en: String(value), lat: "" }], category: "number" },
-        decks: [deckId],
+        decks: [moduleId],
       },
     });
     await storeValue(saved.json.card.id, Number(value));
@@ -2956,11 +2956,11 @@ test("a teacher's numbers reach their students, and the version moves when a wor
   const course = await api("/api/courses?action=create-course", {
     method: "POST", key: tkey, body: { title: "Arabic 1", language: "ar-PS" },
   });
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key: tkey, body: { title: "Lesson 1", description: "", lang: "ar-PS" },
   });
   await api("/api/courses?action=attach-deck", {
-    method: "POST", key: tkey, body: { deckId: deck.json.deck.id, courseId: course.json.course.id },
+    method: "POST", key: tkey, body: { deckId: module.json.deck.id, courseId: course.json.course.id },
   });
 
   const student = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Nour" } });
@@ -3029,11 +3029,11 @@ test("a teacher's numbers reach their students, and the version moves when a wor
 test("numbers saved before Save published still reach students, as last saved", async () => {
   const teacher = await anAdmin("Rafa");
   const course = await aCourse(teacher.key, "Testing");
-  const deck = (await api("/api/courses?action=create-deck", {
+  const module = (await api("/api/courses?action=create-deck", {
     method: "POST", key: teacher.key, body: { title: "Numbers", lang: "ar-PS" },
   })).json.deck;
   await api("/api/courses?action=attach-deck", {
-    method: "POST", key: teacher.key, body: { deckId: deck.id, courseId: course.id },
+    method: "POST", key: teacher.key, body: { deckId: module.id, courseId: course.id },
   });
   const student = await someone("Nour");
   await api("/api/courses?action=join-course", { method: "POST", key: student.key, body: { code: course.code } });
@@ -3079,11 +3079,11 @@ test("a system in a language nobody is learning is not sent", async () => {
   const course = await api("/api/courses?action=create-course", {
     method: "POST", key: tkey, body: { title: "Arabic 2", language: "ar-PS" },
   });
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key: tkey, body: { title: "Lesson 1", description: "", lang: "ar-PS" },
   });
   await api("/api/courses?action=attach-deck", {
-    method: "POST", key: tkey, body: { deckId: deck.json.deck.id, courseId: course.json.course.id },
+    method: "POST", key: tkey, body: { deckId: module.json.deck.id, courseId: course.json.course.id },
   });
   const student = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Lina" } });
   await api("/api/courses?action=join-course", {
@@ -3249,17 +3249,17 @@ test("a deck says which of its number parts reach nobody yet", async () => {
   await api("/api/courses?action=assign-teacher", {
     method: "POST", key: teacher.key, body: { courseId: course.id, handle: teacher.handle },
   });
-  const deck = (await api("/api/courses?action=create-deck", {
+  const module = (await api("/api/courses?action=create-deck", {
     method: "POST", key: teacher.key, body: { title: "Numbers", lang: "ar-PS" },
   })).json.deck;
   await api("/api/courses?action=attach-deck", {
-    method: "POST", key: teacher.key, body: { deckId: deck.id, courseId: course.id },
+    method: "POST", key: teacher.key, body: { deckId: module.id, courseId: course.id },
   });
   const waitingNow = async () => {
     const mine = (await api("/api/courses?action=my-decks", { key: teacher.key })).json.decks;
     const seen = overviewOf(await api("/api/courses?action=admin-overview", { key: teacher.key })).decks;
-    const asTeacher = must(mine.find((/** @type {any} */ d) => d.id === deck.id), "the deck").partsWaiting;
-    assert.deepEqual(must(seen.find((d) => d.id === deck.id), "the deck").partsWaiting, asTeacher,
+    const asTeacher = must(mine.find((/** @type {any} */ d) => d.id === module.id), "the deck").partsWaiting;
+    assert.deepEqual(must(seen.find((d) => d.id === module.id), "the deck").partsWaiting, asTeacher,
       "the administrator is told the same");
     return asTeacher;
   };
@@ -3268,7 +3268,7 @@ test("a deck says which of its number parts reach nobody yet", async () => {
      setting them says so straight away. */
   const all = ["numbers:0-9", "numbers:10-19", "numbers:20-99", "numbers:100-999", "numbers:1000+"];
   const set = await api("/api/courses?action=set-deck-parts", {
-    method: "POST", key: teacher.key, body: { deckId: deck.id, parts: all },
+    method: "POST", key: teacher.key, body: { deckId: module.id, parts: all },
   });
   assert.deepEqual(set.json.partsWaiting, all);
   assert.deepEqual(await waitingNow(), all);
@@ -3292,7 +3292,7 @@ test("a deck says which of its number parts reach nobody yet", async () => {
   const { connector: _and, ...noAnd } = golden.lexemes;
   assert.equal((await save(2, noAnd)).status, 200);
   await api("/api/courses?action=set-deck-parts", {
-    method: "POST", key: teacher.key, body: { deckId: deck.id, parts: ["numbers:0-9", "numbers:11-99"] },
+    method: "POST", key: teacher.key, body: { deckId: module.id, parts: ["numbers:0-9", "numbers:11-99"] },
   });
   assert.deepEqual(await waitingNow(), ["numbers:11-99"]);
 });
@@ -3334,14 +3334,14 @@ test("an unreadable record fails the request rather than reading as absent", asy
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Ziad" } });
   const key = made.json.key;
   await teaching(made.json.user.handle);
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Lesson 1", description: "", lang: "ar-PS" },
   });
-  assert.equal(deck.status, 200, deck.text);
+  assert.equal(module.status, 200, module.text);
 
   const { getStore } = await import("../server/store.js");
   const store = getStore("arabic-courses");
-  await store.set(`deck:${deck.json.deck.id}`, "{ not json");
+  await store.set(`deck:${module.json.deck.id}`, "{ not json");
 
   const listed = await api("/api/courses?action=my-decks", { key });
   assert.equal(listed.status, 500, "the request fails");
@@ -3354,7 +3354,7 @@ test("an unreadable record fails the request rather than reading as absent", asy
    * everybody, which is the assertion above coming true somewhere nobody
    * was looking. It cost an afternoon once.
    */
-  await store.set(`deck:${deck.json.deck.id}`, JSON.stringify(deck.json.deck));
+  await store.set(`deck:${module.json.deck.id}`, JSON.stringify(module.json.deck));
   const after = await api("/api/courses?action=my-decks", { key });
   assert.equal(after.status, 200, `the store was left broken: ${after.text.slice(0, 200)}`);
 });
@@ -3389,12 +3389,12 @@ const anAdmin = async (/** @type {string} */ displayName) => {
 };
 
 /** A deck with one card in it, owned by whoever's key this is. */
-const aDeck = async (/** @type {string} */ key, /** @type {string} */ title) => {
-  const deck = await api("/api/courses?action=create-deck", {
+const aModule = async (/** @type {string} */ key, /** @type {string} */ title) => {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title, lang: "ar-PS" },
   });
-  assert.equal(deck.status, 200, deck.text);
-  const id = deck.json.deck.id;
+  assert.equal(module.status, 200, module.text);
+  const id = module.json.deck.id;
   const card = await api("/api/courses?action=save-card", {
     method: "POST", key,
     body: { card: carded({ ar: "كتاب", en: "book", lat: "kitaab" }), decks: [id] },
@@ -3417,26 +3417,26 @@ const aCourse = async (/** @type {string} */ key, /** @type {string} */ title) =
 test("deleting a deck takes it off every course, and leaves the cards in the library", () => {
   return (async () => {
     const teacher = await anAdmin("Nadia");
-    const { id: deckId, cardId } = await aDeck(teacher.key, "Lesson 1");
+    const { id: moduleId, cardId } = await aModule(teacher.key, "Lesson 1");
     const course = await aCourse(teacher.key, "Arabic 1");
     await api("/api/courses?action=attach-deck", {
-      method: "POST", key: teacher.key, body: { deckId, courseId: course.id },
+      method: "POST", key: teacher.key, body: { deckId: moduleId, courseId: course.id },
     });
 
     const gone = await api("/api/courses?action=delete-deck", {
-      method: "POST", key: teacher.key, body: { deckId },
+      method: "POST", key: teacher.key, body: { deckId: moduleId },
     });
     assert.equal(gone.status, 200, gone.text);
 
     /* Off the course it was attached to — and the course itself stays. */
-    const decks = await api(`/api/courses?action=course-decks&course=${course.id}`, { key: teacher.key });
-    assert.equal(decks.status, 200, decks.text);
-    assert.deepEqual(decks.json.decks.map((/** @type {any} */ d) => d.id), [],
+    const modules = await api(`/api/courses?action=course-decks&course=${course.id}`, { key: teacher.key });
+    assert.equal(modules.status, 200, modules.text);
+    assert.deepEqual(modules.json.decks.map((/** @type {any} */ d) => d.id), [],
       "the deleted deck is still listed against its course");
 
     /* Out of the teacher's own list. */
     const mine = await api("/api/courses?action=my-decks", { key: teacher.key });
-    assert.ok(!mine.json.decks.some((/** @type {any} */ d) => d.id === deckId), "still in my decks");
+    assert.ok(!mine.json.decks.some((/** @type {any} */ d) => d.id === moduleId), "still in my decks");
 
     /* And the card it held is the teacher's own and stays theirs: a deck
        is a folder, not a bag the cards live inside. */
@@ -3450,7 +3450,7 @@ test("a deck nobody owns and a deck somebody else owns are both refused", () => 
   return (async () => {
     const mine = await anAdmin("Omar");
     const stranger = await someone("Rania");
-    const { id: deckId } = await aDeck(mine.key, "Mine");
+    const { id: moduleId } = await aModule(mine.key, "Mine");
 
     const missing = await api("/api/courses?action=delete-deck", {
       method: "POST", key: mine.key, body: { deckId: "dnope" },
@@ -3459,30 +3459,30 @@ test("a deck nobody owns and a deck somebody else owns are both refused", () => 
     assert.equal(missing.json.error, "no-deck");
 
     const theirs = await api("/api/courses?action=delete-deck", {
-      method: "POST", key: stranger.key, body: { deckId },
+      method: "POST", key: stranger.key, body: { deckId: moduleId },
     });
     assert.equal(theirs.status, 403);
     assert.equal(theirs.json.error, "not-yours");
     /* And it is still there, which is what a refusal has to mean. */
     const still = await api("/api/courses?action=my-decks", { key: mine.key });
-    assert.ok(still.json.decks.some((/** @type {any} */ d) => d.id === deckId));
+    assert.ok(still.json.decks.some((/** @type {any} */ d) => d.id === moduleId));
   })();
 });
 
 test("detaching a deck leaves the deck alone, and only the course loses it", () => {
   return (async () => {
     const teacher = await anAdmin("Hana");
-    const { id: deckId, cardId } = await aDeck(teacher.key, "Lesson 2");
+    const { id: moduleId, cardId } = await aModule(teacher.key, "Lesson 2");
     const one = await aCourse(teacher.key, "Arabic A");
     const two = await aCourse(teacher.key, "Arabic B");
     for (const c of [one, two]) {
       await api("/api/courses?action=attach-deck", {
-        method: "POST", key: teacher.key, body: { deckId, courseId: c.id },
+        method: "POST", key: teacher.key, body: { deckId: moduleId, courseId: c.id },
       });
     }
 
     const off = await api("/api/courses?action=detach-deck", {
-      method: "POST", key: teacher.key, body: { deckId, courseId: one.id },
+      method: "POST", key: teacher.key, body: { deckId: moduleId, courseId: one.id },
     });
     assert.equal(off.status, 200, off.text);
 
@@ -3490,9 +3490,9 @@ test("detaching a deck leaves the deck alone, and only the course loses it", () 
     assert.deepEqual(gone.json.decks.map((/** @type {any} */ d) => d.id), []);
     /* The other course keeps it: detaching is about one link, not the deck. */
     const kept = await api(`/api/courses?action=course-decks&course=${two.id}`, { key: teacher.key });
-    assert.deepEqual(kept.json.decks.map((/** @type {any} */ d) => d.id), [deckId]);
+    assert.deepEqual(kept.json.decks.map((/** @type {any} */ d) => d.id), [moduleId]);
     /* And the deck and its cards are untouched. */
-    const cards = await api(`/api/courses?action=deck-cards&deck=${deckId}`, { key: teacher.key });
+    const cards = await api(`/api/courses?action=deck-cards&deck=${moduleId}`, { key: teacher.key });
     assert.equal(cards.status, 200, cards.text);
     assert.deepEqual(cards.json.cards.map((/** @type {any} */ c) => c.id), [cardId]);
   })();
@@ -3510,8 +3510,8 @@ test("a teacher of neither the deck nor the course cannot attach one to the othe
     const boss = await anAdmin("Layla");
     const teacher = await someone("Samir");
     await teaching(teacher.handle);
-    const mine = await aDeck(teacher.key, "Samir's deck");
-    const hers = await aDeck(boss.key, "Layla's deck");
+    const mine = await aModule(teacher.key, "Samir's deck");
+    const hers = await aModule(boss.key, "Layla's deck");
     const theirCourse = await aCourse(boss.key, "Taught by Samir");
     const otherCourse = await aCourse(boss.key, "Taught by nobody");
     await api("/api/courses?action=assign-teacher", {
@@ -3556,15 +3556,15 @@ test("a teacher of neither the deck nor the course cannot attach one to the othe
  * @param {string} courseId
  */
 const whatEachSees = async (key, courseId) => {
-  const decks = (await api("/api/courses?action=my-decks", { key })).json.decks;
+  const modules = (await api("/api/courses?action=my-decks", { key })).json.decks;
   const course = must(
     coursesOf(await api("/api/courses?action=my-courses", { key })).find((c) => c.id === courseId),
     "the course",
   );
   const sent = (await api("/api/courses?action=my-material", { key })).json.decks;
-  const titleOf = (/** @type {string} */ id) => (decks.find((/** @type {any} */ d) => d.id === id) || {}).title;
+  const titleOf = (/** @type {string} */ id) => (modules.find((/** @type {any} */ d) => d.id === id) || {}).title;
   return {
-    teacher: decks
+    teacher: modules
       .filter((/** @type {any} */ d) => d.courses.some((/** @type {any} */ l) => l.courseId === courseId))
       .map((/** @type {any} */ d) => d.title)
       .sort(),
@@ -3588,13 +3588,13 @@ test("decks added and taken out at the same moment all land, and teacher and stu
     const titles = ["L0", "L1 greetings", "L1 daily", "L1 vocab", "L1 verbs", "Must know", "Numbers"];
     /** @type {string[]} */
     const ids = [];
-    for (const title of titles) ids.push((await aDeck(teacher.key, title)).id);
+    for (const title of titles) ids.push((await aModule(teacher.key, title)).id);
 
     /* All seven at once. Each used to read the course, add its own deck
        and write the course back, so the last one in was the only one the
        course kept — while every deck said it was in. */
-    const on = await Promise.all(ids.map((deckId) =>
-      api("/api/courses?action=attach-deck", { method: "POST", key: teacher.key, body: { deckId, courseId: course.id } })));
+    const on = await Promise.all(ids.map((moduleId) =>
+      api("/api/courses?action=attach-deck", { method: "POST", key: teacher.key, body: { deckId: moduleId, courseId: course.id } })));
     for (const r of on) assert.equal(r.status, 200, r.text);
     const all = titles.slice().sort();
     assert.deepEqual(await whatEachSees(teacher.key, course.id), { teacher: all, course: all, student: all });
@@ -3605,8 +3605,8 @@ test("decks added and taken out at the same moment all land, and teacher and stu
     const newcomer = await someone("Lina");
     const late = await someone("Omar");
     const off = await Promise.all([
-      ...ids.slice(0, 6).map((deckId) =>
-        api("/api/courses?action=detach-deck", { method: "POST", key: teacher.key, body: { deckId, courseId: course.id } })),
+      ...ids.slice(0, 6).map((moduleId) =>
+        api("/api/courses?action=detach-deck", { method: "POST", key: teacher.key, body: { deckId: moduleId, courseId: course.id } })),
       api("/api/courses?action=join-course", { method: "POST", key: newcomer.key, body: { code: course.code } }),
       api("/api/courses?action=assign-student", {
         method: "POST", key: teacher.key, body: { courseId: course.id, handle: late.handle },
@@ -3638,10 +3638,10 @@ test("a course and a deck that already disagree are shown as the course has it, 
     ]) {
       await api(`/api/courses?action=${as}`, { method: "POST", key: teacher.key, body: { courseId: course.id, handle } });
     }
-    const kept = await aDeck(teacher.key, "Numbers");
-    const forgot = await aDeck(teacher.key, "Verbs");
-    const alsoForgot = await aDeck(teacher.key, "Vocab");
-    const stale = await aDeck(teacher.key, "Old");
+    const kept = await aModule(teacher.key, "Numbers");
+    const forgot = await aModule(teacher.key, "Verbs");
+    const alsoForgot = await aModule(teacher.key, "Vocab");
+    const stale = await aModule(teacher.key, "Old");
     for (const d of [kept, forgot, alsoForgot]) {
       await api("/api/courses?action=attach-deck", {
         method: "POST", key: teacher.key, body: { deckId: d.id, courseId: course.id },
@@ -3710,10 +3710,10 @@ test("a course's decks are listed to the people in it and to nobody else", () =>
     const teacher = await anAdmin("Zaid");
     const student = await someone("Maya");
     const outsider = await someone("Faris");
-    const { id: deckId } = await aDeck(teacher.key, "Week 1");
+    const { id: moduleId } = await aModule(teacher.key, "Week 1");
     const course = await aCourse(teacher.key, "Arabic 2");
     await api("/api/courses?action=attach-deck", {
-      method: "POST", key: teacher.key, body: { deckId, courseId: course.id },
+      method: "POST", key: teacher.key, body: { deckId: moduleId, courseId: course.id },
     });
     await api("/api/courses?action=assign-student", {
       method: "POST", key: teacher.key, body: { courseId: course.id, handle: student.handle },
@@ -3721,7 +3721,7 @@ test("a course's decks are listed to the people in it and to nobody else", () =>
 
     const asStudent = await api(`/api/courses?action=course-decks&course=${course.id}`, { key: student.key });
     assert.equal(asStudent.status, 200, asStudent.text);
-    assert.deepEqual(asStudent.json.decks.map((/** @type {any} */ d) => d.id), [deckId]);
+    assert.deepEqual(asStudent.json.decks.map((/** @type {any} */ d) => d.id), [moduleId]);
     assert.equal(asStudent.json.decks[0].ownerName, "Zaid", "who wrote it");
     assert.equal(asStudent.json.decks[0].cardCount, 1, "and how much is in it");
     /* The join code is how somebody gets in, so it is never handed to
@@ -3745,29 +3745,29 @@ test("a deck's cards are readable by its owner and by the course it is in, and n
     const teacher = await anAdmin("Bilal");
     const student = await someone("Dina");
     const stranger = await someone("Kamal");
-    const { id: deckId, cardId } = await aDeck(teacher.key, "Week 2");
+    const { id: moduleId, cardId } = await aModule(teacher.key, "Week 2");
     const course = await aCourse(teacher.key, "Arabic 3");
 
-    const asOwner = await api(`/api/courses?action=deck-cards&deck=${deckId}`, { key: teacher.key });
+    const asOwner = await api(`/api/courses?action=deck-cards&deck=${moduleId}`, { key: teacher.key });
     assert.equal(asOwner.status, 200, asOwner.text);
     assert.deepEqual(asOwner.json.cards.map((/** @type {any} */ c) => c.id), [cardId]);
     assert.ok(asOwner.json.version, "with the deck's version, which is what a refresh compares");
 
     /* Before it is attached, somebody in the course is a stranger to it. */
-    const tooEarly = await api(`/api/courses?action=deck-cards&deck=${deckId}`, { key: student.key });
+    const tooEarly = await api(`/api/courses?action=deck-cards&deck=${moduleId}`, { key: student.key });
     assert.equal(tooEarly.status, 403);
 
     await api("/api/courses?action=attach-deck", {
-      method: "POST", key: teacher.key, body: { deckId, courseId: course.id },
+      method: "POST", key: teacher.key, body: { deckId: moduleId, courseId: course.id },
     });
     await api("/api/courses?action=assign-student", {
       method: "POST", key: teacher.key, body: { courseId: course.id, handle: student.handle },
     });
-    const asStudent = await api(`/api/courses?action=deck-cards&deck=${deckId}`, { key: student.key });
+    const asStudent = await api(`/api/courses?action=deck-cards&deck=${moduleId}`, { key: student.key });
     assert.equal(asStudent.status, 200, asStudent.text);
     assert.deepEqual(asStudent.json.cards.map((/** @type {any} */ c) => c.id), [cardId]);
 
-    const asStranger = await api(`/api/courses?action=deck-cards&deck=${deckId}`, { key: stranger.key });
+    const asStranger = await api(`/api/courses?action=deck-cards&deck=${moduleId}`, { key: stranger.key });
     assert.equal(asStranger.status, 403);
     assert.equal(asStranger.json.error, "no-access");
 
@@ -3894,10 +3894,10 @@ test("removing somebody who is not there says so, and your own account has its o
 test("removing a course releases its decks rather than destroying them", () => {
   return (async () => {
     const boss = await anAdmin("Salma");
-    const { id: deckId, cardId } = await aDeck(boss.key, "Week 3");
+    const { id: moduleId, cardId } = await aModule(boss.key, "Week 3");
     const course = await aCourse(boss.key, "Arabic 5");
     await api("/api/courses?action=attach-deck", {
-      method: "POST", key: boss.key, body: { deckId, courseId: course.id },
+      method: "POST", key: boss.key, body: { deckId: moduleId, courseId: course.id },
     });
 
     const gone = await api("/api/courses?action=admin-delete-course", {
@@ -3910,9 +3910,9 @@ test("removing a course releases its decks rather than destroying them", () => {
 
     /* The deck belongs to the teacher who made it, and so do its cards. */
     const mine = await api("/api/courses?action=my-decks", { key: boss.key });
-    const deck = must(mine.json.decks.find((/** @type {any} */ d) => d.id === deckId), "the deck");
-    assert.equal(deck.cardCount, 1);
-    const cards = await api(`/api/courses?action=deck-cards&deck=${deckId}`, { key: boss.key });
+    const module = must(mine.json.decks.find((/** @type {any} */ d) => d.id === moduleId), "the deck");
+    assert.equal(module.cardCount, 1);
+    const cards = await api(`/api/courses?action=deck-cards&deck=${moduleId}`, { key: boss.key });
     assert.deepEqual(cards.json.cards.map((/** @type {any} */ c) => c.id), [cardId]);
 
     const missing = await api("/api/courses?action=admin-delete-course", {
@@ -4369,18 +4369,18 @@ test("a sentence card waits for review, and only its teachers can review it or r
     method: "POST", key: akey, body: { title: "Arabic review", language: "ar-PS" },
   });
   const courseId = course.json.course.id;
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key: akey, body: { title: "Frames", description: "", lang: "ar-PS" },
   });
-  const deckId = deck.json.deck.id;
-  await api("/api/courses?action=attach-deck", { method: "POST", key: akey, body: { deckId, courseId } });
+  const moduleId = module.json.deck.id;
+  await api("/api/courses?action=attach-deck", { method: "POST", key: akey, body: { deckId: moduleId, courseId } });
 
   const frame = await api("/api/courses?action=save-card", {
     method: "POST", key: akey,
     body: {
       card: { id: "", lang: "ar-PS", sentence: true, forms: [{ ar: "اسمي {{name}}", en: "my name is {{name}}", lat: "" }],
               review: { ok: ["ffffffffffffffff"] } },
-      decks: [deckId],
+      decks: [moduleId],
     },
   });
   assert.equal(frame.status, 200, frame.text);
@@ -4394,8 +4394,8 @@ test("a sentence card waits for review, and only its teachers can review it or r
 
   const k1 = "0123456789abcdef";
   const k2 = "fedcba9876543210";
-  const decksBefore = (await api("/api/courses?action=my-decks", { key: akey })).json.decks;
-  const versionBefore = must(decksBefore.find((/** @type {any} */ d) => d.id === deckId), "deck").version || 1;
+  const modulesBefore = (await api("/api/courses?action=my-decks", { key: akey })).json.decks;
+  const versionBefore = must(modulesBefore.find((/** @type {any} */ d) => d.id === moduleId), "deck").version || 1;
   const reviewed = await api("/api/courses?action=review-card", {
     method: "POST", key: akey, body: { cardId, ok: [k1, "not a key"], no: [k2] },
   });
@@ -4404,8 +4404,8 @@ test("a sentence card waits for review, and only its teachers can review it or r
   assert.deepEqual(reviewed.json.card.review.no, [k2]);
   assert.equal(reviewed.json.card.review.by, admin.json.user.handle);
   assert.equal(reviewed.json.card.rev, frame.json.card.rev, "a review is not an edit of the card");
-  const decksAfter = (await api("/api/courses?action=my-decks", { key: akey })).json.decks;
-  assert.ok(must(decksAfter.find((/** @type {any} */ d) => d.id === deckId), "deck").version > versionBefore,
+  const modulesAfter = (await api("/api/courses?action=my-decks", { key: akey })).json.decks;
+  assert.ok(must(modulesAfter.find((/** @type {any} */ d) => d.id === moduleId), "deck").version > versionBefore,
     "but the deck moves, so students fetch it");
 
   /* Striking one approved moves it across; an edit keeps the review. */
@@ -4414,7 +4414,7 @@ test("a sentence card waits for review, and only its teachers can review it or r
   assert.deepEqual(struck.json.card.review.no, [k2, k1]);
   const edited = await api("/api/courses?action=save-card", {
     method: "POST", key: akey,
-    body: { card: { id: cardId, lang: "ar-PS", sentence: true, forms: [{ ar: "أنا اسمي {{name}}", en: "my name is {{name}}", lat: "" }] }, decks: [deckId] },
+    body: { card: { id: cardId, lang: "ar-PS", sentence: true, forms: [{ ar: "أنا اسمي {{name}}", en: "my name is {{name}}", lat: "" }] }, decks: [moduleId] },
   });
   assert.deepEqual(edited.json.card.review.no, [k2, k1], "what was answered stays answered through an edit");
 
@@ -4440,7 +4440,7 @@ test("a sentence card waits for review, and only its teachers can review it or r
   const sent = await api("/api/courses?action=report-flag", {
     method: "POST", key: student.json.key,
     body: { kind: "data", cardId: `srv${cardId}`, exercise: "ar2en", language: "ar-PS",
-            prompt: "اسمي سامي", meaning: "my name is Sami", courseId, deckId, sentence: k1 },
+            prompt: "اسمي سامي", meaning: "my name is Sami", courseId, deckId: moduleId, sentence: k1 },
   });
   assert.equal(sent.status, 200, sent.text);
   const theirs = await api("/api/courses?action=my-reports", { key: akey });
@@ -4487,11 +4487,11 @@ test("a deck marked locked keeps the mark but refuses nothing while locks are se
   const made = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Rana" } });
   const key = made.json.key;
   await teaching(made.json.user.handle);
-  const deckOf = async (/** @type {string} */ title) =>
+  const moduleOf = async (/** @type {string} */ title) =>
     (await api("/api/courses?action=create-deck", { method: "POST", key, body: { title, lang: "ar-PS" } }))
       .json.deck.id;
-  const locked = await deckOf("Fixed");
-  const open = await deckOf("Open");
+  const locked = await moduleOf("Fixed");
+  const open = await moduleOf("Open");
 
   const inside = await api("/api/courses?action=save-card", {
     method: "POST", key, body: { card: carded({ ar: "بيت", en: "house", lat: "beit" }), decks: [locked] },
@@ -4507,8 +4507,8 @@ test("a deck marked locked keeps the mark but refuses nothing while locks are se
     method: "POST", key: other.json.key, body: { deckId: open, locked: true },
   });
   assert.equal(theirs.status, 403);
-  const decks = async () => (await api("/api/courses?action=my-decks", { key })).json.decks;
-  assert.equal((await decks()).find((/** @type {any} */ d) => d.id === locked).locked, true);
+  const modules = async () => (await api("/api/courses?action=my-decks", { key })).json.decks;
+  assert.equal((await modules()).find((/** @type {any} */ d) => d.id === locked).locked, true);
 
   /* Taken out of it: done, and nothing said about locks. */
   const moved = await api("/api/courses?action=save-card", {
@@ -4543,24 +4543,24 @@ test("a teacher exports a deck or a card, and only their own", async () => {
   await teaching(t.json.user.handle);
   const other = await api("/api/courses?action=signup", { method: "POST", body: { displayName: "Ziad" } });
 
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key, body: { title: "Kitchen", lang: "ar-PS" },
   });
-  const deckId = deck.json.deck.id;
-  const save = async (/** @type {string} */ k, /** @type {any} */ form, /** @type {string[]} */ decks) =>
+  const moduleId = module.json.deck.id;
+  const save = async (/** @type {string} */ k, /** @type {any} */ form, /** @type {string[]} */ modules) =>
     (await api("/api/courses?action=save-card", {
-      method: "POST", key: k, body: { card: carded(form), decks },
+      method: "POST", key: k, body: { card: carded(form), decks: modules },
     })).json.card;
-  const pot = await save(key, { ar: "طنجرة", en: "pot", lat: "tanjara", clips: [clipId(41)] }, [deckId]);
+  const pot = await save(key, { ar: "طنجرة", en: "pot", lat: "tanjara", clips: [clipId(41)] }, [moduleId]);
   const cup = await save(key, { ar: "كاسة", en: "cup", lat: "kase" }, []);
   const theirs = await save(other.json.key, { ar: "باب", en: "door", lat: "baab" }, []);
 
   const plan = await api("/api/courses?action=export-plan", {
-    method: "POST", key, body: { deckIds: [deckId], cardIds: [theirs.id], media: true },
+    method: "POST", key, body: { deckIds: [moduleId], cardIds: [theirs.id], media: true },
   });
   assert.equal(plan.status, 200, plan.text);
   const keys = plan.json.manifest.plan.flatMap((/** @type {any} */ c) => c.keys);
-  assert.ok(keys.includes(`deck:${deckId}`), "the deck");
+  assert.ok(keys.includes(`deck:${moduleId}`), "the deck");
   assert.ok(keys.includes(`card:${pot.id}`), "with the card in it");
   assert.ok(keys.includes(`clip:${clipId(41)}`), "and its recording");
   assert.ok(!keys.includes(`card:${cup.id}`), "not a card outside it");
@@ -4575,11 +4575,11 @@ test("a teacher exports a deck or a card, and only their own", async () => {
   assert.deepEqual(bareKeys, [`card:${pot.id}`], "one card, and no recording when they are left out");
 
   const chunk = await api("/api/courses?action=export-chunk", {
-    method: "POST", key, body: { keys: [`card:${pot.id}`, `deck:${deckId}`] },
+    method: "POST", key, body: { keys: [`card:${pot.id}`, `deck:${moduleId}`] },
   });
   assert.equal(chunk.status, 200, chunk.text);
   assert.equal(chunk.json.records[`card:${pot.id}`].forms[0].en, "pot");
-  assert.deepEqual(chunk.json.records[`deck:${deckId}`].cardIds, [pot.id]);
+  assert.deepEqual(chunk.json.records[`deck:${moduleId}`].cardIds, [pot.id]);
 
   const sneaked = await api("/api/courses?action=export-chunk", {
     method: "POST", key, body: { keys: [`card:${theirs.id}`] },
@@ -4614,17 +4614,17 @@ test("a recording the server never received is named to the teacher and the stud
     method: "POST", key: teacher.key, body: { hash: here, data: "data:audio/webm;base64,AAAA" },
   });
   assert.equal(put.status, 200, put.text);
-  const deck = await api("/api/courses?action=create-deck", {
+  const module = await api("/api/courses?action=create-deck", {
     method: "POST", key: teacher.key, body: { title: "Sounds", lang: "ar-PS" },
   });
   const card = await api("/api/courses?action=save-card", {
     method: "POST", key: teacher.key,
-    body: { card: carded({ ar: "باب", en: "door", lat: "baab", clips: [here, lost] }), decks: [deck.json.deck.id] },
+    body: { card: carded({ ar: "باب", en: "door", lat: "baab", clips: [here, lost] }), decks: [module.json.deck.id] },
   });
   assert.equal(card.status, 200, card.text);
   const course = await aCourse(teacher.key, "Listening");
   await api("/api/courses?action=attach-deck", {
-    method: "POST", key: teacher.key, body: { deckId: deck.json.deck.id, courseId: course.id },
+    method: "POST", key: teacher.key, body: { deckId: module.json.deck.id, courseId: course.id },
   });
   const student = await someone("Lina");
   await api("/api/courses?action=assign-student", {

@@ -1,4 +1,4 @@
-/** @import { Card, Course, Deck, User } from "../../src/types.ts" */
+/** @import { Card, Course, Module, User } from "../../src/types.ts" */
 /**
  * The document store, as store.js hands it over. Named rather than repeated
  * at every helper below.
@@ -45,7 +45,7 @@ import { countedNouns, withNouns } from "../../src/numbers/nouns.ts";
 
 /* Locking a deck is set aside for now: a locked deck's flag is kept, but
    nothing is refused because of it. Turn back on to bring locks back. */
-const DECK_LOCKS = false;
+const MODULE_LOCKS = false;
 
 /*
  * Courses, decks and the people who use them.
@@ -791,8 +791,8 @@ const scoped = (rec) => (inScope(rec) ? rec : null);
 
 /** @type {(store: Store, id: string) => Promise<Course | null>} */
 const readCourse = async (store, id) => scoped(await readJson(store, K.course(id)));
-/** @type {(store: Store, id: string) => Promise<Deck | null>} */
-const readDeck = async (store, id) => scoped(await readJson(store, K.deck(id)));
+/** @type {(store: Store, id: string) => Promise<Module | null>} */
+const readModule = async (store, id) => scoped(await readJson(store, K.deck(id)));
 /** @type {(store: Store, id: string) => Promise<Card | null>} */
 const readCard = async (store, id) => scoped(await readJson(store, K.card(id)));
 /* The caller themselves is always readable: an App admin working in another
@@ -993,14 +993,14 @@ const inCourse = (course, h) => isTeacher(course, h) || isStudent(course, h);
  * worked out here, so it says what the students actually have.
  */
 /**
- * @param {Deck} deck
+ * @param {Module} module
  * @param {Course[]} courses  Every course on the site, or at least every one that may list it.
- * @returns {import("../../src/types.ts").DeckLink[]}
+ * @returns {import("../../src/types.ts").ModuleLink[]}
  */
-function linksOf(deck, courses) {
-  const added = new Map((deck.courses || []).map((l) => [l.courseId, l.addedAt]));
+function linksOf(module, courses) {
+  const added = new Map((module.courses || []).map((l) => [l.courseId, l.addedAt]));
   return courses
-    .filter((c) => c && (c.decks || []).includes(deck.id))
+    .filter((c) => c && (c.decks || []).includes(module.id))
     .map((c) => {
       const at = added.get(c.id);
       return at ? { courseId: c.id, addedAt: at } : { courseId: c.id };
@@ -1021,16 +1021,16 @@ async function everyCourse(store) {
 /**
  * Decks as a screen is given them: with the courses that hold them, read
  * off those courses — see linksOf.
- * @template {Deck} D
+ * @template {Module} D
  * @param {Store} store
- * @param {D[]} decks
+ * @param {D[]} modules
  * @param {Course[]} [courses]  Already read, where the caller has them.
  * @returns {Promise<D[]>}
  */
-async function withLinks(store, decks, courses) {
-  if (!decks.length) return decks;
+async function withLinks(store, modules, courses) {
+  if (!modules.length) return modules;
   const all = courses || (await everyCourse(store));
-  return decks.map((d) => ({ ...d, courses: linksOf(d, all) }));
+  return modules.map((d) => ({ ...d, courses: linksOf(d, all) }));
 }
 
 /**
@@ -1039,14 +1039,14 @@ async function withLinks(store, decks, courses) {
  * Every course, not the ones the deck names: a course the deck had
  * forgotten it was in would otherwise keep a deck that no longer exists.
  * @param {Store} store
- * @param {string} deckId
+ * @param {string} moduleId
  */
-async function dropFromCourses(store, deckId) {
+async function dropFromCourses(store, moduleId) {
   for (const c of await everyCourse(store)) {
-    if (!(c.decks || []).includes(deckId) && !onPath(c, deckId)) continue;
+    if (!(c.decks || []).includes(moduleId) && !onPath(c, moduleId)) continue;
     await updateJson(store, K.course(c.id), (/** @type {Course | null} */ fresh) =>
-      fresh && ((fresh.decks || []).includes(deckId) || onPath(fresh, deckId))
-        ? offPath({ ...fresh, decks: (fresh.decks || []).filter((x) => x !== deckId) }, deckId)
+      fresh && ((fresh.decks || []).includes(moduleId) || onPath(fresh, moduleId))
+        ? offPath({ ...fresh, decks: (fresh.decks || []).filter((x) => x !== moduleId) }, moduleId)
         : null
     );
   }
@@ -1056,10 +1056,10 @@ async function dropFromCourses(store, deckId) {
  * Whether a course has a deck anywhere on its path: in its order, among
  * what is published there, or among what is opened early (0.613).
  * @param {Course} course
- * @param {string} deckId
+ * @param {string} moduleId
  */
-function onPath(course, deckId) {
-  return (course.path || []).includes(deckId) || isLiveIn(course, deckId) || (course.opened || []).includes(deckId);
+function onPath(course, moduleId) {
+  return (course.path || []).includes(moduleId) || isLiveIn(course, moduleId) || (course.opened || []).includes(moduleId);
 }
 
 /**
@@ -1067,14 +1067,14 @@ function onPath(course, deckId) {
  * publication there and its opening early, and nothing else. Fields left
  * empty are dropped, so a course with no units stores what it always did.
  * @param {Course} course
- * @param {string} deckId
+ * @param {string} moduleId
  * @returns {Course}
  */
-function offPath(course, deckId) {
+function offPath(course, moduleId) {
   const { path, pathLive, opened, ...rest } = course;
-  const nextPath = (path || []).filter((x) => x !== deckId);
-  const nextLive = Object.fromEntries(Object.entries(pathLive || {}).filter(([k]) => k !== deckId));
-  const nextOpened = (opened || []).filter((x) => x !== deckId);
+  const nextPath = (path || []).filter((x) => x !== moduleId);
+  const nextLive = Object.fromEntries(Object.entries(pathLive || {}).filter(([k]) => k !== moduleId));
+  const nextOpened = (opened || []).filter((x) => x !== moduleId);
   return {
     ...rest,
     ...(nextPath.length ? { path: nextPath } : {}),
@@ -1093,14 +1093,14 @@ function offPath(course, deckId) {
  * one they may work on. */
 /**
  * @param {Store} store
- * @param {Deck | null} deck
+ * @param {Module | null} module
  * @param {string} handle
  * @param {boolean} isAdmin
  */
-async function canEditDeck(store, deck, handle, isAdmin) {
-  if (!deck || !inScope(deck)) return false;
-  if (isAdmin || deck.owner === handle) return true;
-  return (await everyCourse(store)).some((c) => (c.decks || []).includes(deck.id) && isTeacher(c, handle));
+async function canEditModule(store, module, handle, isAdmin) {
+  if (!module || !inScope(module)) return false;
+  if (isAdmin || module.owner === handle) return true;
+  return (await everyCourse(store)).some((c) => (c.decks || []).includes(module.id) && isTeacher(c, handle));
 }
 
 /**
@@ -1119,15 +1119,15 @@ async function readManyJson(store, keys, opts) {
    whether anything did. */
 /**
  * @param {Course[]} courses
- * @param {Deck[]} decks
+ * @param {Module[]} decks
  */
 /**
  * @param {any[]} courses
- * @param {any[]} decks
+ * @param {any[]} modules
  * @param {[string, number][]} fills  Each teacher's value revision — see K.fillsRev.
  * @param {[string, number][]} systems  Each number or time system's revision — see K.numSys.
  */
-function materialVersion(courses, decks, fills = [], systems = []) {
+function materialVersion(courses, modules, fills = [], systems = []) {
   const summary = {
     /* With its path, where it has one (0.613): an order changed, a unit
        published or opened early moves nothing else a device compares.
@@ -1146,7 +1146,7 @@ function materialVersion(courses, decks, fills = [], systems = []) {
     /* With the parts of the numbers it holds, which are not cards and so
        move neither its version nor its count — see set-deck-parts. And
        whether it is a path unit, only where it is one. */
-    decks: decks.map((d) => {
+    decks: modules.map((d) => {
       const row = [d.id, d.version || 1, d.title, (d.cardIds || []).length, (d.parts || []).join(",")];
       const unit = d.unit ? row.concat(["unit"]) : row;
       /* And its personal set, only where it is one (0.629): a teacher
@@ -1374,15 +1374,15 @@ async function clearPersonal(store, handle, org) {
   }
   /* A deck borrowing course cards (66b) goes alone: those cards are the
      space's. */
-  const deckIds = await readIndex(store, "decks");
-  const decks = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(
+  const moduleIds = await readIndex(store, "decks");
+  const modules = (await readManyJson(store, moduleIds.map((id) => K.deck(id)))).filter(
     (d) => d && d.owner === handle && d.personal && here(d)
   );
-  for (const d of decks) await store.delete(K.deck(d.id)).catch(() => {});
-  if (decks.length) {
-    const goneDecks = new Set(decks.map((d) => d.id));
+  for (const d of modules) await store.delete(K.deck(d.id)).catch(() => {});
+  if (modules.length) {
+    const goneModules = new Set(modules.map((d) => d.id));
     await updateJson(store, K.index("decks"), (/** @type {any} */ cur) =>
-      (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x))
+      (cur || []).filter((/** @type {string} */ x) => !goneModules.has(x))
     );
   }
 }
@@ -1620,8 +1620,8 @@ async function setsOffAmong(store, ids) {
   const docs = await readManyJson(store, uniq.map((id) => K.org(id)), EVENTUAL);
   return new Set(uniq.filter((_, i) => !(docs[i] && docs[i].sets)));
 }
-/** Whether a deck is a set hidden by its space (0.684). @param {Set<string>} off @param {any} deck */
-const hidesSet = (off, deck) => !!(deck && deck.set && off.has(orgOf(deck)));
+/** Whether a deck is a set hidden by its space (0.684). @param {Set<string>} off @param {any} module */
+const hidesSet = (off, module) => !!(module && module.set && off.has(orgOf(module)));
 
 /*
  * Making sure Main exists (0.542). Everything written before orgs is in it
@@ -1726,18 +1726,18 @@ function sweepStudentMySpace(store) {
       const orgs = (await readManyJson(store, (await readIndex(store, "orgs")).map((id) => K.org(id)))).filter(Boolean);
       const runs = new Set(orgs.flatMap((o) => o.admins || []));
       const teaches = new Set(courses.flatMap((c) => c.teachers || []));
-      const deckIds = await readIndex(store, "decks");
-      const decks = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(Boolean);
+      const moduleIds = await readIndex(store, "decks");
+      const modules = (await readManyJson(store, moduleIds.map((id) => K.deck(id)))).filter(Boolean);
       const students = new Set();
-      for (const d of decks.filter((x) => x.personal)) {
+      for (const d of modules.filter((x) => x.personal)) {
         const owner = await readJson(store, K.user(d.owner));
         if (owner && (owner.admin || runs.has(d.owner) || teaches.has(d.owner))) continue;
         students.add(d.owner);
         await store.delete(K.deck(d.id)).catch(() => {});
       }
-      const goneDecks = new Set(decks.filter((x) => x.personal && students.has(x.owner)).map((x) => x.id));
-      if (goneDecks.size) {
-        await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x)));
+      const goneModules = new Set(modules.filter((x) => x.personal && students.has(x.owner)).map((x) => x.id));
+      if (goneModules.size) {
+        await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !goneModules.has(x)));
       }
       for (const h of (await readIndex(store, "users"))) {
         const u = await readJson(store, K.user(h));
@@ -2160,16 +2160,16 @@ async function restoreOne(store, key, value, ctx) {
              lost them (0.613): a unit is on the path of every course that
              holds it. Published where the copy says so; never opened early
              by a restore. */
-          const decks = (base.decks || []).concat(more);
+          const modules = (base.decks || []).concat(more);
           const lostPath = (Array.isArray(obj.path) ? obj.path : []).filter(
-            (/** @type {string} */ id) => decks.includes(id) && !(base.path || []).includes(id),
+            (/** @type {string} */ id) => modules.includes(id) && !(base.path || []).includes(id),
           );
           const live = obj.pathLive && typeof obj.pathLive === "object" ? obj.pathLive : {};
           const lostLive = Object.entries(live).filter(([id]) => lostPath.includes(id));
           if (!more.length && base === cur && !lostPath.length) return null;
           return {
             ...base,
-            decks,
+            decks: modules,
             ...(lostPath.length ? { path: (base.path || []).concat(lostPath) } : {}),
             ...(lostLive.length ? { pathLive: { ...(base.pathLive || {}), ...Object.fromEntries(lostLive) } } : {}),
           };
@@ -2713,15 +2713,15 @@ async function handle(req) {
       /** @param {unknown} v @param {number} n */
       const cut = (v, n) => String(v == null ? "" : v).slice(0, n);
       const courseId = cut(raw.courseId, 64);
-      const deckId = cut(raw.deckId, 64);
+      const moduleId = cut(raw.deckId, 64);
       const course = courseId ? await readCourse(store, courseId) : null;
-      const deck = deckId ? await readDeck(store, deckId) : null;
+      const module = moduleId ? await readModule(store, moduleId) : null;
       const context = Object.fromEntries(
         Object.entries({
           courseId,
           courseTitle: course ? String(course.title || "") : "",
-          deckId,
-          deckTitle: deck ? String(deck.title || "") : "",
+          deckId: moduleId,
+          deckTitle: module ? String(module.title || "") : "",
           cardId: cut(raw.cardId, 64),
           exercise: cut(raw.exercise, 40),
           language: cut(raw.language, 20),
@@ -2794,7 +2794,7 @@ async function handle(req) {
         return json({ error: "not-teaching" }, 403);
       }
       const id = `d${randomBytes(6).toString("hex")}`;
-      const deck = {
+      const module = {
         id,
         org: acting,
         ...(personal ? { personal: true, practise: true } : {}),
@@ -2807,10 +2807,10 @@ async function handle(req) {
         cardIds: [],
         updated: Date.now(),
       };
-      await writeJson(store, K.deck(id), deck);
+      await writeJson(store, K.deck(id), module);
       await indexAdd(store, "decks", id);
       await taught();
-      return json({ ok: true, deck });
+      return json({ ok: true, deck: module });
     }
 
     /* ---- cards, owned by whoever made them ---- */
@@ -2835,17 +2835,17 @@ async function handle(req) {
      * @param {Card} card
      * @returns {Promise<string[]>}
      */
-    async function decksHolding(card) {
+    async function modulesHolding(card) {
       if (Array.isArray(card.inDecks)) return card.inDecks;
-      const deckIds = await readIndex(store, "decks");
-      const rows = await readManyJson(store, deckIds.map((id) => K.deck(id)));
+      const moduleIds = await readIndex(store, "decks");
+      const rows = await readManyJson(store, moduleIds.map((id) => K.deck(id)));
       return rows.filter((d) => d && (d.cardIds || []).includes(card.id)).map((d) => d.id);
     }
 
     /* Take a card out of the decks that hold it. One read-modify-write per
        deck, grouped so deleting twenty cards from one deck is one write. */
     /** @param {Map<string, Set<string>>} removals deckId -> the cards to take out */
-    async function pullFromDecks(removals) {
+    async function pullFromModules(removals) {
       for (const [did, cardIds] of removals) {
         /* Against whatever the deck holds at the moment of writing, so a
            card added to it while this was running is not carried off by a
@@ -2940,18 +2940,18 @@ async function handle(req) {
      * other decks — in the deck's language, each with its clock, and a part
      * open where rangeChecks opens it in any of them. A part stored under
      * its old name is ready only when every part it became is.
-     * @param {Deck[]} decks
+     * @param {Module[]} modules
      * @param {Course[]} courses  Every course on the site.
      * @returns {Promise<Map<string, string[]>>}
      */
-    async function partsWaiting(decks, courses) {
+    async function partsWaiting(modules, courses) {
       /** @type {Map<string, string[]>} */
       const out = new Map();
-      const withParts = decks.filter((d) => (d.parts || []).length);
+      const withParts = modules.filter((d) => (d.parts || []).length);
       if (!withParts.length) return out;
       /* A deck's owner, for the decks beside these in their courses that
          are not in this list. */
-      const ownerOf = new Map(decks.map((d) => [d.id, d.owner]));
+      const ownerOf = new Map(modules.map((d) => [d.id, d.owner]));
       const beside = courses.filter((c) => withParts.some((d) => (c.decks || []).includes(d.id)));
       const unknown = [...new Set(beside.flatMap((c) => c.decks || []))].filter((id) => !ownerOf.has(id));
       (await readManyJson(store, unknown.map((id) => K.deck(id)))).forEach((d, i) => {
@@ -3099,7 +3099,7 @@ async function handle(req) {
       /** @type {string[]} */
       const ids = (await readJson(store, K.myCards(owner))) || [];
       /** @type {Set<string>} */
-      const decks = new Set();
+      const modules = new Set();
       let moved = false;
       for (const id of ids) {
         let changed = null;
@@ -3110,11 +3110,11 @@ async function handle(req) {
         });
         if (!changed) continue;
         moved = true;
-        for (const did of /** @type {any} */ (changed).inDecks || []) decks.add(String(did));
+        for (const did of /** @type {any} */ (changed).inDecks || []) modules.add(String(did));
       }
-      for (const did of decks) {
-        await updateJson(store, K.deck(did), (deck) =>
-          deck ? { ...deck, version: (deck.version || 1) + 1, updated: Date.now() } : null,
+      for (const did of modules) {
+        await updateJson(store, K.deck(did), (module) =>
+          module ? { ...module, version: (module.version || 1) + 1, updated: Date.now() } : null,
         );
       }
       if (moved) await bumpFills(owner);
@@ -3147,7 +3147,7 @@ async function handle(req) {
           result.refused.push(id);
           continue;
         }
-        for (const did of await decksHolding(card)) {
+        for (const did of await modulesHolding(card)) {
           let goneFrom = removals.get(did);
           if (!goneFrom) removals.set(did, (goneFrom = new Set()));
           goneFrom.add(id);
@@ -3166,7 +3166,7 @@ async function handle(req) {
         if (fillsOf(card).length) filledOwners.add(card.owner || "");
         result.deleted.push(id);
       }
-      await pullFromDecks(removals);
+      await pullFromModules(removals);
       for (const id of result.deleted) await store.delete(K.card(id)).catch(() => {});
       for (const [owner, gone] of owned) {
         /* Likewise: a card written while this delete was running stays
@@ -3180,14 +3180,14 @@ async function handle(req) {
     }
 
     /**
-     * @param {Deck} deck
+     * @param {Module} module
      * @returns {Promise<string[]>}
      */
-    async function deckCardIds(deck) {
+    async function moduleCardIds(module) {
       /* Decks made before the library existed kept their cards inline.
          Move them across the first time they are read. */
-      if (Array.isArray(deck.cardIds) && deck.cardIds.length) return deck.cardIds;
-      const legacy = (await readJson(store, K.cards(deck.id))) || [];
+      if (Array.isArray(module.cardIds) && module.cardIds.length) return module.cardIds;
+      const legacy = (await readJson(store, K.cards(module.id))) || [];
       if (!legacy.length) return [];
       /** @type {string[]} */
       const ids = [];
@@ -3196,24 +3196,24 @@ async function handle(req) {
         await writeJson(store, K.card(id), {
           ...c,
           id,
-          org: orgOf(deck),
-          owner: deck.owner,
-          lang: deck.lang || "",
+          org: orgOf(module),
+          owner: module.owner,
+          lang: module.lang || "",
           rev: 1,
-          inDecks: [deck.id],
+          inDecks: [module.id],
         });
         ids.push(id);
       }
       /* Added to the owner's list as it stands rather than to the copy
          this read before making the cards, which is a stretch of time long
          enough for a save of their own to land in between. */
-      await updateJson(store, K.myCards(deck.owner), (list) => (list || []).concat(ids));
-      await updateJson(store, K.deck(deck.id), (fresh) => ({
-        ...(fresh || deck),
+      await updateJson(store, K.myCards(module.owner), (list) => (list || []).concat(ids));
+      await updateJson(store, K.deck(module.id), (fresh) => ({
+        ...(fresh || module),
         cardIds: ids,
         cardCount: ids.length,
       }));
-      await store.delete(K.cards(deck.id)).catch(() => {});
+      await store.delete(K.cards(module.id)).catch(() => {});
       return ids;
     }
 
@@ -3221,11 +3221,11 @@ async function handle(req) {
       await liftTags(mine);
       /** @type {string[]} */
       const ids = (await readJson(store, K.myCards(mine))) || [];
-      const deckIds = await readIndex(store, "decks");
+      const moduleIds = await readIndex(store, "decks");
       const courseIds = await readIndex(store, "courses");
-      const [cardRows, deckRows, courseRows] = await Promise.all([
+      const [cardRows, moduleRows, courseRows] = await Promise.all([
         readManyJson(store, ids.map((id) => K.card(id))).then(here),
-        readManyJson(store, deckIds.map((id) => K.deck(id))).then(here),
+        readManyJson(store, moduleIds.map((id) => K.deck(id))).then(here),
         readManyJson(store, courseIds.map((id) => K.course(id))).then(here),
       ]);
 
@@ -3237,7 +3237,7 @@ async function handle(req) {
       );
       /* A space admin looks after every deck in the space (6a), except
          anyone's My space. */
-      const editable = deckRows.filter((d) => d && (d.owner === mine || teaching.has(d.id) || (iManage && !d.personal)));
+      const editable = moduleRows.filter((d) => d && (d.owner === mine || teaching.has(d.id) || (iManage && !d.personal)));
 
       /** @type {Record<string, string[]>} */
       const holding = {};
@@ -3280,24 +3280,24 @@ async function handle(req) {
       /* Asked once per deck per request: each answer reads every course. */
       /** @type {Map<string, Promise<boolean>>} */
       const editable = new Map();
-      /** @param {Deck | null} d */
-      const mayEditDeck = (d) => {
+      /** @param {Module | null} d */
+      const mayEditModule = (d) => {
         if (!d) return Promise.resolve(false);
-        if (!editable.has(d.id)) editable.set(d.id, canEditDeck(store, d, mine, iManage));
+        if (!editable.has(d.id)) editable.set(d.id, canEditModule(store, d, mine, iManage));
         return /** @type {Promise<boolean>} */ (editable.get(d.id));
       };
       if (id) {
         existing = await loadCard(id);
         if (!existing) return json({ error: "no-card" }, 404);
         wasFilling = fillsOf(existing).length > 0;
-        current = await decksHolding(existing);
+        current = await modulesHolding(existing);
         if (existing.owner !== mine && !iManage) {
           /* A card in a deck I teach is mine to correct — a deck it is
              actually in, not one the request happens to name. */
           let allowed = false;
           for (const did of current) {
-            const d = await readDeck(store, did);
-            if (await mayEditDeck(d)) {
+            const d = await readModule(store, did);
+            if (await mayEditModule(d)) {
               allowed = true;
               break;
             }
@@ -4112,7 +4112,7 @@ async function handle(req) {
       /* Which decks it belongs to travels with the card. Older clients sent
          this as deckIds, so both names are honoured rather than silently
          leaving the card in no deck at all. */
-      const wantedDecks = Array.isArray(body.decks)
+      const wantedModules = Array.isArray(body.decks)
         ? body.decks
         : Array.isArray(body.deckIds)
         ? body.deckIds
@@ -4131,22 +4131,22 @@ async function handle(req) {
        * removed or take away one they added. Without it, the list sent is
        * the list, as older builds expect.
        */
-      const decksWere = Array.isArray(body.decksWere) ? body.decksWere.map(String) : null;
-      const takesDecks = wantedDecks && !(touched && !touched.includes("decks")) && !walk;
-      if (takesDecks && decksWere && id) {
+      const modulesWere = Array.isArray(body.decksWere) ? body.decksWere.map(String) : null;
+      const takesModules = wantedModules && !(touched && !touched.includes("decks")) && !walk;
+      if (takesModules && modulesWere && id) {
         const now = await loadCard(id);
-        if (now) current = await decksHolding(now);
+        if (now) current = await modulesHolding(now);
       }
-      const wanted = takesDecks
-        ? decksWere
+      const wanted = takesModules
+        ? modulesWere
           ? (() => {
-              const asked = new Set(wantedDecks.map(String));
-              const were = new Set(decksWere);
+              const asked = new Set(wantedModules.map(String));
+              const were = new Set(modulesWere);
               const add = [...asked].filter((x) => !were.has(x));
               const remove = new Set([...were].filter((x) => !asked.has(x)));
               return new Set([...current, ...add].filter((x) => !remove.has(x)));
             })()
-          : new Set(wantedDecks)
+          : new Set(wantedModules)
         : new Set(current);
       /* Whether what students have of this card moved, which is what makes
          their devices fetch it again. A change to a draft, or to a
@@ -4155,15 +4155,15 @@ async function handle(req) {
       const reached = new Set([...current, ...wanted]);
       /** @type {string[]} */
       const final = [];
-      const deckRecords = [];
+      const moduleRecords = [];
       /** @type {{ id: string, title: string }[]} */
       const refusedLocked = [];
       for (const did of reached) {
-        const d = await readDeck(store, did);
+        const d = await readModule(store, did);
         if (!d) continue;
         const has = current.includes(did);
         const want = wanted.has(did);
-        if (want !== has && !(await mayEditDeck(d))) {
+        if (want !== has && !(await mayEditModule(d))) {
           /* Not this person's deck to change: leave it as it was. */
           if (has) final.push(did);
           continue;
@@ -4175,12 +4175,12 @@ async function handle(req) {
            was and named in the answer, so a save queued offline before the
            lock still lands its words and the teacher is told which deck
            did not take the change. */
-        if (want !== has && d.locked && DECK_LOCKS) {
+        if (want !== has && d.locked && MODULE_LOCKS) {
           if (has) final.push(did);
           refusedLocked.push({ id: d.id, title: d.title });
           continue;
         }
-        const ids = await deckCardIds(d);
+        const ids = await moduleCardIds(d);
         const next = want
           ? ids.includes(saved.id)
             ? ids
@@ -4218,7 +4218,7 @@ async function handle(req) {
             updated: Date.now(),
           };
         });
-        if (record) deckRecords.push(record);
+        if (record) moduleRecords.push(record);
         else if (want) final.splice(final.indexOf(did), 1);
       }
       /*
@@ -4326,8 +4326,8 @@ async function handle(req) {
        * membership laid over the membership it has now.
        */
       const before = existing;
-      const decksAdded = final.filter((x) => !current.includes(x));
-      const decksRemoved = current.filter((x) => !final.includes(x));
+      const modulesAdded = final.filter((x) => !current.includes(x));
+      const modulesRemoved = current.filter((x) => !final.includes(x));
       const wrote = /** @type {Record<string, any>} */ (await updateJson(store, K.card(saved.id), (/** @type {any} */ fresh) => {
         if (!fresh || !before || (fresh.rev || 1) === (before.rev || 1)) return saved;
         /** @type {Record<string, any>} */
@@ -4343,7 +4343,7 @@ async function handle(req) {
         }
         merged.rev = (fresh.rev || 1) + 1;
         const held = Array.isArray(fresh.inDecks) ? fresh.inDecks : current;
-        merged.inDecks = [...new Set([...held, ...decksAdded])].filter((x) => !decksRemoved.includes(x));
+        merged.inDecks = [...new Set([...held, ...modulesAdded])].filter((x) => !modulesRemoved.includes(x));
         return merged;
       }));
       saved = wrote;
@@ -4362,7 +4362,7 @@ async function handle(req) {
         card: { ...teacherView(saved), decks: saved.inDecks || final },
         /* The screen folds these over the decks it holds, so they say
            which courses hold them the way my-decks does. */
-        decks: await withLinks(store, deckRecords),
+        decks: await withLinks(store, moduleRecords),
         ...(trimmed.length ? { trimmed } : {}),
         ...(refusedLocked.length ? { locked: refusedLocked } : {}),
       });
@@ -4378,8 +4378,8 @@ async function handle(req) {
     async function mayEditCard(card) {
       if (!card) return false;
       if (card.owner === mine || iManage) return true;
-      for (const did of await decksHolding(card)) {
-        if (await canEditDeck(store, await readDeck(store, did), mine, iManage)) return true;
+      for (const did of await modulesHolding(card)) {
+        if (await canEditModule(store, await readModule(store, did), mine, iManage)) return true;
       }
       return false;
     }
@@ -4441,7 +4441,7 @@ async function handle(req) {
           },
         };
       });
-      const holding = await decksHolding(next || card);
+      const holding = await modulesHolding(next || card);
       for (const did of holding) {
         await updateJson(store, K.deck(did), (/** @type {any} */ d) =>
           d ? { ...d, version: (d.version || 1) + 1, updated: Date.now() } : null,
@@ -4533,7 +4533,7 @@ async function handle(req) {
         return r.next;
       }));
       if (refused) return json({ error: refused }, refused === "no-card" ? 404 : 400);
-      const holding = await decksHolding(was);
+      const holding = await modulesHolding(was);
       if (seenByStudents(was) !== seenByStudents(next)) {
         for (const did of holding) {
           await updateJson(store, K.deck(did), (/** @type {any} */ d) =>
@@ -4577,7 +4577,7 @@ async function handle(req) {
         if (!allowed.has(cid)) {
           let may = card ? await mayEditCard(card) : false;
           if (!may && !card && f.deckId) {
-            may = await canEditDeck(store, await readDeck(store, String(f.deckId)), mine, iManage);
+            may = await canEditModule(store, await readModule(store, String(f.deckId)), mine, iManage);
           }
           allowed.set(cid, may);
         }
@@ -4608,7 +4608,7 @@ async function handle(req) {
         const card = await loadCard(cardIdOf(f.cardId));
         const may = card
           ? await mayEditCard(card)
-          : !!f.deckId && (await canEditDeck(store, await readDeck(store, String(f.deckId)), mine, iManage));
+          : !!f.deckId && (await canEditModule(store, await readModule(store, String(f.deckId)), mine, iManage));
         if (!may) continue;
         await store.delete(K.flag(fid)).catch(() => {});
         gone.push(fid);
@@ -4659,20 +4659,20 @@ async function handle(req) {
       const shown = rows.filter((d) => !hidesSet(off, d) && (d.owner === mine || teaching.has(d.id) || (iManage && !d.personal)));
       /* And which of its number parts reach nobody yet — see partsWaiting. */
       const waiting = await partsWaiting(shown, courses);
-      const decks = shown.map((d) => ({
+      const modules = shown.map((d) => ({
         ...d,
         courses: linksOf(d, courses),
         cardCount: (d.cardIds || []).length,
         mine: d.owner === mine,
         ...(waiting.has(d.id) ? { partsWaiting: waiting.get(d.id) } : null),
       }));
-      return jsonTagged(req, { ok: true, decks });
+      return jsonTagged(req, { ok: true, decks: modules });
     }
 
     if (action === "rename-deck") {
-      const deck = await readDeck(store, String(body.deckId || ""));
-      if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, iManage)))
+      const module = await readModule(store, String(body.deckId || ""));
+      if (!module) return json({ error: "no-deck" }, 404);
+      if (!(await canEditModule(store, module, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       const title = String(body.title || "").trim().slice(0, 60);
       if (!title) return json({ error: "title-required" }, 400);
@@ -4680,7 +4680,7 @@ async function handle(req) {
          written whole, that copy undid whatever landed in between — a card
          filed into it, a course it was added to. The same for every change
          to a deck below. */
-      await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) =>
+      await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) =>
         fresh ? { ...fresh, title, updated: Date.now() } : null
       );
       await taught();
@@ -4693,12 +4693,12 @@ async function handle(req) {
      * What the cards say is not locked — only which cards are in it.
      */
     if (action === "lock-deck") {
-      const deck = await readDeck(store, String(body.deckId || ""));
-      if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, iManage)))
+      const module = await readModule(store, String(body.deckId || ""));
+      if (!module) return json({ error: "no-deck" }, 404);
+      if (!(await canEditModule(store, module, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       const locked = !!body.locked;
-      await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
+      await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) => {
         if (!fresh) return null;
         const { locked: _was, ...rest } = fresh;
         return { ...(locked ? { ...rest, locked: true } : rest), updated: Date.now() };
@@ -4719,11 +4719,11 @@ async function handle(req) {
      * holds.
      */
     if (action === "set-deck-parts") {
-      const deck = await readDeck(store, String(body.deckId || ""));
-      if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, iManage)))
+      const module = await readModule(store, String(body.deckId || ""));
+      if (!module) return json({ error: "no-deck" }, 404);
+      if (!(await canEditModule(store, module, mine, iManage)))
         return json({ error: "not-yours" }, 403);
-      if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
+      if (module.locked && MODULE_LOCKS) return json({ error: "deck-locked" }, 409);
       const asked = Array.isArray(body.parts) ? body.parts : [];
       const parts = [
         ...new Set(
@@ -4732,7 +4732,7 @@ async function handle(req) {
             .filter((/** @type {string} */ p) => /^(numbers|time):[a-z0-9+-]{1,40}$/.test(p))
         ),
       ].slice(0, 50);
-      const next = await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
+      const next = await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) => {
         if (!fresh) return null;
         const { parts: _was, ...rest } = fresh;
         return { ...rest, ...(parts.length ? { parts } : null), updated: Date.now() };
@@ -4753,20 +4753,20 @@ async function handle(req) {
      * src/sets.ts.
      */
     if (action === "save-set") {
-      const deck = await readDeck(store, String(body.deckId || ""));
-      if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, iManage)))
+      const module = await readModule(store, String(body.deckId || ""));
+      if (!module) return json({ error: "no-deck" }, 404);
+      if (!(await canEditModule(store, module, mine, iManage)))
         return json({ error: "not-yours" }, 403);
-      if (deck.personal) return json({ error: "personal-set" }, 400);
-      if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
+      if (module.personal) return json({ error: "personal-set" }, 400);
+      if (module.locked && MODULE_LOCKS) return json({ error: "deck-locked" }, 409);
       /* A personal set only where the App admin allows them (0.683): while
          they are off, none is made or changed (0.684); one can still be
          made an ordinary deck again. */
       if (body.set !== null) {
-        const space = await readJson(store, K.org(orgOf(deck)));
+        const space = await readJson(store, K.org(orgOf(module)));
         if (!space || !space.sets) return json({ error: "sets-off" }, 403);
       }
-      const next = await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
+      const next = await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) => {
         if (!fresh) return null;
         const { set: _was, ...rest } = /** @type {any} */ (fresh);
         const set = body.set === null ? null : readSet(body.set, fresh.id);
@@ -4784,11 +4784,11 @@ async function handle(req) {
      * chosen — the owner and every teacher with a number system in the
      * deck's language — and set-deck-numbers records the choice.
      */
-    async function numberSources(/** @type {Deck} */ deck) {
+    async function numberSources(/** @type {Module} */ module) {
       const courses = await everyCourse(store);
-      const holding = courses.filter((c) => (c.decks || []).includes(deck.id));
-      const lang = deck.lang || (holding[0] && holding[0].language) || "";
-      const handles = [...new Set([deck.owner].concat(courses.flatMap((c) => c.teachers || [])).filter(Boolean))];
+      const holding = courses.filter((c) => (c.decks || []).includes(module.id));
+      const lang = module.lang || (holding[0] && holding[0].language) || "";
+      const handles = [...new Set([module.owner].concat(courses.flatMap((c) => c.teachers || [])).filter(Boolean))];
       const out = [];
       for (const h of handles) {
         const index = await systemIndex(h);
@@ -4796,25 +4796,25 @@ async function handle(req) {
         const u = await readUser(store, h);
         out.push({ handle: h, displayName: (u && u.displayName) || h, numbers: true, times: !!index.times[lang] });
       }
-      const owner = out.filter((x) => x.handle === deck.owner);
-      const rest = out.filter((x) => x.handle !== deck.owner).sort((a, b) => a.displayName.localeCompare(b.displayName));
+      const owner = out.filter((x) => x.handle === module.owner);
+      const rest = out.filter((x) => x.handle !== module.owner).sort((a, b) => a.displayName.localeCompare(b.displayName));
       return owner.concat(rest);
     }
 
     if (action === "number-sources") {
-      const deck = await readDeck(store, url.searchParams.get("deck") || "");
-      if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, iManage))) return json({ error: "not-yours" }, 403);
-      return json({ ok: true, sources: await numberSources(deck), chosen: deck.numbersFrom || deck.owner });
+      const module = await readModule(store, url.searchParams.get("deck") || "");
+      if (!module) return json({ error: "no-deck" }, 404);
+      if (!(await canEditModule(store, module, mine, iManage))) return json({ error: "not-yours" }, 403);
+      return json({ ok: true, sources: await numberSources(module), chosen: module.numbersFrom || module.owner });
     }
 
     if (action === "set-deck-numbers") {
-      const deck = await readDeck(store, String(body.deckId || ""));
-      if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, iManage))) return json({ error: "not-yours" }, 403);
+      const module = await readModule(store, String(body.deckId || ""));
+      if (!module) return json({ error: "no-deck" }, 404);
+      if (!(await canEditModule(store, module, mine, iManage))) return json({ error: "not-yours" }, 403);
       const from = String(body.from || "");
-      if (!(await numberSources(deck)).some((x) => x.handle === from)) return json({ error: "bad-source" }, 400);
-      const next = await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
+      if (!(await numberSources(module)).some((x) => x.handle === from)) return json({ error: "bad-source" }, 400);
+      const next = await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) => {
         if (!fresh) return null;
         const { numbersFrom: _was, ...rest } = /** @type {any} */ (fresh);
         return {
@@ -4833,10 +4833,10 @@ async function handle(req) {
 
     /* "Practise this myself" on one of your own personal decks (59b). */
     if (action === "set-deck-practise") {
-      const deck = await readDeck(store, String(body.deckId || ""));
-      if (!deck || !deck.personal || deck.owner !== mine) return json({ error: "not-yours" }, 403);
+      const module = await readModule(store, String(body.deckId || ""));
+      if (!module || !module.personal || module.owner !== mine) return json({ error: "not-yours" }, 403);
       const practise = !!body.practise;
-      await updateJson(store, K.deck(deck.id), (/** @type {any} */ f) =>
+      await updateJson(store, K.deck(module.id), (/** @type {any} */ f) =>
         f ? { ...f, practise, version: (f.version || 1) + 1, updated: Date.now() } : null
       );
       return json({ ok: true, practise });
@@ -4851,8 +4851,8 @@ async function handle(req) {
      * the space's and stay as they are.
      */
     if (action === "copy-to-space") {
-      const deck = await readDeck(store, String(body.deckId || ""));
-      if (!deck || !deck.personal || deck.owner !== mine) return json({ error: "not-yours" }, 403);
+      const module = await readModule(store, String(body.deckId || ""));
+      if (!module || !module.personal || module.owner !== mine) return json({ error: "not-yours" }, 403);
       if (!iManage && !(await everyCourse(store)).some((c) => isTeacher(c, mine))) return json({ error: "not-teaching" }, 403);
       const move = body.move === true;
       const courses = (await everyCourse(store)).filter(
@@ -4860,25 +4860,25 @@ async function handle(req) {
       );
       let landed;
       if (move) {
-        for (const cid of deck.cardIds || []) {
+        for (const cid of module.cardIds || []) {
           await updateJson(store, K.card(cid), (/** @type {any} */ c) => {
             if (!c || !c.personal || c.owner !== mine) return null;
             const { personal: _p, ...rest } = c;
             return { ...rest, updated: Date.now() };
           });
         }
-        landed = await updateJson(store, K.deck(deck.id), (/** @type {any} */ d) => {
+        landed = await updateJson(store, K.deck(module.id), (/** @type {any} */ d) => {
           if (!d) return null;
           const { personal: _p, practise: _q, ...rest } = d;
           return { ...rest, version: (d.version || 1) + 1, updated: Date.now() };
         });
       } else {
-        const newDeck = `d${randomBytes(6).toString("hex")}`;
+        const newModule = `d${randomBytes(6).toString("hex")}`;
         /** @type {string[]} */
         const ids = [];
         /** @type {string[]} */
         const madeIds = [];
-        for (const cid of deck.cardIds || []) {
+        for (const cid of module.cardIds || []) {
           const c = await loadCard(cid);
           if (!c) continue;
           if (!c.personal) {
@@ -4887,18 +4887,18 @@ async function handle(req) {
           }
           const copyId = `k${randomBytes(6).toString("hex")}`;
           const { personal: _p, inDecks: _d, ...rest } = /** @type {any} */ (c);
-          await writeJson(store, K.card(copyId), { ...rest, id: copyId, org: acting, owner: mine, rev: 1, inDecks: [newDeck], created: Date.now(), updated: Date.now() });
+          await writeJson(store, K.card(copyId), { ...rest, id: copyId, org: acting, owner: mine, rev: 1, inDecks: [newModule], created: Date.now(), updated: Date.now() });
           ids.push(copyId);
           madeIds.push(copyId);
         }
         if (madeIds.length) await updateJson(store, K.myCards(mine), (/** @type {any} */ cur) => (cur || []).concat(madeIds));
-        const { personal: _p, practise: _q, ...deckRest } = /** @type {any} */ (deck);
+        const { personal: _p, practise: _q, ...moduleRest } = /** @type {any} */ (module);
         landed = {
-          ...deckRest, id: newDeck, org: acting, owner: mine, title: String(body.title || deck.title).slice(0, 60),
+          ...moduleRest, id: newModule, org: acting, owner: mine, title: String(body.title || module.title).slice(0, 60),
           courses: [], cardIds: ids, cardCount: ids.length, version: 1, updated: Date.now(),
         };
-        await writeJson(store, K.deck(newDeck), landed);
-        await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).concat([newDeck]));
+        await writeJson(store, K.deck(newModule), landed);
+        await updateJson(store, K.index("decks"), (/** @type {any} */ cur) => (cur || []).concat([newModule]));
       }
       for (const c of courses) {
         /* A path unit goes onto the path as well, as a draft (A1). */
@@ -4920,22 +4920,22 @@ async function handle(req) {
     if (action === "card-to-space") {
       const card = await loadCard(String(body.cardId || ""));
       if (!card || !card.personal || card.owner !== mine) return json({ error: "not-yours" }, 403);
-      const deck = await readDeck(store, String(body.deckId || ""));
-      if (!deck || deck.personal || !(await canEditDeck(store, deck, mine, iManage))) return json({ error: "not-yours" }, 403);
+      const module = await readModule(store, String(body.deckId || ""));
+      if (!module || module.personal || !(await canEditModule(store, module, mine, iManage))) return json({ error: "not-yours" }, 403);
       let id = card.id;
       if (body.move === true) {
         await updateJson(store, K.card(card.id), (/** @type {any} */ c) => {
           if (!c) return null;
           const { personal: _p, ...rest } = c;
-          return { ...rest, inDecks: [...new Set((c.inDecks || []).concat([deck.id]))], updated: Date.now() };
+          return { ...rest, inDecks: [...new Set((c.inDecks || []).concat([module.id]))], updated: Date.now() };
         });
       } else {
         id = `k${randomBytes(6).toString("hex")}`;
         const { personal: _p, inDecks: _d, ...rest } = /** @type {any} */ (card);
-        await writeJson(store, K.card(id), { ...rest, id, org: acting, owner: mine, rev: 1, inDecks: [deck.id], created: Date.now(), updated: Date.now() });
+        await writeJson(store, K.card(id), { ...rest, id, org: acting, owner: mine, rev: 1, inDecks: [module.id], created: Date.now(), updated: Date.now() });
         await updateJson(store, K.myCards(mine), (/** @type {any} */ cur) => (cur || []).concat([id]));
       }
-      await updateJson(store, K.deck(deck.id), (/** @type {any} */ d) => {
+      await updateJson(store, K.deck(module.id), (/** @type {any} */ d) => {
         if (!d) return null;
         const ids = [...new Set((d.cardIds || []).concat([id]))];
         return { ...d, cardIds: ids, cardCount: ids.length, version: (d.version || 1) + 1, updated: Date.now() };
@@ -4948,17 +4948,17 @@ async function handle(req) {
        is unlocked first: deleting it is the largest change there is to
        which cards it holds. */
     if (action === "delete-deck") {
-      const deck = await readDeck(store, String(body.deckId || ""));
-      if (!deck) return json({ error: "no-deck" }, 404);
-      if (!(await canEditDeck(store, deck, mine, iManage)))
+      const module = await readModule(store, String(body.deckId || ""));
+      if (!module) return json({ error: "no-deck" }, 404);
+      if (!(await canEditModule(store, module, mine, iManage)))
         return json({ error: "not-yours" }, 403);
-      if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
+      if (module.locked && MODULE_LOCKS) return json({ error: "deck-locked" }, 409);
 
-      await dropFromCourses(store, deck.id);
-      await store.delete(K.deck(deck.id)).catch(() => {});
-      await store.delete(K.cards(deck.id)).catch(() => {});
+      await dropFromCourses(store, module.id);
+      await store.delete(K.deck(module.id)).catch(() => {});
+      await store.delete(K.cards(module.id)).catch(() => {});
       await updateJson(store, K.index("decks"), (/** @type {string[] | null} */ cur) =>
-        (cur || []).includes(deck.id) ? (cur || []).filter((x) => x !== deck.id) : null);
+        (cur || []).includes(module.id) ? (cur || []).filter((x) => x !== module.id) : null);
       await taught();
       return json({ ok: true });
     }
@@ -4975,13 +4975,13 @@ async function handle(req) {
      * one students are sent and the one every screen reads — see linksOf.
      */
     if (action === "attach-deck" || action === "detach-deck") {
-      const deck = await readDeck(store, String(body.deckId || ""));
+      const module = await readModule(store, String(body.deckId || ""));
       const course = await readCourse(store, String(body.courseId || ""));
-      if (!deck || !course) return json({ error: "not-found" }, 404);
-      if (!(await canEditDeck(store, deck, mine, iManage)))
+      if (!module || !course) return json({ error: "not-found" }, 404);
+      if (!(await canEditModule(store, module, mine, iManage)))
         return json({ error: "not-yours" }, 403);
       if (!isTeacher(course, mine) && !iManage) return json({ error: "not-teaching" }, 403);
-      if (deck.personal) return json({ error: "personal-deck" }, 400);
+      if (module.personal) return json({ error: "personal-deck" }, 400);
 
       const adding = action === "attach-deck";
       /* Whether the course held it before this, which decides whether the
@@ -4990,28 +4990,28 @@ async function handle(req) {
       let held = false;
       const nextCourse = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) => {
         if (!fresh) return null;
-        held = (fresh.decks || []).includes(deck.id);
+        held = (fresh.decks || []).includes(module.id);
         if (adding === held) {
           /* A unit the course holds but whose path lost it is put back at
              the end; one taken out leaves nothing of itself on the path. */
-          if (deck.unit && adding && !(fresh.path || []).includes(deck.id)) return { ...fresh, path: (fresh.path || []).concat([deck.id]) };
-          if (!adding && onPath(fresh, deck.id)) return offPath(fresh, deck.id);
+          if (module.unit && adding && !(fresh.path || []).includes(module.id)) return { ...fresh, path: (fresh.path || []).concat([module.id]) };
+          if (!adding && onPath(fresh, module.id)) return offPath(fresh, module.id);
           return null;
         }
         /* A path unit is always on the path of every course it is in (A1),
            and starts there as a draft; taken away, it leaves that course's
            path, publication and opening early, and no other course's. */
         if (adding) {
-          const decks = (fresh.decks || []).concat([deck.id]);
-          return deck.unit
-            ? { ...fresh, decks, path: (fresh.path || []).filter((x) => x !== deck.id).concat([deck.id]) }
-            : { ...fresh, decks };
+          const modules = (fresh.decks || []).concat([module.id]);
+          return module.unit
+            ? { ...fresh, decks: modules, path: (fresh.path || []).filter((x) => x !== module.id).concat([module.id]) }
+            : { ...fresh, decks: modules };
         }
-        return offPath({ ...fresh, decks: fresh.decks.filter((d) => d !== deck.id) }, deck.id);
+        return offPath({ ...fresh, decks: fresh.decks.filter((d) => d !== module.id) }, module.id);
       });
       if (!nextCourse) return json({ error: "not-found" }, 404);
       const now = Date.now();
-      const nextDeck = await updateJson(store, K.deck(deck.id), (/** @type {Deck | null} */ fresh) => {
+      const nextModule = await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) => {
         if (!fresh) return null;
         const others = (fresh.courses || []).filter((l) => l.courseId !== course.id);
         const mineNow = (fresh.courses || []).find((l) => l.courseId === course.id);
@@ -5022,9 +5022,9 @@ async function handle(req) {
         const link = held ? { courseId: course.id } : { courseId: course.id, addedAt: now };
         return { ...fresh, courses: others.concat([link]) };
       });
-      if (!nextDeck) return json({ error: "not-found" }, 404);
+      if (!nextModule) return json({ error: "not-found" }, 404);
       await taught();
-      const [shown] = await withLinks(store, [nextDeck]);
+      const [shown] = await withLinks(store, [nextModule]);
       return json({ ok: true, deck: shown, course: nextCourse });
     }
 
@@ -5052,7 +5052,7 @@ async function handle(req) {
       if (!title) return json({ error: "title-required" }, 400);
       const id = `d${randomBytes(6).toString("hex")}`;
       const now = Date.now();
-      const deck = {
+      const module = {
         id,
         org: orgOf(course),
         owner: mine,
@@ -5065,27 +5065,27 @@ async function handle(req) {
         cardIds: [],
         updated: now,
       };
-      await writeJson(store, K.deck(id), deck);
+      await writeJson(store, K.deck(id), module);
       await indexAdd(store, "decks", id);
       const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) =>
         fresh ? { ...fresh, decks: (fresh.decks || []).concat([id]), path: (fresh.path || []).concat([id]) } : null
       );
       await taught();
-      return json({ ok: true, deck, course: next });
+      return json({ ok: true, deck: module, course: next });
     }
 
     if (action === "move-unit") {
       const { course, refused } = await pathCourse();
       if (refused) return refused;
-      const deckId = String(body.deckId || "");
-      if (!(course.path || []).includes(deckId)) return json({ error: "not-on-path" }, 404);
+      const moduleId = String(body.deckId || "");
+      if (!(course.path || []).includes(moduleId)) return json({ error: "not-on-path" }, 404);
       const to = Math.floor(Number(body.to));
       if (!Number.isFinite(to)) return json({ error: "bad-position" }, 400);
       const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) => {
-        if (!fresh || !(fresh.path || []).includes(deckId)) return null;
-        const rest = (fresh.path || []).filter((x) => x !== deckId);
+        if (!fresh || !(fresh.path || []).includes(moduleId)) return null;
+        const rest = (fresh.path || []).filter((x) => x !== moduleId);
         const at = Math.max(0, Math.min(rest.length, to));
-        const path = rest.slice(0, at).concat([deckId], rest.slice(at));
+        const path = rest.slice(0, at).concat([moduleId], rest.slice(at));
         return path.join() === (fresh.path || []).join() ? null : { ...fresh, path };
       });
       await taught();
@@ -5095,14 +5095,14 @@ async function handle(req) {
     if (action === "publish-unit") {
       const { course, refused } = await pathCourse();
       if (refused) return refused;
-      const deckId = String(body.deckId || "");
-      if (!(course.path || []).includes(deckId)) return json({ error: "not-on-path" }, 404);
-      if (isLiveIn(course, deckId)) return json({ ok: true, course });
-      const problems = await unitCheck(course, deckId);
+      const moduleId = String(body.deckId || "");
+      if (!(course.path || []).includes(moduleId)) return json({ error: "not-on-path" }, 404);
+      if (isLiveIn(course, moduleId)) return json({ ok: true, course });
+      const problems = await unitCheck(course, moduleId);
       if (problems.length) return json({ error: "unit-not-ready", problems }, 409);
       const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) =>
-        fresh && (fresh.path || []).includes(deckId) && !isLiveIn(fresh, deckId)
-          ? { ...fresh, pathLive: { ...(fresh.pathLive || {}), [deckId]: Date.now() } }
+        fresh && (fresh.path || []).includes(moduleId) && !isLiveIn(fresh, moduleId)
+          ? { ...fresh, pathLive: { ...(fresh.pathLive || {}), [moduleId]: Date.now() } }
           : null
       );
       await taught();
@@ -5112,14 +5112,14 @@ async function handle(req) {
     if (action === "open-unit") {
       const { course, refused } = await pathCourse();
       if (refused) return refused;
-      const deckId = String(body.deckId || "");
-      if (!isLiveIn(course, deckId)) return json({ error: "unit-draft" }, 409);
+      const moduleId = String(body.deckId || "");
+      if (!isLiveIn(course, moduleId)) return json({ error: "unit-draft" }, 409);
       const open = body.open === true;
       const next = await updateJson(store, K.course(course.id), (/** @type {Course | null} */ fresh) => {
         if (!fresh) return null;
         const was = fresh.opened || [];
-        if (open === was.includes(deckId)) return null;
-        const opened = open ? was.concat([deckId]) : was.filter((x) => x !== deckId);
+        if (open === was.includes(moduleId)) return null;
+        const opened = open ? was.concat([moduleId]) : was.filter((x) => x !== moduleId);
         const { opened: _o, ...rest } = fresh;
         return opened.length ? { ...rest, opened } : rest;
       });
@@ -5136,27 +5136,27 @@ async function handle(req) {
      * teachers, and the number values of the parts those units hold — see
      * countingCards in path.ts.
      * @param {Course} course
-     * @param {string} deckId
+     * @param {string} moduleId
      */
-    async function unitCheck(course, deckId) {
-      const decks = (await readManyJson(store, (course.path || []).map((id) => K.deck(id)))).filter(Boolean);
-      const unitDeck = decks.find((d) => d.id === deckId);
-      if (!unitDeck) return [{ kind: "few-sentences", have: 0, need: 5 }];
-      const from = drawsFrom(course, decks, deckId);
+    async function unitCheck(course, moduleId) {
+      const modules = (await readManyJson(store, (course.path || []).map((id) => K.deck(id)))).filter(Boolean);
+      const unitModule = modules.find((d) => d.id === moduleId);
+      if (!unitModule) return [{ kind: "few-sentences", have: 0, need: 5 }];
+      const from = drawsFrom(course, modules, moduleId);
       /** @type {Map<string, string[]>} */
-      const decksOf = new Map();
-      for (const d of decks) {
+      const modulesOf = new Map();
+      for (const d of modules) {
         if (!from.has(d.id)) continue;
-        for (const id of await deckCardIds(d)) decksOf.set(id, (decksOf.get(id) || []).concat([d.id]));
+        for (const id of await moduleCardIds(d)) modulesOf.set(id, (modulesOf.get(id) || []).concat([d.id]));
       }
-      const ids = [...decksOf.keys()];
+      const ids = [...modulesOf.keys()];
       const rows = await readManyJson(store, ids.map((id) => K.card(id)));
       /** @type {Map<string, any>} */
       const byId = new Map();
       rows.forEach((c, i) => {
         if (c && inScope(c) && isPublished(c)) byId.set(ids[i], studentView(c));
       });
-      const owners = [...new Set([unitDeck.owner, ...(course.teachers || [])])].filter(Boolean);
+      const owners = [...new Set([unitModule.owner, ...(course.teachers || [])])].filter(Boolean);
       for (const owner of owners) {
         /** @type {string[]} */
         const lib = (await readJson(store, K.myCards(owner))) || [];
@@ -5165,12 +5165,12 @@ async function handle(req) {
           if (c && inScope(c) && isPublished(c) && neverAskedAlone(c) && !byId.has(c.id)) byId.set(c.id, studentView(c));
         }
       }
-      const lang = LANGUAGES[/** @type {import("../../src/types.ts").LangId} */ (unitDeck.lang || course.language || "")] || null;
+      const lang = LANGUAGES[/** @type {import("../../src/types.ts").LangId} */ (unitModule.lang || course.language || "")] || null;
       /* The number values a blank may be filled with, from the system the
          unit's numbers come from — counted with that teacher's nouns, as
          the teacher's own screen counts them. */
-      const numLang = unitDeck.lang || course.language || "";
-      const numOwner = unitDeck.numbersFrom || unitDeck.owner;
+      const numLang = unitModule.lang || course.language || "";
+      const numOwner = unitModule.numbersFrom || unitModule.owner;
       const index = await systemIndex(numOwner);
       const sysRow = index.numbers[numLang] ? await readJson(store, K.numSys(index.numbers[numLang])) : null;
       const sys = sysRow ? readNumberSystem(sysRow) : null;
@@ -5184,11 +5184,11 @@ async function handle(req) {
       }
       const all = [...byId.values()];
       const counting = countingCards({
-        course, decks, unitId: deckId, cards: all,
-        deckIdsOf: (c) => decksOf.get(String(c.id)) || [],
+        course, modules: modules, unitId: moduleId, cards: all,
+        moduleIdsOf: (c) => modulesOf.get(String(c.id)) || [],
         fillers,
       });
-      const own = (await deckCardIds(unitDeck)).map((id) => byId.get(id)).filter(Boolean);
+      const own = (await moduleCardIds(unitModule)).map((id) => byId.get(id)).filter(Boolean);
       return unitProblems({ cards: own, counting, lang });
     }
 
@@ -5525,28 +5525,28 @@ async function handle(req) {
 
       /* A deck in two of the person's courses is still one deck; listing
          it twice gave the app two cards with one id. First course wins. */
-      const deckToCourse = new Map();
+      const moduleToCourse = new Map();
       for (const c of courseRows) for (const did of c.decks || []) {
-        if (!deckToCourse.has(did)) deckToCourse.set(did, c);
+        if (!moduleToCourse.has(did)) moduleToCourse.set(did, c);
       }
-      let deckRows = (await readManyJson(store, [...deckToCourse.keys()].map((id) => K.deck(id)), EVENTUAL)).filter(
+      let moduleRows = (await readManyJson(store, [...moduleToCourse.keys()].map((id) => K.deck(id)), EVENTUAL)).filter(
         Boolean
       );
       /* A path unit reaches a student only through a course where it is
          published (0.613, R26): a draft is invisible, its cards, its number
          parts and all. Where it is published in several of their courses,
          the first of those is the one it is sent under. */
-      for (const d of deckRows) {
+      for (const d of moduleRows) {
         if (!d.unit) continue;
         const live = courseRows.find((c) => (c.decks || []).includes(d.id) && isLiveIn(c, d.id));
-        if (live) deckToCourse.set(d.id, live);
-        else deckToCourse.delete(d.id);
+        if (live) moduleToCourse.set(d.id, live);
+        else moduleToCourse.delete(d.id);
       }
-      deckRows = deckRows.filter((d) => deckToCourse.has(d.id));
+      moduleRows = moduleRows.filter((d) => moduleToCourse.has(d.id));
       /* A personal set reaches nobody while its space has them switched
          off (0.684); its students' answers wait on their devices and here. */
-      const setsOff = await setsOffAmong(store, deckRows.filter((d) => d.set).map((d) => orgOf(d)));
-      deckRows = deckRows.filter((d) => !hidesSet(setsOff, d));
+      const setsOff = await setsOffAmong(store, moduleRows.filter((d) => d.set).map((d) => orgOf(d)));
+      moduleRows = moduleRows.filter((d) => !hidesSet(setsOff, d));
 
       /* Whose values can reach this person: whoever owns a deck they hold,
          and whoever teaches a course they are in — the same two lists the
@@ -5556,12 +5556,12 @@ async function handle(req) {
          move when one is written. */
       const teacherHandles = [
         ...new Set(
-          deckRows
+          moduleRows
             .map((/** @type {any} */ d) => d.owner)
             .concat(courseRows.flatMap((/** @type {any} */ c) => c.teachers || []))
             /* And whoever a deck takes its numbers from (0.541), who may
                teach none of these courses. */
-            .concat(deckRows.map((/** @type {any} */ d) => d.numbersFrom || ""))
+            .concat(moduleRows.map((/** @type {any} */ d) => d.numbersFrom || ""))
             .filter(Boolean)
         ),
       ];
@@ -5585,7 +5585,7 @@ async function handle(req) {
        */
       const langs = [
         ...new Set(
-          deckRows
+          moduleRows
             .map((/** @type {any} */ d) => d.lang)
             .concat(courseRows.map((/** @type {any} */ c) => c.language))
             .filter(Boolean)
@@ -5618,7 +5618,7 @@ async function handle(req) {
       ).flat();
       /** @type {[string, number][]} */
       const systemsAt = systems.map((/** @type {any} */ sys) => [sys.id, Number(sys.rev) || 0]);
-      const version = materialVersion(courseRows, deckRows, fillsAt, systemsAt);
+      const version = materialVersion(courseRows, moduleRows, fillsAt, systemsAt);
       const courses = courseRows.map((c) => ({
         ...c,
         /* Said outright, so the app never needs "absent means Main". */
@@ -5631,25 +5631,25 @@ async function handle(req) {
       }));
       if (known && known === version) return json({ ok: true, unchanged: true, version, teaches, teachesIn });
 
-      const ownerHandles = [...new Set(deckRows.map((d) => d.owner))];
+      const ownerHandles = [...new Set(moduleRows.map((d) => d.owner))];
       const owners = await readManyJson(store, ownerHandles.map((h) => K.user(h)), EVENTUAL);
       /** @type {Record<string, string>} */
       const nameOf = {};
       ownerHandles.forEach((h, i) => (nameOf[h] = owners[i] ? owners[i].displayName : h));
       await nameTheGone(nameOf, ownerHandles);
 
-      const decks = [];
-      for (const d of deckRows) {
-        const course = deckToCourse.get(d.id);
+      const modules = [];
+      for (const d of moduleRows) {
+        const course = moduleToCourse.get(d.id);
         const link = (d.courses || []).find((/** @type {{ courseId: string }} */ c) => c.courseId === course.id);
-        const cardIds = await deckCardIds(d);
+        const cardIds = await moduleCardIds(d);
         /* Which number system and clock fill this deck's number parts: the
            chosen person's, in the deck's language (0.541). null when that
            person has none, so the device files nothing rather than
            everything. */
         const numLang = d.lang || course.language || "";
         const numIndex = await systemIndex(d.numbersFrom || d.owner);
-        decks.push({
+        modules.push({
           ...d,
           numbersSystemId: numIndex.numbers[numLang] || null,
           timeSystemId: numIndex.times[numLang] || null,
@@ -5662,9 +5662,9 @@ async function handle(req) {
           courseLanguage: course.language || "",
         });
       }
-      decks.sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0));
+      modules.sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0));
 
-      const allCardIds = [...new Set(decks.flatMap((d) => d.cardIds))];
+      const allCardIds = [...new Set(modules.flatMap((d) => d.cardIds))];
       const cardRows = await readManyJson(store, allCardIds.map((id) => K.card(id)), EVENTUAL);
       const cardById = new Map();
       /* Only what is published, and only the version that is: a draft, and
@@ -5768,7 +5768,7 @@ async function handle(req) {
       };
 
       const bundled = [];
-      for (const d of decks) {
+      for (const d of modules) {
         const own = d.cardIds
           .map((/** @type {string} */ id) => cardById.get(id))
           .filter(Boolean)
@@ -5787,7 +5787,7 @@ async function handle(req) {
           bundled.push({ deckId: d.id, cards: own });
           continue;
         }
-        const course = deckToCourse.get(d.id);
+        const course = moduleToCourse.get(d.id);
         const from = [...new Set([d.owner, ...((course && course.teachers) || [])])].filter(Boolean);
         const held = new Set(own.map((/** @type {any} */ c) => c.id));
         const values = [];
@@ -5831,7 +5831,7 @@ async function handle(req) {
         bundled.flatMap((b) => b.cards.flatMap((/** @type {any} */ c) => formsOf(c).flatMap((/** @type {Record<string, any>} */ f) => (Array.isArray(f.images) ? f.images : [])))),
         "image",
       );
-      return json({ ok: true, version, teaches, teachesIn, courses, decks, cards: bundled, systems, missingClips, missingImages });
+      return json({ ok: true, version, teaches, teachesIn, courses, decks: modules, cards: bundled, systems, missingClips, missingImages });
     }
 
     /* Everything in a course is visible to everyone in it. */
@@ -5849,7 +5849,7 @@ async function handle(req) {
       const nameOf = {};
       ownerHandles.forEach((h, i) => (nameOf[h] = owners[i] ? owners[i].displayName : h));
       await nameTheGone(nameOf, ownerHandles);
-      const decks = rows.map((d) => {
+      const modules = rows.map((d) => {
         const link = d.courses.find((/** @type {{ courseId: string }} */ c) => c.courseId === course.id);
         return {
           ...d,
@@ -5858,32 +5858,32 @@ async function handle(req) {
           cardCount: (d.cardIds || []).length,
         };
       });
-      decks.sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0));
+      modules.sort((a, b) => (a.addedAt || 0) - (b.addedAt || 0));
       /* Neither code, to anybody: whoever is asking is already in. The
          teacher code is the one that matters — it makes a teacher of
          whoever holds it, and this answer goes to students. Teachers and
          the administrator read both codes from my-courses and Admin. */
-      return json({ ok: true, course: { ...course, code: undefined, teacherCode: undefined }, decks });
+      return json({ ok: true, course: { ...course, code: undefined, teacherCode: undefined }, decks: modules });
     }
 
     if (action === "deck-cards") {
-      const deck = await readDeck(store, url.searchParams.get("deck") || "");
-      if (!deck) return json({ error: "not-found" }, 404);
+      const module = await readModule(store, url.searchParams.get("deck") || "");
+      if (!module) return json({ error: "not-found" }, 404);
 
       /* Somebody in a course that lists it — the course's say, which is
          what sends it to them in the first place. */
       const allowed =
-        deck.owner === mine ||
+        module.owner === mine ||
         iManage ||
-        (await everyCourse(store)).some((c) => (c.decks || []).includes(deck.id) && inCourse(c, mine));
+        (await everyCourse(store)).some((c) => (c.decks || []).includes(module.id) && inCourse(c, mine));
       if (!allowed) return json({ error: "no-access" }, 403);
 
       const cards = (
-        await readManyJson(store, (deck.cardIds || []).map((id) => K.card(id)))
+        await readManyJson(store, (module.cardIds || []).map((id) => K.card(id)))
       )
         .filter((/** @type {any} */ c) => c && isPublished(c))
         .map((/** @type {any} */ c) => studentView(c));
-      return json({ ok: true, version: deck.version, cards });
+      return json({ ok: true, version: module.version, cards });
     }
 
     /* ================= a teacher's export =================
@@ -5904,25 +5904,25 @@ async function handle(req) {
       const own = (await readJson(store, K.myCards(mine))) || [];
       const courses = await everyCourse(store);
       const teaching = new Set(courses.filter((c) => isTeacher(c, mine)).flatMap((c) => c.decks || []));
-      const deckRows = (await readManyJson(store, (await readIndex(store, "decks")).map((id) => K.deck(id))))
+      const moduleRows = (await readManyJson(store, (await readIndex(store, "decks")).map((id) => K.deck(id))))
         .filter((d) => d && inScope(d));
       /* An administrator may take anything, as a backup would. */
       const admin = iManage;
-      const decks = deckRows.filter((d) => admin || d.owner === mine || teaching.has(d.id));
-      const cards = new Set(own.concat(decks.flatMap((d) => d.cardIds || [])));
-      return { decks: new Map(decks.map((d) => [d.id, d])), cards, admin };
+      const modules = moduleRows.filter((d) => admin || d.owner === mine || teaching.has(d.id));
+      const cards = new Set(own.concat(modules.flatMap((d) => d.cardIds || [])));
+      return { decks: new Map(modules.map((d) => [d.id, d])), cards, admin };
     }
 
     if (action === "export-plan") {
       const may = await exportable();
       /** @type {string[]} */
-      const askedDecks = (Array.isArray(body.deckIds) ? body.deckIds : []).map(String);
+      const askedModules = (Array.isArray(body.deckIds) ? body.deckIds : []).map(String);
       /** @type {string[]} */
       const askedCards = (Array.isArray(body.cardIds) ? body.cardIds : []).map(String);
-      const deckIds = [...new Set(askedDecks)].filter((id) => may.decks.has(id));
+      const moduleIds = [...new Set(askedModules)].filter((id) => may.decks.has(id));
       /* A deck goes with every card in it: a deck put back without them
          would be an empty deck that says it holds cards. */
-      const wanted = new Set(askedCards.concat(deckIds.flatMap((id) => may.decks.get(id).cardIds || [])));
+      const wanted = new Set(askedCards.concat(moduleIds.flatMap((id) => may.decks.get(id).cardIds || [])));
       const ids = [...wanted].filter((id) => may.admin || may.cards.has(id));
       const cards = here(await readManyJson(store, ids.map((id) => K.card(id)))).filter(Boolean);
       const withMedia = body.media !== false;
@@ -5944,7 +5944,7 @@ async function handle(req) {
           chunks.push({ id: `${kind}-${chunks.length}`, kind, keys: keys.slice(i, i + size) });
         }
       };
-      batch("deck", deckIds.map(K.deck), 40);
+      batch("deck", moduleIds.map(K.deck), 40);
       batch("card", cards.map((c) => K.card(c.id)), 25);
       batch("clip", clips.map(K.clip), 3);
       batch("image", images.map(K.image), 2);
@@ -5956,10 +5956,10 @@ async function handle(req) {
           takenAt: Date.now(),
           by: mine,
           counts: {
-            users: 0, courses: 0, decks: deckIds.length, cards: cards.length,
+            users: 0, courses: 0, decks: moduleIds.length, cards: cards.length,
             systems: 0, flags: 0, clips: clips.length, images: images.length, keys: 0,
           },
-          indexes: { decks: deckIds },
+          indexes: { decks: moduleIds },
           chunks: chunks.map((c) => ({ id: c.id, kind: c.kind, keys: c.keys.length })),
           plan: chunks,
         },
@@ -5967,7 +5967,7 @@ async function handle(req) {
         /* What was asked for and is not this teacher's to take. */
         refused:
           askedCards.filter((id) => !may.admin && !may.cards.has(id)).length +
-          askedDecks.filter((id) => !may.decks.has(id)).length,
+          askedModules.filter((id) => !may.decks.has(id)).length,
       });
     }
 
@@ -6155,13 +6155,13 @@ async function handle(req) {
       if (action === "admin-overview") {
         const userIds = await readIndex(store, "users");
         const courseIds = await readIndex(store, "courses");
-        const deckIds = await readIndex(store, "decks");
+        const moduleIds = await readIndex(store, "decks");
         const flagIds = await readIndex(store, "flags");
 
-        const [courseRows, userRows, deckRows, flagRows] = await Promise.all([
+        const [courseRows, userRows, moduleRows, flagRows] = await Promise.all([
           readManyJson(store, courseIds.map((id) => K.course(id))).then(here),
           readManyJson(store, userIds.map((h) => K.user(h))).then(here),
-          readManyJson(store, deckIds.map((id) => K.deck(id))).then(here),
+          readManyJson(store, moduleIds.map((id) => K.deck(id))).then(here),
           readManyJson(store, flagIds.map((id) => K.flag(id))).then(here),
         ]);
         const courses = courseRows.filter(Boolean);
@@ -6202,11 +6202,11 @@ async function handle(req) {
         /** @type {Record<string, string>} */
       const nameOf = {};
         for (const u of userRows) if (u) nameOf[u.handle] = u.displayName;
-        await nameTheGone(nameOf, deckRows.filter(Boolean).map((d) => d.owner));
+        await nameTheGone(nameOf, moduleRows.filter(Boolean).map((d) => d.owner));
         /* Which courses hold a deck, said by the courses — see linksOf —
            and which of its number parts reach nobody yet. */
-        const waiting = await partsWaiting(deckRows.filter(Boolean), courses);
-        const decks = deckRows.filter(Boolean).map((d) => {
+        const waiting = await partsWaiting(moduleRows.filter(Boolean), courses);
+        const modules = moduleRows.filter(Boolean).map((d) => {
           const courseLinks = linksOf(d, courses);
           return {
             ...d,
@@ -6281,7 +6281,7 @@ async function handle(req) {
         const former = (await readJson(store, K.former(acting))) || [];
         /* And the space's invitation, for its admins to share (37a). */
         const invite = actingOrgDoc ? { code: actingOrgDoc.inviteCode, slug: actingOrgDoc.slug, name: actingOrgDoc.name, admins: actingOrgDoc.admins || [] } : null;
-        return jsonTagged(req, { ok: true, users, courses, decks, flags, former, invite, linkSlug: actingOrgDoc ? actingOrgDoc.slug : "" });
+        return jsonTagged(req, { ok: true, users, courses, decks: modules, flags, former, invite, linkSlug: actingOrgDoc ? actingOrgDoc.slug : "" });
       }
 
       /* A lost key: the handle survives, so memberships and progress do too. */
@@ -6343,7 +6343,7 @@ async function handle(req) {
           : await readIndex(store, "gone"));
         const owners = [...new Set([...handles, ...goneHandles])];
         const courseIds = /** @type {string[]} */ (await pick(await readIndex(store, "courses"), K.course));
-        const deckIds = /** @type {string[]} */ (await pick(await readIndex(store, "decks"), K.deck));
+        const moduleIds = /** @type {string[]} */ (await pick(await readIndex(store, "decks"), K.deck));
         /* Reports were the one thing on the site a backup did not hold, so
            a restore quietly threw away every problem anybody had reported
            and not yet fixed. They are small and they are somebody's words
@@ -6360,8 +6360,8 @@ async function handle(req) {
         const cardLists = await readManyJson(store, owners.map((h) => K.myCards(h)));
         /* Every deck's cards, for the whole site as for one space: a card
            can be in a deck and on nobody's list. */
-        const deckCards = (await readManyJson(store, deckIds.map((id) => K.deck(id)))).flatMap((d) => (d && d.cardIds) || []);
-        const cardIds = /** @type {string[]} */ (await pick([...new Set(cardLists.flatMap((l) => l || []).concat(deckCards))], K.card));
+        const moduleCards = (await readManyJson(store, moduleIds.map((id) => K.deck(id)))).flatMap((d) => (d && d.cardIds) || []);
+        const cardIds = /** @type {string[]} */ (await pick([...new Set(cardLists.flatMap((l) => l || []).concat(moduleCards))], K.card));
 
         /* Clip hashes are only discoverable from the cards that use them, so
            the cards have to be read to know what a complete backup contains.
@@ -6436,7 +6436,7 @@ async function handle(req) {
         batch("user", handles.map(K.user), 40);
         batch("keymap", keyHashes.map(K.keyOf), 60);
         batch("course", courseIds.map(K.course), 40);
-        batch("deck", deckIds.map(K.deck), 40);
+        batch("deck", moduleIds.map(K.deck), 40);
         batch("owncards", owners.map(K.myCards), 60);
         batch("card", cardIds.map(K.card), 25);
         batch("system", systemKeys, 10);
@@ -6463,7 +6463,7 @@ async function handle(req) {
           return json({
             ok: true,
             usage: {
-              people: handles.length, courses: courseIds.length, decks: deckIds.length,
+              people: handles.length, courses: courseIds.length, decks: moduleIds.length,
               cards: cardIds.length, recordings: clipHashes.length, pictures: imageHashes.length, bytes,
             },
           });
@@ -6505,7 +6505,7 @@ async function handle(req) {
             counts: {
               users: handles.length,
               courses: courseIds.length,
-              decks: deckIds.length,
+              decks: moduleIds.length,
               cards: cardIds.length,
               systems: systemKeys.length,
               flags: flagIds.length,
@@ -6516,7 +6516,7 @@ async function handle(req) {
               progress: progressHandles.length,
               practiceAudio: practiceAudio.length,
             },
-            indexes: { users: handles, courses: courseIds, decks: deckIds, flags: flagIds, orgs: orgIds, gone: goneHandles },
+            indexes: { users: handles, courses: courseIds, decks: moduleIds, flags: flagIds, orgs: orgIds, gone: goneHandles },
             bytes,
             chunks: chunks.map((c) => ({ id: c.id, kind: c.kind, keys: c.keys.length })),
             /* Repeated so a chunk can be fetched without the client having to
@@ -6730,7 +6730,7 @@ async function handle(req) {
 
         const handles = await readIndex(store, "users");
         const courseIds = await readIndex(store, "courses");
-        const deckIds = await readIndex(store, "decks");
+        const moduleIds = await readIndex(store, "decks");
         const cardLists = await readManyJson(store, handles.map((h) => K.myCards(h)));
         const cardIds = [...new Set(cardLists.flatMap((l) => l || []))];
 
@@ -6807,7 +6807,7 @@ async function handle(req) {
         }
 
         if (want.has("decks")) {
-          for (const id of deckIds) {
+          for (const id of moduleIds) {
             await store.delete(K.deck(id));
             removed.decks += 1;
           }
@@ -6910,11 +6910,11 @@ async function handle(req) {
         if (!former.some((/** @type {any} */ r) => r.handle === from)) return json({ error: "not-former" }, 400);
         const heir = await readUser(store, to);
         if (!heir || suspensionIn(heir, acting)) return json({ error: "not-in-space" }, 400);
-        const deckIds = await readIndex(store, "decks");
-        const decks = here(await readManyJson(store, deckIds.map((id) => K.deck(id)))).filter(
+        const moduleIds = await readIndex(store, "decks");
+        const modules = here(await readManyJson(store, moduleIds.map((id) => K.deck(id)))).filter(
           (d) => d && d.owner === from && !d.personal
         );
-        for (const d of decks) {
+        for (const d of modules) {
           await updateJson(store, K.deck(d.id), (/** @type {any} */ f) => (f ? { ...f, owner: to, updated: Date.now() } : null));
         }
         const theirs = (await readJson(store, K.myCards(from))) || [];
@@ -6927,7 +6927,7 @@ async function handle(req) {
         const moved = new Set(cards.map((c) => c.id));
         await updateJson(store, K.myCards(from), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => !moved.has(x)));
         await updateJson(store, K.myCards(to), (/** @type {any} */ cur) => [...new Set((cur || []).concat([...moved]))]);
-        return json({ ok: true, decks: decks.length, cards: cards.length });
+        return json({ ok: true, decks: modules.length, cards: cards.length });
       }
 
       /* Taking one record off Former members, by hand, when asked (A5). */
@@ -6957,18 +6957,18 @@ async function handle(req) {
            here, only what is left of someone whose account is gone. */
         if (await readJson(store, K.user(handle))) return json({ error: "account-exists" }, 400);
         /* Their decks first, off every course that holds them. */
-        const deckIds = await readIndex(store, "decks");
-        const theirDecks = here(await readManyJson(store, deckIds.map((id) => K.deck(id))))
+        const moduleIds = await readIndex(store, "decks");
+        const theirModules = here(await readManyJson(store, moduleIds.map((id) => K.deck(id))))
           .filter((d) => d && d.owner === handle);
-        for (const d of theirDecks) {
+        for (const d of theirModules) {
           await dropFromCourses(store, d.id);
           await store.delete(K.deck(d.id)).catch(() => {});
           await store.delete(K.cards(d.id)).catch(() => {});
         }
-        if (theirDecks.length) {
-          const goneDecks = new Set(theirDecks.map((d) => d.id));
+        if (theirModules.length) {
+          const goneModules = new Set(theirModules.map((d) => d.id));
           await updateJson(store, K.index("decks"), (/** @type {any} */ cur) =>
-            (cur || []).filter((/** @type {string} */ x) => !goneDecks.has(x))
+            (cur || []).filter((/** @type {string} */ x) => !goneModules.has(x))
           );
         }
         /* Then their cards, out of whatever decks of others still hold them. */
@@ -6994,8 +6994,8 @@ async function handle(req) {
         await updateJson(store, K.former(acting), (/** @type {any} */ cur) =>
           (cur || []).filter((/** @type {any} */ r) => r.handle !== handle)
         );
-        if (theirDecks.length || cards) await taught();
-        return json({ ok: true, decks: theirDecks.length, cards });
+        if (theirModules.length || cards) await taught();
+        return json({ ok: true, decks: theirModules.length, cards });
       }
 
       /* Dismissing feedback about the app (0.552): the App admin's alone. */
@@ -7251,8 +7251,8 @@ async function handle(req) {
         /* Every card of this org, gathered before any account goes: from
            its decks, and from everyone's own lists (a card can be in no
            deck, and an App admin's card can be in this org). */
-        const decksBefore = (await readManyJson(store, (await readIndex(store, "decks")).map((x) => K.deck(x)))).filter((d) => d && orgOf(d) === id);
-        const cardIds = new Set(decksBefore.flatMap((d) => d.cardIds || []));
+        const modulesBefore = (await readManyJson(store, (await readIndex(store, "decks")).map((x) => K.deck(x)))).filter((d) => d && orgOf(d) === id);
+        const cardIds = new Set(modulesBefore.flatMap((d) => d.cardIds || []));
         for (const list of await readManyJson(store, handles.map((h) => K.myCards(h)))) {
           for (const cid of list || []) cardIds.add(cid);
         }
@@ -7272,14 +7272,14 @@ async function handle(req) {
           await store.delete(K.course(c.id)).catch(() => {});
           await updateJson(store, K.index("courses"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => x !== c.id));
         }
-        const decks = (await readManyJson(store, (await readIndex(store, "decks")).map((x) => K.deck(x)))).filter((d) => d && orgOf(d) === id);
+        const modules = (await readManyJson(store, (await readIndex(store, "decks")).map((x) => K.deck(x)))).filter((d) => d && orgOf(d) === id);
         for (const cid of cardIds) {
           const c = await readJson(store, K.card(cid));
           if (c && orgOf(c) === id) await store.delete(K.card(cid)).catch(() => {});
         }
-        for (const d of decks) await store.delete(K.deck(d.id)).catch(() => {});
+        for (const d of modules) await store.delete(K.deck(d.id)).catch(() => {});
         await updateJson(store, K.index("decks"), (/** @type {any} */ cur) =>
-          (cur || []).filter((/** @type {string} */ x) => !decks.some((d) => d.id === x))
+          (cur || []).filter((/** @type {string} */ x) => !modules.some((d) => d.id === x))
         );
         const flagIds = await readIndex(store, "flags");
         const flags = await readManyJson(store, flagIds.map((x) => K.flag(x)));
@@ -7309,7 +7309,7 @@ async function handle(req) {
         for (const slug of [org.slug].concat(org.formerSlugs || [])) await store.delete(K.slug(slug)).catch(() => {});
         await store.delete(K.org(id)).catch(() => {});
         await updateJson(store, K.index("orgs"), (/** @type {any} */ cur) => (cur || []).filter((/** @type {string} */ x) => x !== id));
-        return json({ ok: true, deleted: { people: users.length, decks: decks.length } });
+        return json({ ok: true, deleted: { people: users.length, decks: modules.length } });
       }
 
       if (action === "admin-create-user") {
@@ -7492,8 +7492,8 @@ async function handle(req) {
         const course = await readCourse(store, String(body.courseId || ""));
         if (!course) return json({ error: "not-found" }, 404);
 
-        for (const deckId of course.decks || []) {
-          await updateJson(store, K.deck(deckId), (/** @type {Deck | null} */ d) =>
+        for (const moduleId of course.decks || []) {
+          await updateJson(store, K.deck(moduleId), (/** @type {Module | null} */ d) =>
             d && (d.courses || []).some((l) => l.courseId === course.id)
               ? { ...d, courses: d.courses.filter((l) => l.courseId !== course.id) }
               : null
@@ -7566,7 +7566,7 @@ async function handle(req) {
         if (!card) return json({ error: "no-card" }, 404);
         /* Named `decks` because that is what CardReadout reads it as. */
         /* As students have it: a report is about what they were asked. */
-        return json({ ok: true, card: { ...studentView(card), decks: await decksHolding(card) } });
+        return json({ ok: true, card: { ...studentView(card), decks: await modulesHolding(card) } });
       }
 
       /* Dealt with, or not worth keeping. There is no state on a flag

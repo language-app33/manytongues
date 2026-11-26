@@ -5,10 +5,10 @@
  * being parsed by every student on every launch.
  */
 
-import { decksForSystem } from "./number-decks.ts";
+import { modulesForSystem } from "./number-modules.ts";
 import { installHow } from "./install-steps.ts";
 import React, { createContext, useContext, useState, useEffect, useRef, useMemo, useCallback, useLayoutEffect } from "react";
-import type { Card, Course, Deck, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
+import type { Card, Course, Module, ExerciseState, FlagKind, Form, Item, Lang, LangId, Millis, Parked } from "./types.ts";
 import { formsOf, leadOf, wordOf } from "./cards.ts";
 import { createPortal } from "react-dom";
 import * as API from "./courses-api.ts";
@@ -18,7 +18,7 @@ import { asMeaning, cardRef, fillNames, fillsOf, isSentence, mergeMet, slotsOf, 
 import { reviewOf } from "./review.ts";
 import type { Reader, TableGroup } from "./card-facts.ts";
 import { askLine, A_SENTENCE, blanksOn, cellTitle, CLIP_KINDS, combosOf, dimsSaid, dimText, EXAMPLES_CEILING,
-  examplesOf, fillersOn, IN_NO_DECK, isTableCell, lexicalKeys, lexicalLabel, NO_PART, NOT_DRILLED,
+  examplesOf, fillersOn, IN_NO_MODULE, isTableCell, lexicalKeys, lexicalLabel, NO_PART, NOT_DRILLED,
   rowsLine, tablesOn, tableTitle, unnamedOn } from "./card-facts.ts";
 import { colOf, foldJoined, NO_PARTNER, personsFor, personsOf, rowOf, slotLinks, slotRows, tensesOf } from "./verbs.ts";
 import { isOffline, watchNet } from "./net.ts";
@@ -32,7 +32,7 @@ import { composerFor, timeComposerFor } from "./numbers/index.ts";
 import { readNumberSystem, readTimeSystem } from "./numbers/schema.ts";
 import { setsWithNouns } from "./numbers/nouns.ts";
 import type { SystemSet } from "./numbers/generate.ts";
-import { fileIntoDecks, generate, handOn, handOnCounting, handOnSplit } from "./numbers/generate.ts";
+import { fileIntoModules, generate, handOn, handOnCounting, handOnSplit } from "./numbers/generate.ts";
 /* The one reading of which schedules say nothing (0.580: this file had its
    own, which dropped a skipped-but-never-answered state when set aside). */
 import { compactStates } from "./sync.ts";
@@ -441,7 +441,7 @@ export function plural(n: number, one: string, many?: string) {
  * them (0.563) — a part is one skill on the teacher's numbers, held by the
  * deck as an id (Deck.parts), and counted as the card it is to a student.
  */
-export function deckSize(d: { cardCount?: number; parts?: string[] }, cards = d.cardCount || 0) {
+export function moduleSize(d: { cardCount?: number; parts?: string[] }, cards = d.cardCount || 0) {
   /* A number part is a card like any other (0.563): it is counted with
      them, and whether it reaches students is notReaching's to say. */
   return plural(cards + (d.parts || []).length, "card");
@@ -3408,10 +3408,10 @@ function ReadUnnamed({ card }: { card: Record<string, any> }) {
  *   what is behind a blank is a fact about the collection and not about this
  *   card.
  */
-export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
+export function CardReadout({ card, lang, modules, cards, reader = "teacher" }: {
   card: Record<string, any> & { subs?: Record<string, any>[], decks?: string[] };
   lang?: Lang;
-  decks: { id: string, title?: string }[];
+  modules: { id: string, title?: string }[];
   cards?: Record<string, any>[];
   reader?: Reader;
 }) {
@@ -3424,7 +3424,7 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
      which tense and which person it is. */
   const loose = forms.filter((f) => !isTableCell(f, L) && !isTenseForm(f));
   const titles = (card.decks || [])
-    .map((id: string) => decks.find((d) => d.id === id))
+    .map((id: string) => modules.find((d) => d.id === id))
     .map((d) => d && d.title)
     .filter(Boolean);
 
@@ -3453,7 +3453,7 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
             ))}
           </span>
         ) : (
-          IN_NO_DECK
+          IN_NO_MODULE
         )}
       </ReadRow>
       {/* What the card is for, where it is not simply a card. A value
@@ -5115,7 +5115,7 @@ export const cardLostRecordings = (card: any): number =>
    the part that failed. */
 export async function pullTeaching(handle: string) {
   const at = API.actingSpace();
-  let [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
+  let [c, d, k] = await Promise.allSettled([API.myCourses(), API.myModules(), API.myCards()]);
   if (movedSince(at)) {
     const kept = recallSpace("teach", handle);
     return kept
@@ -5128,7 +5128,7 @@ export async function pullTeaching(handle: string) {
      nothing held, ask again for the whole of it. */
   if (!held && [c, d, k].some(same)) {
     API.forgetEtags();
-    [c, d, k] = await Promise.allSettled([API.myCourses(), API.myDecks(), API.myCards()]);
+    [c, d, k] = await Promise.allSettled([API.myCourses(), API.myModules(), API.myCards()]);
   }
   /* Nothing moved: the space stands as it is, and nobody is told. */
   if (held && same(c) && same(d) && same(k)) return { ...held, failed: null };
@@ -5312,7 +5312,7 @@ function recsOf(form: { clips?: string[]; slowClips?: string[] }) {
 const keptAnswers = (form: Record<string, any>) =>
   answersOf(form, answerFields()).map(({ at: _at, ...answer }) => storedAnswer(answer));
 
-export function cardToItem(card: Card, deckTitle: string, courseId: string, deckId: string, freshStates: () => Record<string, ExerciseState>): Item {
+export function cardToItem(card: Card, moduleTitle: string, courseId: string, moduleId: string, freshStates: () => Record<string, ExerciseState>): Item {
   /*
    * What a sub-form is called on this device.
    *
@@ -5556,10 +5556,10 @@ export function cardToItem(card: Card, deckTitle: string, courseId: string, deck
     ...(typeof card.value === "number" && Number.isFinite(card.value)
       ? { value: card.value }
       : null),
-    tags: [deckTitle],
+    tags: [moduleTitle],
     locked: true,
     flags: [],
-    source: { courseId, deckId, cardId: card.id, rev: card.rev || 1 },
+    source: { courseId, deckId: moduleId, cardId: card.id, rev: card.rev || 1 },
     /* When the card was made, not when it reached this device — so "added"
        means the same thing to the student as it does to the teacher who
        added it. Falls back for a card made before the server kept the
@@ -5586,7 +5586,7 @@ export function serverCardId(item: Item | null | undefined) {
   /* A card out of a number system also says where it came from, and what
      it says is not a card id — so the two are told apart by name rather
      than by which fields happen to be filled in. */
-  const from = fromDeck(item);
+  const from = fromModule(item);
   if (from && from.cardId) return from.cardId;
   return item.id || "";
 }
@@ -5598,7 +5598,7 @@ export function serverCardId(item: Item | null | undefined) {
  * language's number system — which carries a source of its own shape, and
  * which nothing that asks this is about.
  */
-export function fromDeck(
+export function fromModule(
   item: { source?: Item["source"] } | null | undefined,
 ): { courseId: string; deckId: string; cardId: string; rev: number } | null {
   const source = item && item.source;
@@ -5643,7 +5643,7 @@ export interface Folded {
 
 export type CoursesPulled = Folded & {
   unchanged?: false;
-  decks: Deck[];
+  decks: Module[];
   courses: Course[];
   /* The teachers' numbers, paired with their clocks. Held by the caller
      as well as folded into the cards, because a skill's question is drawn
@@ -5675,8 +5675,8 @@ export async function pullCourses(
     return { unchanged: true, version: r.version || "", teaches: !!r.teaches, teachesIn: idsOf(r.teachesIn) };
   }
   const enrolled = r.courses || [];
-  const decks = r.decks || [];
-  const cardsByDeck: Map<string, Card[]> = new Map(
+  const modules = r.decks || [];
+  const cardsByModule: Map<string, Card[]> = new Map(
     (r.cards || []).map((x: { deckId: string; cards?: Card[] }) => [x.deckId, x.cards || []]),
   );
 
@@ -5704,16 +5704,16 @@ export async function pullCourses(
    */
   const incoming: Item[] = [];
   const at: Map<string, Item> = new Map();
-  for (const deck of decks) {
-    const lists = new Set(deck.cardIds || []);
-    for (const card of cardsByDeck.get(deck.id) || []) {
-      const tag = lists.has(card.id) ? String(deck.title || "") : "";
+  for (const module of modules) {
+    const lists = new Set(module.cardIds || []);
+    for (const card of cardsByModule.get(module.id) || []) {
+      const tag = lists.has(card.id) ? String(module.title || "") : "";
       const had = at.get(localIdFor(card.id));
       if (had) {
         if (tag && !had.tags.includes(tag)) had.tags = had.tags.concat([tag]);
         continue;
       }
-      const item = cardToItem(card, deck.title, deck.courseId, deck.id, freshStates);
+      const item = cardToItem(card, module.title, module.courseId, module.id, freshStates);
       /* cardToItem names it after the deck it was built from; a value
          borrowed by that deck is not in it and carries no tag from it. */
       item.tags = tag ? [tag] : [];
@@ -5765,9 +5765,9 @@ export async function pullCourses(
     /* And only the parts a deck holds, filed under that deck: numbers
        arrive the way every other card does — see fileIntoDecks. A deck in
        another language holds none of this system's. */
-    const holding = decksForSystem(decks, set.numbers.languageId, set.numbers.id)
-      .map((d: Deck) => ({ id: d.id, title: String(d.title || ""), parts: d.parts || [] }));
-    const filed = fileIntoDecks(handed, { composer, sys: set.numbers, timeComposer, timeSys: set.times }, holding);
+    const holding = modulesForSystem(modules, set.numbers.languageId, set.numbers.id)
+      .map((d: Module) => ({ id: d.id, title: String(d.title || ""), parts: d.parts || [] }));
+    const filed = fileIntoModules(handed, { composer, sys: set.numbers, timeComposer, timeSys: set.times }, holding);
     for (const item of filed) {
       if (at.has(item.id)) continue;
       at.set(item.id, item);
@@ -5778,7 +5778,7 @@ export async function pullCourses(
   const folded = foldCourses(items, incoming, parked);
   return {
     ...folded,
-    decks,
+    decks: modules,
     courses: enrolled,
     systems,
     /* The same fold again, against whatever the cards are by the time the
@@ -6408,8 +6408,8 @@ export function PickSheet({ title, lede, className = "", onClose, children }: {
  * line long and belongs near the top, beside what kind of card this is:
  * both are facts about the card rather than about its words.
  */
-/* What DeckSwitch says, where it is not putting a card in decks. */
-export interface DeckWords {
+/* What ModuleSwitch says, where it is not putting a card in decks. */
+export interface ModuleWords {
   /** The button while nothing is chosen. */
   first: string;
   /** The way off a chosen deck's pill, for a screen reader. */
@@ -6424,11 +6424,11 @@ export interface DeckWords {
   another: string;
 }
 
-export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Modules", find, size = deckSize, saving, onAdd, disabled = false }: {
+export function ModuleSwitch({ modules, chosen, onToggle, onOpen, of = "card", words, title = "Modules", find, size = moduleSize, saving, onAdd, disabled = false }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
-  decks: Pick<Deck, "id" | "title" | "locked" | "cardCount">[];
+  modules: Pick<Module, "id" | "title" | "locked" | "cardCount">[];
   chosen: string[];
   onToggle: (id: string, wasOn: boolean) => void;
   /** Where a pill's name opens what it names — a course's decks do. */
@@ -6440,7 +6440,7 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
       them — Set a goal picks the decks it aims at, and "Add this card to a
       deck" would be the wrong sentence there. Each one left out is the
       card's. */
-  words?: Partial<DeckWords>;
+  words?: Partial<ModuleWords>;
   /** The sheet's title, where what is picked from it is not decks — the
       Build a session screen picks single cards with the same pills. */
   title?: string;
@@ -6449,13 +6449,13 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
   find?: { placeholder: string; match: (id: string, q: string) => boolean };
   /** The small line under each row's name, or nothing. A deck says how
       big it is; a single card has nothing to add. */
-  size?: ((d: Pick<Deck, "cardCount">) => Node) | null;
+  size?: ((d: Pick<Module, "cardCount">) => Node) | null;
   /** Decks whose change is still being saved, and which way. Such a row
       says "Adding…" or "Removing…" and cannot be tapped until it is done,
       where a save takes long enough for a teacher to wonder. */
   saving?: Record<string, "add" | "drop">;
   /** Where the decks are chosen somewhere else than this sheet — a card's
-      editor opens DeckPickScreen, the screen selected cards are put in
+      editor opens ModulePickScreen, the screen selected cards are put in
       decks from, so a deck can be made on the way (0.594). Given, the add
       button calls it, and is there even with no decks yet: making the
       first one is what that screen is for. */
@@ -6469,11 +6469,11 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
   const [q, setQ] = useState("");
   const pending = saving || {};
 
-  const all = decks || [];
+  const all = modules || [];
   const wanted = q.trim().toLowerCase();
   const listed = find && wanted ? all.filter((d) => find.match(d.id, wanted)) : all;
   const inThese = all.filter((d) => chosen.includes(d.id));
-  const say: DeckWords = {
+  const say: ModuleWords = {
     first: `Add this ${of} to a module`,
     drop: (title) => `Take this ${of} out of ${title}`,
     lede: `Choose the modules this ${of} belongs to.`,
@@ -6624,9 +6624,9 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
  * and the name box closes; nothing, and it stays open with the name in it.
  * Left out — taking cards out of decks — there is no New deck.
  */
-export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHint, busy = false, error, confirm, confirmOff = false, onConfirm, onCancel, empty = "You have no modules yet." }: {
+export function ModulePickScreen({ title, modules, chosen, onToggle, onCreate, newHint, busy = false, error, confirm, confirmOff = false, onConfirm, onCancel, empty = "You have no modules yet." }: {
   title: Node;
-  decks: Pick<Deck, "id" | "title" | "locked" | "cardCount">[];
+  modules: Pick<Module, "id" | "title" | "locked" | "cardCount">[];
   chosen: string[];
   onToggle: (id: string, wasOn: boolean) => void;
   onCreate?: (title: string) => Promise<unknown>;
@@ -6700,7 +6700,7 @@ export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHi
         ))}
 
       <CheckList
-        options={decks.map((d) => ({
+        options={modules.map((d) => ({
           id: d.id,
           title: d.title,
           /* A locked deck is shown, and cannot be ticked: its cards stay
@@ -6710,10 +6710,10 @@ export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHi
               <span className="at-lockmark" title="Locked" aria-label="Locked" role="img">
                 <Icon name="lock" size={12} />{" "}
               </span>
-              {deckSize(d)}
+              {moduleSize(d)}
             </>
           ) : (
-            deckSize(d)
+            moduleSize(d)
           ),
           disabled: !!d.locked,
         }))}

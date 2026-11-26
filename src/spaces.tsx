@@ -3,7 +3,7 @@
 import "./teaching.css";
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
-import type { Card, Course, Deck, Feedback, Flag, Form, Lang, LangId, User } from "./types.ts";
+import type { Card, Course, Module, Feedback, Flag, Form, Lang, LangId, User } from "./types.ts";
 import type { CardRow, CardViews, FilterGroup, Node } from "./shared.tsx";
 import { CardEditor, ImageScreen } from "./card-editor.tsx";
 import { usableAccent } from "./contrast.ts";
@@ -94,10 +94,10 @@ import type { NumberSystem, TimeSystem } from "./numbers/types.ts";
 import { partsNow } from "./numbers/types.ts";
 import { cardSentences, needsReview, stateFrom, toReview } from "./review.ts";
 import type { PartSentences } from "./review.ts";
-import { deckQuality, FIXES_SHOWN, qualityTone } from "./deck-quality.ts";
+import { moduleQuality, FIXES_SHOWN, qualityTone } from "./module-quality.ts";
 import { moduleKind, moduleKindCap } from "./modules.ts";
 import type { ModuleKind } from "./modules.ts";
-import type { Quality } from "./deck-quality.ts";
+import type { Quality } from "./module-quality.ts";
 import { blankFills, countingCards, deleteUnitLine, draftsLine, isLiveIn, isPathUnit, pathUnits, problemLine, sameFormBlanks, unitProblems } from "./path.ts";
 import type { UnitProblem } from "./path.ts";
 import { inPlayWith, langsToMakeIn, teachingChoices } from "./lang-choice.ts";
@@ -117,7 +117,7 @@ import { dismissDropped, droppedCards, lockedNote, sendCardMedia as sendWaitingM
 import { buildDialogIndex } from "./dialogs.ts";
 import { feedbackToText, flagsToText } from "./flag-export.ts";
 import { IMPORTED_STATUS, matchImport, mediaOf, mentions, readImportFile, remapIds, tickedAtFirst, toSave } from "./imports.ts";
-import type { CardMatch, DeckMatch, ImportFile } from "./imports.ts";
+import type { CardMatch, ModuleMatch, ImportFile } from "./imports.ts";
 import { freshStates, unitsOf } from "./scheduler.ts";
 import {
   APP_BUILD,
@@ -164,7 +164,7 @@ import {
   localIdFor,
   narrowing,
   plural,
-  deckSize,
+  moduleSize,
   notReaching,
   shortDate,
   pullAdmin,
@@ -181,8 +181,8 @@ import {
   useReach,
   useReachHold,
   Popover,
-  DeckSwitch,
-  DeckPickScreen,
+  ModuleSwitch,
+  ModulePickScreen,
   PickSheet,
   BrandMark,
 } from "./shared.tsx";
@@ -1337,10 +1337,10 @@ async function buildFromManifest(manifest: any, onProgress: (done: number, total
  *   nearly all of a file's size and nothing a reader of the words wants.
  */
 export async function buildExport(
-  { cardIds, deckIds, media }: { cardIds: string[]; deckIds: string[]; media: boolean },
+  { cardIds, deckIds: moduleIds, media }: { cardIds: string[]; deckIds: string[]; media: boolean },
   onProgress: (done: number, total: number) => void
 ) {
-  const r = await API.exportPlan(cardIds, deckIds, media);
+  const r = await API.exportPlan(cardIds, moduleIds, media);
   const { plan, ...whole } = r.manifest;
   const parts = [
     /* Decks only where one made it in: a file naming a part it holds
@@ -1684,11 +1684,11 @@ export function verifyBackup(file: any) {
 
   /* References that would dangle on restore. Reported, not repaired — this
      tells you whether the backup is whole, which is the question. */
-  let danglingDecks = 0;
+  let danglingModules = 0;
   let danglingClips = 0;
   for (const [key, value] of Object.entries<any>(rec)) {
     if (key.startsWith("course:")) {
-      for (const id of value.decks || []) if (!rec[`deck:${id}`]) danglingDecks += 1;
+      for (const id of value.decks || []) if (!rec[`deck:${id}`]) danglingModules += 1;
     }
     if (key.startsWith("card:")) {
       for (const h of clipHashes(value)) if (!rec[`clip:${h}`]) danglingClips += 1;
@@ -1696,8 +1696,8 @@ export function verifyBackup(file: any) {
   }
   /* Only what the file set out to hold is held to holding it: a backup of
      the wording alone is not a broken backup for having no audio in it. */
-  if (has.includes("decks") && danglingDecks) {
-    problems.push(`${danglingDecks} module reference(s) point outside the file.`);
+  if (has.includes("decks") && danglingModules) {
+    problems.push(`${danglingModules} module reference(s) point outside the file.`);
   }
   if (has.includes("clips") && danglingClips) {
     problems.push(`${danglingClips} recording(s) are referenced but missing.`);
@@ -1925,32 +1925,32 @@ const SET_WORDING: [keyof SetConfig["wording"], string, string][] = [
   ["askBoth", "Asking both", "In practice, when the answer is their word with the name."],
 ];
 
-function SetSection({ deck, decks, cards, busy, onSave }: {
-  deck: Deck;
+function SetSection({ module, modules, cards, busy, onSave }: {
+  module: Module;
   /** Every deck the teacher can see, for the lists to be chosen from. */
-  decks: Deck[];
+  modules: Module[];
   cards: Card[];
   busy?: boolean;
   onSave: (next: SetConfig) => void;
 }) {
-  const saved = readSet(deck.set, deck.id);
+  const saved = readSet(module.set, module.id);
   const [draft, setDraft] = useState<SetConfig | null>(saved);
   const [picking, setPicking] = useState(false);
   /* A save elsewhere — another teacher, this one on another device —
      starts the draft again from what is stored. */
   const savedKey = JSON.stringify(saved);
   useEffect(() => {
-    setDraft(readSet(deck.set, deck.id));
+    setDraft(readSet(module.set, module.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [savedKey, deck.id]);
-  const courseIds = (deck.courses || []).map((l) => l.courseId);
-  const offered = decks.filter((d) => d.id !== deck.id && !d.set && !d.personal
+  }, [savedKey, module.id]);
+  const courseIds = (module.courses || []).map((l) => l.courseId);
+  const offered = modules.filter((d) => d.id !== module.id && !d.set && !d.personal
     && (d.courses || []).some((l) => courseIds.includes(l.courseId)));
-  const wordsOf = (deckId: string) => cards.filter((c) => (c.decks || []).includes(deckId)
+  const wordsOf = (moduleId: string) => cards.filter((c) => (c.decks || []).includes(moduleId)
     && !isSentence(c) && !isDialog(c) && !!(formsOf(c)[0] || {}).ar && !!(formsOf(c)[0] || {}).en);
-  const own = cards.filter((c) => (c.decks || []).includes(deck.id));
+  const own = cards.filter((c) => (c.decks || []).includes(module.id));
   const pictured = (c: Card) => Array.isArray((formsOf(c)[0] || {}).images) && ((formsOf(c)[0] || {}).images || []).length > 0;
-  const titleOf = (id: string) => (decks.find((d) => d.id === id) || { title: "A deck you can't see" }).title;
+  const titleOf = (id: string) => (modules.find((d) => d.id === id) || { title: "A deck you can't see" }).title;
   const changed = JSON.stringify(draft) !== savedKey;
   const edit = (patch: Partial<SetConfig>) => draft && setDraft({ ...draft, ...patch });
 
@@ -1965,9 +1965,9 @@ function SetSection({ deck, decks, cards, busy, onSave }: {
   if (!draft) return null;
   if (picking) {
     return (
-      <DeckPickScreen
+      <ModulePickScreen
         title="Words to choose from"
-        decks={offered.map((d) => ({ id: d.id, title: d.title, locked: d.locked, cardCount: d.cardCount }))}
+        modules={offered.map((d) => ({ id: d.id, title: d.title, locked: d.locked, cardCount: d.cardCount }))}
         chosen={draft.lists}
         onToggle={(id, wasOn) => edit({ lists: wasOn ? draft.lists.filter((x) => x !== id) : draft.lists.concat([id]) })}
         confirm="Done"
@@ -2056,7 +2056,7 @@ function SetSection({ deck, decks, cards, busy, onSave }: {
 
       <Help>You won&rsquo;t see what each student chose. It is included only in a problem report a student sends.</Help>
       <div className="at-chips at-mt3">
-        <Button variant="primary" icon="save" disabled={busy || !changed} onClick={() => onSave(readSet(draft, deck.id) || emptySet())}>Save</Button>
+        <Button variant="primary" icon="save" disabled={busy || !changed} onClick={() => onSave(readSet(draft, module.id) || emptySet())}>Save</Button>
       </div>
 
     </div>
@@ -2580,7 +2580,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
   const [galleryOpen, setGalleryOpen] = useState(false);
   const [elementsOpen, setElementsOpen] = useState(false);
   const [stylesOpen, setStylesOpen] = useState(false);
-  const [selDecks, setSelDecks] = useState(() => new Set<string>());
+  const [selModules, setSelModules] = useState(() => new Set<string>());
   const [selFlags, setSelFlags] = useState(() => new Set<string>());
   /* The flagged card being looked at: { flag, card, error }. The card
      arrives after the flag does, so the screen is up while it is fetched
@@ -2595,12 +2595,12 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
      on https, and a feature whose whole point is a paste cannot answer
      that with "sorry". */
   const [exporting, setExporting] = useState<{ done: number, total: number, text: string } | null>(null);
-  const [deckAction, setDeckAction] = useState<"add" | "remove" | null>(null); // "add" | "remove"
+  const [moduleAction, setModuleAction] = useState<"add" | "remove" | null>(null); // "add" | "remove"
   /* Whose decks to show: a handle, or "" for everyone's. Search already
      matches the maker's name, but only if you know whose name to type —
      which is the thing an administrator looking at decks made by six
      different people does not know yet. */
-  const [deckOwner, setDeckOwner] = useState("");
+  const [moduleOwner, setModuleOwner] = useState("");
   /* One slot for whatever is waiting to be confirmed, so only one of these
      can ever be on screen at a time. */
   const { setConfirm, modal: confirmModal } = useConfirm(run, {
@@ -2706,7 +2706,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
   const mayAct = (u: { handle: string; admin?: boolean }) =>
     !!account && u.handle !== account.handle && !u.admin && (account.admin || !leads.has(u.handle));
   const courses = (data && data.courses) || [];
-  const decks = (data && data.decks) || [];
+  const modules = (data && data.decks) || [];
   /* Newest first, as the server sends them. */
   const flags = (data && data.flags) || [];
 
@@ -2763,7 +2763,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
         kind: flagTitle,
         exercise: (language, type) => exerciseLabel(languages, language, type),
         course: (id) => (courses.find((c: Course) => c.id === id) || {}).title || "",
-        deck: (id) => (decks.find((d: Deck) => d.id === id) || {}).title || "",
+        deck: (id) => (modules.find((d: Module) => d.id === id) || {}).title || "",
         when: dateTime,
       },
     });
@@ -2784,21 +2784,21 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
   /* Everyone who has actually made a deck, with how many — read off the
      decks rather than off the people, so the menu never offers a name that
      would narrow the list to nothing. */
-  const deckMakers: { value: string, label: string, count: number }[] = [];
-  for (const d of decks) {
-    const found = deckMakers.find((m) => m.value === d.owner);
+  const moduleMakers: { value: string, label: string, count: number }[] = [];
+  for (const d of modules) {
+    const found = moduleMakers.find((m) => m.value === d.owner);
     if (found) found.count += 1;
-    else deckMakers.push({ value: d.owner, label: d.ownerName || d.owner, count: 1 });
+    else moduleMakers.push({ value: d.owner, label: d.ownerName || d.owner, count: 1 });
   }
-  deckMakers.sort((a, b) => a.label.localeCompare(b.label));
-  const deckOwnerOptions = [
-    { value: "", label: "Anyone", note: String(decks.length) },
-    ...deckMakers.map((m) => ({ value: m.value, label: m.label, note: String(m.count) })),
+  moduleMakers.sort((a, b) => a.label.localeCompare(b.label));
+  const moduleOwnerOptions = [
+    { value: "", label: "Anyone", note: String(modules.length) },
+    ...moduleMakers.map((m) => ({ value: m.value, label: m.label, note: String(m.count) })),
   ];
   /* Filtered before the list sees them, so the count line, "select all" and
      every bulk action work on what is on screen rather than on what a
      narrowed list is hiding. */
-  const shownDecks = deckOwner ? decks.filter((d) => d.owner === deckOwner) : decks;
+  const shownModules = moduleOwner ? modules.filter((d) => d.owner === moduleOwner) : modules;
 
   /* One course, on its own screen — the same shape as deck settings. */
   if (openCourse2) {
@@ -3293,14 +3293,14 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
 
           {tab === "decks" && (
             <>
-              {deckAction && (
+              {moduleAction && (
                 <Screen
                   title={
-                    deckAction === "add"
+                    moduleAction === "add"
                       ? "Add the selected modules to…"
                       : "Take the selected modules out of…"
                   }
-                  onBack={() => setDeckAction(null)}
+                  onBack={() => setModuleAction(null)}
                 >
                   <div className="at-cklist">
                     {courses.map((c) => (
@@ -3311,17 +3311,17 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                         onClick={() =>
                           run(
                             async () => {
-                              const n = selDecks.size;
-                              for (const id of selDecks) {
-                                if (deckAction === "add") await API.attachDeck(id, c.id);
-                                else await API.detachDeck(id, c.id);
+                              const n = selModules.size;
+                              for (const id of selModules) {
+                                if (moduleAction === "add") await API.attachModule(id, c.id);
+                                else await API.detachModule(id, c.id);
                               }
-                              setDeckAction(null);
-                              setSelDecks(new Set());
+                              setModuleAction(null);
+                              setSelModules(new Set());
                               return n;
                             },
                             (n) =>
-                              `${plural(n, "module")} ${deckAction === "add" ? "added to" : "removed from"} ${c.title}`
+                              `${plural(n, "module")} ${moduleAction === "add" ? "added to" : "removed from"} ${c.title}`
                           )
                         }
                       >
@@ -3338,7 +3338,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                     )}
                   </div>
                   <div className="at-row at-mt5">
-                    <Button variant="ghost" onClick={() => setDeckAction(null)}>
+                    <Button variant="ghost" onClick={() => setModuleAction(null)}>
                       Cancel
                     </Button>
                   </div>
@@ -3347,11 +3347,11 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
 
               <ItemList
                 noun="deck"
-                items={shownDecks}
+                items={shownModules}
                 size="large"
                 busy={busy}
                 empty={
-                  deckOwner
+                  moduleOwner
                     ? "Nothing by them. Choose Anyone to see every module again."
                     : "No modules yet. Make one, then add it to a course so students can see it."
                 }
@@ -3363,29 +3363,29 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                   <FilterMenu
                     icon="person"
                     label="Filter by who made it"
-                    options={deckOwnerOptions}
-                    value={deckOwner}
+                    options={moduleOwnerOptions}
+                    value={moduleOwner}
                     /* Anything picked before the list was narrowed is
                        dropped: a bulk delete must never reach decks the
                        filter has taken off the screen. */
                     onChange={(v) => {
-                      setDeckOwner(v);
-                      setSelDecks(new Set());
+                      setModuleOwner(v);
+                      setSelModules(new Set());
                     }}
                   />
                 }
-                selected={selDecks}
-                onSelectedChange={setSelDecks}
+                selected={selModules}
+                onSelectedChange={setSelModules}
                 bulkActions={[
-                  { label: "Add to a course", onClick: () => setDeckAction("add") },
-                  { label: "Remove from a course", onClick: () => setDeckAction("remove") },
+                  { label: "Add to a course", onClick: () => setModuleAction("add") },
+                  { label: "Remove from a course", onClick: () => setModuleAction("remove") },
                   {
                     label: "Delete",
                     danger: true,
                     onClick: (ids) => {
-                      const picked = decks.filter((d) => ids.includes(d.id));
+                      const picked = modules.filter((d) => ids.includes(d.id));
                       /* A locked deck is unlocked before it can go. */
-                      const held = picked.filter((d) => d.locked && DECK_LOCKS);
+                      const held = picked.filter((d) => d.locked && MODULE_LOCKS);
                       if (held.length) {
                         snack(lockedDeleteNote(held.map((d) => d.title)), "warn");
                         return;
@@ -3403,8 +3403,8 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                           </p>
                         ),
                         action: async () => {
-                          for (const d of picked) await API.deleteDeck(d.id);
-                          setSelDecks(new Set());
+                          for (const d of picked) await API.deleteModule(d.id);
+                          setSelModules(new Set());
                         },
                       });
                     },
@@ -3415,14 +3415,14 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                     title={d.title}
                     meta={
                       <>
-                        <LockMark locked={d.locked && DECK_LOCKS} />
-                        {`${d.ownerName} · ${deckSize(d)}`}
+                        <LockMark locked={d.locked && MODULE_LOCKS} />
+                        {`${d.ownerName} · ${moduleSize(d)}`}
                       </>
                     }
                     actions={
                         <IconButton icon="delete" label={`Delete ${moduleKind(d)}`} danger onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
-                            if (d.locked && DECK_LOCKS) {
+                            if (d.locked && MODULE_LOCKS) {
                               snack(lockedDeleteNote([d.title]), "warn");
                               return;
                             }
@@ -3440,7 +3440,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                                   </p>
                                 </>
                               ),
-                              action: () => API.deleteDeck(d.id),
+                              action: () => API.deleteModule(d.id),
                             });
                           }} />
                     }
@@ -3525,7 +3525,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                     <CardReadout
                       card={openCard.card}
                       lang={languages[openCard.card.lang]}
-                      decks={decks}
+                      modules={modules}
                     />
                   )}
                 </Screen>
@@ -4593,13 +4593,13 @@ function ExportScreen({ ask, onDone, onClose }: {
 export type ImportPlan = {
   file: ImportFile;
   cards: CardMatch[];
-  decks: DeckMatch[];
+  decks: ModuleMatch[];
   ticked: Set<string>;
 };
 
-function ImportScreen({ cards, decks, langName, busy, failed, onImport, onClose }: {
+function ImportScreen({ cards, modules, langName, busy, failed, onImport, onClose }: {
   cards: Card[];
-  decks: Deck[];
+  modules: Module[];
   langName: (lang: string) => string;
   busy?: boolean;
   /** Why the last import stopped, where it did: some of it may be in. */
@@ -4607,7 +4607,7 @@ function ImportScreen({ cards, decks, langName, busy, failed, onImport, onClose 
   onImport: (plan: ImportPlan) => void;
   onClose: () => void;
 }) {
-  const [read, setRead] = useState<{ name: string; file: ImportFile; cards: CardMatch[]; decks: DeckMatch[] } | null>(null);
+  const [read, setRead] = useState<{ name: string; file: ImportFile; cards: CardMatch[]; decks: ModuleMatch[] } | null>(null);
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [err, setErr] = useState("");
 
@@ -4625,7 +4625,7 @@ function ImportScreen({ cards, decks, langName, busy, failed, onImport, onClose 
       setErr(file);
       return;
     }
-    const m = matchImport(file, cards, decks);
+    const m = matchImport(file, cards, modules);
     setRead({ name: f.name, file, ...m });
     setTicked(new Set(m.cards.filter(tickedAtFirst).map((x) => x.card.id)));
   };
@@ -4647,8 +4647,8 @@ function ImportScreen({ cards, decks, langName, busy, failed, onImport, onClose 
   const fresh = listOf("new");
   const same = listOf("same");
   const twins = listOf("sameWord");
-  const newDecks = read ? read.decks.filter((d) => !d.existing) : [];
-  const nothing = !ticked.size && !newDecks.length;
+  const newModules = read ? read.decks.filter((d) => !d.existing) : [];
+  const nothing = !ticked.size && !newModules.length;
 
   return (
     <Screen
@@ -4891,8 +4891,8 @@ function ClearScreen({ onClear, onClose }: {
 
 /* Locking a deck is set aside for now: a deck that was locked is shown
    and treated as open, and the flag itself is left where it is stored. */
-const DECK_LOCKS = false;
-function unlockedDecks(ds: Deck[]): Deck[] {
+const MODULE_LOCKS = false;
+function unlockedModules(ds: Module[]): Module[] {
   return (ds || []).map((d) => (d.locked ? { ...d, locked: false } : d));
 }
 
@@ -4990,7 +4990,7 @@ const NEW_KINDS: { kind: NewKind; title: string; meta: string }[] = [
   { kind: "set", title: "Personal set", meta: "Pictures each student answers a question about once, then practises with their own word." },
 ];
 
-function NewDeck({
+function NewModule({
   choices,
   mustAsk,
   initialLang,
@@ -5112,10 +5112,10 @@ function NewDeck({
 
 /* What can be changed about a saved deck, held while it is being edited:
    nothing reaches the server until Save, as on a card. */
-type DeckDraft = { title: string; locked: boolean; courses: string[]; parts: string[]; pronouns: string[] };
+type ModuleDraft = { title: string; locked: boolean; courses: string[]; parts: string[]; pronouns: string[] };
 
 const sameSet = (a: string[], b: string[]) => a.length === b.length && a.every((x) => b.includes(x));
-const sameDraft = (a: DeckDraft, b: DeckDraft) =>
+const sameDraft = (a: ModuleDraft, b: ModuleDraft) =>
   a.title.trim() === b.title.trim() && a.locked === b.locked &&
   sameSet(a.courses, b.courses) && sameSet(a.parts, b.parts) && sameSet(a.pronouns, b.pronouns);
 
@@ -5604,7 +5604,7 @@ function InContext({ cards, languages, langOfCard, busy, onLink, onAddWord, onOp
    Deck quality
 
    How well a deck is built to be learnt from, out of 100 — see
-   deck-quality.ts for what is counted. On each deck in the list as a
+   module-quality.ts for what is counted. On each deck in the list as a
    number in its colour, and on the deck's own page with the few changes
    that would raise it most, folded away until asked for.
    ------------------------------------------------------------------ */
@@ -5630,11 +5630,11 @@ function QualityMark({ quality }: { quality?: Quality | null }) {
 function PathSection({ course, units, problemsOf, qualityOf, spare, othersOf, busy, onOpen, onCreate, onAdd, onMove, onOpenForClass, onRemove, onDelete }: {
   course: Course;
   /** The course's units in path order, drafts included. */
-  units: Deck[];
+  units: Module[];
   problemsOf: (unitId: string) => UnitProblem[];
-  qualityOf: (unit: Deck) => Quality | null;
+  qualityOf: (unit: Module) => Quality | null;
   /** The teacher's units not in this course, to add. */
-  spare: Deck[];
+  spare: Module[];
   /** How many other courses hold a unit. */
   othersOf: (unitId: string) => number;
   busy?: boolean;
@@ -5648,7 +5648,7 @@ function PathSection({ course, units, problemsOf, qualityOf, spare, othersOf, bu
 }) {
   const [naming, setNaming] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
-  const [deleting, setDeleting] = useState<Deck | null>(null);
+  const [deleting, setDeleting] = useState<Module | null>(null);
   const opened = new Set(course.opened || []);
   return (
     <div className="at-formblock" data-el="course-path">
@@ -5808,7 +5808,7 @@ const FIX_ICON: Record<string, string> = {
  * why, what it is worth and, where it is about particular cards, those
  * cards to tap (0.563).
  */
-function DeckQuality({ quality, cards, lang, onOpenCard }: {
+function ModuleQuality({ quality, cards, lang, onOpenCard }: {
   quality: Quality;
   cards: Card[];
   lang: Partial<Lang>;
@@ -6241,7 +6241,7 @@ export const waitingToPublish = (c: { status?: string; changes?: unknown }): boo
 export function filterCards(
   cards: Card[],
   {
-    audio = "any", forms = "any", deckMode = "any", deckIds = [], blankMode = "any", blankNames = [], review = "any",
+    audio = "any", forms = "any", deckMode: moduleMode = "any", deckIds: moduleIds = [], blankMode = "any", blankNames = [], review = "any",
     kinds = [], subtypes = [], sceneKinds = [], status = "any",
   }: {
     audio?: string;
@@ -6267,7 +6267,7 @@ export function filterCards(
      it takes the whole collection to know what a frame makes. */
   waiting: Set<string> = new Set(),
 ) {
-  const byDeck = deckIds.length && (deckMode === "in" || deckMode === "out");
+  const byModule = moduleIds.length && (moduleMode === "in" || moduleMode === "out");
   return cards.filter((c) => {
     if (audio === "with" && !cardHasAudio(c)) return false;
     if (audio === "without" && cardHasAudio(c)) return false;
@@ -6284,10 +6284,10 @@ export function filterCards(
       if (kind === "word" && subtypes.length && !subtypes.includes(String(c.category || "") || "none")) return false;
       if (kind === "scene" && sceneKinds.length && !sceneKinds.includes(sceneKindOf(c as any))) return false;
     }
-    if (deckMode === "none" && (c.decks || []).length) return false;
-    if (byDeck) {
-      const inOne = (c.decks || []).some((id) => deckIds.includes(id));
-      if (deckMode === "in" ? !inOne : inOne) return false;
+    if (moduleMode === "none" && (c.decks || []).length) return false;
+    if (byModule) {
+      const inOne = (c.decks || []).some((id) => moduleIds.includes(id));
+      if (moduleMode === "in" ? !inOne : inOne) return false;
     }
     /* The blanks a card leaves and the blanks it fills are two lists and
        never both: fillsOf gives a card with a hole in it nothing to fill,
@@ -6384,7 +6384,7 @@ const SHOW_IN_CONTEXT = false;
  * which of the two sides you are in, in one line (0.551). One piece for
  * both since 0.685 (the owner's 5a), where each side had its own copy.
  */
-function DecksOrCards({ tab, onTab, mine, spaceName }: {
+function ModulesOrCards({ tab, onTab, mine, spaceName }: {
   tab: string;
   onTab: (key: string) => void;
   /** My space, the teacher's own, rather than Material, the space's. */
@@ -6426,7 +6426,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* Told which languages this space holds, so that switch has something to
      offer; told nothing is held on the way out. */
   onLangChoices?: (choices: LangChoice[]) => void;
-  onTry?: (plan: { items: any[], exercise: any, back: any, decks?: Deck[] }) => void;
+  onTry?: (plan: { items: any[], exercise: any, back: any, decks?: Module[] }) => void;
   resume?: { cardId?: string; tab?: string; deckId?: string | null } | null;
   /* Sends a recording the server lacks from this device, where the device
      still has it. True when it went up. */
@@ -6437,9 +6437,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      Asked once, at the first render: recall forgets another person's
      contents when it is asked for them, which is not something to do
      again on every keystroke. */
-  const held: React.MutableRefObject<{ courses: Course[], decks: Deck[], cards: Card[] } | null> = useRef(null);
+  const held: React.MutableRefObject<{ courses: Course[], decks: Module[], cards: Card[] } | null> = useRef(null);
   if (held.current === null) held.current = recallSpace("teach", account.handle) || false;
-  const last: { courses: Course[], decks: Deck[], cards: Card[] } | null = held.current || null;
+  const last: { courses: Course[], decks: Module[], cards: Card[] } | null = held.current || null;
   /* Coming back from a trial: the tab, the deck and the card that was
      being read, in that order — the card sits on top of the screen it was
      opened from, and closing it has to land somewhere that makes sense.
@@ -6452,18 +6452,18 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      below are the side on screen (0.545): the space's, or My space. Every
      write goes through the setters, whole or by function, so the side not
      on screen is never lost. */
-  const [allDecks, setDecks] = useState<Deck[]>(last ? unlockedDecks(last.decks) : []);
+  const [allModules, setModules] = useState<Module[]>(last ? unlockedModules(last.decks) : []);
   const [side, setSide] = useState<"space" | "mine">(personalOnly ? "mine" : "space");
   const mineSide = side === "mine";
   /* A My space deck on its way into the space, and the courses ticked for it. */
-  const [toSpace, setToSpace] = useState<{ deck: Deck; move: boolean } | null>(null);
+  const [toSpace, setToSpace] = useState<{ deck: Module; move: boolean } | null>(null);
   const [toCourses, setToCourses] = useState<string[]>([]);
   /* A My space card on its way into a deck of the space, and that deck. */
   const [cardToSpace, setCardToSpace] = useState<{ card: Card; move: boolean } | null>(null);
-  const [cardDeck, setCardDeck] = useState("");
+  const [cardModule, setCardModule] = useState("");
   /* The space's own name on the toggle (0.549), cut short when long, in full on hover. */
   const spaceName = shownName || (account.org && typeof account.org === "object" && account.org.name) || "Space";
-  const decks = useMemo(() => allDecks.filter((d) => !!d.personal === mineSide), [allDecks, mineSide]);
+  const modules = useMemo(() => allModules.filter((d) => !!d.personal === mineSide), [allModules, mineSide]);
   /* See useRun. A locked deck the server kept as it was outranks "done":
      the teacher asked for a change that did not all happen. */
   const { run, busy, setBusy, error, setError } = useRun({
@@ -6482,20 +6482,20 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* The decks a course is still saving, and which way: shown on the
      deck's row as "Adding…" or "Removing…" until the server answers, and
      not tappable meanwhile, so a second tap cannot undo the first. */
-  const [deckSaving, setDeckSaving] = useState<Record<string, "add" | "drop">>({});
+  const [moduleSaving, setModuleSaving] = useState<Record<string, "add" | "drop">>({});
   /* Cards and word sets on their way out of a deck: a ring where their
      Remove was until the server answers, and no second Remove meanwhile. */
   const [leaving, setLeaving] = useState<Set<string>>(() => new Set());
   /* Add existing cards' Done while it saves: how many of the cards that
      change have been saved, said on the button. */
   const [applying, setApplying] = useState<{ done: number; total: number } | null>(null);
-  const [openDeck, setOpenDeck] = useState<any | null>((back && back.deckId) || null);
+  const [openModule, setOpenModule] = useState<any | null>((back && back.deckId) || null);
   /* The personal sets, and the decks they name as lists, with the cards
      each holds — what a trial of a set's picture is set up from (0.632). */
-  const setDecksForTrial = (): Deck[] => {
-    const sets = decks.filter((d) => d.set);
+  const setModulesForTrial = (): Module[] => {
+    const sets = modules.filter((d) => d.set);
     const wanted = new Set(sets.flatMap((d) => [d.id, ...((d.set && d.set.lists) || [])]));
-    return decks
+    return modules
       .filter((d) => wanted.has(d.id))
       .map((d) => ({ ...d, cardIds: allCards.filter((c) => (c.decks || []).includes(d.id)).map((c) => String(c.id)) }));
   };
@@ -6587,7 +6587,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      My space, where only a regular deck can be made (0.633). */
   const [choosingKind, setChoosingKind] = useState(false);
   const [newKind, setNewKind] = useState<NewKind>("deck");
-  const newDeck = () => {
+  const newModule = () => {
     setNewKind("deck");
     if (mineSide) setNaming("new");
     else setChoosingKind(true);
@@ -6623,21 +6623,21 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      before either. */
   const [wordSets, setWordSets] = useState(false);
   /* The open deck, being edited: null while it is only read. */
-  const [deckDraft, setDeckDraft] = useState<DeckDraft | null>(null);
-  const [discardingDeck, setDiscardingDeck] = useState(false);
+  const [moduleDraft, setModuleDraft] = useState<ModuleDraft | null>(null);
+  const [discardingModule, setDiscardingModule] = useState(false);
   /* The deck's own "Manage cards" page, and the picker it opens to add
      cards the teacher already has: what is ticked, held until Done. */
   const [managing, setManaging] = useState(false);
   const [adding, setAdding] = useState<{ ids: string[]; parts: string[]; pronouns: boolean } | null>(null);
   /* Already teaching something? Then this is a rare errand, folded away. */
   const [joinNote, setJoinNote] = useState("");
-  const [selDecks, setSelDecks] = useState(() => new Set<string>());
+  const [selModules, setSelModules] = useState(() => new Set<string>());
   /* What the Export screen is about to put in a file, or null. */
   const [exportAsk, setExportAsk] = useState<ExportAsk | null>(null);
   /* Whether the Import screen is open. */
   const [importing, setImporting] = useState(false);
-  const [deckAction, setDeckAction] = useState<"add" | "remove" | null>(null); // "add" | "remove"
-  const [pickedDecks, setPickedDecks] = useState<string[]>([]);
+  const [moduleAction, setModuleAction] = useState<"add" | "remove" | null>(null); // "add" | "remove"
+  const [pickedModules, setPickedModules] = useState<string[]>([]);
   /* The name of a deck being made from the add-to-a-deck screen, or null
      when nothing is being made. "" is a form that is open and empty, which
      is not the same as no form at all. */
@@ -6677,7 +6677,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         if (sent) fresh = await pullTeaching(account.handle);
       }
       setCourses(fresh.courses);
-      setDecks(unlockedDecks(fresh.decks));
+      setModules(unlockedModules(fresh.decks));
       setCards(fresh.cards);
       setMissingClips(fresh.missingClips);
       /* Part of it may have failed while the rest arrived. */
@@ -6710,14 +6710,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* Fed from the state, so a card saved or a deck renamed is what comes
      back next time, not what the last fetch happened to return. */
   useEffect(() => {
-    rememberSpace("teach", account.handle, { courses, decks, cards, missingClips });
-  }, [account.handle, courses, decks, cards, missingClips]);
+    rememberSpace("teach", account.handle, { courses, decks: modules, cards, missingClips });
+  }, [account.handle, courses, modules, cards, missingClips]);
 
   /* What Sync now fetched for this space, when this space is the one being
      looked at. See AdminSpace. */
   useFreshSpace("teach", account.handle, (shown) => {
     setCourses(shown.courses);
-    setDecks(unlockedDecks(shown.decks));
+    setModules(unlockedModules(shown.decks));
     setCards(shown.cards);
     setError("");
   });
@@ -6743,11 +6743,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const knownLangs = useMemo(() => {
     if (teachingLangs.length) return teachingLangs;
   const ids: string[] = [];
-    for (const d of decks) {
+    for (const d of modules) {
       if (d.lang && languages[d.lang] && !ids.includes(d.lang)) ids.push(d.lang);
     }
     return ids;
-  }, [teachingLangs, decks, languages]);
+  }, [teachingLangs, modules, languages]);
 
   const multiLang = knownLangs.length > 1;
   const soleLang = knownLangs[0] || Object.keys(languages)[0];
@@ -6777,9 +6777,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     [taught]
   );
 
-  const langOfDeck: (deck: Deck) => Lang | undefined = useCallback((deck) => {
-    if (deck && deck.lang && languages[deck.lang]) return languages[deck.lang];
-    for (const link of (deck && deck.courses) || []) {
+  const langOfModule: (module: Module) => Lang | undefined = useCallback((module) => {
+    if (module && module.lang && languages[module.lang]) return languages[module.lang];
+    for (const link of (module && module.courses) || []) {
       const c = courses.find((x) => x.id === link.courseId);
       if (c && languages[c.language]) return languages[c.language];
     }
@@ -6788,17 +6788,17 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
   const langOfCard: (card: Card) => Lang | undefined = useCallback((card) =>
     (card && card.lang && languages[card.lang]) ||
-    langOfDeck(decks.find((d) => ((card && card.decks) || []).includes(d.id)) || ({} as any)),
-  [languages, decks, langOfDeck]);
+    langOfModule(modules.find((d) => ((card && card.decks) || []).includes(d.id)) || ({} as any)),
+  [languages, modules, langOfModule]);
 
   /* The decks a card can go into: those in its language, since a deck holds
      cards in one — offering the rest only lists decks the switch at the top
      has put away, and a card put in one of them lands in the wrong script.
      Any it is in already stay, so they can still be seen and taken off. */
-  const decksIn = useCallback(
+  const modulesIn = useCallback(
     (langs: Set<LangId>, keep: string[] = []) =>
-      decks.filter((d) => keep.includes(d.id) || langs.has((langOfDeck(d) || ({} as Lang)).id)),
-    [decks, langOfDeck]
+      modules.filter((d) => keep.includes(d.id) || langs.has((langOfModule(d) || ({} as Lang)).id)),
+    [modules, langOfModule]
   );
 
   /*
@@ -6816,11 +6816,11 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     () =>
       teachingChoices(
         courses.map((c) => c.language),
-        decks.map((d) => (langOfDeck(d) || ({} as Lang)).id),
+        modules.map((d) => (langOfModule(d) || ({} as Lang)).id),
         cards.map((c) => (langOfCard(c) || ({} as Lang)).id),
         languages,
       ),
-    [courses, decks, cards, languages, langOfDeck, langOfCard]
+    [courses, modules, cards, languages, langOfModule, langOfCard]
   );
   useEffect(() => {
     if (onLangChoices) onLangChoices(langChoices);
@@ -6840,15 +6840,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      on by Delete, out of sight — so switching lets go of what was ticked. */
   useEffect(() => {
     setSelCards(new Set());
-    setSelDecks(new Set());
+    setSelModules(new Set());
   }, [offKey]);
   const onCourses = useMemo(
     () => (off.length ? courses.filter((c) => inPlayWith(off, c.language)) : courses),
     [courses, off]
   );
-  const onDecks = useMemo(
-    () => (off.length ? decks.filter((d) => inPlayWith(off, (langOfDeck(d) || ({} as Lang)).id)) : decks),
-    [decks, off, langOfDeck]
+  const onModules = useMemo(
+    () => (off.length ? modules.filter((d) => inPlayWith(off, (langOfModule(d) || ({} as Lang)).id)) : modules),
+    [modules, off, langOfModule]
   );
   const onCards = useMemo(
     () => (off.length ? cards.filter((c) => inPlayWith(off, (langOfCard(c) || ({} as Lang)).id)) : cards),
@@ -6951,7 +6951,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     [reviewMap],
   );
   /*
-   * How well each deck is built to be learnt from — see deck-quality.ts.
+   * How well each deck is built to be learnt from — see module-quality.ts.
    *
    * A sentence may use any word a deck of the same course teaches, so what
    * counts as known is the cards of every deck in the deck's courses, and
@@ -6969,8 +6969,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
    */
   const countingFor = useCallback(
     (unitId: string, course: Course): Card[] =>
-      countingCards({ course, decks: allDecks, unitId, cards: lendable, deckIdsOf: (c) => c.decks || [], fillers: lendable }),
-    [allDecks, lendable],
+      countingCards({ course, modules: allModules, unitId, cards: lendable, moduleIdsOf: (c) => c.decks || [], fillers: lendable }),
+    [allModules, lendable],
   );
   /* The course a unit is judged in: the one its page was opened from, or
      else the first whose path holds it. */
@@ -6984,29 +6984,29 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* A unit's checklist in a course, as this screen reads it. */
   const problemsIn = useCallback(
     (unitId: string, course: Course): UnitProblem[] => {
-      const unit = allDecks.find((d) => d.id === unitId);
+      const unit = allModules.find((d) => d.id === unitId);
       const held = cards.filter((c) => (c.decks || []).includes(unitId));
-      return unitProblems({ cards: held, counting: countingFor(unitId, course), lang: unit ? langOfDeck(unit) : null });
+      return unitProblems({ cards: held, counting: countingFor(unitId, course), lang: unit ? langOfModule(unit) : null });
     },
-    [allDecks, cards, countingFor, langOfDeck],
+    [allModules, cards, countingFor, langOfModule],
   );
   const qualityOf = useCallback(
-    (deck: Deck, pending = false): Quality => {
-      const held = cards.filter((c) => (c.decks || []).includes(deck.id));
+    (module: Module, pending = false): Quality => {
+      const held = cards.filter((c) => (c.decks || []).includes(module.id));
       const owned = new Set(cards.map((c) => c.id));
       const linked = new Set(
-        (deck.courses || []).flatMap((l) => (courses.find((c) => c.id === l.courseId) || { decks: [] as string[] }).decks),
+        (module.courses || []).flatMap((l) => (courses.find((c) => c.id === l.courseId) || { decks: [] as string[] }).decks),
       );
       /* A unit's words may come only from what the path has taught by
          then, so a word a later unit teaches reads as not taught (R15). */
-      const onPath = isPathUnit(deck) ? courseOfUnit(deck.id) : null;
+      const onPath = isPathUnit(module) ? courseOfUnit(module.id) : null;
       const known = onPath
-        ? countingFor(deck.id, onPath)
+        ? countingFor(module.id, onPath)
         : linked.size
         ? lendable.filter((c) => !owned.has(c.id) || (c.decks || []).some((id) => linked.has(id)))
         : lendable;
-      return deckQuality(held, {
-        lang: langOfDeck(deck),
+      return moduleQuality(held, {
+        lang: langOfModule(module),
         pool: lendable,
         known,
         partsOf: (c) => sentenceParts.get(String(c.id)) || [],
@@ -7014,29 +7014,29 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         pending,
       });
     },
-    [cards, courses, lendable, langOfDeck, sentenceParts, lentById, courseOfUnit, countingFor],
+    [cards, courses, lendable, langOfModule, sentenceParts, lentById, courseOfUnit, countingFor],
   );
   const qualities: Map<string, Quality> = useMemo(
-    () => (tab === "decks" ? new Map(decks.map((d) => [d.id, qualityOf(d)])) : new Map()),
-    [tab, decks, qualityOf],
+    () => (tab === "decks" ? new Map(modules.map((d) => [d.id, qualityOf(d)])) : new Map()),
+    [tab, modules, qualityOf],
   );
   /* And the open deck's, with the links nobody has confirmed, which is
      slower and wanted on that page alone. */
   const openQuality: Quality | null = useMemo(() => {
-    const d = openDeck ? decks.find((x) => x.id === openDeck) : null;
+    const d = openModule ? modules.find((x) => x.id === openModule) : null;
     return d ? qualityOf(d, true) : null;
-  }, [openDeck, decks, qualityOf]);
+  }, [openModule, modules, qualityOf]);
   /* The checklist of every unit on the course on screen, and of the unit
      open, worked out once per change rather than on every render. */
   const pathChecks: Map<string, UnitProblem[]> = useMemo(() => {
     const out: Map<string, UnitProblem[]> = new Map();
     const course = courseView ? courses.find((c) => c.id === courseView) : null;
-    if (course) for (const u of pathUnits(course, allDecks)) out.set(u.id, problemsIn(u.id, course));
-    const open = openDeck ? allDecks.find((d) => d.id === openDeck) : null;
+    if (course) for (const u of pathUnits(course, allModules)) out.set(u.id, problemsIn(u.id, course));
+    const open = openModule ? allModules.find((d) => d.id === openModule) : null;
     const at = open && isPathUnit(open) ? courseOfUnit(open.id) : null;
     if (open && at && !out.has(open.id)) out.set(open.id, problemsIn(open.id, at));
     return out;
-  }, [courseView, courses, allDecks, openDeck, problemsIn, courseOfUnit]);
+  }, [courseView, courses, allModules, openModule, problemsIn, courseOfUnit]);
   /* Narrowed then ordered. ItemList's own search runs after this, over what
      is left, so a search inside a filter behaves the way it reads. */
   const shownCards = useMemo(
@@ -7050,20 +7050,20 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      filter, then with the pronouns folded. Worked out up here rather than
      where the deck is drawn, so a selection made in it can be opened out
      by the same hand as one made on the Cards tab. */
-  const deckView = useMemo(() => {
-    if (!openDeck) return null;
-    const held = cards.filter((c) => (c.decks || []).includes(openDeck));
+  const moduleView = useMemo(() => {
+    if (!openModule) return null;
+    const held = cards.filter((c) => (c.decks || []).includes(openModule));
     /* "In no deck" is never true of a deck's own cards, so inside one it
        is set aside rather than emptying the list. */
     const inside = cardFilter.deckMode === "none" ? { ...cardFilter, deckMode: "any" } : cardFilter;
     const mine = sortCards(filterCards(held, inside, waitingIds), sortKey, newestFirst);
-    return { held, mine, listed: groupPronouns(mine, openDeck) };
-  }, [openDeck, cards, cardFilter, waitingIds, sortKey, newestFirst]);
+    return { held, mine, listed: groupPronouns(mine, openModule) };
+  }, [openModule, cards, cardFilter, waitingIds, sortKey, newestFirst]);
   /* The cards a selection stands for. Everything that acts on one goes
      through this, because a pronoun entry is eight cards and no action
      knows what an entry is. */
   const pickedIds = (ids: Iterable<string>) =>
-    pickedCardIds(ids, deckView ? deckView.listed : listedCards);
+    pickedCardIds(ids, moduleView ? moduleView.listed : listedCards);
   /* The ways into the Export screen: a card, the cards ticked, a deck,
      the decks ticked. */
   const exportCards = (ids: string[]) => {
@@ -7071,8 +7071,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const name = one ? asMeaning(leadOf(one).en) || leadOf(one).ar || "card" : `${ids.length}-cards`;
     setExportAsk({ cardIds: ids, deckIds: [], name, what: one ? "This card" : `These ${plural(ids.length, "card")}` });
   };
-  const exportDecks = (ids: string[]) => {
-    const picked = decks.filter((d) => ids.includes(d.id));
+  const exportModules = (ids: string[]) => {
+    const picked = modules.filter((d) => ids.includes(d.id));
     const name = picked.length === 1 ? picked[0].title : `${picked.length}-decks`;
     setExportAsk({
       cardIds: [],
@@ -7088,17 +7088,17 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
    * the server has not got; the cards; and last, the cards that name
    * another card of the file, once that card's new id is known.
    */
-  async function importFrom({ file, cards: matches, decks: deckMatches, ticked }: ImportPlan) {
-    const deckTo = new Map<string, string>();
-    let madeDecks = 0;
-    for (const m of deckMatches) {
+  async function importFrom({ file, cards: matches, decks: moduleMatches, ticked }: ImportPlan) {
+    const moduleTo = new Map<string, string>();
+    let madeModules = 0;
+    for (const m of moduleMatches) {
       if (m.existing) {
-        deckTo.set(m.deck.id, m.existing.id);
+        moduleTo.set(m.deck.id, m.existing.id);
         continue;
       }
-      const r = await API.createDeck(m.deck.title || "Imported deck", "", m.deck.lang);
-      deckTo.set(m.deck.id, r.deck.id);
-      madeDecks += 1;
+      const r = await API.createModule(m.deck.title || "Imported deck", "", m.deck.lang);
+      moduleTo.set(m.deck.id, r.deck.id);
+      madeModules += 1;
     }
     const going = matches.filter((m) => ticked.has(m.card.id));
     const media = mediaOf(going.map((m) => m.card), file);
@@ -7112,21 +7112,21 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     for (const m of matches) {
       if (m.kind === "sameWord" && m.existing && !ticked.has(m.card.id)) moved.set(m.card.id, m.existing.id);
     }
-    const into = (m: CardMatch) => m.inDecks.map((d) => deckTo.get(d)).filter((d): d is string => !!d);
+    const into = (m: CardMatch) => m.inDecks.map((d) => moduleTo.get(d)).filter((d): d is string => !!d);
     const saved: { match: CardMatch; card: Card }[] = [];
     let unnamed = 0;
     for (const m of going) {
       const replacing = m.kind === "same";
-      const decksFor = [...new Set([...(replacing && m.existing ? m.existing.decks || [] : []), ...into(m)])];
+      const modulesFor = [...new Set([...(replacing && m.existing ? m.existing.decks || [] : []), ...into(m)])];
       const body = remapIds(toSave(m.card, replacing ? m.card.id : ""), moved);
       let r;
       try {
-        r = await API.saveCard(body, decksFor, { status: IMPORTED_STATUS });
+        r = await API.saveCard(body, modulesFor, { status: IMPORTED_STATUS });
       } catch (e) {
         /* Its ID is one a card of yours already answers to. Brought in
            without it rather than not at all; the count says how many. */
         if (!(e instanceof Error) || e.message !== "ref-taken") throw e;
-        r = await API.saveCard({ ...body, ref: "" }, decksFor, { status: IMPORTED_STATUS });
+        r = await API.saveCard({ ...body, ref: "" }, modulesFor, { status: IMPORTED_STATUS });
         unnamed += 1;
       }
       absorbSaved(r);
@@ -7155,7 +7155,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const said = [
       going.length - replaced ? `imported ${plural(going.length - replaced, "card")}` : "",
       replaced ? `replaced ${plural(replaced, "card")}` : "",
-      madeDecks ? `made ${plural(madeDecks, "deck")}` : "",
+      madeModules ? `made ${plural(madeModules, "deck")}` : "",
       unnamed ? `${unnamed} came in without its ID, which a card of yours already has` : "",
     ].filter(Boolean).join(", ") || "added your cards to the deck";
     /* And that students don't have them yet, where any were saved: the
@@ -7166,7 +7166,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const importScreen = importing && (
     <ImportScreen
       cards={cards}
-      decks={decks}
+      modules={modules}
       langName={(id) => (languages[id as LangId] || { name: id }).name}
       busy={busy}
       failed={error}
@@ -7285,7 +7285,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       }
       const said = cardWords(c, langOfCard(c));
       const titles = (c.decks || [])
-        .map((id: string) => (decks.find((d) => d.id === id) || { title: "" }).title)
+        .map((id: string) => (modules.find((d) => d.id === id) || { title: "" }).title)
         .filter(Boolean);
       return {
         word: said.word,
@@ -7533,10 +7533,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           {(cardFilter.deckMode === "in" || cardFilter.deckMode === "out") && (
             <>
               <CheckList
-                options={decks.map((d) => ({
+                options={modules.map((d) => ({
                   id: d.id,
                   title: d.title,
-                  note: deckSize(d),
+                  note: moduleSize(d),
                 }))}
                 chosen={cardFilter.deckIds}
                 onToggle={(id, on) =>
@@ -7757,8 +7757,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      out of every deck, locked or not, so the confirmation says which
      locked decks will lose it. */
   const lockedWarning = (ids: string[]) => {
-    const held = decks
-      .filter((d) => d.locked && DECK_LOCKS && (d.cardIds || []).some((x) => ids.includes(x)))
+    const held = modules
+      .filter((d) => d.locked && MODULE_LOCKS && (d.cardIds || []).some((x) => ids.includes(x)))
       .map((d) => `"${d.title}"`);
     if (!held.length) return null;
     return (
@@ -7782,13 +7782,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
    * published card with changes waiting, the whole card is the changes —
    * saving a tag would publish them.
    */
-  const touchedBy = (card: Partial<Card>, decks: string[]): string[] | undefined => {
+  const touchedBy = (card: Partial<Card>, modules: string[]): string[] | undefined => {
     const was = card.id ? cardsNow.current.find((c) => c.id === card.id) : null;
     if (!was) return undefined;
     const keys = new Set([...Object.keys(card), ...Object.keys(was)]);
     const out = [...keys].filter((k) => !SAVE_BOOKKEEPING.has(k) &&
       JSON.stringify((card as Record<string, unknown>)[k] ?? null) !== JSON.stringify((was as Record<string, unknown>)[k] ?? null));
-    if ([...(was.decks || [])].sort().join() !== [...decks].sort().join()) out.push("decks");
+    if ([...(was.decks || [])].sort().join() !== [...modules].sort().join()) out.push("decks");
     return out;
   };
   /* Its offline pictures and recordings first (0.659): send-waiting.ts. */
@@ -7797,15 +7797,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      screens that do not keep a save for later. */
   /* With the decks this screen believed the card was in, so the server
      applies only what was added or taken away (0.580). */
-  const saveNamed = async (named: Partial<Card>, decks: string[]) => {
+  const saveNamed = async (named: Partial<Card>, modules: string[]) => {
     const { card, waiting } = await sendCardMedia(named);
     /* Its media could not go, so neither can it: said as the connection. */
     if (waiting) throw new Error("offline");
-    return API.saveCard(card, decks, card.id
-      ? { touched: touchedBy(card, decks), decksWere: card.decks || [] }
+    return API.saveCard(card, modules, card.id
+      ? { touched: touchedBy(card, modules), decksWere: card.decks || [] }
       : { personal: mineSide });
   };
-  const sendOrKeep = useCallback(async (given0: Partial<Card>, decks: string[], given: API.SaveExtra = {}) => {
+  const sendOrKeep = useCallback(async (given0: Partial<Card>, modules: string[], given: API.SaveExtra = {}) => {
     /* Its offline pictures and recordings first; if they cannot go, the
        card is kept with them (0.659). */
     const media = await sendCardMedia(given0);
@@ -7814,10 +7814,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const withSide = !card.id && mineSide ? { ...given, personal: true } : given;
     const extra: API.SaveExtra = withSide.touched || withSide.walk || withSide.into || !card.id
       ? withSide
-      : { ...withSide, touched: touchedBy(card, decks) };
+      : { ...withSide, touched: touchedBy(card, modules) };
     try {
       if (media.waiting) throw new Error("offline");
-      return await API.saveCard(card, decks, extra);
+      return await API.saveCard(card, modules, extra);
     } catch (e) {
       /* No connection, by the app's one rule — a deploy restarting the
          server included — keeps the card, as offline does (0.669). */
@@ -7827,7 +7827,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       if (API.tryingSpace()) throw new Error("trying-space-save");
       /* With the space it was made in, so it is sent there whatever space
          the app is in when the connection comes back (0.580). */
-      const kept = keepPending(CARD_OUTBOX, { card, decks, extra, org: API.currentOrg() });
+      const kept = keepPending(CARD_OUTBOX, { card, decks: modules, extra, org: API.currentOrg() });
       /* Nowhere to keep it: said, and the editor stays open with what was
          typed (0.580, audit finding 6). */
       if (!kept) throw new Error("device-full");
@@ -7873,7 +7873,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       out[i] = next;
       return out;
     });
-    absorbDecks(r.decks);
+    absorbModules(r.decks);
   }
 
   /* A card's status, from the menu beside Edit — see StatusMenu. The card
@@ -7902,9 +7902,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               : "Marked as a draft",
     );
 
-  function absorbDecks(records: Deck[]) {
+  function absorbModules(records: Module[]) {
     if (!Array.isArray(records) || !records.length) return;
-    setDecks((prev) =>
+    setModules((prev) =>
       prev.map((d) => {
         const fresh = records.find((x) => x.id === d.id);
         return fresh ? { ...d, ...fresh, cardCount: (fresh.cardIds || []).length } : d;
@@ -7916,7 +7916,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     const gone = new Set(ids);
     if (!gone.size) return;
     setCards((prev) => prev.filter((c) => !gone.has(c.id)));
-    setDecks((prev) =>
+    setModules((prev) =>
       prev.map((d) => {
         const ids2 = (d.cardIds || []).filter((x) => !gone.has(x));
         return ids2.length === (d.cardIds || []).length
@@ -7930,8 +7930,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      a teacher looks after a deck, and what in it is not yet reaching
      students is the thing worth seeing without opening it. */
   const cardById = useMemo(() => new Map(cards.map((c) => [c.id, c])), [cards]);
-  const deckWaiting = (deck: Deck): string => {
-    const n = (deck.cardIds || []).filter((id) => waitingIds.has(id)).length;
+  const moduleWaiting = (module: Module): string => {
+    const n = (module.cardIds || []).filter((id) => waitingIds.has(id)).length;
     return n ? ` · ${n} to review` : "";
   };
 
@@ -7946,7 +7946,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           .map((l) => (l as Lang).id)
       ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selCards, cards, decks, languages, listedCards, deckView]
+    [selCards, cards, modules, languages, listedCards, moduleView]
   );
   /*
    * The language a deck made from the add-to-a-deck screen takes.
@@ -7958,7 +7958,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
    * falls back to the one this teacher mostly teaches and says on screen
    * which it chose.
    */
-  const newDeckLang = useMemo(
+  const newModuleLang = useMemo(
     () => (pickedLangs.size === 1 ? [...pickedLangs][0] : soleLangOn),
     [pickedLangs, soleLangOn]
   );
@@ -7966,14 +7966,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* Made, then ticked: the deck a teacher just named is the one they were
      about to choose, so choosing it again by hand is a step that says
      nothing. */
-  const createDeckHere = (title: string) =>
+  const createModuleHere = (title: string) =>
     run(
       async () => {
-        const r = await API.createDeck(title, "", newDeckLang, mineSide);
+        const r = await API.createModule(title, "", newModuleLang, mineSide);
         const made = r && r.deck;
         if (made) {
-          setDecks((prev) => prev.concat([made]));
-          setPickedDecks((prev) => prev.concat([made.id]));
+          setModules((prev) => prev.concat([made]));
+          setPickedModules((prev) => prev.concat([made.id]));
         }
         return made;
       },
@@ -7985,7 +7985,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      lock and its cards are. */
   if (naming) {
     return (
-      <NewDeck
+      <NewModule
         kind={newKind}
         courses={courses.map((c) => ({ id: c.id, title: c.title }))}
         choices={choicesOn}
@@ -8000,12 +8000,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                  deck made, then marked as a set (0.633). */
               const r: any = newKind === "unit"
                 ? await API.createUnit(courseId, title)
-                : await API.createDeck(title, "", lang || soleLangOn, mineSide);
+                : await API.createModule(title, "", lang || soleLangOn, mineSide);
               if (newKind === "set" && r && r.deck && r.deck.id) await API.saveSet(r.deck.id, emptySet());
               setNaming(null);
               await refresh();
               if (newKind === "unit") setUnitCourse(courseId);
-              if (r && r.deck && r.deck.id) setOpenDeck(r.deck.id);
+              if (r && r.deck && r.deck.id) setOpenModule(r.deck.id);
             },
             `${title} created`
           )
@@ -8084,30 +8084,30 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     );
   })() : null;
   const editorScreen = editing ? (() => {
-    const forDeck = editing.decks[0]
-      ? decks.find((d) => d.id === editing.decks[0])
-      : decks[0] || { courses: [] };
+    const forModule = editing.decks[0]
+      ? modules.find((d) => d.id === editing.decks[0])
+      : modules[0] || { courses: [] };
     /* An explicit choice wins, then the card's own language, then the deck it
        is going into. With one language taught there is never a choice. */
     const editLang =
       (editing.lang && languages[editing.lang]) ||
-      (editing.card ? langOfCard(editing.card) : langOfDeck(forDeck || ({ courses: [] } as any)));
+      (editing.card ? langOfCard(editing.card) : langOfModule(forModule || ({ courses: [] } as any)));
     return (
       <CardEditor
         key={`${editing.opened || ""}`}
         card={editing.card}
         lang={editLang || LANGUAGES[DEFAULT_LANGUAGE]}
-        decks={decksIn(new Set([(editLang || LANGUAGES[DEFAULT_LANGUAGE]).id]), editing.decks)}
-        inDecks={editing.decks}
+        modules={modulesIn(new Set([(editLang || LANGUAGES[DEFAULT_LANGUAGE]).id]), editing.decks)}
+        inModules={editing.decks}
         /* A deck made from the card's decks screen, in the card's language;
            the editor ticks it (0.594). */
-        onCreateDeck={(title) => {
+        onCreateModule={(title) => {
           const langId = (editLang || LANGUAGES[DEFAULT_LANGUAGE]).id;
           return run(
             async () => {
-              const r = await API.createDeck(title, "", langId, mineSide);
+              const r = await API.createModule(title, "", langId, mineSide);
               const made = r && r.deck;
-              if (made) setDecks((prev) => prev.concat([made]));
+              if (made) setModules((prev) => prev.concat([made]));
               return made;
             },
             (made) => `${(made && made.title) || title} created`
@@ -8132,7 +8132,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         /* A My space card into the space (0.549, 3a): teachers and admins. */
         onToSpace={editing.card && editing.card.id && editing.card.personal && !personalOnly
           ? (move: boolean) => {
-              setCardDeck("");
+              setCardModule("");
               setCardToSpace({ card: editing.card as Card, move });
             }
           : undefined}
@@ -8147,14 +8147,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               /* The card, and the screen it was opened from — a deck's card
                  list, say, so answering comes back to the card inside the
                  deck rather than to the space's front door. */
-              back={{ cardId: editing.card.id, tab, deckId: openDeck }}
+              back={{ cardId: editing.card.id, tab, deckId: openModule }}
               card={editing.card}
               cards={lendable}
               lang={editLang || undefined}
               /* With the personal sets and their lists, each with its
                  cards, so a set's picture is tried as a student meets it
                  — with a stand-in answer, a teacher having none (0.632). */
-              onTry={onTry ? (plan) => onTry({ ...plan, decks: setDecksForTrial() }) : undefined}
+              onTry={onTry ? (plan) => onTry({ ...plan, decks: setModulesForTrial() }) : undefined}
             />
           ) : null
         }
@@ -8163,7 +8163,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
              card opened from a list is, or to edit where this one was. */
           setEditing({ card: other, decks: other.decks || [], lang: other.lang || (editLang || {}).id || "", opened: Date.now(), locked: !!editing.locked })
         }
-        onSave={({ forms, note, name, examples, category, sentence, decks: inDecks, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next, exit, publish }) =>
+        onSave={({ forms, note, name, examples, category, sentence, decks: inModules, uses, fills, ref, spread, stripped, drill, scene: written, clue, capitals, carry, next, exit, publish }) =>
           run(
             async () => {
               const [main, ...subs] = forms;
@@ -8273,7 +8273,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                         ...(typeof capitals === "boolean" ? { capitals } : {}),
                       }),
                 },
-                inDecks,
+                inModules,
                 /* A new card starts as a draft, and a change to a published
                    card waits for publishing — see "A card's status" in
                    save-card. Its decks, ID and tags apply at once. */
@@ -8451,7 +8451,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             title={`${cardToSpace.move ? "Move" : "Copy"} this card to ${spaceName}?`}
             confirmLabel={cardToSpace.move ? "Move it" : "Copy it"}
             danger={false}
-            busy={busy || !cardDeck}
+            busy={busy || !cardModule}
             body={
               <>
                 <p>
@@ -8462,16 +8462,16 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 <RadioGroup
                   name="card-to-space"
                   label="Into which module"
-                  value={cardDeck}
-                  onChange={setCardDeck}
-                  options={allDecks.filter((x) => !x.personal).map((x) => ({ value: x.id, label: x.title }))}
+                  value={cardModule}
+                  onChange={setCardModule}
+                  options={allModules.filter((x) => !x.personal).map((x) => ({ value: x.id, label: x.title }))}
                 />
               </>
             }
             onCancel={() => setCardToSpace(null)}
             onConfirm={() =>
               run(async () => {
-                await API.cardToSpace(cardToSpace.card.id, cardDeck, cardToSpace.move);
+                await API.cardToSpace(cardToSpace.card.id, cardModule, cardToSpace.move);
                 setCardToSpace(null);
                 setEditing(null);
                 await refresh();
@@ -8555,7 +8555,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      of the language's decks hold it — see WordSet. */
   const wordSetsOf = (langId: LangId): WordSet[] => {
     const lang = languages[langId];
-    const inLang = decks.filter((d) => ((langOfDeck(d) || {}).id || d.lang) === langId);
+    const inLang = modules.filter((d) => ((langOfModule(d) || {}).id || d.lang) === langId);
     const out: WordSet[] = [];
     const parts = composerFor(langId) ? numberPartsOf(langId) : [];
     if (parts.length) {
@@ -8590,12 +8590,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   };
   /* The pronouns into a deck or out of it, from their own screen (0.569):
      every pronoun card of the language, as Add existing cards does it. */
-  const pronounsInDeck = (langId: LangId, deckId: string, on: boolean) =>
+  const pronounsInModule = (langId: LangId, moduleId: string, on: boolean) =>
     run(async () => {
       for (const card of pronounCardsOf(langId)) {
         const inNow = card.decks || [];
-        if (on === inNow.includes(deckId)) continue;
-        absorbSaved(await saveNamed(card, on ? inNow.concat([deckId]) : inNow.filter((x) => x !== deckId)));
+        if (on === inNow.includes(moduleId)) continue;
+        absorbSaved(await saveNamed(card, on ? inNow.concat([moduleId]) : inNow.filter((x) => x !== moduleId)));
       }
     }, on ? "Added to the module" : "Taken out of the module");
 
@@ -8636,7 +8636,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     );
   };
   /* Where nothing below draws a list to sit over, it is the screen. */
-  if (cardScreen && (pronouning || numbering || (!openDeck && courseView))) return cardScreen;
+  if (cardScreen && (pronouning || numbering || (!openModule && courseView))) return cardScreen;
 
   /* ---- filling in the numbers a deck builds from ----
          Sits before the deck screen so that closing it lands back on the
@@ -8654,12 +8654,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         cards={cards}
         busy={busy}
         onClose={() => setPronouning(null)}
-        decks={decks
-          .filter((d) => ((langOfDeck(d) || {}).id || d.lang) === pronouning)
+        modules={modules
+          .filter((d) => ((langOfModule(d) || {}).id || d.lang) === pronouning)
           .map((d) => ({ id: d.id, title: String(d.title || ""), locked: !!d.locked, cardCount: d.cardCount || 0 }))}
-        onDeck={(deckId, on) => void pronounsInDeck(pronouning, deckId, on)}
-        onSave={async (card, inDecks) => {
-          const r = await sendOrKeep(card, inDecks);
+        onModule={(moduleId, on) => void pronounsInModule(pronouning, moduleId, on)}
+        onSave={async (card, inModules) => {
+          const r = await sendOrKeep(card, inModules);
           absorbSaved(r);
           return r;
         }}
@@ -8707,19 +8707,19 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         /* The decks in this language and the parts each holds — the same
            setting a deck's Numbers and pronouns screen writes, reached from
            the part's end. */
-        decks={decks
-          .filter((d) => (langOfDeck(d) || { id: "" }).id === numbering)
+        modules={modules
+          .filter((d) => (langOfModule(d) || { id: "" }).id === numbering)
           .map((d) => ({ id: d.id, title: String(d.title || ""), parts: partsNow(d.parts || []), locked: !!d.locked, cardCount: d.cardCount || 0 }))}
-        onDeckPart={(deckId, rangeId, on) =>
+        onModulePart={(moduleId, rangeId, on) =>
           run(async () => {
-            const d = decks.find((x) => x.id === deckId);
+            const d = modules.find((x) => x.id === moduleId);
             if (!d) return;
             const had = partsNow(d.parts || []);
             const parts = on ? had.concat(had.includes(rangeId) ? [] : [rangeId]) : had.filter((x) => x !== rangeId);
-            const r: any = await API.setDeckParts(deckId, parts);
-            setDecks((prev) =>
+            const r: any = await API.setModuleParts(moduleId, parts);
+            setModules((prev) =>
               prev.map((x) =>
-                x.id === deckId
+                x.id === moduleId
                   ? { ...x, parts: r.parts || parts, ...(r.partsWaiting ? { partsWaiting: r.partsWaiting } : null) }
                   : x
               )
@@ -8734,33 +8734,33 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      One screen for both places cards are selected: the Cards tab, and
      inside a deck — where the deck already open is left off the list,
      there being nothing to add a card to that it is already in. ---- */
-  const cardActionScreen = (inDeck?: string) => {
+  const cardActionScreen = (inModule?: string) => {
     const close = () => {
       setCardAction(null);
-      setPickedDecks([]);
+      setPickedModules([]);
     };
     return (
-      <DeckPickScreen
+      <ModulePickScreen
         title={
           cardAction === "add"
             ? "Add the selected cards to…"
             : "Take the selected cards out of…"
         }
-        decks={(cardAction === "add" ? decksIn(new Set([...pickedLangs, newDeckLang])) : decks).filter((d) => d.id !== inDeck)}
-        chosen={pickedDecks}
+        modules={(cardAction === "add" ? modulesIn(new Set([...pickedLangs, newModuleLang])) : modules).filter((d) => d.id !== inModule)}
+        chosen={pickedModules}
         onToggle={(id, on) =>
-          setPickedDecks((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
+          setPickedModules((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
         }
         /* Only when adding: there is nothing to take a card out of that
            was made a moment ago. */
-        onCreate={cardAction === "add" ? createDeckHere : undefined}
+        onCreate={cardAction === "add" ? createModuleHere : undefined}
         /* The cards decide, so say which language it will be — silently
            making a deck in the wrong one is a thing nothing here shows
            until a student opens it. */
-        newHint={newDeckLang ? `It will be a ${languageName(languages, newDeckLang)} deck.` : ""}
+        newHint={newModuleLang ? `It will be a ${languageName(languages, newModuleLang)} deck.` : ""}
         busy={busy}
         confirm={cardAction === "add" ? "Add" : "Remove"}
-        confirmOff={!pickedDecks.length}
+        confirmOff={!pickedModules.length}
         onCancel={close}
         onConfirm={() =>
           run(
@@ -8775,8 +8775,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 const inNow = card.decks || [];
                 const next =
                   cardAction === "add"
-                    ? [...new Set(inNow.concat(pickedDecks))]
-                    : inNow.filter((x) => !pickedDecks.includes(x));
+                    ? [...new Set(inNow.concat(pickedModules))]
+                    : inNow.filter((x) => !pickedModules.includes(x));
                 if (next.length === inNow.length) continue;
                 absorbSaved(await saveNamed(card, next));
                 changed += 1;
@@ -9066,8 +9066,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* What a saved deck holds of the things the screen can change, in the
      shape a draft of it takes — so starting to edit is copying this, and
      whether anything has changed is comparing against it. */
-  const draftOf = (d: Deck): DeckDraft => {
-    const langId = (langOfDeck(d) || {}).id || d.lang;
+  const draftOf = (d: Module): ModuleDraft => {
+    const langId = (langOfModule(d) || {}).id || d.lang;
     return {
       title: d.title,
       locked: !!d.locked,
@@ -9081,25 +9081,25 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      lock last when it is going on and first when it is coming off, so
      cards going in or out of the deck in the same save are not refused
      by it. */
-  const saveDeck = (d: Deck, now: DeckDraft) => {
+  const saveModule = (d: Module, now: ModuleDraft) => {
     const was = draftOf(d);
-    const langId = (langOfDeck(d) || {}).id || d.lang;
+    const langId = (langOfModule(d) || {}).id || d.lang;
     const title = now.title.trim();
     return run(
       async () => {
-        if (title !== d.title) await API.renameDeck(d.id, title);
-        if (!now.locked && was.locked) await API.lockDeck(d.id, false);
-        for (const id of now.courses) if (!was.courses.includes(id)) await API.attachDeck(d.id, id);
-        for (const id of was.courses) if (!now.courses.includes(id)) await API.detachDeck(d.id, id);
-        if (!sameSet(now.parts, was.parts)) await API.setDeckParts(d.id, now.parts);
+        if (title !== d.title) await API.renameModule(d.id, title);
+        if (!now.locked && was.locked) await API.lockModule(d.id, false);
+        for (const id of now.courses) if (!was.courses.includes(id)) await API.attachModule(d.id, id);
+        for (const id of was.courses) if (!now.courses.includes(id)) await API.detachModule(d.id, id);
+        if (!sameSet(now.parts, was.parts)) await API.setModuleParts(d.id, now.parts);
         for (const card of pronounCardsOf(langId)) {
           const inNow = card.decks || [];
           const want = now.pronouns.includes(card.id);
           if (want === inNow.includes(d.id)) continue;
           absorbSaved(await saveNamed(card, want ? inNow.concat([d.id]) : inNow.filter((x) => x !== d.id)));
         }
-        if (now.locked && !was.locked) await API.lockDeck(d.id, true);
-        setDeckDraft(null);
+        if (now.locked && !was.locked) await API.lockModule(d.id, true);
+        setModuleDraft(null);
         await refresh();
       },
       `${title} saved`
@@ -9110,13 +9110,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
      written straight away from the Manage cards page. A deck
      being edited has its draft brought along, so saving the edit does not
      put back what was just changed. */
-  const saveBuiltins = async (d: Deck, parts: string[], pronounsOn: boolean) => {
-    const langId = (langOfDeck(d) || {}).id || d.lang;
+  const saveBuiltins = async (d: Module, parts: string[], pronounsOn: boolean) => {
+    const langId = (langOfModule(d) || {}).id || d.lang;
     if (!sameSet(parts, draftOf(d).parts)) {
       /* Put on screen from the answer, as the Numbers screen does, so
          nothing has to fetch every deck again to show it. */
-      const r: any = await API.setDeckParts(d.id, parts);
-      setDecks((prev) =>
+      const r: any = await API.setModuleParts(d.id, parts);
+      setModules((prev) =>
         prev.map((x) =>
           x.id === d.id
             ? { ...x, parts: (r && r.parts) || parts, ...(r && r.partsWaiting ? { partsWaiting: r.partsWaiting } : null) }
@@ -9130,14 +9130,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       if (pronounsOn === inNow.includes(d.id)) continue;
       absorbSaved(await saveNamed(card, pronounsOn ? inNow.concat([d.id]) : inNow.filter((x) => x !== d.id)));
     }
-    setDeckDraft((dd) => (dd ? { ...dd, parts, pronouns: pronounsOn ? pron.map((c) => c.id) : [] } : dd));
+    setModuleDraft((dd) => (dd ? { ...dd, parts, pronouns: pronounsOn ? pron.map((c) => c.id) : [] } : dd));
   };
   /* Add existing cards: the teacher's cards in the deck's language, ticked
      where they are in it already, with the word sets in a group of their
      own at the top, each saying how much of it is written. Nothing changes
      until Done. */
-  const addingScreen = (d: Deck) => {
-    const langId = (langOfDeck(d) || {}).id || d.lang;
+  const addingScreen = (d: Module) => {
+    const langId = (langOfModule(d) || {}).id || d.lang;
     const picked = adding || { ids: [], parts: [], pronouns: false };
     const parts = numberPartsOf(langId);
     const pron = pronounCardsOf(langId);
@@ -9252,7 +9252,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       </Screen>
     );
   };
-  const openAdding = (d: Deck) => {
+  const openAdding = (d: Module) => {
     const was = draftOf(d);
     setAdding({
       ids: cards.filter((c) => (c.decks || []).includes(d.id) && !isPronounCard(c)).map((c) => c.id),
@@ -9263,7 +9263,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
   /* Out of this deck, at once, with Undo: a card, the pronouns, or a range
      of the numbers. Nothing is deleted. */
-  const removeFromDeck = (d: Deck, items: any[]) => {
+  const removeFromModule = (d: Module, items: any[]) => {
     const was = draftOf(d);
     const cardsOut = items.filter((x) => !isNumberPart(x) && !isPronounGroup(x)) as Card[];
     const partsOut = items.filter(isNumberPart).map((x: any) => x.part);
@@ -9299,15 +9299,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     );
   };
 
-  if (wordSets && !openDeck) return wordSetsScreen();
+  if (wordSets && !openModule) return wordSetsScreen();
 
   /* ---- an open deck takes over the screen, showing its cards the same
          way the Cards tab does ---- */
-  if (openDeck) {
-    const d = decks.find((x) => x.id === openDeck);
+  if (openModule) {
+    const d = modules.find((x) => x.id === openModule);
     if (!d) {
-      setOpenDeck(null);
-      setDeckDraft(null);
+      setOpenModule(null);
+      setModuleDraft(null);
       return null;
     }
     /* Its own kind, on its own screen: "this unit", "Delete personal set". */
@@ -9317,16 +9317,16 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     /* The deck's cards, through the same sort and the same filter the Cards
        tab uses — this screen showed them in whatever order they arrived and
        offered no way to narrow them at all. See deckView. */
-    const held = deckView ? deckView.held : [];
-    const mine = deckView ? deckView.mine : [];
-    const langId = (langOfDeck(d) || {}).id || d.lang;
+    const held = moduleView ? moduleView.held : [];
+    const mine = moduleView ? moduleView.mine : [];
+    const langId = (langOfModule(d) || {}).id || d.lang;
     /* The deck's number ranges, word sets, a range to an entry, ahead of its cards
        — the pronouns are already one entry among them. */
     const numberEntries: NumberPart[] = numberPartsOf(langId)
       .filter((r) => partsNow(d.parts || []).includes(r.id))
       .map((r) => ({ id: `numbers:${r.id}`, part: r.id, label: r.label, builtin: "numbers" }));
-    const listed: any[] = (numberEntries as any[]).concat(deckView ? deckView.listed : []);
-    const deckEmpty = !held.length && !numberEntries.length;
+    const listed: any[] = (numberEntries as any[]).concat(moduleView ? moduleView.listed : []);
+    const moduleEmpty = !held.length && !numberEntries.length;
     const matchEntry = (it: any, q: string) =>
       isNumberPart(it) ? it.label.toLowerCase().includes(q) : cardMatches(it, q);
     const numberTile = (n: NumberPart, extra?: Node) => (
@@ -9347,13 +9347,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         label={`Remove from this ${kindW}`}
         onClick={(e: React.MouseEvent) => {
           e.stopPropagation();
-          removeFromDeck(d, [it]);
+          removeFromModule(d, [it]);
         }}
       />
     );
     /* A card in the deck, read on the deck screen; on Manage cards, with
        Remove where the Cards tab has Delete. */
-    const deckTile = (it: any, manage: boolean) =>
+    const moduleTile = (it: any, manage: boolean) =>
       isNumberPart(it)
         ? numberTile(it, manage ? removeBtn(it) : null)
         : isPronounGroup(it)
@@ -9412,7 +9412,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     /* ---- Manage cards: the deck's cards laid out as the Cards tab lays
            out every card, with what changes which cards are in it. ---- */
     if (managing) {
-      const newCard = () => setMaking({ decks: [d.id], lang: (langOfDeck(d) || {}).id });
+      const newCard = () => setMaking({ decks: [d.id], lang: (langOfModule(d) || {}).id });
       return (
         <Screen title="Manage cards" scrollKey={`manage:${d.id}`}
           onBack={() => { setManaging(false); setSelCards(new Set()); setCardAction(null); setTagAction(null); }}>
@@ -9423,7 +9423,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             items={listed}
             count={mine.length === held.length ? null : `${mine.length} of ${plural(held.length, "card")}`}
             /* With the deck empty, Import is in the box below instead. */
-            tools={deckEmpty ? null : <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
+            tools={moduleEmpty ? null : <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
             menus={cardMenus}
             searchBelow
             size="small"
@@ -9436,7 +9436,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               ) : null
             }
             empty={filterNote}
-            emptyPanel={deckEmpty ? (
+            emptyPanel={moduleEmpty ? (
               <Nudge
                 icon="cards"
                 tone="attention"
@@ -9460,7 +9460,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             selected={selCards}
             onSelectedChange={setSelCards}
             bulkActions={[
-              { label: `Remove from this ${kindW}`, onClick: (picked: string[]) => removeFromDeck(d, listed.filter((it) => picked.includes(it.id))) },
+              { label: `Remove from this ${kindW}`, onClick: (picked: string[]) => removeFromModule(d, listed.filter((it) => picked.includes(it.id))) },
               { label: "Add to another module", onClick: () => setCardAction("add") },
               { label: "Add tags", onClick: () => setTagAction("add") },
               { label: "Remove tags", onClick: () => setTagAction("remove") },
@@ -9478,7 +9478,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 {removeBtn(c)}
               </>
             ), removeBtn)}
-            renderItem={(it) => deckTile(it, true)}
+            renderItem={(it) => moduleTile(it, true)}
           />
           {cardScreen}
           {cardAction === "add" && cardActionScreen(d.id)}
@@ -9494,7 +9494,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
        the path of the course it was opened from, with that course's
        checklist and Publish above its cards. */
     const unitIn = isPathUnit(d) ? courseOfUnit(d.id) : null;
-    const unitNo = unitIn ? pathUnits(unitIn, allDecks).findIndex((u) => u.id === d.id) + 1 : 0;
+    const unitNo = unitIn ? pathUnits(unitIn, allModules).findIndex((u) => u.id === d.id) + 1 : 0;
     const unitLive = !!unitIn && isLiveIn(unitIn, d.id);
     const fromServer = serverProblems && unitIn && serverProblems.unitId === d.id && serverProblems.courseId === unitIn.id
       ? serverProblems.problems : null;
@@ -9504,7 +9504,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       return card ? String(leadOf(card as never).ar || card.name || "").trim() : id;
     };
     const unitDrafts = held.filter((c) => c.status && c.status !== "published").length;
-    const unitLang = langOfDeck(d) || null;
+    const unitLang = langOfModule(d) || null;
     /* Advice, not points (A6): blanks whose approved cards are all of one form. */
     const sameForm = unitIn && unitLang
       ? sameFormBlanks(
@@ -9536,12 +9536,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     };
     /* Read and edited on one screen, as a card is: what is shown is the
        saved deck until Edit is pressed, and the draft after. */
-    const editing = !!deckDraft;
-    const shown = deckDraft || draftOf(d);
-    const changed = !!deckDraft && !sameDraft(deckDraft, draftOf(d));
-    const edit = (patch: Partial<DeckDraft>) => deckDraft && setDeckDraft({ ...deckDraft, ...patch });
+    const editing = !!moduleDraft;
+    const shown = moduleDraft || draftOf(d);
+    const changed = !!moduleDraft && !sameDraft(moduleDraft, draftOf(d));
+    const edit = (patch: Partial<ModuleDraft>) => moduleDraft && setModuleDraft({ ...moduleDraft, ...patch });
     const askDelete = () => {
-      if (d.locked && DECK_LOCKS) {
+      if (d.locked && MODULE_LOCKS) {
         snack(lockedDeleteNote([d.title]), "warn");
         return;
       }
@@ -9556,7 +9556,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             the apps of everyone studying it. There is no undoing this.
           </p>
         ),
-        action: () => API.deleteDeck(d.id),
+        action: () => API.deleteModule(d.id),
       });
     };
     return (
@@ -9573,8 +9573,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
            arrow was, asking first when there is something to lose. */
         onBack={
           editing
-            ? () => (changed ? setDiscardingDeck(true) : setDeckDraft(null))
-            : () => { setOpenDeck(null); setCardAction(null); setTagAction(null); setManaging(false); setAdding(null); setServerProblems(null); }
+            ? () => (changed ? setDiscardingModule(true) : setModuleDraft(null))
+            : () => { setOpenModule(null); setCardAction(null); setTagAction(null); setManaging(false); setAdding(null); setServerProblems(null); }
         }
         backIcon={editing ? "close" : "back"}
         backLabel={editing ? "Cancel" : "Back"}
@@ -9589,13 +9589,13 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 off: !shown.title.trim() || !changed,
                 busy: !!busy,
                 onClick: () => {
-                  if (busy || !deckDraft) return;
+                  if (busy || !moduleDraft) return;
                   if (!changed) snack("No changes to save.");
                   else if (!shown.title.trim()) snack("Some required fields are missing. They're marked with *.", "warn");
-                  else saveDeck(d, deckDraft);
+                  else saveModule(d, moduleDraft);
                 },
               }
-            : { icon: "edit", label: "Edit", onClick: () => setDeckDraft(draftOf(d)) }
+            : { icon: "edit", label: "Edit", onClick: () => setModuleDraft(draftOf(d)) }
         }
       >
             <Notice kind="error">{error}</Notice>
@@ -9609,7 +9609,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 <span className="at-formnum">{`This ${kindW}`}</span>
                 <span className="at-formacts">
                   <Button reads size="sm" className="iconly" aria-label={`Export this ${kindW}`} title={`Export this ${kindW}`}
-                    onClick={() => exportDecks([d.id])}>
+                    onClick={() => exportModules([d.id])}>
                     <Icon name="download" />
                   </Button>
                 </span>
@@ -9617,8 +9617,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     and, only when some of it sends students nothing, why
                     (0.563). */}
                 <span className="at-formrole">
-                  <span className="at-formline">{(langOfDeck(d) || {}).name}</span>
-                  <span className="at-formline">{deckSize(d, held.length)}</span>
+                  <span className="at-formline">{(langOfModule(d) || {}).name}</span>
+                  <span className="at-formline">{moduleSize(d, held.length)}</span>
                   {(() => {
                     const off = notReaching(d, held);
                     return off ? <span className="at-formline at-notreach">{off.long}</span> : null;
@@ -9648,8 +9648,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                       icon="school"
                       tone="attention"
                       action={editing ? (
-                        <DeckSwitch
-                          decks={courses.map((c) => ({ id: c.id, title: c.title }))}
+                        <ModuleSwitch
+                          modules={courses.map((c) => ({ id: c.id, title: c.title }))}
                           chosen={shown.courses}
                           onToggle={(id, on) =>
                             edit({ courses: on ? shown.courses.filter((x) => x !== id) : shown.courses.concat([id]) })
@@ -9670,8 +9670,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                       Not in a course yet, so no students can see it. Add it to a course to share it.
                     </Nudge>
                   ) : (
-                    <DeckSwitch
-                      decks={courses.map((c) => ({ id: c.id, title: c.title }))}
+                    <ModuleSwitch
+                      modules={courses.map((c) => ({ id: c.id, title: c.title }))}
                       chosen={shown.courses}
                       onToggle={(id, on) =>
                         edit({ courses: on ? shown.courses.filter((x) => x !== id) : shown.courses.concat([id]) })
@@ -9693,7 +9693,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
               </fieldset>
 
-              {(d.parts || []).length ? <NumbersFrom deckId={d.id} /> : null}
+              {(d.parts || []).length ? <NumbersFrom moduleId={d.id} /> : null}
 
               {/* The whole deck, whatever the list below is showing: what a
                   deck covers is a fact about the deck, not about the cards
@@ -9702,8 +9702,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   it rather than under a heading of its own. */}
               <Field label={`${KindW} quality`} lede={QUALITY_LEDE}>
                 {openQuality && (
-                  <DeckQuality quality={openQuality} cards={held}
-                    lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]}
+                  <ModuleQuality quality={openQuality} cards={held}
+                    lang={langOfModule(d) || LANGUAGES[DEFAULT_LANGUAGE]}
                     onOpenCard={(id) => openCard(held.find((c) => String(c.id) === id))} />
                 )}
               </Field>
@@ -9713,15 +9713,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 deck made as one (0.633). */}
             {d.set && !d.personal && (
               <SetSection
-                deck={d}
-                decks={decks}
+                module={d}
+                modules={modules}
                 cards={allCards}
                 busy={!!busy}
                 onSave={(next) =>
                   run(async () => {
                     const r: any = await API.saveSet(d.id, next);
                     const set = r && r.deck ? r.deck.set : undefined;
-                    setDecks((prev) => prev.map((x) => {
+                    setModules((prev) => prev.map((x) => {
                       if (x.id !== d.id) return x;
                       const { set: _was, ...rest } = x;
                       return set ? { ...rest, set } : rest;
@@ -9758,7 +9758,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
             {/* The cards, word sets among them, to read: which cards
                 the deck holds is changed on Manage cards. */}
-            <Section title="Cards" lede={deckEmpty ? undefined : "Tap a card to see it."}>
+            <Section title="Cards" lede={moduleEmpty ? undefined : "Tap a card to see it."}>
             {/* A word set the deck holds that is still being written
                 (0.569): what is missing, and the way straight to the set.
                 Students already get what is written, so it says so rather
@@ -9802,7 +9802,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               noun="card"
               items={listed}
               count={mine.length === held.length ? null : `${mine.length} of ${plural(held.length, "card")}`}
-              tools={deckEmpty ? null : (
+              tools={moduleEmpty ? null : (
                 <Button variant="primary" icon="cards" onClick={() => setManaging(true)}>
                   {`Manage this ${kindW}'s cards`}
                 </Button>
@@ -9812,7 +9812,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               size="small"
               busy={busy}
               empty={filterNote}
-              emptyPanel={deckEmpty ? (
+              emptyPanel={moduleEmpty ? (
                 <Nudge
                   icon="cards"
                   tone="attention"
@@ -9823,7 +9823,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               ) : undefined}
               match={matchEntry}
               views={cardViews("teacher-deck", (c) => cardActions(c))}
-              renderItem={(it) => deckTile(it, false)}
+              renderItem={(it) => moduleTile(it, false)}
             />
             </Section>
 
@@ -9847,15 +9847,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         {tagAction && tagActionScreen()}
         {statusAction && statusActionScreen()}
 
-        {discardingDeck && (
+        {discardingModule && (
           <ConfirmModal
             title="Discard your changes?"
             body={<p>{`The ${kindW} goes back to how it was last saved.`}</p>}
             confirmLabel="Discard changes"
-            onCancel={() => setDiscardingDeck(false)}
+            onCancel={() => setDiscardingModule(false)}
             onConfirm={() => {
-              setDiscardingDeck(false);
-              setDeckDraft(null);
+              setDiscardingModule(false);
+              setModuleDraft(null);
             }}
           />
         )}
@@ -9872,8 +9872,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               run(async () => {
                 await confirm.action();
                 setConfirm(null);
-                setDeckDraft(null);
-                setOpenDeck(null);
+                setModuleDraft(null);
+                setOpenModule(null);
                 await refresh();
               })
             }
@@ -9893,23 +9893,23 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     }
     /* Units are on the path above, never among the ordinary decks, nor
        among those that can be added beside it. */
-    const mine = decks.filter((d) => !isPathUnit(d) && (d.courses || []).some((l) => l.courseId === c.id));
-    const plainDecks = decks.filter((d) => !isPathUnit(d));
+    const mine = modules.filter((d) => !isPathUnit(d) && (d.courses || []).some((l) => l.courseId === c.id));
+    const plainModules = modules.filter((d) => !isPathUnit(d));
     /* What of this course's decks — its units with them — students don't
        get yet (0.679), said here as the deck says it of itself: the course
        is where a teacher looks to see what their students have. */
-    const courseDecks = decks.filter((d) => (d.courses || []).some((l) => l.courseId === c.id));
-    const courseCards = [...new Set(courseDecks.flatMap((d) => d.cardIds || []))]
+    const courseModules = modules.filter((d) => (d.courses || []).some((l) => l.courseId === c.id));
+    const courseCards = [...new Set(courseModules.flatMap((d) => d.cardIds || []))]
       .map((id) => cardById.get(id))
       .filter(Boolean) as Card[];
     const courseOff = notReaching(
-      { parts: courseDecks.flatMap((d) => d.parts || []), partsWaiting: courseDecks.flatMap((d) => d.partsWaiting || []) },
+      { parts: courseModules.flatMap((d) => d.parts || []), partsWaiting: courseModules.flatMap((d) => d.partsWaiting || []) },
       courseCards,
     );
     /* The cards among them, which Show them lists: a number part is
        written under Numbers, not published. */
     const courseUnpublished = courseCards.filter((x) => x.status === "draft" || x.status === "review").length;
-    const units = pathUnits(c, allDecks) as Deck[];
+    const units = pathUnits(c, allModules) as Module[];
     /* What the server saved, put on screen as it is — see toggleDeck. */
     const tookCourse = (r: any) => {
       const next = r && r.course;
@@ -9918,10 +9918,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         ? { ...x, decks: next.decks || [], path: next.path, pathLive: next.pathLive, opened: next.opened }
         : x)));
     };
-    const tookDeck = (r: any) => {
+    const tookModule = (r: any) => {
       const saved = r && r.deck;
       if (!saved) return;
-      setDecks((prev) => (prev.some((d) => d.id === saved.id)
+      setModules((prev) => (prev.some((d) => d.id === saved.id)
         ? prev.map((d) => (d.id === saved.id ? { ...d, ...saved, courses: saved.courses || d.courses } : d))
         : prev.concat([{ ...saved, cardCount: (saved.cardIds || []).length }])));
     };
@@ -9931,30 +9931,30 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
         units={units}
         problemsOf={(id) => pathChecks.get(id) || []}
         qualityOf={(u) => qualities.get(u.id) || qualityOf(u)}
-        spare={allDecks.filter((d) => isPathUnit(d) && !(c.decks || []).includes(d.id))}
+        spare={allModules.filter((d) => isPathUnit(d) && !(c.decks || []).includes(d.id))}
         othersOf={(id) => courses.filter((x) => x.id !== c.id && (x.decks || []).includes(id)).length}
         busy={busy}
-        onOpen={(id) => { setUnitCourse(c.id); setOpenDeck(id); }}
+        onOpen={(id) => { setUnitCourse(c.id); setOpenModule(id); }}
         onCreate={(title) => run(async () => {
           const r = await API.createUnit(c.id, title);
-          tookDeck({ deck: { ...r.deck, courses: [{ courseId: c.id }] } });
+          tookModule({ deck: { ...r.deck, courses: [{ courseId: c.id }] } });
           tookCourse(r);
         }, `${title} added to the path`)}
         onAdd={(id) => run(async () => {
-          const r = await API.attachDeck(id, c.id);
-          tookDeck(r);
+          const r = await API.attachModule(id, c.id);
+          tookModule(r);
           tookCourse(r);
         })}
         onMove={(id, to) => run(async () => tookCourse(await API.moveUnit(c.id, id, to)))}
         onOpenForClass={(id, open) => run(async () => tookCourse(await API.openUnit(c.id, id, open)),
           open ? "Opened for the class" : "Closed for the class")}
         onRemove={(id) => run(async () => {
-          const r = await API.detachDeck(id, c.id);
-          tookDeck(r);
+          const r = await API.detachModule(id, c.id);
+          tookModule(r);
           tookCourse(r);
         })}
         onDelete={(id) => run(async () => {
-          await API.deleteDeck(id);
+          await API.deleteModule(id);
           await refresh(true);
         })}
       />
@@ -9980,23 +9980,23 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
        decks — and is put on screen as it is, rather than fetching every
        course, deck and card again: that fetch is what made each tap take
        seconds. */
-    const toggleDeck = (id: string, on: boolean) => {
-      if (deckSaving[id]) return;
-      const title = (decks.find((d) => d.id === id) || { title: "The module" }).title;
-      setDeckSaving((now) => ({ ...now, [id]: on ? "drop" : "add" }));
+    const toggleModule = (id: string, on: boolean) => {
+      if (moduleSaving[id]) return;
+      const title = (modules.find((d) => d.id === id) || { title: "The module" }).title;
+      setModuleSaving((now) => ({ ...now, [id]: on ? "drop" : "add" }));
       run(
         async () => {
-          const r: any = on ? await API.detachDeck(id, c.id) : await API.attachDeck(id, c.id);
+          const r: any = on ? await API.detachModule(id, c.id) : await API.attachModule(id, c.id);
           const saved = r && r.deck;
           if (saved && Array.isArray(saved.courses))
-            setDecks((prev) => prev.map((d) => (d.id === id ? { ...d, courses: saved.courses } : d)));
+            setModules((prev) => prev.map((d) => (d.id === id ? { ...d, courses: saved.courses } : d)));
           else await refresh(true);
           if (r && r.course && Array.isArray(r.course.decks))
             setCourses((prev) => prev.map((x) => (x.id === c.id ? { ...x, decks: r.course.decks } : x)));
         },
         on ? `${title} taken out of ${c.title}` : `${title} added to ${c.title}`,
       ).finally(() =>
-        setDeckSaving((now) => {
+        setModuleSaving((now) => {
           const next = { ...now };
           delete next[id];
           return next;
@@ -10087,7 +10087,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                       <Button
                         size="sm"
                         onClick={() => {
-                          setCardFilter({ ...NO_CARD_FILTER, status: "waiting", deckMode: "in", deckIds: courseDecks.map((d) => d.id) });
+                          setCardFilter({ ...NO_CARD_FILTER, status: "waiting", deckMode: "in", deckIds: courseModules.map((d) => d.id) });
                           setCourseView(null);
                           setTab("cards");
                         }}
@@ -10101,15 +10101,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 </div>
               )}
               {mine.length ? (
-                <DeckSwitch
-                  decks={plainDecks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
+                <ModuleSwitch
+                  modules={plainModules.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
                   chosen={mine.map((d) => d.id)}
-                  onOpen={(id) => setOpenDeck(id)}
-                  onToggle={toggleDeck}
-                  saving={deckSaving}
+                  onOpen={(id) => setOpenModule(id)}
+                  onToggle={toggleModule}
+                  saving={moduleSaving}
                   find={{
                     placeholder: "Search modules",
-                    match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
+                    match: (id, q) => (modules.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
                   }}
                   words={{
                     first: "Add a module to this course",
@@ -10125,15 +10125,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   icon="folder"
                   tone="attention"
                   action={
-                    <DeckSwitch
-                      decks={plainDecks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
+                    <ModuleSwitch
+                      modules={plainModules.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
                       chosen={mine.map((d) => d.id)}
-                      onOpen={(id) => setOpenDeck(id)}
-                      onToggle={toggleDeck}
-                      saving={deckSaving}
+                      onOpen={(id) => setOpenModule(id)}
+                      onToggle={toggleModule}
+                      saving={moduleSaving}
                       find={{
                         placeholder: "Search modules",
-                        match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
+                        match: (id, q) => (modules.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
                       }}
                       words={{
                         first: "Add a module to this course",
@@ -10224,7 +10224,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     size="sm"
                     onClick={() => {
                       setCardFilter({ ...NO_CARD_FILTER, status: "waiting" });
-                      setOpenDeck(null);
+                      setOpenModule(null);
                       setCourseView(null);
                       setTab("cards");
                     }}
@@ -10289,7 +10289,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
           {tab === "cards" && (
             <>
-              <DecksOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} />
+              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} />
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
                   <LanguageRadio
@@ -10387,9 +10387,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     run(
                       async () => {
                         const { kept, made } = splitByMeaning(card);
-                        const decksOf = card.decks || [];
-                        absorbSaved(await sendOrKeep({ ...kept, lang: kept.lang || "" }, decksOf));
-                        for (const one of made) absorbSaved(await sendOrKeep({ ...one, lang: one.lang || "" }, decksOf));
+                        const modulesOf = card.decks || [];
+                        absorbSaved(await sendOrKeep({ ...kept, lang: kept.lang || "" }, modulesOf));
+                        for (const one of made) absorbSaved(await sendOrKeep({ ...one, lang: one.lang || "" }, modulesOf));
                         return made.length + 1;
                       },
                       (n: number) => `Split into ${n} cards`,
@@ -10582,15 +10582,15 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   }
                 />
               )}
-              <DecksOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} />
-              {deckAction && (
+              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} />
+              {moduleAction && (
                 <Screen
                   title={
-                    deckAction === "add"
+                    moduleAction === "add"
                       ? "Add the selected modules to…"
                       : "Take the selected modules out of…"
                   }
-                  onBack={() => setDeckAction(null)}
+                  onBack={() => setModuleAction(null)}
                 >
                   <CheckList
                     options={courses.map((c) => ({
@@ -10607,7 +10607,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   <div className="at-row at-mt5">
                     <Button variant="ghost"
                       onClick={() => {
-                        setDeckAction(null);
+                        setModuleAction(null);
                         setPickedCourses([]);
                       }}
           icon="close"
@@ -10619,26 +10619,26 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                       onClick={() =>
                         run(
                           async () => {
-                            const n = selDecks.size;
-                            for (const id of selDecks) {
+                            const n = selModules.size;
+                            for (const id of selModules) {
                               for (const cid of pickedCourses) {
-                                if (deckAction === "add") await API.attachDeck(id, cid);
-                                else await API.detachDeck(id, cid);
+                                if (moduleAction === "add") await API.attachModule(id, cid);
+                                else await API.detachModule(id, cid);
                               }
                             }
-                            setDeckAction(null);
+                            setModuleAction(null);
                             setPickedCourses([]);
-                            setSelDecks(new Set());
+                            setSelModules(new Set());
                             await refresh();
                             return n;
                           },
                           (n) =>
-                            `${plural(n, "module")} ${deckAction === "add" ? "added to" : "removed from"} ${plural(pickedCourses.length, "course")}`
+                            `${plural(n, "module")} ${moduleAction === "add" ? "added to" : "removed from"} ${plural(pickedCourses.length, "course")}`
                         )
                       }
           icon="check"
         >
-          {deckAction === "add" ? "Add" : "Remove"}
+          {moduleAction === "add" ? "Add" : "Remove"}
         </Button>
                   </div>
                 </Screen>
@@ -10656,7 +10656,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     run(async () => {
                       await confirm.action();
                       setConfirm(null);
-                      setOpenDeck(null);
+                      setOpenModule(null);
                       await refresh();
                     })
                   }
@@ -10687,24 +10687,24 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
               <ItemList
                 noun="module"
-                items={onDecks}
+                items={onModules}
                 size="large"
                 busy={busy}
                 empty={
-                  decks.length
+                  modules.length
                     ? "No modules in the languages switched on."
                     : "No modules yet. Make one, then add it to a course so students can see it."
                 }
                 /* With no decks at all, the same prompt the Cards tab shows
                    with no cards, in place of an empty list. */
-                emptyPanel={decks.length ? undefined : (
+                emptyPanel={modules.length ? undefined : (
                   <Nudge
                     icon="folder"
                     action={
                       /* Import sits here, beside New deck, while there are no
                          decks; the toolbar holds it once there are. */
                       <div className="at-nudgeacts">
-                        <Button variant="primary" icon="add" onClick={newDeck}>
+                        <Button variant="primary" icon="add" onClick={newModule}>
                           New module
                         </Button>
                         <IconButton icon="upload" label="Import modules" onClick={() => setImporting(true)} />
@@ -10715,21 +10715,21 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   </Nudge>
                 )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
-                tools={decks.length ? <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} /> : null}
-                onNew={newDeck}
-                selected={selDecks}
-                onSelectedChange={setSelDecks}
+                tools={modules.length ? <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} /> : null}
+                onNew={newModule}
+                selected={selModules}
+                onSelectedChange={setSelModules}
                 bulkActions={[
-                  { label: "Add to a course", onClick: () => setDeckAction("add") },
-                  { label: "Remove from a course", onClick: () => setDeckAction("remove") },
-                  { label: "Export", icon: "download", onClick: (ids: string[]) => exportDecks(ids) },
+                  { label: "Add to a course", onClick: () => setModuleAction("add") },
+                  { label: "Remove from a course", onClick: () => setModuleAction("remove") },
+                  { label: "Export", icon: "download", onClick: (ids: string[]) => exportModules(ids) },
                   {
                     label: "Delete",
                     danger: true,
                     onClick: (ids) => {
-                      const picked = decks.filter((d) => ids.includes(d.id));
+                      const picked = modules.filter((d) => ids.includes(d.id));
                       /* A locked deck is unlocked before it can go. */
-                      const held = picked.filter((d) => d.locked && DECK_LOCKS);
+                      const held = picked.filter((d) => d.locked && MODULE_LOCKS);
                       if (held.length) {
                         snack(lockedDeleteNote(held.map((d) => d.title)), "warn");
                         return;
@@ -10747,8 +10747,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                           </p>
                         ),
                         action: async () => {
-                          for (const d of picked) await API.deleteDeck(d.id);
-                          setSelDecks(new Set());
+                          for (const d of picked) await API.deleteModule(d.id);
+                          setSelModules(new Set());
                         },
                       });
                     },
@@ -10764,8 +10764,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                       title={d.title}
                       meta={
                         <>
-                          <LockMark locked={d.locked && DECK_LOCKS} />
-                          {`${(langOfDeck(d) || { name: "" }).name} · ${deckSize(d)}${deckWaiting(d)}`}
+                          <LockMark locked={d.locked && MODULE_LOCKS} />
+                          {`${(langOfModule(d) || { name: "" }).name} · ${moduleSize(d)}${moduleWaiting(d)}`}
                           {(() => {
                             /* Its cards that send students nothing yet (0.563). */
                             const off = notReaching(d, (d.cardIds || []).map((id) => cardById.get(id)).filter(Boolean) as Card[]);
@@ -10781,12 +10781,12 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                           })()}
                         </>
                       }
-                      onOpen={() => setOpenDeck(d.id)}
+                      onOpen={() => setOpenModule(d.id)}
                       actions={
                         <>
                           <IconButton icon="download" label={`Export ${moduleKind(d)}`} onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
-                              exportDecks([d.id]);
+                              exportModules([d.id]);
                             }} />
                           {/* A My space deck into the space (0.549; 2a, 9b, 10a). */}
                           {d.personal && !personalOnly && (
@@ -10803,7 +10803,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                           )}
                           <IconButton icon="delete" label={`Delete ${moduleKind(d)}`} danger onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
-                              if (d.locked && DECK_LOCKS) {
+                              if (d.locked && MODULE_LOCKS) {
                                 snack(lockedDeleteNote([d.title]), "warn");
                                 return;
                               }
@@ -10822,7 +10822,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                                     </p>
                                   </>
                                 ),
-                                action: () => API.deleteDeck(d.id),
+                                action: () => API.deleteModule(d.id),
                               });
                             }} />
                         </>
@@ -10879,7 +10879,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
 export function StudentCourses({
   courses,
-  decks,
+  modules,
   languages,
   busy,
   error,
@@ -10899,14 +10899,14 @@ export function StudentCourses({
   /** Your spaces, when Learning shows more than one: the courses go under
       a heading per space (memberships). */
   spaces?: { id: string; name: string }[];
-  decks: (Deck & { courseId: string, courseTitle?: string })[];
+  modules: (Module & { courseId: string, courseTitle?: string })[];
   languages: Record<LangId, Lang>;
   busy?: boolean;
   error?: Node;
   /** Not given while the super admin tries a space (0.574): no joining. */
   onJoin?: (code: string) => Promise<any>;
   onRefresh?: () => void;
-  onPractise: (deckTitle: string) => void;
+  onPractise: (moduleTitle: string) => void;
 }) {
   const [note, setNote] = useState("");
   useReachHold(onRetry, { detail: "Your own cards still work." });
@@ -10944,7 +10944,7 @@ export function StudentCourses({
         }
       })}
       renderCourse={(c) => {
-        const mine = decks.filter((d) => d.courseId === c.id);
+        const mine = modules.filter((d) => d.courseId === c.id);
         return (
           <Tile
             title={c.title}
@@ -11018,7 +11018,7 @@ function FetchingSystems({ name, load, onBack }: { name: string; load: () => Pro
   );
 }
 
-function NumbersFrom({ deckId }: { deckId: string }) {
+function NumbersFrom({ moduleId }: { moduleId: string }) {
   const [sources, setSources] = useState<{ handle: string; displayName: string }[] | null>(null);
   const [chosen, setChosen] = useState("");
   const [error, setError] = useState("");
@@ -11028,7 +11028,7 @@ function NumbersFrom({ deckId }: { deckId: string }) {
   useEffect(() => {
     let live = true;
     const go = (): Promise<void> =>
-      API.numberSources(deckId).then(
+      API.numberSources(moduleId).then(
         (r) => {
           if (!live) return;
           loadReach.ok();
@@ -11044,11 +11044,11 @@ function NumbersFrom({ deckId }: { deckId: string }) {
     return () => {
       live = false;
     };
-  }, [deckId, loadReach]);
+  }, [moduleId, loadReach]);
   async function choose(h: string, was: string): Promise<void> {
     setChosen(h);
     try {
-      await API.setDeckNumbers(deckId, h);
+      await API.setModuleNumbers(moduleId, h);
       saveReach.ok();
     } catch (e) {
       setChosen(was);
@@ -11060,7 +11060,7 @@ function NumbersFrom({ deckId }: { deckId: string }) {
   return (
     <Field label="Numbers from" lede="Whose numbers and recordings this module's students practise.">
       <RadioGroup
-        name={`numbers-from-${deckId}`}
+        name={`numbers-from-${moduleId}`}
         label="Numbers from"
         quiet
         value={chosen}

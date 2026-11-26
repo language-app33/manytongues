@@ -298,7 +298,7 @@ test("cards in the deck with no picture say they are not part of the set", () =>
 });
 
 test("the deck check counts a set's pictures and its lists' words without a recording, as on any deck", async () => {
-  const { deckQuality } = await import(path.join(here, "..", "src", "deck-quality.ts"));
+  const { moduleQuality } = await import(path.join(here, "..", "src", "module-quality.ts"));
   const { LANGUAGES } = await import(path.join(here, "..", "src", "languages.ts"));
   const ar = LANGUAGES["ar-PS"];
   const recordings = (/** @type {any} */ q) => q.checks.find((/** @type {any} */ c) => c.key === "recordings");
@@ -310,8 +310,8 @@ test("the deck check counts a set's pictures and its lists' words without a reco
     { id: "w1", lang: "ar-PS", category: "noun", forms: [{ ar: "عمة", en: "aunt", lat: "amma", clips: ["c2"] }] },
     { id: "w2", lang: "ar-PS", category: "noun", forms: [{ ar: "جدة", en: "grandmother", lat: "jidda" }] },
   ];
-  const ofList = recordings(deckQuality(list, { lang: ar, pool: list }));
+  const ofList = recordings(moduleQuality(list, { lang: ar, pool: list }));
   assert.equal(ofList.share, 0.5, "half the list's words are recorded");
-  const ofSet = deckQuality(pictures, { lang: ar, pool: pictures });
-  assert.deepEqual(ofSet, deckQuality(pictures.map((p) => ({ ...p })), { lang: ar, pool: pictures }), "a set is scored on its cards, as any deck");
+  const ofSet = moduleQuality(pictures, { lang: ar, pool: pictures });
+  assert.deepEqual(ofSet, moduleQuality(pictures.map((p) => ({ ...p })), { lang: ar, pool: pictures }), "a set is scored on its cards, as any deck");
 });

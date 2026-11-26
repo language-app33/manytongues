@@ -168,7 +168,7 @@ function filled(at, items) {
  */
 function dealt(at, items) {
   seed(11);
-  const built = at.trainer.buildSession({ items, settings, inDeck: () => true, perDay: 60 });
+  const built = at.trainer.buildSession({ items, settings, inModule: () => true, perDay: 60 });
   return built.exercises.map((/** @type {any} */ ex) => {
     seed(13);
     const f = at.trainer.castQuestion(items, ex);
@@ -263,7 +263,7 @@ test("a large collection is dealt in under a second", () => {
     const t0 = performance.now();
     cold.trainer.installIndexes(items, settings);
     seed(17);
-    const built = cold.trainer.buildSession({ items, settings, inDeck: () => true, perDay: 60 });
+    const built = cold.trainer.buildSession({ items, settings, inModule: () => true, perDay: 60 });
     times.push(performance.now() - t0);
     assert.ok(built.exercises.length > 0);
   }

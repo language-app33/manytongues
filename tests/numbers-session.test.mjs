@@ -94,7 +94,7 @@ const clearedOnly = (/** @type {string[]} */ ids) =>
 /** Deal one, the way a render does. */
 const deal = (/** @type {any[]} */ items) => {
   installIndexes(items, settings);
-  return buildSession({ items, settings, inDeck: () => true, systems: SETS });
+  return buildSession({ items, settings, inModule: () => true, systems: SETS });
 };
 
 /** Several sessions' questions, since which ones come up is drawn. */
@@ -343,7 +343,7 @@ test("and so does a sitting of what is going wrong", () => {
     forms: [{ ...it.forms[0], s: { num2fig: missed, time2fig: missed } }],
   }));
   installIndexes(items, settings);
-  const got = buildWeakSession({ items, settings, inDeck: () => true, systems: SETS });
+  const got = buildWeakSession({ items, settings, inModule: () => true, systems: SETS });
   assert.equal(got.reason, null, got.reason || "");
   allSaid(got.exercises, "weak");
 });
@@ -401,9 +401,9 @@ const rangeOf = (/** @type {string} */ id) =>
   must(skills().find((/** @type {any} */ s) => s.range.id === id), `the range ${id}`);
 
 /** Deal with everything held but only some of it in the deck. */
-const dealIn = (/** @type {any[]} */ items, /** @type {(it: any) => boolean} */ inDeck) => {
+const dealIn = (/** @type {any[]} */ items, /** @type {(it: any) => boolean} */ inModule) => {
   installIndexes(items, settings);
-  return buildSession({ items, settings, inDeck, includeAll: true, systems: SETS });
+  return buildSession({ items, settings, inModule: inModule, includeAll: true, systems: SETS });
 };
 
 test("no number is asked while none of its words is cleared", () => {
@@ -683,7 +683,7 @@ test("a counted noun is a building block too: it is counted only once cleared in
       ? { ...it, forms: [{ ...it.forms[0], s: { ...it.forms[0].s, count2phrase: { ...freshState(), right: i } } }] }
       : it));
     installIndexes(turned, settings);
-    const got = buildSession({ items: turned, settings, inDeck: (/** @type {any} */ it) => isRangeSkill(it), systems: SETS });
+    const got = buildSession({ items: turned, settings, inModule: (/** @type {any} */ it) => isRangeSkill(it), systems: SETS });
     for (const ex of got.exercises) if (ex.type === "count2phrase" && ex.ask) counted.add(ex.ask.nounId);
   }
   assert.ok(counted.size > 0, "nothing was counted");
@@ -752,7 +752,7 @@ test("a listening question on a range is dealt a number somebody recorded", () =
   installIndexes(items, settings);
   const heard = [];
   for (let i = 0; i < 12; i += 1) {
-    const got = buildSession({ items, settings, inDeck: () => true, systems: [{ numbers: sys, times: TIME }] });
+    const got = buildSession({ items, settings, inModule: () => true, systems: [{ numbers: sys, times: TIME }] });
     heard.push(...got.exercises.filter((/** @type {any} */ e) => e.type === "rec2fig" && e.ask.rangeId === "numbers:0-9"));
   }
   assert.ok(heard.length > 0, "no listening question was dealt on the range with a recording in it");

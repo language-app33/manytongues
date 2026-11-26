@@ -220,7 +220,7 @@ function block(flag: Flag, n: number, of: number, opts: FlagExportOptions): stri
 
   const exercise = names.exercise(flag.language, flag.exercise);
   const courseName = flag.courseId ? names.course(flag.courseId) : "";
-  const deckName = flag.deckId ? names.deck(flag.deckId) : "";
+  const moduleName = flag.deckId ? names.deck(flag.deckId) : "";
   const since = madeByApp(flag) ? SINCE.made : SINCE[flag.cardState || "here"] || "";
 
   out.push(
@@ -258,7 +258,7 @@ function block(flag: Flag, n: number, of: number, opts: FlagExportOptions): stri
     ...row("Expected", flag.expected ? `"${flag.expected}"` : ""),
     ...row("Marked", MARKED[flag.verdict || ""] || ""),
     ...row("Course", courseName ? `${courseName} (${flag.courseId})` : flag.courseId),
-    ...row("Deck", deckName ? `${deckName} (${flag.deckId})` : flag.deckId),
+    ...row("Deck", moduleName ? `${moduleName} (${flag.deckId})` : flag.deckId),
     ...row("Card", `${flag.cardId || "none"}${since ? ` — ${since}` : ""}`)
   );
 

@@ -12,12 +12,12 @@ import assert from "node:assert/strict";
 import {
   cardHeld, drawsFrom, isPathUnit, mergeReached, neverAskedAlone, pathRows, pathUnits,
 } from "../src/path.ts";
-import { NAME_KINDS } from "../src/deck-quality.ts";
+import { NAME_KINDS } from "../src/module-quality.ts";
 
 /** @param {string} id @returns {{ id: string, unit: true, cardIds: string[] }} */
 const unit = (id) => ({ id, unit: true, cardIds: [] });
 /** @param {string} id */
-const deck = (id) => ({ id, cardIds: [] });
+const module = (id) => ({ id, cardIds: [] });
 
 /**
  * A course with these units on its path, all published unless named in `drafts`.
@@ -40,14 +40,14 @@ const rowOf = (rows, id) => rows.find((/** @type {any} */ r) => r.id === id);
 
 test("a course with no path gives no rows, and draws from nothing", () => {
   const c = { id: "c1", decks: ["d1"] };
-  assert.deepEqual(pathRows(c, [deck("d1")], () => false, []).rows, []);
-  assert.equal(drawsFrom(c, [deck("d1")], "d1").size, 0);
-  assert.deepEqual(pathUnits(c, [deck("d1")]), []);
+  assert.deepEqual(pathRows(c, [module("d1")], () => false, []).rows, []);
+  assert.equal(drawsFrom(c, [module("d1")], "d1").size, 0);
+  assert.deepEqual(pathUnits(c, [module("d1")]), []);
 });
 
 test("isPathUnit reads the flag", () => {
   assert.equal(isPathUnit(unit("u")), true);
-  assert.equal(isPathUnit(deck("d")), false);
+  assert.equal(isPathUnit(module("d")), false);
   assert.equal(isPathUnit(null), false);
 });
 
@@ -258,9 +258,9 @@ test("a blank's five may come from an earlier unit, or from names kept anywhere"
   const framesN = fiveFrames(withNames);
   const course = { id: "c", decks: ["u1"], path: ["u1"], pathLive: {} };
   const counting = countingCards({
-    course, decks: [unit("u1")], unitId: "u1",
+    course, modules: [unit("u1")], unitId: "u1",
     cards: [...mine.map((c) => ({ ...c, decks: ["u1"] })), ...names.map((c) => ({ ...c, decks: [] })), ...framesN.map((c) => ({ ...c, decks: ["u1"] }))],
-    deckIdsOf: (c) => c.decks,
+    moduleIdsOf: (c) => c.decks,
   });
   assert.deepEqual(unitProblems({ cards: [...mine, ...framesN], counting, lang: vi }), [],
     "two names in no deck make up the five");
@@ -272,7 +272,7 @@ test("a word only in a later unit is not counted, even in an approved sentence",
   const inUnit = (/** @type {any} */ c, /** @type {string} */ u) => ({ ...c, decks: [u] });
   const all = [...five.slice(0, 4).map((c) => inUnit(c, "u2")), inUnit(five[4], "u3")];
   const frames = fiveFrames(all).map((c) => inUnit(c, "u2"));
-  const counting = countingCards({ course, decks: units, unitId: "u2", cards: [...all, ...frames], deckIdsOf: (c) => c.decks });
+  const counting = countingCards({ course, modules: units, unitId: "u2", cards: [...all, ...frames], moduleIdsOf: (c) => c.decks });
   assert.ok(!counting.some((c) => c.id === five[4].id), "the later unit's word is not among what counts");
   const p = unitProblems({ cards: [...all.slice(0, 4), ...frames], counting, lang: vi });
   assert.equal(p.filter((x) => x.kind === "blank-short").length, 5);
@@ -326,8 +326,8 @@ test("numbers count toward a blank when a unit up to this one holds their part",
   const frames = ["dem", "co", "mua", "ban", "lay"].map((v, i) => approve(counter(`n${i}`, v)));
   const course = { id: "c", decks: ["u1", "u2"], path: ["u1", "u2"], pathLive: { u1: 1 } };
   const build = (/** @type {string[]} */ parts) => countingCards({
-    course, decks: [{ ...unit("u1"), parts }, unit("u2")], unitId: "u2",
-    cards: frames, deckIdsOf: (c) => c.decks || [], fillers,
+    course, modules: [{ ...unit("u1"), parts }, unit("u2")], unitId: "u2",
+    cards: frames, moduleIdsOf: (c) => c.decks || [], fillers,
   });
   const held = build(["numbers:0-9"]);
   assert.deepEqual(unitProblems({ cards: frames, counting: held, lang: vi }), []);
@@ -353,7 +353,7 @@ test("what counts toward unit 2: unit 1's words and names anywhere, not unit 3's
     food("lan", "Lan", { decks: [], category: "name" }),
     food("loose", "loose", { decks: [] }),
   ];
-  const ids = countingCards({ course, decks: units, unitId: "u2", cards, deckIdsOf: (/** @type {any} */ c) => c.decks, fillers: cards })
+  const ids = countingCards({ course, modules: units, unitId: "u2", cards, moduleIdsOf: (/** @type {any} */ c) => c.decks, fillers: cards })
     .map((c) => c.id).sort();
   assert.deepEqual(ids, ["early", "lan", "mine"]);
 });
@@ -370,7 +370,7 @@ test("the same unit in two courses can be clear in one and short in the other", 
   const b = { id: "b", decks: ["u1", "u2"], path: ["u1", "u2"], pathLive: {} };
   const judge = (/** @type {any} */ course) => unitProblems({
     cards: own, lang: vi,
-    counting: countingCards({ course, decks: units, unitId: "u2", cards: all, deckIdsOf: (c) => c.decks }),
+    counting: countingCards({ course, modules: units, unitId: "u2", cards: all, moduleIdsOf: (c) => c.decks }),
   });
   assert.deepEqual(judge(a), []);
   assert.ok(judge(b).some((p) => p.kind === "blank-short"));

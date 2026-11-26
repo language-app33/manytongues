@@ -167,7 +167,7 @@ test("a dealt session offline asks nothing that plays a recording it hasn't got"
   const session = buildSession({
     items: [card()],
     settings,
-    inDeck: () => true,
+    inModule: () => true,
     practice: true,
   });
   assert.ok((session.exercises || []).length > 0, "the card is still practised");
@@ -195,7 +195,7 @@ test("with the recording here, the session asks about it as usual", () => {
   const session = buildSession({
     items: [card()],
     settings,
-    inDeck: () => true,
+    inModule: () => true,
     practice: true,
   });
   assert.ok(heard(session).length > 0, "a downloaded course is practised in full");
@@ -207,7 +207,7 @@ test("online, a recording that is here is asked about (0.660: and only then)", (
   const session = buildSession({
     items: [card()],
     settings,
-    inDeck: () => true,
+    inModule: () => true,
     practice: true,
   });
   assert.ok(heard(session).length > 0);

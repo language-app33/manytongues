@@ -352,15 +352,15 @@ export function formIn<T extends { ar: string }>(text: string, forms: T[], lang:
 const count = (n: number, one: string, many = `${one}s`) => `${n} ${n === 1 ? one : many}`;
 const verb = (n: number, one: string, many: string) => (n === 1 ? one : many);
 
-export function deckQuality(cards: Held[], options: QualityOptions): Quality {
+export function moduleQuality(cards: Held[], options: QualityOptions): Quality {
   const { lang, pool } = options;
-  const deck = (cards || []).filter(Boolean);
+  const module = (cards || []).filter(Boolean);
   const partsOf = options.partsOf || ((card: Held) => cardSentences(card, pool || [], lang));
   const byId = options.cardById || ((id: string) => (pool || []).find((c) => c && c.id === id));
 
-  const words = deck.filter((c) => wantsSentences(c, lang));
-  const said = saidIn(deck, lang);
-  const scenes = deck.filter((c) => isDialog(c) && practised(c));
+  const words = module.filter((c) => wantsSentences(c, lang));
+  const said = saidIn(module, lang);
+  const scenes = module.filter((c) => isDialog(c) && practised(c));
 
   /* Every sentence a form is met in, by card and by spelling. */
   const met: Map<string, Map<string, Set<string>>> = new Map();
@@ -402,7 +402,7 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
   /* Each sentence with a blank that was read, by the key it is said under,
      and whether any sentence it makes reaches a student (0.600). */
   const shown: Map<string, boolean> = new Map();
-  for (const card of deck) {
+  for (const card of module) {
     if (isDialog(card) && !practised(card)) continue;
     const holed = holedParts(card);
     if (!holed.length) continue;
@@ -511,7 +511,7 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
     !(formsOf(c) as Held[]).some((f) => Array.isArray(f.images) && f.images.length > 0));
   const writesApart = !!(lang && lang.script);
   const unspelt = units.filter((u) => u.some((v) => !spelt(v)));
-  const reviewing = deck.filter((c) => parts.has(String(c.id)));
+  const reviewing = module.filter((c) => parts.has(String(c.id)));
   const unreviewed = reviewing.filter((c) => toReview(stateFrom(c, parts.get(String(c.id)) || [])));
   /* A card is a repeat when an earlier one shares an answer and a meaning
      with it — any of each, where a card accepts several. */

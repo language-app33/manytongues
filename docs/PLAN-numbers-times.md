@@ -205,13 +205,13 @@ is decided when the queue is built and never changes under the learner.
 The brief asks for a migration *"keyed on schema version like existing
 migrations."* The existing ones are lifts applied on read, keyed on the
 shape they find, idempotent by construction (`liftItem`, `liftAnswers`,
-`liftStates` in `src/ArabicTrainer.tsx:4186-4335`; `deckCardIds` on the
+`liftStates` in `src/ArabicTrainer.tsx:4186-4335`; `moduleCardIds` on the
 server, `server/api/courses.js:909-940`; `DECISIONS.md:959`, *"Lift on
 read, not a migration"*). `Doc.version` is written as `3` and read
 nowhere.
 
 **Adaptation.** The number migration is a server-side lift in the
-`deckCardIds` mould: on a teacher's first read of the number system for a
+`moduleCardIds` mould: on a teacher's first read of the number system for a
 language, if no system exists and part cards do, build the system from
 them and write it once. `composerVersion` on the system is the version
 key the brief wants, and it versions the *composer*, not the storage
@@ -834,7 +834,7 @@ and typechecked and never run. Fixtures may live in `tests/golden/`.
 ## 9. Migration
 
 One shape to migrate (§1.5), on the server, once, idempotent, in the
-`deckCardIds` mould:
+`moduleCardIds` mould:
 
 1. When a teacher first opens the number system for a language (or on
    `my-systems` finding none for that language), read the teacher's cards

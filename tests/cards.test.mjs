@@ -40,13 +40,13 @@ const { shapeOf, shapeChoices, shapeLabel, categoryChoices, categoryOffers, tabl
    same way. They are one subject with the sorting above: what a card is
    called, on the device and on the server. */
 const built3 = await buildOnce(["shared.tsx"]);
-const { localIdFor, cardToItem, serverCardId, foldCourses, deckSize, notReaching } = await import(path.join(built3, "shared.js"));
+const { localIdFor, cardToItem, serverCardId, foldCourses, moduleSize, notReaching } = await import(path.join(built3, "shared.js"));
 
 /* And which recording a question leads with, which is a plain function of a
    card's progress and belongs with the rest of them. The trainer is bundled
    the same way; nothing in it touches a browser on the way in. */
 const built4 = await buildOnce(["ArabicTrainer.tsx"]);
-const { leadSpeed, deckPercent, levelPercent, nextReviewAt, reviewLine, nextPassAt, nextPass, passLine,
+const { leadSpeed, modulePercent, levelPercent, nextReviewAt, reviewLine, nextPassAt, nextPass, passLine,
   formIsAmbiguous, formTagsAt, kinTags, twinsOf,
   onePerLevel, quietUnits, easedUnits,
   drillableUnits, askedUnits, agreeTook, laddered, liftStates, merge,
@@ -207,9 +207,9 @@ test("filtering by whether students have the card as it is (0.679)", () => {
   assert.deepEqual(ids({ status: "published" }), ["out", "out-too"]);
   assert.deepEqual(ids({ status: "any" }), list.map((c) => c.id));
   /* And alongside a deck, which is how a course's line asks. */
-  const inDecks = [card({ id: "a", status: "review", decks: ["d1"] }), card({ id: "b", status: "review", decks: ["d2"] })];
+  const inModules = [card({ id: "a", status: "review", decks: ["d1"] }), card({ id: "b", status: "review", decks: ["d2"] })];
   assert.deepEqual(
-    filterCards(inDecks, { status: "waiting", deckMode: "in", deckIds: ["d1"] }).map((/** @type {any} */ c) => c.id),
+    filterCards(inModules, { status: "waiting", deckMode: "in", deckIds: ["d1"] }).map((/** @type {any} */ c) => c.id),
     ["a"],
   );
 });
@@ -582,12 +582,12 @@ test("what a word is decides which table it is offered", () => {
 test("a deck counts the levels its cards have finished, not only its finished cards", () => {
   /* Four cards, none of them finished, each halfway up its own ladder.
      The old measure called this nought. */
-  assert.equal(deckPercent({ n: 4, learnt: 0, got: 2 }), 50);
+  assert.equal(modulePercent({ n: 4, learnt: 0, got: 2 }), 50);
   /* And one card of four finished, the rest untouched, is the number the
      old measure gave — the two agree wherever nothing is partway. */
-  assert.equal(deckPercent({ n: 4, learnt: 1, got: 1 }), 25);
+  assert.equal(modulePercent({ n: 4, learnt: 1, got: 1 }), 25);
   /* A deck nobody has started is still nought. */
-  assert.equal(deckPercent({ n: 9, learnt: 0, got: 0 }), 0);
+  assert.equal(modulePercent({ n: 9, learnt: 0, got: 0 }), 0);
 });
 
 test("and is held at 99 until the last card is in", () => {
@@ -595,14 +595,14 @@ test("and is held at 99 until the last card is in", () => {
      and a tile reading 100% over a card still to learn is the one number
      here nobody would trust again. Read off the finished count rather than
      the sum, so a rounding cannot reach the hundred early. */
-  assert.equal(deckPercent({ n: 200, learnt: 199, got: 199.6 }), 99);
-  assert.equal(deckPercent({ n: 4, learnt: 3, got: 3.999 }), 99);
+  assert.equal(modulePercent({ n: 200, learnt: 199, got: 199.6 }), 99);
+  assert.equal(modulePercent({ n: 4, learnt: 3, got: 3.999 }), 99);
   /* And only every card finishing gets there. */
-  assert.equal(deckPercent({ n: 4, learnt: 4, got: 4 }), 100);
+  assert.equal(modulePercent({ n: 4, learnt: 4, got: 4 }), 100);
   /* Rounded down the rest of the way: two thirds is 66, never 67. */
-  assert.equal(deckPercent({ n: 3, learnt: 0, got: 2 }), 66);
+  assert.equal(modulePercent({ n: 3, learnt: 0, got: 2 }), 66);
   /* An empty deck is nought rather than a division by nothing. */
-  assert.equal(deckPercent({ n: 0, learnt: 0, got: 0 }), 0);
+  assert.equal(modulePercent({ n: 0, learnt: 0, got: 0 }), 0);
 });
 
 /*
@@ -3052,12 +3052,12 @@ test("a noun opened from storage reads its old grammar into the boxes, and saves
 /* A number part is counted as a card like any other (0.563): a deck of
    numbers used to say "0 cards" while it held them. */
 test("a deck's size counts its number parts as cards", () => {
-  assert.equal(deckSize({ cardCount: 0 }), "0 cards");
-  assert.equal(deckSize({ cardCount: 1, parts: [] }), "1 card");
-  assert.equal(deckSize({ cardCount: 0, parts: ["numbers:0-10", "time:hours"] }), "2 cards");
-  assert.equal(deckSize({ cardCount: 5, parts: ["numbers:0-10"] }), "6 cards");
+  assert.equal(moduleSize({ cardCount: 0 }), "0 cards");
+  assert.equal(moduleSize({ cardCount: 1, parts: [] }), "1 card");
+  assert.equal(moduleSize({ cardCount: 0, parts: ["numbers:0-10", "time:hours"] }), "2 cards");
+  assert.equal(moduleSize({ cardCount: 5, parts: ["numbers:0-10"] }), "6 cards");
   /* An open deck counts the cards it has in hand rather than the record's. */
-  assert.equal(deckSize({ cardCount: 9, parts: ["numbers:0-10"] }, 3), "4 cards");
+  assert.equal(moduleSize({ cardCount: 9, parts: ["numbers:0-10"] }, 3), "4 cards");
 });
 
 /* And which of them don't reach students yet, and why: drafts, cards

@@ -159,7 +159,7 @@ const PLACES: Record<string, [string, string]> = {
   TenseLadder: [LEARN, "Opening a verb from a tile · where each of its tenses is"],
   ProgressTab: [LEARN, "The Progress tab"],
   Lately: [LEARN, "The Progress tab · what moved today and this week"],
-  DeckScreen: [LEARN, "The Progress tab · one module, with when it could be learnt"],
+  ModuleScreen: [LEARN, "The Progress tab · one module, with when it could be learnt"],
   UnitScreen: [LEARN, "A course's path · one unit, its words and sentences"],
   PathHomeLine: [LEARN, "Home · a course's current unit"],
   PrepScreen: [LEARN, "Focused training · Set a goal (Prep mode until 0.681), getting modules learnt by a date"],
@@ -176,7 +176,7 @@ const PLACES: Record<string, [string, string]> = {
   TeachSpace: [TEACH, "The Teaching space"],
   CoursesPage: [TEACH, "The Courses tab"],
   CourseSettings: [TEACH, "Course settings"],
-  NewDeck: [TEACH, "Making a new module"],
+  NewModule: [TEACH, "Making a new module"],
   NumbersFrom: [TEACH, "A module's screen · whose numbers it uses"],
   ExportScreen: [TEACH, "Exporting cards or modules"],
   ImportScreen: [TEACH, "Importing cards or modules"],
@@ -221,8 +221,8 @@ const PLACES: Record<string, [string, string]> = {
   RenameAsk: [TEACH, "Editing a card · renaming an ID or a tag"],
   StripAsk: [TEACH, "Editing a card · taking a tag off every card"],
   RecordingOverlays: [TEACH, "Editing a card · recording a form"],
-  DeckSwitch: [TEACH, "Editing a card · which modules it is in"],
-  DeckPickScreen: [TEACH, "Putting cards in modules · a card being written, or selected cards"],
+  ModuleSwitch: [TEACH, "Editing a card · which modules it is in"],
+  ModulePickScreen: [TEACH, "Putting cards in modules · a card being written, or selected cards"],
   Nudge: [TEACH, "An empty part of a module, course or card, inviting you to fill it"],
   ChoiceSwitch: [TEACH, "Editing a card · its subtype, and a built session's mode"],
   BlankNameBox: [TEACH, "Editing a card · naming a blank nobody has named yet"],
@@ -237,7 +237,7 @@ const PLACES: Record<string, [string, string]> = {
   ImageScreen: [TEACH, "Editing a card · adding a picture"],
   FullImage: [TEACH, "Reading a card · a picture full screen"],
   StoredImage: [TEACH, "Editing a card · a picture on a form"],
-  DeckQuality: [TEACH, "A module · its quality, and what would raise it"],
+  ModuleQuality: [TEACH, "A module · its quality, and what would raise it"],
   PathSection: [TEACH, "A course · its path of units"],
   PracticeSection: [TEACH, "A course · which exercises its students are asked"],
   SetSection: [TEACH, "A personal set: its wording, the decks of words to choose from, words said with the name and what is asked"],
@@ -261,7 +261,7 @@ const PLACES: Record<string, [string, string]> = {
   GrammarToggles: [TEACH, "Editing a card · what is true of the whole word, as toggles"],
   TwoWordsBlock: [TEACH, "A language's number system · choosing one word before a noun where two were written"],
   CountedSection: [TEACH, "A language's number system · the noun cards a part counts with"],
-  PartDecks: [TEACH, "A language's number system · the modules that hold a part"],
+  PartModules: [TEACH, "A language's number system · the modules that hold a part"],
   PartTags: [TEACH, "A language's number system · the tags a part fills blanks under"],
   TimesTab: [TEACH, "A language's number system · telling the time"],
   PeriodsSection: [TEACH, "A language's number system · the parts of the day"],
@@ -276,7 +276,7 @@ const PLACES: Record<string, [string, string]> = {
   WrittenOutScreen: [TEACH, "A language's number system · one number written out by hand"],
   TryItScreen: [TEACH, "A language's number system · checking a number"],
   InContext: [TEACH, "The In context tab"],
-  DecksOrCards: [TEACH, "Material and My space · Modules or Cards, and which side you are in"],
+  ModulesOrCards: [TEACH, "Material and My space · Modules or Cards, and which side you are in"],
   MeaningSplits: [TEACH, "The Cards tab · cards with more than one meaning, to split or keep"],
   TryExercises: [TEACH, "A card · trying an exercise on it"],
   CodeBox: [TEACH, "A code to hand out"],
@@ -1056,7 +1056,7 @@ export function ComponentGallery() {
 
       <Row name="CardReadout" what="A card and everything it holds, read-only — see card-facts.ts, which is what it draws. `reader` is who is looking: a teacher sees which decks carry it and what other cards call it, a student the card itself. Falls back to the default language pack when lang is left off.">
         <V label="card + lang" wide>
-          <CardReadout card={{ ...SAMPLE_CARD, decks: ["d1"] }} decks={[{ id: "d1", title: "Lesson 1" }]} />
+          <CardReadout card={{ ...SAMPLE_CARD, decks: ["d1"] }} modules={[{ id: "d1", title: "Lesson 1" }]} />
         </V>
       </Row>
 

@@ -152,7 +152,7 @@ export const ASKED = "Asked on its own";
 export const NOT_ASKED = "Not asked on its own";
 export const LENT = "Lent to sentences";
 export const NOT_LENT = "Not lent to sentences";
-export const IN_NO_DECK = "In no module";
+export const IN_NO_MODULE = "In no module";
 export const A_SENTENCE = "A sentence — other cards fill its blanks";
 export const NOT_DRILLED = "Not on its own — it fills other cards";
 /* The words the read-out has always used for a scene whose part nobody
@@ -623,13 +623,13 @@ export const lexicalLabel = (lang: Lang | null | undefined, key: string): string
    The list itself
    ------------------------------------------------------------------ */
 
-const deckTitles = (value: unknown, ctx: FactCtx): string[] => {
+const moduleTitles = (value: unknown, ctx: FactCtx): string[] => {
   const ids = Array.isArray(value) ? value : [];
   const titles = ids
     .map((id) => (ctx.decks || []).find((d) => d.id === str(id)))
     .map((d) => str(d && d.title))
     .filter(Boolean);
-  return titles.length ? titles : ids.length ? [] : [IN_NO_DECK];
+  return titles.length ? titles : ids.length ? [] : [IN_NO_MODULE];
 };
 
 /**
@@ -878,7 +878,7 @@ export const CARD_FACTS: FieldRule[] = [
     label: "Modules",
     what: "Which modules carry the card. A card is seen through its modules, and one in no module reaches nobody — which is the teacher's problem to fix and so their line to read.",
     reader: "teacher",
-    shown: deckTitles,
+    shown: moduleTitles,
   },
   {
     key: "lang",

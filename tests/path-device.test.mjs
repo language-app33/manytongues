@@ -32,7 +32,7 @@ const { freshState, topLevelOf } = await import(path.join(here, "..", "src", "sc
 const { markedState } = await import(path.join(here, "..", "src", "grade.ts"));
 const { mergeData } = await import(path.join(here, "..", "src", "sync.ts"));
 const { mergeReached, reachesFurther } = await import(path.join(here, "..", "src", "path.ts"));
-const { generate, fileIntoDecks, isRangeSkill, isNumeralCard } = await import(path.join(here, "..", "src", "numbers", "generate.ts"));
+const { generate, fileIntoModules, isRangeSkill, isNumeralCard } = await import(path.join(here, "..", "src", "numbers", "generate.ts"));
 const { arComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.ts"));
 const { arTimeComposer } = await import(path.join(here, "..", "src", "numbers", "ar-PS.time.ts"));
 
@@ -63,7 +63,7 @@ const word = (i, s = null) => ({
 /** A path unit holding server cards. @param {string} id @param {number[]} cards */
 const unit = (id, cards) => ({ id, unit: true, title: `Unit ${id}`, cardIds: cards.map((i) => `k${i}`) });
 /** An ordinary deck. @param {string} id @param {number[]} cards */
-const deck = (id, cards) => ({ id, title: `Deck ${id}`, cardIds: cards.map((i) => `k${i}`) });
+const module = (id, cards) => ({ id, title: `Deck ${id}`, cardIds: cards.map((i) => `k${i}`) });
 /** A course whose path is these units, all published. @param {string} id @param {string[]} path @param {Record<string, any>} [over] */
 const course = (id, path, over = {}) => ({
   id, decks: [...path], path, pathLive: Object.fromEntries(path.map((p) => [p, 1])), ...over,
@@ -71,11 +71,11 @@ const course = (id, path, over = {}) => ({
 
 /** The ids of the cards a regular session deals. @param {any[]} items @param {Record<string, any>} [o] */
 const dealt = (items, o = {}) => {
-  const got = buildSession({ items, settings: o.settings || settings, inDeck: () => true, budget: 60, ...o });
+  const got = buildSession({ items, settings: o.settings || settings, inModule: () => true, budget: 60, ...o });
   return new Set(got.exercises.map((/** @type {any} */ e) => e.id));
 };
-/** @param {any[]} items @param {any[]} courses @param {any[]} decks @param {Record<string, any>} [s] */
-const install = (items, courses, decks, s = settings) => installIndexes(items, s, [], { courses, decks });
+/** @param {any[]} items @param {any[]} courses @param {any[]} modules @param {Record<string, any>} [s] */
+const install = (items, courses, modules, s = settings) => installIndexes(items, s, [], { courses, decks: modules });
 
 test("two units and nothing practised: a session brings unit 1's new words only", () => {
   const items = [1, 2, 3, 4, 5, 6].map((i) => word(i));
@@ -106,7 +106,7 @@ test("once unit 1's words are all cleared, unit 2's start to arrive", () => {
 
 test("a word also in an ordinary deck arrives straight away", () => {
   const items = [1, 2, 3].map((i) => word(i));
-  install(items, [course("A", ["u1", "u2"])], [unit("u1", [1]), unit("u2", [2, 3]), deck("d", [3])]);
+  install(items, [course("A", ["u1", "u2"])], [unit("u1", [1]), unit("u2", [2, 3]), module("d", [3])]);
   const ids = dealt(items);
   assert.ok(ids.has("srvk3"), "the word in an ordinary deck was held");
   assert.ok(!ids.has("srvk2"));
@@ -139,7 +139,7 @@ test("Practise this unit on a unit opened early brings its new words", () => {
   const row = pathIndexNow().rows.get("A")[1];
   assert.equal(row.openedEarly, true);
   assert.ok(!dealt(items).has("srvk2"), "an ordinary session brings the opened unit's words");
-  const ids = dealt(items, { pathUnit: "u2", inDeck: (/** @type {any} */ it) => ["srvk2", "srvk3"].includes(it.id) });
+  const ids = dealt(items, { pathUnit: "u2", inModule: (/** @type {any} */ it) => ["srvk2", "srvk3"].includes(it.id) });
   assert.ok(ids.has("srvk2") && ids.has("srvk3"));
 });
 
@@ -152,7 +152,7 @@ test("a unit locked in one course and open in another is not held", () => {
 
 test("a learner with no path units is dealt exactly as before", () => {
   const items = [1, 2, 3].map((i) => word(i));
-  install(items, [{ id: "A", decks: ["d"] }], [deck("d", [1, 2, 3])]);
+  install(items, [{ id: "A", decks: ["d"] }], [module("d", [1, 2, 3])]);
   assert.equal(pathIndexNow().unitIds.size, 0);
   assert.ok(items.every((it) => !pathHolds(it, settings)));
 });
@@ -167,16 +167,16 @@ const generated = generate({ ...SET, now: 1750000000000, numerals: LANGUAGES["ar
 
 test("numbers filed with no deck id come out exactly as before", () => {
   const parts = ["numbers:0-9"];
-  const old = fileIntoDecks(generated.items, SET, [{ title: "Numbers", parts }]);
+  const old = fileIntoModules(generated.items, SET, [{ title: "Numbers", parts }]);
   assert.ok(old.length > 0);
   assert.ok(old.every((/** @type {any} */ it) => !("deckIds" in it)));
-  const withId = fileIntoDecks(generated.items, SET, [{ id: "dn", title: "Numbers", parts }]);
+  const withId = fileIntoModules(generated.items, SET, [{ id: "dn", title: "Numbers", parts }]);
   assert.deepEqual(withId.map((/** @type {any} */ it) => it.tags), old.map((/** @type {any} */ it) => it.tags));
   assert.ok(withId.every((/** @type {any} */ it) => it.deckIds && it.deckIds.includes("dn")));
 });
 
 test("a unit that holds 0 to 9 holds back its skill, its words and the figures until it opens", () => {
-  const nums = fileIntoDecks(generated.items, SET, [{ id: "u2", title: "Unit u2", parts: ["numbers:0-9"] }]);
+  const nums = fileIntoModules(generated.items, SET, [{ id: "u2", title: "Unit u2", parts: ["numbers:0-9"] }]);
   const skill = must(nums.find((/** @type {any} */ it) => isRangeSkill(it) && it.range.id === "numbers:0-9"), "0 to 9");
   const figure = must(nums.find((/** @type {any} */ it) => isNumeralCard(it)), "a figure");
   const words = nums.filter((/** @type {any} */ it) => !isRangeSkill(it) && !isNumeralCard(it));
@@ -194,7 +194,7 @@ test("a unit that holds 0 to 9 holds back its skill, its words and the figures u
 });
 
 test("the same part held by a locked unit and an ordinary deck arrives straight away", () => {
-  const nums = fileIntoDecks(generated.items, SET, [
+  const nums = fileIntoModules(generated.items, SET, [
     { id: "u2", title: "Unit u2", parts: ["numbers:0-9"] },
     { id: "d", title: "Numbers", parts: ["numbers:0-9"] },
   ]);
@@ -237,11 +237,11 @@ test("after the merge, a unit that has slipped back stays reached and its follow
 test("remembering what was reached is written once: the next build finds nothing new", () => {
   const items = [word(1, cleared), word(2)];
   const courses = [course("A", ["u1", "u2"])];
-  const decks = [unit("u1", [1]), unit("u2", [2])];
-  const first = pathIndexOf(items, courses, decks, settings);
+  const modules = [unit("u1", [1]), unit("u2", [2])];
+  const first = pathIndexOf(items, courses, modules, settings);
   assert.equal(reachesFurther(settings.pathReached, first.reached), true, "there is something to write the first time");
   const written = { ...settings, pathReached: mergeReached(undefined, first.reached) };
-  const second = pathIndexOf(items, courses, decks, written);
+  const second = pathIndexOf(items, courses, modules, written);
   assert.equal(reachesFurther(written.pathReached, second.reached), false, "and nothing the second");
 });
 
@@ -283,7 +283,7 @@ test("a card in two units counts in both; one that can never be asked counts in 
 });
 
 test("a unit holding 0 to 9 counts the part's skill and words under Words, and is not finished till they are cleared", () => {
-  const nums = fileIntoDecks(generated.items, SET, [{ id: "u1", title: "Unit u1", parts: ["numbers:0-9"] }]);
+  const nums = fileIntoModules(generated.items, SET, [{ id: "u1", title: "Unit u1", parts: ["numbers:0-9"] }]);
   const items = [word(1, cleared), ...nums];
   install(items, [course("A", ["u1", "u2"])], [{ ...unit("u1", [1]), parts: ["numbers:0-9"] }, unit("u2", [])]);
   const st = unitStages("u1", items, settings);
@@ -314,18 +314,18 @@ const marked = () => {
   const learntWord = word(4, () => state({ phase: "review", interval: 30, due: NOW + 30 * DAY, reps: 4, right: 4, hist: [1, 1, 1, 1], passes: 2, updated: NOW - DAY }));
   const items = [word(1), word(2), word(3), learntWord, sentence(11), text(20), word(30)];
   const courses = [course("A", ["u1", "u2"])];
-  const decks = [unit("u1", [1, 2, 3, 4, 11, 20]), unit("u2", [3, 30])];
-  install(items, courses, decks);
-  return { items, courses, decks };
+  const modules = [unit("u1", [1, 2, 3, 4, 11, 20]), unit("u2", [3, 30])];
+  install(items, courses, modules);
+  return { items, courses, decks: modules };
 };
 
 test("marking a unit cleared clears every word and sentence of it, and the unit reads as finished", () => {
-  const { items, courses, decks } = marked();
+  const { items, courses, decks: modules } = marked();
   const after = clearPathUnit(items, settings, "u1");
   for (const id of ["srvk1", "srvk2", "srvk3", "srvk4", "srvk11"]) {
     assert.ok(isCleared(statusOf(after.find((/** @type {any} */ it) => it.id === id), after)), `${id} is ${statusOf(after.find((/** @type {any} */ it) => it.id === id), after)}`);
   }
-  const idx = pathIndexOf(after, courses, decks, settings);
+  const idx = pathIndexOf(after, courses, modules, settings);
   assert.equal(idx.finished.get("u1"), true);
   assert.equal(idx.rows.get("A")[1].state, "open", "and the next unit opens");
 });
@@ -347,10 +347,10 @@ test("marking twice is marking once", () => {
 });
 
 test("a card in the marked unit and another counts as cleared in both", () => {
-  const { items, courses, decks } = marked();
+  const { items, courses, decks: modules } = marked();
   const after = clearPathUnit(items, settings, "u1");
   /* Unit 2 holds word 3 and word 30: word 3 now counts toward it. */
-  install(after, courses, decks);
+  install(after, courses, modules);
   assert.deepEqual(unitStages("u2", after, settings).words, { done: 1, all: 2 });
 });
 
@@ -385,14 +385,14 @@ test("a marked card missed twice at its top is no longer cleared, by the existin
 test("marking a unit that holds 0 to 9 clears the part, its words, its figures and the unit in one press", () => {
   /* The owner's 1b: the part's questions in figures, which open only once
      the figures are cleared, are cleared in the same press. */
-  const nums = fileIntoDecks(generated.items, SET, [{ id: "u1", title: "Unit u1", parts: ["numbers:0-9"] }]);
+  const nums = fileIntoModules(generated.items, SET, [{ id: "u1", title: "Unit u1", parts: ["numbers:0-9"] }]);
   const items = [word(1), ...nums];
   const courses = [course("A", ["u1", "u2"])];
-  const decks = [{ ...unit("u1", [1]), parts: ["numbers:0-9"] }, unit("u2", [])];
+  const modules = [{ ...unit("u1", [1]), parts: ["numbers:0-9"] }, unit("u2", [])];
   const sets = [{ numbers: SYS, times: TIME }];
-  installIndexes(items, settings, sets, { courses, decks });
+  installIndexes(items, settings, sets, { courses, decks: modules });
   const after = clearPathUnit(items, settings, "u1");
-  installIndexes(after, settings, sets, { courses, decks });
+  installIndexes(after, settings, sets, { courses, decks: modules });
   for (const it of unitItems("u1", after)) {
     const st = statusOf(it, after);
     if (st !== null) assert.ok(isCleared(st), `${it.id} is ${st}`);

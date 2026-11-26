@@ -12,7 +12,7 @@
  */
 import React, { createContext, useContext, useState, useEffect, useId, useLayoutEffect, useMemo, useRef } from "react";
 import * as API from "./courses-api.ts";
-import type { Card, Deck, Form, GrammarDim, Item, Lang, VerbExample, VerbPerson, VerbSpec, VerbTense } from "./types.ts";
+import type { Card, Module, Form, GrammarDim, Item, Lang, VerbExample, VerbPerson, VerbSpec, VerbTense } from "./types.ts";
 import type { ExampleSentence } from "./examples.ts";
 import { MAX_EXAMPLES, blankSentence, exampleCells, examplesRowOf, filledExample, othersOf, readExample, sentenceOf, verbExamplesOf, wishOf } from "./examples.ts";
 import { wordsOffered } from "./context-index.ts";
@@ -95,8 +95,8 @@ import {
   PickSheet,
   ChoiceSwitch,
   Popover,
-  DeckSwitch,
-  DeckPickScreen,
+  ModuleSwitch,
+  ModulePickScreen,
   Locked,
   Pressable,
   AudioPrompt,
@@ -6850,7 +6850,7 @@ function KindBlock({ card, lang, scene, shape, word, talk, typeLocked, onPick, d
  * the Advanced tab writes it in — so ticking the box carries it over
  * without anything to copy: it is the same form.
  */
-function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, decks, chosen, onToggleDeck, onSetDecks, onCreateDeck, onExport, onToSpace, onDelete, setOnly = false }: {
+function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, drops, modules, chosen, onToggleModule, onSetModules, onCreateModule, onExport, onToSpace, onDelete, setOnly = false }: {
   /** In personal sets and nothing else: the advanced card is not offered,
       unless the card is one already (0.634). */
   setOnly?: boolean;
@@ -6864,14 +6864,14 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   onAdvanced: (on: boolean) => void;
   /** What saving as a basic card would drop — see droppedByBasic. */
   drops: string[];
-  decks: Deck[];
+  modules: Module[];
   chosen: string[];
-  onToggleDeck: (id: string, on: boolean) => void;
+  onToggleModule: (id: string, on: boolean) => void;
   /** Every deck the card is in at once — what Done on the decks screen
       leaves ticked. */
-  onSetDecks: (ids: string[]) => void;
+  onSetModules: (ids: string[]) => void;
   /** Make a deck in the card's language, from the decks screen. */
-  onCreateDeck?: (title: string) => Promise<Deck | null | undefined>;
+  onCreateModule?: (title: string) => Promise<Module | null | undefined>;
   /** Export the card, where it can be — on a saved card being read. */
   onExport?: () => void;
   /** A My space card into the space (0.549): copy or move it into a deck. */
@@ -6888,17 +6888,17 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
   return (
     <>
     {picking && (
-      <DeckPickScreen
+      <ModulePickScreen
         title="Add this card to…"
-        decks={decks}
+        modules={modules}
         chosen={picking}
         onToggle={(id, on) => setPicking((x) => (x ? (on ? x.filter((y) => y !== id) : x.concat([id])) : x))}
         onCreate={
-          onCreateDeck
+          onCreateModule
             ? async (title) => {
                 /* Made, then ticked: the deck just named is the one this
                    card was about to go in. */
-                const made = await onCreateDeck(title);
+                const made = await onCreateModule(title);
                 if (made) setPicking((x) => (x ? x.concat([made.id]) : x));
                 return made;
               }
@@ -6908,7 +6908,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
         confirm="Done"
         onCancel={() => setPicking(null)}
         onConfirm={() => {
-          onSetDecks(picking);
+          onSetModules(picking);
           setPicking(null);
         }}
         empty={`No ${lang.name} modules yet. Make a deck with New deck, above.`}
@@ -7020,7 +7020,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
           )}
           {chosen.length || !locked ? (
             <div className={chosen.length ? "at-deckhold" : "at-nudgeact"}>
-              <DeckSwitch decks={decks} chosen={chosen} onToggle={onToggleDeck} onAdd={() => setPicking(chosen.slice())} />
+              <ModuleSwitch modules={modules} chosen={chosen} onToggle={onToggleModule} onAdd={() => setPicking(chosen.slice())} />
             </div>
           ) : null}
         </div>
@@ -10746,12 +10746,12 @@ type CardTab = "overview" | "content" | "exercises" | "settings";
  * counted on the Exercises tab instead.
  */
 function byTab(written: ReturnType<typeof writtenCard>, clue: string, capitals: boolean | null): Record<CardTab, string> {
-  const { forms, name, category, decks, examples, uses, sentence, note, stripped, drill, fills, ref, spread, scene } = written;
+  const { forms, name, category, decks: modules, examples, uses, sentence, note, stripped, drill, fills, ref, spread, scene } = written;
   const bare = (forms as Record<string, any>[]).map(({ ask, lend, ...rest }) => rest);
   const practice = (forms as Record<string, any>[]).map((f) => [f.ask, f.lend]);
   const { sceneKind, ...sceneRest } = scene || ({} as Record<string, any>);
   return {
-    overview: JSON.stringify([name, decks, bare.slice(0, 1)]),
+    overview: JSON.stringify([name, modules, bare.slice(0, 1)]),
     content: JSON.stringify([bare.slice(1), category, sceneKind || null, examples, uses, sentence, note, stripped, scene ? sceneRest : null, clue, capitals, fills, ref, spread]),
     exercises: JSON.stringify([practice, drill]),
     settings: "",
@@ -10820,18 +10820,18 @@ function TabPanel({ id, tab, locked, panel, after, onLockedTap, children }: {
   );
 }
 
-export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below, error = null }: {
+export function CardEditor({ card, lang, modules, inModules, onCreateModule, allCards, onSave, onDelete, onClose, onOpenCard, busy, confirming, making = "word", draft = null, locked = false, onUnlock, onRelock, status, onExport, onToSpace, about, below, error = null }: {
   card: Card | null;
   /** Why the last save failed, said inside this screen, which covers the
       space it opened from (0.580, audit finding 12). */
   error?: string | null;
   lang: Lang;
-  decks: Deck[];
-  inDecks?: string[];
+  modules: Module[];
+  inModules?: string[];
   /** Make a deck in this card's language from its decks screen, so a card
       written for a deck not yet made need not be left to make it (0.594).
       Resolves to the deck made, or nothing where it could not be. */
-  onCreateDeck?: (title: string) => Promise<Deck | null | undefined>;
+  onCreateModule?: (title: string) => Promise<Module | null | undefined>;
   allCards: Card[];
   onSave: (written: { forms: any, note: string, name: string, examples: VerbExample[], category: string, sentence: boolean, decks: string[], uses: string[], fills: string[], ref: string, spread: { from: string, to: string }[], stripped: string[], drill: boolean, scene: { title: string, sceneKind: SceneKind, speakers: string[], you: number | null, lines: any[] } | null, clue: string, capitals?: boolean, carry: { ids: string[], changes: WordChange[] } | null, next: "meaning" | "word" | null, exit: boolean, publish: boolean }) => void;
   /** Open another of the teacher's cards in place of this one — the
@@ -10905,7 +10905,7 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
   });
   const word = shape === "word" ? wordDraft : textDraft;
   const talk = useSceneDraft({ card: base === "scene" ? card : null, allCards });
-  const [chosen, setChosen] = useState(inDecks || []);
+  const [chosen, setChosen] = useState(inModules || []);
   /* A basic card is held to its name and its word, which is all it shows. */
   const canSave = scene
     ? talk.canSave
@@ -11019,7 +11019,7 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
   /* What is short, as against what is wrong: an empty field a red
      asterisk marks, or a mistake that already has its own red line. */
   /* In personal sets and nothing else (0.634): see SetOnly. */
-  const setOnly = chosen.length > 0 && chosen.every((id) => !!((decks || []).find((d) => d.id === id) || {}).set);
+  const setOnly = chosen.length > 0 && chosen.every((id) => !!((modules || []).find((d) => d.id === id) || {}).set);
   const missing = (() => {
     if (scene) return !talk.title.trim() || !talk.sceneKind || !canSaveScene(talk.title, talk.written, talk.text);
     if (word.needsName) return true;
@@ -11205,13 +11205,13 @@ export function CardEditor({ card, lang, decks, inDecks, onCreateDeck, allCards,
               canUntick={!(typeLocked && base !== "word")}
               onAdvanced={(on) => reshape(picked, on)}
               drops={drops}
-              decks={decks || []}
+              modules={modules || []}
               chosen={chosen}
-              onToggleDeck={(id, on) =>
+              onToggleModule={(id, on) =>
                 setChosen((x) => (on ? x.filter((y) => y !== id) : x.concat([id])))
               }
-              onSetDecks={setChosen}
-              onCreateDeck={onCreateDeck}
+              onSetModules={setChosen}
+              onCreateModule={onCreateModule}
               onExport={locked ? onExport : undefined}
               onToSpace={locked ? onToSpace : undefined}
               onDelete={!locked && stored && onDelete ? onDelete : undefined}

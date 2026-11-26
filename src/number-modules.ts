@@ -1,4 +1,4 @@
-import type { Deck } from "./types.ts";
+import type { Module } from "./types.ts";
 /*
  * Which of a learner's decks a number system is filed into (0.541).
  *
@@ -7,12 +7,12 @@ import type { Deck } from "./types.ts";
  * server older than the choice, and takes every system in its language as
  * it always did; null means the deck has no numbers to give.
  */
-export function decksForSystem<D extends Deck & { courseLanguage?: string }>(
-  decks: D[],
+export function modulesForSystem<D extends Module & { courseLanguage?: string }>(
+  modules: D[],
   languageId: string,
   systemId: string,
 ): D[] {
-  return decks.filter(
+  return modules.filter(
     (d) =>
       (d.lang || d.courseLanguage) === languageId &&
       (d.numbersSystemId === undefined || d.numbersSystemId === systemId),

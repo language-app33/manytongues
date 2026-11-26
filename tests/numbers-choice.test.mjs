@@ -18,7 +18,7 @@ const dir = await mkdtemp(path.join(tmpdir(), "manytongues-numbers-choice-"));
 process.env.DATA_DIR = dir;
 process.env.ADMIN_KEY = "numbers-choice-admin";
 const { createApp } = await import("../server/index.js");
-const { decksForSystem } = await import("../src/number-decks.ts");
+const { modulesForSystem } = await import("../src/number-modules.ts");
 
 const server = createApp();
 await new Promise((resolve) => server.listen(0, "127.0.0.1", () => resolve(undefined)));
@@ -78,37 +78,37 @@ test("a deck's students get its chosen teacher's numbers, once", async () => {
   const saraSys = (await api("save-system", { key: sara.key, body: { kind: "numbers", system: system() } })).json.system;
   const tomSys = (await api("save-system", { key: tom.key, body: { kind: "numbers", system: system() } })).json.system;
 
-  const deck = (await api("create-deck", { key: sara.key, body: { title: "Numbers", description: "", lang: "ar-PS" } })).json.deck;
-  await api("attach-deck", { key: sara.key, body: { deckId: deck.id, courseId: course.id } });
-  await api("set-deck-parts", { key: sara.key, body: { deckId: deck.id, parts: ["numbers:0-10"] } });
+  const module = (await api("create-deck", { key: sara.key, body: { title: "Numbers", description: "", lang: "ar-PS" } })).json.deck;
+  await api("attach-deck", { key: sara.key, body: { deckId: module.id, courseId: course.id } });
+  await api("set-deck-parts", { key: sara.key, body: { deckId: module.id, parts: ["numbers:0-10"] } });
 
   /* Both teachers may be chosen; the owner first. */
-  const sources = await api("number-sources", { key: sara.key, params: { deck: deck.id } });
+  const sources = await api("number-sources", { key: sara.key, params: { deck: module.id } });
   assert.equal(sources.status, 200);
   assert.deepEqual(sources.json.sources.map((/** @type {any} */ x) => x.handle), [sara.handle, tom.handle]);
   assert.equal(sources.json.chosen, sara.handle);
 
   /* By default, the owner's system alone is named on the deck. */
   let material = (await api("my-material", { key: lina.key })).json;
-  let sent = material.decks.find((/** @type {any} */ d) => d.id === deck.id);
+  let sent = material.decks.find((/** @type {any} */ d) => d.id === module.id);
   assert.equal(sent.numbersSystemId, saraSys.id);
 
   /* Chosen otherwise, the deck names the other teacher's. */
-  const set = await api("set-deck-numbers", { key: sara.key, body: { deckId: deck.id, from: tom.handle } });
+  const set = await api("set-deck-numbers", { key: sara.key, body: { deckId: module.id, from: tom.handle } });
   assert.equal(set.status, 200);
   material = (await api("my-material", { key: lina.key })).json;
-  sent = material.decks.find((/** @type {any} */ d) => d.id === deck.id);
+  sent = material.decks.find((/** @type {any} */ d) => d.id === module.id);
   assert.equal(sent.numbersSystemId, tomSys.id);
 
   /* Somebody who isn't a source is refused. */
-  const bad = await api("set-deck-numbers", { key: sara.key, body: { deckId: deck.id, from: lina.handle } });
+  const bad = await api("set-deck-numbers", { key: sara.key, body: { deckId: module.id, from: lina.handle } });
   assert.equal(bad.status, 400);
   /* And a student can't choose at all. */
-  assert.equal((await api("number-sources", { key: lina.key, params: { deck: deck.id } })).status, 403);
+  assert.equal((await api("number-sources", { key: lina.key, params: { deck: module.id } })).status, 403);
 });
 
 test("a system is filed only into the decks that name it", () => {
-  const decks = [
+  const modules = [
     { id: "a", title: "A", lang: "ar-PS", numbersSystemId: "n1" },
     { id: "b", title: "B", lang: "ar-PS", numbersSystemId: "n2" },
     { id: "c", title: "C", lang: "ar-PS", numbersSystemId: null },
@@ -116,7 +116,7 @@ test("a system is filed only into the decks that name it", () => {
     { id: "e", title: "E", lang: "vi-VN", numbersSystemId: "n1" },
   ];
   const ids = (/** @type {string} */ sys) =>
-    decksForSystem(/** @type {any} */ (decks), "ar-PS", sys).map((d) => d.id);
+    modulesForSystem(/** @type {any} */ (modules), "ar-PS", sys).map((d) => d.id);
   /* A deck without the field came from an older server and takes every
      system, as before; null takes none. */
   assert.deepEqual(ids("n1"), ["a", "d"]);

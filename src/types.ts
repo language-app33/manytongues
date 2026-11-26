@@ -1268,12 +1268,12 @@ export type Card = {
 export type CardStatus = "draft" | "review" | "published";
 
 /** Where a deck sits in a course, and since when. */
-export interface DeckLink {
+export interface ModuleLink {
   courseId: string;
   addedAt?: Millis;
 }
 
-export interface Deck {
+export interface Module {
   id: string;
   owner: string;
   title: string;
@@ -1281,7 +1281,7 @@ export interface Deck {
   lang: LangId;
   /** Moves whenever the deck's cards change. */
   version?: number;
-  courses: DeckLink[];
+  courses: ModuleLink[];
   cardIds?: string[];
   cardCount?: number;
   updated?: Millis;
@@ -1373,7 +1373,7 @@ export interface AdminOverview {
     studying: { title: string; language?: LangId }[];
   })[];
   courses: Course[];
-  decks: (Deck & { cardCount: number; ownerName: string; courseTitles: string[] })[];
+  decks: (Module & { cardCount: number; ownerName: string; courseTitles: string[] })[];
   flags: Flag[];
   /** Who has left the space this overview is of (0.544). */
   former?: FormerMember[];

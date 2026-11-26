@@ -62,7 +62,7 @@ await post("attach-deck", teacher.key, { courseId: course.id, deckId: family.id 
 await post("attach-deck", teacher.key, { courseId: course.id, deckId: hanoi.id });
 
 const material = async () => (await raw("/api/courses?action=my-material", { key: student.key })).json;
-const sentDeck = async (/** @type {string} */ id) => (await material()).decks.find((/** @type {any} */ d) => d.id === id);
+const sentModule = async (/** @type {string} */ id) => (await material()).decks.find((/** @type {any} */ d) => d.id === id);
 /* The material's cards come bundled by deck. */
 const sentCard = async (/** @type {string} */ id) =>
   (await material()).cards.flatMap((/** @type {any} */ b) => b.cards).find((/** @type {any} */ c) => c.id === id);
@@ -87,11 +87,11 @@ test("a teacher saves a set on a deck, and a student of the course receives it",
   const r = await post("save-set", teacher.key, { deckId: family.id, set: SET });
   assert.equal(r.status, 200, r.text);
   assert.deepEqual(r.json.deck.set.lists, [hanoi.id]);
-  const d = await sentDeck(family.id);
+  const d = await sentModule(family.id);
   assert.equal(d.set.order, "after");
   assert.deepEqual(d.set.lists, [hanoi.id]);
   assert.equal(d.set.wording.none, "I don't know this person", "with the default where nothing was written");
-  assert.equal((await sentDeck(hanoi.id)).set, undefined);
+  assert.equal((await sentModule(hanoi.id)).set, undefined);
 });
 
 test("saving it again moves the material's version", async () => {
@@ -119,7 +119,7 @@ test("it survives a change of the deck's title and cards", async () => {
   await post("save-set", teacher.key, { deckId: family.id, set: SET });
   await post("rename-deck", teacher.key, { deckId: family.id, title: "My family" });
   await post("save-card", teacher.key, { card: { id: "", lang: "ar-PS", forms: [{ ar: "لان", en: "Lan", lat: "lan" }] }, decks: [family.id], publish: true });
-  const d = await sentDeck(family.id);
+  const d = await sentModule(family.id);
   assert.equal(d.title, "My family");
   assert.deepEqual(d.set.lists, [hanoi.id]);
   assert.equal(d.cardCount, 1);
@@ -128,7 +128,7 @@ test("it survives a change of the deck's title and cards", async () => {
 test("null makes it an ordinary deck again", async () => {
   const r = await post("save-set", teacher.key, { deckId: family.id, set: null });
   assert.equal(r.status, 200, r.text);
-  assert.equal((await sentDeck(family.id)).set, undefined);
+  assert.equal((await sentModule(family.id)).set, undefined);
 });
 
 const A = "a".repeat(64);
@@ -164,16 +164,16 @@ test("a name is cut at forty characters, and a form with no names carries none",
 
 test("switched off, a set is hidden from its teacher and its students, and comes back as it was", async () => {
   await post("save-set", teacher.key, { deckId: family.id, set: SET });
-  const decksOf = async (/** @type {string} */ key) => (await raw("/api/courses?action=my-decks", { key })).json.decks.map((/** @type {any} */ d) => d.id);
+  const modulesOf = async (/** @type {string} */ key) => (await raw("/api/courses?action=my-decks", { key })).json.decks.map((/** @type {any} */ d) => d.id);
   await post("admin-update-org", owner.key, { id: "main", sets: false });
-  assert.equal(await sentDeck(family.id), undefined, "a student is not sent it");
-  assert.ok(await sentDeck(hanoi.id), "its word list is an ordinary deck, and still sent");
-  assert.ok(!(await decksOf(teacher.key)).includes(family.id), "its teacher does not see it");
-  assert.ok((await decksOf(teacher.key)).includes(hanoi.id));
+  assert.equal(await sentModule(family.id), undefined, "a student is not sent it");
+  assert.ok(await sentModule(hanoi.id), "its word list is an ordinary deck, and still sent");
+  assert.ok(!(await modulesOf(teacher.key)).includes(family.id), "its teacher does not see it");
+  assert.ok((await modulesOf(teacher.key)).includes(hanoi.id));
   const changed = await post("save-set", teacher.key, { deckId: family.id, set: { ...SET, order: "before" } });
   assert.equal(changed.status, 403, "nor can it be changed");
   await post("admin-update-org", owner.key, { id: "main", sets: true });
-  assert.ok((await decksOf(teacher.key)).includes(family.id), "back for its teacher");
-  const back = await sentDeck(family.id);
+  assert.ok((await modulesOf(teacher.key)).includes(family.id), "back for its teacher");
+  const back = await sentModule(family.id);
   assert.deepEqual(back && back.set.lists, [hanoi.id], "and for its students, as it was");
 });

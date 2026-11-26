@@ -1140,7 +1140,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   Teaching › Modules carries a quality out of 100, in green from 80,
   amber from 50 and red below; the deck's own page shows it large, with the
   three changes that would raise it most folded under it. Teachers only.
-  The owner's rules, in `src/deck-quality.ts`:
+  The owner's rules, in `src/module-quality.ts`:
 
   | part | points | what earns it |
   |---|---|---|
@@ -1161,7 +1161,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   works out, and finding unknown words in a sentence goes through `keyed` on
   the language's context, a lookup rather than a comparison per word, which
   is what lets every deck in the list be scored at once. Tests:
-  `tests/deck-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
+  `tests/module-quality.test.mjs`; why: DECISIONS.md, "A deck's quality (0.461)".
 - **A course's path: units, in order (0.613).** A course holds a second
   kind of element beside its decks: the **unit**. Underneath, a unit is a
   deck with `unit: true`; a course lists its units in `path`, in order,
@@ -1266,8 +1266,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   what can be asked, so that both stages full is exactly the path's
   "finished". Progress lists every published unit in order with
   `pathStateWord`, and leaves the units' titles out of the deck tiles and
-  out of the decks a saved session or a prep picks (`deckTags`). A unit
-  opens on `UnitScreen` — `DeckScreen`, fed by `unitItems`, with its state
+  out of the decks a saved session or a prep picks (`moduleTags`). A unit
+  opens on `UnitScreen` — `ModuleScreen`, fed by `unitItems`, with its state
   and stages above — locked ones too, read only; one open for the learner,
   or opened early, offers "Practise this unit", which is `begin` with the
   unit's items as the pool and `pathUnit` set.
@@ -1315,8 +1315,12 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   the tabs, lists, pickers and messages that mean any of the three say
   "module", and a module's own screen names its kind ("Delete unit",
   "Personal set name", "Deck quality"). `src/modules.ts` holds the one
-  rule (`moduleKind`). In the code and in saved data each of them is still
-  a `Deck`; why: DECISIONS.md, "Modules".
+  rule (`moduleKind`). The code says *module* too (0.687): the type is
+  `Module`, and every name a programmer gives it says module. What is
+  sent to the server or kept — a card's `decks`, `deckId`, the `deck:`
+  records, the server's actions such as `create-deck`, backup files,
+  changes waiting to be sent — still says deck, so nothing saved had to
+  change; why: DECISIONS.md, "Modules".
 - **Word sets: lists every language has, written once (0.569).** Numbers
   and pronouns so far, months and days of the week to come. The app knows
   the list; the teacher writes the words once for the language, and a deck
@@ -1467,7 +1471,7 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   choice, `numbersFrom`, set on the deck's screen under "Numbers from",
   or its owner. The server stamps each deck it sends a learner with that
   person's system and clock ids, and the device files a system only into
-  the decks that name it (`decksForSystem` in `src/number-decks.ts`), so
+  the decks that name it (`modulesForSystem` in `src/number-modules.ts`), so
   two teachers with numbers no longer give a course every number twice.
 
   **A deck holds the parts it teaches.** A system is one document per
@@ -1711,7 +1715,7 @@ How the wall is kept, in `server/api/courses.js` (since 0.542):
 - A request acts in the caller's own org, or, for an App admin, in the
   one its `x-org` header names. That org is held for the request in
   `orgScope`, and while it is set the record readers (`readCourse`,
-  `readDeck`, `readCard`, `readUser`) answer null for another org's record.
+  `readModule`, `readCard`, `readUser`) answer null for another org's record.
   So something in another space reads exactly like something that doesn't
   exist, whichever action asked. Lists read straight off an index are
   filtered with `inScope` where they are read.

@@ -296,7 +296,7 @@ export const CORPUS = [
 ];
 
 /** The decks the cards above are filed in, for a read-out that names them. */
-export const DECKS = [
+export const MODULES = [
   { id: "deck-1", title: "Lesson 1" },
   { id: "deck-2", title: "Lesson 2" },
   { id: "deck-3", title: "Vietnamese basics" },

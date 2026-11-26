@@ -22,7 +22,7 @@ const { levelOf } = await import(path.join(here, "..", "src", "languages.ts"));
 
 const settings = { language: "ar-PS" };
 const DAY = 86400000;
-const anyDeck = () => true;
+const anyModule = () => true;
 
 /** A schedule in review, right twice running, due `inDays` from now. */
 const kept = (/** @type {number} */ inDays, /** @type {number[]} */ hist = [1, 1], passes = 2) => ({
@@ -56,7 +56,7 @@ const fresh = (/** @type {string} */ id) => ({
 
 const deal = (/** @type {any[]} */ items, /** @type {Record<string, any>} */ over = {}) => {
   installIndexes(items, settings);
-  return buildSession({ items, settings, inDeck: anyDeck, ...over });
+  return buildSession({ items, settings, inModule: anyModule, ...over });
 };
 
 /** Which questions a session put to one card — once each, since a deck

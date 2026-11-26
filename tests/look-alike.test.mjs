@@ -84,7 +84,7 @@ const CHOICE = TYPES.filter((/** @type {string} */ t) => EX[t].picks === "meanin
 const dealt = (/** @type {number} */ rounds) => {
   const all = [];
   for (let i = 0; i < rounds; i += 1) {
-    all.push(...buildSession({ items: ITEMS, settings, inDeck: () => true, systems: SETS }).exercises);
+    all.push(...buildSession({ items: ITEMS, settings, inModule: () => true, systems: SETS }).exercises);
   }
   return all;
 };
@@ -186,7 +186,7 @@ test("a session on one deck takes its wrong answers from that deck", () => {
      it was dealt from, and a choice question draws on those first. */
   const foods = WORDS.slice(0, 6).map((w) => w.id);
   const inFoods = (/** @type {any} */ it) => foods.includes(it.id);
-  const built = buildSession({ items: ITEMS, settings, inDeck: inFoods, systems: SETS });
+  const built = buildSession({ items: ITEMS, settings, inModule: inFoods, systems: SETS });
   assert.deepEqual([...built.from].sort(), [...foods].sort(), "the session names the cards it was dealt from");
   const near = (/** @type {any} */ u) => foods.includes(u.id);
   const asked = built.exercises.filter((/** @type {any} */ q) => CHOICE.includes(q.type));
@@ -203,6 +203,6 @@ test("a session on one deck takes its wrong answers from that deck", () => {
 });
 
 test("a session on everything held names no deck to prefer", () => {
-  const built = buildSession({ items: ITEMS, settings, inDeck: () => true, systems: SETS });
+  const built = buildSession({ items: ITEMS, settings, inModule: () => true, systems: SETS });
   assert.equal(built.from, undefined);
 });

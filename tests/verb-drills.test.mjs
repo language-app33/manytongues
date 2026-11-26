@@ -231,7 +231,7 @@ test("a tense is seen before it is asked anything, and dealt once for all its fo
   installIndexes(items, settings);
   /* A session takes one form of the verb, and the cited past is one of
      them: the first of a few sessions that takes the present. */
-  const ofVerb = Array.from({ length: 20 }, () => buildSession({ items, settings, inDeck: () => true }).exercises
+  const ofVerb = Array.from({ length: 20 }, () => buildSession({ items, settings, inModule: () => true }).exercises
     .filter((/** @type {any} */ e) => e.id === "v1" && e.subId && e.subId.startsWith("p-")))
     .find((list) => list.length > 0) || [];
   assert.ok(ofVerb.length > 0, "the present is dealt");
@@ -249,7 +249,7 @@ test("once the pattern is got, the rest of the tense's questions are open", () =
   installIndexes(items, settings);
   /* A session takes one form of the verb, and the cited past is one of
      them, so the present is looked for over a few sessions. */
-  const ofVerb = Array.from({ length: 10 }, () => buildSession({ items, settings, inDeck: () => true }).exercises)
+  const ofVerb = Array.from({ length: 10 }, () => buildSession({ items, settings, inModule: () => true }).exercises)
     .flat()
     .filter((/** @type {any} */ e) => e.id === "v1" && e.subId && e.subId.startsWith("p-"));
   assert.ok(ofVerb.some((/** @type {any} */ e) => e.type !== "vpattern"), `asked ${ofVerb.map((/** @type {any} */ e) => e.type).join(", ")}`);
@@ -266,7 +266,7 @@ test("a verb already learnt goes back to learning until the practices are answer
   installIndexes([v], settings);
   const items = [v].concat(words(8));
   installIndexes(items, settings);
-  const got = buildSession({ items, settings, inDeck: () => true });
+  const got = buildSession({ items, settings, inModule: () => true });
   const asked = got.exercises.filter((/** @type {any} */ e) => e.subId === "p-she").map((/** @type {any} */ e) => e.type);
   assert.ok(!asked.some((/** @type {string} */ t) => EX[t].level > 1), `asked ${asked.join(", ")}`);
 });
@@ -354,7 +354,7 @@ test("a session shows one new tense at most, and asks who it is about a few ques
   /* Few enough cards that the session takes both verbs. */
   const items = [verb(), verb2()].concat(words(6));
   installIndexes(items, settings);
-  const got = buildSession({ items, settings, inDeck: () => true });
+  const got = buildSession({ items, settings, inModule: () => true });
   const tables = got.exercises.filter((/** @type {any} */ e) => e.type === "vpattern");
   assert.equal(tables.length, 1, "one table");
   const t = at(got.exercises, (e) => e.type === "vpattern");

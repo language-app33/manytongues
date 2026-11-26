@@ -74,13 +74,13 @@ async function classroom(name) {
   const key = teacher.json.key;
   /* Courses are an administrator's to make. */
   await api("claim-admin", { key, body: { adminKey: "test-admin-key" } });
-  const deck = await api("create-deck", { key, body: { title: "Lesson", lang: "ar-PS" } });
-  const deckId = deck.json.deck.id;
+  const module = await api("create-deck", { key, body: { title: "Lesson", lang: "ar-PS" } });
+  const moduleId = module.json.deck.id;
   const course = await api("create-course", { key, body: { title: "Class", language: "ar-PS" } });
-  await api("attach-deck", { key, body: { deckId, courseId: course.json.course.id } });
+  await api("attach-deck", { key, body: { deckId: moduleId, courseId: course.json.course.id } });
   const student = await api("signup", { body: { displayName: `${name}'s student` } });
   await api("assign-student", { key, body: { courseId: course.json.course.id, handle: student.json.user.handle } });
-  return { key, deckId, courseId: course.json.course.id, studentKey: student.json.key };
+  return { key, deckId: moduleId, courseId: course.json.course.id, studentKey: student.json.key };
 }
 
 /** What a student's device is sent, as one list of cards. */
@@ -102,8 +102,8 @@ async function teacherCard(key, id) {
 }
 
 test("a card made as a draft reaches no student until it is published", async () => {
-  const { key, deckId, studentKey } = await classroom("Huda");
-  const made = await api("save-card", { key, body: { card: word("بيت", "house"), decks: [deckId], status: "draft" } });
+  const { key, deckId: moduleId, studentKey } = await classroom("Huda");
+  const made = await api("save-card", { key, body: { card: word("بيت", "house"), decks: [moduleId], status: "draft" } });
   assert.equal(made.status, 200, made.text);
   assert.equal(made.json.card.status, "draft");
   const id = made.json.card.id;
@@ -126,15 +126,15 @@ test("a card made as a draft reaches no student until it is published", async ()
 });
 
 test("a card made without saying so is published, as every card always was", async () => {
-  const { key, deckId, studentKey } = await classroom("Rami");
-  const made = await api("save-card", { key, body: { card: word("قلم", "pen"), decks: [deckId] } });
+  const { key, deckId: moduleId, studentKey } = await classroom("Rami");
+  const made = await api("save-card", { key, body: { card: word("قلم", "pen"), decks: [moduleId] } });
   assert.equal(made.json.card.status, "published");
   assert.ok((await material(studentKey)).cards.some((/** @type {any} */ c) => c.id === made.json.card.id));
 });
 
 test("changes to a published card wait for publishing, and students keep the card they have", async () => {
-  const { key, deckId, studentKey } = await classroom("Lina");
-  const made = await api("save-card", { key, body: { card: word("باب", "door"), decks: [deckId] } });
+  const { key, deckId: moduleId, studentKey } = await classroom("Lina");
+  const made = await api("save-card", { key, body: { card: word("باب", "door"), decks: [moduleId] } });
   const card = made.json.card;
   const first = await material(studentKey);
 
@@ -142,7 +142,7 @@ test("changes to a published card wait for publishing, and students keep the car
     key,
     body: {
       card: { ...card, forms: [{ ...card.forms[0], en: "a door" }] },
-      decks: [deckId],
+      decks: [moduleId],
       into: "changes",
       touched: ["forms"],
     },
@@ -174,11 +174,11 @@ test("changes to a published card wait for publishing, and students keep the car
 });
 
 test("changes can be thrown away, and a card that comes back to what students have has none", async () => {
-  const { key, deckId } = await classroom("Omar");
-  const card = (await api("save-card", { key, body: { card: word("شمس", "sun"), decks: [deckId] } })).json.card;
+  const { key, deckId: moduleId } = await classroom("Omar");
+  const card = (await api("save-card", { key, body: { card: word("شمس", "sun"), decks: [moduleId] } })).json.card;
   const changed = (await api("save-card", {
     key,
-    body: { card: { ...card, note: "bright" }, decks: [deckId], into: "changes", touched: ["note"] },
+    body: { card: { ...card, note: "bright" }, decks: [moduleId], into: "changes", touched: ["note"] },
   })).json.card;
   assert.equal(changed.changes, "draft");
   const discarded = await api("card-status", { key, body: { cardId: card.id, to: "discard" } });
@@ -188,11 +188,11 @@ test("changes can be thrown away, and a card that comes back to what students ha
   /* Written and then put back by hand: nothing is waiting. */
   const again = (await api("save-card", {
     key,
-    body: { card: { ...card, note: "bright" }, decks: [deckId], into: "changes", touched: ["note"] },
+    body: { card: { ...card, note: "bright" }, decks: [moduleId], into: "changes", touched: ["note"] },
   })).json.card;
   const back = await api("save-card", {
     key,
-    body: { card: { ...again, note: "" }, decks: [deckId], into: "changes", touched: ["note"] },
+    body: { card: { ...again, note: "" }, decks: [moduleId], into: "changes", touched: ["note"] },
   });
   assert.equal(back.json.card.changes, undefined, "changes that come to nothing are no changes");
 
@@ -201,12 +201,12 @@ test("changes can be thrown away, and a card that comes back to what students ha
 });
 
 test("the header applies at once, whatever is waiting", async () => {
-  const { key, deckId, studentKey } = await classroom("Dina");
-  const card = (await api("save-card", { key, body: { card: word("قطة", "cat"), decks: [deckId] } })).json.card;
+  const { key, deckId: moduleId, studentKey } = await classroom("Dina");
+  const card = (await api("save-card", { key, body: { card: word("قطة", "cat"), decks: [moduleId] } })).json.card;
   const first = await material(studentKey);
   const tagged = await api("save-card", {
     key,
-    body: { card: { ...card, fills: ["animal"], ref: "cat" }, decks: [deckId], into: "changes", touched: ["fills", "ref"]},
+    body: { card: { ...card, fills: ["animal"], ref: "cat" }, decks: [moduleId], into: "changes", touched: ["fills", "ref"]},
   });
   assert.equal(tagged.status, 200, tagged.text);
   assert.equal(tagged.json.card.changes, undefined, "a tag is not a change to publish");
@@ -221,18 +221,18 @@ test("the header applies at once, whatever is waiting", async () => {
     key,
     body: { card: { ...tagged.json.card, note: "meows" }, decks: [], into: "changes", touched: ["note"] },
   });
-  assert.deepEqual(kept.json.card.decks, [deckId], "a save naming its fields does not take the card out of its decks");
+  assert.deepEqual(kept.json.card.decks, [moduleId], "a save naming its fields does not take the card out of its decks");
 });
 
 test("the card screen sends the whole card: its words wait, its ID and tags apply at once", async () => {
-  const { key, deckId, studentKey } = await classroom("Sami");
-  const card = (await api("save-card", { key, body: { card: word("ماء", "water"), decks: [deckId] } })).json.card;
+  const { key, deckId: moduleId, studentKey } = await classroom("Sami");
+  const card = (await api("save-card", { key, body: { card: word("ماء", "water"), decks: [moduleId] } })).json.card;
   const first = await material(studentKey);
   const saved = await api("save-card", {
     key,
     body: {
       card: { ...card, forms: [{ ...card.forms[0], en: "the water" }], fills: ["drink"], ref: "water" },
-      decks: [deckId],
+      decks: [moduleId],
       into: "changes",
     },
   });
@@ -248,33 +248,33 @@ test("the card screen sends the whole card: its words wait, its ID and tags appl
 });
 
 test("two saves to one part of a card: the later one wins, without asking", async () => {
-  const { key, deckId } = await classroom("Hadi");
-  const card = (await api("save-card", { key, body: { card: word("نار", "fire"), decks: [deckId], status: "draft" } })).json.card;
+  const { key, deckId: moduleId } = await classroom("Hadi");
+  const card = (await api("save-card", { key, body: { card: word("نار", "fire"), decks: [moduleId], status: "draft" } })).json.card;
   const one = await api("save-card", {
     key,
-    body: { card: { ...card, note: "hot" }, decks: [deckId], into: "changes" },
+    body: { card: { ...card, note: "hot" }, decks: [moduleId], into: "changes" },
   });
   assert.equal(one.status, 200, one.text);
   const two = await api("save-card", {
     key,
-    body: { card: { ...card, note: "warm" }, decks: [deckId], into: "changes" },
+    body: { card: { ...card, note: "warm" }, decks: [moduleId], into: "changes" },
   });
   assert.equal(two.status, 200, two.text);
   assert.equal(two.json.card.note, "warm");
 });
 
 test("a save from another screen writes what students have, and the changes keep it", async () => {
-  const { key, deckId, studentKey } = await classroom("Maha");
-  const card = (await api("save-card", { key, body: { card: word("ولد", "boy"), decks: [deckId] } })).json.card;
+  const { key, deckId: moduleId, studentKey } = await classroom("Maha");
+  const card = (await api("save-card", { key, body: { card: word("ولد", "boy"), decks: [moduleId] } })).json.card;
   const changed = (await api("save-card", {
     key,
-    body: { card: { ...card, forms: [{ ...card.forms[0], en: "a boy" }] }, decks: [deckId], into: "changes", touched: ["forms"]},
+    body: { card: { ...card, forms: [{ ...card.forms[0], en: "a boy" }] }, decks: [moduleId], into: "changes", touched: ["forms"]},
   })).json.card;
 
   /* The Pronouns screen, say: a field of its own, straight to students. */
   const direct = await api("save-card", {
     key,
-    body: { card: { ...changed, clue: "young" }, decks: [deckId], touched: ["clue"]},
+    body: { card: { ...changed, clue: "young" }, decks: [moduleId], touched: ["clue"]},
   });
   assert.equal(direct.status, 200, direct.text);
   const handed = must((await material(studentKey)).cards.find((/** @type {any} */ c) => c.id === card.id), "the card");
@@ -290,16 +290,16 @@ test("a save from another screen writes what students have, and the changes keep
 });
 
 test("a rename reaches both versions of a card that uses the name", async () => {
-  const { key, deckId, studentKey } = await classroom("Yara");
+  const { key, deckId: moduleId, studentKey } = await classroom("Yara");
   const sentence = (await api("save-card", {
     key,
-    body: { card: { ...word("{{pet}} نايم", "{{pet}} is asleep"), sentence: true }, decks: [deckId] },
+    body: { card: { ...word("{{pet}} نايم", "{{pet}} is asleep"), sentence: true }, decks: [moduleId] },
   })).json.card;
   const changed = (await api("save-card", {
     key,
     body: {
       card: { ...sentence, note: "a quiet one" },
-      decks: [deckId], into: "changes", touched: ["note"],
+      decks: [moduleId], into: "changes", touched: ["note"],
     },
   })).json.card;
   assert.equal(changed.changes, "draft");
@@ -311,18 +311,18 @@ test("a rename reaches both versions of a card that uses the name", async () => 
   assert.equal(walked.status, 200, walked.text);
   assert.equal(walked.json.card.forms[0].en, "{{animal}} is asleep", "the changes are renamed");
   assert.equal(walked.json.card.note, "a quiet one", "and keep what was waiting");
-  assert.deepEqual(walked.json.card.decks, [deckId], "and its decks");
+  assert.deepEqual(walked.json.card.decks, [moduleId], "and its decks");
   const handed = must((await material(studentKey)).cards.find((/** @type {any} */ c) => c.id === sentence.id), "the sentence");
   assert.equal(handed.forms[0].en, "{{animal}} is asleep", "and so is what students have");
   assert.equal(handed.note, "", "without the changes");
 });
 
 test("unpublishing takes a card from students and keeps the teacher's work as a draft", async () => {
-  const { key, deckId, studentKey } = await classroom("Nasser");
-  const card = (await api("save-card", { key, body: { card: word("كلب", "dog"), decks: [deckId] } })).json.card;
+  const { key, deckId: moduleId, studentKey } = await classroom("Nasser");
+  const card = (await api("save-card", { key, body: { card: word("كلب", "dog"), decks: [moduleId] } })).json.card;
   await api("save-card", {
     key,
-    body: { card: { ...card, note: "barks" }, decks: [deckId], into: "changes", touched: ["note"] },
+    body: { card: { ...card, note: "barks" }, decks: [moduleId], into: "changes", touched: ["note"] },
   });
   const first = await material(studentKey);
   assert.ok(first.cards.some((/** @type {any} */ c) => c.id === card.id));
@@ -340,17 +340,17 @@ test("unpublishing takes a card from students and keeps the teacher's work as a 
   /* A draft card saved from the card screen is written as itself. */
   const edited = await api("save-card", {
     key,
-    body: { card: { ...off.json.card, note: "barks loudly" }, decks: [deckId], into: "changes", touched: ["note"] },
+    body: { card: { ...off.json.card, note: "barks loudly" }, decks: [moduleId], into: "changes", touched: ["note"] },
   });
   assert.equal(edited.json.card.note, "barks loudly");
   assert.equal(edited.json.card.changes, undefined, "a draft has no second version");
 });
 
 test("a draft fills no student's blank", async () => {
-  const { key, deckId, studentKey } = await classroom("Rana");
+  const { key, deckId: moduleId, studentKey } = await classroom("Rana");
   await api("save-card", {
     key,
-    body: { card: { ...word("{{fruit}} طيب", "{{fruit}} is tasty"), sentence: true }, decks: [deckId] },
+    body: { card: { ...word("{{fruit}} طيب", "{{fruit}} is tasty"), sentence: true }, decks: [moduleId] },
   });
   const apple = (await api("save-card", {
     key,
@@ -366,16 +366,16 @@ test("a draft fills no student's blank", async () => {
 });
 
 test("an import is Ready for review: a new card is, and a published card's changes are", async () => {
-  const { key, deckId, studentKey } = await classroom("Nour");
-  const made = await api("save-card", { key, body: { card: word("بيت", "house"), decks: [deckId], status: "review" } });
+  const { key, deckId: moduleId, studentKey } = await classroom("Nour");
+  const made = await api("save-card", { key, body: { card: word("بيت", "house"), decks: [moduleId], status: "review" } });
   assert.equal(made.json.card.status, "review");
   assert.ok(!(await material(studentKey)).cards.some((/** @type {any} */ c) => c.id === made.json.card.id),
     "no student has it");
 
-  const card = (await api("save-card", { key, body: { card: word("كتاب", "book"), decks: [deckId] } })).json.card;
+  const card = (await api("save-card", { key, body: { card: word("كتاب", "book"), decks: [moduleId] } })).json.card;
   const replaced = await api("save-card", {
     key,
-    body: { card: { ...card, forms: [{ ...card.forms[0], en: "a book" }] }, decks: [deckId], status: "review" },
+    body: { card: { ...card, forms: [{ ...card.forms[0], en: "a book" }] }, decks: [moduleId], status: "review" },
   });
   assert.equal(replaced.json.card.status, "published", "the card stays published");
   assert.equal(replaced.json.card.changes, "review", "and the import waits as its changes");
@@ -384,13 +384,13 @@ test("an import is Ready for review: a new card is, and a published card's chang
 });
 
 test("save and publish: a new card and a published card's changes reach students in one save", async () => {
-  const { key, deckId, studentKey } = await classroom("Nour");
+  const { key, deckId: moduleId, studentKey } = await classroom("Nour");
   const first = await material(studentKey);
 
   /* A new card, which the card screen would otherwise make a draft. */
   const made = await api("save-card", {
     key,
-    body: { card: word("شمس", "sun"), decks: [deckId], status: "draft", publish: true },
+    body: { card: word("شمس", "sun"), decks: [moduleId], status: "draft", publish: true },
   });
   assert.equal(made.status, 200, made.text);
   assert.equal(made.json.card.status, "published");
@@ -404,7 +404,7 @@ test("save and publish: a new card and a published card's changes reach students
     key,
     body: {
       card: { ...card, forms: [{ ...card.forms[0], en: "the sun" }] },
-      decks: [deckId],
+      decks: [moduleId],
       into: "changes",
       publish: true,
     },
@@ -418,10 +418,10 @@ test("save and publish: a new card and a published card's changes reach students
   assert.equal(handed.forms[0].en, "the sun");
 
   /* And a draft that already exists, published by the save that edits it. */
-  const draft = await api("save-card", { key, body: { card: word("قمر", "moon"), decks: [deckId], status: "draft" } });
+  const draft = await api("save-card", { key, body: { card: word("قمر", "moon"), decks: [moduleId], status: "draft" } });
   const out = await api("save-card", {
     key,
-    body: { card: { ...draft.json.card, forms: [{ ar: "قمر", en: "the moon", lat: "" }] }, decks: [deckId], into: "changes", publish: true },
+    body: { card: { ...draft.json.card, forms: [{ ar: "قمر", en: "the moon", lat: "" }] }, decks: [moduleId], into: "changes", publish: true },
   });
   assert.equal(out.json.card.status, "published");
   const fourth = await material(studentKey);
