@@ -8,6 +8,16 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.691 — 26 November 2026
+
+**A card's status and "Filter by who made it" open the same panel too.**
+The status button on a card (Published, Draft, Ready for review…) and the
+"Filter by who made it" button in Admin › Modules now open the panel the
+three dots open, instead of a small list hanging from the button. The
+current choice is edged in colour and ticked. Unpublish and Discard changes
+are in red and still ask first. Each person in the filter shows how many
+modules they made. The menu behind your initials is unchanged.
+
 ## 0.690 — 26 November 2026
 
 **Three dots open the same panel everywhere.** The three dots on a module's

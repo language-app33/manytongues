@@ -4875,10 +4875,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
     statusBtn ? `${statusBtn.className}: ${spokenName(statusBtn)}` : "(no status button)");
   if (statusBtn) click(statusBtn);
   await sleep(100);
-  const statusLines = [...document.querySelectorAll(".at-statusmenu .at-pickmenu .at-pickline")].map((b) => (b.textContent || "").trim());
-  check("and it opens the app's menu of what can be done from there",
-    statusLines.join(" | ") === "Published | Unpublish…", statusLines.join(" | ") || "(no menu)");
-  if (statusBtn) click(statusBtn);
+  /* In the app's one panel since 0.690: a row per choice, the one that
+     holds now ticked. */
+  const statusLines = [...document.querySelectorAll(".at-statussheet .at-sheetact")]
+    .map((b) => `${((b.querySelector("b") || {}).textContent || "").trim()}${b.classList.contains("on") ? " ✓" : ""}`);
+  check("and it opens the app's panel of what can be done from there, the status now ticked",
+    statusLines.join(" | ") === "Published ✓ | Unpublish", statusLines.join(" | ") || "(no panel)");
+  click(document.querySelector('.at-statussheet [aria-label="Close"]'));
   await sleep(100);
   /* On the title's own line since 0.484, as icons, each named out loud,
      with Export by the "This card" heading rather than among them. */

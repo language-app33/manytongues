@@ -2373,15 +2373,16 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
   quiet?: string;
 }) {
   const [open, setOpen] = useState(false);
-
-  /* The same close-on-anything-else the corner menu uses. Registered only
-     while it is open, and the menu stops the click that opened it from
-     closing it again. */
+  const shut = useCallback(() => setOpen(false), []);
 
   if (!options || options.length < 2) return null;
   const on = value !== quiet;
   const chosen = options.find((o) => o.value === value);
 
+  /* The choices open in the app's one panel (0.690, the owner's 2a): the
+     sheet three dots open, a row each with the chosen one ticked — a long
+     list of people scrolls there, where a list hanging from the button ran
+     off a phone. */
   return (
     <div className="at-pickwrap" onClick={(e) => e.stopPropagation()}>
       <button
@@ -2390,35 +2391,34 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
         /* The label says what the filter does; the title also says where it
            has got to, because the lit button alone does not name the person
            the list has been narrowed to. */
-        title={on && chosen ? `${label}: ${chosen.label}` : label}
+        title={on && chosen ? `${label}: ${typeof chosen.label === "string" ? chosen.label : ""}` : label}
         aria-label={label}
+        aria-haspopup="dialog"
         aria-expanded={open}
         aria-pressed={on}
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => setOpen(true)}
       >
         <Icon name={icon} />
       </button>
 
       {open && (
-        <Popover className="at-pickmenu" onClose={() => setOpen(false)}>
-          {options.map((o) => (
-            <button
-              key={o.value}
-              type="button"
-              className={`at-pickline${o.value === value ? " on" : ""}`}
-              onClick={() => {
-                onChange(o.value);
-                setOpen(false);
-              }}
-            >
-              <span className="at-pickmark">
-                {o.value === value ? <Icon name="check" size={16} /> : null}
-              </span>
-              <span className="at-picktext">{o.label}</span>
-              {o.note ? <span className="at-picknote">{o.note}</span> : null}
-            </button>
-          ))}
-        </Popover>
+        <PickSheet title={label || "Filter"} className="at-picksheet" onClose={shut}>
+          <div className="at-sheetacts">
+            {options.map((o) => (
+              <SheetAction
+                key={o.value}
+                icon={o.value === quiet ? "group" : icon}
+                label={o.label}
+                note={o.note}
+                on={o.value === value}
+                onClick={() => {
+                  setOpen(false);
+                  onChange(o.value);
+                }}
+              />
+            ))}
+          </div>
+        </PickSheet>
       )}
     </div>
   );
@@ -2494,20 +2494,25 @@ export function MoreMenu({ label = "More", title, lede, items, ghost = true }: {
 /* One thing to do in a panel of them (0.680): its icon in a round well,
    and its name, with a line under it where it cannot be done and why.
    Drawn like a row of "Where you are", the other panel of places to go.
-   In the library since 0.690, where MoreMenu draws its rows with it. */
-export function SheetAction({ icon, label, note, danger, disabled, onClick }: {
+   In the library since 0.690, where MoreMenu draws its rows with it, and
+   so do the pickers that choose one of a few — a card's status, whose
+   modules to show — where `on` marks the one chosen now with a tick. */
+export function SheetAction({ icon, label, note, danger, disabled, on, onClick }: {
   icon: string;
-  label: string;
-  note?: string;
+  label: Node;
+  note?: Node;
   danger?: boolean;
   disabled?: boolean;
+  /** The choice that holds now, in a sheet of choices. */
+  on?: boolean;
   onClick: () => void;
 }) {
   return (
     <button
       type="button"
-      className={`at-sheetact${danger ? " danger" : ""}`}
+      className={`at-sheetact${danger ? " danger" : ""}${on ? " on" : ""}`}
       disabled={disabled}
+      aria-current={on ? "true" : undefined}
       onClick={onClick}
     >
       <span className="at-sheetactico" aria-hidden="true">
@@ -2517,6 +2522,11 @@ export function SheetAction({ icon, label, note, danger, disabled, onClick }: {
         <b>{label}</b>
         {note ? <i>{note}</i> : null}
       </span>
+      {on ? (
+        <span className="at-sheetacton" aria-hidden="true">
+          <Icon name="check" size={20} />
+        </span>
+      ) : null}
     </button>
   );
 }
