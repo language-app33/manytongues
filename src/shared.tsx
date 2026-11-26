@@ -2424,6 +2424,95 @@ export function FilterMenu({ icon = "tune", label, options, value, onChange, qui
   );
 }
 
+/*
+ * Three dots that open a short menu of what can be done with the thing they
+ * sit on — a module's Export and Delete, a list's Import (0.689). The less
+ * often used actions, out of the way of the ones a tile or a list is for.
+ *
+ * Its clicks stop at it, so a tile it sits on does not open as well; that is
+ * also why the window never hears them, and why one menu opening shuts any
+ * other that is open itself rather than leaving it to the window.
+ *
+ * Items are { label, icon, danger, onClick }; anything falsy is left out, so
+ * an action that only some things have is written in place with `&&`.
+ */
+type MoreItem = { label: string; icon?: string; danger?: boolean; onClick: () => void };
+let shutOpenMore: (() => void) | null = null;
+export function MoreMenu({ label = "More", items, ghost = true }: {
+  /** What the button is called, to a screen reader and on hover. */
+  label?: string;
+  items: (MoreItem | null | false | undefined)[];
+  ghost?: boolean;
+}) {
+  const [open, setOpen] = useState(false);
+  const shut = useCallback(() => setOpen(false), []);
+  const wrap: React.MutableRefObject<HTMLDivElement | null> = useRef(null);
+  useEffect(() => () => {
+    if (shutOpenMore === shut) shutOpenMore = null;
+  }, [shut]);
+  /* Under its button unless that runs it behind the bar at the foot of the
+     window — the last tile on a phone, whose Delete was hidden there — and
+     there is more room above, where it then opens instead. */
+  useLayoutEffect(() => {
+    const box = wrap.current;
+    const menu = box && (box.querySelector(".at-moremenu") as HTMLElement | null);
+    if (!open || !box || !menu || typeof window === "undefined") return;
+    const dock = document.querySelector(".at-dock");
+    const floor = Math.min(window.innerHeight, dock ? dock.getBoundingClientRect().top : Infinity) - 8;
+    const btn = box.getBoundingClientRect();
+    const tall = menu.scrollHeight;
+    if (btn.bottom + 6 + tall > floor && btn.top - 6 - tall > 8) {
+      menu.classList.add("up");
+      menu.style.maxHeight = "";
+      menu.style.overflowY = "";
+    }
+  }, [open]);
+  const live = items.filter(Boolean) as MoreItem[];
+  if (!live.length) return null;
+  return (
+    <div className="at-pickwrap at-morewrap" ref={wrap} onClick={(e) => e.stopPropagation()}>
+      <button
+        type="button"
+        className={`at-icon at-morebtn${ghost ? " ghost" : ""}${open ? " on" : ""}`}
+        title={label}
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        onClick={() => {
+          if (open) {
+            setOpen(false);
+            return;
+          }
+          if (shutOpenMore && shutOpenMore !== shut) shutOpenMore();
+          shutOpenMore = shut;
+          setOpen(true);
+        }}
+      >
+        <Icon name="more" />
+      </button>
+      {open && (
+        <Popover className="at-pickmenu at-moremenu" role="menu" onClose={shut}>
+          {live.map((it) => (
+            <button
+              key={it.label}
+              type="button"
+              role="menuitem"
+              className={`at-pickline${it.danger ? " danger" : ""}`}
+              onClick={() => {
+                setOpen(false);
+                it.onClick();
+              }}
+            >
+              <span className="at-pickmark">{it.icon ? <Icon name={it.icon} size={18} /> : null}</span>
+              <span className="at-picktext">{it.label}</span>
+            </button>
+          ))}
+        </Popover>
+      )}
+    </div>
+  );
+}
+
 /**
  * The standard list frame: New button, search, Select mode, bulk-action
  * tray, empty state, and paging.
@@ -2437,6 +2526,8 @@ export function ItemList<T>({
   noun,
   plural,
   tools,
+  more,
+  narrow,
   menus,
   filters,
   count,
@@ -2449,7 +2540,6 @@ export function ItemList<T>({
   views,
   onNew,
   newOff,
-  searchBelow,
   query: outsideQuery,
   renderItem,
   selected,
@@ -2464,25 +2554,25 @@ export function ItemList<T>({
   "person";
   "card". */ noun: string;
   plural?: string;
-  /** Controls in the toolbar itself;
-  right of the search box. */ tools?: Node;
+  /** Controls in the top row, after New and its three dots: the main
+      thing a screen does with its list, such as "Copy all reports". */
+  tools?: Node;
+  /** What the three dots beside New hold — Import, on a list that has it
+      (0.689). Nothing here, no dots. */
+  more?: (MoreItem | null | false | undefined)[];
+  /** Controls that narrow the list in a way of their own, at the end of
+      the search row after Select and the menus — a FilterMenu. */
+  narrow?: Node;
   /**
-   * The menus in the second row, beside Select — Sort and Filter on a card
-   * list. Each is a button that opens its `content` in a panel under the
+   * The menus on the search row, after Select — Sort and Filter on a card
+   * list. Each is an icon that opens its `content` in a panel under the
    * row, and one is open at a time: two panels at once is two answers to
    * "why is this list short". `busy` is how many of its settings are away
-   * from their default, which the button carries as a count — `narrowing`
+   * from their default, which the icon carries as a count — `narrowing`
    * counts a FilterBar's groups for it.
    */
   menus?: { key: string; label: string; icon?: string; busy?: number; content?: Node }[];
   /** Controls under the toolbar — tag pickers and the like. */ filters?: Node;
-  /**
-   * The search box on a line of its own, under New and the toolbar's
-   * buttons, rather than between them. The Cards tab asks for it: its row
-   * carries three or four icons beside New card, which left the box too
-   * narrow to read what was typed in it on a phone.
-   */
-  searchBelow?: boolean;
   /**
    * The search, typed somewhere else on the screen. Given, the list draws
    * no search box of its own and narrows by this instead — the Courses tab
@@ -2688,71 +2778,89 @@ export function ItemList<T>({
       className="at-listwrap"
       style={trayH ? ({ "--bulk-h": `${trayH}px` } as React.CSSProperties) : undefined}
     >
-      <div className="at-toolbar at-toolbar-top">
-        {(onNew || newOff) && !bare && (
-          <button className={`at-btn primary${newOff ? " off" : ""}`} aria-disabled={newOff ? true : undefined}
-            onClick={newOff || onNew}>
-            <Icon name="add" />
-            New {noun}
-          </button>
-        )}
-        {items.length > 0 && !searchBelow && !outside && searchBox}
-        {/* Beside the search box, because narrowing by hand and narrowing by
-            typing are the same job. */}
-        {tools}
-        {/* And at the far end, how to draw them — which is about reading
-            the list rather than about what is in it, so it stands apart
-            from the row below that decides that. Its icon is a picture of
-            the view the list is in. */}
-        {views && items.length > 0 && (
-          <button
-            className="at-icon at-viewbtn"
-            title={viewLabel}
-            aria-label={viewLabel}
-            onClick={() => {
-              setView(then.id);
-              saveView(viewKey, then.id);
-            }}
-          >
-            <Icon name={at.icon} />
-          </button>
-        )}
-      </div>
+      {/* The top row (0.689): New and the three dots holding the list's
+          less used actions, together at the start; the screen's own
+          button after them; and at the far end how to draw the list —
+          which is about reading it rather than about what is in it. Its
+          icon is a picture of the view the list is in. Left out when it
+          would hold nothing. */}
+      {(() => {
+        const withNew = (onNew || newOff) && !bare;
+        const dots = !bare && more && more.some(Boolean);
+        const viewBtn = views && items.length > 0;
+        if (!withNew && !dots && !tools && !viewBtn) return null;
+        return (
+          <div className="at-toolbar at-toolbar-top">
+            {withNew && (
+              <button className={`at-btn primary${newOff ? " off" : ""}`} aria-disabled={newOff ? true : undefined}
+                onClick={newOff || onNew}>
+                <Icon name="add" />
+                New {noun}
+              </button>
+            )}
+            {dots ? <MoreMenu label={`More for these ${plural || `${noun}s`}`} items={more || []} /> : null}
+            {tools}
+            {viewBtn && (
+              <button
+                className="at-icon at-viewbtn"
+                title={viewLabel}
+                aria-label={viewLabel}
+                onClick={() => {
+                  setView(then.id);
+                  saveView(viewKey, then.id);
+                }}
+              >
+                <Icon name={at.icon} />
+              </button>
+            )}
+          </div>
+        );
+      })()}
 
-      {searchBelow && !outside && items.length > 0 && (
-        <div className="at-toolbar at-toolbar-search">{searchBox}</div>
-      )}
-
-      {/* Select, and the menus that order and narrow the list — one row,
-          under the one that searches it. Select is not a filter and comes
-          first; the menus are in the order they are given. */}
-      {(canSelect || live.length > 0) && !bare && (
-        <div className="at-toolbar at-toolbar-sub">
-          {canSelect && (
-            <button
-              className={`at-btn sm ghost at-selectbtn${selecting ? " on" : ""}`}
-              aria-pressed={selecting}
-              onClick={() => (selecting ? stopSelecting() : startSelecting())}
-            >
-              <Icon name={selecting ? "close" : "select"} size={16} />
-              {selecting ? "Done" : "Select"}
-            </button>
-          )}
-          {live.map((m) => (
-            <button
-              key={m.key}
-              className={`at-btn sm ghost at-menubtn${m.busy ? " on" : ""}`}
-              aria-expanded={openMenu === m.key}
-              onClick={() => setOpenMenu((v) => (v === m.key ? "" : m.key))}
-            >
-              <Icon name={m.icon || "tune"} size={16} />
-              {m.label}
-              {m.busy ? <span className="at-filtercount">{m.busy}</span> : null}
-              <Icon name={openMenu === m.key ? "chevronUp" : "chevronDown"} size={16} />
-            </button>
-          ))}
-        </div>
-      )}
+      {/* The search row (0.689): the box on a line of its own, wide enough
+          to read what was typed in it on a phone, and after it, as icons,
+          Select and the menus that order and narrow the list. Select is not
+          a filter and comes first; the menus are in the order they are
+          given. */}
+      {(() => {
+        const box = items.length > 0 && !outside;
+        const sel = canSelect && !bare;
+        const menusHere = live.length > 0 && !bare;
+        if (!box && !sel && !menusHere && !narrow) return null;
+        const selLabel = selecting ? "Done selecting" : "Select";
+        return (
+          <div className="at-toolbar at-toolbar-search">
+            {box ? searchBox : <span className="at-toolbarfill" />}
+            {sel && (
+              <button
+                type="button"
+                className={`at-icon ghost at-selectbtn${selecting ? " on" : ""}`}
+                title={selLabel}
+                aria-label={selLabel}
+                aria-pressed={selecting}
+                onClick={() => (selecting ? stopSelecting() : startSelecting())}
+              >
+                <Icon name={selecting ? "close" : "select"} />
+              </button>
+            )}
+            {menusHere && live.map((m) => (
+              <button
+                key={m.key}
+                type="button"
+                className={`at-icon ghost at-menubtn${m.busy ? " on" : ""}${openMenu === m.key ? " open" : ""}`}
+                title={m.busy ? `${m.label} (${m.busy} on)` : m.label}
+                aria-label={m.label}
+                aria-expanded={openMenu === m.key}
+                onClick={() => setOpenMenu((v) => (v === m.key ? "" : m.key))}
+              >
+                <Icon name={m.icon || "tune"} />
+                {m.busy ? <span className="at-filtercount">{m.busy}</span> : null}
+              </button>
+            ))}
+            {narrow}
+          </div>
+        );
+      })()}
 
       {shownMenu ? <div className="at-listmenu">{shownMenu.content}</div> : null}
 

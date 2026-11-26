@@ -158,6 +158,17 @@ Pick several. `options, chosen, onToggle, empty`
 `chosen` is an array of ids, and `onToggle` is called `(id, wasOn)` — the
 second argument saves the caller working out which way the tick just went.
 
+### `MoreMenu` — 3 uses
+Three dots that open a short menu of actions (0.689): the less used things
+done with a tile or a list — a module's Export and Delete, a list's Import —
+out of the way of the one it is for. `label, items, ghost=true`
+
+`items` is `[{ label, icon, danger, onClick }]`; anything falsy is left out,
+so an action only some things have is written in place with `&&`. Its
+clicks stop at it, so a tile it sits on does not open as well, and opening
+one shuts any other. It opens under its button, or above it where below
+would run behind the bar at the foot of the window.
+
 ### `FilterBar` / `narrowing(groups)` — 3 uses
 The panel a list's Sort or Filter button opens onto. `groups, note`
 
@@ -195,10 +206,13 @@ and paging at 120 items.
 
 `noun, plural, items, itemKey, match, groups, groupOf, size="large"|"small",
 views, onNew, renderItem, selected, onSelectedChange, bulkActions, tools,
-menus, filters, count, empty, busy`
+more, narrow, menus, filters, count, empty, busy`
 
-The controls are **two rows**: New, the search box, `tools` and the view
-button on the first; Select and the `menus` on the second. Whichever menu is
+The controls are **two rows** (0.689): New, the three dots holding `more`
+(Import, where a list has it), `tools` (the screen's own main button) and,
+at the far end, the view button on the first; the search box on a line of
+its own on the second, with Select, the `menus` and `narrow` after it as
+icons. Either row is left out when it would hold nothing. Whichever menu is
 open renders under them, then `filters`, then the tiles.
 
 `menus` is `[{ key, label, icon, busy, content }]` — one open at a time, so

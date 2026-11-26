@@ -8,6 +8,43 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.689 — 26 November 2026
+
+**Module tiles are simpler.** In Teaching › Material › Modules and
+My space › Modules:
+
+- A module's quality is now a number in a ring that fills as far round as
+  the score goes, in the score's colour, on the right of the tile. A module
+  with nothing to score yet shows an empty ring with a dash.
+- Export, Delete and, in My space, Copy and Move to the space are in a menu
+  behind three dots beside the ring. The dots don't open the module, and
+  Delete still asks first.
+- The language and the number of cards are no longer on the tile. Whether
+  it is a unit, what is waiting for review, cards reaching no students and
+  missing recordings are still said under the title.
+
+**Lists have their search on a line of its own.** Everywhere a list can be
+searched, the search box has its own row, with Select, Sort and Filter after
+it as icons (hold or hover to see their names; Sort and Filter still show a
+count while they narrow the list). Import moved into a menu behind three dots
+beside New. While a list is empty, its welcome panel keeps its own Import
+button.
+
+**Word sets have their own tab.** Material and My space now have three
+tabs: Modules, Cards and Word sets. The Word sets tab lists numbers and
+pronouns where the Cards tab used to have a row leading to them. It is left
+out where no language you teach has a word set.
+
+**The line describing Material and My space is above the tabs,** and says
+more plainly who sees what:
+
+- Material: "Shared with all of *your space*'s teachers. Students see a
+  module once it's in a course."
+- My space: "Only you can see these. When one is ready, copy or move it to
+  *your space*."
+
+Trade-off: Export, Delete and Import each take one more tap.
+
 ## 0.688 — 26 November 2026
 
 **A unit can be placed and published from its own screen, in every course

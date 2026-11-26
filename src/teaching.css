@@ -352,6 +352,23 @@
 .at-quality.good, .at-qualityscore.good b { color: var(--jade); }
 .at-quality.fair, .at-qualityscore.fair b { color: var(--brass); }
 .at-quality.poor, .at-qualityscore.poor b { color: var(--rose); }
+/* QualityRing (0.689): a module's score on its tile, the number in a ring
+   filled from the top, clockwise, as far as the score goes. */
+.at-qring { position:relative; display:inline-flex; align-items:center; justify-content:center;
+  width:44px; height:44px; flex:0 0 auto; }
+.at-qring svg { position:absolute; inset:0; transform:rotate(-90deg); }
+.at-qringtrack, .at-qringfill { fill:none; stroke-width:4; }
+.at-qringtrack { stroke: var(--line); }
+.at-qringfill { stroke-linecap:round; }
+.at-qring.good .at-qringfill { stroke: var(--jade); }
+.at-qring.fair .at-qringfill { stroke: var(--brass); }
+.at-qring.poor .at-qringfill { stroke: var(--rose); }
+.at-qringnum { position:relative; font-family: var(--ui); font-size:14px; font-weight:800;
+  letter-spacing:-.02em; line-height:1; color: var(--ink); }
+.at-qring.good .at-qringnum { color: var(--jade); }
+.at-qring.fair .at-qringnum { color: var(--brass); }
+.at-qring.poor .at-qringnum { color: var(--rose); }
+.at-qring.none .at-qringnum { color: var(--muted); }
 .at-qualityscore { margin:0 0 6px; display:flex; align-items:baseline; gap:6px; }
 .at-qualityscore b { font-size: var(--fs-stat); font-weight:800; line-height:1.1; letter-spacing:-.02em; }
 .at-qualityscore span { font-size: var(--fs-sm); color: var(--muted); }

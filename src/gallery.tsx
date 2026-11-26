@@ -37,6 +37,7 @@ import {
   Field,
   FilterBar,
   FilterMenu,
+  MoreMenu,
   Help,
   Icon,
   IconButton,
@@ -325,6 +326,7 @@ const PLACES: Record<string, [string, string]> = {
   SearchBox: [PARTS, "A search field, with a cross to clear it"],
   FilterBar: [PARTS, "What Sort or Filter opens onto"],
   FilterMenu: [PARTS, "One filter, in the toolbar"],
+  MoreMenu: [PARTS, "Three dots, opening a menu of actions"],
   ModeSelector: [PARTS, "Choosing a mode · drawn nowhere yet"],
   Tabs: [PARTS, "A row of tabs"],
   Screen: [PARTS, "A full screen"],
@@ -819,7 +821,7 @@ export function ComponentGallery() {
       <Row
         name="FilterMenu"
         what="One filter, narrow enough to sit beside a search box."
-        note="Goes in ItemList's tools slot, where it takes the width of an icon until it is pressed. FilterBar is the answer when a list wants several pickers at once; this is the answer when it wants one and the choices are a list rather than a few — every teacher who has made a deck, say, which Segmented would wrap into four rows. `quiet` is the value that means everything, and the button lights while anything else is picked."
+        note="Goes in ItemList's narrow slot, at the end of the search row, where it takes the width of an icon until it is pressed. FilterBar is the answer when a list wants several pickers at once; this is the answer when it wants one and the choices are a list rather than a few — every teacher who has made a deck, say, which Segmented would wrap into four rows. `quiet` is the value that means everything, and the button lights while anything else is picked."
       >
         <V label="press it">
           <FilterMenu
@@ -831,6 +833,22 @@ export function ComponentGallery() {
               { value: "", label: "Anyone", note: "12" },
               { value: "sara", label: "Sara", note: "7" },
               { value: "omar", label: "Omar Haddad", note: "5" },
+            ]}
+          />
+        </V>
+      </Row>
+
+      <Row
+        name="MoreMenu"
+        what="Three dots that open a short menu of actions."
+        note="For the less used actions on a tile or a list — a module's Export and Delete, a list's Import — out of the way of the one it is for. items is [{ label, icon, danger, onClick }]; anything falsy is left out. Its clicks stop at it, so a tile it sits on does not open too, and opening one shuts any other."
+      >
+        <V label="press it">
+          <MoreMenu
+            label="More for this module"
+            items={[
+              { label: "Export", icon: "download", onClick: () => {} },
+              { label: "Delete", icon: "delete", danger: true, onClick: () => {} },
             ]}
           />
         </V>
@@ -1062,8 +1080,8 @@ export function ComponentGallery() {
 
       <Row
         name="ItemList"
-        what="The standard list frame: New button, search and the view button on one row; Select and the menus on the next; bulk actions, empty state, paging at 120."
-        note="match is (item, lowercasedQuery) => boolean. bulkActions is [{ label, danger, onClick(ids) }]. menus is [{ key, label, icon, busy, content }] — one open at a time, drawn under the row. views adds the view button — small grid, large grid, list, table — with { key, columns, row(item) } saying what a line and a table row show; key is where the list remembers its view."
+        what="The standard list frame: New, its three dots and the view button on one row; the search box, then Select and the menus as icons, on the next; bulk actions, empty state, paging at 120."
+        note="match is (item, lowercasedQuery) => boolean. more is the three dots' items, [{ label, icon, danger, onClick }] — Import, where a list has it. tools is the screen's own button after them; narrow a FilterMenu at the end of the search row. bulkActions is [{ label, danger, onClick(ids) }]. menus is [{ key, label, icon, busy, content }] — one open at a time, drawn under the row. views adds the view button — small grid, large grid, list, table — with { key, columns, row(item) } saying what a line and a table row show; key is where the list remembers its view."
       >
         <V label="items + renderItem" wide>
           <ItemList
@@ -1078,6 +1096,7 @@ export function ComponentGallery() {
               columns: [{ key: "title", label: "Title" }],
               row: (d) => ({ word: d.title, meaning: null, cells: { title: d.title } }),
             }}
+            more={[{ label: "Import", icon: "upload", onClick: () => {} }]}
             menus={[
               {
                 key: "sort",
