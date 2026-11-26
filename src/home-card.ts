@@ -281,7 +281,7 @@ export const HOME_SHAPES: HomeShape[] = [
 
 /* ------------------------------------------------------------------
    Which card shows. One count per device, moved on by each finished
-   session and each time the app is opened (0.673); the shape and the
+   session and each time the app is opened (0.674); the shape and the
    fact are read off it separately, so the twenty shapes and the facts
    drift past each other.
    ------------------------------------------------------------------ */

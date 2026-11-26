@@ -14212,7 +14212,7 @@ export default function ArabicTrainer() {
      screen is the moment a session is finished, whether it ran its course,
      ran out of time or was all answered. A trial is a teacher's look at one
      question, not a session, so it turns nothing. Counted per device.
-     Opening the app turns it too (0.673): see readHomeTurn. */
+     Opening the app turns it too (0.674): see readHomeTurn. */
   const [homeTurn, setHomeTurn] = useState(readHomeTurn);
   /* How far the student has come: before practice, the first day, or
      from the second day of practice (0.666). The card's welcome and the
@@ -16534,8 +16534,10 @@ export default function ArabicTrainer() {
 
                   {/* A shape in the logo's style and a fact about how
                       language varies, turned after every finished session
-                      (0.664). See home-card.ts. */}
-                  <HomeCard turn={homeTurn} stage={stage} />
+                      (0.664). See home-card.ts. Not under a prep (0.673):
+                      the prep's tile is the top of the screen, and the card
+                      pushed Practice off a phone. */}
+                  {!homePrep && <HomeCard turn={homeTurn} stage={stage} />}
 
                   {/* Practice, and beside it on the right the way to
                       Focused training (0.650): weak spots, a session built
@@ -18447,7 +18449,7 @@ function HomeCard({ turn, stage }: { turn: number; stage: HomeStage }) {
 /* The card's count, on this device only: which card is showing is a
    matter of what this screen last showed, not something to sync.
 
-   It also turns once each time the app is opened (0.673): a reload, or
+   It also turns once each time the app is opened (0.674): a reload, or
    closing the app and opening it again, shows the next card, not the one
    left from last time. Once per page load, not per mount, so going to
    another screen and back does not turn it, and the end of a session
