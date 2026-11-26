@@ -8123,9 +8123,12 @@ export function praiseFor(n: number) {
 }
 
 /* --- AlsoBox --------------------------------------------------------
-   What is worth knowing beyond the answer, under a "Learn more" heading.
-   It is shown open, with nothing to fold it away: the blocks are there to
-   be read, and a tap to reach them was a tap most answers never got.
+   What is worth knowing beyond the answer, behind a "Learn more" toggle.
+   It starts closed (0.674, back to how it was before 0.372): open, it put
+   several blocks between the answer and Continue on every card. A tap
+   opens it, with a chevron saying which way it will go. It is closed again
+   on every new question, because the answer, and this with it, unmounts
+   between questions.
 
    Renders nothing — not even the heading — when there is nothing to put
    in it, so "Learn more" is never a promise the box cannot keep.
@@ -8145,6 +8148,7 @@ function alsoName(el: any): string {
   return el.type === RelatedWords ? "related-words" : el.props["data-el"] || "";
 }
 function AlsoBox({ children }: { children?: Node }) {
+  const [open, setOpen] = useState(false);
   const shown = React.Children.toArray(children).filter(Boolean) as any[];
   if (!shown.length) return null;
   const row = (cells: any[]) => (
@@ -8166,12 +8170,21 @@ function AlsoBox({ children }: { children?: Node }) {
   rows.push(...shown.filter(wide));
   return (
     <>
-      <p className="at-alsomore" data-el="also-heading">
+      <button
+        type="button"
+        className="at-alsomore"
+        data-el="also-heading"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+      >
         Learn more
-      </p>
-      <div className="at-alsobox" data-el="also">
-        {rows}
-      </div>
+        <Icon name={open ? "chevronUp" : "chevronDown"} size={18} />
+      </button>
+      {open && (
+        <div className="at-alsobox" data-el="also">
+          {rows}
+        </div>
+      )}
     </>
   );
 }
