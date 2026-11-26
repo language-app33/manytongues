@@ -9119,7 +9119,7 @@ const openPronounTables = async () => {
   await sleep(200);
   check("and Filter replaces it rather than standing beside it",
     frame.querySelectorAll(".at-listmenu").length === 1 &&
-      sortLabels().join(" | ") === "Kind | Recordings | Forms | Decks | Blanks | Review",
+      sortLabels().join(" | ") === "Kind | Status | Recordings | Forms | Decks | Blanks | Review",
     `${frame.querySelectorAll(".at-listmenu").length} panels · ${sortLabels().join(" | ")}`);
 
   /* ---- and by kind, with each kind's subtypes under it ----
