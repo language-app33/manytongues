@@ -2002,7 +2002,7 @@ if (/Build a session/.test(document.body.textContent)) {
 
   /* And the session kept a few steps ago, which is only worth keeping if
      there is a way back to it. */
-  /* Under a heading of its own on Focused training (0.679), where a
+  /* Under a heading of its own on Focused training (0.680), where a
      button used to open a screen listing them. */
   const savedHead = () => ((document.querySelector(".at-screen.training .at-trainsaved .at-sectionhead") || {}).textContent || "").trim();
   check("a kept session puts a way back to it in Focused training, under a heading",
@@ -2018,7 +2018,7 @@ if (/Build a session/.test(document.body.textContent)) {
     !!tile && /^\d{1,3}%$/.test(((tile.querySelector(".pc") || {}).textContent || "").trim()),
     tile ? (tile.textContent || "").trim() : "(no tile)");
   /* What the session is, and the dots in its corner that do the rest
-     from here (0.675), in a panel from the foot of the screen (0.679). */
+     from here (0.675), in a panel from the foot of the screen (0.680). */
   const tileLine = ((tile && tile.querySelector(".ln")) || {}).textContent || "";
   check("and the tile says what kind of session it is",
     / · .*\bcards?\b/.test(tileLine), tileLine || "(no line)");
@@ -9192,7 +9192,7 @@ const openPronounTables = async () => {
   await sleep(200);
   check("and Filter replaces it rather than standing beside it",
     frame.querySelectorAll(".at-listmenu").length === 1 &&
-      sortLabels().join(" | ") === "Kind | Recordings | Forms | Decks | Blanks | Review",
+      sortLabels().join(" | ") === "Kind | Status | Recordings | Forms | Decks | Blanks | Review",
     `${frame.querySelectorAll(".at-listmenu").length} panels · ${sortLabels().join(" | ")}`);
 
   /* ---- and by kind, with each kind's subtypes under it ----

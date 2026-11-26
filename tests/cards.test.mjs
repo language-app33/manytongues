@@ -191,6 +191,29 @@ test("filtering by which decks a card is in, and which it is not", () => {
   );
 });
 
+test("filtering by whether students have the card as it is (0.679)", () => {
+  /* What an import brings in is Ready for review, which students do not
+     get: "waiting" is what the band after an import and a course's line
+     open on, so it must hold everything Publish would send. */
+  const list = [
+    card({ id: "out" }),
+    card({ id: "out-too", status: "published" }),
+    card({ id: "draft", status: "draft" }),
+    card({ id: "imported", status: "review" }),
+    card({ id: "changed", status: "published", changes: "review" }),
+  ];
+  const ids = (/** @type {any} */ f) => filterCards(list, f).map((/** @type {any} */ c) => c.id);
+  assert.deepEqual(ids({ status: "waiting" }), ["draft", "imported", "changed"]);
+  assert.deepEqual(ids({ status: "published" }), ["out", "out-too"]);
+  assert.deepEqual(ids({ status: "any" }), list.map((c) => c.id));
+  /* And alongside a deck, which is how a course's line asks. */
+  const inDecks = [card({ id: "a", status: "review", decks: ["d1"] }), card({ id: "b", status: "review", decks: ["d2"] })];
+  assert.deepEqual(
+    filterCards(inDecks, { status: "waiting", deckMode: "in", deckIds: ["d1"] }).map((/** @type {any} */ c) => c.id),
+    ["a"],
+  );
+});
+
 test("filtering by which side of a blank a card is on, and which blank", () => {
   /* A teacher who has written forty names wants three things of this list:
      the names, to check them; the sentences the names go into; and
