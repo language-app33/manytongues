@@ -1643,7 +1643,7 @@ if (/Build a session/.test(document.body.textContent)) {
     const dupes2 = answered.filter((n, i) => n !== "related-word" && answered.indexOf(n) !== i);
     check("and each of those means one thing too", dupes2.length === 0, dupes2.join(", "));
 
-    /* The extras are folded behind a "Learn more" toggle (0.674): closed
+    /* The extras are folded behind a "Learn more" toggle (0.675): closed
        on every new answer, open on a tap, closed again on a second. */
     const moreHead = document.querySelector('[data-el="also-heading"]');
     check("what is not the answer is behind Learn more",
