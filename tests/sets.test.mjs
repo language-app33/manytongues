@@ -294,7 +294,7 @@ test("a meaning one list has and another lacks says so, naming both", () => {
 test("cards in the deck with no picture say they are not part of the set", () => {
   const set = { ...S.emptySet(), lists: ["dA"] };
   const four = [{ title: "Hanoi", words: words(["a", "b", "c", "d"]) }];
-  assert.deepEqual(S.setGaps(set, four, [{ picture: true }, { picture: false }]), ["1 card in this deck has no picture, so it is not part of the set."]);
+  assert.deepEqual(S.setGaps(set, four, [{ picture: true }, { picture: false }]), ["1 card in this set has no picture, so it is not part of the set."]);
 });
 
 test("the deck check counts a set's pictures and its lists' words without a recording, as on any deck", async () => {

@@ -109,7 +109,7 @@ export function sendWaitingCards({ say, onSaved }: { say: Say; onSaved?: (r: any
         const media = await sendCardMedia(held.card, say);
         if (media.waiting) return "keep";
         const r = await API.saveCard(media.card, held.decks, held.extra || {}, held.org);
-        if (r && Array.isArray(r.locked)) for (const d of r.locked) locked.add(d.title || "a deck");
+        if (r && Array.isArray(r.locked)) for (const d of r.locked) locked.add(d.title || "a module");
         if (onSaved) onSaved(r);
         return "sent";
       } catch (e) {

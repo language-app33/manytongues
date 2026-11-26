@@ -158,10 +158,10 @@ const PLACES: Record<string, [string, string]> = {
   TenseLadder: [LEARN, "Opening a verb from a tile · where each of its tenses is"],
   ProgressTab: [LEARN, "The Progress tab"],
   Lately: [LEARN, "The Progress tab · what moved today and this week"],
-  DeckScreen: [LEARN, "The Progress tab · one deck, with when it could be learnt"],
+  DeckScreen: [LEARN, "The Progress tab · one module, with when it could be learnt"],
   UnitScreen: [LEARN, "A course's path · one unit, its words and sentences"],
   PathHomeLine: [LEARN, "Home · a course's current unit"],
-  PrepScreen: [LEARN, "Focused training · Prep mode, getting decks learnt by a date"],
+  PrepScreen: [LEARN, "Focused training · Prep mode, getting modules learnt by a date"],
   PrepLine: [LEARN, "The home screen · how long is left to prep, and whether your pace gets you there"],
   ReviewItem: [LEARN, "The Progress tab · one card"],
   StudentCourses: [LEARN, "The Courses tab"],
@@ -175,11 +175,11 @@ const PLACES: Record<string, [string, string]> = {
   TeachSpace: [TEACH, "The Teaching space"],
   CoursesPage: [TEACH, "The Courses tab"],
   CourseSettings: [TEACH, "Course settings"],
-  NewDeck: [TEACH, "Making a new deck"],
-  NumbersFrom: [TEACH, "A deck's screen · whose numbers it uses"],
-  ExportScreen: [TEACH, "Exporting cards or decks"],
-  ImportScreen: [TEACH, "Importing cards or decks"],
-  LockMark: [TEACH, "A locked deck's padlock"],
+  NewDeck: [TEACH, "Making a new module"],
+  NumbersFrom: [TEACH, "A module's screen · whose numbers it uses"],
+  ExportScreen: [TEACH, "Exporting cards or modules"],
+  ImportScreen: [TEACH, "Importing cards or modules"],
+  LockMark: [TEACH, "A locked module's padlock"],
   CardEditor: [TEACH, "Editing a card"],
   WordEditor: [TEACH, "Editing a card · a word or phrase"],
   VerbEditor: [TEACH, "Editing a card · a verb"],
@@ -199,7 +199,7 @@ const PLACES: Record<string, [string, string]> = {
   CastBlock: [TEACH, "Editing a card · who is who in a scene"],
   SentencePicker: [TEACH, "Editing a card · picking a sentence card as a line"],
   CapitalsBlock: [TEACH, "Editing a card · the tick for whether its English keeps its capital letters in a sentence"],
-  BasicBlock: [TEACH, "Editing a card · the Basic tab: the name, the Advanced box, the word and its decks"],
+  BasicBlock: [TEACH, "Editing a card · the Basic tab: the name, the Advanced box, the word and its modules"],
   MeaningsBlock: [TEACH, "Editing a card · Advanced · the other cards with the same word or meaning, the clue, and adding another"],
   CarryAsk: [TEACH, "Editing a card · whether a spelling fix goes onto the other cards with the same word"],
   FormBlock: [TEACH, "Editing a card · one form"],
@@ -215,13 +215,13 @@ const PLACES: Record<string, [string, string]> = {
   IdBox: [TEACH, "Editing a card · the ID it answers to"],
   TagList: [TEACH, "Editing a card · its tags"],
   TagSheet: [TEACH, "Editing a card · the sheet custom tags are chosen in"],
-  PickSheet: [TEACH, "Editing a card · the sheet a subtype or a card's decks are chosen in"],
+  PickSheet: [TEACH, "Editing a card · the sheet a subtype or a card's modules are chosen in"],
   RenameAsk: [TEACH, "Editing a card · renaming an ID or a tag"],
   StripAsk: [TEACH, "Editing a card · taking a tag off every card"],
   RecordingOverlays: [TEACH, "Editing a card · recording a form"],
-  DeckSwitch: [TEACH, "Editing a card · which decks it is in"],
-  DeckPickScreen: [TEACH, "Putting cards in decks · a card being written, or selected cards"],
-  Nudge: [TEACH, "An empty part of a deck, course or card, inviting you to fill it"],
+  DeckSwitch: [TEACH, "Editing a card · which modules it is in"],
+  DeckPickScreen: [TEACH, "Putting cards in modules · a card being written, or selected cards"],
+  Nudge: [TEACH, "An empty part of a module, course or card, inviting you to fill it"],
   ChoiceSwitch: [TEACH, "Editing a card · its subtype, and a built session's mode"],
   BlankNameBox: [TEACH, "Editing a card · naming a blank nobody has named yet"],
   VerbTable: [TEACH, "Filling in a verb's forms"],
@@ -235,10 +235,10 @@ const PLACES: Record<string, [string, string]> = {
   ImageScreen: [TEACH, "Editing a card · adding a picture"],
   FullImage: [TEACH, "Reading a card · a picture full screen"],
   StoredImage: [TEACH, "Editing a card · a picture on a form"],
-  DeckQuality: [TEACH, "A deck · its quality, and what would raise it"],
+  DeckQuality: [TEACH, "A module · its quality, and what would raise it"],
   PathSection: [TEACH, "A course · its path of units"],
   PracticeSection: [TEACH, "A course · which exercises its students are asked"],
-  SetSection: [TEACH, "A deck · Personal set: its wording, the decks of words to choose from, words said with the name and what is asked"],
+  SetSection: [TEACH, "A personal set: its wording, the decks of words to choose from, words said with the name and what is asked"],
   UnitChecklist: [TEACH, "A unit · what it needs before it is published"],
   PronounsEditor: [TEACH, "A language's pronouns, written once"],
   NumberSystemEditor: [TEACH, "A language's number system"],
@@ -259,7 +259,7 @@ const PLACES: Record<string, [string, string]> = {
   GrammarToggles: [TEACH, "Editing a card · what is true of the whole word, as toggles"],
   TwoWordsBlock: [TEACH, "A language's number system · choosing one word before a noun where two were written"],
   CountedSection: [TEACH, "A language's number system · the noun cards a part counts with"],
-  PartDecks: [TEACH, "A language's number system · the decks that hold a part"],
+  PartDecks: [TEACH, "A language's number system · the modules that hold a part"],
   PartTags: [TEACH, "A language's number system · the tags a part fills blanks under"],
   TimesTab: [TEACH, "A language's number system · telling the time"],
   PeriodsSection: [TEACH, "A language's number system · the parts of the day"],
@@ -290,7 +290,7 @@ const PLACES: Record<string, [string, string]> = {
   useConfirm: [ADMIN, "Admin · the question asked before something is done"],
   InviteLink: [ADMIN, "The People tab · the space's invitation link"],
   FormerMembers: [ADMIN, "The People tab · Former members"],
-  OthersWork: [TEACH, "Deleting a deck or card someone else made"],
+  OthersWork: [TEACH, "Deleting a module or card someone else made"],
   LeaveSpace: [LEARN, "Settings · leaving your space"],
   SpaceScreen: [ADMIN, "The Spaces tab · one space"],
   SpaceExtras: [ADMIN, "The Spaces tab · a space's storage and export"],
@@ -991,8 +991,8 @@ export function ComponentGallery() {
 
       <Row name="Empty" what="The nothing-here state.">
         <V label="title + children + action" wide>
-          <Empty title="No decks yet" action={<Button size="sm" icon="add">New deck</Button>}>
-            A deck is a set of cards you hand to a course.
+          <Empty title="No modules yet" action={<Button size="sm" icon="add">New module</Button>}>
+            A module is something you hand a course to learn from.
           </Empty>
         </V>
       </Row>
@@ -1101,7 +1101,7 @@ export function ComponentGallery() {
               },
             ]}
             renderItem={(d) => <Tile title={d.title} meta="12 cards" />}
-            empty={<Empty title="No decks">Nothing here yet.</Empty>}
+            empty={<Empty title="No modules">Nothing here yet.</Empty>}
           />
         </V>
       </Row>

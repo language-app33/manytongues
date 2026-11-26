@@ -9095,3 +9095,28 @@ path units, with the cards of each that can be asked.
 under it. It borrows the ghost button's outline, dimmed state and focus
 ring. Its accessible name is the title alone, with the line as its
 description, so it is still "Weak spots" to a screen reader.
+
+## Modules: one word for decks, units and personal sets (0.672)
+
+**The owner chose *module* as the word for anything a course learns
+from** — a deck, a path unit or a personal set — over set, collection,
+study, material, pack and learnable. "Deck" had been doing two jobs: the
+umbrella (the Decks tab, "Delete deck" on a unit) and the plain kind ("What
+kind of deck? Regular deck / Unit / Personal set"). Now:
+
+- Wherever the screen means any of the three, it says *module* (the
+  owner's 3a), on the student side too (4a): Progress, Prep mode, Build a
+  session, the help text.
+- The plain kind is **Deck** (1a); "Regular deck" is gone.
+- On one module's own screen the screen names its kind (2a):
+  `moduleKind` in `src/modules.ts` reads `unit === true` as a unit and a
+  `set` as a personal set, and everything else as a deck. The kind chooser
+  and the word lists a personal set draws from stay "deck", because there
+  it is the plain kind that is meant.
+- Server error codes (`no-deck`, `deck-locked`) are unchanged; only the
+  sentences the app shows for them changed.
+
+**Code and data (the owner's 5b).** The owner asked for the rename to
+reach the code too. That follows as its own change, so that this release
+is wording alone and can be checked as such.
+

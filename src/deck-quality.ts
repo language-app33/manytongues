@@ -570,11 +570,11 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
     const lost = wordRows.reduce((t, w) => t + (1 - w.share), 0) / wordRows.length;
     add("words", worth("words") * lost,
       `Use ${count(short.length, "word")} in more sentences`,
-      "Each word should appear in 2 sentences in this deck, and each of its other forms in 1.",
+      "Each word should appear in 2 sentences in this module, and each of its other forms in 1.",
       short.slice().sort((a, b) => a.share - b.share).map((w) => w.id));
   } else if (!said.length && words.length) {
     add("words", worth("words"), "Add sentences",
-      "None of this deck's words appear in a sentence yet, so they can't be practised in context.");
+      "None of this module's words appear in a sentence yet, so they can't be practised in context.");
   }
   /* Links the app can see and nobody has confirmed: worth what confirming
      them all would add. Only where asked for — it reads every word of the
@@ -598,7 +598,7 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
     if (n) {
       add("confirm", worth("words") * (mean(rowsFrom(more)) - mean(wordRows)),
         `Confirm ${count(n, "word")} found in a sentence`,
-        `The app spotted ${n === 1 ? "a word" : "words"} of this deck inside a sentence. Confirm ${n === 1 ? "it" : "them"} on the In context tab so ${n === 1 ? "it counts" : "they count"}.`);
+        `The app spotted ${n === 1 ? "a word" : "words"} of this module inside a sentence. Confirm ${n === 1 ? "it" : "them"} on the In context tab so ${n === 1 ? "it counts" : "they count"}.`);
     }
   }
   if (said.length) {
@@ -607,14 +607,14 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
       const n = onlyUnlinked.length;
       add("unlinked", worth("sentences") * (n / said.length),
         `Link ${count(n, "sentence")} to ${n === 1 ? "its" : "their"} words`,
-        `Open ${n === 1 ? "the sentence" : "each sentence"} and choose which of this deck's words it practises.`,
+        `Open ${n === 1 ? "the sentence" : "each sentence"} and choose which of this module's words it practises.`,
         idsOf(onlyUnlinked));
     }
     if (onlyStrange.length) {
       const n = onlyStrange.length;
       add("unknown", worth("sentences") * (n / said.length),
         `${count(n, "sentence")} ${verb(n, "uses", "use")} words nobody teaches`,
-        `No deck in the course has a card for: ${sampleOf(onlyStrange)}. Add cards for them, or reword the ${n === 1 ? "sentence" : "sentences"}.`,
+        `No module in the course has a card for: ${sampleOf(onlyStrange)}. Add cards for them, or reword the ${n === 1 ? "sentence" : "sentences"}.`,
         idsOf(onlyStrange));
     }
     if (both.length) {
@@ -640,7 +640,7 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
     }
   } else if (words.length) {
     add("sentences", worth("sentences"), "Add sentences",
-      "None of this deck's words appear in a sentence yet, so they can't be practised in context.");
+      "None of this module's words appear in a sentence yet, so they can't be practised in context.");
   }
   add("recordings", worth("recordings") * (1 - share(unrecorded.length, units.length)),
     `Record ${count(unrecorded.length, "word or sentence", "words or sentences")}`,
@@ -667,7 +667,7 @@ export function deckQuality(cards: Held[], options: QualityOptions): Quality {
     `Sentences over ${longest} words are hard to answer.`,
     idsOf(long));
   add("scene", worth("scene") * (scenes.length ? 0 : 1), "Add a conversation or a text",
-    "It practises the deck's words together, the way they're really used.");
+    "It practises the module's words together, the way they're really used.");
   fixes.sort((a, b) => b.gain - a.gain);
 
   const untaught = strange.map((x) => ({ id: String(x.card.id), text: x.texts[0] || "", words: unknownOf(x) }));

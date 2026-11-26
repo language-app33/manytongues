@@ -8,6 +8,37 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.672 — 26 November 2026
+
+**Decks, units and personal sets are now called modules.** A module is
+anything a teacher gives a course to learn from: a deck of cards, a unit on
+a course's path, or a personal set. The word is used wherever the app means
+any of the three:
+
+- **Teaching:** the Decks tab under Material and under My space is now
+  **Modules**, and so is the one in Admin. The button is **New module**,
+  and it asks "What kind of module?" with three choices: **Deck** (which
+  used to be called "Regular deck"), **Unit** and **Personal set**. A
+  course's screen lists its **Modules** beside its Path. A card says which
+  modules it is in, and the card filter and card list use the same word.
+  Importing, exporting, backups, handing over a space and the warnings
+  about locked or deleted material all say "module" too.
+- **On a module's own screen, the app names its kind.** A unit's screen
+  says "This unit", "Edit unit" and "Delete unit". A personal set's says
+  "This personal set" and "Personal set name". A deck's screen still says
+  "Deck". The quality score is "Deck quality", "Unit quality" or
+  "Personal set quality" to match, and just "Quality" in a list.
+- **Students:** Progress shows **Modules**, Prep mode asks for **Modules to
+  target**, Build a session offers **Choose modules**, and the help text
+  explains what a module is.
+
+Nothing about how anything works has changed: the same decks, units and
+sets, in the same courses, with the same cards and progress.
+
+To check by hand: on a phone, the search box under Material › Modules is
+narrower than its words, so it reads "Search module" with the last letter
+cut off, as it would for any longer word.
+
 ## 0.671 — 26 November 2026
 
 **Weak spots replaces Fix mistakes in Build a session.** Choosing Weak spots

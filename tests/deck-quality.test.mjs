@@ -208,7 +208,7 @@ test("a sentence loses its points for a word no deck of the course teaches, or f
   const unknown = q.fixes.find((f) => f.key === "unknown");
   assert.ok(unknown);
   assert.match(unknown.title, /^1 sentence uses words nobody teaches/);
-  assert.match(unknown.text, /No deck in the course has a card for: افتح\./);
+  assert.match(unknown.text, /No module in the course has a card for: افتح\./);
   assert.ok(q.fixes.some((f) => f.key === "unlinked"));
 });
 

@@ -231,7 +231,7 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, decks, onDe
     >
       <Help>
         The words for I, you, he and the rest, written once for {lang.name}. Each becomes a card
-        that can be practised and put in decks, and a sentence with a {"{{pronoun}}"} blank puts
+        that can be practised and put in modules, and a sentence with a {"{{pronoun}}"} blank puts
         its verb in the form that goes with the pronoun it is filled with.
       </Help>
       <Help>
@@ -242,7 +242,7 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, decks, onDe
       </Help>
       <Notice kind="error">{error}</Notice>
       {decks && onDeck ? (
-        <Field label="Decks" lede="The decks this set is in. A pronoun written later goes into them too.">
+        <Field label="Modules" lede="The modules this set is in. A pronoun written later goes into them too.">
           {Object.values(held).some(Boolean) ? (
             <DeckSwitch
               decks={decks}
@@ -251,7 +251,7 @@ export function PronounsEditor({ lang, cards, busy, onSave, onClose, decks, onDe
               onToggle={(id, wasOn) => onDeck(id, !wasOn)}
             />
           ) : (
-            <Help>Write and save a pronoun first, then the set can go in a deck.</Help>
+            <Help>Write and save a pronoun first, then the set can go in a module.</Help>
           )}
         </Field>
       ) : null}

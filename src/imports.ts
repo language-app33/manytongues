@@ -51,7 +51,7 @@ export function readImportFile(parsed: any): ImportFile | string {
     else if (key.startsWith("clip:") && typeof value === "string") file.clips[key.slice(5)] = value;
     else if (key.startsWith("image:") && typeof value === "string") file.images[key.slice(6)] = value;
   }
-  if (!file.cards.length && !file.decks.length) return "There are no cards or decks in that file.";
+  if (!file.cards.length && !file.decks.length) return "There are no cards or modules in that file.";
   return file;
 }
 

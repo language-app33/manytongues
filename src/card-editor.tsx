@@ -6815,7 +6815,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
           onSetDecks(picking);
           setPicking(null);
         }}
-        empty={`No ${lang.name} decks yet. Make one with New deck, above.`}
+        empty={`No ${lang.name} modules yet. Make a deck with New deck, above.`}
       />
     )}
     <div className="at-formblock">
@@ -6905,8 +6905,8 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
     {/* ---- and where it goes ---- */}
     <div className="at-formblock at-mt5">
       <div className="at-formhead">
-        <span className="at-formnum">Decks</span>
-        <span className="at-formrole">Manage what decks this card belongs to.</span>
+        <span className="at-formnum">Modules</span>
+        <span className="at-formrole">Manage what modules this card belongs to.</span>
       </div>
       {/* In no deck, the list stands in the Nudge panel's dress; built by
           hand rather than with Nudge so the list keeps its place in the
@@ -6920,7 +6920,7 @@ function BasicBlock({ lang, scene, word, talk, advanced, canUntick, onAdvanced, 
         )}
         <div className={chosen.length ? "at-deckhold" : "at-nudgebody"}>
           {!chosen.length && (
-            <p className="at-nudgetext">Not in a deck yet, so no students can see it. Add it to a deck to share it.</p>
+            <p className="at-nudgetext">Not in a module yet, so no students can see it. Add it to a module to share it.</p>
           )}
           {chosen.length || !locked ? (
             <div className={chosen.length ? "at-deckhold" : "at-nudgeact"}>

@@ -10893,7 +10893,7 @@ function PictureChoices({ options, value, onChange, disabled, turn = 0 }: {
  * three.
  */
 export function noCardsYet(courseCount: number) {
-  if (!courseCount) return "Join a course and the decks your teacher shares will appear here.";
+  if (!courseCount) return "Join a course and the modules your teacher shares will appear here.";
   const them = courseCount === 1 ? "it" : "them";
   return `You're in ${plural(courseCount, "course")}, but there are no cards in ${them} yet.`;
 }
@@ -18006,7 +18006,7 @@ export default function ArabicTrainer() {
                  let that tab apply it when it mounts. */
               setDeckWanted(deckTitle);
               setTab("items");
-              flash(`${deckTitle} — showing just this deck`);
+              flash(`${deckTitle} — showing just this module`);
             }}
           />
           </React.Suspense>
@@ -18313,7 +18313,7 @@ export default function ArabicTrainer() {
               onLangs={(next) => setSetting(teachingLangs ? "teachLangsOff" : "langsOff", next)}
               note={
                 teachingLangs
-                  ? "Select the languages you see in your courses, decks, and cards. This doesn't change anything for your students."
+                  ? "Select the languages you see in your courses, modules, and cards. This doesn't change anything for your students."
                   : "Select the languages you see in your cards, progress, and anything you practice."
               }
             />
@@ -19110,7 +19110,7 @@ function FocusedTrainingSheet({
         />
         <TrainingChoice
           title="Prep mode"
-          note="Get decks ready by a date, like an exam, a trip or the start of a class."
+          note="Get modules ready by a date, like an exam, a trip or the start of a class."
           status={prepLine}
           onClick={onPrep}
           dialog
@@ -19399,7 +19399,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
   const [tried, setTried] = useState(false);
   const need = {
     mode: !mode ? "Choose a mode." : "",
-    cards: !picked.size ? "Choose at least one deck or card." : "",
+    cards: !picked.size ? "Choose at least one module or card." : "",
     length: needsLength && !limitKind ? "Choose a length." : "",
   };
   const said = tried ? need : { mode: "", cards: "", length: "" };
@@ -19487,30 +19487,30 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
       <div className="at-formblock">
         <div className="at-formhead">
           <span className="at-formnum">Cards</span>
-          <span className="at-formrole">Pick whole decks, single cards, or both.</span>
+          <span className="at-formrole">Pick whole modules, single cards, or both.</span>
         </div>
         <CheckList
           options={[{
             id: "all",
             title: "All cards",
-            note: "Every card you can practise. Decks and cards can't be chosen while this is ticked.",
+            note: "Every card you can practise. Modules and cards can't be chosen while this is ticked.",
             disabled: !eligible.length,
           }]}
           chosen={allCards ? ["all"] : []}
           onToggle={(_, wasOn) => setAllCards(!wasOn)}
         />
-        <FormField label="Decks" className="at-mt5">
+        <FormField label="Modules" className="at-mt5">
           <DeckSwitch
             disabled={allCards}
             decks={tagGroups.map(([n, group]) => ({ id: n, title: n, cardCount: group.length }))}
             chosen={decks}
             onToggle={(id, wasOn) => setDecks((d) => (wasOn ? d.filter((x) => x !== id) : d.concat([id])))}
             words={{
-              first: "Choose decks",
+              first: "Choose modules",
               drop: (title) => `Take ${title} out of this session`,
-              lede: "Every card in a deck you choose is in the session.",
+              lede: "Every card in a module you choose is in the session.",
               note: "",
-              none: "No decks yet. Single cards can still be chosen below.",
+              none: "No modules yet. Single cards can still be chosen below.",
             }}
           />
         </FormField>
@@ -19538,7 +19538,7 @@ function ManualSessionSheet({ items, allTags, settings, editing, onStart, onSave
             words={{
               first: "Choose cards",
               drop: (title) => `Take ${title} out of this session`,
-              lede: "Single cards, on top of any decks chosen above.",
+              lede: "Single cards, on top of any modules chosen above.",
               note: "",
               none: "No cards to practise yet.",
             }}
@@ -20351,7 +20351,7 @@ export function prepStatus(
 /** What a prep's forecast says, in a sentence. */
 export function readyWords(answer: ReadyAnswer, date: string, perDay: number, target: PrepTarget = "learnt"): string {
   const day = new Date(prepStart(date)).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
-  if (answer.kind === "already") return `Every card in these decks is already ${target === "cleared" ? "cleared" : "learnt"}.`;
+  if (answer.kind === "already") return `Every card in these modules is already ${target === "cleared" ? "cleared" : "learnt"}.`;
   if (answer.kind === "late") {
     return answer.earliest === null
       ? `You can't be ready before ${day}: however much you practise, it would take more than two years.`
@@ -20418,8 +20418,8 @@ function PrepScreen({
       }
     >
       <Lede>
-        Preparing for something on a set date? Pick the decks you need ready by then. The home screen will offer
-        sessions drawn only from those decks, and tell you whether you're on track.
+        Preparing for something on a set date? Pick the modules you need ready by then. The home screen will offer
+        sessions drawn only from those modules, and tell you whether you're on track.
       </Lede>
       <FormField label="What are you preparing for?" htmlFor="at-prep-name">
         <input
@@ -20452,17 +20452,17 @@ function PrepScreen({
       </FormField>
       {/* The decks as a card's editor puts a card in them: pills, and a
           sheet to add more from. */}
-      <FormField label="Decks to target">
+      <FormField label="Modules to target">
         <DeckSwitch
           decks={decks.map((d) => ({ id: d.name, title: d.name, cardCount: d.n }))}
           chosen={chosen}
           onToggle={(id, wasOn) => setChosen((c) => (wasOn ? c.filter((x) => x !== id) : c.concat([id])))}
           words={{
-            first: "Choose decks",
+            first: "Choose modules",
             drop: (title) => `Stop targeting ${title}`,
-            lede: "Choose the decks to have ready by then.",
+            lede: "Choose the modules to have ready by then.",
             note: "",
-            none: "No decks to prepare yet.",
+            none: "No modules to prepare yet.",
           }}
         />
       </FormField>
@@ -20754,7 +20754,7 @@ function DeckScreen({
         </span>
       </div>
       {allDone ? (
-        <Lede>Every card in this deck is learnt.</Lede>
+        <Lede>Every card in this module is learnt.</Lede>
       ) : (
         <div className="at-forecast" aria-live="polite">
           <p>
@@ -20777,7 +20777,7 @@ function DeckScreen({
             <span className="at-forecastpace">Practising more than that won't bring it sooner.</span>
           </p>
           <p className="at-forecastnote">
-            Both are estimates, assuming you practise only this deck and get every answer right, so the real date
+            Both are estimates, assuming you practise only this module and get every answer right, so the real date
             will be a little later.
           </p>
         </div>
@@ -21284,7 +21284,7 @@ function ProgressTab({
         </Section>
       ))}
       {deckRows.length > 0 && (
-        <Section head title="Decks" lede="How you're doing on each deck you're studying.">
+        <Section head title="Modules" lede="How you're doing on each module you're studying.">
           <div className="at-deckprog">
             {deckRows.map((d) => (
               /* A button: the whole tile opens the deck's own screen. */
@@ -21381,10 +21381,10 @@ const GUIDE = [
     ],
   },
   {
-    title: "Decks and courses",
+    title: "Modules and courses",
     body: [
-      "A deck is a set of cards. A course is a set of decks with people in it. Teachers make decks and put them in courses; students join a course and receive its decks.",
-      "Course cards are studied but not edited — they belong to the course. If a deck is withdrawn from a course, its cards leave your device at the next check.",
+      "A module is something to learn from: a deck of cards, a unit on a course's path, or a personal set. A course is a set of modules with people in it. Teachers make modules and put them in courses; students join a course and receive its modules.",
+      "Course cards are studied but not edited — they belong to the course. If a module is withdrawn from a course, its cards leave your device at the next check.",
     ],
   },
   {
@@ -22688,7 +22688,7 @@ function AccountSettings({
 
             <FormField
               label="Reset progress"
-              lede="Sends every card back to the start, as though never practiced. Your cards, forms, decks and recordings all stay. What goes is everything the app has worked out about how well you know them — intervals, ease, difficulty and history. Nothing will be due until you practice it again."
+              lede="Sends every card back to the start, as though never practiced. Your cards, forms, modules and recordings all stay. What goes is everything the app has worked out about how well you know them — intervals, ease, difficulty and history. Nothing will be due until you practice it again."
             >
               <Button variant="danger" size="sm" onClick={() => setResetting(true)}>
                 Reset progress
@@ -22756,7 +22756,7 @@ function AccountSettings({
 
             <FormField
               label="Delete your account"
-              lede="Deletes your account, your My space and your practice history, and takes you off every course. Decks and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
+              lede="Deletes your account, your My space and your practice history, and takes you off every course. Modules and cards you made for your space stay there, under your name, and a record says you left. Cards on this device stay until you clear them. There is no undoing it."
             >
               <CloseAccount onClosed={onCloseAccount} handle={account.handle} />
             </FormField>

@@ -1135,8 +1135,8 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
     own version there (`save-system`). There was a separate Publish step
     (`sign-system`, still answered for old builds); it was one decision
     split over two buttons, and the second was the one forgotten.
-- **A deck says how well it is built to be learnt from.** Every deck under
-  Teaching › Decks carries a *Deck quality* out of 100, in green from 80,
+- **A deck says how well it is built to be learnt from.** Every module under
+  Teaching › Modules carries a quality out of 100, in green from 80,
   amber from 50 and red below; the deck's own page shows it large, with the
   three changes that would raise it most folded under it. Teachers only.
   The owner's rules, in `src/deck-quality.ts`:
@@ -1309,6 +1309,13 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   recording is `voices` on a form, a name per recording hash, asked on the
   recording screen of every card. Every rule is in `src/sets.ts`; the plan
   is `docs/PLAN-personal-sets.md`; why: DECISIONS.md, "Personal sets".
+- **Modules: the word for a deck, a unit or a personal set (0.672).** On
+  screen, *module* is whatever a teacher hands a course to learn from;
+  the tabs, lists, pickers and messages that mean any of the three say
+  "module", and a module's own screen names its kind ("Delete unit",
+  "Personal set name", "Deck quality"). `src/modules.ts` holds the one
+  rule (`moduleKind`). In the code and in saved data each of them is still
+  a `Deck`; why: DECISIONS.md, "Modules".
 - **Word sets: lists every language has, written once (0.569).** Numbers
   and pronouns so far, months and days of the week to come. The app knows
   the list; the teacher writes the words once for the language, and a deck
@@ -1947,6 +1954,8 @@ src/
   flag-export.ts   reported problems written out as text to paste elsewhere,
                    each with the card it is about. Pure: the clock, the
                    locale and every name it cannot work out are passed in.
+  modules.ts       what a module is called on screen (0.672): a deck, a
+                   unit or a personal set. Pure, imports nothing.
   sets.ts          personal sets (0.629–0.632): a deck's `set`, read and
                    narrowed; a student's answer under `SET_KEY` in a
                    picture's progress; which list is chosen, what is still to

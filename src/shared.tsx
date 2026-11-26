@@ -3431,10 +3431,10 @@ export function CardReadout({ card, lang, decks, cards, reader = "teacher" }: {
     <section className="at-panel">
       <p className="at-eyebrow">Where it lives</p>
       <p className="at-hint">
-        A card is seen through its decks. One in no deck reaches nobody.
+        A card is seen through its modules. One in no module reaches nobody.
       </p>
       <ReadRow label="Language">{L.name}</ReadRow>
-      <ReadRow label="Decks">
+      <ReadRow label="Modules">
         {titles.length ? (
           <span className="at-flags">
             {titles.map((t) => (
@@ -6415,7 +6415,7 @@ export interface DeckWords {
   another: string;
 }
 
-export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Decks", find, size = deckSize, saving, onAdd, disabled = false }: {
+export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words, title = "Modules", find, size = deckSize, saving, onAdd, disabled = false }: {
   /* Only what is shown of a deck: a card's editor hands over whole decks,
      and the number screen hands over the decks a part of the numbers can
      go in. */
@@ -6465,12 +6465,12 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
   const listed = find && wanted ? all.filter((d) => find.match(d.id, wanted)) : all;
   const inThese = all.filter((d) => chosen.includes(d.id));
   const say: DeckWords = {
-    first: `Add this ${of} to a deck`,
+    first: `Add this ${of} to a module`,
     drop: (title) => `Take this ${of} out of ${title}`,
-    lede: `Choose the decks this ${of} belongs to.`,
-    note: `A student sees this ${of} only where it is in a deck their course uses.`,
-    none: `You have no decks yet. Make one under Decks, then this ${of} can go in it.`,
-    another: "Another deck",
+    lede: `Choose the modules this ${of} belongs to.`,
+    note: `A student sees this ${of} only where it is in a module their course uses.`,
+    none: `You have no modules yet. Make one under Modules, then this ${of} can go in it.`,
+    another: "Another module",
     ...words,
   };
 
@@ -6615,7 +6615,7 @@ export function DeckSwitch({ decks, chosen, onToggle, onOpen, of = "card", words
  * and the name box closes; nothing, and it stays open with the name in it.
  * Left out — taking cards out of decks — there is no New deck.
  */
-export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHint, busy = false, error, confirm, confirmOff = false, onConfirm, onCancel, empty = "You have no decks yet." }: {
+export function DeckPickScreen({ title, decks, chosen, onToggle, onCreate, newHint, busy = false, error, confirm, confirmOff = false, onConfirm, onCancel, empty = "You have no modules yet." }: {
   title: Node;
   decks: Pick<Deck, "id" | "title" | "locked" | "cardCount">[];
   chosen: string[];

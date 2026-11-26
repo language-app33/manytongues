@@ -152,7 +152,7 @@ export const ASKED = "Asked on its own";
 export const NOT_ASKED = "Not asked on its own";
 export const LENT = "Lent to sentences";
 export const NOT_LENT = "Not lent to sentences";
-export const IN_NO_DECK = "In no deck";
+export const IN_NO_DECK = "In no module";
 export const A_SENTENCE = "A sentence — other cards fill its blanks";
 export const NOT_DRILLED = "Not on its own — it fills other cards";
 /* The words the read-out has always used for a scene whose part nobody
@@ -875,8 +875,8 @@ export const CARD_FACTS: FieldRule[] = [
   {
     key: "decks",
     on: "card",
-    label: "Decks",
-    what: "Which decks carry the card. A card is seen through its decks, and one in no deck reaches nobody — which is the teacher's problem to fix and so their line to read.",
+    label: "Modules",
+    what: "Which modules carry the card. A card is seen through its modules, and one in no module reaches nobody — which is the teacher's problem to fix and so their line to read.",
     reader: "teacher",
     shown: deckTitles,
   },

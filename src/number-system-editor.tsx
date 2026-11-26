@@ -1388,8 +1388,8 @@ function PartDecks({ range, decks, onDeckPart }: {
   if (!onDeckPart) return null;
   return (
     <PartBlock
-      title="Decks"
-      role="The decks this range of numbers is in. The same as ticking it on a deck's Add existing cards, and saved straight away."
+      title="Modules"
+      role="The modules this range of numbers is in. The same as ticking it on a module's Add existing cards, and saved straight away."
     >
       <DeckSwitch
         of="range"

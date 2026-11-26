@@ -1373,9 +1373,9 @@ const sessionMode = async (/** @type {RegExp} */ want) => {
   return !!row;
 };
 const sessionDeck = async (/** @type {RegExp} */ want) => {
-  clickNamed(/^(Choose decks|Another deck)$/);
+  clickNamed(/^(Choose modules|Another module)$/);
   await sleep(80);
-  const sheet = document.querySelector('[role="dialog"][aria-label="Decks"]');
+  const sheet = document.querySelector('[role="dialog"][aria-label="Modules"]');
   const row = sheet ? [...sheet.querySelectorAll(".at-deckpick")].find((b) => want.test(b.textContent || "")) : null;
   click(row);
   await sleep(60);
@@ -1431,12 +1431,12 @@ if (/Build a session/.test(document.body.textContent)) {
   click(startBtn());
   await sleep(80);
   check("tapping it says what is missing, and only that",
-    wants() === "Choose a mode.|Choose at least one deck or card.", wants());
+    wants() === "Choose a mode.|Choose at least one module or card.", wants());
   check("and starts nothing", !document.querySelector(".at-instruction"));
 
   check("a mode is chosen from the subtype's kind of sheet", await sessionMode(/Regular/));
   check("and reads as chosen", /Regular/.test(sessionModeSaid()), sessionModeSaid());
-  check("and its line goes", wants() === "Choose at least one deck or card.", wants());
+  check("and its line goes", wants() === "Choose at least one module or card.", wants());
 
   /* Introductions rather than Everything: the walks further down need the
      climbed cards untouched, and a hand-built session asks a card every
@@ -2405,7 +2405,7 @@ if (/Build a session/.test(document.body.textContent)) {
      card to look at the card. */
   const readout = open ? (open.textContent || "") : "";
   check("and it stops at the card, without the shelf it came off",
-    !!open && !/Where it lives/i.test(readout) && !/In no deck/i.test(readout),
+    !!open && !/Where it lives/i.test(readout) && !/In no module/i.test(readout),
     readout.replace(/\s+/g, " ").slice(0, 120) || "(nothing open)");
   click([...document.querySelectorAll("button")].find((b) => /^(Back|Done|Close)$/i.test(b.textContent || "") || b.getAttribute("aria-label") === "Back"));
   await sleep(250);
@@ -2792,7 +2792,7 @@ if (/Build a session/.test(document.body.textContent)) {
     await sleep(80);
     /* The decks as a card's editor chooses them: a button opening a sheet,
        and the chosen ones as pills. */
-    click(buttonNamed(/^Choose decks$/));
+    click(buttonNamed(/^Choose modules$/));
     await sleep(80);
     const lessonPick = [...document.querySelectorAll(".at-decksheet button.at-deckpick")]
       .find((b) => /Lesson 1/.test(b.textContent || ""));
@@ -4769,7 +4769,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   const teachRead = [...document.querySelectorAll(".at-screen.cardform")].pop();
   check("a teacher's card opens in the card editor, locked, decks and all",
     !!teachRead && !!teachRead.querySelector("fieldset.at-cardlock[disabled]") &&
-      /Decks/.test(teachRead.textContent || "") && !document.querySelector(".at-readout"),
+      /Modules/.test(teachRead.textContent || "") && !document.querySelector(".at-readout"),
     teachRead ? (teachRead.textContent || "").replace(/\s+/g, " ").slice(0, 120) : "(no card screen)");
   /* And where it stands with students, beside Edit: the app's own menu
      button, the height of the buttons beside it, opening the app's own
@@ -5354,7 +5354,7 @@ const openPronounTables = async () => {
   await sleep(200);
   check("and ticking one raises the bulk actions", !!document.querySelector(".at-bulkfloat"),
     (document.body.textContent || "").slice(-80));
-  clickNamed(/^Add to a deck$/);
+  clickNamed(/^Add to a module$/);
   await sleep(300);
   check("the deck screen offers to make one on the spot", !!buttonNamed(/^New deck$/),
     [...document.querySelectorAll("button")].map((b) => b.textContent).join("|").slice(-120));
@@ -5769,12 +5769,12 @@ const openPronounTables = async () => {
     const named = () => [...document.querySelectorAll(".at-formblock .at-formnum")]
       .map((n) => (n.textContent || "").trim());
     check("and the decks are a section of their own, under the kind of card",
-      named().indexOf("Decks") === named().indexOf("This card") + 1 &&
+      named().indexOf("Modules") === named().indexOf("This card") + 1 &&
         !!addBtn() && !!addBtn().closest(".at-formblock") &&
-        /^Decks$/.test(((addBtn().closest(".at-formblock").querySelector(".at-formnum") || {}).textContent || "").trim()),
+        /^Modules$/.test(((addBtn().closest(".at-formblock").querySelector(".at-formnum") || {}).textContent || "").trim()),
       named().join(" | "));
     check("and says it is in none yet, as the offer to put it in one",
-      !pills().length && /add this card to a deck/i.test(addBtn() ? addBtn().textContent || "" : ""),
+      !pills().length && /add this card to a module/i.test(addBtn() ? addBtn().textContent || "" : ""),
       `${pills().length} pills · ${addBtn() ? (addBtn().textContent || "").trim() : "no button"}`);
     /* The same screen selected cards are put in decks from (0.594): the
        decks to tick, with New deck at the top, so a card written for a
@@ -5856,7 +5856,7 @@ const openPronounTables = async () => {
     click(drop());
     await sleep(200);
     check("and pressing it leaves the card in no deck, offering one again",
-      !pills().length && /add this card to a deck/i.test(addBtn() ? addBtn().textContent || "" : ""),
+      !pills().length && /add this card to a module/i.test(addBtn() ? addBtn().textContent || "" : ""),
       `${pills().length} pills · ${addBtn() ? (addBtn().textContent || "").trim() : "no button"}`);
   }
 
@@ -8353,7 +8353,7 @@ const openPronounTables = async () => {
     !!setTile("Numbers") && !!setTile("Pronouns"),
     setsScreen() ? (setsScreen().textContent || "").slice(0, 200) : "(no screen)");
   check("each saying how much of it is written and how many decks hold it",
-    /^0 of 9 pronouns written · in no deck yet$/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || "") &&
+    /^0 of 9 pronouns written · in no module yet$/.test(((setTile("Pronouns") || {}).querySelector?.(".at-deckmeta") || {}).textContent || "") &&
       / ranges? written · in /.test(((setTile("Numbers") || {}).querySelector?.(".at-deckmeta") || {}).textContent || ""),
     `${((setTile("Pronouns") || {}).textContent || "")} | ${((setTile("Numbers") || {}).textContent || "")}`);
   click(setTile("Pronouns"));
@@ -8401,7 +8401,7 @@ const openPronounTables = async () => {
   check("and a reading left as it came is not stored, so it goes on following the English",
     !sent.enIs && !sent.enAsk, JSON.stringify({ enIs: sent.enIs, enAsk: sent.enAsk }));
   check("once one is written, the set can be put in a deck from its own screen",
-    !!screen() && [...screen().querySelectorAll("button")].some((b) => /^Add this word set to a deck$/.test((b.textContent || "").trim())),
+    !!screen() && [...screen().querySelectorAll("button")].some((b) => /^Add this word set to a module$/.test((b.textContent || "").trim())),
     screen() ? [...screen().querySelectorAll("button")].map((b) => (b.textContent || "").trim()).join(" | ") : "(no screen)");
   click([...(screen() || document).querySelectorAll("button")].find((b) => b.getAttribute("aria-label") === "Back"));
   await sleep(300);
@@ -9119,7 +9119,7 @@ const openPronounTables = async () => {
   await sleep(200);
   check("and Filter replaces it rather than standing beside it",
     frame.querySelectorAll(".at-listmenu").length === 1 &&
-      sortLabels().join(" | ") === "Kind | Recordings | Forms | Decks | Blanks | Review",
+      sortLabels().join(" | ") === "Kind | Recordings | Forms | Modules | Blanks | Review",
     `${frame.querySelectorAll(".at-listmenu").length} panels · ${sortLabels().join(" | ")}`);
 
   /* ---- and by kind, with each kind's subtypes under it ----
@@ -9217,12 +9217,12 @@ const openPronounTables = async () => {
      ticked, and emptying the list in the meantime would read as a list that
      had lost its cards. */
   const deckMode = (/** @type {RegExp} */ re) =>
-    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen decks"] .at-seg')]
+    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
       .find((b) => re.test((b.textContent || "").trim()));
   check("the filter offers in, not in, or any deck at all",
-    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen decks"] .at-seg')]
-      .map((b) => (b.textContent || "").trim()).join(" | ") === "Any deck | In these | Not in these | In no deck",
-    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen decks"] .at-seg')]
+    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
+      .map((b) => (b.textContent || "").trim()).join(" | ") === "Any module | In these | Not in these | In no module",
+    [...frame.querySelectorAll('[role="group"][aria-label="In or out of the chosen modules"] .at-seg')]
       .map((b) => (b.textContent || "").trim()).join(" | ") || "(no deck filter)");
   click(deckMode(/^Not in these$/));
   await sleep(200);
@@ -9252,7 +9252,7 @@ const openPronounTables = async () => {
     tiles() === all - outside, `${tiles()} in, ${outside} out, ${all} in total`);
   /* And the cards in no deck at all, with nothing to tick: fewer than
      every card, and every one of them outside Lesson 1. */
-  click(deckMode(/^In no deck$/));
+  click(deckMode(/^In no module$/));
   await sleep(250);
   const loose = tiles();
   check("in no deck shows the cards no deck holds, with nothing ticked",
@@ -9274,7 +9274,7 @@ const openPronounTables = async () => {
   /* ---- and the same controls over one deck ----
      Including the filter still in force, which is the point of one setting
      for both. */
-  click(tabNamed(/^Decks$/));
+  click(tabNamed(/^Modules$/));
   await sleep(500);
   const deckTile = [...frame.querySelectorAll(".at-deckcard, .at-minicard, .at-tile")]
     .find((t) => /Lesson 1/.test(t.textContent || ""));
@@ -9354,7 +9354,7 @@ const openPronounTables = async () => {
   await sleep(150);
   const heads = [...document.querySelectorAll(".at-cardtable thead th")].map((th) => (th.textContent || "").trim()).filter(Boolean);
   check("the table view has a column for everything the teacher compares",
-    heads.join(" | ") === "Status | Word | Transliteration | Meaning | Kind | Subtype | Decks | Recording | Review | Created | Modified",
+    heads.join(" | ") === "Status | Word | Transliteration | Meaning | Kind | Subtype | Modules | Recording | Review | Created | Modified",
     heads.join(" | ") || "(no table)");
   check("and a row per card", document.querySelectorAll(".at-cardtable tbody tr[data-card]").length > 0,
     String(document.querySelectorAll(".at-cardtable tbody tr").length));
@@ -9806,7 +9806,7 @@ const openPronounTables = async () => {
      a call the space saves straight away. */
   const heads = [...up().querySelectorAll(".at-formhead .at-formnum")].map((h) => h.textContent);
   check("the part's sections are headed as a card's are, decks first",
-    up().classList.contains("cardform") && heads[0] === "Decks" && heads.includes("Words"),
+    up().classList.contains("cardform") && heads[0] === "Modules" && heads.includes("Words"),
     heads.join(" | "));
   const pills = [...up().querySelectorAll(".at-deckpill .nm")].map((p) => p.textContent);
   check("the decks that hold the part are pills",
@@ -9824,7 +9824,7 @@ const openPronounTables = async () => {
   check("picking a deck asks for the part to be put in it",
     JSON.stringify(deckCalls[deckCalls.length - 1]) === JSON.stringify(["d1", "numbers:0-9", true]),
     JSON.stringify(deckCalls));
-  const shut = document.querySelector('.at-sheet[aria-label="Decks"] .at-iconbtn, .at-sheet[aria-label="Decks"] button[aria-label="Close"]');
+  const shut = document.querySelector('.at-sheet[aria-label="Modules"] .at-iconbtn, .at-sheet[aria-label="Modules"] button[aria-label="Close"]');
   click(shut);
   await sleep(150);
 
@@ -12915,7 +12915,7 @@ const openPronounTables = async () => {
   check("a published unit can be opened for the class; a draft cannot",
     /Open for the class/.test(rows[0] || "") && !/Open for the class/.test(rows[1] || ""), rows.join(" | "));
   const screenText = ((pathBlock && pathBlock.closest(".at-screen")) || document.body).textContent || "";
-  const decksPart = screenText.slice(screenText.lastIndexOf("Decks"));
+  const decksPart = screenText.slice(screenText.lastIndexOf("Modules"));
   check("a unit is not among the course's ordinary decks", /Lesson 1/.test(decksPart) && !/Greetings unit|Family unit/.test(decksPart),
     decksPart.replace(/\s+/g, " ").slice(0, 200));
   click(pathBlock ? pathBlock.querySelector('[data-el="path-unit"] button') : null);
@@ -12960,18 +12960,18 @@ const openPronounTables = async () => {
   const toDecks = async () => {
     click(tab(/^Material$/) || null);
     await sleep(400);
-    click(tab(/^Decks$/) || null);
+    click(tab(/^Modules$/) || null);
     await sleep(500);
   };
   await toDecks();
   const sheetRows = () => [...document.querySelectorAll(".at-sheet .at-openrow")].map((b) => (b.querySelector(".at-decktitle") || b).textContent || "");
   const openSheet = async () => {
-    click(buttonNamed(/^New deck$/));
+    click(buttonNamed(/^New module$/));
     await sleep(300);
   };
   await openSheet();
-  check("New deck asks what kind: a regular deck, a unit or a personal set",
-    sheetRows().join(" | ") === "Regular deck | Unit | Personal set", sheetRows().join(" | ") || "no sheet");
+  check("New module asks what kind: a deck, a unit or a personal set",
+    sheetRows().join(" | ") === "Deck | Unit | Personal set", sheetRows().join(" | ") || "no sheet");
   const setValue = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set;
   const name = async (/** @type {string} */ v) => {
     const box = /** @type {HTMLInputElement | null} */ ([...document.querySelectorAll(".at-screen.cardform .at-formblock input.at-input")].pop() || null);

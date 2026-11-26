@@ -95,6 +95,8 @@ import { partsNow } from "./numbers/types.ts";
 import { cardSentences, needsReview, stateFrom, toReview } from "./review.ts";
 import type { PartSentences } from "./review.ts";
 import { deckQuality, FIXES_SHOWN, qualityTone } from "./deck-quality.ts";
+import { moduleKind, moduleKindCap } from "./modules.ts";
+import type { ModuleKind } from "./modules.ts";
 import type { Quality } from "./deck-quality.ts";
 import { blankFills, countingCards, deleteUnitLine, draftsLine, isLiveIn, isPathUnit, pathUnits, problemLine, sameFormBlanks, unitProblems } from "./path.ts";
 import type { UnitProblem } from "./path.ts";
@@ -1169,24 +1171,24 @@ export const BACKUP_PARTS: {
   {
     key: "courses",
     title: "Courses",
-    what: "Who teaches each one, who studies it, and which decks it uses.",
+    what: "Who teaches each one, who studies it, and which modules it uses.",
     kinds: ["course"],
     prefixes: ["course:"],
     index: "courses",
     count: "courses",
-    spaceWhat: "Its courses: who teaches each one, who studies it, and which decks it uses.",
+    spaceWhat: "Its courses: who teaches each one, who studies it, and which modules it uses.",
     unit: "course",
   },
   {
     key: "decks",
-    title: "Decks",
-    what: "Deck names, and which courses each deck belongs to.",
+    title: "Modules",
+    what: "Module names — decks, units and personal sets — and which courses each belongs to.",
     kinds: ["deck"],
     prefixes: ["deck:"],
     index: "decks",
     count: "decks",
-    spaceWhat: "Its decks, including its members' My space decks made here.",
-    unit: "deck",
+    spaceWhat: "Its modules, including its members' My space modules made here.",
+    unit: "module",
   },
   {
     key: "cards",
@@ -1454,7 +1456,7 @@ async function writeFile(
   if (parts.includes("decks")) {
     let dangling = 0;
     for (const id of refs.decks) if (!seen.has(`deck:${id}`)) dangling += 1;
-    if (dangling) problems.push(`${dangling} deck reference(s) point outside the file.`);
+    if (dangling) problems.push(`${dangling} module reference(s) point outside the file.`);
   }
   if (parts.includes("clips")) {
     let dangling = 0;
@@ -1695,7 +1697,7 @@ export function verifyBackup(file: any) {
   /* Only what the file set out to hold is held to holding it: a backup of
      the wording alone is not a broken backup for having no audio in it. */
   if (has.includes("decks") && danglingDecks) {
-    problems.push(`${danglingDecks} deck reference(s) point outside the file.`);
+    problems.push(`${danglingDecks} module reference(s) point outside the file.`);
   }
   if (has.includes("clips") && danglingClips) {
     problems.push(`${danglingClips} recording(s) are referenced but missing.`);
@@ -1971,7 +1973,7 @@ function SetSection({ deck, decks, cards, busy, onSave }: {
         confirm="Done"
         onConfirm={() => setPicking(false)}
         onCancel={() => setPicking(false)}
-        empty="No other deck is in this deck's courses yet. Make a deck of words, add it to the course, and choose it here."
+        empty="No other deck is in this set's courses yet. Make a deck of words, add it to the course, and choose it here."
       />
     );
   }
@@ -1985,7 +1987,7 @@ function SetSection({ deck, decks, cards, busy, onSave }: {
   return (
     <div className="at-formblock" data-el="set-section">
       {head}
-      <Help>Its pictures are this deck&rsquo;s cards that have a picture. Add and record them as on any deck.</Help>
+      <Help>Its pictures are this set&rsquo;s cards that have a picture. Add and record them as on any module.</Help>
 
       {SET_WORDING.map(([key, label, lede]) => (
         <Field key={key} label={label} lede={lede}>
@@ -2307,7 +2309,7 @@ function CourseSettings({
               ? null
               : c.language
                 ? "Changing this converts nothing. Cards already written stay as they are and will be treated as the new language, which is usually wrong."
-                : "Until this is set, decks and cards made for this course fall back to the first language on the list, which is rarely the right one."}
+                : "Until this is set, modules and cards made for this course fall back to the first language on the list, which is rarely the right one."}
           >
             {/* Set once, then behind a deliberate act. Changing it later
                 converts nothing — it just relabels every existing card. */}
@@ -2847,7 +2849,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
               body: (
                 <p>
                   That was their only role here, so this takes them out of the course. They lose
-                  access to every deck in it. Their account, their own cards and their progress
+                  access to every module in it. Their account, their own cards and their progress
                   are untouched, and they can rejoin with the code.
                 </p>
               ),
@@ -2872,7 +2874,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                     it, and the cards disappear from their apps at the next check.
                   </p>
                   <p>
-                    The decks themselves are kept and go back to the teachers who made them, so
+                    The modules themselves are kept and go back to the teachers who made them, so
                     no one's work is destroyed. There is no undoing the course itself.
                   </p>
                 </>
@@ -2900,7 +2902,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
             /* Admin is the space you are in, for everyone who runs it. */
             ["courses", "Courses", "school"],
             ["people", "People", "group"],
-            ["decks", "Decks", "folder"],
+            ["decks", "Modules", "folder"],
             ["flags", "Flags", "flag"],
           ]}
       tab={tab}
@@ -2972,7 +2974,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 items={courses}
                 size="large"
                 busy={busy}
-                empty="No courses yet. Make the first one — a course is what carries decks to students."
+                empty="No courses yet. Make the first one — a course is what carries modules to students."
                 match={(c, q) => c.title.toLowerCase().includes(q)}
                 renderItem={(c) => (
                   <Tile
@@ -3270,7 +3272,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                       <WhenRow
                         label="Last changed material"
                         at={u.lastTaught}
-                        never="Never made a card or a deck"
+                        never="Never made a card or a module"
                       />
                     </div>
                   </PersonFold>
@@ -3294,8 +3296,8 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 <Screen
                   title={
                     deckAction === "add"
-                      ? "Add the selected decks to…"
-                      : "Take the selected decks out of…"
+                      ? "Add the selected modules to…"
+                      : "Take the selected modules out of…"
                   }
                   onBack={() => setDeckAction(null)}
                 >
@@ -3318,7 +3320,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                               return n;
                             },
                             (n) =>
-                              `${plural(n, "deck")} ${deckAction === "add" ? "added to" : "removed from"} ${c.title}`
+                              `${plural(n, "module")} ${deckAction === "add" ? "added to" : "removed from"} ${c.title}`
                           )
                         }
                       >
@@ -3349,8 +3351,8 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                 busy={busy}
                 empty={
                   deckOwner
-                    ? "Nothing by them. Choose Anyone to see every deck again."
-                    : "No decks yet. Make one, then add it to a course so students can see it."
+                    ? "Nothing by them. Choose Anyone to see every module again."
+                    : "No modules yet. Make one, then add it to a course so students can see it."
                 }
                 match={(d, q) =>
                   d.title.toLowerCase().includes(q) ||
@@ -3389,7 +3391,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                       }
                       const n = picked.reduce((t, d) => t + (d.cardCount || 0), 0);
                       setConfirm({
-                        title: `Delete ${plural(picked.length, "deck")}?`,
+                        title: `Delete ${plural(picked.length, "module")}?`,
                         confirmLabel: "Delete them",
                         confirmWord: "delete",
                         body: (
@@ -3417,7 +3419,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                       </>
                     }
                     actions={
-                        <IconButton icon="delete" label="Delete deck" danger onClick={(e: React.MouseEvent) => {
+                        <IconButton icon="delete" label={`Delete ${moduleKind(d)}`} danger onClick={(e: React.MouseEvent) => {
                             e.stopPropagation();
                             if (d.locked && DECK_LOCKS) {
                               snack(lockedDeleteNote([d.title]), "warn");
@@ -3425,11 +3427,11 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
                             }
                             setConfirm({
                               title: `Delete ${d.title}?`,
-                              confirmLabel: "Delete the deck",
+                              confirmLabel: `Delete the ${moduleKind(d)}`,
                               confirmWord: d.title,
                               body: (
                                 <>
-                                  {d.owner !== account.handle ? <OthersWork name={d.ownerName} what="deck" /> : null}
+                                  {d.owner !== account.handle ? <OthersWork name={d.ownerName} what={moduleKind(d)} /> : null}
                                   <p>
                                     Its {plural(d.cardCount || 0, "card")} go with it,
                                     out of every course it is in and out of the apps of everyone
@@ -3571,7 +3573,7 @@ export function AdminSpace({ account, spaceName, languages, onClose, superMode =
             <div className="at-ruled">
             <Section head title="Backup">
               <Help>
-                Everything on the site in one file: people and their courses, the decks, the
+                Everything on the site in one file: people and their courses, the modules, the
                 cards and their recordings. Sign-in keys are held only as fingerprints, so the
                 file cannot reveal anyone's key — but restoring it leaves every existing key
                 working.
@@ -4191,7 +4193,7 @@ function BackupScreen({
         <>
           <Help>
             {ofSpace
-              ? `One file holding the space ${door.name} and nothing from any other space: its people, courses, decks, cards, recordings and pictures, its members' My space made here, and its members' practice.`
+              ? `One file holding the space ${door.name} and nothing from any other space: its people, courses, modules, cards, recordings and pictures, its members' My space made here, and its members' practice.`
               : "One file holding every space on the site, and everyone in them."}
           </Help>
           <Help>
@@ -4244,7 +4246,7 @@ function BackupScreen({
           )}
           {restoring && door.kind === "site" && unspacedIn(file) > 0 && (
             <Help>
-              {plural(unspacedIn(file), "course, deck or card", "courses, decks or cards")} in it
+              {plural(unspacedIn(file), "course, module or card", "courses, modules or cards")} in it
               {unspacedIn(file) === 1 ? " is" : " are"} from before spaces, so
               {unspacedIn(file) === 1 ? " it goes" : " they go"} into {door.into || "this space"}, the space you
               are in — and any of them already on the site with no space are moved there too. To put them in
@@ -4527,7 +4529,7 @@ function ExportScreen({ ask, onDone, onClose }: {
       setTimeout(() => URL.revokeObjectURL(url), 60000);
       const counts = manifest.counts || {};
       const said = [
-        counts.decks ? plural(counts.decks, "deck") : "",
+        counts.decks ? plural(counts.decks, "module") : "",
         plural(counts.cards || 0, "card"),
         media && counts.clips ? plural(counts.clips, "recording") : "",
       ].filter(Boolean).join(", ");
@@ -4667,7 +4669,7 @@ function ImportScreen({ cards, decks, langName, busy, failed, onImport, onClose 
       }
     >
       <Help>
-        Select a backup of a deck or of the whole app. You will be able to review every card before it is actually imported.
+        Select a backup of a module or of the whole app. You will be able to review every card before it is actually imported.
       </Help>
       <div className="at-row at-mt3">
         <label className="at-btn ghost" style={{ cursor: "pointer" }}>
@@ -4697,8 +4699,8 @@ function ImportScreen({ cards, decks, langName, busy, failed, onImport, onClose 
                   <b>{d.deck.title}</b> · {langName(d.deck.lang)} ·{" "}
                   {d.existing
                     ? d.existing.locked
-                      ? `you have this deck, but it is locked, so no cards can be added to it`
-                      : `you have this deck: the cards you import are added to it, and nothing is taken out`
+                      ? `you have this module, but it is locked, so no cards can be added to it`
+                      : `you have this module: the cards you import are added to it, and nothing is taken out`
                     : "a new deck, in no course until you add it to one"}
                 </Help>
               ))}
@@ -4928,7 +4930,7 @@ function wordSetLine(s: WordSet): string {
   const done = s.written === s.total
     ? `All ${plural(s.total, s.unit)} written`
     : `${s.written} of ${plural(s.total, s.unit)} written`;
-  return `${done} · ${s.decks ? `in ${plural(s.decks, "deck")}` : "in no deck yet"}`;
+  return `${done} · ${s.decks ? `in ${plural(s.decks, "module")}` : "in no module yet"}`;
 }
 /* A row that opens something, drawn as a deck's tile is: a real button, so
    it answers a keyboard and a screen reader the way a tap does. */
@@ -4959,8 +4961,8 @@ function LockMark({ locked }: { locked?: boolean }) {
 function lockedDeleteNote(titles: string[]): string {
   const names = titles.map((t) => `"${t}"`).join(", ");
   return titles.length === 1
-    ? `${names} is locked. Unlock it in deck settings to delete it.`
-    : `${names} are locked. Unlock them in deck settings to delete them.`;
+    ? `${names} is locked. Unlock it in its settings to delete it.`
+    : `${names} are locked. Unlock them in their settings to delete them.`;
 }
 
 
@@ -4982,7 +4984,7 @@ function lockedDeleteNote(titles: string[]): string {
    and fixed once it is made. */
 type NewKind = "deck" | "unit" | "set";
 const NEW_KINDS: { kind: NewKind; title: string; meta: string }[] = [
-  { kind: "deck", title: "Regular deck", meta: "A set of cards, for any course." },
+  { kind: "deck", title: "Deck", meta: "A set of cards, for any course." },
   { kind: "unit", title: "Unit", meta: "One step of a course's path, opened in order." },
   { kind: "set", title: "Personal set", meta: "Pictures each student answers a question about once, then practises with their own word." },
 ];
@@ -5046,7 +5048,7 @@ function NewDeck({
         <div className="at-formhead">
           <span className="at-formnum">{unit ? "This unit" : kind === "set" ? "This personal set" : "This deck"}</span>
         </div>
-        <Field label={<>{unit ? "Unit name" : kind === "set" ? "Set name" : "Deck name"}<span className="at-reqstar" aria-hidden="true" /></>}>
+        <Field label={<>{unit ? "Unit name" : kind === "set" ? "Personal set name" : "Deck name"}<span className="at-reqstar" aria-hidden="true" /></>}>
           <input
             className="at-input"
             placeholder="e.g. Week 3 · Verbs"
@@ -5077,7 +5079,7 @@ function NewDeck({
             value={lang}
             onChange={setLang}
             label="Language"
-            lede="A deck holds cards in one language, and this sets the script and keyboard its cards are written with."
+            lede="A module holds cards in one language, and this sets the script and keyboard its cards are written with."
           />
         )}
 
@@ -5609,8 +5611,8 @@ function InContext({ cards, languages, langOfCard, busy, onLink, onAddWord, onOp
 function QualityMark({ quality }: { quality?: Quality | null }) {
   if (!quality || quality.score === null) return null;
   return (
-    <span className={`at-quality ${qualityTone(quality.score)}`} title="Deck quality, out of 100">
-      {` · Deck quality ${quality.score}`}
+    <span className={`at-quality ${qualityTone(quality.score)}`} title="Quality, out of 100">
+      {` · Quality ${quality.score}`}
     </span>
   );
 }
@@ -5790,7 +5792,7 @@ function UnitChecklist({ live, problems, drafts, textOf, busy, onPublish }: {
 /* What the score is made of, said under the Deck quality heading before
    the score rather than after it, as the card editor explains a section. */
 const QUALITY_LEDE =
-  "Decks with higher scores tend to achieve better learning outcomes.";
+  "Modules with higher scores tend to achieve better learning outcomes.";
 
 /* The picture beside each suggestion: what it asks you to go and add. */
 const FIX_ICON: Record<string, string> = {
@@ -6164,7 +6166,7 @@ const TEACHER_COLUMNS = [
   { key: "meaning", label: "Meaning" },
   { key: "kind", label: "Kind" },
   { key: "subtype", label: "Subtype" },
-  { key: "decks", label: "Decks" },
+  { key: "decks", label: "Modules" },
   { key: "audio", label: "Recording" },
   { key: "review", label: "Review" },
   { key: "created", label: "Created" },
@@ -7017,7 +7019,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       cardIds: [],
       deckIds: picked.map((d) => d.id),
       name,
-      what: picked.length === 1 ? `${picked[0].title} and its cards` : `These ${plural(picked.length, "deck")} and their cards`,
+      what: picked.length === 1 ? `${picked[0].title} and its cards` : `These ${plural(picked.length, "module")} and their cards`,
     });
   };
   /*
@@ -7426,7 +7428,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     },
     {
       key: "decks",
-      label: "Decks",
+      label: "Modules",
       /* What the count on the Filter button reads: a mode with no deck
          ticked narrows nothing, so it is not counted as narrowing. */
       value: cardFilter.deckMode === "none" || (cardFilter.deckMode !== "any" && cardFilter.deckIds.length)
@@ -7440,18 +7442,18 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         <div className="at-deckfilter">
           <Segmented
             size={null}
-            label="In or out of the chosen decks"
+            label="In or out of the chosen modules"
             options={[
-              { value: "any", label: "Any deck" },
+              { value: "any", label: "Any module" },
               { value: "in", label: "In these" },
               { value: "out", label: "Not in these" },
-              { value: "none", label: "In no deck" },
+              { value: "none", label: "In no module" },
             ]}
             value={cardFilter.deckMode}
             onChange={(v) => setCardFilter((f) => ({ ...f, deckMode: v }))}
           />
           {cardFilter.deckMode === "none" && (
-            <p className="at-hint">Cards that are in no deck at all, so no student sees them.</p>
+            <p className="at-hint">Cards that are in no module at all, so no student sees them.</p>
           )}
           {(cardFilter.deckMode === "in" || cardFilter.deckMode === "out") && (
             <>
@@ -7468,14 +7470,14 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                     deckIds: on ? f.deckIds.filter((x) => x !== id) : f.deckIds.concat([id]),
                   }))
                 }
-                empty="You have no decks yet."
+                empty="You have no modules yet."
               />
               <p className="at-hint">
                 {!cardFilter.deckIds.length
-                  ? "Tick a deck. Until you do, this narrows nothing."
+                  ? "Tick a module. Until you do, this narrows nothing."
                   : cardFilter.deckMode === "in"
-                  ? `Cards in ${cardFilter.deckIds.length === 1 ? "that deck" : "any of those decks"}.`
-                  : `Cards in none of ${cardFilter.deckIds.length === 1 ? "that deck" : "those decks"}.`}
+                  ? `Cards in ${cardFilter.deckIds.length === 1 ? "that module" : "any of those modules"}.`
+                  : `Cards in none of ${cardFilter.deckIds.length === 1 ? "that module" : "those modules"}.`}
               </p>
             </>
           )}
@@ -7687,7 +7689,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
     return (
       <p>
         <b>
-          {held.length === 1 ? `The deck ${held[0]} is locked` : `The decks ${held.join(", ")} are locked`}, but
+          {held.length === 1 ? `The module ${held[0]} is locked` : `The modules ${held.join(", ")} are locked`}, but
           deleting still takes {ids.length === 1 ? "this card" : "these cards"} out of{" "}
           {held.length === 1 ? "it" : "them"}.
         </b>
@@ -7787,7 +7789,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
   function absorbSaved(r: any) {
     const card = r && r.card;
     if (!card) return;
-    if (Array.isArray(r.locked)) for (const d of r.locked) lockedHits.current.add(d.title || "a deck");
+    if (Array.isArray(r.locked)) for (const d of r.locked) lockedHits.current.add(d.title || "a module");
     setCards((prev) => {
       const i = prev.findIndex((c) => c.id === card.id);
       const next = { ...card, decks: card.decks || [] };
@@ -8379,12 +8381,12 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               <>
                 <p>
                   {cardToSpace.move
-                    ? "The card becomes the space's, in the deck you choose. Nothing stays in My space."
-                    : "A copy goes into the deck you choose. The copy and this card won't stay in sync."}
+                    ? "The card becomes the space's, in the module you choose. Nothing stays in My space."
+                    : "A copy goes into the module you choose. The copy and this card won't stay in sync."}
                 </p>
                 <RadioGroup
                   name="card-to-space"
-                  label="Into which deck"
+                  label="Into which module"
                   value={cardDeck}
                   onChange={setCardDeck}
                   options={allDecks.filter((x) => !x.personal).map((x) => ({ value: x.id, label: x.title }))}
@@ -8412,7 +8414,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 <>
                   {confirm.card.owner && confirm.card.owner !== account.handle ? <OthersWork what="card" /> : null}
                   <p>
-                    Gone from every deck, and from your students' apps. Recordings go too. This
+                    Gone from every module, and from your students' apps. Recordings go too. This
                     can't be undone.
                   </p>
                   {lockedWarning([confirm.card.id])}
@@ -8520,7 +8522,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         if (on === inNow.includes(deckId)) continue;
         absorbSaved(await saveNamed(card, on ? inNow.concat([deckId]) : inNow.filter((x) => x !== deckId)));
       }
-    }, on ? "Added to the deck" : "Taken out of the deck");
+    }, on ? "Added to the module" : "Taken out of the module");
 
   /* ---- the Word sets screen (0.569) ----
      Every set the teacher can write, each language's under its name where
@@ -8545,7 +8547,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       <Screen title="Word sets" onBack={() => setWordSets(false)}>
         <Help>
           Lists every language has, such as numbers and pronouns. You write the words once for the
-          language, then add the set to a deck as a whole, or a range of numbers at a time.
+          language, then add the set to a module as a whole, or a range of numbers at a time.
         </Help>
         <Notice kind="error">{error}</Notice>
         {several
@@ -8647,7 +8649,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   : x
               )
             );
-          }, on ? "Added to the deck" : "Taken out of the deck")
+          }, on ? "Added to the module" : "Taken out of the module")
         }
       />
     );
@@ -9233,6 +9235,9 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       setDeckDraft(null);
       return null;
     }
+    /* Its own kind, on its own screen: "this unit", "Delete personal set". */
+    const kindW = moduleKind(d);
+    const KindW = moduleKindCap(d);
     if (adding) return addingScreen(d);
     /* The deck's cards, through the same sort and the same filter the Cards
        tab uses — this screen showed them in whatever order they arrived and
@@ -9258,13 +9263,13 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       </div>
     );
     const removeBtn = (it: any) => leaving.has(it.id) ? (
-      <span className="at-spinslot" role="status" aria-label="Removing from this deck…">
+      <span className="at-spinslot" role="status" aria-label={`Removing from this ${kindW}…`}>
         <span className="at-spin" aria-hidden="true" />
       </span>
     ) : (
       <IconButton
         icon="remove"
-        label="Remove from this deck"
+        label={`Remove from this ${kindW}`}
         onClick={(e: React.MouseEvent) => {
           e.stopPropagation();
           removeFromDeck(d, [it]);
@@ -9296,7 +9301,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         : cardTile(it);
     const filterNote = (
       <>
-        No cards in this deck match the filter.{" "}
+        No cards in this {kindW} match the filter.{" "}
         <Button variant="ghost" size="sm" icon="close" onClick={() => setCardFilter(NO_CARD_FILTER)}>
           Clear all filters
         </Button>
@@ -9309,7 +9314,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         busy={busy}
         body={
           <p>
-            Removed from every deck, and from the apps of everyone studying them. This can't
+            Removed from every module, and from the apps of everyone studying them. This can't
             be undone.
           </p>
         }
@@ -9366,7 +9371,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   </div>
                 }
               >
-                No cards in this deck yet. Make a new one or add cards you already have, so your students have something to practise.
+                No cards in this {kindW} yet. Make a new one or add cards you already have, so your students have something to practise.
               </Nudge>
             ) : undefined}
             match={matchEntry}
@@ -9374,8 +9379,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
             selected={selCards}
             onSelectedChange={setSelCards}
             bulkActions={[
-              { label: "Remove from this deck", onClick: (picked: string[]) => removeFromDeck(d, listed.filter((it) => picked.includes(it.id))) },
-              { label: "Add to another deck", onClick: () => setCardAction("add") },
+              { label: `Remove from this ${kindW}`, onClick: (picked: string[]) => removeFromDeck(d, listed.filter((it) => picked.includes(it.id))) },
+              { label: "Add to another module", onClick: () => setCardAction("add") },
               { label: "Add tags", onClick: () => setTagAction("add") },
               { label: "Remove tags", onClick: () => setTagAction("remove") },
               { label: "Change status", onClick: () => setStatusAction({ to: null }) },
@@ -9462,7 +9467,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       setConfirm({
         kind: "deck",
         title: `Delete ${d.title}?`,
-        confirmLabel: "Delete the deck",
+        confirmLabel: `Delete the ${kindW}`,
         confirmWord: d.title,
         body: (
           <p>
@@ -9477,7 +9482,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
       <Screen
         /* What is being done, not which deck: its name is the first
            thing on the screen. */
-        title={editing ? (unitIn ? "Edit unit" : "Edit deck") : unitIn ? `Unit ${unitNo} · ${d.title}` : "Deck"}
+        title={editing ? `Edit ${kindW}` : unitIn ? `Unit ${unitNo} · ${d.title}` : KindW}
         scrollKey={d.id}
         /* Laid out like a card's screen — see .at-screen.cardform: one
            sheet ruled into sections, each headed at the editor's size with
@@ -9520,9 +9525,9 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 the card's way — and its quality is read either way. */}
             <div className="at-formblock">
               <div className="at-formhead">
-                <span className="at-formnum">{unitIn ? "This unit" : "This deck"}</span>
+                <span className="at-formnum">{`This ${kindW}`}</span>
                 <span className="at-formacts">
-                  <Button reads size="sm" className="iconly" aria-label="Export this deck" title="Export this deck"
+                  <Button reads size="sm" className="iconly" aria-label={`Export this ${kindW}`} title={`Export this ${kindW}`}
                     onClick={() => exportDecks([d.id])}>
                     <Icon name="download" />
                   </Button>
@@ -9541,7 +9546,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               </div>
               <fieldset className="at-cardlock" disabled={!editing}
 >
-                <Field label={<>Deck name<span className="at-reqstar" aria-hidden="true" /></>}>
+                <Field label={<>{KindW} name<span className="at-reqstar" aria-hidden="true" /></>}>
                   <input
                     className="at-input"
                     placeholder="e.g. Week 3 · Verbs"
@@ -9556,7 +9561,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 {/* A My space deck is in no course; in their place, whether its
                     owner practises it (0.545, 59b, 61a). */}
                 {d.personal ? null : (
-                <Field label="Courses" lede="Students in these courses see this deck.">
+                <Field label="Courses" lede={`Students in these courses see this ${kindW}.`}>
                   {!shown.courses.length ? (
                     <Nudge
                       icon="school"
@@ -9571,10 +9576,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                           title="Courses"
                           size={null}
                           words={{
-                            first: "Add this deck to a course",
+                            first: `Add this ${kindW} to a course`,
                             another: "Another course",
-                            drop: (t) => `Take this deck out of ${t}`,
-                            lede: "Choose the courses whose students see this deck.",
+                            drop: (t) => `Take this ${kindW} out of ${t}`,
+                            lede: `Choose the courses whose students see this ${kindW}.`,
                             note: "",
                             none: "You aren't teaching a course yet.",
                           }}
@@ -9593,10 +9598,10 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                       title="Courses"
                       size={null}
                       words={{
-                        first: "Add this deck to a course",
+                        first: `Add this ${kindW} to a course`,
                         another: "Another course",
-                        drop: (t) => `Take this deck out of ${t}`,
-                        lede: "Choose the courses whose students see this deck.",
+                        drop: (t) => `Take this ${kindW} out of ${t}`,
+                        lede: `Choose the courses whose students see this ${kindW}.`,
                         note: "",
                         none: "You aren't teaching a course yet.",
                       }}
@@ -9614,7 +9619,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   a filter has left on screen. How much of it is practised
                   in context is part of the same score, so it is read under
                   it rather than under a heading of its own. */}
-              <Field label="Deck quality" lede={QUALITY_LEDE}>
+              <Field label={`${KindW} quality`} lede={QUALITY_LEDE}>
                 {openQuality && (
                   <DeckQuality quality={openQuality} cards={held}
                     lang={langOfDeck(d) || LANGUAGES[DEFAULT_LANGUAGE]}
@@ -9685,7 +9690,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 const ours = !d.numbersFrom || d.numbersFrom === account.handle;
                 notes.push({
                   key: "numbers",
-                  text: `${waiting === 1 ? "A range" : `${waiting} ranges`} of numbers in this deck still ${waiting === 1 ? "needs its" : "need their"} words written. Students get the other ranges, and ${waiting === 1 ? "this one" : "these"} as soon as ${waiting === 1 ? "it is" : "they are"} written.`,
+                  text: `${waiting === 1 ? "A range" : `${waiting} ranges`} of numbers in this ${kindW} still ${waiting === 1 ? "needs its" : "need their"} words written. Students get the other ranges, and ${waiting === 1 ? "this one" : "these"} as soon as ${waiting === 1 ? "it is" : "they are"} written.`,
                   open: ours ? () => setNumbering(langId) : undefined,
                 });
               }
@@ -9718,7 +9723,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               count={mine.length === held.length ? null : `${mine.length} of ${plural(held.length, "card")}`}
               tools={deckEmpty ? null : (
                 <Button variant="primary" icon="cards" onClick={() => setManaging(true)}>
-                  Manage this deck's cards
+                  {`Manage this ${kindW}'s cards`}
                 </Button>
               )}
               menus={cardMenus}
@@ -9730,9 +9735,9 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 <Nudge
                   icon="cards"
                   tone="attention"
-                  action={<Button variant="primary" icon="cards" onClick={() => setManaging(true)}>Manage this deck's cards</Button>}
+                  action={<Button variant="primary" icon="cards" onClick={() => setManaging(true)}>{`Manage this ${kindW}'s cards`}</Button>}
                 >
-                  No cards in this deck yet. Add some so your students have something to practise.
+                  No cards in this {kindW} yet. Add some so your students have something to practise.
                 </Nudge>
               ) : undefined}
               match={matchEntry}
@@ -9746,11 +9751,11 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
             {editing && (
               <div className="at-formblock at-mt5">
                 <div className="at-formhead">
-                  <span className="at-formnum">Delete deck</span>
+                  <span className="at-formnum">{`Delete ${kindW}`}</span>
                 </div>
-                <p className="at-dangerline">Deleting a deck is permanent and cannot be undone.</p>
+                <p className="at-dangerline">{`Deleting a ${kindW} is permanent and cannot be undone.`}</p>
                 <Button variant="danger" icon="delete" onClick={askDelete}>
-                  Delete deck
+                  {`Delete ${kindW}`}
                 </Button>
               </div>
             )}
@@ -9764,7 +9769,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
         {discardingDeck && (
           <ConfirmModal
             title="Discard your changes?"
-            body={<p>The deck goes back to how it was last saved.</p>}
+            body={<p>{`The ${kindW} goes back to how it was last saved.`}</p>}
             confirmLabel="Discard changes"
             onCancel={() => setDiscardingDeck(false)}
             onConfirm={() => {
@@ -9882,7 +9887,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
        seconds. */
     const toggleDeck = (id: string, on: boolean) => {
       if (deckSaving[id]) return;
-      const title = (decks.find((d) => d.id === id) || { title: "The deck" }).title;
+      const title = (decks.find((d) => d.id === id) || { title: "The module" }).title;
       setDeckSaving((now) => ({ ...now, [id]: on ? "drop" : "add" }));
       run(
         async () => {
@@ -9971,11 +9976,11 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 another on the end of the row. A name opens its deck. */}
             <div className="at-formblock">
               <div className="at-formhead">
-                <span className="at-formnum">Decks</span>
+                <span className="at-formnum">Modules</span>
                 <span className="at-formrole">
                   {mine.length
-                    ? "Students in this course see these decks. Tap one to open it."
-                    : "Students in this course see the decks you add here."}
+                    ? "Students in this course see these modules. Tap one to open it."
+                    : "Students in this course see the modules you add here."}
                 </span>
               </div>
               {mine.length ? (
@@ -9986,16 +9991,16 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   onToggle={toggleDeck}
                   saving={deckSaving}
                   find={{
-                    placeholder: "Search decks",
+                    placeholder: "Search modules",
                     match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
                   }}
                   words={{
-                    first: "Add a deck to this course",
-                    another: "Another deck",
+                    first: "Add a module to this course",
+                    another: "Another module",
                     drop: (t) => `Take ${t} out of this course`,
-                    lede: `Choose the decks ${c.title} teaches. Students see them at their next check.`,
+                    lede: `Choose the modules ${c.title} teaches. Students see them at their next check.`,
                     note: "",
-                    none: "You have no decks yet. Make one under Decks, then add it to this course.",
+                    none: "You have no modules yet. Make one under Modules, then add it to this course.",
                   }}
                 />
               ) : (
@@ -10010,21 +10015,21 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                       onToggle={toggleDeck}
                       saving={deckSaving}
                       find={{
-                        placeholder: "Search decks",
+                        placeholder: "Search modules",
                         match: (id, q) => (decks.find((d) => d.id === id)?.title || "").toLowerCase().includes(q),
                       }}
                       words={{
-                        first: "Add a deck to this course",
-                        another: "Another deck",
+                        first: "Add a module to this course",
+                        another: "Another module",
                         drop: (t) => `Take ${t} out of this course`,
-                        lede: `Choose the decks ${c.title} teaches. Students see them at their next check.`,
+                        lede: `Choose the modules ${c.title} teaches. Students see them at their next check.`,
                         note: "",
-                        none: "You have no decks yet. Make one under Decks, then add it to this course.",
+                        none: "You have no modules yet. Make one under Modules, then add it to this course.",
                       }}
                     />
                   }
                 >
-                  Nothing here yet. Add a deck to give your students something to practise.
+                  Nothing here yet. Add a module to give your students something to practise.
                 </Nudge>
               )}
             </div>
@@ -10098,7 +10103,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               languages={languages}
               busy={busy}
               error={error}
-              lead="Open a course to see its decks, its people and its student code."
+              lead="Open a course to see its modules, its people and its student code."
               emptyLead={
                 courses.length
                   ? "None of your courses is in the languages switched on. The language button at the top brings the others back."
@@ -10128,7 +10133,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   title={c.title}
                   meta={`${languageName(languages, c.language)} · ${plural(
                     c.students.length
-                  , "student")} · ${plural(c.decks.length, "deck")}`}
+                  , "student")} · ${plural(c.decks.length, "module")}`}
                   onOpen={() => setCourseView(c.id)}
                 />
               )}
@@ -10141,16 +10146,16 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               {/* Decks or Cards, inside Material and My space (0.550): the card
                   screen's own tab row. */}
               <Tabs
-                tabs={[["decks", "Decks", "folder"], ["cards", "Cards", "cards"]]}
+                tabs={[["decks", "Modules", "folder"], ["cards", "Cards", "cards"]]}
                 value={tab}
                 onChange={setTab}
-                label="Decks or cards"
+                label="Modules or cards"
               />
               {/* Which of the two you are in, in one line (0.551). */}
               <Help className="at-mb3">
                 {mineSide
                   ? "Only you see these. Copy or move them to the space when they're ready."
-                  : `${spaceName}'s decks and cards, shared with its teachers.`}
+                  : `${spaceName}'s modules and cards, shared with its teachers.`}
               </Help>
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
@@ -10191,7 +10196,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   body={
                     <>
                       <p>
-                        Removed from every deck, and from the apps of everyone studying them.
+                        Removed from every module, and from the apps of everyone studying them.
                         Recordings go too. This can't be undone.
                       </p>
                       {lockedWarning(confirm.ids || [])}
@@ -10266,7 +10271,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 />
               )}
               <Help>
-                A card is one thing to learn — a word, a phrase, a sentence. Add it to a deck so students get it.
+                A card is one thing to learn — a word, a phrase, a sentence. Add it to a module so students get it.
               </Help>
               {/* Word sets (0.569): one row, however many sets there are,
                   opening the screen that lists them. Above the cards
@@ -10322,7 +10327,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                       </Button>
                     }
                   >
-                    No cards yet. A card is anything to learn, with its meaning. Make your first one, then add it to a deck for your students.
+                    No cards yet. A card is anything to learn, with its meaning. Make your first one, then add it to a module for your students.
                   </Nudge>
                 )}
                 match={cardMatches}
@@ -10335,8 +10340,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 selected={selCards}
                 onSelectedChange={setSelCards}
                 bulkActions={[
-                  { label: "Add to a deck", onClick: () => setCardAction("add") },
-                  { label: "Remove from a deck", onClick: () => setCardAction("remove") },
+                  { label: "Add to a module", onClick: () => setCardAction("add") },
+                  { label: "Remove from a module", onClick: () => setCardAction("remove") },
                   { label: "Add tags", onClick: () => setTagAction("add") },
                   { label: "Remove tags", onClick: () => setTagAction("remove") },
                   { label: "Change status", onClick: () => setStatusAction({ to: null }) },
@@ -10442,23 +10447,23 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               {/* Decks or Cards, inside Material and My space (0.550): the card
                   screen's own tab row. */}
               <Tabs
-                tabs={[["decks", "Decks", "folder"], ["cards", "Cards", "cards"]]}
+                tabs={[["decks", "Modules", "folder"], ["cards", "Cards", "cards"]]}
                 value={tab}
                 onChange={setTab}
-                label="Decks or cards"
+                label="Modules or cards"
               />
               {/* Which of the two you are in, in one line (0.551). */}
               <Help className="at-mb3">
                 {mineSide
                   ? "Only you see these. Copy or move them to the space when they're ready."
-                  : `${spaceName}'s decks and cards, shared with its teachers.`}
+                  : `${spaceName}'s modules and cards, shared with its teachers.`}
               </Help>
               {deckAction && (
                 <Screen
                   title={
                     deckAction === "add"
-                      ? "Add the selected decks to…"
-                      : "Take the selected decks out of…"
+                      ? "Add the selected modules to…"
+                      : "Take the selected modules out of…"
                   }
                   onBack={() => setDeckAction(null)}
                 >
@@ -10503,7 +10508,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                             return n;
                           },
                           (n) =>
-                            `${plural(n, "deck")} ${deckAction === "add" ? "added to" : "removed from"} ${plural(pickedCourses.length, "course")}`
+                            `${plural(n, "module")} ${deckAction === "add" ? "added to" : "removed from"} ${plural(pickedCourses.length, "course")}`
                         )
                       }
           icon="check"
@@ -10534,11 +10539,13 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               )}
 
               <Help>
-                A deck is a set of cards. A deck can be used to group cards by theme, class, or objective. Students see a deck once it's added to a course they belong to.
+                {mineSide
+                  ? "A module is something a course learns from. Here in My space, each one is a deck: a set of cards, grouped by theme, class or objective."
+                  : "A module is something a course learns from: a deck of cards, a unit on a course's path, or a personal set. Students see a module once it's added to a course they belong to."}
               </Help>
 
               {choosingKind && (
-                <PickSheet title="New deck" lede="What kind of deck? This can't be changed once it is made." onClose={() => setChoosingKind(false)}>
+                <PickSheet title="New module" lede="What kind of module? This can't be changed once it is made." onClose={() => setChoosingKind(false)}>
                   {NEW_KINDS.map((k) => (
                     <OpenRow key={k.kind} title={k.title} meta={k.meta} label={k.title} onOpen={() => {
                       setChoosingKind(false);
@@ -10550,14 +10557,14 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
               )}
 
               <ItemList
-                noun="deck"
+                noun="module"
                 items={onDecks}
                 size="large"
                 busy={busy}
                 empty={
                   decks.length
-                    ? "No decks in the languages switched on."
-                    : "No decks yet. Make one, then add it to a course so students can see it."
+                    ? "No modules in the languages switched on."
+                    : "No modules yet. Make one, then add it to a course so students can see it."
                 }
                 /* With no decks at all, the same prompt the Cards tab shows
                    with no cards, in place of an empty list. */
@@ -10566,11 +10573,11 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                     icon="folder"
                     action={
                       <Button variant="primary" icon="add" onClick={newDeck}>
-                        New deck
+                        New module
                       </Button>
                     }
                   >
-                    No decks yet. A deck is a set of cards. Make your first one, then add it to a course so students can see it.
+                    No modules yet. A module is something to learn from, such as a deck of cards. Make your first one, then add it to a course so students can see it.
                   </Nudge>
                 )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
@@ -10596,7 +10603,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                       const n = picked.reduce((t, d) => t + (d.cardCount || 0), 0);
                       setConfirm({
                         kind: "deck",
-                        title: `Delete ${plural(picked.length, "deck")}?`,
+                        title: `Delete ${plural(picked.length, "module")}?`,
                         confirmLabel: "Delete them",
                         confirmWord: "delete",
                         body: (
@@ -10643,7 +10650,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                       onOpen={() => setOpenDeck(d.id)}
                       actions={
                         <>
-                          <IconButton icon="download" label="Export deck" onClick={(e: React.MouseEvent) => {
+                          <IconButton icon="download" label={`Export ${moduleKind(d)}`} onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
                               exportDecks([d.id]);
                             }} />
@@ -10660,7 +10667,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                               }} />
                             </>
                           )}
-                          <IconButton icon="delete" label="Delete deck" danger onClick={(e: React.MouseEvent) => {
+                          <IconButton icon="delete" label={`Delete ${moduleKind(d)}`} danger onClick={(e: React.MouseEvent) => {
                               e.stopPropagation();
                               if (d.locked && DECK_LOCKS) {
                                 snack(lockedDeleteNote([d.title]), "warn");
@@ -10669,11 +10676,11 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                               setConfirm({
                                 kind: "deck",
                                 title: `Delete ${d.title}?`,
-                                confirmLabel: "Delete the deck",
+                                confirmLabel: `Delete the ${moduleKind(d)}`,
                                 confirmWord: d.title,
                                 body: (
                                   <>
-                                    {d.owner !== account.handle ? <OthersWork name={(d as any).ownerName} what="deck" /> : null}
+                                    {d.owner !== account.handle ? <OthersWork name={(d as any).ownerName} what={moduleKind(d)} /> : null}
                                     <p>
                                       Its {plural(d.cardCount || 0, "card")} go with
                                       it, out of every course and out of the apps of everyone
@@ -10781,7 +10788,7 @@ export function StudentCourses({
       languages={languages}
       busy={busy}
       error={error}
-      lead="Open a course to see its decks."
+      lead="Open a course to see its modules."
       emptyLead={onJoin ? "You're not in a course yet. Enter the code your teacher gave you below." : "There are no courses here yet."}
       joinTitle="Join a course"
       joinHint="Enter the code your teacher gave you."
@@ -10807,12 +10814,12 @@ export function StudentCourses({
         return (
           <Tile
             title={c.title}
-            meta={`${languageName(languages, c.language)} · ${plural(mine.length, "deck")}`}
+            meta={`${languageName(languages, c.language)} · ${plural(mine.length, "module")}`}
             footer={
               <TileNote live={mine.length > 0}>
                 {mine.length
                   ? mine.map((d) => d.title).join(", ")
-                  : "No decks yet — nothing to study until your teacher adds one"}
+                  : "No modules yet — nothing to study until your teacher adds one"}
               </TileNote>
             }
             actions={
@@ -10917,7 +10924,7 @@ function NumbersFrom({ deckId }: { deckId: string }) {
   if (error) return <Notice kind="error">{error}</Notice>;
   if (!sources || !sources.length) return null;
   return (
-    <Field label="Numbers from" lede="Whose numbers and recordings this deck's students practise.">
+    <Field label="Numbers from" lede="Whose numbers and recordings this module's students practise.">
       <RadioGroup
         name={`numbers-from-${deckId}`}
         label="Numbers from"
@@ -11329,7 +11336,7 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
                   <>
                     <p>
                       Every account in it ({plural(org.people.length, "person")}), with their practice history, and every
-                      course, deck and card in it are deleted. Its address becomes free again.
+                      course, module and card in it are deleted. Its address becomes free again.
                     </p>
                     <p>This can't be undone.</p>
                   </>
@@ -11455,7 +11462,7 @@ function FormerMembers({ former, people, busy, ask }: {
           body={
             <RadioGroup
               name="hand-over"
-              label="Who should own their decks and cards now"
+              label="Who should own their modules and cards now"
               value={heir}
               onChange={setHeir}
               options={people.map((p) => ({ value: p.handle, label: p.displayName }))}
@@ -11469,7 +11476,7 @@ function FormerMembers({ former, people, busy, ask }: {
               title: "Hand it over?",
               confirmLabel: "Hand it over",
               danger: false,
-              body: <p>Every deck and card they made for the space becomes theirs to look after. Their numbers stay theirs.</p>,
+              body: <p>Every module and card they made for the space becomes theirs to look after. Their numbers stay theirs.</p>,
               action: () => API.handOver(from, heir),
             } as Pending);
           }}
@@ -11480,7 +11487,7 @@ function FormerMembers({ former, people, busy, ask }: {
 }
 
 /* Deleting what somebody else made (0.544, 94a): said first, in so many words. */
-function OthersWork({ name, what }: { name?: string; what: "deck" | "card" }) {
+function OthersWork({ name, what }: { name?: string; what: ModuleKind | "card" }) {
   return (
     <Notice kind="warn">
       {name ? `${name} made this ${what}.` : `Someone else made this ${what}.`} Deleting it removes it from
@@ -11493,7 +11500,7 @@ function OthersWork({ name, what }: { name?: string; what: "deck" | "card" }) {
 /*
  * A space's storage figures, its backup and its restore (0.546; 60a, 63a;
  * 0.583, docs/PLAN-space-backup.md): how much it holds, and the whole of it
- * in one file — its people, courses, decks, cards, recordings and pictures,
+ * in one file — its people, courses, modules, cards, recordings and pictures,
  * its members' My space here, and every member's practice — with the same
  * choice of parts as the site's backup. Put back through the same engine as
  * the site's, which never overwrites.

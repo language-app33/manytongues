@@ -359,6 +359,6 @@ export function setGaps(
     }
   }
   const bare = cards.filter((c) => !c.picture).length;
-  if (bare) out.push(`${bare === 1 ? "1 card" : `${bare} cards`} in this deck ${bare === 1 ? "has" : "have"} no picture, so ${bare === 1 ? "it is" : "they are"} not part of the set.`);
+  if (bare) out.push(`${bare === 1 ? "1 card" : `${bare} cards`} in this set ${bare === 1 ? "has" : "have"} no picture, so ${bare === 1 ? "it is" : "they are"} not part of the set.`);
   return out;
 }
