@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.673 — 26 November 2026
+## 0.675 — 26 November 2026
 
 **Focused training, tidied.** The dumbbell drawing at the top of the screen
 is gone, so the choices start higher up.
@@ -30,6 +30,28 @@ still deletes at once, as before. The tiles are a line or two taller.
 
 Still to check by hand: the menu on a real phone, opened from a tile near
 the foot of the screen.
+## 0.674 — 26 November 2026
+
+**The fact on Home changes each time you open the app.** The picture and
+the fact under the progress ring used to move on only after a finished
+session, so opening the app again showed the same one. Now reloading the
+page, or closing the app and opening it again, brings the next picture and
+fact too. Finishing a session still moves it on as before; going to You and
+back does not.
+
+Still to check by hand: closing and reopening the app installed on a real
+phone. A phone that only sends the app to the background, rather than
+closing it, shows the same card when you come back.
+
+## 0.673 — 26 November 2026
+
+**Home is less crowded while you're prepping.** With a Prep mode goal set,
+the card on Home (the drawing and the fact under it) is left off. The
+prep's own tile already fills the top of the screen, and on a phone the
+card pushed Practice off the bottom. Clear the goal and the card comes
+back.
+
+Still to check by hand: Home on a real phone with a goal set.
 
 ## 0.672 — 26 November 2026
 

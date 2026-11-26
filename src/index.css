@@ -2587,7 +2587,7 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
    ring's colour, so the two read as one measure. */
 .at-savedtiles { display:grid; grid-template-columns:repeat(auto-fill, minmax(128px, 1fr)); gap:8px;
   margin-top: var(--s3); }
-/* Since 0.673 a tile is a box holding two buttons: the tile's face,
+/* Since 0.675 a tile is a box holding two buttons: the tile's face,
    which starts it, and the dots in its top corner, which open its menu. */
 .at-savedtile { position:relative; min-width:0; display:flex;
   background: var(--well); border:1px solid transparent; border-radius: var(--r-sm); }
@@ -3591,7 +3591,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
 .at-training .at-row { max-width:420px; margin-inline:auto; }
 .at-training > :first-child { margin-top:0; }
 .at-training .at-row + .at-row { margin-top:12px; }
-/* The line at its top (0.668; its drawing went in 0.673). */
+/* The line at its top (0.668; its drawing went in 0.675). */
 .at-trainingintro { max-width:420px; margin:0 auto 20px; }
 .at-trainingintro p { margin:0; padding:0 8px; font-size:15px; line-height:1.4; color: var(--text-soft); text-wrap: balance; }
 /* Its choices (0.671): the name in the buttons' own lettering, and a line
@@ -3603,7 +3603,7 @@ fieldset.at-cardlock:disabled .at-deckpill:has(> .at-deckdrop) { padding-inline:
   min-width:0; padding:14px 14px 16px; background:transparent; color: var(--text);
   border:2px solid var(--line); border-radius: var(--r); cursor:pointer; font-family: var(--ui); text-align:center;
   transition: transform 60ms, background 120ms; }
-/* Its picture (0.673): the choice's icon in a round well, as a Nudge
+/* Its picture (0.675): the choice's icon in a round well, as a Nudge
    carries one, in the colour the app marks what can be done. */
 .at-trainchoiceico { width:40px; height:40px; border-radius:50%; display:inline-flex; align-items:center;
   justify-content:center; margin-bottom:2px; color: var(--jade);

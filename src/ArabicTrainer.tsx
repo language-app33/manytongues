@@ -14210,7 +14210,8 @@ export default function ArabicTrainer() {
   /* The card on Home turns once per finished session (0.664): the end
      screen is the moment a session is finished, whether it ran its course,
      ran out of time or was all answered. A trial is a teacher's look at one
-     question, not a session, so it turns nothing. Counted per device. */
+     question, not a session, so it turns nothing. Counted per device.
+     Opening the app turns it too (0.674): see readHomeTurn. */
   const [homeTurn, setHomeTurn] = useState(readHomeTurn);
   /* How far the student has come: before practice, the first day, or
      from the second day of practice (0.666). The card's welcome and the
@@ -16532,8 +16533,10 @@ export default function ArabicTrainer() {
 
                   {/* A shape in the logo's style and a fact about how
                       language varies, turned after every finished session
-                      (0.664). See home-card.ts. */}
-                  <HomeCard turn={homeTurn} stage={stage} />
+                      (0.664). See home-card.ts. Not under a prep (0.673):
+                      the prep's tile is the top of the screen, and the card
+                      pushed Practice off a phone. */}
+                  {!homePrep && <HomeCard turn={homeTurn} stage={stage} />}
 
                   {/* Practice, and beside it on the right the way to
                       Focused training (0.650): weak spots, a session built
@@ -17972,7 +17975,7 @@ export default function ArabicTrainer() {
 
         {/* The Build screen again, opened on what was kept. Saving goes
             back to where it was opened from: the list, or a tile's menu on
-            Focused training (0.673). */}
+            Focused training (0.675). */}
         {editingSaved && (
           <ManualSessionSheet
             items={shown}
@@ -18446,10 +18449,23 @@ function HomeCard({ turn, stage }: { turn: number; stage: HomeStage }) {
   );
 }
 /* The card's count, on this device only: which card is showing is a
-   matter of what this screen last showed, not something to sync. */
+   matter of what this screen last showed, not something to sync.
+
+   It also turns once each time the app is opened (0.674): a reload, or
+   closing the app and opening it again, shows the next card, not the one
+   left from last time. Once per page load, not per mount, so going to
+   another screen and back does not turn it, and the end of a session
+   still turns it as before. The very first open, with nothing stored,
+   shows the first card. */
 const HOME_TURN_KEY = "arabic-trainer:home-card";
+let homeTurnedOnOpen = false;
 function readHomeTurn(): number {
-  try { return Math.max(0, parseInt(localStorage.getItem(HOME_TURN_KEY) || "0", 10) || 0); } catch { return 0; }
+  let stored: string | null = null;
+  try { stored = localStorage.getItem(HOME_TURN_KEY); } catch { /* private window */ }
+  const turn = Math.max(0, parseInt(stored || "0", 10) || 0);
+  if (homeTurnedOnOpen) return turn;
+  homeTurnedOnOpen = true;
+  return writeHomeTurn(stored === null ? turn : turn + 1);
 }
 function writeHomeTurn(turn: number): number {
   try { localStorage.setItem(HOME_TURN_KEY, String(turn)); } catch { /* private window: the card still turns for this visit */ }
@@ -18523,7 +18539,7 @@ function Climb({ items, settings, target = "learnt" }: { items: Item[]; settings
  * Each carries how much of its own cards is learnt, worked out the way the
  * ring above it is, so "Thursday's verbs · 40%" and the ring cannot be
  * counting different things. Pressing one starts it, which is what Start
- * does on the list. Since 0.673 it also says what the list's row says —
+ * does on the list. Since 0.675 it also says what the list's row says —
  * its kind, its length, its cards — and the dots in its corner start,
  * change or delete it from here.
  *
@@ -18568,7 +18584,7 @@ function SavedTiles({ sessions, items, settings, onStart, onEdit, onDelete }: {
         /* The tile is two buttons, side by side rather than one inside the
            other: the tile itself, which starts the session as it always
            has, and the dots in its corner, which open a menu to start,
-           change or delete it (0.673) — what the row on Saved sessions
+           change or delete it (0.675) — what the row on Saved sessions
            offers, without going there. The dots stay pressable when every
            card in it has gone, which is when changing or deleting it is
            the thing to do. */
@@ -19194,7 +19210,7 @@ function FocusedTrainingSheet({
       <div className="at-training">
         {/* What the screen is for (0.668). Each button says what it does
             itself (0.671), so the line is short; the dumbbell drawing over
-            it went in 0.673, when each button got a picture of its own. */}
+            it went in 0.675, when each button got a picture of its own. */}
         <div className="at-trainingintro" data-el="training-intro">
           <p>Practise with a goal in mind.</p>
         </div>
@@ -19257,7 +19273,7 @@ function FocusedTrainingSheet({
    it saying what it is. `off` is dimmed but still pressed, so the press
    can say why there is nothing in it, as Weak spots always has; `status`
    is a second line for where it stands, in the accent colour. `icon`
-   is the picture over its name (0.673), in a round well like a Nudge's. */
+   is the picture over its name (0.675), in a round well like a Nudge's. */
 function TrainingChoice({ title, icon, note, status, off, disabled, dialog, onClick }: {
   title: string;
   icon: string;
@@ -19296,7 +19312,7 @@ function TrainingChoice({ title, icon, note, status, off, disabled, dialog, onCl
  * What a kept session is, in one line: its kind of practice, how long it
  * runs and how many of its cards are still here — "Regular · 20 questions
  * · 34 cards". The row on Saved sessions and the tile on Focused training
- * both say it (0.673), from here, so they cannot come to say different
+ * both say it (0.675), from here, so they cannot come to say different
  * things.
  *
  * How much of it is still here matters: a card withdrawn since is simply

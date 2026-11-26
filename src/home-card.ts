@@ -7,8 +7,9 @@
  * and Build a session moved to Focused training (0.650), and the owner
  * wanted it to be more engaging without being one more readout of the
  * learner's own numbers. A fact about how language varies is a small
- * reason to look, and it changes after every finished session, so there
- * is something new each time a learner comes back.
+ * reason to look, and it changes after every finished session and each
+ * time the app is opened (0.673), so there is something new each time a
+ * learner comes back.
  *
  * The facts are the ones the owner approved on the review page, each
  * checked against the source it names (November 2026). The shapes are
@@ -280,8 +281,9 @@ export const HOME_SHAPES: HomeShape[] = [
 
 /* ------------------------------------------------------------------
    Which card shows. One count per device, moved on by each finished
-   session; the shape and the fact are read off it separately, so the
-   twenty shapes and the facts drift past each other.
+   session and each time the app is opened (0.674); the shape and the
+   fact are read off it separately, so the twenty shapes and the facts
+   drift past each other.
    ------------------------------------------------------------------ */
 
 export function homeCardAt(turn: number): { shape: HomeShape; fact: HomeFact } {
