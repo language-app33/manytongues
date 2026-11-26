@@ -551,14 +551,14 @@ test("the selected tab has a stroke, in a colour that exists in both themes", ()
   assert.match(rule(".at-tab2"), /border:\s*2px solid/, "the tab has no border for the stroke to take");
 });
 
-test("what is not the answer is headed, not hidden behind a tap", () => {
-  /* The blocks are shown open under a plain "Learn more" heading. It is
-     text, not a control: no pointer, no hover, nothing to fold the box. */
+test("what is not the answer opens on a tap", () => {
+  /* Back to a toggle (0.678): "Learn more" is a quiet, centred control with
+     a pointer, and the box stays folded until it is tapped. */
   const more = rule(".at-alsomore");
-  assert.ok(more, "there is no rule for the heading");
+  assert.ok(more, "there is no rule for the toggle");
   assert.match(more, /text-align:\s*center/);
-  assert.doesNotMatch(more, /cursor:\s*pointer/, "the heading still looks pressable");
-  assert.equal(rule(".at-alsomore:hover"), "", "the heading still changes colour under the pointer");
+  assert.match(more, /cursor:\s*pointer/, "the toggle does not look pressable");
+  assert.match(more, /border:\s*0/, "the toggle is drawn as a boxed button");
 });
 
 test("the foot is not cut in two by a rule between its parts", () => {

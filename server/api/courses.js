@@ -1602,7 +1602,7 @@ async function codeTarget(store, given) {
 /** A space as anyone may be told of it. @param {any} org */
 const orgCard = (org) => ({
   id: org.id, slug: org.slug, name: org.name, logo: org.logo || "", colour: org.colour || "",
-  /* Whether its teachers may make personal sets (0.672): off unless the
+  /* Whether its teachers may make personal sets (0.683): off unless the
      App admin switched them on for this space. */
   sets: !!org.sets,
 });
@@ -4741,7 +4741,7 @@ async function handle(req) {
         return json({ error: "not-yours" }, 403);
       if (deck.personal) return json({ error: "personal-set" }, 400);
       if (deck.locked && DECK_LOCKS) return json({ error: "deck-locked" }, 409);
-      /* A new personal set only where the App admin allows them (0.672);
+      /* A new personal set only where the App admin allows them (0.683);
          one made before keeps working, and can still be changed or undone. */
       if (body.set !== null && !(/** @type {any} */ (deck).set)) {
         const space = await readJson(store, K.org(orgOf(deck)));

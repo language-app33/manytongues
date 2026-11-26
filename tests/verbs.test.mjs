@@ -159,6 +159,12 @@ test("the subject's grammar picks the column", () => {
   assert.equal(must(personFor(arabic, { number: "plural" }), "they").id, "they");
 });
 
+test("an uncountable noun is agreed with as a singular", () => {
+  /* الميّ باردة: nothing has a column of its own for a word with no plural. */
+  assert.equal(must(personFor(arabic, { number: "uncountable", gender: "feminine" }), "she").id, "she");
+  assert.equal(must(personFor(arabic, { number: "uncountable", gender: "masculine" }), "he").id, "he");
+});
+
 test("a verb is marked for a room as well as a person", () => {
   /*
    * The plural *you*, which was missing until 0.194 — and missing in a way

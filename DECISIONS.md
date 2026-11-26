@@ -12,6 +12,17 @@ anything that was never really a choice.
 ---
 
 
+## A picture says its count again (0.677)
+
+0.651 stopped picture questions saying "dual" or "plural", after a learner
+said the label only repeated what a picture of two plants showed. In 0.660
+a learner reported, twice, that a picture of one lemon did not say whether
+ليمونة or ليمون was wanted. The owner chose the label back: `pictureLabel`
+names the count wherever another form of the card has another count
+(singular, dual, plural), and the gender as before. A label that repeats
+the picture costs a word; one that is missing costs a guess. A word with
+one form, and an uncountable one, still says nothing.
+
 ## Home's name is a heading in the page, not chrome (0.670)
 
 The app's name on Home was positioned absolutely over the page's top
@@ -9096,7 +9107,80 @@ under it. It borrows the ghost button's outline, dimmed state and focus
 ring. Its accessible name is the title alone, with the line as its
 description, so it is still "Weak spots" to a screen reader.
 
-## Personal sets are a space's feature, off until the App admin switches it on (0.672)
+---
+
+## Uncountable is a value of number, and a tick over a noun's boxes (0.672)
+
+**26 November 2026** · `UNCOUNTABLE` and `agreesAs` in `src/answers.ts`; `GRAMMAR.number` in `src/languages.ts`; `personFor` in `src/verbs.ts`; `readNounCard` in `src/numbers/nouns.ts`; `nounBoxes`, `nounUncountable`, `tickUncountable` and `NounEditor` in `src/card-editor.tsx`
+
+A noun's card had a box for every number the language counts in, and no way
+to say the word has none of them but the first: مي with an empty Plural box
+was indistinguishable from a noun whose plural nobody had written yet, and
+the number screen listed it as "no plural".
+
+**Stored as a number, not as a fact of its own.** `number: "uncountable"`
+on the card's own word. A separate per-card field (as person-or-thing is)
+would have left agreement untouched, but it would also have let a card say
+"uncountable" and "plural" at once, and needed its own column in an import
+and its own tag. As a value of the axis it is said wherever number is said.
+
+**Nothing agrees with it.** The agreement tables match a noun's number by
+equality, so the one reader of them, `personFor`, takes an uncountable word
+as a singular (`agreesAs`). No column of any table names the value, and
+none should.
+
+**Counting leaves it out silently.** `readNounCard` answers null, as for a
+card that is not a noun, so it is neither counted nor listed as unfinished.
+
+**On the card it is a tick, never a box.** `nounBoxes` leaves the value out
+of the boxes and, where the card's own word says it, draws one box (one a
+side for a person or an animal). Ticking marks the word in each singular
+box and takes the forms in the other boxes out of the draft, with the
+pronoun cells on the end of them; they are held until the editor closes, so
+unticking puts them back, and a save while ticked drops them — which is
+what the owner asked the tick to do. A form in no box is left alone.
+
+**Offered on a noun only** (`optionRules.uncountable.onlyOn`), in Arabic
+and Hebrew. Vietnamese declares no number.
+
+**Group words got a line of help and no value.** ناس is a plural of people
+and عيلة a feminine singular; marked that way the agreement rules already
+read them right, so the card says which box to use rather than offering a
+choice most teachers would never need.
+
+**Still open:** a collective beside its unit noun (تفاح, تفاحة) — see "A
+noun is laid out in boxes", which keeps them as two cards.
+
+**Revisit if** teachers want uncountables counted with a measure word
+("two cups of water"), which needs measure words as cards of their own.
+
+## Imported cards say they don't reach students yet (0.679)
+
+**Problem.** A learner reported "no material" in a course whose decks they
+could see. The course had been filled from a backup, and an import saves
+every card as Ready for review (the owner's rule, so nothing a file brings
+in reaches students unread). Students are sent published cards only, so
+they got the decks and none of their cards, and Home said there was nothing
+to practise. The teacher was told "Imported N cards" and nothing more.
+
+**Decided (owner, 1a 2a 3c).** Keep the rule. Say it to the teacher instead:
+
+- The import's own message adds that students won't see the cards until
+  they are published.
+- A band across Teaching counts the cards that import brought in which are
+  still waiting (`waitingToPublish`: a draft, ready for review, or changes
+  not yet published), with Show the cards, which opens the card list on the
+  new **Status** filter. Held in the screen's state, not saved: it is a
+  reminder about the import just made, and the deck and course lines below
+  carry the same fact for good.
+- A course's screen says what of its decks (units included) doesn't reach
+  students, with `notReaching` as a deck already says it of itself.
+- The student's side is unchanged (3c): a course whose decks are still empty
+  keeps its Practice button.
+
+**Revisit if** teachers import material they have already checked and the
+band reads as nagging: a "Publish them all" on it is the next step.
+## Personal sets are a space's feature, off until the App admin switches it on (0.683)
 
 A space's document carries `sets`, false when absent, so every space —
 those made before this release too — starts with personal sets off. Only

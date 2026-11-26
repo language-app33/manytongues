@@ -6185,11 +6185,18 @@ export const NO_CARD_FILTER = {
   blankNames: [] as string[],
   /* And where a card stands with review — see filterCards. */
   review: "any",
+  /* And whether students have it as it is — see filterCards. */
+  status: "any",
   /* What kind of card, and which of its kind: see filterCards. */
   kinds: [] as string[],
   subtypes: [] as string[],
   sceneKinds: [] as string[],
 };
+
+/** Whether a card has anything students don't have yet (0.679): a draft, a
+    card ready for review, or a published card with changes on it. */
+export const waitingToPublish = (c: { status?: string; changes?: unknown }): boolean =>
+  (!!c.status && c.status !== "published") || !!c.changes;
 
 /*
  * What a card list leaves out.
@@ -6232,7 +6239,7 @@ export function filterCards(
   cards: Card[],
   {
     audio = "any", forms = "any", deckMode = "any", deckIds = [], blankMode = "any", blankNames = [], review = "any",
-    kinds = [], subtypes = [], sceneKinds = [],
+    kinds = [], subtypes = [], sceneKinds = [], status = "any",
   }: {
     audio?: string;
     forms?: string;
@@ -6247,6 +6254,11 @@ export function filterCards(
     kinds?: string[];
     subtypes?: string[];
     sceneKinds?: string[];
+    /* Whether students have the card as it is (0.679): "waiting" keeps
+       the drafts, the cards ready for review and the published cards with
+       changes not yet published — everything Publish would send — and
+       "published" keeps the cards students have, with nothing waiting. */
+    status?: string;
   } = {},
   /* The ids of the cards waiting for review, worked out by the caller —
      it takes the whole collection to know what a frame makes. */
@@ -6260,6 +6272,8 @@ export function filterCards(
     if (forms === "one" && cardFormCount(c) !== 1) return false;
     if (review === "waiting" && !waiting.has(c.id)) return false;
     if (review === "sentences" && !needsReview(c)) return false;
+    if (status === "waiting" && !waitingToPublish(c)) return false;
+    if (status === "published" && waitingToPublish(c)) return false;
     if (forms === "several" && cardFormCount(c) < 2) return false;
     if (kinds.length) {
       const kind = cardKindOf(c);
@@ -6367,7 +6381,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /** The name of the space on screen — for an App admin, the one at the
       address rather than their own. */
   spaceName?: string | null;
-  /** Whether this space offers personal sets (0.672): the App admin's
+  /** Whether this space offers personal sets (0.683): the App admin's
       choice, off unless they switched it on. */
   setsOn?: boolean;
   /** A learner's My space (0.545): only their own decks and cards, no courses. */
@@ -6849,6 +6863,18 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   const [sortKey, setSortKey] = useState("changed");
   const [newestFirst, setNewestFirst] = useState(true);
   const [cardFilter, setCardFilter] = useState(NO_CARD_FILTER);
+  /* The cards the last import brought in (0.679). They come in Ready for
+     review, which students do not get, and the import itself said nothing
+     about that: a teacher could import a course's material, add its decks
+     to the course, and leave every student with empty decks. Held for as
+     long as this is open, so the band below can say so until they are
+     published. */
+  const [importedIds, setImportedIds] = useState<string[]>([]);
+  const importedWaiting = useMemo(() => {
+    if (!importedIds.length) return 0;
+    const ids = new Set(importedIds);
+    return cards.filter((c) => ids.has(c.id) && waitingToPublish(c)).length;
+  }, [cards, importedIds]);
   /*
    * Where every sentence card stands with review, and which are waiting.
    *
@@ -7092,6 +7118,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
     }
     setImporting(false);
     await refresh();
+    setImportedIds(saved.map((x) => x.card.id));
     const replaced = going.filter((m) => m.kind === "same").length;
     const said = [
       going.length - replaced ? `imported ${plural(going.length - replaced, "card")}` : "",
@@ -7099,7 +7126,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
       madeDecks ? `made ${plural(madeDecks, "deck")}` : "",
       unnamed ? `${unnamed} came in without its ID, which a card of yours already has` : "",
     ].filter(Boolean).join(", ") || "added your cards to the deck";
-    return `${said.charAt(0).toUpperCase()}${said.slice(1)}.`;
+    /* And that students don't have them yet, where any were saved: the
+       band at the top says it again, and stays. */
+    const waiting = saved.length ? " Students won't see them until you publish them." : "";
+    return `${said.charAt(0).toUpperCase()}${said.slice(1)}.${waiting}`;
   }
   const importScreen = importing && (
     <ImportScreen
@@ -7401,6 +7431,18 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           {!cardFilter.kinds.length && <p className="at-hint">Tick a kind. Until you do, this narrows nothing.</p>}
         </div>
       ),
+    },
+    {
+      key: "status",
+      label: "Status",
+      value: cardFilter.status,
+      onChange: (v) => setCardFilter((f) => ({ ...f, status: v })),
+      quiet: "any",
+      options: [
+        { value: "any", label: "Any" },
+        { value: "waiting", label: "Waiting to publish" },
+        { value: "published", label: "Published" },
+      ],
     },
     {
       key: "audio",
@@ -9345,7 +9387,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
             noun="card"
             items={listed}
             count={mine.length === held.length ? null : `${mine.length} of ${plural(held.length, "card")}`}
-            tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
+            /* With the deck empty, Import is in the box below instead. */
+            tools={deckEmpty ? null : <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
             menus={cardMenus}
             searchBelow
             size="small"
@@ -9363,9 +9406,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 icon="cards"
                 tone="attention"
                 action={
-                  <div className="at-row">
-                    <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
-                    <Button icon="add" onClick={() => openAdding(d)}>Add existing cards</Button>
+                  /* Import, icon-only, beside the two worded buttons while
+                     the deck is empty; the toolbar holds it once it is not. */
+                  <div className="at-nudgeacts">
+                    <div className="at-row">
+                      <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
+                      <Button icon="add" onClick={() => openAdding(d)}>Add existing cards</Button>
+                    </div>
+                    <IconButton icon="upload" label="Import cards" onClick={() => setImporting(true)} />
                   </div>
                 }
               >
@@ -9812,6 +9860,20 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
        among those that can be added beside it. */
     const mine = decks.filter((d) => !isPathUnit(d) && (d.courses || []).some((l) => l.courseId === c.id));
     const plainDecks = decks.filter((d) => !isPathUnit(d));
+    /* What of this course's decks — its units with them — students don't
+       get yet (0.679), said here as the deck says it of itself: the course
+       is where a teacher looks to see what their students have. */
+    const courseDecks = decks.filter((d) => (d.courses || []).some((l) => l.courseId === c.id));
+    const courseCards = [...new Set(courseDecks.flatMap((d) => d.cardIds || []))]
+      .map((id) => cardById.get(id))
+      .filter(Boolean) as Card[];
+    const courseOff = notReaching(
+      { parts: courseDecks.flatMap((d) => d.parts || []), partsWaiting: courseDecks.flatMap((d) => d.partsWaiting || []) },
+      courseCards,
+    );
+    /* The cards among them, which Show them lists: a number part is
+       written under Numbers, not published. */
+    const courseUnpublished = courseCards.filter((x) => x.status === "draft" || x.status === "review").length;
     const units = pathUnits(c, allDecks) as Deck[];
     /* What the server saved, put on screen as it is — see toggleDeck. */
     const tookCourse = (r: any) => {
@@ -9981,6 +10043,28 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     : "Students in this course see the decks you add here."}
                 </span>
               </div>
+              {courseOff && (
+                <div className="at-mb3">
+                  <Nudge
+                    icon="view"
+                    tone="attention"
+                    action={courseUnpublished ? (
+                      <Button
+                        size="sm"
+                        onClick={() => {
+                          setCardFilter({ ...NO_CARD_FILTER, status: "waiting", deckMode: "in", deckIds: courseDecks.map((d) => d.id) });
+                          setCourseView(null);
+                          setTab("cards");
+                        }}
+                      >
+                        {courseUnpublished === 1 ? "Show the card" : "Show the cards"}
+                      </Button>
+                    ) : undefined}
+                  >
+                    {`${plural(courseOff.n, "card")} in this course ${courseOff.n === 1 ? "doesn't" : "don't"} reach students yet: ${courseOff.why}.`}
+                  </Nudge>
+                </div>
+              )}
               {mine.length ? (
                 <DeckSwitch
                   decks={plainDecks.map((d) => ({ id: d.id, title: d.title, cardCount: d.cardCount }))}
@@ -10092,6 +10176,35 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               }
             >
               Some recordings are missing. Record them again so students can hear them.
+            </TopBanner>
+          )}
+          {/* What an import brought in and students don't have yet (0.679):
+              on until every card of it is published, or the teacher puts
+              it away. */}
+          {importedWaiting > 0 && (
+            <TopBanner
+              actions={
+                <>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setCardFilter({ ...NO_CARD_FILTER, status: "waiting" });
+                      setOpenDeck(null);
+                      setCourseView(null);
+                      setTab("cards");
+                    }}
+                  >
+                    {importedWaiting === 1 ? "Show the card" : "Show the cards"}
+                  </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setImportedIds([])}>
+                    Dismiss
+                  </Button>
+                </>
+              }
+            >
+              {importedWaiting === 1
+                ? "1 imported card is waiting for review. Students won't see it until you publish it."
+                : `${importedWaiting} imported cards are waiting for review. Students won't see them until you publish them.`}
             </TopBanner>
           )}
 
@@ -10296,7 +10409,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 /* Numbers and pronouns used to have an icon each here; they
                    are word sets now, reached from the row above the list
                    (0.569). */
-                tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
+                tools={cards.length ? <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} /> : null}
                 menus={cardMenus}
                 searchBelow
                 size="small"
@@ -10317,12 +10430,17 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   <Nudge
                     icon="cards"
                     action={
-                      <Button variant="primary" icon="add" onClick={() => {
-                        if (mustAskOn) setNewCardLang(knownOn[0] || "");
-                        else setMaking({ decks: [], lang: soleLangOn });
-                      }}>
-                        New card
-                      </Button>
+                      /* Import sits here, beside New card, while there are no
+                         cards; the toolbar holds it once there are. */
+                      <div className="at-nudgeacts">
+                        <Button variant="primary" icon="add" onClick={() => {
+                          if (mustAskOn) setNewCardLang(knownOn[0] || "");
+                          else setMaking({ decks: [], lang: soleLangOn });
+                        }}>
+                          New card
+                        </Button>
+                        <IconButton icon="upload" label="Import cards" onClick={() => setImporting(true)} />
+                      </div>
                     }
                   >
                     No cards yet. A card is anything to learn, with its meaning. Make your first one, then add it to a deck for your students.
@@ -10542,7 +10660,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
               {choosingKind && (
                 <PickSheet title="New deck" lede="What kind of deck? This can't be changed once it is made." onClose={() => setChoosingKind(false)}>
-                  {/* Spaced as every list of tiles is (0.672); a personal
+                  {/* Spaced as every list of tiles is (0.683); a personal
                       set only where the App admin switched them on. */}
                   <div className="at-decklist2">
                     {NEW_KINDS.filter((k) => k.kind !== "set" || setsOn).map((k) => (
@@ -10572,16 +10690,21 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   <Nudge
                     icon="folder"
                     action={
-                      <Button variant="primary" icon="add" onClick={newDeck}>
-                        New deck
-                      </Button>
+                      /* Import sits here, beside New deck, while there are no
+                         decks; the toolbar holds it once there are. */
+                      <div className="at-nudgeacts">
+                        <Button variant="primary" icon="add" onClick={newDeck}>
+                          New deck
+                        </Button>
+                        <IconButton icon="upload" label="Import decks" onClick={() => setImporting(true)} />
+                      </div>
                     }
                   >
                     No decks yet. A deck is a set of cards. Make your first one, then add it to a course so students can see it.
                   </Nudge>
                 )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
-                tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
+                tools={decks.length ? <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} /> : null}
                 onNew={newDeck}
                 selected={selDecks}
                 onSelectedChange={setSelDecks}
@@ -11280,7 +11403,7 @@ function SpaceScreen({ org, busy, error, dialog, onBack, run, ask }: {
           </Field>
         </fieldset>
       </div>
-      {/* What the space's teachers may make (0.672): personal sets are off
+      {/* What the space's teachers may make (0.683): personal sets are off
           until the App admin switches them on here. Sets already made keep
           working either way. */}
       <Section title="Features">

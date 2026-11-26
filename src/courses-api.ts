@@ -30,7 +30,7 @@ export interface OrgCard {
   name: string;
   logo: string;
   colour: string;
-  /** Whether its teachers may make personal sets (0.672): the App admin's
+  /** Whether its teachers may make personal sets (0.683): the App admin's
       choice, off unless switched on. Absent from an older server: off. */
   sets?: boolean;
   /** Whether this account runs it (0.610). Only on whoami's list of yours. */

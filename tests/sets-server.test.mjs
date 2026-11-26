@@ -69,7 +69,7 @@ const sentCard = async (/** @type {string} */ id) =>
 const SET = { wording: { question: "Who is this person to you?" }, lists: [hanoi.id], named: [], order: "after" };
 
 /* Personal sets are off in a space until the App admin switches them on
-   (0.672): only they may, and only a new set is refused while off. */
+   (0.683): only they may, and only a new set is refused while off. */
 test("a space offers no personal sets until the App admin switches them on", async () => {
   const card = async () => (await raw("/api/courses?action=whoami", { key: teacher.key })).json.user.org;
   assert.equal((await card()).sets, false, "off by default");
