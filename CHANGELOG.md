@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.673 — 26 November 2026
+
+**The fact on Home changes each time you open the app.** The picture and
+the fact under the progress ring used to move on only after a finished
+session, so opening the app again showed the same one. Now reloading the
+page, or closing the app and opening it again, brings the next picture and
+fact too. Finishing a session still moves it on as before; going to You and
+back does not.
+
+Still to check by hand: closing and reopening the app installed on a real
+phone. A phone that only sends the app to the background, rather than
+closing it, shows the same card when you come back.
+
 ## 0.672 — 26 November 2026
 
 **A noun can be marked uncountable.** On a noun's card in Arabic or Hebrew,

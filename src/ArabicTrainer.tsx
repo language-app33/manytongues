@@ -14211,7 +14211,8 @@ export default function ArabicTrainer() {
   /* The card on Home turns once per finished session (0.664): the end
      screen is the moment a session is finished, whether it ran its course,
      ran out of time or was all answered. A trial is a teacher's look at one
-     question, not a session, so it turns nothing. Counted per device. */
+     question, not a session, so it turns nothing. Counted per device.
+     Opening the app turns it too (0.673): see readHomeTurn. */
   const [homeTurn, setHomeTurn] = useState(readHomeTurn);
   /* How far the student has come: before practice, the first day, or
      from the second day of practice (0.666). The card's welcome and the
@@ -18444,10 +18445,23 @@ function HomeCard({ turn, stage }: { turn: number; stage: HomeStage }) {
   );
 }
 /* The card's count, on this device only: which card is showing is a
-   matter of what this screen last showed, not something to sync. */
+   matter of what this screen last showed, not something to sync.
+
+   It also turns once each time the app is opened (0.673): a reload, or
+   closing the app and opening it again, shows the next card, not the one
+   left from last time. Once per page load, not per mount, so going to
+   another screen and back does not turn it, and the end of a session
+   still turns it as before. The very first open, with nothing stored,
+   shows the first card. */
 const HOME_TURN_KEY = "arabic-trainer:home-card";
+let homeTurnedOnOpen = false;
 function readHomeTurn(): number {
-  try { return Math.max(0, parseInt(localStorage.getItem(HOME_TURN_KEY) || "0", 10) || 0); } catch { return 0; }
+  let stored: string | null = null;
+  try { stored = localStorage.getItem(HOME_TURN_KEY); } catch { /* private window */ }
+  const turn = Math.max(0, parseInt(stored || "0", 10) || 0);
+  if (homeTurnedOnOpen) return turn;
+  homeTurnedOnOpen = true;
+  return writeHomeTurn(stored === null ? turn : turn + 1);
 }
 function writeHomeTurn(turn: number): number {
   try { localStorage.setItem(HOME_TURN_KEY, String(turn)); } catch { /* private window: the card still turns for this visit */ }
