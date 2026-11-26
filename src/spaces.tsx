@@ -9342,7 +9342,8 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
             noun="card"
             items={listed}
             count={mine.length === held.length ? null : `${mine.length} of ${plural(held.length, "card")}`}
-            tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
+            /* With the deck empty, Import is in the box below instead. */
+            tools={deckEmpty ? null : <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
             menus={cardMenus}
             searchBelow
             size="small"
@@ -9360,9 +9361,14 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 icon="cards"
                 tone="attention"
                 action={
-                  <div className="at-row">
-                    <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
-                    <Button icon="add" onClick={() => openAdding(d)}>Add existing cards</Button>
+                  /* Import, icon-only, beside the two worded buttons while
+                     the deck is empty; the toolbar holds it once it is not. */
+                  <div className="at-nudgeacts">
+                    <div className="at-row">
+                      <Button variant="primary" icon="add" onClick={newCard}>New card</Button>
+                      <Button icon="add" onClick={() => openAdding(d)}>Add existing cards</Button>
+                    </div>
+                    <IconButton icon="upload" label="Import cards" onClick={() => setImporting(true)} />
                   </div>
                 }
               >
@@ -10293,7 +10299,7 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                 /* Numbers and pronouns used to have an icon each here; they
                    are word sets now, reached from the row above the list
                    (0.569). */
-                tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
+                tools={cards.length ? <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} /> : null}
                 menus={cardMenus}
                 searchBelow
                 size="small"
@@ -10314,12 +10320,17 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   <Nudge
                     icon="cards"
                     action={
-                      <Button variant="primary" icon="add" onClick={() => {
-                        if (mustAskOn) setNewCardLang(knownOn[0] || "");
-                        else setMaking({ decks: [], lang: soleLangOn });
-                      }}>
-                        New card
-                      </Button>
+                      /* Import sits here, beside New card, while there are no
+                         cards; the toolbar holds it once there are. */
+                      <div className="at-nudgeacts">
+                        <Button variant="primary" icon="add" onClick={() => {
+                          if (mustAskOn) setNewCardLang(knownOn[0] || "");
+                          else setMaking({ decks: [], lang: soleLangOn });
+                        }}>
+                          New card
+                        </Button>
+                        <IconButton icon="upload" label="Import cards" onClick={() => setImporting(true)} />
+                      </div>
                     }
                   >
                     No cards yet. A card is anything to learn, with its meaning. Make your first one, then add it to a deck for your students.
@@ -10565,16 +10576,21 @@ export function TeachSpace({ account, spaceName: shownName, languages, settings,
                   <Nudge
                     icon="folder"
                     action={
-                      <Button variant="primary" icon="add" onClick={newDeck}>
-                        New deck
-                      </Button>
+                      /* Import sits here, beside New deck, while there are no
+                         decks; the toolbar holds it once there are. */
+                      <div className="at-nudgeacts">
+                        <Button variant="primary" icon="add" onClick={newDeck}>
+                          New deck
+                        </Button>
+                        <IconButton icon="upload" label="Import decks" onClick={() => setImporting(true)} />
+                      </div>
                     }
                   >
                     No decks yet. A deck is a set of cards. Make your first one, then add it to a course so students can see it.
                   </Nudge>
                 )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
-                tools={<IconButton icon="upload" label="Import" onClick={() => setImporting(true)} />}
+                tools={decks.length ? <IconButton icon="upload" label="Import" onClick={() => setImporting(true)} /> : null}
                 onNew={newDeck}
                 selected={selDecks}
                 onSelectedChange={setSelDecks}

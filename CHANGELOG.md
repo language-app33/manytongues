@@ -8,6 +8,18 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.672 — 26 November 2026
+
+**Import sits in the empty box.** In Teaching › Material, when there are no
+decks yet, Import is now an icon-only button beside New deck, in the "No
+decks yet" box, instead of standing alone above it. The same goes for
+Cards with no cards yet, beside New card, and for a deck with no cards on
+Manage cards, beside New card and Add existing cards. Once there is
+something in the list, Import goes back to its usual place beside search.
+
+Still to check by hand: the three empty screens on a real phone, in light
+and dark.
+
 ## 0.671 — 26 November 2026
 
 **Weak spots replaces Fix mistakes in Build a session.** Choosing Weak spots
