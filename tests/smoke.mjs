@@ -2840,9 +2840,9 @@ if (/Build a session/.test(document.body.textContent)) {
       !homeCard()?.querySelector(".at-climb") && !homeCard()?.querySelector(".at-btn.primary") &&
         !!buttonNamed(/^Practice(?! this)/) && !!homeCard()?.querySelector('[data-el="focused-training"]'),
       (homeCard()?.textContent || "").replace(/\s+/g, " ").slice(0, 120));
-    check("and the card under it keeps its fact but leaves its drawing off, so Home is less crowded (0.673)",
-      !!homeCard()?.querySelector(".at-homecardfact") && !homeCard()?.querySelector(".at-homeart"),
-      (homeCard()?.querySelector('[data-el="home-fact"]') || {}).innerHTML?.slice(0, 120) || "(no card)");
+    check("and the card with the drawing and the fact is left off, so Home is less crowded (0.673)",
+      !document.querySelector('[data-el="home-fact"]'),
+      (document.querySelector('[data-el="home-fact"]') || {}).textContent || "");
     const counter = () => ((document.querySelector(".at-preptoday") || {}).textContent || "");
     check("under it, today's sessions against what today needs, as a count and a row of dots",
       /^Today's sessions\d+(\/\d+)?$/.test(counter()) &&
@@ -2913,8 +2913,9 @@ if (/Build a session/.test(document.body.textContent)) {
     await leaveTraining();
     click(buttonNamed(/^Home$/));
     await sleep(300);
-    check("and from the home screen, which has its climb back, and the card its drawing",
-      !prepButton() && !prepTile() && !!homeCard()?.querySelector(".at-climb") && !!homeCard()?.querySelector(".at-homeart"),
+    check("and from the home screen, which has its climb back, and the card with its drawing and fact",
+      !prepButton() && !prepTile() && !!homeCard()?.querySelector(".at-climb") &&
+        !!homeCard()?.querySelector('[data-el="home-fact"] .at-homeart') && !!homeCard()?.querySelector(".at-homecardfact"),
       (prepButton() || {}).textContent || "");
     click(buttonNamed(/^Progress$/));
     await sleep(300);

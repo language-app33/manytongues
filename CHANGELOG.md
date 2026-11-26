@@ -11,9 +11,10 @@ and moves once per batch of work you would notice, not once per commit.
 ## 0.673 — 26 November 2026
 
 **Home is less crowded while you're prepping.** With a Prep mode goal set,
-the card on Home keeps its fact but drops its drawing. The prep's own tile
-already fills the top of the screen, and on a phone the drawing pushed
-Practice off the bottom. Clear the goal and the drawing comes back.
+the card on Home (the drawing and the fact under it) is left off. The
+prep's own tile already fills the top of the screen, and on a phone the
+card pushed Practice off the bottom. Clear the goal and the card comes
+back.
 
 Still to check by hand: Home on a real phone with a goal set.
 
