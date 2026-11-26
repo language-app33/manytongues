@@ -8123,7 +8123,7 @@ export function praiseFor(n: number) {
 
 /* --- AlsoBox --------------------------------------------------------
    What is worth knowing beyond the answer, behind a "Learn more" toggle.
-   It starts closed (0.676, back to how it was before 0.372): open, it put
+   It starts closed (0.677, back to how it was before 0.372): open, it put
    several blocks between the answer and Continue on every card. A tap
    opens it, with a chevron saying which way it will go. It is closed again
    on every new question, because the answer, and this with it, unmounts
@@ -14236,6 +14236,25 @@ export default function ArabicTrainer() {
     turnedFor.current = session;
     setHomeTurn((t: number) => writeHomeTurn(t + 1));
   }, [session, exercise]);
+  /* Coming back to the app after it has been in the background for a
+     while turns the card too (0.676), as a phone often keeps the app
+     there rather than closing it, so it never reopens. Not after a quick
+     look away (HOME_AWAY_TURN): tapping a fact's source and coming
+     straight back finds the same fact, not a new one. */
+  useEffect(() => {
+    let hiddenAt = document.visibilityState === "hidden" ? Date.now() : 0;
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") {
+        if (!hiddenAt) hiddenAt = Date.now();
+        return;
+      }
+      const away = hiddenAt ? Date.now() - hiddenAt : 0;
+      hiddenAt = 0;
+      if (away >= HOME_AWAY_TURN) setHomeTurn((t: number) => writeHomeTurn(t + 1));
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
   /* At the end of a session, whether starting it again the same way would
      ask anything: worked out once, when the end screen opens, and the
      button that offers it left off when it would not. */
@@ -18471,6 +18490,9 @@ function HomeCard({ turn, stage }: { turn: number; stage: HomeStage }) {
    still turns it as before. The very first open, with nothing stored,
    shows the first card. */
 const HOME_TURN_KEY = "arabic-trainer:home-card";
+/* How long the app must be in the background before coming back turns
+   the card (0.676, the owner's 1b). */
+const HOME_AWAY_TURN = 30 * 60 * 1000;
 let homeTurnedOnOpen = false;
 function readHomeTurn(): number {
   let stored: string | null = null;

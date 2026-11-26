@@ -552,7 +552,7 @@ test("the selected tab has a stroke, in a colour that exists in both themes", ()
 });
 
 test("what is not the answer opens on a tap", () => {
-  /* Back to a toggle (0.676): "Learn more" is a quiet, centred control with
+  /* Back to a toggle (0.677): "Learn more" is a quiet, centred control with
      a pointer, and the box stays folded until it is tapped. */
   const more = rule(".at-alsomore");
   assert.ok(more, "there is no rule for the toggle");
