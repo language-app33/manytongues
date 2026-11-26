@@ -9495,45 +9495,66 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
        checklist and Publish above its cards. */
     const unitIn = isPathUnit(d) ? courseOfUnit(d.id) : null;
     const unitNo = unitIn ? pathUnits(unitIn, allModules).findIndex((u) => u.id === d.id) + 1 : 0;
-    const unitLive = !!unitIn && isLiveIn(unitIn, d.id);
-    const fromServer = serverProblems && unitIn && serverProblems.unitId === d.id && serverProblems.courseId === unitIn.id
-      ? serverProblems.problems : null;
-    const unitChecks = unitIn ? fromServer || pathChecks.get(d.id) || [] : [];
+    /* Every course whose path holds it (0.688, the owner's 3a): each gets
+       its own place, checklist and publishing, since a unit is placed,
+       published and opened early separately in each. The course it was
+       opened from comes first. */
+    const unitCourses = isPathUnit(d)
+      ? courses
+        .filter((x) => (x.path || []).includes(d.id))
+        .sort((a, b) => (a.id === (unitIn && unitIn.id) ? -1 : b.id === (unitIn && unitIn.id) ? 1 : 0))
+      : [];
     const cardText = (id: string) => {
       const card = lentById.get(id);
       return card ? String(leadOf(card as never).ar || card.name || "").trim() : id;
     };
     const unitDrafts = held.filter((c) => c.status && c.status !== "published").length;
     const unitLang = langOfModule(d) || null;
+    /* One course's checklist: what the server said, where it said it of
+       this course; else this screen's reading. */
+    const checksIn = (course: Course): UnitProblem[] => {
+      if (serverProblems && serverProblems.unitId === d.id && serverProblems.courseId === course.id) return serverProblems.problems;
+      if (unitIn && course.id === unitIn.id && pathChecks.has(d.id)) return pathChecks.get(d.id) || [];
+      return problemsIn(d.id, course);
+    };
     /* Advice, not points (A6): blanks whose approved cards are all of one form. */
-    const sameForm = unitIn && unitLang
+    const sameFormIn = (course: Course) => unitLang
       ? sameFormBlanks(
-        blankFills(held, countingFor(d.id, unitIn), unitLang),
+        blankFills(held, countingFor(d.id, course), unitLang),
         (id) => lentById.get(id),
         dimsOf(unitLang).map((dim) => dim.field),
       )
       : [];
-    const publishUnit = () => {
-      if (!unitIn) return;
+    /* What the server saved of a course's path, put on screen as it is. */
+    const tookPath = (courseId: string, r: any) => {
+      if (r && r.course) {
+        setCourses((prev) => prev.map((x) => (x.id === courseId
+          ? { ...x, path: r.course.path, pathLive: r.course.pathLive, opened: r.course.opened }
+          : x)));
+      }
+    };
+    const publishUnit = (course: Course) => {
       run(async () => {
         try {
-          const r: any = await API.publishUnit(unitIn.id, d.id);
+          const r: any = await API.publishUnit(course.id, d.id);
           setServerProblems(null);
-          if (r && r.course) {
-            setCourses((prev) => prev.map((x) => (x.id === unitIn.id
-              ? { ...x, path: r.course.path, pathLive: r.course.pathLive, opened: r.course.opened }
-              : x)));
-          }
+          tookPath(course.id, r);
         } catch (e) {
           const data = e && typeof e === "object" && "data" in e ? (e as { data?: any }).data : null;
           if (data && data.error === "unit-not-ready" && Array.isArray(data.problems)) {
-            setServerProblems({ unitId: d.id, courseId: unitIn.id, problems: data.problems });
+            setServerProblems({ unitId: d.id, courseId: course.id, problems: data.problems });
             return;
           }
           throw e;
         }
-      }, `${d.title} published in ${unitIn.title}`);
+      }, `${d.title} published in ${course.title}`);
     };
+    const moveUnit = (course: Course, to: number) =>
+      run(async () => tookPath(course.id, await API.moveUnit(course.id, d.id, to)),
+        `${d.title} is now unit ${to + 1} in ${course.title}`);
+    const openForClass = (course: Course, open: boolean) =>
+      run(async () => tookPath(course.id, await API.openUnit(course.id, d.id, open)),
+        open ? `Opened for ${course.title}` : `Closed for ${course.title}`);
     /* Read and edited on one screen, as a card is: what is shown is the
        saved deck until Edit is pressed, and the draft after. */
     const editing = !!moduleDraft;
@@ -9731,30 +9752,50 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
               />
             )}
 
-            {unitIn && (
-              <div className="at-formblock" data-el="unit-checklist-block">
-                <div className="at-formhead">
-                  <span className="at-formnum">{unitIn.title}</span>
-                  <span className="at-formrole">{unitLive ? "Published" : "Draft"}</span>
+            {unitCourses.map((course) => {
+              const path = pathUnits(course, allModules);
+              const at = path.findIndex((u) => u.id === d.id);
+              const live = isLiveIn(course, d.id);
+              const isOpen = live && (course.opened || []).includes(d.id);
+              const sameForm = sameFormIn(course);
+              return (
+                <div className="at-formblock" data-el="unit-checklist-block" key={course.id}>
+                  <div className="at-formhead">
+                    <span className="at-formnum">{course.title}</span>
+                    <span className="at-formrole" data-el="unit-place">
+                      {`Unit ${at + 1} of ${path.length} · ${live ? "Published" : "Draft"}${isOpen ? " · Open for the class" : ""}`}
+                    </span>
+                  </div>
+                  <div className="at-row at-pathacts at-mb3" data-el="unit-path-actions">
+                    <Button size="sm" variant="ghost" icon="chevronUp" disabled={!!busy || at <= 0}
+                      onClick={() => moveUnit(course, at - 1)}>Move earlier</Button>
+                    <Button size="sm" variant="ghost" icon="chevronDown" disabled={!!busy || at < 0 || at >= path.length - 1}
+                      onClick={() => moveUnit(course, at + 1)}>Move later</Button>
+                    {live ? (
+                      <Button size="sm" variant="ghost" disabled={!!busy} onClick={() => openForClass(course, !isOpen)}>
+                        {isOpen ? "Close for the class" : "Open for the class"}
+                      </Button>
+                    ) : null}
+                  </div>
+                  <UnitChecklist
+                    live={live}
+                    problems={checksIn(course)}
+                    drafts={unitDrafts}
+                    textOf={cardText}
+                    busy={busy}
+                    onPublish={() => publishUnit(course)}
+                  />
+                  {sameForm.length ? (
+                    <Field label="Forms">
+                      <Help>These blanks always take the same form. Adding cards of another gender or number would give more practice:</Help>
+                      <ul className="at-checklist">
+                        {sameForm.map((b, i) => <li key={i}>{`"${cardText(b.cardId)}": ${b.slot}`}</li>)}
+                      </ul>
+                    </Field>
+                  ) : null}
                 </div>
-                <UnitChecklist
-                  live={unitLive}
-                  problems={unitChecks}
-                  drafts={unitDrafts}
-                  textOf={cardText}
-                  busy={busy}
-                  onPublish={publishUnit}
-                />
-                {sameForm.length ? (
-                  <Field label="Forms">
-                    <Help>These blanks always take the same form. Adding cards of another gender or number would give more practice:</Help>
-                    <ul className="at-checklist">
-                      {sameForm.map((b, i) => <li key={i}>{`"${cardText(b.cardId)}": ${b.slot}`}</li>)}
-                    </ul>
-                  </Field>
-                ) : null}
-              </div>
-            )}
+              );
+            })}
 
             {/* The cards, word sets among them, to read: which cards
                 the deck holds is changed on Manage cards. */}
@@ -10765,6 +10806,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                       meta={
                         <>
                           <LockMark locked={d.locked && MODULE_LOCKS} />
+                          {/* A unit says so (0.688, the owner's 1b): its
+                              place on each path is on its own screen. */}
+                          {isPathUnit(d) ? <span data-el="unit-label">Unit · </span> : null}
                           {`${(langOfModule(d) || { name: "" }).name} · ${moduleSize(d)}${moduleWaiting(d)}`}
                           {(() => {
                             /* Its cards that send students nothing yet (0.563). */
@@ -10781,7 +10825,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                           })()}
                         </>
                       }
-                      onOpen={() => setOpenModule(d.id)}
+                      onOpen={() => { setUnitCourse(null); setOpenModule(d.id); }}
                       actions={
                         <>
                           <IconButton icon="download" label={`Export ${moduleKind(d)}`} onClick={(e: React.MouseEvent) => {

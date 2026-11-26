@@ -8,6 +8,34 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.688 — 26 November 2026
+
+**A unit can be placed and published from its own screen, in every course
+it is on.** In Teaching › Material › Modules, open a unit and you'll find,
+for each course whose path holds it:
+
+- its place, such as "Unit 2 of 5 · Published", and "Open for the class"
+  when it is;
+- **Move earlier** and **Move later**, to change its place on that path;
+- **Open for the class** (or **Close for the class**) once it is
+  published there;
+- that course's checklist and **Publish unit**, as before.
+
+Before, the unit's screen showed only one course, and moving or opening a
+unit could only be done from the course's page. The course page's Path
+section is unchanged.
+
+**Units are labelled in the Modules list.** A unit's tile now starts with
+"Unit", so it can be told apart from a deck at a glance. Its place on each
+path is on its own screen, not in the list.
+
+**Trade-off:** there is still no single screen in Material that shows a
+whole path in order; for that, open the course.
+
+To check by hand: on a phone, open a unit that is on two courses' paths
+and check each course has its own place, buttons and checklist; move it
+and check the course's Path section shows the new order.
+
 ## 0.687 — 26 November 2026
 
 **Nothing changes for people using the app.** Inside the code, decks,

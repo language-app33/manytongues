@@ -9264,3 +9264,28 @@ using the app could see. Where a renamed variable meets such a field the
 code says so plainly — `{ deckId: moduleId }`. Comments still say "deck"
 where they did; they are prose, and many of them mean the plain kind.
 
+
+## A unit is placed from its own screen, in every course (0.688)
+
+**26 November 2026** · the unit block in `ModuleScreen`'s render in
+`src/spaces.tsx` (`unitCourses`, `checksIn`, `moveUnit`, `openForClass`);
+the unit label in Material's Modules list; `tests/smoke.mjs`
+
+The owner asked whether Material should get a Path tab, then chose to
+manage units in the Modules tab instead (1b, 2b, 3a): a plain "Unit" label
+on the tile, no kind filter, and the path controls on the unit's own
+screen. A unit's place is per course (`path` lives on the course), so the
+screen shows one block per course whose path holds the unit — the course
+it was opened from first — each with "Unit n of m", draft or published,
+Move earlier / Move later, Open or Close for the class, that course's
+checklist and Publish. It calls the same `move-unit`, `open-unit` and
+`publish-unit` actions as the course page's Path section, and writes back
+the course's `path`, `pathLive` and `opened` as the server returned them.
+No server change.
+
+The checklist for courses other than the one already read for `pathChecks`
+is worked out on render with `problemsIn`; a unit is on few courses, so it
+was not worth a memo. Remove from this course and Delete unit stay where
+they were (the Courses field and the screen's Delete), so nothing is
+offered twice on one screen. The list label does not show places, so a
+whole path in order is still read on the course page.

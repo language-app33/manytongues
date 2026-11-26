@@ -287,6 +287,10 @@ let teachesTwo = false;
 /* A course with a path (0.616): two units, the first published, served
    to the teacher's screens only while a walk below sets it. */
 let withPath = false;
+/** The path's order as the stub server holds it, and the moves asked of it (0.688). */
+let pathOrder = ["u1", "u2"];
+/** @type {any[]} */
+const movedUnits = [];
 /* And a learner's course with a path: two published units. */
 let studentPath = false;
 /* And a learner's course with a personal set (0.630): a deck of three
@@ -517,10 +521,18 @@ const fakeFetch = async (input, opts = {}) => {
       return json({
         ok: true,
         courses: [
-          { id: "c1", title: "Arabic 101", language: "ar-PS", decks: ["d1", "u1", "u2"], path: ["u1", "u2"], pathLive: { u1: 1 },
+          { id: "c1", title: "Arabic 101", language: "ar-PS", decks: ["d1", "u1", "u2"], path: pathOrder.slice(), pathLive: { u1: 1 },
             students: [], teachers: [account.handle], role: "teacher" },
         ],
       });
+    }
+    if (action === "move-unit" && withPath) {
+      const body = JSON.parse(opts.body || "{}");
+      movedUnits.push(body);
+      const rest = pathOrder.filter((x) => x !== body.deckId);
+      rest.splice(body.to, 0, body.deckId);
+      pathOrder = rest;
+      return json({ ok: true, course: { id: "c1", path: pathOrder.slice(), pathLive: { u1: 1 }, opened: [] } });
     }
     if (action === "my-decks" && withPath) {
       return json({
@@ -13078,7 +13090,40 @@ const openPronounTables = async () => {
   check("a unit's page is headed with its number and shows its checklist",
     /Unit 1 · Greetings unit/.test(unitText) && /Checklist/.test(unitText) && /Add 5 more sentences with a blank \(0 of 5\)/.test(unitText),
     unitText.slice(0, 300));
+  /* Its place on the path, and moving it, on its own screen (0.688). */
+  const place = unitScreen ? (unitScreen.querySelector('[data-el="unit-place"]') || {}).textContent || "" : "";
+  check("a unit's page says its place on the course's path", /^Unit 1 of 2 · Published$/.test(place), place || "no place line");
+  const acts = unitScreen ? [...unitScreen.querySelectorAll('[data-el="unit-path-actions"] button')] : [];
+  const actNamed = (/** @type {RegExp} */ re) => acts.find((b) => re.test((b.textContent || "").trim()));
+  check("the first unit cannot move earlier, can move later, and can be opened for the class",
+    !!actNamed(/^Move earlier$/) && /** @type {HTMLButtonElement} */ (actNamed(/^Move earlier$/)).disabled
+      && !!actNamed(/^Move later$/) && !/** @type {HTMLButtonElement} */ (actNamed(/^Move later$/)).disabled
+      && !!actNamed(/^Open for the class$/),
+    acts.map((b) => `${(b.textContent || "").trim()}${/** @type {HTMLButtonElement} */ (b).disabled ? " (off)" : ""}`).join(", ") || "no actions");
+  click(actNamed(/^Move later$/) || null);
+  await sleep(800);
+  const placeAfter = (([...document.querySelectorAll(".at-screen.cardform")].pop() || document.body).querySelector('[data-el="unit-place"]') || {}).textContent || "";
+  check("Move later asks the server and the page then says Unit 2 of 2",
+    movedUnits.length === 1 && movedUnits[0].courseId === "c1" && movedUnits[0].deckId === "u1" && movedUnits[0].to === 1 && /^Unit 2 of 2/.test(placeAfter),
+    `${JSON.stringify(movedUnits)} · ${placeAfter}`);
+  /* And in Material's Modules, a unit is labelled one; a deck is not. */
+  /* Back from the unit to its course, and back from the course. */
+  for (let i = 0; i < 2; i++) {
+    click([...document.querySelectorAll(".at-screen.cardform")].pop()?.querySelector('[aria-label="Back"]') || null);
+    await sleep(400);
+  }
+  click([...document.querySelectorAll(".at-dock [role=tab]"), ...frame().querySelectorAll("button")]
+    .filter((b) => /^Material$/.test((b.textContent || "").trim())).pop() || null);
+  await sleep(400);
+  click([...frame().querySelectorAll("button, [role=tab]")].filter((b) => /^Modules$/.test((b.textContent || "").trim())).pop() || null);
+  await sleep(500);
+  const tiles = [...document.querySelectorAll(".at-deckcard")].map((t) => (t.textContent || "").replace(/\s+/g, " "));
+  const tileOf = (/** @type {RegExp} */ re) => tiles.find((t) => re.test(t)) || "";
+  check("in Material's Modules, a unit is labelled Unit and a deck is not",
+    /Unit · /.test(tileOf(/Greetings unit/)) && /Unit · /.test(tileOf(/Family unit/)) && !!tileOf(/Lesson 1/) && !/Unit · /.test(tileOf(/Lesson 1/)),
+    tiles.join(" | ").slice(0, 300) || "no tiles");
   withPath = false;
+  pathOrder = ["u1", "u2"];
   r.unmount();
   host.remove();
   check("and nothing threw on the path's screens", errors.length === before, errors.slice(before, before + 3).join(" | "));
