@@ -126,9 +126,13 @@ What the page holds:
   Never a separate "Recommended: b" line or box beside the options.
 - **A picture wherever one is relevant.** A change the owner would see in
   the app is shown as a realistic mock-up in the app's real look, at phone
-  size, one per option where the options look different. Anything else
-  (behaviour, order of steps, what is stored) gets a simple sketch, or
-  none if it would add nothing.
+  size. Anything else (behaviour, order of steps, what is stored) gets a
+  simple sketch, or none if it would add nothing.
+- **Every option gets its own mock-up**, not one picture for the question
+  and not a picture of the recommended option only. If a question has
+  options a, b and c that would look different in the app, there are three
+  mock-ups, side by side or one after another, so they can be compared.
+  The only options without one are those with nothing to see.
 - **Choosing is done on the pictures wherever possible.** Where the
   options have mock-ups or sketches, the owner taps the picture itself to
   select that option, and the chosen one is plainly marked; no separate
