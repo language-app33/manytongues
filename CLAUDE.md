@@ -149,9 +149,13 @@ Follow-up questions go in **a new version of the same page**, not a new
 page and not the chat: the earlier decisions stay on it, shown as settled
 with the owner's notes, and the new questions carry on the numbering.
 
-**When a page is shared, the chat message is extremely short**: a line
-saying what the page is for and how many questions it holds, and the link.
-Do not repeat the questions, the options or the reasoning in the chat.
+**No long text in the chat. Whenever a page is shared or updated, the
+reply in the chat is one very short sentence and the link to the page,
+and nothing else.** This holds every time: for the first version, and for
+every later version after the owner pastes answers or asks for a change.
+Do not repeat or summarise the questions, the options, the reasoning or
+what changed on the page in the chat; anything worth saying goes on the
+page itself.
 
 ## How to propose fixes
 
