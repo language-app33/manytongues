@@ -334,6 +334,8 @@ const savedSets = [];
 /** @type {any[]} */
 const madeUnits = [];
 let teacherSets = false;
+/* A module of the teacher's own in My space (0.712), where a walk asks. */
+let teacherPersonal = false;
 /* What the deck screen's Lock asked the server to do. */
 /** @type {any[]} */
 const lockedModules = [];
@@ -517,6 +519,11 @@ const fakeFetch = async (input, opts = {}) => {
        course hands out, which is what makes them worth trying an exercise
        on: one has a recording and one does not, and one is a phrase that
        teaches the other. */
+    /* A course's exercises chosen (0.708): saved as asked, and handed back. */
+    if (action === "set-course-practice") {
+      const body = JSON.parse(opts.body || "{}");
+      return json({ ok: true, course: { id: body.courseId, practice: body.practice } });
+    }
     if (action === "my-courses" && withPath) {
       return json({
         ok: true,
@@ -563,6 +570,9 @@ const fakeFetch = async (input, opts = {}) => {
             { id: "d5", title: "Our family", owner: account.handle, lang: "ar-PS", cardIds: ["k777777777777"], cardCount: 1, courses: [{ courseId: "c1", addedAt: 5 }],
               set: { wording: { question: "Who is this person to you?", none: "I don't know this person", askName: "Who is this?", askWord: "What do you call this person?", askBoth: "Their name, with what you call them" },
                 lists: [], named: [], asks: { name: true, word: true, both: true }, order: "before" } },
+          ] : []),
+          ...(teacherPersonal ? [
+            { id: "dp1", title: "My draft", owner: account.handle, lang: "ar-PS", personal: true, cardIds: [], cardCount: 0, courses: [] },
           ] : []),
         ],
       });
@@ -781,6 +791,12 @@ const dayLater = (s) =>
 /* ---- what the device held before this build: a signed-in account and a
    document from an older build carrying its own private sync key ---- */
 localStorage.setItem("arabic-account", JSON.stringify(account));
+/* And it has been opened before, in Learning: a device with no answer yet
+   about whether its person teaches moves to Teaching when the first answer
+   says so (0.706), and the walks below start in Learning. The walk of a
+   teacher's very first sign-in clears this itself. */
+localStorage.setItem("arabic-trainer-teaches:", "0");
+localStorage.setItem("arabic-trainer-teaches:main", "0");
 const legacyKey = "raven-saffron-thistle-velvet-9f9f";
 localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
   version: 3, items: [], tombstones: {}, log: {}, settings: { language: "ar-PS" },
@@ -2520,10 +2536,9 @@ if (/Build a session/.test(document.body.textContent)) {
      They were plain text, so the only way to find out which cards were
      still new was to read every deck. */
   const counts = /** @type {HTMLButtonElement[]} */ ([...document.querySelectorAll("button.at-rung")]);
-  /* Every card, then one per level of the ladder, then the ones that have
-     been all the way up, then the ones that have stuck. They used to be
-     the four maturities. */
-  check("every count at the top is a button", counts.length === 7, `${counts.length} tiles`);
+  /* Three groups since 0.705: Learning, Almost there, Learnt. They used
+     to be seven tiles, every card and then one per level. */
+  check("every count at the top is a button", counts.length === 3, `${counts.length} tiles`);
   const live = counts.find((b) => !b.disabled);
   check("a count with cards behind it can be pressed", !!live,
     counts.map((b) => `${(b.textContent || "").replace(/\s+/g, " ")}${b.disabled ? " (off)" : ""}`).join(" · "));
@@ -2537,9 +2552,8 @@ if (/Build a session/.test(document.body.textContent)) {
      spread over every level, so one card's 40% and another's would be
      forty per cent of different climbs. The bars belong under a level,
      where they measure the same thing on every tile. */
-  check("but the list of every card carries no bars, which would compare different climbs",
-    !/All cards/.test((live || {}).textContent || "") ||
-      ![...shown].some((t) => t.querySelector(".at-minibar")),
+  check("but the list carries no bars, which would compare different climbs",
+    ![...shown].some((t) => t.querySelector(".at-minibar")),
     `${[...shown].filter((t) => t.querySelector(".at-minibar")).length} of ${shown.length} barred`);
   /* On a screen of its own, titled by the tile that opened it. They used
      to open as a strip under the grid, which put a list of any length
@@ -2566,7 +2580,7 @@ if (/Build a session/.test(document.body.textContent)) {
     document.querySelectorAll(".at-cardgrid .at-minicard").length === 0,
     `${document.querySelectorAll(".at-cardgrid .at-minicard").length} still up`);
   check("which brings the tiles back",
-    document.querySelectorAll("button.at-rung").length === 7,
+    document.querySelectorAll("button.at-rung").length === 3,
     `${document.querySelectorAll("button.at-rung").length} tiles`);
 
   /* ---- the tiles say what a level asks, not what number it is ----
@@ -2575,21 +2589,12 @@ if (/Build a session/.test(document.body.textContent)) {
      read, on the screen whose job is saying where you are. */
   {
     const named = counts.map((b) => (b.textContent || "").replace(/\s+/g, " ").trim());
-    check("every tile says what its level asks, in words",
-      counts.length === 7 && named.every((t) => /[A-Za-z]{3}/.test(t)) &&
-        !named.some((t) => /^\d+\s*Level \d+$/.test(t)),
-      named.join(" · "));
-    check("in the same words a card's own screen uses",
-      named.some((t) => /What it means/.test(t)) && named.some((t) => /Learnt/.test(t)),
-      named.join(" · "));
-    /* Cleared stands between the top level and Learnt, which is the whole
-       reason it exists: a card worked all the way up tonight used to be
-       filed under "write it from its meaning" beside cards that had only
-       just reached that rung. */
-    check("and a card up its whole ladder is counted apart from one still on the top rung",
-      named.findIndex((t) => /Cleared/.test(t)) ===
-        named.findIndex((t) => /Learnt/.test(t)) - 1 &&
-        named.some((t) => /Cleared/.test(t)),
+    const labels = counts.map((b) => ((b.querySelector(".at-rungname") || {}).textContent || "").trim());
+    check("the three groups are Learning, Almost there and Learnt, in that order",
+      labels.join("|") === "Learning|Almost there|Learnt", labels.join(" · "));
+    check("and each says what it means in words, with a number",
+      counts.length === 3 && named.every((t) => /^\d+/.test(t) && /[A-Za-z]{3}.*[A-Za-z]{3}/.test(t)) &&
+        !named.some((t) => /Level \d/.test(t)),
       named.join(" · "));
     check("and each carries a drawing of what it asks",
       counts.every((b) => !!b.querySelector("svg")),
@@ -2610,7 +2615,7 @@ if (/Build a session/.test(document.body.textContent)) {
      own screen and nowhere in the list, which left a card coming back
      tonight looking exactly like one coming back in a month. */
   {
-    const top = counts.filter((b) => /Cleared|Learnt/.test(b.textContent || ""));
+    const top = counts.filter((b) => /Almost there|Learnt/.test(b.textContent || ""));
     check("both tiles at the top of the ladder are there to open", top.length === 2,
       counts.map((b) => (b.textContent || "").replace(/\s+/g, " ").trim()).join(" · "));
     const openable = top.filter((b) => !b.disabled);
@@ -2620,12 +2625,12 @@ if (/Build a session/.test(document.body.textContent)) {
     check("and at least one of them has cards behind it", openable.length > 0,
       top.map((b) => `${(b.textContent || "").replace(/\s+/g, " ").trim()}${b.disabled ? " (off)" : ""}`).join(" · "));
     for (const tile of openable) {
-      const name = (tile.textContent || "").replace(/\s+/g, " ").trim().replace(/^\d+\s*/, "");
+      const name = ((tile.querySelector(".at-rungname") || {}).textContent || "").trim();
       click(tile);
       await sleep(300);
       const cards = [...document.querySelectorAll(".at-cardgrid .at-minicard")];
       const said = cards.map((t) => ((t.querySelector(".at-minimeta") || {}).textContent || "").trim());
-      const isCleared = /Cleared/.test(name);
+      const isCleared = /Almost there/.test(name);
       /* Under Cleared, which of the reviews still to make is next — "First
          review in 3d" — because that is what the card is waiting on. Under
          Learnt there is nothing left to count, so it is simply the next
@@ -2779,9 +2784,9 @@ if (/Build a session/.test(document.body.textContent)) {
      the number underneath, so it is the number that names it here rather
      than the whole of its text. */
   const levelTile = counts.find(
-    (b) => !b.disabled && /Level \d/.test((b.textContent || "").replace(/\s+/g, " ")),
+    (b) => !b.disabled && /^Learning$/.test(((b.querySelector(".at-rungname") || {}).textContent || "").trim()),
   );
-  check("a level has cards behind it", !!levelTile,
+  check("Learning has cards behind it", !!levelTile,
     counts.map((b) => (b.textContent || "").replace(/\s+/g, " ")).join(" · "));
   click(levelTile);
   await sleep(300);
@@ -2797,40 +2802,15 @@ if (/Build a session/.test(document.body.textContent)) {
   check("and each heading is a status, with how many are in it",
     heads.length > 0 && headed.every((h) => /^(Paused|Learning|Not started)\s*\d+$/.test(h)),
     headed.join(" · ") || "no headings");
-  /* ---- and each of them says how far it has got on that level ----
-     The headings say which of three states a card is in, which is the
-     difference between started and not. This is the difference between a
-     card nearly through the level and one that has just begun, and those
-     look identical under "Learning" without it. */
+  /* ---- and each of them says where it is (0.705) ----
+     Learning holds all four levels, so a percentage of one level would
+     compare different climbs: each card says its level instead. */
   {
     const tiles = [...document.querySelectorAll(".at-cardgrid .at-minicard")];
-    const pctOf = (/** @type {Element} */ t) =>
-      ((t.querySelector(".at-minibar b") || {}).textContent || "").trim();
-    check("every card under a level says how far it has got on it, as a percentage",
-      tiles.length > 0 && tiles.every((t) => /^\d+%$/.test(pctOf(t))),
-      tiles.map(pctOf).map((p) => p || "(none)").join(" · ") || "no tiles");
-    /* Read off the bar itself rather than the tile's text, the way the
-       deck bars are: a number beside a word runs into it. */
-    check("and the bar beside it is drawn to the width of that number",
-      tiles.every((t) => {
-        const fill = /** @type {any} */ (t.querySelector(".at-minibarrail > span"));
-        return !!fill && fill.style.width === pctOf(t);
-      }),
-      tiles.map((t) => {
-        const fill = /** @type {any} */ (t.querySelector(".at-minibarrail > span"));
-        return fill ? fill.style.width : "no bar";
-      }).join(" · "));
-    /* The bar is the number again, so a screen reader is told once. */
-    check("the bar is drawing, and not read out twice",
-      tiles.every((t) => {
-        const rail = t.querySelector(".at-minibarrail");
-        return !!rail && rail.getAttribute("aria-hidden") === "true";
-      }));
-    /* And it is never full: a card whose level is done has moved up and is
-       under the next tile along. */
-    check("and none of them is full, because a finished level is the next tile",
-      tiles.every((t) => Number(pctOf(t).replace("%", "")) < 100),
-      tiles.map(pctOf).join(" · "));
+    const metaOf = (/** @type {Element} */ t) => ((t.querySelector(".at-minimeta") || {}).textContent || "").trim();
+    check("every card under Learning says where it is, and carries no bar",
+      tiles.length > 0 && tiles.every((t) => !!metaOf(t) && !t.querySelector(".at-minibar")),
+      tiles.map(metaOf).map((p) => p || "(none)").join(" · ") || "no tiles");
   }
 
   /* The counts are of the whole run, so they add up to the number on the
@@ -3037,9 +3017,9 @@ if (/Build a session/.test(document.body.textContent)) {
 {
   click(buttonNamed(/^Progress$/));
   await sleep(400);
-  /* The first tile is "Cards" — every card that is anywhere on the ladder. */
+  /* Every card in view, as the line under "Your cards" counts them (0.705). */
   const cardCount = () =>
-    Number(((document.querySelector("button.at-rung") || {}).textContent || "").trim().match(/^\d+/));
+    Number(((document.body.textContent || "").match(/How well you know your (\d+) cards/) || [])[1]);
   const both = cardCount();
   /* The languages are in the sheet behind where you are, at the top of
      the page (0.601). */
@@ -4123,6 +4103,9 @@ check("no console errors during the session", errors.length === 0, errors.slice(
       !!keep && !!done && keep.parentElement === done.parentElement &&
         !!(keep.compareDocumentPosition(done) & 4) && /primary/.test(keep.className) && !/primary/.test(done.className),
       `keep:${!!keep} done:${!!done} ${keep ? keep.className : ""}`);
+    /* The line above is in plain words (0.703). */
+    check("the end of a session does not talk about gaps",
+      !/Every gap/.test(document.body.textContent || ""), (document.body.textContent || "").slice(0, 200));
     if (keep) {
       click(keep);
       await sleep(300);
@@ -4332,7 +4315,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   for (const id of ids) {
     click(must(document.querySelector(`.at-cardgrid .at-minicard[data-card="${id}"]`), `the tile of ${id}`));
     await sleep(350);
-    click(must(buttonNamed(on ? /^Mark as high priority$/ : /High priority — tap to clear/), `the priority button on ${id}`));
+    click(must(buttonNamed(on ? /^Practise this first$/ : /Practising first — tap to stop/), `the priority button on ${id}`));
     await sleep(300);
     backOut();
     await sleep(350);
@@ -4746,13 +4729,13 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   click(firstTile);
   await sleep(350);
 
-  const markBtn = buttonNamed(/^Mark as high priority$/);
+  const markBtn = buttonNamed(/^Practise this first$/);
   check("a learner can mark a card high priority from their own card list", !!markBtn,
     (document.body.textContent || "").slice(-160).replace(/\s+/g, " "));
   click(markBtn);
   await sleep(300);
   check("and the button then says how to take it off",
-    !!buttonNamed(/High priority — tap to clear/),
+    !!buttonNamed(/Practising first — tap to stop/),
     (document.body.textContent || "").slice(-120).replace(/\s+/g, " "));
 
   backOut();
@@ -4803,7 +4786,7 @@ const setPriority = async (/** @type {string[]} */ ids, /** @type {boolean} */ o
   await sleep(400);
   click(must(document.querySelector(".at-cardgrid .at-minipri"), "the marked tile").closest(".at-minicard"));
   await sleep(350);
-  click(must(buttonNamed(/High priority — tap to clear/), "the button that clears it"));
+  click(must(buttonNamed(/Practising first — tap to stop/), "the button that clears it"));
   await sleep(300);
   backOut();
   await sleep(350);
@@ -11847,6 +11830,33 @@ const openPronounTables = async () => {
   teachesTwo = false;
 }
 
+/* ---- a teacher's first sign-in on a device opens Teaching (0.706) ----
+   No stored answer yet about whether they teach: the device opens in
+   Learning, and when the first answer says they teach, it moves to
+   Teaching by itself, without the switch being touched. */
+{
+  const before = errors.length;
+  await sleep(1500);
+  for (const k of Object.keys(localStorage)) {
+    if (k.startsWith("arabic-trainer-teaches:")) localStorage.removeItem(k);
+  }
+  localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+    version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+  }));
+  const host = document.createElement("div");
+  document.body.appendChild(host);
+  const r = createRoot(host);
+  r.render(React.createElement(App));
+  await sleep(2500);
+  const said = (host.textContent || "").replace(/\s+/g, " ");
+  check("a teacher's first sign-in on a device opens Teaching's Home, not Learning's",
+    !!host.querySelector(".at-screen.bare") && /My courses/.test(said) && !/Join a course to get started/.test(said),
+    said.slice(0, 200));
+  check("and nothing threw on the way", errors.length === before, errors.slice(before, before + 3).join(" | "));
+  r.unmount();
+  host.remove();
+}
+
 /* ---- a number at the top of its ladder ----
 
    A learner whose numbers are up to the top of their ladder, which in
@@ -13139,11 +13149,34 @@ const openPronounTables = async () => {
     rows.join(" | ") || "no path section");
   check("a published unit can be opened for the class; a draft cannot",
     /Open for the class/.test(rows[0] || "") && !/Open for the class/.test(rows[1] || ""), rows.join(" | "));
-  const screenText = ((pathBlock && pathBlock.closest(".at-screen")) || document.body).textContent || "";
-  const modulesPart = screenText.slice(screenText.lastIndexOf("Modules"));
+  /* The Modules block itself (0.707: it now sits above the path, so the
+     text after the word is no longer only its own). */
+  const modulesBlock = [...(((pathBlock && pathBlock.closest(".at-screen")) || document).querySelectorAll(".at-formblock"))]
+    .find((b) => ((b.querySelector(".at-formnum") || {}).textContent || "").trim() === "Modules");
+  const modulesPart = (modulesBlock && modulesBlock.textContent) || "";
   check("a unit is not among the course's ordinary decks", /Lesson 1/.test(modulesPart) && !/Greetings unit|Family unit/.test(modulesPart),
     modulesPart.replace(/\s+/g, " ").slice(0, 200));
-  click(pathBlock ? pathBlock.querySelector('[data-el="path-unit"] button') : null);
+  /* The Exercises tab (0.708): the four presets and a line; the switches
+     one by one only under Custom. */
+  {
+    const courseScreen = (pathBlock && pathBlock.closest(".at-screen")) || document.body;
+    const tabNamed = (/** @type {string} */ n) => [...courseScreen.querySelectorAll("[role=tab]")]
+      .find((t) => (t.textContent || "").trim() === n);
+    const panel = () => ((courseScreen.querySelector('[role=tabpanel][aria-label="exercises"]') || {}).textContent || "");
+    click(tabNamed("Exercises") || null);
+    await sleep(300);
+    check("a course's Exercises tab shows the presets, without the switches one by one",
+      /With translation/.test(panel()) && !/Match the pairs/.test(panel()), panel().slice(0, 200));
+    click([...courseScreen.querySelectorAll('[role=tabpanel][aria-label="exercises"] button')]
+      .find((b) => (b.textContent || "").trim() === "Custom") || null);
+    await sleep(500);
+    check("and Custom shows them", /Match the pairs/.test(panel()), panel().slice(0, 200));
+    click(tabNamed("Course") || null);
+    await sleep(300);
+  }
+  /* Found again: the Course tab was drawn afresh. */
+  const pathAgain = [...document.querySelectorAll('[data-el="course-path"]')].pop();
+  click(pathAgain ? pathAgain.querySelector('[data-el="path-unit"] button') : null);
   await sleep(600);
   const unitScreen = [...document.querySelectorAll(".at-screen.cardform")].pop();
   const unitText = unitScreen ? (unitScreen.textContent || "").replace(/\s+/g, " ") : "";
@@ -13198,7 +13231,7 @@ const openPronounTables = async () => {
     check("a module's tile has its quality in a ring, and no language or card count",
       !!lesson && !!lesson.querySelector(".at-qring") && !/\bcards?\b|Arabic/.test(meta),
       lesson ? `${meta} | ring: ${!!lesson.querySelector(".at-qring")}` : "(no Lesson 1)");
-    /* 0.703: the ring left of the name, and who can see it on the line
+    /* 0.714: the ring left of the name, and who can see it on the line
        straight under the name rather than under a rule at the foot. */
     check("its ring is left of its name, and who can see it is right under the name",
       !!lesson && !!lesson.querySelector(".at-deckrow2 > .at-decklead .at-qring") &&
@@ -13221,10 +13254,61 @@ const openPronounTables = async () => {
   check("and nothing threw on the path's screens", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
+/* ---- My space is being retired from Teaching (0.712) ----
+   A teacher with nothing in it has no My space in the bar; one with a
+   module still there has the tab, which says it is being retired and
+   offers nothing new to make. */
+{
+  const before = errors.length;
+  /** @param {boolean} personal */
+  const openTeaching = async (personal) => {
+    teacherPersonal = personal;
+    localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+    }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    await sleep(1500);
+    if (!host.querySelector(".at-screen.bare")) {
+      click(host.querySelector('[data-el="where-you-are"]'));
+      await sleep(200);
+      click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+      await sleep(900);
+    }
+    const bar = () => [...document.querySelectorAll(".at-dock [role=tab]")].map((b) => (b.textContent || "").trim());
+    return { host, r, bar };
+  };
+  {
+    const { host, r, bar } = await openTeaching(false);
+    check("a teacher with nothing in My space has no My space in the bar",
+      bar().length > 0 && !bar().some((t) => /My space/.test(t)), bar().join(" | ") || "no bar");
+    r.unmount();
+    host.remove();
+  }
+  {
+    const { host, r, bar } = await openTeaching(true);
+    check("a teacher with a module still in My space keeps the tab",
+      bar().some((t) => /My space/.test(t)), bar().join(" | ") || "no bar");
+    click([...document.querySelectorAll(".at-dock [role=tab]")].find((b) => /My space/.test(b.textContent || "")) || null);
+    await sleep(600);
+    const frameText = ((host.querySelector(".at-screen.bare") || host).textContent || "").replace(/\s+/g, " ");
+    check("which says it is being retired",
+      /My space is being retired/.test(frameText), frameText.slice(0, 200));
+    check("and offers no New module",
+      ![...(host.querySelector(".at-screen.bare") || host).querySelectorAll("button")].some((b) => /^New module$/.test((b.textContent || "").trim())),
+      frameText.slice(0, 200));
+    r.unmount();
+    host.remove();
+  }
+  teacherPersonal = false;
+  check("and nothing threw on My space", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
 /* ---- personal sets are the App admin's to switch on (0.683) ----
-   A space whose card does not say so offers only a regular deck and a
-   unit on New deck; the tiles sit in the spaced list every list of tiles
-   uses, not straight on the sheet. */
+   A space whose card does not say so offers no New personal set. New
+   module makes a deck in one step (0.710): no sheet asking which kind. */
 {
   const before = errors.length;
   const offOrg = { id: "main", slug: "main", name: "Main", logo: "", colour: "", sets: false };
@@ -13250,14 +13334,19 @@ const openPronounTables = async () => {
   await sleep(400);
   click(tab(/^Modules$/) || null);
   await sleep(500);
+  click(frame().querySelector('[aria-label="More for these modules"]'));
+  await sleep(200);
+  const moreLines = [...document.querySelectorAll(".at-moresheet .at-sheetact b")].map((b) => (b.textContent || "").trim());
+  check("with personal sets off in the space, the three dots offer no New personal set",
+    !moreLines.includes("New personal set"), moreLines.join(" | ") || "(no sheet)");
+  click(document.querySelector('.at-moresheet [aria-label="Close"]'));
+  await sleep(200);
   click(buttonNamed(/^New module$/));
   await sleep(300);
-  const rows = [...document.querySelectorAll(".at-sheet .at-openrow")];
-  const titles = rows.map((b) => (b.querySelector(".at-decktitle") || b).textContent || "").join(" | ");
-  check("with personal sets off in the space, New module offers a deck and a unit only", titles === "Deck | Unit", titles || "no sheet");
-  check("and the kinds sit in the spaced list of tiles", rows.length > 0 && rows.every((b) => !!b.parentElement && b.parentElement.classList.contains("at-decklist2")),
-    rows.map((b) => (b.parentElement && b.parentElement.className) || "").join(", ") || "no rows");
-  click(document.querySelector('.at-sheet button[aria-label="Close"]'));
+  const madeTitle = (([...document.querySelectorAll(".at-screen.cardform .at-screenhead h2")].pop() || {}).textContent || "").trim();
+  check("and New module goes straight to naming a deck, with no sheet asking what kind",
+    !document.querySelector(".at-sheet .at-openrow") && madeTitle === "Create deck", madeTitle || "no screen");
+  backOut();
   await sleep(200);
   whoamiAs = null;
   r.unmount();
@@ -13266,9 +13355,9 @@ const openPronounTables = async () => {
 }
 
 /* ---- a new deck's kind, and a personal set's section (0.632, 0.633) ----
-   New deck asks first what kind: a regular deck, a unit or a personal
-   set. A unit asks for its course; a personal set is made as a deck and
-   marked as a set. An ordinary deck has no Personal set section; a set
+   New module makes a deck (0.710); a personal set is made from the three
+   dots, and a unit from a course's path. A personal set is made as a deck
+   and marked as a set. An ordinary deck has no Personal set section; a set
    has one, with no switch: its question changed, two lists added, a word
    ticked, the word after the name, saved. */
 {
@@ -13301,14 +13390,13 @@ const openPronounTables = async () => {
     await sleep(500);
   };
   await toModules();
-  const sheetRows = () => [...document.querySelectorAll(".at-sheet .at-openrow")].map((b) => (b.querySelector(".at-decktitle") || b).textContent || "");
-  const openSheet = async () => {
-    click(buttonNamed(/^New module$/));
-    await sleep(300);
-  };
-  await openSheet();
-  check("New module asks what kind: a deck, a unit or a personal set",
-    sheetRows().join(" | ") === "Deck | Unit | Personal set", sheetRows().join(" | ") || "no sheet");
+  const screenTitle = () => (([...document.querySelectorAll(".at-screen.cardform .at-screenhead h2")].pop() || {}).textContent || "").trim();
+  click(buttonNamed(/^New module$/));
+  await sleep(300);
+  check("New module goes straight to naming a deck",
+    !document.querySelector(".at-sheet .at-openrow") && screenTitle() === "Create deck", screenTitle() || "no screen");
+  backOut();
+  await sleep(300);
   const setValue = must(Object.getOwnPropertyDescriptor(w.HTMLInputElement.prototype, "value"), "the value descriptor").set;
   const name = async (/** @type {string} */ v) => {
     const box = /** @type {HTMLInputElement | null} */ ([...document.querySelectorAll(".at-screen.cardform .at-formblock input.at-input")].pop() || null);
@@ -13322,10 +13410,11 @@ const openPronounTables = async () => {
     click([...document.querySelectorAll('.at-fab[aria-label="Save"]')].pop() || null);
     await sleep(700);
   };
-  click([...document.querySelectorAll(".at-sheet .at-openrow")].find((b) => /Personal set/.test(b.textContent || "")) || null);
+  click(frame().querySelector('[aria-label="More for these modules"]'));
+  await sleep(200);
+  click([...document.querySelectorAll(".at-moresheet .at-sheetact")].find((b) => /New personal set/.test(b.textContent || "")) || null);
   await sleep(400);
-  const screenTitle = () => (([...document.querySelectorAll(".at-screen.cardform .at-screenhead h2")].pop() || {}).textContent || "").trim();
-  check("choosing Personal set opens Create personal set", screenTitle() === "Create personal set", screenTitle());
+  check("New personal set, in the three dots, opens Create personal set", screenTitle() === "Create personal set", screenTitle());
   const madeBefore = madeModules.length;
   const setsBefore = savedSets.length;
   await name("Grandparents");
@@ -13338,14 +13427,24 @@ const openPronounTables = async () => {
     JSON.stringify({ madeSet, markedSet }));
   backOut();
   await sleep(300);
-  await toModules();
-  await openSheet();
-  click([...document.querySelectorAll(".at-sheet .at-openrow")].find((b) => /^Unit/.test((b.querySelector(".at-decktitle") || b).textContent || "")) || null);
-  await sleep(400);
-  check("choosing Unit asks for its course", screenTitle() === "Create unit" && /Course/.test((([...document.querySelectorAll(".at-screen.cardform")].pop() || {}).textContent) || ""),
-    screenTitle());
-  await name("Family unit 2");
-  await save();
+  /* A unit is made where it is used: a course's path, New unit (0.710). */
+  click(tab(/^Home\d*$/) || null);
+  await sleep(500);
+  click([...document.querySelectorAll(".at-deckcard")].find((t) => /Arabic 101/.test(t.textContent || "")) || null);
+  await sleep(500);
+  click(buttonNamed(/^New unit$/));
+  await sleep(300);
+  {
+    const box = /** @type {HTMLInputElement | null} */ ([...document.querySelectorAll(".at-modal input.at-input, [role=dialog] input.at-input")].pop() || null);
+    if (box) {
+      setValue?.call(box, "Family unit 2");
+      box.dispatchEvent(new w.Event("input", { bubbles: true }));
+      await sleep(120);
+    }
+    check("a course's path asks a new unit's title", !!box, "no title box");
+    click([...document.querySelectorAll(".at-modal button, [role=dialog] button")].filter((b) => /^New unit$/.test((b.textContent || "").trim())).pop() || null);
+    await sleep(700);
+  }
   const unitMade = madeUnits[madeUnits.length - 1];
   check("and saved, it is made on that course's path", !!unitMade && unitMade.courseId === "c1" && unitMade.title === "Family unit 2", JSON.stringify(unitMade));
   backOut();

@@ -1660,11 +1660,11 @@ export function Tile({ title, meta, onOpen, actions, footer, lead, note }: {
   actions?: Node;
   footer?: Node;
   /** Before the title, centred on it and what is under it: a module's
-      quality ring (0.703, the owner's 3a), so the scores of a list stand
+      quality ring (0.714, the owner's 3a), so the scores of a list stand
       in one column down its left. */
   lead?: Node;
   /** A line straight under the title, inside the column beside `lead`,
-      where `footer` sits under the whole row (0.703). */
+      where `footer` sits under the whole row (0.714). */
   note?: Node;
 }) {
   return (
@@ -1686,7 +1686,7 @@ export function Tile({ title, meta, onOpen, actions, footer, lead, note }: {
 }
 
 /* The line at the foot of a tile: whether anyone can see it. No rule over
-   it since 0.703 (the owner's wish), so it reads as part of the tile's
+   it since 0.714 (the owner's wish), so it reads as part of the tile's
    text rather than a separate strip. Said in words
    alone — a green or grey dot beside them repeated the sentence in a code
    nobody had been told. `live` is kept on the element for anything that
@@ -3259,12 +3259,12 @@ function ReadForm({ form, lang, title, what, reader }: {
   return (
     <section className="at-panel">
       <p className="at-eyebrow">{title}</p>
-      <p className="at-hint">{what}</p>
+      {what ? <p className="at-hint">{what}</p> : null}
       <ReadSaid form={form} lang={lang} />
       <ReadSound form={form} />
       {reader === "teacher" ? <ReadAsked form={form} /> : null}
       {form.note ? <ReadRow label="Note">{String(form.note)}</ReadRow> : null}
-      <ReadReference form={form} lang={lang} />
+      {reader === "student" ? null : <ReadReference form={form} lang={lang} />}
     </section>
   );
 }
@@ -3584,6 +3584,9 @@ export function CardReadout({ card, lang, modules, cards, reader = "teacher" }: 
 }) {
   const L = lang || LANGUAGES[DEFAULT_LANGUAGE];
   const teacher = reader === "teacher";
+  /* The student's own card page (0.704): no "What it is", no line about
+     what is asked, no Reference. See Reader in card-facts.ts. */
+  const student = reader === "student";
   const forms: Record<string, any>[] = formsOf(card);
   const tables = tablesOn(card, L);
   /* The forms that are not cells of a table: a cell is a form like any
@@ -3709,7 +3712,7 @@ export function CardReadout({ card, lang, modules, cards, reader = "teacher" }: 
           offered and which blanks it fills without anybody ticking one.
           First, because it is the first question the editor asks — before
           the editor opens, in the case of the three shapes. */}
-      <ReadKind card={card} lang={L} />
+      {student ? null : <ReadKind card={card} lang={L} />}
 
       {loose.map((f, i) => (
         <React.Fragment key={String(f.id || i)}>
@@ -3720,7 +3723,7 @@ export function CardReadout({ card, lang, modules, cards, reader = "teacher" }: 
             title={i === 0 ? "The card" : `Other form ${i}`}
             what={
               i === 0
-                ? "What a student is asked, and what counts as the answer."
+                ? student ? "" : "What a student is asked, and what counts as the answer."
                 : "Another way the same thing is said. It is practiced on its own."
             }
           />

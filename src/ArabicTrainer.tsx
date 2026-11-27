@@ -1037,14 +1037,13 @@ const LEVEL_REACHED: Record<number, string> = {
  * than the badge, and brass rather than jade: the work is done and the app
  * is still checking.
  */
-const LADDER_TILES: { key: string; label: string; icon: string }[] = [
-  { key: "all", label: "All cards", icon: "cards" },
-  { key: "l1", label: LEVEL_NAME[1], icon: "help" },
-  { key: "l2", label: LEVEL_NAME[2], icon: "search" },
-  { key: "l3", label: LEVEL_NAME[3], icon: "copy" },
-  { key: "l4", label: LEVEL_NAME[4], icon: "edit" },
-  { key: "cleared", label: "Cleared", icon: "check" },
-  { key: "done", label: "Learnt", icon: "verify" },
+/* Three groups since 0.705, in place of seven tiles: the four levels
+   together as Learning, then Cleared as "Almost there", then Learnt. The
+   levels are still on each card's own page. */
+const LADDER_TILES: { key: string; label: string; note: string; icon: string; tone: string; bar: string }[] = [
+  { key: "learning", label: "Learning", note: "You're still getting to know these.", icon: "help", tone: "var(--text)", bar: "at-sharebar-a" },
+  { key: "cleared", label: "Almost there", note: "Right at every level. A few more days and they're learnt.", icon: "check", tone: "var(--brass)", bar: "at-sharebar-b" },
+  { key: "done", label: "Learnt", note: "You still knew these days later.", icon: "verify", tone: "var(--jade)", bar: "at-sharebar-c" },
 ];
 
 const STATUS_LABEL: Record<string, string> = {
@@ -11708,6 +11707,13 @@ export default function ArabicTrainer() {
     if (open === "teach") return "teach";
     return loadTeaches() ? "teach" : "learn";
   });
+  /* Whether the person has chosen where to be on this launch, and whether
+     the page was opened to a place (0.706). A teacher's first sign-in on a
+     device has no stored answer, so it opens in Learning; when the first
+     answer says they teach, it moves to Teaching — unless either of these
+     has already said where to be. */
+  const pickedSpace = useRef(false);
+  const openedTo = useRef(new URLSearchParams(window.location.search).has("open"));
   useEffect(() => {
     const q = new URLSearchParams(window.location.search);
     if (!q.has("open")) return;
@@ -13819,7 +13825,18 @@ export default function ArabicTrainer() {
           materialVersion.current,
           dataRef.current.parked || {},
         );
+        /* Whether this device had no answer yet (0.706), read before the
+           answer below is kept. */
+        let firstTimeHere = false;
+        try {
+          firstTimeHere = localStorage.getItem(teachesKey()) === null;
+        } catch (e) {
+          firstTimeHere = false;
+        }
         setTeaches(r.teaches);
+        if (r.teaches && firstTimeHere && !pickedSpace.current && !TRYING && !openedTo.current) {
+          setSpace((s) => (s === "learn" ? "teach" : s));
+        }
         /* Trying a space (0.574): its answer is not yours to keep. */
         if (!TRYING) {
           saveTeaches(r.teaches);
@@ -16230,6 +16247,7 @@ export default function ArabicTrainer() {
   /* Going to another space is going to its address, as it always was:
      every screen then agrees about where you are. */
   const goToSpace = (to: { id: string; slug: string }, open = "") => {
+    pickedSpace.current = true;
     const then = open ? `?open=${open}` : "";
     if (to.id === "super") {
       /* Super admin is shown only at one of your own addresses: from a
@@ -16286,6 +16304,7 @@ export default function ArabicTrainer() {
   /* A mode beside a space. Learning there is Learning narrowed to it;
      another space's mode is gone to at its address (0.610). */
   const pickMode = (row: WhereRow, mode: string) => {
+    pickedSpace.current = true;
     setWhereOpen(false);
     if (!row.here) {
       if (mode === "learn" && where.multi) setSpaceFilter(row.id);
@@ -17871,7 +17890,7 @@ export default function ArabicTrainer() {
                 <Stat value={`${tally.first} / ${tally.asked}`} big />
                 <Help>
                   {practice
-                    ? "Your schedule is untouched, apart from anything marked Again."
+                    ? "Extra practice. Your schedule hasn't changed, apart from anything you marked Again."
                     : /*
                        * Which kind of session this was.
                        *
@@ -17884,12 +17903,12 @@ export default function ArabicTrainer() {
                        * your schedule.
                        */
                     session.due === 0
-                    ? "None of these were due, so your schedule has barely moved. The practice still counts."
+                    ? "None of these were due yet, so they will come back when planned. The practice still counts."
                     : session.items && session.due && session.due < session.items
-                    ? `${session.items - session.due} of these weren't due yet and have barely moved.`
+                    ? `${session.items - session.due} of these weren't due yet, so they will come back when planned.`
                     : tally.first === tally.asked
-                    ? "Clean run. Every gap just got longer."
-                    : `${tally.asked - tally.first} lapsed and will come back shortly.`}
+                    ? "All correct. These words will come back less often now."
+                    : `${tally.asked - tally.first} to try again. They will come back soon.`}
                 </Help>
                 <WhatMoved moved={moved} items={items} settings={settings} />
                 {/* Another session started exactly as this one was, on top
@@ -18913,23 +18932,12 @@ function CardLadder({ card, items, settings }: { card: Item; items?: Item[]; set
   if (!levels.length || !at) return null;
   return (
     <Section title="Progress" lede={standingLabel(at)}>
-      <div className="at-ladder">
-        {levels.map((row) => (
-          <div className={`at-ladderrow${row.level === at.level ? " on" : ""}`} key={row.level}>
-            <span className="num" style={{ color: LEVEL_COLOR[row.level] }}>
-              {row.level}
-            </span>
-            <span className="nm">{LEVEL_NAME[row.level] || `Level ${row.level}`}</span>
-            <span className="st" style={{ color: STATUS_COLOR[row.status] }}>
-              {STATUS_LABEL[row.status] || row.status}
-            </span>
-            {/* The count only where it means something: on the level being
-                worked on, where it says how much of what has to hold for
-                the next one to open does. */}
-            <span className="ct">
-              {row.level === at.level && row.status !== "done" ? `${row.done} of ${row.of}` : ""}
-            </span>
-          </div>
+      {/* One bar of four (0.704): the level the card is on, filled up to
+          it. The levels by name are not listed: the line above says where
+          the card is, and the bar how far up. */}
+      <div className="at-levelbar" role="img" aria-label={`Level ${at.level} of 4`}>
+        {[1, 2, 3, 4].map((n) => (
+          <span key={n} className={n <= at.level ? "at-levelbar-on" : undefined} />
         ))}
       </div>
       <Help>
@@ -18937,7 +18945,7 @@ function CardLadder({ card, items, settings }: { card: Item; items?: Item[]; set
           ? "Missing the same question twice running closes the levels above it. Nothing is lost — this opens again as soon as the level under it is back."
           : at.status === "done"
           ? "Every level is done. The card still comes back, just further and further apart."
-          : "A level opens once everything under it is through the learning steps and back in review. The last one waits longer: everything under it has to hold for four days."}
+          : "Answer right twice in a row to move up a level."}
       </Help>
     </Section>
   );
@@ -19047,7 +19055,7 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
            sound and what it means, without the teacher's side of it — which
            decks carry it, what other cards call it, which of its forms are
            lent out. See Reader in card-facts.ts. */
-        reader="both"
+        reader="student"
       />
 
       {tenseFormsOf(live).length ? (
@@ -19058,14 +19066,8 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
 
       {onPriority && (
         <div className="at-card at-mt4">
-          <p className="at-eyebrow">High priority</p>
-          <Help>
-            For a card you want to get on with. Marked, it joins your very next
-            session whatever its schedule says, and opens it — and it stays in
-            every session until you take the mark off. Nothing else about it
-            changes: what you have learnt, and when it would have come round
-            anyway, are both still there underneath.
-          </Help>
+          <p className="at-eyebrow">Practise this first</p>
+          <Help>Puts this card at the start of every session until you turn it off.</Help>
           <div className="at-row at-mt3">
             <Button
               variant={live.priority ? "primary" : "default"}
@@ -19073,7 +19075,7 @@ function CardScreen({ card, items, settings, onPriority, onBack, action }: {
               icon="star"
               onClick={() => onPriority(live.id, !live.priority)}
             >
-              {live.priority ? "High priority — tap to clear" : "Mark as high priority"}
+              {live.priority ? "Practising first — tap to stop" : "Practise this first"}
             </Button>
           </div>
         </div>
@@ -21205,7 +21207,7 @@ function ProgressTab({
      to say four hundred and once to list them — is a walk of every card
      for nothing. */
   const byBucket = useMemo(() => {
-    const out: Record<string, Item[]> = { all: counted, l1: [], l2: [], l3: [], l4: [], cleared: [], done: [] };
+    const out: Record<string, Item[]> = { l1: [], l2: [], l3: [], l4: [], cleared: [], done: [] };
     for (const it of counted) {
       const at = progressOf.get(it.id);
       /* A card with nothing it can be asked yet — no meaning, or every
@@ -21220,6 +21222,8 @@ function ProgressTab({
         at.status === "done" ? "done" : at.status === "cleared" ? "cleared" : `l${at.level}`;
       (out[bucket] || []).push(it);
     }
+    /* The four levels as one group, Learning (0.705), in level order. */
+    out.learning = [...out.l1, ...out.l2, ...out.l3, ...out.l4];
     return out;
   }, [counted, progressOf]);
   /* Which tile is open, or none. One at a time: they are six views of the
@@ -21233,7 +21237,7 @@ function ProgressTab({
      two tiles — "Cards" is spread over every level, so one card's 40% and
      another's would be forty per cent of different climbs, and under
      "Learnt" every bar would be full. */
-  const onLevel = /^l\d$/.test(showing);
+  const onLevel = showing === "learning";
   /* And whether it is one of the two at the top, where the climb is over
      and what is left is time: every bar there would be full, so each card
      says when it is next asked instead. */
@@ -21296,9 +21300,21 @@ function ProgressTab({
       <Lately moves={moves} />
       <Section
         head
-        title="The ladder"
-        lede="See how well you know each card. Answer a card correctly twice in a row to move it up a level."
+        title="Your cards"
+        lede={`How well you know your ${counted.length} cards.`}
       >
+      {/* The three groups' shares, drawn once; the tiles carry the numbers. */}
+      {(() => {
+        const total = LADDER_TILES.reduce((n, t) => n + byBucket[t.key].length, 0);
+        return total ? (
+          <div className="at-sharebar" aria-hidden="true">
+            {LADDER_TILES.map((t) => (
+              <span key={t.key} className={t.bar}
+                style={{ width: `${(100 * byBucket[t.key].length) / total}%` }} />
+            ))}
+          </div>
+        ) : null;
+      })()}
 
       {/* A number you want to see the cards behind is a number worth
           pressing. Buttons rather than divs with a click on them: there is
@@ -21312,16 +21328,8 @@ function ProgressTab({
           looking at now, and each says what its level actually asks rather
           than what number it happens to be. */}
       <div className="at-rungs">
-        {LADDER_TILES.map(({ key, label, icon }) => {
+        {LADDER_TILES.map(({ key, label, note, icon, tone }) => {
           const count = byBucket[key].length;
-          const tone =
-            key === "all"
-              ? "var(--text)"
-              : key === "done"
-              ? "var(--jade)"
-              : key === "cleared"
-              ? STATUS_COLOR.cleared
-              : LEVEL_COLOR[Number(key.slice(1))];
           return (
             <button
               type="button"
@@ -21341,7 +21349,7 @@ function ProgressTab({
               </span>
               <b style={{ color: tone }}>{count}</b>
               <span className="at-rungname">{label}</span>
-              {/^l\d$/.test(key) && <span className="at-rungstep">Level {key.slice(1)}</span>}
+              <span className="at-rungstep">{note}</span>
             </button>
           );
         })}
@@ -21409,7 +21417,7 @@ function ProgressTab({
                  apart is which comes back first — "Cleared" on every
                  tile and "Learnt" on every tile said nothing at all. */
               meta={
-                showing === "all"
+                showing === "learning"
                   ? standingShort(progressOf.get(it.id) || null)
                   : showing === "cleared"
                   ? heldLine(progressOf.get(it.id) || null) ||
@@ -21418,13 +21426,6 @@ function ProgressTab({
                   ? reviewLine(progress.next.get(it.id) || 0)
                   : undefined
               }
-              /* And under a level, how far the card has got on it. The
-                 headings say which of three states it is in, which is the
-                 difference between started and not; this says how much of
-                 the level is behind it, which is the difference between a
-                 card that is nearly through and one that has just begun —
-                 and those look identical under "Learning" without it. */
-              bar={onLevel ? { pct: levelPercent(progressOf.get(it.id)) } : undefined}
               /* Everything on the tile, said in full. Elsewhere a tile is
                  something to scan past and is clipped to keep it short;
                  here the small print is the answer to the question the

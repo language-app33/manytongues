@@ -1343,7 +1343,9 @@ Three rules shape what a session asks, all of them in `src/scheduler.ts`:
   (`course.wordSets`, chosen on its page, `set-course-word-set`), or the
   earliest written of those reaching it; `my-material` sends each deck
   holding pronouns that set's cards in place of its own. Why:
-  DECISIONS.md, "One word set per course".
+  DECISIONS.md, "One word set per course". Since 0.713 a space uses one
+  set per kind and language, the first written (`schoolWordSet`), and a
+  course's stored choice is no longer read.
 - **A number is built, not memorised, and so is a time.** A learner who
   knows *forty* and *seven* knows *forty-seven*, so numbers are not cards
   one at a time. A language's numbers are **one document** — the words it

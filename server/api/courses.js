@@ -2809,6 +2809,7 @@ async function handle(req) {
         courses: [],
         cardIds: [],
         updated: Date.now(),
+        editedBy: mine,
       };
       await writeJson(store, K.deck(id), module);
       await indexAdd(store, "decks", id);
@@ -3058,6 +3059,12 @@ async function handle(req) {
       return /** @type {Promise<any>} */ (numbersHeld.get(at));
     };
 
+    /** The one order sets are put in: the earliest written first, and on a
+        tie the handle that sorts first. Used by reachingSets and by
+        schoolWordSet (0.713). */
+    const firstWritten = (/** @type {{ handle: string, at: number }} */ a, /** @type {{ handle: string, at: number }} */ b) =>
+      a.at - b.at || a.handle.localeCompare(b.handle);
+
     /**
      * Whose sets of one kind reach a course now, the earliest written first.
      *
@@ -3095,7 +3102,7 @@ async function handle(req) {
       }
       return [...first]
         .map(([handle, at]) => ({ handle, at }))
-        .sort((a, b) => a.at - b.at || a.handle.localeCompare(b.handle));
+        .sort(firstWritten);
     }
 
     /**
@@ -3109,7 +3116,36 @@ async function handle(req) {
     async function wordSetPick(course, kind, decks, cardOf) {
       const chosen = String(((/** @type {any} */ (course).wordSets || {})[kind]) || "");
       const reaching = await reachingSets(course, kind, decks, cardOf);
-      return { handle: chosen || (reaching[0] ? reaching[0].handle : ""), chosen: !!chosen, reaching };
+      /* The school's set (0.713): one per kind and language in a space, the
+         first written. A course's stored choice is no longer read; where
+         the space has no set of the kind, the earliest reaching it. */
+      const school = orgOf(course) === acting ? await schoolWordSet(kind, course.language || "") : null;
+      return { handle: school || (reaching[0] ? reaching[0].handle : ""), chosen: !!chosen, reaching };
+    }
+
+    /** @type {Promise<Awaited<ReturnType<typeof spaceWordSets>>> | null} */
+    let spaceSetsHeld = null;
+    /**
+     * The school's set of one kind in one language (0.713): of the sets
+     * spaceWordSets lists for the space this request acts in, the one
+     * written first — numbers by their document's `created`, pronouns by
+     * the earliest `created` among the teacher's pronoun cards there — or
+     * null where there is none. Read once a request.
+     * @param {"numbers" | "pronouns"} kind
+     * @param {string} lang
+     * @returns {Promise<string | null>}
+     */
+    async function schoolWordSet(kind, lang) {
+      if (!spaceSetsHeld) spaceSetsHeld = spaceWordSets();
+      const { pronouns, numbers } = await spaceSetsHeld;
+      const rows = kind === "numbers"
+        ? numbers.filter((n) => n.lang === lang).map((n) => ({ handle: n.owner, at: Number(n.numbers && n.numbers.created) || 0 }))
+        : pronouns.filter((p) => p.lang === lang).map((p) => ({
+          handle: p.owner,
+          at: Math.min(...p.cards.map((c) => Number(c.created) || 0)),
+        }));
+      rows.sort(firstWritten);
+      return rows.length ? rows[0].handle : null;
     }
 
     /**
@@ -3420,7 +3456,19 @@ async function handle(req) {
          teacher hears about it — and a device that still has one can send
          it again. */
       const missingClips = await clipsMissing(store, cards.flatMap(clipsOfCard));
-      return jsonTagged(req, { ok: true, cards: cards.map((c) => ({ ...teacherView(c), decks: holding[c.id] || [] })), missingClips });
+      /* Who made each card and who last changed it, by name (0.711): one
+         look-up for the whole answer. */
+      const cardNames = await namesOf(cards.flatMap((c) => [c.owner || "", c.editedBy || ""]));
+      return jsonTagged(req, {
+        ok: true,
+        cards: cards.map((c) => ({
+          ...teacherView(c),
+          decks: holding[c.id] || [],
+          ...(c.owner ? { ownerName: cardNames[c.owner] || c.owner } : null),
+          ...(c.editedBy ? { editedByName: cardNames[c.editedBy] || c.editedBy } : null),
+        })),
+        missingClips,
+      });
     }
 
     if (action === "save-card") {
@@ -4237,6 +4285,8 @@ async function handle(req) {
              would fall back into Main. */
           ...(existing.org ? { org: existing.org } : {}),
           updated: Date.now(),
+          /* Who changed it last (0.711). */
+          editedBy: mine,
         };
       } else {
         const newId = `k${randomBytes(6).toString("hex")}`;
@@ -4269,6 +4319,7 @@ async function handle(req) {
           rev: 1,
           created: now,
           updated: now,
+          editedBy: mine,
         };
         /* Added to whatever the list holds when the write lands. Read and
            written whole, two cards made at once cost one of them its place
@@ -4396,6 +4447,7 @@ async function handle(req) {
             cardCount: now.length,
             version: (base.version || 1) + 1,
             updated: Date.now(),
+            editedBy: mine,
           };
         });
         if (record) moduleRecords.push(record);
@@ -4694,7 +4746,7 @@ async function handle(req) {
         } else {
           next = { ...c, pending: { ...pending, status: to } };
         }
-        return { next: { ...next, rev: (c.rev || 1) + 1, updated: Date.now() } };
+        return { next: { ...next, rev: (c.rev || 1) + 1, updated: Date.now(), editedBy: mine } };
       };
       const first = statusOf(card);
       if ("error" in first) return json({ error: first.error }, 400);
@@ -4722,7 +4774,7 @@ async function handle(req) {
       if (seenByStudents(was) !== seenByStudents(next)) {
         for (const did of holding) {
           await updateJson(store, K.deck(did), (/** @type {any} */ d) =>
-            d ? { ...d, version: (d.version || 1) + 1, updated: Date.now() } : null,
+            d ? { ...d, version: (d.version || 1) + 1, updated: Date.now(), editedBy: mine } : null,
           );
         }
         if (fillsOf(was).length || fillsOf(next).length || isSentence(was) || isSentence(next)) {
@@ -4844,12 +4896,17 @@ async function handle(req) {
       const shown = rows.filter((d) => !hidesSet(off, d) && (d.owner === mine || teaching.has(d.id) || (iManage && !d.personal)));
       /* And which of its number parts reach nobody yet — see partsWaiting. */
       const waiting = await partsWaiting(shown, courses);
+      /* Who made each one and who last changed it, by name (0.711): one
+         look-up for the whole answer. */
+      const deckNames = await namesOf(shown.flatMap((d) => [d.owner, d.editedBy || ""]));
       const modules = shown.map((d) => ({
         ...d,
         courses: linksOf(d, courses),
         cardCount: (d.cardIds || []).length,
         mine: d.owner === mine,
         ...(waiting.has(d.id) ? { partsWaiting: waiting.get(d.id) } : null),
+        ...(d.owner ? { ownerName: deckNames[d.owner] || d.owner } : null),
+        ...(d.editedBy ? { editedByName: deckNames[d.editedBy] || d.editedBy } : null),
       }));
       return jsonTagged(req, { ok: true, decks: modules });
     }
@@ -4866,7 +4923,7 @@ async function handle(req) {
          filed into it, a course it was added to. The same for every change
          to a deck below. */
       await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) =>
-        fresh ? { ...fresh, title, updated: Date.now() } : null
+        fresh ? { ...fresh, title, updated: Date.now(), editedBy: mine } : null
       );
       await taught();
       return json({ ok: true, title });
@@ -4886,7 +4943,7 @@ async function handle(req) {
       await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) => {
         if (!fresh) return null;
         const { locked: _was, ...rest } = fresh;
-        return { ...(locked ? { ...rest, locked: true } : rest), updated: Date.now() };
+        return { ...(locked ? { ...rest, locked: true } : rest), updated: Date.now(), editedBy: mine };
       });
       await taught();
       return json({ ok: true, locked });
@@ -4920,7 +4977,7 @@ async function handle(req) {
       const next = await updateJson(store, K.deck(module.id), (/** @type {Module | null} */ fresh) => {
         if (!fresh) return null;
         const { parts: _was, ...rest } = fresh;
-        return { ...rest, ...(parts.length ? { parts } : null), updated: Date.now() };
+        return { ...rest, ...(parts.length ? { parts } : null), updated: Date.now(), editedBy: mine };
       });
       await taught();
       /* And which of them reach nobody yet, so the deck can say so at once. */
@@ -4955,7 +5012,7 @@ async function handle(req) {
         if (!fresh) return null;
         const { set: _was, ...rest } = /** @type {any} */ (fresh);
         const set = body.set === null ? null : readSet(body.set, fresh.id);
-        return { ...rest, ...(set ? { set } : null), updated: Date.now() };
+        return { ...rest, ...(set ? { set } : null), updated: Date.now(), editedBy: mine };
       });
       await taught();
       return json({ ok: true, deck: next });
@@ -4974,7 +5031,7 @@ async function handle(req) {
       if (!module || !module.personal || module.owner !== mine) return json({ error: "not-yours" }, 403);
       const practise = !!body.practise;
       await updateJson(store, K.deck(module.id), (/** @type {any} */ f) =>
-        f ? { ...f, practise, version: (f.version || 1) + 1, updated: Date.now() } : null
+        f ? { ...f, practise, version: (f.version || 1) + 1, updated: Date.now(), editedBy: mine } : null
       );
       return json({ ok: true, practise });
     }
@@ -5461,6 +5518,19 @@ async function handle(req) {
             teacherCode: role === "teacher" ? c.teacherCode : undefined,
           };
         });
+      /* Names for a course's people (0.707), so its People tab can say who
+         they are: only where the caller teaches it or manages the space,
+         looked up once for the whole answer, and never stored. */
+      const named = out.filter((c) => c.teaching || iManage);
+      if (named.length) {
+        const names = await namesOf(named.flatMap((c) => [...(c.teachers || []), ...(c.students || [])]));
+        for (const c of named) {
+          /** @type {Record<string, string>} */
+          const people = {};
+          for (const h of [...(c.teachers || []), ...(c.students || [])]) people[h] = names[h] || h;
+          c.people = people;
+        }
+      }
       return jsonTagged(req, { ok: true, courses: out });
     }
 
@@ -5597,6 +5667,20 @@ async function handle(req) {
        */
       await writeJson(store, keyOf(id), saved);
       await writeJson(store, K.sysSigned(id), { rev: saved.rev, at: Date.now(), by: mine, system: saved });
+      /* Numbers written where the space has none become the school's
+         (0.713), with no Share step: marked with the space as share-word-set
+         marks them, the clock with them. */
+      if (whose === mine && (await teachesHere()) && !(await schoolWordSet("numbers", wanted.languageId))) {
+        const now = await systemIndex(mine);
+        const lang = wanted.languageId;
+        if (now.numbers[lang]) {
+          const keys = [K.numSys(String(now.numbers[lang]))].concat(now.times[lang] ? [K.timeSys(String(now.times[lang]))] : []);
+          for (const key of keys) {
+            await updateJson(store, key, (/** @type {any} */ s) =>
+              s && !(s.spaces || []).includes(acting) ? { ...s, spaces: (s.spaces || []).concat([acting]) } : null);
+          }
+        }
+      }
       await taught();
       return json({ ok: true, system: saved, signed: saved.rev });
     }
@@ -5656,8 +5740,20 @@ async function handle(req) {
       if (!(await teachesHere())) return json({ error: "not-teaching" }, 403);
       const { pronouns, numbers } = await spaceWordSets();
       const names = await namesOf(pronouns.map((p) => p.owner).concat(numbers.map((n) => n.owner)));
+      /* The school's set of each kind, by language (0.713). */
+      /** @type {{ numbers: Record<string, string>, pronouns: Record<string, string> }} */
+      const school = { numbers: {}, pronouns: {} };
+      for (const lang of new Set(numbers.map((n) => n.lang))) {
+        const h = await schoolWordSet("numbers", lang);
+        if (h) school.numbers[lang] = h;
+      }
+      for (const lang of new Set(pronouns.map((p) => p.lang))) {
+        const h = await schoolWordSet("pronouns", lang);
+        if (h) school.pronouns[lang] = h;
+      }
       return json({
         ok: true,
+        school,
         pronouns: pronouns.map((p) => ({
           owner: p.owner,
           name: names[p.owner] || p.owner,

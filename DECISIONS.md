@@ -9413,3 +9413,110 @@ the reason 0.685 gave — a tab does not look like a `Segmented` — at the
 cost 0.699 named: tabs remain the one place where chosen is not green, and
 the outline is the darkest line on a light screen. 0.699's ordinary
 lettering and 2px track edge stay.
+
+## The end-of-session line is in plain words (0.703)
+
+The old lines only made sense to someone who knows how cards are spaced
+out. The five lines under the score on the session-complete screen keep
+their conditions and their order (`practice`, `session.due === 0`, some not
+due, all first-time right, otherwise); only the words changed.
+
+## A student's card page shows only what a student uses (0.704)
+
+The page was the teacher's readout shown to students, and its level rule
+was out of date. `Reader` gains `"student"`: everything `"both"` gets
+except `ReadKind`, the lede of "The card" and `ReadReference`. Only
+`CardScreen` passes it; the teacher's flagged-card screen keeps the default.
+`CardLadder`'s four rows became one four-part bar (`at-levelbar`, filled in
+`--jade`); `TenseLadder` is unchanged. "High priority" is renamed on the
+card screen only; filters, tiles and sessions keep the old words.
+
+## Progress shows three groups (0.705)
+
+Seven boxes, two of them (Cleared, Learnt) unexplained, answered "how am I
+doing?". `LADDER_TILES` is now three entries (`learning`, `cleared`,
+`done`), each with a one-line `note` where "Level N" was. `byBucket` is
+filled as before and gains a derived `learning` bucket (l1–l4 in order);
+the `all` bucket and tile went. Learning's list is grouped by `STATUS_RUNS`
+with `standingShort` as small print and no per-level bar, which would
+compare different climbs. One stacked `at-sharebar` above the tiles.
+
+## A teacher's first screen is Teaching (0.706)
+
+A teacher told to ask their teacher for a code assumes the invitation
+failed. `space` still starts from `loadTeaches()`; in `refreshCourses`,
+when the device had no stored answer (`teachesKey()` absent, read before
+`saveTeaches`) and the answer says they teach, Learning switches to
+Teaching — unless the person already chose (`pickedSpace`, set by
+`pickMode` and `goToSpace`), the page was opened with `?open=`, or the
+space is being tried. A stored "0" still opens Learning.
+
+## A course lists people by name, and its modules come first (0.707)
+
+Teachers could not tell students apart, and the thing they open a course
+for was at the bottom. `my-courses` adds `people` (handle → display name,
+one `namesOf` call for the whole answer) to each course the caller teaches
+or whose space they manage; never to a student, never stored. The People
+tab shows the name, the handle under it, and initials from the name. The
+Course tab's blocks are reordered: This course, Modules, Join code, Path,
+Word sets.
+
+## A course's Exercises tab shows the four presets; switches only under Custom (0.708)
+
+About 57 switches on one page, for a choice nearly every teacher makes with
+the preset. `PracticeSection` draws the same `Segmented` and saves the same
+way; under it one line per mode (`MODE_SAYS`). The rows of switches are
+drawn only when the mode is `custom`. Under a preset, switches left in
+`off` from an earlier Custom still apply (src/course-practice.ts is
+unchanged), and one `Help` line says how many.
+
+## The quality score waits until there is something to score, and is never red (0.709)
+
+A teacher's first module opened on 11 out of 100 in red. `qualityShown`
+in src/module-quality.ts: a score, and either a sentence (the `long` check
+applies exactly when there is one) or a recording (`recordings` has a share
+above 0). `QualityRing`, `QualityMark` and the module page's quality `Field`
+draw nothing below that; the ring's dash state is gone. `poor` is drawn in
+the neutral muted colour, never rose; `qualityTone` is unchanged.
+
+## New module no longer asks what kind (0.710)
+
+The first choice a teacher made was irreversible and needed two terms
+explained. `newModule()` sets the kind to "deck" and opens naming on both
+sides; the `PickSheet` of kinds and `NEW_KINDS` are gone. A unit is made
+from `PathSection`'s New unit, as it already could be. Personal sets, where
+`setsOn`, are a "New personal set" item in the Material list's `more` menu.
+A module's own screen still names its kind.
+
+## Cards and modules say who made them and who last changed them (0.711)
+
+With private drafting going away, "whose is this and who touched it?"
+needs an answer on the page. Authenticated writes that set `updated` on a
+card or module now also set `editedBy: mine` (save-card new, edit and
+pending, its module bumps, card-status, create-deck, rename-deck,
+lock-deck, set-deck-parts, save-set, set-deck-practise); migrations, sweeps
+and copies do not. `my-cards` and `my-decks` add `ownerName` and
+`editedByName` from one `namesOf` call. `madeLine` in card-facts.ts writes
+the line; `canEditModule` and `mayEditCard` are unchanged.
+
+## My space leaves Teaching (0.712)
+
+Material and My space were the same screen twice, and a new teacher had to
+choose between them before making anything. `TeachSpace` offers the
+`myspace` tab only while `hasPersonal` (a personal module or card); an
+effect moves a teacher off it once it empties. On the mine side nothing
+creates: no `onNew`, no Import, no empty-state `Nudge`; every way out stays.
+Its Word sets tab shows only with a personal pronoun card. The server, the
+`personalOnly` prop and every other mention of My space are unchanged.
+
+## One set of numbers and one of pronouns per language, for the whole school (0.713)
+
+A teacher met four ideas (my set, shared sets, sets by teacher, a chooser
+per course) for what is simply "the numbers". `schoolWordSet(kind, lang)`
+picks, among the sets `spaceWordSets()` lists for the acting space, the
+first written, with the same `firstWritten` order `reachingSets` uses.
+`wordSetPick` returns it (falling back to the earliest reaching the course)
+and no longer reads `course.wordSets`, which stays stored. `space-word-sets`
+adds `school`; `save-system` marks a teacher's numbers (and clock) with the
+space when it has none. `CourseWordSets` and its API wrappers are gone;
+`share-word-set`, `course-word-sets` and `set-course-word-set` still work.
