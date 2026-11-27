@@ -8,7 +8,7 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
-## 0.699 — 27 November 2026
+## 0.700 — 27 November 2026
 
 **A module's tile no longer counts the cards that don't reach students.**
 In Teaching › Material › Modules, the red "1 not reaching students" line is
