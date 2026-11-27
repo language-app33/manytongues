@@ -673,7 +673,7 @@ export const COMPONENT_USES = {
     { file: "spaces.tsx", line: 5608, where: "InContext" },
     { file: "spaces.tsx", line: 5611, where: "InContext" },
     { file: "spaces.tsx", line: 5853, where: "UnitChecklist" },
-    { file: "spaces.tsx", line: 6476, where: "ModulesOrCards" },
+    { file: "spaces.tsx", line: 6477, where: "ModulesOrCards" },
     { file: "spaces.tsx", line: 8876, where: "TeachSpace" },
     { file: "spaces.tsx", line: 8886, where: "TeachSpace" },
     { file: "spaces.tsx", line: 8892, where: "TeachSpace" },

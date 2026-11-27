@@ -6473,11 +6473,11 @@ function ModulesOrCards({ tab, onTab, mine, spaceName, withSets }: {
 }) {
   return (
     <>
-      <Help className="at-mb3">
-        {mine
-          ? `My space is being retired. Move what you want to keep to ${spaceName}, where you now make everything. Nothing here is deleted unless you delete it.`
-          : "Your modules, and the modules of the courses you teach. Students see a module once it's in a course."}
-      </Help>
+      {mine && (
+        <Help className="at-mb3">
+          {`My space is being retired. Move what you want to keep to ${spaceName}, where you now make everything. Nothing here is deleted unless you delete it.`}
+        </Help>
+      )}
       <Tabs
         tabs={[
           ["decks", "Modules", "folder"],

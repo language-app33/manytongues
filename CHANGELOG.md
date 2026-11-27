@@ -8,6 +8,13 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.720 — 27 November 2026
+
+**Material no longer opens with an explanation.** The sentence at the top
+of Teaching's Material page, about whose modules are listed and when
+students see them, is gone; the page starts with its Modules and Cards
+tabs.
+
 ## 0.719 — 27 November 2026
 
 **My space is gone, and what was in it is deleted.** Teaching no longer
