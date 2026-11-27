@@ -8,6 +8,19 @@ counter, not a decimal, and 1.0 is reserved for whenever the app is
 considered launched. The release lives in `package.json`'s `version` field
 and moves once per batch of work you would notice, not once per commit.
 
+## 0.712 — 27 November 2026
+
+**My space is being retired from Teaching.** Teachers now make everything in
+Material. If you have nothing in My space, its tab is gone and the bar is
+Home, Material and You. If you still have modules or cards there, the tab
+stays so you can move, copy, export or delete them, but nothing new can be
+made in it; the tab disappears once it is empty. Nothing is deleted or moved
+for you. Material's first line now says what it actually lists: your
+modules and those of the courses you teach. Trade-off: there is no longer a
+private place to draft. A card that is a Draft is still hidden from
+students, and a module in no course is still seen and changed only by the
+person who made it and administrators.
+
 ## 0.711 — 27 November 2026
 
 **Cards and modules say who made them and who last changed them.** A card's

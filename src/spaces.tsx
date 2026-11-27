@@ -6475,8 +6475,8 @@ function ModulesOrCards({ tab, onTab, mine, spaceName, withSets }: {
     <>
       <Help className="at-mb3">
         {mine
-          ? `Only you can see these. When one is ready, copy or move it to ${spaceName}.`
-          : `Shared with all of ${spaceName}'s teachers. Students see a module once it's in a course.`}
+          ? `My space is being retired. Move what you want to keep to ${spaceName}, where you now make everything. Nothing here is deleted unless you delete it.`
+          : "Your modules, and the modules of the courses you teach. Students see a module once it's in a course."}
       </Help>
       <Tabs
         tabs={[
@@ -6976,6 +6976,18 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* The languages with any word set to write, in the order they are
      taught: what the Word sets tab lists, and whether there is one. */
   const wordSetLangsOn = Object.keys(taughtOn).filter((id) => numberLangsOn.includes(id) || pronounLangsOn.includes(id));
+  /* My space is being retired (0.712): its tab is offered only while the
+     teacher still has something in it, and its Word sets only while they
+     have a pronoun of their own there. */
+  const hasPersonal = allModules.some((d) => d.personal) || allCards.some((c) => c.personal);
+  const minePronouns = allCards.some((c) => c.personal && isPronounCard(c));
+  const setsHere = wordSetLangsOn.length > 0 && (!mineSide || minePronouns);
+  useEffect(() => {
+    if (mineSide && !hasPersonal && !personalOnly) {
+      setSide("space");
+      setTab("decks");
+    }
+  }, [mineSide, hasPersonal, personalOnly]);
   /* And for making a card or a deck: with the switch on one language,
      that is the one — see langsToMakeIn. Exactly one is the only case
      where there is nothing to ask. None is not the same as one: it means
@@ -10601,7 +10613,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
            own (0.550): the same lists, one side each. Decks and Cards are
            chosen inside each. */
         ["material", "Material", "folder"],
-        ["myspace", "My space", "person"],
+        /* Only while there is something in it (0.712). */
+        ...(hasPersonal || personalOnly ? [["myspace", "My space", "person"] as [string, string, string]] : []),
         /* In context is hidden for now, on the owner's word, and comes
            back later; what it shows is still built when it is asked for. */
         ...(SHOW_IN_CONTEXT ? [["context", "In context", "search"] as [string, string, string]] : []),
@@ -10760,7 +10773,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
 
           {tab === "cards" && (
             <>
-              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets={wordSetLangsOn.length > 0} />
+              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets={setsHere} />
               {newCardLang !== null && (
                 <Screen title="New card" onBack={() => setNewCardLang(null)}>
                   <LanguageRadio
@@ -10842,7 +10855,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     ? null
                     : `${shownCards.length} of ${plural(onCards.length, "card")}`
                 }
-                more={cards.length ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
+                more={cards.length && !mineSide ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []}
                 menus={cardMenus}
                 size="small"
                 busy={busy}
@@ -10858,7 +10871,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                     )
                     : "No cards in the languages switched on."
                 }
-                emptyPanel={cards.length ? undefined : (
+                emptyPanel={cards.length || mineSide ? undefined : (
                   <Nudge
                     icon="cards"
                     action={
@@ -10879,7 +10892,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   </Nudge>
                 )}
                 match={cardMatches}
-                onNew={() => {
+                /* Nothing new is made in My space (0.712). */
+                onNew={mineSide ? undefined : () => {
                   /* Offered first in the language the switch is on, where
                      it is on one. */
                   if (mustAskOn) setNewCardLang(knownOn[0] || "");
@@ -10953,14 +10967,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
           {/* Word sets (0.689): a tab of their own beside Modules and Cards,
               where they were a row at the head of the Cards tab. Where no
               language switched on has one, Modules stands in for it. */}
-          {tab === "wordsets" && wordSetLangsOn.length > 0 && (
+          {tab === "wordsets" && setsHere && (
             <>
               <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets />
               {wordSetsTab()}
             </>
           )}
 
-          {(tab === "decks" || (tab === "wordsets" && !wordSetLangsOn.length)) && (
+          {(tab === "decks" || (tab === "wordsets" && !setsHere)) && (
             <>
               {toSpace && (
                 <ConfirmModal
@@ -11002,7 +11016,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                   }
                 />
               )}
-              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets={wordSetLangsOn.length > 0} />
+              <ModulesOrCards tab={tab} onTab={setTab} mine={mineSide} spaceName={spaceName} withSets={setsHere} />
               {moduleAction && (
                 <Screen
                   title={
@@ -11083,11 +11097,9 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 />
               )}
 
-              <Help>
-                {mineSide
-                  ? "A module is something a course learns from. Here in My space, each one is a deck: a set of cards, grouped by theme, class or objective."
-                  : "A module is a set of cards a course learns from. Students see a module once it's added to a course they belong to."}
-              </Help>
+              {mineSide ? null : (
+                <Help>A module is a set of cards a course learns from. Students see a module once it&apos;s added to a course they belong to.</Help>
+              )}
 
               <ItemList
                 noun="module"
@@ -11101,7 +11113,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 }
                 /* With no decks at all, the same prompt the Cards tab shows
                    with no cards, in place of an empty list. */
-                emptyPanel={modules.length ? undefined : (
+                emptyPanel={modules.length || mineSide ? undefined : (
                   <Nudge
                     icon="folder"
                     action={
@@ -11120,14 +11132,14 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                 )}
                 match={(d, q) => d.title.toLowerCase().includes(q)}
                 more={[
-                  ...(modules.length ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []),
+                  ...(modules.length && !mineSide ? [{ label: "Import", icon: "upload", onClick: () => setImporting(true) }] : []),
                   /* A personal set, where the space has them (0.710). */
                   ...(setsOn && !mineSide ? [{ label: "New personal set", icon: "add", onClick: () => {
                     setNewKind("set");
                     setNaming("new");
                   } }] : []),
                 ]}
-                onNew={newModule}
+                onNew={mineSide ? undefined : newModule}
                 selected={selModules}
                 onSelectedChange={setSelModules}
                 bulkActions={[

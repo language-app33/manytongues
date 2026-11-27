@@ -9498,3 +9498,13 @@ lock-deck, set-deck-parts, save-set, set-deck-practise); migrations, sweeps
 and copies do not. `my-cards` and `my-decks` add `ownerName` and
 `editedByName` from one `namesOf` call. `madeLine` in card-facts.ts writes
 the line; `canEditModule` and `mayEditCard` are unchanged.
+
+## My space leaves Teaching (0.712)
+
+Material and My space were the same screen twice, and a new teacher had to
+choose between them before making anything. `TeachSpace` offers the
+`myspace` tab only while `hasPersonal` (a personal module or card); an
+effect moves a teacher off it once it empties. On the mine side nothing
+creates: no `onNew`, no Import, no empty-state `Nudge`; every way out stays.
+Its Word sets tab shows only with a personal pronoun card. The server, the
+`personalOnly` prop and every other mention of My space are unchanged.

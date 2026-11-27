@@ -334,6 +334,8 @@ const savedSets = [];
 /** @type {any[]} */
 const madeUnits = [];
 let teacherSets = false;
+/* A module of the teacher's own in My space (0.712), where a walk asks. */
+let teacherPersonal = false;
 /* What the deck screen's Lock asked the server to do. */
 /** @type {any[]} */
 const lockedModules = [];
@@ -568,6 +570,9 @@ const fakeFetch = async (input, opts = {}) => {
             { id: "d5", title: "Our family", owner: account.handle, lang: "ar-PS", cardIds: ["k777777777777"], cardCount: 1, courses: [{ courseId: "c1", addedAt: 5 }],
               set: { wording: { question: "Who is this person to you?", none: "I don't know this person", askName: "Who is this?", askWord: "What do you call this person?", askBoth: "Their name, with what you call them" },
                 lists: [], named: [], asks: { name: true, word: true, both: true }, order: "before" } },
+          ] : []),
+          ...(teacherPersonal ? [
+            { id: "dp1", title: "My draft", owner: account.handle, lang: "ar-PS", personal: true, cardIds: [], cardCount: 0, courses: [] },
           ] : []),
         ],
       });
@@ -13241,6 +13246,58 @@ const openPronounTables = async () => {
   r.unmount();
   host.remove();
   check("and nothing threw on the path's screens", errors.length === before, errors.slice(before, before + 3).join(" | "));
+}
+
+/* ---- My space is being retired from Teaching (0.712) ----
+   A teacher with nothing in it has no My space in the bar; one with a
+   module still there has the tab, which says it is being retired and
+   offers nothing new to make. */
+{
+  const before = errors.length;
+  /** @param {boolean} personal */
+  const openTeaching = async (personal) => {
+    teacherPersonal = personal;
+    localStorage.setItem("arabic-trainer:arabic-trainer-v3", JSON.stringify({
+      version: 3, tombstones: {}, log: {}, settings: { language: "ar-PS" }, account, items: [],
+    }));
+    const host = document.createElement("div");
+    document.body.appendChild(host);
+    const r = createRoot(host);
+    r.render(React.createElement(App));
+    await sleep(1500);
+    if (!host.querySelector(".at-screen.bare")) {
+      click(host.querySelector('[data-el="where-you-are"]'));
+      await sleep(200);
+      click([...document.querySelectorAll(".at-wheremode")].find((b) => /^Teach$/.test(b.textContent || "")) || null);
+      await sleep(900);
+    }
+    const bar = () => [...document.querySelectorAll(".at-dock [role=tab]")].map((b) => (b.textContent || "").trim());
+    return { host, r, bar };
+  };
+  {
+    const { host, r, bar } = await openTeaching(false);
+    check("a teacher with nothing in My space has no My space in the bar",
+      bar().length > 0 && !bar().some((t) => /My space/.test(t)), bar().join(" | ") || "no bar");
+    r.unmount();
+    host.remove();
+  }
+  {
+    const { host, r, bar } = await openTeaching(true);
+    check("a teacher with a module still in My space keeps the tab",
+      bar().some((t) => /My space/.test(t)), bar().join(" | ") || "no bar");
+    click([...document.querySelectorAll(".at-dock [role=tab]")].find((b) => /My space/.test(b.textContent || "")) || null);
+    await sleep(600);
+    const frameText = ((host.querySelector(".at-screen.bare") || host).textContent || "").replace(/\s+/g, " ");
+    check("which says it is being retired",
+      /My space is being retired/.test(frameText), frameText.slice(0, 200));
+    check("and offers no New module",
+      ![...(host.querySelector(".at-screen.bare") || host).querySelectorAll("button")].some((b) => /^New module$/.test((b.textContent || "").trim())),
+      frameText.slice(0, 200));
+    r.unmount();
+    host.remove();
+  }
+  teacherPersonal = false;
+  check("and nothing threw on My space", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
 /* ---- personal sets are the App admin's to switch on (0.683) ----
