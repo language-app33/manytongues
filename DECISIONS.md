@@ -9571,3 +9571,39 @@ or a personal set is attached to it. The sheet is drawn at the frame's
 level, beside `MeaningSplits`, so it opens from Home as well as Material.
 "New personal set" left the Material list's `more` menu: one place to
 choose a kind. `PathSection`'s New unit stays.
+
+## One bar over a list, and a quiet line under it (0.725)
+
+Teaching › Material › Cards had two rows of controls over its list — New,
+three dots and the view button, then the search box with Select, Sort and
+Filter — and Sort and Filter opened by pushing the list down. Selecting put
+a tray of seven buttons over half a phone. The owner designed the
+replacement, and `ItemList` draws it for every list that uses it:
+
+- **One row**: New, the search box, Filter and three dots. On a phone New
+  is + alone, so the box keeps 200px; the words come back from 640px.
+- **A quiet line** under it: the count, the order and the view switch, in
+  small text rather than boxes. They are about how the list is read, not
+  what is in it, and boxes for them were the second row.
+- **Sort waits for Apply; filters apply as they are ticked.** The owner
+  chose the word Apply and chose that it mean what it says: a list
+  reordering behind the panel while someone is still choosing is a list
+  they have lost their place in. A filter is different — watching the
+  count fall is how a teacher knows they have narrowed enough — so the
+  Filter panel's button counts along ("Show 5 cards") and only shuts it.
+- **Chips on one line that scrolls sideways**, never wrapping: three
+  filters on three lines would push the list down as far as the panel did.
+- **Select is in the three dots**, first, because a phone has no room for a
+  sixth icon — except where it would be alone there (People), where it is
+  its own icon rather than dots opening onto one row. A finger held on a
+  tile also starts selecting.
+- **The search box stays while selecting**: narrowing to what is to be
+  ticked is half of selecting, and what was ticked survives a search.
+- **One Actions button** at the foot opens a panel of every bulk action,
+  each with its own picture, Delete last.
+
+The cost: Select and Import are one press further away, New is an icon on
+a phone, a new order needs Apply, and every bulk action is one press
+further. Nothing was removed. `menus` and `count` went from `ItemList`'s
+inputs for `sort`, `filter` and `total`.
+
