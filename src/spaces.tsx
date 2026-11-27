@@ -6945,18 +6945,10 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
   /* The languages with any word set to write, in the order they are
      taught: what the Word sets tab lists, and whether there is one. */
   const wordSetLangsOn = Object.keys(taughtOn).filter((id) => numberLangsOn.includes(id) || pronounLangsOn.includes(id));
-  /* My space is being retired (0.712): its tab is offered only while the
-     teacher still has something in it, and its Word sets only while they
-     have a pronoun of their own there. */
-  const hasPersonal = allModules.some((d) => d.personal) || allCards.some((c) => c.personal);
+  /* My space is gone (0.719). Its Word sets only ever showed a teacher's
+     own pronouns there. */
   const minePronouns = allCards.some((c) => c.personal && isPronounCard(c));
   const setsHere = wordSetLangsOn.length > 0 && (!mineSide || minePronouns);
-  useEffect(() => {
-    if (mineSide && !hasPersonal && !personalOnly) {
-      setSide("space");
-      setTab("decks");
-    }
-  }, [mineSide, hasPersonal, personalOnly]);
   /* And for making a card or a deck: with the switch on one language,
      that is the one — see langsToMakeIn. Exactly one is the only case
      where there is nothing to ask. None is not the same as one: it means
@@ -10530,8 +10522,8 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
            own (0.550): the same lists, one side each. Decks and Cards are
            chosen inside each. */
         ["material", "Material", "folder"],
-        /* Only while there is something in it (0.712). */
-        ...(hasPersonal || personalOnly ? [["myspace", "My space", "person"] as [string, string, string]] : []),
+        /* My space is gone (0.719): its material is deleted, and it has no tab. */
+        ...(personalOnly ? [["myspace", "My space", "person"] as [string, string, string]] : []),
         /* In context is hidden for now, on the owner's word, and comes
            back later; what it shows is still built when it is asked for. */
         ...(SHOW_IN_CONTEXT ? [["context", "In context", "search"] as [string, string, string]] : []),
@@ -11104,7 +11096,7 @@ export function TeachSpace({ account, spaceName: shownName, setsOn = false, lang
                       title={d.title}
                       /* One line under the name (0.715, the owner's 1c):
                          what in it needs looking at, who can see it, and
-                         its quality score last (0.719, the owner's wish:
+                         its quality score last (0.720, the owner's wish:
                          no ring left of the name). No score until there is
                          something to score (0.709).
                          Its language and size are off the tile (0.689),

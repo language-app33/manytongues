@@ -1186,7 +1186,7 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
 /* No rule above it (0.715, the owner's 2b): it sits under the tile's text
    at the spacing of the line of facts. */
 .at-reach { display:flex; align-items:center; gap:8px; margin-top:3px; flex-wrap:wrap; }
-/* A three-dots button with no outline (0.719, the owner's wish, on a
+/* A three-dots button with no outline (0.720, the owner's wish, on a
    module's tile): the icon alone, the 44px it can be pressed in kept. */
 .at-morebtn.bare { border-color: transparent; }
 .at-reachtext { font-size:12px; color: var(--muted); min-width:0; }

@@ -13224,7 +13224,7 @@ const openPronounTables = async () => {
     tiles.join(" | ").slice(0, 300) || "no tiles");
   /* A module's tile (0.689): no language or size under its title, and
      Export and Delete behind three dots that do not open the module when
-     pressed. Since 0.719 its quality is " · score: N" at the end of the
+     pressed. Since 0.720 its quality is " · score: N" at the end of the
      line under its name (0.715), after the courses it is in, and the
      three dots have no outline. */
   {
@@ -13256,10 +13256,9 @@ const openPronounTables = async () => {
   check("and nothing threw on the path's screens", errors.length === before, errors.slice(before, before + 3).join(" | "));
 }
 
-/* ---- My space is being retired from Teaching (0.712) ----
-   A teacher with nothing in it has no My space in the bar; one with a
-   module still there has the tab, which says it is being retired and
-   offers nothing new to make. */
+/* ---- My space is gone from Teaching (0.712, 0.719) ----
+   No teacher has My space in the bar: not one with nothing in it, and
+   not one with a module still there, which the server deletes. */
 {
   const before = errors.length;
   /** @param {boolean} personal */
@@ -13291,16 +13290,9 @@ const openPronounTables = async () => {
   }
   {
     const { host, r, bar } = await openTeaching(true);
-    check("a teacher with a module still in My space keeps the tab",
-      bar().some((t) => /My space/.test(t)), bar().join(" | ") || "no bar");
-    click([...document.querySelectorAll(".at-dock [role=tab]")].find((b) => /My space/.test(b.textContent || "")) || null);
-    await sleep(600);
-    const frameText = ((host.querySelector(".at-screen.bare") || host).textContent || "").replace(/\s+/g, " ");
-    check("which says it is being retired",
-      /My space is being retired/.test(frameText), frameText.slice(0, 200));
-    check("and offers no New module",
-      ![...(host.querySelector(".at-screen.bare") || host).querySelectorAll("button")].some((b) => /^New module$/.test((b.textContent || "").trim())),
-      frameText.slice(0, 200));
+    /* My space is gone (0.719): no tab, whatever is left in it. */
+    check("a teacher with a module still in My space has no My space either",
+      bar().length > 0 && !bar().some((t) => /My space/.test(t)), bar().join(" | ") || "no bar");
     r.unmount();
     host.remove();
   }
