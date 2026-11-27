@@ -1439,6 +1439,14 @@ span.at-picture { display:flex; align-items:center; justify-content:center; colo
   background: color-mix(in srgb, var(--accent) 18%, transparent); }
 .at-dockitem:hover, .at-docktabs .at-tab2:not(.on):hover, .at-dockitem.open { background: var(--press); }
 .at-docklabel { display:block; }
+/* A count on a section's button in the bar — what Teaching's To do holds,
+   on Home (0.690) — sits on the icon's shoulder as a small badge, rather
+   than as a third line under the name. */
+.at-docktabs .at-tabcount { position:absolute; top:5px; left:calc(50% + 6px);
+  min-width:18px; height:18px; padding:0 5px; border-radius:999px;
+  display:inline-flex; align-items:center; justify-content:center;
+  background: var(--brass); color: var(--onbrass);
+  font-size:11px; font-weight:800; line-height:1; }
 /* On a phone the pill runs the width of the window and the names come down
    a size rather than wrap when a space has more items than fit. */
 @media (max-width: 599px) {
@@ -2904,6 +2912,13 @@ button.at-deckstat { width:100%; font:inherit; color:inherit; text-align:start; 
 .at-joinsheet .at-btn { width:100%; }
 .at-emptyart { display:flex; justify-content:center; margin:0 0 var(--s4); color: var(--muted); }
 .at-chatart { display:block; width:128px; height:auto; }
+/* The cup of tea under an empty To do (0.690), the Home card's size of
+   line at a smaller scale. */
+.at-teaart { display:block; width:150px; height:auto; color: var(--text); }
+/* To do on Teaching's Home (0.690): one Nudge per thing waiting, a gap
+   between, and the buttons of each in a row that wraps on a phone. */
+.at-todolist { display:flex; flex-direction:column; gap:10px; }
+.at-todoacts { display:flex; flex-wrap:wrap; gap:8px; }
 .at-empty2 .at-hint { margin:0 auto; max-width: 46ch; }
 .at-empty2 .at-row { justify-content:center; margin-top: var(--s4); }
 /* --- Segmented: pick one of a few ---

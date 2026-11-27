@@ -9289,3 +9289,40 @@ was not worth a memo. Remove from this course and Delete unit stay where
 they were (the Courses field and the screen's Delete), so nothing is
 offered twice on one screen. The list label does not show places, so a
 whole path in order is still read on the course page.
+
+
+## Teaching's Home and its To do (0.690)
+
+**27 November 2026** · `TeachSpace`, `TodoSection` and `CoursesPage` in
+`src/spaces.tsx`; `TeaArt` and `SpaceFrame` in `src/shared.tsx`;
+`tests/smoke.mjs`
+
+The owner asked to declutter Teaching (1a 2b 3a 4b 5a 6a 7a 8b 9a 10b
+11c). The Courses tab is labelled Home; its key stays `courses`, which a
+resumed session may hold. To do (`todo`, memoised beside `waitingOn`)
+gathers what used to be said in five places: the two `TopBanner`s (lost
+recordings, imported cards waiting), the two `.at-reviewbanner` lines over
+the Cards list (sentences to review, cards with more than one meaning),
+and each course's not-reaching note, which also stays on the course.
+`MeaningSplits` now renders on any tab, since its way in is on Home.
+
+**It reads the space's side only.** Those counts are worked out from the
+side on screen (`cards`, `reviewMap`), and students only ever get the
+space's cards, so To do is null while My space is on screen, and Home's
+tab sets the side back to the space. The last count is kept (`todoKept`)
+for the badge on Home while the teacher is in My space; it is stale only
+if a card is moved into the space from there, and is right again on
+reaching Home. Working out the sentence review for both sides at once
+would double the heaviest memo in the space for a number on a button.
+
+**Student reports stay out of it** (the owner's 6a): see "Reports from
+students are the administrator's alone".
+
+**The course screen's tabs** are the page `Tabs` Material uses: Course
+(name, language, student code, path, modules), People, Exercises
+(`PracticeSection`). `courseTab` resets to Course whenever another course
+opens.
+
+**The empty state** is `Empty` with `TeaArt`, a cup drawn in the logo's
+loops and colours, its dot in the page's ink.
+

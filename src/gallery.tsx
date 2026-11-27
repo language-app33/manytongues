@@ -175,7 +175,8 @@ const PLACES: Record<string, [string, string]> = {
 
   /* Teaching */
   TeachSpace: [TEACH, "The Teaching space"],
-  CoursesPage: [TEACH, "The Courses tab"],
+  TodoSection: [TEACH, "Teaching\u2019s Home \u00b7 To do, what is waiting on you"],
+  CoursesPage: [TEACH, "Teaching\u2019s Home, under To do, and a learner\u2019s Courses"],
   CourseSettings: [TEACH, "Course settings"],
   NewModule: [TEACH, "Making a new module"],
   NumbersFrom: [TEACH, "A module's screen · whose numbers it uses"],

@@ -841,6 +841,27 @@ export function ChatArt() {
   );
 }
 
+/* --- TeaArt -------------------------------------------------------
+   A cup of tea on its saucer, steam rising, drawn as the logo is: loose
+   loops in its four colours, and its dot (0.690). For To do on Teaching's
+   Home when nothing is waiting: time for a cup. The lines carry their own
+   colours, so it reads the same in either theme; the dot follows the
+   page's ink, as the Home card's does. */
+export function TeaArt() {
+  return (
+    <svg className="at-teaart" viewBox="0 0 240 150" width="240" height="150" focusable="false">
+      <g fill="none" strokeWidth="9" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M100 46C92 36 110 28 102 14" stroke="#A99BE0" />
+        <path d="M128 46C120 36 138 28 130 14" stroke="#A99BE0" />
+        <path d="M156 75C178 68 192 84 184 98C177 110 160 110 151 101" stroke="#F7C548" />
+        <path d="M74 62C100 57 138 57 162 62C165 98 150 123 118 124C86 125 71 100 74 62Z" stroke="#FF7A59" />
+        <path d="M50 134C78 126 158 124 188 132C194 140 162 144 118 144C76 144 44 141 50 134Z" stroke="#7FD1C7" />
+      </g>
+      <circle cx="117" cy="90" r="7" fill="currentColor" />
+    </svg>
+  );
+}
+
 /* --- Nudge ---------------------------------------------------------
    "Nothing here yet", said inside an open deck or course where the
    section would otherwise be one grey line. An icon, one warm sentence,
@@ -1196,8 +1217,11 @@ export function TabTitle({ children }: { children?: Node }) {
   );
 }
 
-export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, children }: {
+export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", dialog, space, counts, children }: {
   tabs: [string, string, string?][];
+  /** A number on a tab's button in the bar: what Teaching's To do holds,
+      on Home (0.690). */
+  counts?: Record<string, number>;
   /** Which of Teaching, Admin or Super admin this is. Each tab is headed
       with its own name (0.553); the mode itself is said by where you are,
       at the title's right (0.601), so it no longer prefixes the name. */
@@ -1236,7 +1260,7 @@ export function SpaceFrame({ tabs, tab, onTab, error, busy, label = "Section", d
           {/* No app name here (0.554): each tab is headed with its own name
               below. The space's sections are in the bar at the foot. */}
           <Notice kind="error">{error}</Notice>
-          <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} dock />
+          <Tabs tabs={tabs} value={tab} onChange={onTab} label={label} counts={counts} dock />
           {/* The tab's own name at the top (0.553), in the words of the bar.
               A screen opened over the tab covers it, with its own title. */}
           {space && tabs.find((t) => t[0] === tab) ? (
